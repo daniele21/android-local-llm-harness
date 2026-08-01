@@ -65,12 +65,9 @@ class SingleDecodeScheduler(
         }
 
         val position = queue.count { candidate -> candidate.compareTo(work) <= 0 } + 1
-        try {
-            onQueued(position)
-        } catch (error: Throwable) {
-            works.remove(requestId, work)
-            throw error
-        }
+        runCatching { onQueued(position) }
+            .onFailure { works.remove(requestId, work) }
+            .getOrThrow()
         queue.put(work)
         return DecodeSubmission(
             queuePosition = position,
@@ -84,22 +81,18 @@ class SingleDecodeScheduler(
             return false
         }
 
-        if (work.started.get()) {
-            work.onRunningCancellation()
-            return true
-        }
-
-        if (queue.remove(work)) {
-            works.remove(requestId, work)
-            work.notifyQueuedCancellation()
-            return true
-        }
-
-        if (work.started.get()) {
-            work.onRunningCancellation()
+        when {
+            work.started.get() -> work.onRunningCancellation()
+            queue.remove(work) -> {
+                works.remove(requestId, work)
+                work.notifyQueuedCancellation()
+            }
+            work.started.get() -> work.onRunningCancellation()
         }
         return true
     }
+
+    fun cancelAll(): Int = works.keys.count { requestId -> cancel(requestId) }
 
     fun snapshot(): DecodeSchedulerSnapshot = DecodeSchedulerSnapshot(
         activeRequest = activeRequest.get(),
