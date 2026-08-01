@@ -75,7 +75,12 @@ jobs:
 
       - name: Run static analysis and repository guards
         shell: bash
-        run: "$GRADLE_COMMAND" --stacktrace detekt verifyNoModelArtifacts
+        run: |
+          "$GRADLE_COMMAND" \
+            --no-configuration-cache \
+            --stacktrace \
+            detekt \
+            verifyNoModelArtifacts
 
       - name: Run JVM unit tests
         shell: bash
