@@ -66,15 +66,31 @@ jobs:
             echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
           fi
 
-      - name: Validate project
+      - name: Check repository formatting
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace spotlessCheck
+
+      - name: Run static analysis and repository guards
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace detekt verifyNoModelArtifacts
+
+      - name: Run JVM unit tests
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace check
+
+      - name: Run Android Lint
         shell: bash
         run: |
           "$GRADLE_COMMAND" \
             --stacktrace \
-            qualityCheck \
-            check \
             lintDebug \
-            :apps:local-llm-console:lintInternal \
+            :apps:local-llm-console:lintInternal
+
+      - name: Build Android artifacts
+        shell: bash
+        run: |
+          "$GRADLE_COMMAND" \
+            --stacktrace \
             assembleDebug \
             :apps:local-llm-console:assembleInternal
 
