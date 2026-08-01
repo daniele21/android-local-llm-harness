@@ -1,4 +1,5 @@
 #include "gguf_metadata.h"
+#include "native_handle_registry.h"
 
 #include "gguf.h"
 #include "llama.h"
@@ -7,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 
 namespace {
@@ -34,6 +36,36 @@ bool require(bool condition, const char* expression, int line) {
 bool test_runtime_is_linked() {
     REQUIRE(llama_max_devices() > 0);
     static_cast<void>(llama_supports_mmap());
+    return true;
+}
+
+bool test_native_handle_registry() {
+    struct Value {
+        explicit Value(int input) : value(input) {}
+        int value;
+    };
+
+    NativeHandleRegistry<Value> registry;
+    REQUIRE(registry.empty());
+    REQUIRE(registry.add(nullptr) == 0);
+
+    const auto first_handle = registry.add(std::make_shared<Value>(7));
+    const auto second_handle = registry.add(std::make_shared<Value>(9));
+    REQUIRE(first_handle > 0);
+    REQUIRE(second_handle > first_handle);
+    REQUIRE(registry.size() == 2);
+    REQUIRE(registry.get(first_handle)->value == 7);
+    REQUIRE(registry.get(second_handle)->value == 9);
+    REQUIRE(!registry.get(999));
+
+    const auto acquired = registry.get(first_handle);
+    REQUIRE(registry.remove(first_handle));
+    REQUIRE(!registry.get(first_handle));
+    REQUIRE(acquired->value == 7);
+    REQUIRE(!registry.remove(first_handle));
+
+    registry.clear();
+    REQUIRE(registry.empty());
     return true;
 }
 
@@ -93,6 +125,9 @@ int main() {
     if (!test_runtime_is_linked()) {
         return 1;
     }
+    if (!test_native_handle_registry()) {
+        return 1;
+    }
     if (!test_missing_file()) {
         return 1;
     }
@@ -103,6 +138,6 @@ int main() {
         return 1;
     }
 
-    std::cout << "All native llama.cpp and GGUF metadata tests passed\n";
+    std::cout << "All native llama.cpp lifecycle and GGUF metadata tests passed\n";
     return 0;
 }
