@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(local_llm_jni LANGUAGES C CXX)
+project(local_llm_native_tests LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -7,13 +7,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 get_filename_component(
-    LLAMA_CPP_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../../../../../third_party/llama.cpp"
+    REPOSITORY_ROOT
+    "${CMAKE_CURRENT_LIST_DIR}/../../../.."
     ABSOLUTE
 )
+set(LLAMA_CPP_DIR "${REPOSITORY_ROOT}/third_party/llama.cpp")
 
 if(NOT EXISTS "${LLAMA_CPP_DIR}/CMakeLists.txt")
-    message(FATAL_ERROR "Pinned llama.cpp submodule is missing. Run git submodule update --init --recursive.")
+    message(FATAL_ERROR "Pinned llama.cpp submodule is missing")
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -29,42 +30,29 @@ set(LLAMA_TOOLS_INSTALL OFF CACHE BOOL "" FORCE)
 set(LLAMA_TESTS_INSTALL OFF CACHE BOOL "" FORCE)
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-set(GGML_BACKEND_DL ON CACHE BOOL "" FORCE)
-set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
+set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+set(GGML_CPU_ALL_VARIANTS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${LLAMA_CPP_DIR}" "${CMAKE_BINARY_DIR}/llama.cpp")
 
 add_library(
-    local_llm_jni
-    SHARED
-    gguf_metadata.cpp
-    llama_jni.cpp
-)
-
-target_compile_definitions(
-    local_llm_jni
-    PRIVATE
-    LOCAL_LLM_LLAMA_CPP_TAG="b9637"
-    LOCAL_LLM_LLAMA_CPP_COMMIT="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
+    local_llm_gguf_metadata
+    STATIC
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp/gguf_metadata.cpp"
 )
 
 target_include_directories(
-    local_llm_jni
-    PRIVATE
-    "${LLAMA_CPP_DIR}/include"
+    local_llm_gguf_metadata
+    PUBLIC
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
     "${LLAMA_CPP_DIR}/ggml/include"
 )
 
-find_library(android_lib android REQUIRED)
-find_library(log_lib log REQUIRED)
-find_library(dl_lib dl REQUIRED)
+target_link_libraries(local_llm_gguf_metadata PUBLIC ggml)
 
-target_link_libraries(
-    local_llm_jni
-    PRIVATE
-    llama
-    ggml
-    ${android_lib}
-    ${log_lib}
-    ${dl_lib}
-)
+add_executable(gguf_metadata_test gguf_metadata_test.cpp)
+target_include_directories(gguf_metadata_test PRIVATE "${LLAMA_CPP_DIR}/include")
+target_link_libraries(gguf_metadata_test PRIVATE local_llm_gguf_metadata llama)
+
+enable_testing()
+add_test(NAME gguf_metadata_test COMMAND gguf_metadata_test)

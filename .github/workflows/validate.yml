@@ -15,10 +15,25 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Run native host tests
+        shell: bash
+        run: |
+          cmake \
+            -S backends/llama-cpp/src/test-native \
+            -B build/native-tests \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-tests --parallel 2
+          ctest --test-dir build/native-tests --output-on-failure
 
       - uses: actions/setup-java@v4
         with:

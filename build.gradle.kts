@@ -89,13 +89,13 @@ tasks.register<JavaExec>("detekt") {
 
 tasks.register("verifyNoModelArtifacts") {
     group = "verification"
-    description = "Fails when GGUF/GGML model binaries are present in the repository source tree."
+    description = "Fails when project-owned GGUF/GGML model binaries are present in the repository source tree."
     notCompatibleWithConfigurationCache("The guard intentionally scans the live repository tree.")
 
     doLast {
         val forbiddenFiles = fileTree(rootDir) {
             include("**/*.gguf", "**/*.ggml")
-            exclude("**/build/**", ".gradle/**")
+            exclude("**/build/**", ".gradle/**", "third_party/**")
         }.files
 
         check(forbiddenFiles.isEmpty()) {
