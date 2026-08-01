@@ -37,7 +37,7 @@ jobs:
             "build-tools;36.0.0" \
             "ndk;28.2.13676358"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.5.0"
 
