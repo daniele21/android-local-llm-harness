@@ -7,9 +7,12 @@
 
 The project combines Android libraries, an Android application and a native C++ backend. It needs reproducible versions and quality checks without coupling the build to tools that do not yet support Android Gradle Plugin 9 reliably.
 
+Android 17/API 37 is currently a preview platform. Although Android Gradle Plugin 9.3 can compile against API 37, the standard SDK package was not consistently available from the CI SDK repository during Phase 0 validation. Android 16/API 36 is the current stable platform and satisfies the 2026 Google Play target requirement.
+
 ## Decision
 
-- Use Android Gradle Plugin 9.3.0, Gradle 9.5.0, JDK 17, Android API 37, Build Tools 36.0.0 and NDK 28.2.13676358.
+- Use Android Gradle Plugin 9.3.0, Gradle 9.5.0, JDK 17, stable Android API 36, Build Tools 36.0.0 and NDK 28.2.13676358.
+- Re-evaluate API 37 after its SDK platform package is consistently available through normal CI installation channels.
 - Use the Android Gradle Plugin built-in Kotlin support.
 - Centralize dependency and plugin versions in `gradle/libs.versions.toml`.
 - Use Spotless with ktlint for formatting.
@@ -20,13 +23,15 @@ The project combines Android libraries, an Android application and a native C++ 
 
 ## Consequences
 
+- Builds use a stable, reproducibly installable SDK platform.
 - Static analysis remains independent from AGP/Kotlin plugin compatibility.
 - Build files remain straightforward during the early module count.
 - The wrapper and all tool versions are pinned.
-- A future move to Detekt 2 or convention plugins requires a new review but not an SDK API change.
+- A future move to API 37, Detekt 2 or convention plugins requires a new review but not an SDK API change.
 
 ## Alternatives considered
 
+- Android API 37 preview: deferred because the SDK package was not reliably available to the CI runner.
 - Detekt 2 alpha Gradle plugin: rejected for Phase 0 because it is pre-stable and has AGP 9 built-in Kotlin caveats.
 - Detekt 1.x Android Gradle plugin: rejected because its compatibility matrix predates AGP 9.
 - Immediate custom convention plugins: deferred because they would initially wrap almost identical configuration without clear domain-specific variants.
