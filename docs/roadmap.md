@@ -10,6 +10,19 @@
 - [x] telemetry and dashboard contracts
 - [x] developer console shell
 
+### Repository hardening
+
+- [x] centralized and pinned build versions
+- [x] Spotless and ktlint formatting checks
+- [x] Detekt CLI and Android Lint checks
+- [x] debug, internal and release console variants
+- [x] dependency locking configuration
+- [x] CI artifact publication
+- [x] CODEOWNERS, security, versioning and ADR foundations
+- [x] model-binary repository guard
+- [ ] generated Gradle Wrapper committed
+- [ ] clean CI validation completed
+
 ## Phase 1 — functional embedded runtime
 
 - [ ] pin a llama.cpp commit
