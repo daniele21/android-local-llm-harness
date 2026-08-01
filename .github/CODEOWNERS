@@ -1,0 +1,6 @@
+* @daniele21
+
+/backends/llama-cpp/ @daniele21
+/third_party/llama.cpp/ @daniele21
+/.github/workflows/ @daniele21
+/docs/adr/ @daniele21

@@ -5,9 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +28,7 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - name: Install Android SDK components
+        shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null
           sdkmanager \
@@ -30,5 +40,48 @@ jobs:
         with:
           gradle-version: "9.5.0"
 
+      - name: Select Gradle command
+        shell: bash
+        run: |
+          if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
+            chmod +x gradlew
+            echo "GRADLE_COMMAND=./gradlew" >> "$GITHUB_ENV"
+          else
+            echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
+          fi
+
       - name: Validate project
-        run: gradle check lintDebug
+        shell: bash
+        run: |
+          "$GRADLE_COMMAND" \
+            --stacktrace \
+            qualityCheck \
+            check \
+            lintDebug \
+            :apps:local-llm-console:lintInternal \
+            assembleDebug \
+            :apps:local-llm-console:assembleInternal
+
+      - name: Upload console APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-llm-console-apks
+          path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+
+      - name: Upload Android libraries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-llm-harness-aars
+          path: "**/build/outputs/aar/*.aar"
+          if-no-files-found: warn
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: "**/build/reports/**"
+          if-no-files-found: warn

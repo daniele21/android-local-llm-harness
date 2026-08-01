@@ -1,20 +1,23 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
     namespace = "io.github.daniele21.localllm.llamacpp"
-    compileSdk = 37
-    ndkVersion = "28.2.13676358"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    buildToolsVersion = libs.versions.buildTools.get()
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
+
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=c++_shared"
                 cppFlags += listOf("-std=c++17", "-Wall", "-Wextra")
             }
         }
+
         ndk {
             abiFilters += "arm64-v8a"
         }
@@ -30,6 +33,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        lintConfig = rootProject.file("lint.xml")
+        abortOnError = true
+        htmlReport = true
+        sarifReport = true
     }
 }
 

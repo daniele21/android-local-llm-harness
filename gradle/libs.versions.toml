@@ -1,0 +1,19 @@
+[versions]
+agp = "9.3.0"
+compileSdk = "37"
+minSdk = "26"
+targetSdk = "37"
+buildTools = "36.0.0"
+ndk = "28.2.13676358"
+spotless = "8.9.0"
+detekt = "1.23.8"
+junit4 = "4.13.2"
+
+[libraries]
+detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
