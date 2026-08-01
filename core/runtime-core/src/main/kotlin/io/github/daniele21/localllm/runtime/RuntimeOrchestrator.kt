@@ -36,11 +36,13 @@ class RuntimeOrchestrator(
     private val integrityCache: ModelIntegrityCache = ModelIntegrityCache(),
     private val clock: MonotonicClock = MonotonicClock(System::nanoTime),
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
+    private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
 ) : LocalLlmClient, AutoCloseable {
     private val resourceLock = Any()
     private val state = AtomicReference(RuntimeState.IDLE)
     private val sessions = ConcurrentHashMap<SessionId, SessionDescriptor>()
     private val closed = AtomicBoolean(false)
+    private val deferredModelUnload = AtomicBoolean(false)
 
     @Volatile
     private var backendInitialized = false
@@ -184,6 +186,28 @@ class RuntimeOrchestrator(
         }
     }
 
+    fun memoryResourceSnapshot(): RuntimeMemoryResourceSnapshot {
+        val schedulerSnapshot = scheduler.snapshot()
+        return RuntimeMemoryResourceSnapshot(
+            modelLoaded = loadedModel != null,
+            activeSessions = sessions.size,
+            activeGeneration = schedulerSnapshot.activeRequest != null,
+            queuedGenerations = schedulerSnapshot.queuedRequests,
+        )
+    }
+
+    fun handleMemoryPressure(pressure: RuntimeMemoryPressure): RuntimeMemoryResult {
+        val action = memoryPolicy.decide(pressure, memoryResourceSnapshot())
+        return when (action) {
+            RuntimeMemoryAction.NONE -> RuntimeMemoryResult(action, 0, false, false)
+            RuntimeMemoryAction.UNLOAD_IDLE_MODEL -> {
+                val unloaded = unloadIdleModel()
+                RuntimeMemoryResult(action, 0, unloaded, deferred = !unloaded)
+            }
+            RuntimeMemoryAction.CANCEL_AND_RELEASE_ALL -> releaseForCriticalMemory(action)
+        }
+    }
+
     fun unloadIdleModel(): Boolean = synchronized(resourceLock) {
         val schedulerSnapshot = scheduler.snapshot()
         if (sessions.isNotEmpty() || schedulerSnapshot.activeRequest != null || schedulerSnapshot.queuedRequests != 0) {
@@ -218,6 +242,7 @@ class RuntimeOrchestrator(
                 }
             }
         }
+        deferredModelUnload.set(false)
         integrityCache.clear()
         state.set(RuntimeState.IDLE)
     }
@@ -300,8 +325,9 @@ class RuntimeOrchestrator(
                 ),
             )
         } finally {
-            if (!closed.get()) {
-                state.set(RuntimeState.READY)
+            val unloaded = attemptDeferredModelUnload(ignoreActiveGeneration = true)
+            if (!closed.get() && !unloaded) {
+                state.set(if (deferredModelUnload.get()) RuntimeState.DEGRADED else RuntimeState.READY)
             }
         }
     }
@@ -353,9 +379,55 @@ class RuntimeOrchestrator(
         if (!session.released.compareAndSet(false, true)) {
             return
         }
-        synchronized(resourceLock) {
-            backend.releaseContext(session.context)
-            sessions.remove(session.id, session)
+        val release = runCatching {
+            synchronized(resourceLock) {
+                backend.releaseContext(session.context)
+                sessions.remove(session.id, session)
+            }
+        }
+        if (release.isFailure) {
+            session.released.set(false)
+            state.set(RuntimeState.DEGRADED)
+            release.getOrThrow()
+        }
+        attemptDeferredModelUnload(ignoreActiveGeneration = false)
+    }
+
+    private fun releaseForCriticalMemory(action: RuntimeMemoryAction): RuntimeMemoryResult {
+        deferredModelUnload.set(true)
+        sessions.values.forEach { session -> session.closing.set(true) }
+        val cancelled = scheduler.cancelAll()
+        sessions.values.forEach { session ->
+            if (session.activeRequests.get() == 0) {
+                releaseSession(session)
+            }
+        }
+        val unloaded = attemptDeferredModelUnload(ignoreActiveGeneration = false)
+        if (!unloaded) {
+            state.set(RuntimeState.DEGRADED)
+        }
+        return RuntimeMemoryResult(
+            action = action,
+            cancelledRequests = cancelled,
+            modelUnloaded = unloaded,
+            deferred = !unloaded,
+        )
+    }
+
+    private fun attemptDeferredModelUnload(ignoreActiveGeneration: Boolean): Boolean {
+        if (!deferredModelUnload.get()) return false
+        return synchronized(resourceLock) {
+            val schedulerSnapshot = scheduler.snapshot()
+            val activeBlocksUnload = !ignoreActiveGeneration && schedulerSnapshot.activeRequest != null
+            if (sessions.isNotEmpty() || schedulerSnapshot.queuedRequests != 0 || activeBlocksUnload) {
+                return@synchronized false
+            }
+
+            loadedModel?.let { backend.unloadModel(it.handle) }
+            loadedModel = null
+            deferredModelUnload.set(false)
+            state.set(RuntimeState.IDLE)
+            true
         }
     }
 
