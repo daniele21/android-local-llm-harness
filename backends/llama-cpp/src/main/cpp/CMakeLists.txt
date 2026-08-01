@@ -16,6 +16,8 @@ if(NOT EXISTS "${LLAMA_CPP_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "Pinned llama.cpp submodule is missing. Run git submodule update --init --recursive.")
 endif()
 
+# Keep upstream libraries static inside the JNI shared object. CPU variants are
+# selected by ggml at runtime; the dynamic backend loader must stay disabled.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
