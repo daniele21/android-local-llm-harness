@@ -22,9 +22,4 @@ class LlamaCppBridge {
     )
 }
 
-data class NativeRuntimeStatus(
-    val linked: Boolean,
-    val runtimeVersion: String,
-    val modelProfileId: String,
-    val detail: String,
-)
+data class NativeRuntimeStatus(val linked: Boolean, val runtimeVersion: String, val modelProfileId: String, val detail: String)

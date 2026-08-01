@@ -8,18 +8,9 @@ interface LocalLlmClient {
     fun closeSession(sessionId: SessionId)
 }
 
-data class PrepareResult(
-    val ready: Boolean,
-    val modelDigest: ModelDigest?,
-    val detail: String,
-)
+data class PrepareResult(val ready: Boolean, val modelDigest: ModelDigest?, val detail: String)
 
-data class RuntimeSnapshot(
-    val state: RuntimeState,
-    val loadedModel: ModelDigest?,
-    val activeSessions: Int,
-    val queuedRequests: Int,
-)
+data class RuntimeSnapshot(val state: RuntimeState, val loadedModel: ModelDigest?, val activeSessions: Int, val queuedRequests: Int)
 
 enum class RuntimeState {
     IDLE,

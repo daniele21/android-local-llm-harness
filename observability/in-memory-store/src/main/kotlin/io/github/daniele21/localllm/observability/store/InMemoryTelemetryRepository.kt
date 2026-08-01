@@ -8,10 +8,7 @@ import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import java.util.ArrayDeque
 
-class InMemoryTelemetryRepository(
-    private val maxRuns: Int = 500,
-    private val maxLogs: Int = 2_000,
-) : TelemetryRepository {
+class InMemoryTelemetryRepository(private val maxRuns: Int = 500, private val maxLogs: Int = 2_000) : TelemetryRepository {
     private val lock = Any()
     private val runs = ArrayDeque<GenerationRunRecord>()
     private val logs = ArrayDeque<StructuredLog>()

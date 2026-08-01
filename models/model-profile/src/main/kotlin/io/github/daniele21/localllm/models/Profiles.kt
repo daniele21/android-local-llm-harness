@@ -77,8 +77,4 @@ interface ModelProfileRegistry {
     fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase
 }
 
-data class ResolvedUseCase(
-    val binding: AppModelBinding,
-    val useCase: UseCaseProfile,
-    val model: GgufModelProfile,
-)
+data class ResolvedUseCase(val binding: AppModelBinding, val useCase: UseCaseProfile, val model: GgufModelProfile)

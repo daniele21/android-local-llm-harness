@@ -18,9 +18,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-class RuntimeOrchestrator(
-    private val registry: ModelProfileRegistry,
-) : LocalLlmClient {
+class RuntimeOrchestrator(private val registry: ModelProfileRegistry) : LocalLlmClient {
     private val state = AtomicReference(RuntimeState.IDLE)
     private val sessions = ConcurrentHashMap<SessionId, SessionDescriptor>()
 
@@ -61,26 +59,23 @@ class RuntimeOrchestrator(
         return id
     }
 
-    override fun generate(
-        request: GenerationRequest,
-        listener: GenerationListener,
-    ): GenerationHandle {
+    override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle {
         val session = sessions[request.sessionId]
         if (session == null) {
             listener.onEvent(
                 GenerationEvent.Failed(
                     requestId = request.requestId,
                     error = LocalLlmError.Configuration("Unknown session ${request.sessionId.value}"),
-                )
+                ),
             )
         } else {
             listener.onEvent(
                 GenerationEvent.Failed(
                     requestId = request.requestId,
                     error = LocalLlmError.NativeRuntime(
-                        "Runtime scaffold is active, but llama.cpp inference is not linked yet"
+                        "Runtime scaffold is active, but llama.cpp inference is not linked yet",
                     ),
-                )
+                ),
             )
         }
         return NoOpGenerationHandle(request.requestId)
@@ -90,14 +85,9 @@ class RuntimeOrchestrator(
         sessions.remove(sessionId)
     }
 
-    private data class SessionDescriptor(
-        val applicationId: ApplicationId,
-        val useCaseId: UseCaseId,
-    )
+    private data class SessionDescriptor(val applicationId: ApplicationId, val useCaseId: UseCaseId)
 }
 
-private class NoOpGenerationHandle(
-    override val requestId: RequestId,
-) : GenerationHandle {
+private class NoOpGenerationHandle(override val requestId: RequestId) : GenerationHandle {
     override fun cancel() = Unit
 }

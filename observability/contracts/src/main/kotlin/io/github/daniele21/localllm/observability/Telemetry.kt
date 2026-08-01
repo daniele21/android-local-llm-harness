@@ -43,12 +43,7 @@ data class StructuredLog(
 
 enum class LogLevel { DEBUG, INFO, WARN, ERROR }
 
-data class HealthCheckResult(
-    val id: String,
-    val status: HealthStatus,
-    val detail: String,
-    val durationMs: Long,
-)
+data class HealthCheckResult(val id: String, val status: HealthStatus, val detail: String, val durationMs: Long)
 
 enum class HealthStatus { PASS, WARN, FAIL, NOT_RUN }
 

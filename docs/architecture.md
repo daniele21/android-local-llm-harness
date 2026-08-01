@@ -13,7 +13,7 @@ Native app / Capacitor plugin
       |       |       |
  App registry |   Telemetry sink
       |       |
- Model profile| 
+ Model profile|
       |    Model store
       |       |
       +--- llama.cpp JNI ---> GGUF

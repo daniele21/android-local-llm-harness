@@ -12,24 +12,11 @@ interface ModelStore {
     fun snapshot(): ModelStoreSnapshot
 }
 
-data class StoredModel(
-    val digest: ModelDigest,
-    val file: File,
-    val sizeBytes: Long,
-    val verified: Boolean,
-)
+data class StoredModel(val digest: ModelDigest, val file: File, val sizeBytes: Long, val verified: Boolean)
 
-data class VerificationResult(
-    val valid: Boolean,
-    val actualDigest: ModelDigest?,
-    val detail: String,
-)
+data class VerificationResult(val valid: Boolean, val actualDigest: ModelDigest?, val detail: String)
 
-data class ModelStoreSnapshot(
-    val modelCount: Int,
-    val totalBytes: Long,
-    val entries: List<StoredModel>,
-)
+data class ModelStoreSnapshot(val modelCount: Int, val totalBytes: Long, val entries: List<StoredModel>)
 
 object ModelStoreLayout {
     fun relativeArtifactPath(digest: ModelDigest): String {
