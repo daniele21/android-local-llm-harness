@@ -40,7 +40,7 @@ add_library(
     local_llm_jni
     SHARED
     gguf_metadata.cpp
-    llama_jni.cpp
+    llama_jni_entry.cpp
 )
 
 target_compile_definitions(
