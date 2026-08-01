@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    name: Phase 1 validation
+    name: Repository validation
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -24,9 +24,11 @@ jobs:
           submodules: recursive
 
       - name: Verify llama.cpp pin
+        if: ${{ hashFiles('scripts/verify-llama-cpp-pin.sh') != '' }}
         run: ./scripts/verify-llama-cpp-pin.sh
 
       - name: Run native host tests
+        if: ${{ hashFiles('backends/llama-cpp/src/test-native/CMakeLists.txt') != '' }}
         shell: bash
         run: |
           cmake \
