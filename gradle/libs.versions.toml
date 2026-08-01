@@ -1,8 +1,8 @@
 [versions]
 agp = "9.3.0"
-compileSdk = "37"
+compileSdk = "36"
 minSdk = "26"
-targetSdk = "37"
+targetSdk = "36"
 buildTools = "36.0.0"
 ndk = "28.2.13676358"
 spotless = "8.9.0"
