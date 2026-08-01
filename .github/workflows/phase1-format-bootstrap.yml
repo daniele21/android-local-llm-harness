@@ -1,0 +1,56 @@
+name: Phase 1 Format Bootstrap
+
+on:
+  push:
+    branches: [agent/phase-1-native-runtime]
+    paths:
+      - .github/phase1-format-bootstrap-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply pinned repository formatter
+        run: ./gradlew --no-configuration-cache spotlessApply
+
+      - name: Commit formatting changes
+        shell: bash
+        run: |
+          git diff --check
+
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Repository is already formatted."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply Phase 1 repository formatting"
+          git push
