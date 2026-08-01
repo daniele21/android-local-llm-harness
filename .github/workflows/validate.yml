@@ -14,11 +14,29 @@ concurrency:
 
 jobs:
   build:
+    name: Repository validation
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        if: ${{ hashFiles('scripts/verify-llama-cpp-pin.sh') != '' }}
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Run native host tests
+        if: ${{ hashFiles('backends/llama-cpp/src/test-native/CMakeLists.txt') != '' }}
+        shell: bash
+        run: |
+          cmake \
+            -S backends/llama-cpp/src/test-native \
+            -B build/native-tests \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-tests --parallel 2
+          ctest --test-dir build/native-tests --output-on-failure
 
       - uses: actions/setup-java@v4
         with:
@@ -51,15 +69,31 @@ jobs:
             echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
           fi
 
-      - name: Validate project
+      - name: Check repository formatting
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace spotlessCheck
+
+      - name: Run static analysis and repository guards
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace detekt verifyNoModelArtifacts
+
+      - name: Run JVM unit tests
+        shell: bash
+        run: "$GRADLE_COMMAND" --stacktrace check
+
+      - name: Run Android Lint
         shell: bash
         run: |
           "$GRADLE_COMMAND" \
             --stacktrace \
-            qualityCheck \
-            check \
             lintDebug \
-            :apps:local-llm-console:lintInternal \
+            :apps:local-llm-console:lintInternal
+
+      - name: Build Android artifacts
+        shell: bash
+        run: |
+          "$GRADLE_COMMAND" \
+            --stacktrace \
             assembleDebug \
             :apps:local-llm-console:assembleInternal
 
