@@ -104,13 +104,12 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
         return GgufInspectionResult.Failure(GgufInspectionError(code = code, message = response[2]))
     }
 
-    private fun protocolFailure(message: String): GgufInspectionResult.Failure =
-        GgufInspectionResult.Failure(
-            GgufInspectionError(
-                code = GgufInspectionErrorCode.NATIVE_PROTOCOL,
-                message = message,
-            ),
-        )
+    private fun protocolFailure(message: String): GgufInspectionResult.Failure = GgufInspectionResult.Failure(
+        GgufInspectionError(
+            code = GgufInspectionErrorCode.NATIVE_PROTOCOL,
+            message = message,
+        ),
+    )
 
     private companion object {
         const val SUCCESS_FIELD_COUNT = 9

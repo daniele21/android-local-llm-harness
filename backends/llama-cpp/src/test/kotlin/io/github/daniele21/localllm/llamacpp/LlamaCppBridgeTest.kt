@@ -4,11 +4,11 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.models.ArtifactSource
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class LlamaCppBridgeTest {
     @Test
