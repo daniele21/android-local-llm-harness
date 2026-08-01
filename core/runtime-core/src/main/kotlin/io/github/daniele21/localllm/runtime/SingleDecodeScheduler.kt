@@ -49,6 +49,7 @@ class SingleDecodeScheduler(
         task: () -> Unit,
         onQueuedCancellation: () -> Unit,
         onRunningCancellation: () -> Unit,
+        onQueued: (position: Int) -> Unit = {},
     ): DecodeSubmission {
         check(!closed.get()) { "Decode scheduler is closed" }
         val work = ScheduledWork(
@@ -63,9 +64,16 @@ class SingleDecodeScheduler(
             "A decode request with ID ${requestId.value} is already scheduled"
         }
 
+        val position = queue.count { candidate -> candidate.compareTo(work) <= 0 } + 1
+        try {
+            onQueued(position)
+        } catch (error: Throwable) {
+            works.remove(requestId, work)
+            throw error
+        }
         queue.put(work)
         return DecodeSubmission(
-            queuePosition = queue.count { candidate -> candidate.compareTo(work) <= 0 },
+            queuePosition = position,
             handle = SchedulerHandle(requestId, this),
         )
     }
