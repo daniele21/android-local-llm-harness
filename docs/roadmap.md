@@ -20,8 +20,8 @@
 - [x] CI artifact publication
 - [x] CODEOWNERS, security, versioning and ADR foundations
 - [x] model-binary repository guard
-- [ ] generated Gradle Wrapper committed
-- [ ] clean CI validation completed
+- [x] generated Gradle Wrapper committed and checksum-validated
+- [x] clean CI validation completed
 
 ## Phase 1 — functional embedded runtime
 
