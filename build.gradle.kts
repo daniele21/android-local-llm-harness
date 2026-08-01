@@ -66,6 +66,7 @@ val detektInputs = providers.provider {
 tasks.register<JavaExec>("detekt") {
     group = "verification"
     description = "Runs Detekt CLI without coupling it to the Android Gradle Plugin."
+    notCompatibleWithConfigurationCache("Detekt CLI inputs are assembled from the repository source tree.")
     classpath = detektCli
     mainClass.set("io.gitlab.arturbosch.detekt.cli.Main")
 
@@ -89,6 +90,7 @@ tasks.register<JavaExec>("detekt") {
 tasks.register("verifyNoModelArtifacts") {
     group = "verification"
     description = "Fails when GGUF/GGML model binaries are present in the repository source tree."
+    notCompatibleWithConfigurationCache("The guard intentionally scans the live repository tree.")
 
     doLast {
         val forbiddenFiles = fileTree(rootDir) {
