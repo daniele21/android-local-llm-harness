@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: validate-${{ github.ref }}
@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-java@v4
         with:
@@ -41,20 +43,24 @@ jobs:
         with:
           gradle-version: "9.5.0"
 
-      - name: Select Gradle command
+      - name: Apply and commit initial formatting
         shell: bash
         run: |
-          if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
-            chmod +x gradlew
-            echo "GRADLE_COMMAND=./gradlew" >> "$GITHUB_ENV"
-          else
-            echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
+          ./gradlew --no-configuration-cache spotlessApply
+          git diff --check
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Apply repository formatting"
+            git push
           fi
 
       - name: Validate project
         shell: bash
         run: |
-          "$GRADLE_COMMAND" \
+          ./gradlew \
             --stacktrace \
             qualityCheck \
             check \
