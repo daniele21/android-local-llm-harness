@@ -40,16 +40,16 @@ The harness never silently substitutes another model. Declared fallbacks, when a
 ## Build prerequisites
 
 - JDK 17
-- Android SDK API 37
+- Android SDK API 36
 - Android Build Tools 36.0.0
 - Android NDK 28.2.13676358
-- Gradle 9.5.0
+- Gradle 9.5.0 through the committed wrapper
 
-The repository uses Android Gradle Plugin 9.3.0 and its built-in Kotlin support.
+The repository uses Android Gradle Plugin 9.3.0 and its built-in Kotlin support. Android API 36 is the stable reproducible build target; API 37 remains a preview platform and will be adopted only when the required SDK package is consistently available in CI.
 
 ## Current state
 
-This first commit establishes module boundaries, contracts, a compilable JNI stub and a minimal developer console. The actual `llama.cpp` source is intentionally not vendored yet; see [`third_party/llama.cpp/README.md`](third_party/llama.cpp/README.md).
+The repository establishes module boundaries, contracts, a compilable JNI stub, a minimal developer console and the Phase 0 build-quality foundation. The actual `llama.cpp` source is intentionally not vendored yet; see [`third_party/llama.cpp/README.md`](third_party/llama.cpp/README.md).
 
 ## Roadmap
 
@@ -61,4 +61,4 @@ This first commit establishes module boundaries, contracts, a compilable JNI stu
 6. Create the Capacitor plugin adapter.
 7. Add a Binder transport and promote the console app into the shared runtime host.
 
-See [`docs/architecture.md`](docs/architecture.md) and [`docs/roadmap.md`](docs/roadmap.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md) and [`docs/roadmap.md`](docs/roadmap.md).
