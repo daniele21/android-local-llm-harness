@@ -51,8 +51,24 @@ target_include_directories(
 target_link_libraries(local_llm_gguf_metadata PUBLIC ggml)
 
 add_executable(gguf_metadata_test gguf_metadata_test.cpp)
-target_include_directories(gguf_metadata_test PRIVATE "${LLAMA_CPP_DIR}/include")
+target_include_directories(
+    gguf_metadata_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+    "${LLAMA_CPP_DIR}/include"
+)
 target_link_libraries(gguf_metadata_test PRIVATE local_llm_gguf_metadata llama)
+
+add_executable(native_cancellation_registry_test native_cancellation_registry_test.cpp)
+target_include_directories(
+    native_cancellation_registry_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+)
+
+find_package(Threads REQUIRED)
+target_link_libraries(native_cancellation_registry_test PRIVATE Threads::Threads)
 
 enable_testing()
 add_test(NAME gguf_metadata_test COMMAND gguf_metadata_test)
+add_test(NAME native_cancellation_registry_test COMMAND native_cancellation_registry_test)
