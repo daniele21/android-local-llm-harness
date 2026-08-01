@@ -30,4 +30,5 @@ dependencies {
     implementation(project(":models:model-store"))
     implementation(project(":backends:llama-cpp"))
     implementation(project(":observability:contracts"))
+    testImplementation(libs.junit4)
 }
