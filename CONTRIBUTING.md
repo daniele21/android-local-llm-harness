@@ -3,7 +3,7 @@
 ## Development prerequisites
 
 - JDK 17
-- Android SDK API 37
+- Android SDK API 36
 - Android Build Tools 36.0.0
 - Android NDK 28.2.13676358
 
@@ -14,8 +14,6 @@ Use the committed Gradle wrapper for every local and CI build.
 ```bash
 ./gradlew qualityCheck check lintDebug assembleDebug
 ```
-
-The first repository bootstrap may temporarily use an installed Gradle 9.5.0 distribution only to generate and commit the wrapper.
 
 ## Formatting and static analysis
 
