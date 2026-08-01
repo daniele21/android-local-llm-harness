@@ -141,7 +141,7 @@ class SingleDecodeScheduler(
                     work.task()
                 }
             } finally {
-                activeRequest.compareAndSet(work.requestId, null)
+                activeRequest.set(null)
                 works.remove(work.requestId, work)
             }
         }
