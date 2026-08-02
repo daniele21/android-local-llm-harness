@@ -7,12 +7,15 @@ This file is the stable entry point for coding agents working in this repository
 Read these documents before making a non-trivial change:
 
 1. [`README.md`](README.md) — product purpose, toolchain and top-level module map.
-2. [`docs/architecture.md`](docs/architecture.md) — data plane, control plane and runtime boundaries.
-3. [`docs/roadmap.md`](docs/roadmap.md) — current status and next priorities.
-4. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
-5. [`docs/definition-of-done.md`](docs/definition-of-done.md) — repository-wide completion requirements.
-6. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) — real-device GGUF validation.
-7. [`docs/adr/README.md`](docs/adr/README.md) — architectural decision records.
+2. [`BRANCHING.md`](BRANCHING.md) — canonical implementation line, pull-request and branch discipline.
+3. [`docs/architecture.md`](docs/architecture.md) — data plane, control plane and runtime boundaries.
+4. [`docs/roadmap.md`](docs/roadmap.md) — current status and next priorities.
+5. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
+6. [`docs/definition-of-done.md`](docs/definition-of-done.md) — repository-wide completion requirements.
+7. [`docs/api-usage.md`](docs/api-usage.md) — implemented embedded API, lifecycle and usage examples.
+8. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) — real-device GGUF validation.
+9. [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) — privacy-safe acceptance-evidence collection.
+10. [`docs/adr/README.md`](docs/adr/README.md) — architectural decision records.
 
 When sources disagree, use this precedence:
 
@@ -56,6 +59,7 @@ The harness must never silently select or substitute a model.
 - Prefer composition and dependency injection over global mutable state.
 - Add a module only for a real responsibility, dependency boundary, reuse boundary or independently testable behavior.
 - Do not create generic utilities without a clear domain concept merely to remove duplication.
+- Keep one canonical implementation line per active phase; do not revive superseded branches or PRs.
 
 ## Repository map
 
@@ -72,12 +76,16 @@ The harness must never silently select or substitute a model.
 | `apps/local-llm-console` | Developer console and future control plane | Diagnostics UI and runtime inspection |
 | `apps/device-test-runner` | Real-device Phase 1 validation app | GGUF lifecycle, cancellation and memory instrumentation tests |
 | `third_party/llama.cpp` | Pinned upstream submodule | Controlled pin updates only |
-| `scripts` | Reproducible repository and device validation | CI guards and host runners |
-| `docs` | Architecture, plan, roadmap, ADRs and operations | Durable decisions and guidance |
+| `scripts` | Reproducible repository and device validation | CI guards, host runners and evidence capture |
+| `docs` | Architecture, plan, roadmap, ADRs, API and operations | Durable decisions and guidance |
 
 `settings.gradle.kts` is authoritative for the Gradle module list. Run `python3 scripts/verify-agent-navigation.py` after adding, removing or renaming a module.
 
 ## Task routing
+
+### Branch, pull-request or release-line change
+
+Start with [`BRANCHING.md`](BRANCHING.md) and inspect all open pull requests before creating another implementation branch. Do not create parallel work for a responsibility already owned by an active PR. Keep Dependabot and other dependency-only updates separate from functional runtime changes.
 
 ### Public contract change
 
@@ -103,31 +111,35 @@ Start with `observability/contracts`. Store identifiers, sizes, timings, token c
 
 ### Android or Capacitor integration
 
-Keep product behavior in core modules and integrations thin. Do not duplicate model resolution, generation policy, validation, error mapping or telemetry across surfaces.
+Keep product behavior in core modules and integrations thin. Do not duplicate model resolution, generation policy, validation, error mapping or telemetry across surfaces. Keep [`docs/api-usage.md`](docs/api-usage.md) aligned with public API and lifecycle behavior.
 
 ### Real-device validation change
 
-Start in `apps/device-test-runner`, `scripts/run-device-e2e.sh` and [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md). Keep GGUF files outside the repository and APKs. Device checks must use production store, runtime and backend implementations rather than test doubles.
+Start in `apps/device-test-runner`, `scripts/run-device-e2e.sh`, `scripts/capture-device-e2e-evidence.sh`, [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md). Keep GGUF files outside the repository, APKs and evidence bundles. Device checks must use production store, runtime and backend implementations rather than test doubles.
 
 ## Change workflow
 
-1. Inspect the relevant contracts, implementation, tests and documentation.
-2. Identify the module that owns the behavior.
-3. Implement the smallest coherent change without speculative abstractions.
-4. Add tests for normal, failure, cancellation and lifecycle paths as applicable.
-5. Run targeted checks while iterating.
-6. Run the complete relevant validation before merge.
-7. Update the correct source of truth in the same change.
-8. Keep commits focused and describe behavior rather than file movement.
+1. Confirm the canonical base and active pull request in `BRANCHING.md` and GitHub.
+2. Inspect the relevant contracts, implementation, tests and documentation.
+3. Identify the module that owns the behavior.
+4. Implement the smallest coherent change without speculative abstractions.
+5. Add tests for normal, failure, cancellation and lifecycle paths as applicable.
+6. Run targeted checks while iterating.
+7. Run the complete relevant validation before merge.
+8. Update the correct source of truth in the same change.
+9. Keep commits focused and describe behavior rather than file movement.
 
 Do not mark a roadmap item complete before its acceptance criteria and required evidence are satisfied.
 
 ## Validation commands
 
-### Repository navigation
+### Repository navigation and shell runners
 
 ```bash
 python3 scripts/verify-agent-navigation.py
+find scripts -type f -name '*.sh' -exec bash -n {} \;
+bash scripts/run-device-e2e.sh --help
+bash scripts/capture-device-e2e-evidence.sh --help
 ```
 
 ### Kotlin and JVM
@@ -157,16 +169,17 @@ cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
 ```
 
-### Real Android device
+### Real Android device acceptance evidence
 
 ```bash
-bash scripts/run-device-e2e.sh \
+bash scripts/capture-device-e2e-evidence.sh \
   --model /absolute/path/to/model.gguf \
   --architecture <architecture> \
-  --quantization <quantization>
+  --quantization <quantization> \
+  --memory-repeat 5
 ```
 
-Add `--memory-repeat 5` for repeated lifecycle and PSS regression validation. Real-device evidence is required for changes touching native loading, generation, cancellation, memory management, ABI packaging or JNI behavior.
+Real-device evidence is required for changes touching native loading, generation, cancellation, memory management, ABI packaging or JNI behavior.
 
 ## Testing expectations
 
@@ -182,13 +195,14 @@ Add `--memory-repeat 5` for repeated lifecycle and PSS regression validation. Re
 
 | Change | Documentation to update |
 | --- | --- |
+| Branch, PR stacking or merge process | `BRANCHING.md`, and this guide when routing changes |
 | Module boundary or dependency direction | `docs/architecture.md`, usually an ADR, and this guide |
-| New public API or lifecycle behavior | Feature documentation and `docs/implementation-plan.md` when scope changes |
+| New public API or lifecycle behavior | `docs/api-usage.md` and `docs/implementation-plan.md` when scope changes |
 | Completed or deferred work | `docs/roadmap.md` |
 | Irreversible architectural choice | New ADR and ADR index |
 | New validation command or guard | This guide, relevant operational document and CI |
 | New module | `settings.gradle.kts`, repository map, tests and architecture docs |
-| Device test behavior or arguments | `docs/device-e2e-testing.md` and `scripts/run-device-e2e.sh` |
+| Device test behavior or arguments | `docs/device-e2e-testing.md`, `docs/device-e2e-evidence.md` and related scripts |
 | Feature completion | `docs/definition-of-done.md` and feature-specific evidence |
 
 ## Maintaining `AGENTS.md`
@@ -217,6 +231,7 @@ Pause and surface the issue rather than improvising when:
 - a model or upstream native dependency would need to be committed directly;
 - a change requires exposing backend-native state through public APIs;
 - tests show unbounded memory growth, use-after-close, data races or unrecoverable runtime state;
-- required Android/NDK tooling or real-device validation is unavailable.
+- required Android/NDK tooling or real-device validation is unavailable;
+- a proposed branch or PR duplicates an active implementation line.
 
 A partial, explicitly documented result is preferable to claiming completion without required evidence.
