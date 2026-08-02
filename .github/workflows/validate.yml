@@ -3,7 +3,8 @@ name: Validate
 on:
   push:
     branches: [main]
-  pull_request:
+  pull_request: {}
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -27,11 +28,9 @@ jobs:
         run: python3 scripts/verify-agent-navigation.py
 
       - name: Verify llama.cpp pin
-        if: ${{ hashFiles('scripts/verify-llama-cpp-pin.sh') != '' }}
         run: ./scripts/verify-llama-cpp-pin.sh
 
       - name: Run native host tests
-        if: ${{ hashFiles('backends/llama-cpp/src/test-native/CMakeLists.txt') != '' }}
         shell: bash
         run: |
           cmake \
