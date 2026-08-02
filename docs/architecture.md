@@ -70,3 +70,115 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - Prompt/output persistence is disabled by default.
 - Native handles are never exposed outside the backend module.
 - Large payloads will not cross the future Binder boundary inline.
+- State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
+- Cancellation and partial failures must leave the runtime recoverable.
+
+## Modularity and maintainability
+
+The codebase must remain modular, extensible and independently testable without becoming fragmented into speculative modules.
+
+Dependencies follow this direction:
+
+```text
+apps / integrations
+        |
+     transports
+        |
+ core contracts + runtime orchestration
+        |
+ model profiles + model store + observability contracts
+        |
+ backend interfaces
+        |
+ llama.cpp Kotlin bridge / JNI / C++ implementation
+```
+
+Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
+
+The main ownership boundaries are:
+
+```text
+core/contracts
+    public contracts and backend-independent DTOs
+
+core/runtime-core
+    orchestration, sessions, scheduling and lifecycle
+
+models/model-profile
+    model, use-case and application binding configuration
+
+models/model-store
+    artifact storage, identity and integrity
+
+backends/llama-cpp
+    Kotlin/JNI/C++ implementation specific to llama.cpp
+
+transports
+    in-process communication now and Binder later
+
+observability
+    metrics, logs, health, benchmarks and diagnostic state
+
+integrations
+    thin native Android and Capacitor adapters
+
+apps
+    developer console and sample applications
+```
+
+A new module is justified only when it owns a real responsibility, creates a necessary dependency boundary, provides actual reuse, isolates a platform or third-party dependency, or needs an independent testing/release boundary.
+
+Do not introduce empty modules merely to anticipate the target architecture. Do not solve duplication by moving unrelated code into generic utility packages. Shared abstractions must represent a clear domain concept.
+
+Public APIs must remain small and stable. Backend, transport, model store, scheduler, telemetry store and cache policies should be replaceable behind explicit interfaces when replacement is part of the architecture.
+
+## Shared generation engine
+
+Synchronous generation and streaming must share the same underlying generation behavior:
+
+- prompt and chat-template preparation;
+- tokenization;
+- context-limit validation;
+- sampler construction;
+- prefill;
+- decode;
+- token-to-text conversion;
+- stop-condition handling;
+- metric collection;
+- typed error mapping;
+- temporary resource ownership and cleanup.
+
+They differ only in how output is delivered and how cancellation is surfaced to the caller.
+
+The JNI boundary must remain coarse-grained. Avoid crossing JNI once per token when output can be aggregated safely.
+
+Native code should be split by responsibility and linked through CMake. The target decomposition is conceptually:
+
+```text
+backend_runtime
+model_registry
+context_registry
+gguf_inspector
+tokenizer
+sampler_factory
+generation_engine
+streaming_sink
+cancellation_registry
+jni_converters
+jni_entrypoints
+```
+
+This is an ownership map, not a requirement to create empty files. Components should be extracted when the corresponding responsibility has concrete behavior and tests.
+
+Do not include implementation `.cpp` files from other `.cpp` files to share logic.
+
+## Architectural change policy
+
+A change that alters module ownership, dependency direction, public contracts, native resource ownership, model identity, transport boundaries or privacy defaults requires:
+
+1. updated architecture documentation;
+2. an ADR when the decision materially constrains future implementations;
+3. updated tests and validation evidence;
+4. updated coding-agent navigation when paths or ownership change.
+
+The repository-wide completion rules are defined in [`definition-of-done.md`](definition-of-done.md).
