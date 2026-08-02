@@ -74,6 +74,8 @@ Native code must be split by responsibility and linked normally through CMake. D
 - Model-store changes test interruption, duplicate import and integrity failure where relevant.
 - Native changes include C++ tests for pure native behavior and Kotlin tests for the bridge contract.
 - Android/JNI/ABI changes are validated on an `arm64-v8a` device with a real supported GGUF before production readiness is claimed.
+- Real-device validation uses the production model store, runtime orchestrator and backend rather than fake implementations.
+- Device evidence includes GGUF inspection, import verification, load, context creation, streaming generation, cancellation, release, unload and shutdown.
 
 ## Validation completion
 
@@ -86,12 +88,24 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
 ```
 
 CI must pass from a clean checkout with the pinned JDK, Android SDK, NDK, Gradle and `llama.cpp` source.
+
+Changes that affect Android native loading, GGUF compatibility, generation, cancellation, memory ownership or ABI packaging additionally require:
+
+```bash
+bash scripts/run-device-e2e.sh \
+  --model /absolute/path/to/model.gguf \
+  --architecture <architecture> \
+  --quantization <quantization>
+```
+
+Use `--memory-repeat` with a device-specific PSS budget when the change can affect model, context or native allocation lifetime. Store the device/model matrix and test output as review evidence; do not commit the GGUF.
 
 ## Observability and privacy completion
 
@@ -110,6 +124,7 @@ The same change updates the appropriate source of truth:
 - completed, deferred or remaining work in `docs/roadmap.md`;
 - durable architectural decisions in `docs/adr/`;
 - coding-agent navigation, module ownership or validation commands in `AGENTS.md`;
+- device procedure and evidence requirements in `docs/device-e2e-testing.md`;
 - public usage documentation and examples when APIs change.
 
 Feature documentation must cover, as applicable:
