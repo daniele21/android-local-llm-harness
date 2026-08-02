@@ -55,7 +55,7 @@ Phase 1 is functionally implemented but is not production-ready until all items 
 - [x] add a repository guard for agent-document links and module discoverability
 - [x] document modularity and repository-wide Definition of Done
 - [ ] complete cumulative pull-request validation from a clean checkout
-- [ ] reconcile the Phase 1 branch with the latest `main` history
+- [x] reconcile the Phase 1 branch with the latest `main` history
 - [ ] run the end-to-end lifecycle on a real Android `arm64-v8a` device with a supported GGUF
 - [ ] verify repeated load/unload and generation do not show unbounded memory growth
 - [ ] verify cancellation during prefill and decode on device
