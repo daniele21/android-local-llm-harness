@@ -11,6 +11,7 @@ Pull request #13 and `agent/phase-1-consolidation` are the only active Phase 1 i
 Run #142 on commit `eea01c1492f1be66b1b0b6b6a2175e5a9de11e2f` completed successfully from a clean checkout. The current pull-request head must remain green after every subsequent documentation or tooling change.
 
 - [x] coding-agent navigation and llama.cpp pin guards
+- [x] shell-runner syntax and help-path validation
 - [x] native host configuration, compilation and tests
 - [x] Spotless and ktlint formatting checks
 - [x] Detekt static analysis and model-artifact repository guard
@@ -54,6 +55,13 @@ bash scripts/capture-device-e2e-evidence.sh \
   --quantization <quantization> \
   --memory-repeat 5
 ```
+
+### Embedded API documentation
+
+- [x] document public contracts, explicit model resolution and module responsibilities
+- [x] provide minimal Android assembly, import, prepare, session and generation examples
+- [x] document streaming events, cancellation, shutdown, model switching, memory pressure and typed failures
+- [x] record current Phase 1 platform and integration limits in [`api-usage.md`](api-usage.md)
 
 ### Device evidence still required
 
@@ -112,6 +120,7 @@ bash scripts/capture-device-e2e-evidence.sh \
 - [x] add an adb host runner that streams an external GGUF into app-private storage
 - [x] add device tests for generation lifecycle, active cancellation and optional PSS regression cycles
 - [x] add reproducible device-evidence capture without storing model, prompt, output or serial data
+- [x] document the embedded API and lifecycle with minimal usage examples
 
 ### Consolidation gate
 
@@ -129,7 +138,7 @@ Phase 1 is functionally implemented but is not production-ready until all items 
 - [ ] verify repeated load/unload and generation do not show unbounded memory growth
 - [ ] verify cancellation during prefill and decode on device
 - [ ] verify the packaged APK/AAR loads the expected JNI libraries on representative devices
-- [ ] publish feature-level API and lifecycle documentation with minimal usage examples
+- [x] publish feature-level API and lifecycle documentation with minimal usage examples
 - [ ] merge the consolidated Phase 1 work into `main`
 - [ ] delete historical Phase 0/1 branches and refresh deferred dependency pull requests
 
@@ -150,7 +159,7 @@ unload
 shutdown
 ```
 
-The executable procedure is documented in [`device-e2e-testing.md`](device-e2e-testing.md). Evidence collection and review are documented in [`device-e2e-evidence.md`](device-e2e-evidence.md).
+The embedded API is documented in [`api-usage.md`](api-usage.md). The executable procedure is documented in [`device-e2e-testing.md`](device-e2e-testing.md). Evidence collection and review are documented in [`device-e2e-evidence.md`](device-e2e-evidence.md).
 
 ## Phase 2 — observability and health
 
