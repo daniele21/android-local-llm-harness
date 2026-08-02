@@ -101,7 +101,7 @@ ctest --test-dir build/native-tests --output-on-failure
 Connect a physical `arm64-v8a` device with USB debugging enabled, then run:
 
 ```bash
-scripts/run-device-e2e.sh \
+bash scripts/run-device-e2e.sh \
   --model /absolute/path/to/model.gguf \
   --architecture qwen2 \
   --quantization Q4_K_M
