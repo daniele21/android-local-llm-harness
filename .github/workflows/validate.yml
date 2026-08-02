@@ -30,12 +30,13 @@ jobs:
       - name: Verify llama.cpp pin
         run: ./scripts/verify-llama-cpp-pin.sh
 
-      - name: Check shell script syntax
+      - name: Check repository scripts
         shell: bash
         run: |
           while IFS= read -r -d '' script; do
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
+          python3 -m py_compile scripts/*.py
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
 
@@ -94,7 +95,7 @@ jobs:
             detekt \
             verifyNoModelArtifacts
 
-      - name: Run JVM unit tests
+      - name: Run JVM unit and simulated acceptance tests
         shell: bash
         run: |
           "$GRADLE_COMMAND" --stacktrace check
@@ -126,6 +127,10 @@ jobs:
             :apps:device-test-runner:assembleDebug \
             :apps:device-test-runner:assembleDebugAndroidTest \
             2>&1 | tee build/android-artifacts.log
+
+      - name: Verify Android native packaging
+        shell: bash
+        run: python3 scripts/verify-android-packaging.py
 
       - name: Upload console APKs
         if: always()
