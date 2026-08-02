@@ -4,11 +4,11 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Pull request #13 and `agent/phase-1-consolidation` are the only active Phase 1 implementation line.
+Phase 1 was merged into `main` through pull request #13 at merge commit `6a7e4f6e2a6b7fa11484e8f57ff0a11053b52fbf`.
 
-### Verified in the pre-merge GitHub Actions runs
+### Verified pre-merge GitHub Actions gate
 
-Run #155 on commit `201cf2e083cba4a31c95bd457b7dfa5cd50e1a54` completed successfully from a clean checkout. Run #158 validates the final documentation and policy alignment on the current pull-request head.
+Run #159 on commit `a0498504706241f4b518a1f8c9e1f843f0cc7351` completed successfully from a clean checkout immediately before merge.
 
 - [x] coding-agent navigation and llama.cpp pin guards
 - [x] shell and Python runner validation
@@ -25,7 +25,7 @@ Run #155 on commit `201cf2e083cba4a31c95bd457b7dfa5cd50e1a54` completed successf
 
 ### Pre-hardware merge gate
 
-The repository may merge Phase 1 after the complete simulated and packaging gate is green. This gate does not claim that physical-device behavior has been proven.
+The repository merged Phase 1 after the complete simulated and packaging gate passed. This gate does not claim that physical-device behavior has been proven.
 
 - [x] import a deterministic model fixture through the real `FileSystemModelStore`
 - [x] verify SHA-256 identity, store lookup and model-store snapshot behavior
@@ -45,13 +45,13 @@ These checks provide strong host-side evidence for orchestration, storage, cance
 
 ### Branch and pull-request control
 
-- [x] designate `agent/phase-1-consolidation` and PR #13 as the single active Phase 1 line
+- [x] designate `agent/phase-1-consolidation` and PR #13 as the single Phase 1 implementation line
 - [x] audit Phase 0 and Phase 1 branch ancestry and unique commits
 - [x] confirm the historical native-runtime CPU-backend configuration is already present in the consolidated implementation
 - [x] close superseded implementation PRs #8 and #12 with recovery notes
 - [x] keep Dependabot infrastructure upgrades isolated from the functional consolidation
 - [x] document branch, stacked-PR and merge discipline in [`BRANCHING.md`](../BRANCHING.md)
-- [ ] merge PR #13 into `main`
+- [x] merge PR #13 into `main`
 - [ ] delete superseded historical remote branches after the merge is audited
 - [ ] rebase or recreate dependency-only pull requests against the post-Phase-1 `main`
 
@@ -118,7 +118,7 @@ Deferring this gate permits continued repository development and integration wor
 
 ## Phase 1 — functional embedded runtime
 
-### Implemented on the Phase 1 development line
+### Implemented
 
 - [x] pin a llama.cpp commit and verify the pin in CI
 - [x] compile the Android `arm64-v8a` CPU backend
@@ -158,7 +158,7 @@ Deferring this gate permits continued repository development and integration wor
 - [x] pass the simulated lifecycle and post-cancellation recovery gate
 - [x] validate exact APK/AAR native packaging and ELF architecture
 - [x] publish feature-level API and lifecycle documentation with minimal usage examples
-- [ ] merge the consolidated Phase 1 work into `main`
+- [x] merge the consolidated Phase 1 work into `main`
 - [ ] delete historical Phase 0/1 branches and refresh deferred dependency pull requests
 
 ### Production-readiness gate
