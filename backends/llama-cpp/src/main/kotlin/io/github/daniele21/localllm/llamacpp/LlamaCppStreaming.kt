@@ -7,6 +7,7 @@ interface NativeStreamingCallback {
 }
 
 interface NativeLlamaStreamingApi {
+    @Suppress("LongParameterList")
     fun generateStreaming(
         contextHandle: Long,
         requestId: String,
@@ -27,6 +28,7 @@ class JniLlamaStreamingApi : NativeLlamaStreamingApi {
         System.loadLibrary("local_llm_jni")
     }
 
+    @Suppress("LongParameterList")
     external override fun generateStreaming(
         contextHandle: Long,
         requestId: String,

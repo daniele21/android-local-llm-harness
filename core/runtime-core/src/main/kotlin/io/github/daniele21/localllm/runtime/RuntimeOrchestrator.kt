@@ -28,6 +28,7 @@ fun interface MonotonicClock {
     fun nowNanos(): Long
 }
 
+@Suppress("TooManyFunctions")
 class RuntimeOrchestrator(
     private val registry: ModelProfileRegistry,
     private val modelStore: ModelStore,
@@ -105,6 +106,7 @@ class RuntimeOrchestrator(
         }
     }
 
+    @Suppress("ReturnCount")
     override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle {
         if (closed.get()) {
             return failImmediately(request.requestId, listener, LocalLlmError.Configuration("Runtime is closed"))
@@ -247,6 +249,7 @@ class RuntimeOrchestrator(
         state.set(RuntimeState.IDLE)
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
         if (lifecycle.cancelRequested.get()) {
             lifecycle.finish(GenerationEvent.Failed(request.requestId, LocalLlmError.Cancelled()))

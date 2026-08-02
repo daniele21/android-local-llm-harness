@@ -105,33 +105,36 @@ class SingleDecodeScheduler(
 
     private fun runLoop() {
         while (!closed.get()) {
-            val work = try {
-                queue.take()
-            } catch (_: InterruptedException) {
-                if (closed.get()) return
-                continue
-            }
+            takeNextWork()?.let(::execute)
+        }
+    }
 
+    private fun takeNextWork(): ScheduledWork? = try {
+        queue.take()
+    } catch (_: InterruptedException) {
+        null
+    }
+
+    private fun execute(work: ScheduledWork) {
+        if (work.cancelled.get()) {
+            works.remove(work.requestId, work)
+            work.notifyQueuedCancellation()
+            return
+        }
+        if (!work.started.compareAndSet(false, true)) {
+            return
+        }
+
+        activeRequest.set(work.requestId)
+        try {
             if (work.cancelled.get()) {
-                works.remove(work.requestId, work)
-                work.notifyQueuedCancellation()
-                continue
+                work.onRunningCancellation()
+            } else {
+                work.task()
             }
-            if (!work.started.compareAndSet(false, true)) {
-                continue
-            }
-
-            activeRequest.set(work.requestId)
-            try {
-                if (work.cancelled.get()) {
-                    work.onRunningCancellation()
-                } else {
-                    work.task()
-                }
-            } finally {
-                activeRequest.set(null)
-                works.remove(work.requestId, work)
-            }
+        } finally {
+            activeRequest.set(null)
+            works.remove(work.requestId, work)
         }
     }
 

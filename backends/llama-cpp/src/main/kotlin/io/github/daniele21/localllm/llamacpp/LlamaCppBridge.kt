@@ -30,6 +30,7 @@ class JniLlamaApi : NativeLlamaApi {
     external override fun inspectGguf(path: String): Array<String>
 }
 
+@Suppress("TooManyFunctions")
 class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
     fun inspect(profile: GgufModelProfile): NativeRuntimeStatus {
         val linked = nativeApi.isLlamaCppLinked()

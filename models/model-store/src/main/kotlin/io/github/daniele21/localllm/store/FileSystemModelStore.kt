@@ -4,12 +4,15 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.models.GgufArtifact
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
+@Suppress("TooManyFunctions")
 class FileSystemModelStore(private val rootDirectory: File, private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES) : ModelStore {
     init {
         require(bufferSizeBytes > 0) { "bufferSizeBytes must be positive" }
@@ -177,6 +180,7 @@ class FileSystemModelStore(private val rootDirectory: File, private val bufferSi
         )
     }
 
+    @Suppress("ThrowsCount")
     private fun existingImport(destination: File, expectedDigest: ModelDigest, expectedSize: Long): StoredModel? {
         if (!destination.exists()) return null
         if (!destination.isFile) {
@@ -214,20 +218,9 @@ class FileSystemModelStore(private val rootDirectory: File, private val bufferSi
 
     private fun copyAndDigest(source: File, destination: File): DigestedFile {
         val messageDigest = MessageDigest.getInstance(SHA_256)
-        var copiedBytes = 0L
-
-        source.inputStream().buffered(bufferSizeBytes).use { input ->
+        val copiedBytes = source.inputStream().buffered(bufferSizeBytes).use { input ->
             destination.outputStream().buffered(bufferSizeBytes).use { output ->
-                val buffer = ByteArray(bufferSizeBytes)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    if (read == 0) continue
-                    messageDigest.update(buffer, 0, read)
-                    output.write(buffer, 0, read)
-                    copiedBytes += read
-                }
-                output.flush()
+                copyAndDigest(input, output, messageDigest)
             }
         }
 
@@ -235,6 +228,22 @@ class FileSystemModelStore(private val rootDirectory: File, private val bufferSi
             digest = ModelDigest(messageDigest.digest().toHex()),
             sizeBytes = copiedBytes,
         )
+    }
+
+    private fun copyAndDigest(input: InputStream, output: OutputStream, messageDigest: MessageDigest): Long {
+        val buffer = ByteArray(bufferSizeBytes)
+        var copiedBytes = 0L
+        var read = input.read(buffer)
+        while (read >= 0) {
+            if (read > 0) {
+                messageDigest.update(buffer, 0, read)
+                output.write(buffer, 0, read)
+                copiedBytes += read
+            }
+            read = input.read(buffer)
+        }
+        output.flush()
+        return copiedBytes
     }
 
     private fun digest(file: File): ModelDigest {
@@ -253,13 +262,13 @@ class FileSystemModelStore(private val rootDirectory: File, private val bufferSi
     private fun moveIntoPlace(source: File, destination: File) {
         try {
             Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
-        } catch (error: AtomicMoveNotSupportedException) {
+        } catch (_: AtomicMoveNotSupportedException) {
             try {
                 Files.move(source.toPath(), destination.toPath())
-            } catch (race: FileAlreadyExistsException) {
+            } catch (_: FileAlreadyExistsException) {
                 throw destinationConflict(destination, "another import created the destination concurrently")
             }
-        } catch (error: FileAlreadyExistsException) {
+        } catch (_: FileAlreadyExistsException) {
             throw destinationConflict(destination, "another import created the destination concurrently")
         }
     }
