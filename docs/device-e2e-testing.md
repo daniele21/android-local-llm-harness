@@ -8,6 +8,7 @@ The test model is never committed to the repository or packaged in an APK. The h
 
 The `apps/device-test-runner` module exercises the production implementations of:
 
+- native GGUF inspection without full model loading;
 - `FileSystemModelStore` import and SHA-256 verification;
 - explicit application/use-case/model binding;
 - `RuntimeOrchestrator` preparation and session lifecycle;
@@ -23,6 +24,8 @@ The main lifecycle is:
 
 ```text
 copy model into app-private storage
+        ↓
+inspect GGUF metadata
         ↓
 import and verify SHA-256
         ↓
@@ -55,7 +58,7 @@ The initial Phase 1 device gate is CPU-only and uses `gpuLayers = 0`.
 ## Run the standard lifecycle and cancellation suite
 
 ```bash
-scripts/run-device-e2e.sh \
+bash scripts/run-device-e2e.sh \
   --model /absolute/path/to/model.gguf \
   --architecture qwen2 \
   --quantization Q4_K_M
@@ -72,13 +75,13 @@ The script:
 5. streams the model into `files/e2e/model.gguf` inside the app sandbox;
 6. verifies the transferred byte count;
 7. discovers the installed `AndroidJUnitRunner` component;
-8. runs generation, cancellation and any enabled memory test;
+8. runs inspection, generation, cancellation and any enabled memory test;
 9. returns a non-zero exit code when instrumentation fails.
 
 ## Run repeated lifecycle and memory validation
 
 ```bash
-scripts/run-device-e2e.sh \
+bash scripts/run-device-e2e.sh \
   --model /absolute/path/to/model.gguf \
   --architecture qwen2 \
   --quantization Q4_K_M \
@@ -109,6 +112,7 @@ Cancellation validation is enabled by default. The cancellation prompt should be
 Successful tests print privacy-safe markers without prompt or generated content:
 
 ```text
+LOCAL_LLM_E2E inspection version=... architecture=... tensorCount=... fileType=...
 LOCAL_LLM_E2E generation inputTokens=... outputTokens=... ttftMs=... totalMs=...
 LOCAL_LLM_E2E cancellation terminal=cancelled
 LOCAL_LLM_E2E memory pssSamplesKb=[...] growthKb=...
