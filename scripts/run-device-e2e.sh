@@ -245,6 +245,7 @@ TEST_OUTPUT="$(
 )"
 TEST_STATUS=$?
 set -e
+TEST_OUTPUT="${TEST_OUTPUT//$'\r'/}"
 printf '%s\n' "$TEST_OUTPUT"
 
 if (( TEST_STATUS != 0 )) || grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg=' <<< "$TEST_OUTPUT"; then
