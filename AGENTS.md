@@ -160,7 +160,7 @@ ctest --test-dir build/native-tests --output-on-failure
 ### Real Android device
 
 ```bash
-scripts/run-device-e2e.sh \
+bash scripts/run-device-e2e.sh \
   --model /absolute/path/to/model.gguf \
   --architecture <architecture> \
   --quantization <quantization>
