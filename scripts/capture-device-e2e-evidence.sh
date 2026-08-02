@@ -219,7 +219,7 @@ APK_INVENTORY="$EVIDENCE_DIR/apk-inventory.txt"
 APK_HASHES="$EVIDENCE_DIR/apk-sha256.txt"
 : > "$APK_INVENTORY"
 : > "$APK_HASHES"
-while IFS= read -r -d '' apk; do
+while IFS= read -r apk; do
     relative_apk="${apk#"$ROOT_DIR/"}"
     printf '%s  %s\n' "$(sha256_file "$apk")" "$relative_apk" >> "$APK_HASHES"
     printf '## %s\n' "$relative_apk" >> "$APK_INVENTORY"
@@ -231,7 +231,7 @@ while IFS= read -r -d '' apk; do
     printf '\n' >> "$APK_INVENTORY"
 done < <(
     find "$ROOT_DIR/apps/device-test-runner/build/outputs/apk" \
-        -type f -name '*.apk' -print0 2>/dev/null | sort -z
+        -type f -name '*.apk' -print 2>/dev/null | LC_ALL=C sort
 )
 
 FINISHED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
