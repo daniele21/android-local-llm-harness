@@ -49,16 +49,16 @@ class LocalLlmDeviceE2eTest {
 
     @Test
     fun fullLifecycleGeneratesAndReleasesResources() {
-        val harness = buildHarness(config.maxOutputTokens)
+        val harness = buildHarness(config.generation.maxOutputTokens)
         val runtime = harness.runtime
 
         try {
             val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
             assertTrue("Prepare failed: ${prepared.detail}", prepared.ready)
-            assertEquals(config.modelDigest, prepared.modelDigest)
+            assertEquals(config.model.digest, prepared.modelDigest)
 
             val session = runtime.createSession(harness.applicationId, harness.useCaseId)
-            val completed = generateAndAwait(runtime, harness, session, config.prompt)
+            val completed = generateAndAwait(runtime, harness, session, config.generation.prompt)
 
             assertTrue("Generation returned an empty output", completed.output.isNotBlank())
             assertTrue(completed.metrics.inputTokens > 0)
@@ -83,9 +83,12 @@ class LocalLlmDeviceE2eTest {
 
     @Test
     fun activeGenerationCanBeCancelled() {
-        assumeTrue("Cancellation validation disabled by instrumentation argument", config.cancellationEnabled)
+        assumeTrue(
+            "Cancellation validation disabled by instrumentation argument",
+            config.cancellation.enabled,
+        )
 
-        val harness = buildHarness(config.cancellationMaxOutputTokens)
+        val harness = buildHarness(config.cancellation.maxOutputTokens)
         val runtime = harness.runtime
 
         try {
@@ -99,7 +102,7 @@ class LocalLlmDeviceE2eTest {
             val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
 
             val handle = runtime.generate(
-                request(harness, session, config.cancellationPrompt),
+                request(harness, session, config.cancellation.prompt),
                 GenerationListener { event ->
                     events += event
                     if (event is GenerationEvent.TextDelta) firstDelta.countDown()
@@ -140,60 +143,60 @@ class LocalLlmDeviceE2eTest {
     fun repeatedLifecycleStaysInsideConfiguredPssBudget() {
         assumeTrue(
             "Memory stability validation requires memoryRepeatCount >= 2",
-            config.memoryRepeatCount >= 2,
+            config.memory.repeatCount >= 2,
         )
 
         val pssSamplesKb = mutableListOf<Int>()
-        repeat(config.memoryRepeatCount) { iteration ->
-            val harness = buildHarness(config.memoryOutputTokens)
+        repeat(config.memory.repeatCount) { iteration ->
+            val harness = buildHarness(config.memory.outputTokens)
             val runtime = harness.runtime
             try {
                 val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
                 assertTrue("Prepare failed on iteration $iteration: ${prepared.detail}", prepared.ready)
                 val session = runtime.createSession(harness.applicationId, harness.useCaseId)
-                generateAndAwait(runtime, harness, session, config.memoryPrompt)
+                generateAndAwait(runtime, harness, session, config.memory.prompt)
                 closeSessionAndUnload(runtime, session)
             } finally {
                 runtime.close()
             }
 
             Runtime.getRuntime().gc()
-            Thread.sleep(config.memorySettleMillis)
+            Thread.sleep(config.memory.settleMillis)
             pssSamplesKb += totalPssKb()
         }
 
         val growthKb = pssSamplesKb.last() - pssSamplesKb.first()
         assertTrue(
-            "PSS grew by ${growthKb}KB across ${config.memoryRepeatCount} cycles; " +
-                "budget=${config.maxPssGrowthKb}KB, samples=$pssSamplesKb",
-            growthKb <= config.maxPssGrowthKb,
+            "PSS grew by ${growthKb}KB across ${config.memory.repeatCount} cycles; " +
+                "budget=${config.memory.maxPssGrowthKb}KB, samples=$pssSamplesKb",
+            growthKb <= config.memory.maxPssGrowthKb,
         )
         println("LOCAL_LLM_E2E memory pssSamplesKb=$pssSamplesKb growthKb=$growthKb")
     }
 
     private fun buildHarness(maxOutputTokens: Int): DeviceHarness {
-        val sourceModel = config.resolveModelFile(context)
+        val sourceModel = config.model.resolveModelFile(context)
         val applicationId = ApplicationId("device-e2e")
         val useCaseId = UseCaseId("generation")
         val modelProfileId = "device-e2e-model"
         val useCaseProfileId = "device-e2e-use-case"
 
         val artifact = GgufArtifact(
-            digest = config.modelDigest,
+            digest = config.model.digest,
             fileName = sourceModel.name,
             sizeBytes = sourceModel.length(),
-            architecture = config.modelArchitecture,
-            quantization = config.modelQuantization,
-            source = ArtifactSource.Imported(config.modelRelativePath),
+            architecture = config.model.architecture,
+            quantization = config.model.quantization,
+            source = ArtifactSource.Imported(config.model.relativePath),
         )
         val modelProfile = GgufModelProfile(
             id = modelProfileId,
             artifact = artifact,
-            contextSize = config.contextSize,
-            batchSize = config.batchSize,
-            microBatchSize = config.microBatchSize,
-            cpuThreads = config.cpuThreads,
-            batchThreads = config.cpuThreads,
+            contextSize = config.model.contextSize,
+            batchSize = config.model.batchSize,
+            microBatchSize = config.model.microBatchSize,
+            cpuThreads = config.model.cpuThreads,
+            batchThreads = config.model.cpuThreads,
             gpuLayers = 0,
         )
         val useCase = UseCaseProfile(
@@ -262,9 +265,7 @@ class LocalLlmDeviceE2eTest {
         )
         return when (val result = terminalEvent.get()) {
             is GenerationEvent.Completed -> result
-            is GenerationEvent.Failed -> throw AssertionError(
-                "Generation failed with ${result.error::class.simpleName}: ${result.error.message}",
-            )
+            is GenerationEvent.Failed -> throw AssertionError("Generation failed: ${result.error}")
             else -> throw AssertionError("Generation completed without a terminal event")
         }
     }
@@ -327,32 +328,70 @@ private class SingleBindingRegistry(
 }
 
 private data class DeviceTestConfig(
-    val modelRelativePath: String,
-    val modelDigest: ModelDigest,
-    val modelArchitecture: String,
-    val modelQuantization: String,
-    val prompt: String,
-    val maxOutputTokens: Int,
+    val model: ModelArguments,
+    val generation: GenerationArguments,
+    val cancellation: CancellationArguments,
+    val memory: MemoryArguments,
+    val timeoutSeconds: Long,
+) {
+    companion object {
+        fun fromInstrumentation(): DeviceTestConfig {
+            val arguments = InstrumentationRegistry.getArguments()
+            val reader = InstrumentationArgumentReader(arguments)
+            val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+
+            return DeviceTestConfig(
+                model = ModelArguments(
+                    relativePath = reader.string("modelRelativePath", "files/e2e/model.gguf"),
+                    digest = ModelDigest(reader.requiredString("modelSha256").lowercase()),
+                    architecture = reader.string("modelArchitecture", "unknown"),
+                    quantization = reader.string("modelQuantization", "unknown"),
+                    contextSize = reader.positiveInt("contextSize", 512),
+                    batchSize = reader.positiveInt("batchSize", 128),
+                    microBatchSize = reader.positiveInt("microBatchSize", 64),
+                    cpuThreads = reader.positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),
+                ),
+                generation = GenerationArguments(
+                    prompt = reader.decoded("promptBase64", "Reply with the single word READY."),
+                    maxOutputTokens = reader.positiveInt("maxOutputTokens", 32),
+                ),
+                cancellation = CancellationArguments(
+                    enabled = reader.string("cancellationEnabled", "true").toBooleanStrict(),
+                    prompt = reader.decoded(
+                        "cancellationPromptBase64",
+                        "Write a numbered list from 1 to 1000. Continue until every number is written.",
+                    ),
+                    maxOutputTokens = reader.positiveInt("cancellationMaxOutputTokens", 512),
+                ),
+                memory = MemoryArguments(
+                    repeatCount = reader.nonNegativeInt("memoryRepeatCount", 0),
+                    prompt = reader.decoded("memoryPromptBase64", "Reply with the single word READY."),
+                    outputTokens = reader.positiveInt("memoryOutputTokens", 16),
+                    settleMillis = reader.positiveLong("memorySettleMillis", 750),
+                    maxPssGrowthKb = reader.nonNegativeInt("maxPssGrowthKb", 131_072),
+                ),
+                timeoutSeconds = reader.positiveLong("timeoutSeconds", 120),
+            )
+        }
+    }
+}
+
+private data class ModelArguments(
+    val relativePath: String,
+    val digest: ModelDigest,
+    val architecture: String,
+    val quantization: String,
     val contextSize: Int,
     val batchSize: Int,
     val microBatchSize: Int,
     val cpuThreads: Int,
-    val timeoutSeconds: Long,
-    val cancellationEnabled: Boolean,
-    val cancellationPrompt: String,
-    val cancellationMaxOutputTokens: Int,
-    val memoryRepeatCount: Int,
-    val memoryPrompt: String,
-    val memoryOutputTokens: Int,
-    val memorySettleMillis: Long,
-    val maxPssGrowthKb: Int,
 ) {
     fun resolveModelFile(context: Context): File {
-        require(modelRelativePath.isNotBlank() && !File(modelRelativePath).isAbsolute) {
+        require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) {
             "modelRelativePath must be a non-empty path relative to the application data directory"
         }
         val dataRoot = context.dataDir.canonicalFile
-        val modelFile = File(dataRoot, modelRelativePath).canonicalFile
+        val modelFile = File(dataRoot, relativePath).canonicalFile
         require(modelFile.path.startsWith(dataRoot.path + File.separator)) {
             "modelRelativePath escapes the application data directory"
         }
@@ -361,63 +400,54 @@ private data class DeviceTestConfig(
         }
         return modelFile
     }
+}
 
-    companion object {
-        fun fromInstrumentation(): DeviceTestConfig {
-            val arguments = InstrumentationRegistry.getArguments()
+private data class GenerationArguments(
+    val prompt: String,
+    val maxOutputTokens: Int,
+)
 
-            fun string(name: String, default: String): String =
-                arguments.getString(name)?.takeIf { it.isNotBlank() } ?: default
+private data class CancellationArguments(
+    val enabled: Boolean,
+    val prompt: String,
+    val maxOutputTokens: Int,
+)
 
-            fun requiredString(name: String): String =
-                arguments.getString(name)?.takeIf { it.isNotBlank() }
-                    ?: error("Missing required instrumentation argument: $name")
+private data class MemoryArguments(
+    val repeatCount: Int,
+    val prompt: String,
+    val outputTokens: Int,
+    val settleMillis: Long,
+    val maxPssGrowthKb: Int,
+)
 
-            fun positiveInt(name: String, default: Int): Int =
-                string(name, default.toString()).toInt().also {
-                    require(it > 0) { "$name must be positive" }
-                }
+private class InstrumentationArgumentReader(
+    private val arguments: android.os.Bundle,
+) {
+    fun string(name: String, default: String): String =
+        arguments.getString(name)?.takeIf { it.isNotBlank() } ?: default
 
-            fun nonNegativeInt(name: String, default: Int): Int =
-                string(name, default.toString()).toInt().also {
-                    require(it >= 0) { "$name must not be negative" }
-                }
+    fun requiredString(name: String): String =
+        arguments.getString(name)?.takeIf { it.isNotBlank() }
+            ?: error("Missing required instrumentation argument: $name")
 
-            fun positiveLong(name: String, default: Long): Long =
-                string(name, default.toString()).toLong().also {
-                    require(it > 0) { "$name must be positive" }
-                }
-
-            fun decoded(name: String, default: String): String {
-                val encoded = arguments.getString(name)?.takeIf { it.isNotBlank() } ?: return default
-                return Base64.decode(encoded, Base64.DEFAULT).toString(Charsets.UTF_8)
-            }
-
-            val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
-            return DeviceTestConfig(
-                modelRelativePath = string("modelRelativePath", "files/e2e/model.gguf"),
-                modelDigest = ModelDigest(requiredString("modelSha256").lowercase()),
-                modelArchitecture = string("modelArchitecture", "unknown"),
-                modelQuantization = string("modelQuantization", "unknown"),
-                prompt = decoded("promptBase64", "Reply with the single word READY."),
-                maxOutputTokens = positiveInt("maxOutputTokens", 32),
-                contextSize = positiveInt("contextSize", 512),
-                batchSize = positiveInt("batchSize", 128),
-                microBatchSize = positiveInt("microBatchSize", 64),
-                cpuThreads = positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),
-                timeoutSeconds = positiveLong("timeoutSeconds", 120),
-                cancellationEnabled = string("cancellationEnabled", "true").toBooleanStrict(),
-                cancellationPrompt = decoded(
-                    "cancellationPromptBase64",
-                    "Write a numbered list from 1 to 1000. Continue until every number is written.",
-                ),
-                cancellationMaxOutputTokens = positiveInt("cancellationMaxOutputTokens", 512),
-                memoryRepeatCount = nonNegativeInt("memoryRepeatCount", 0),
-                memoryPrompt = decoded("memoryPromptBase64", "Reply with the single word READY."),
-                memoryOutputTokens = positiveInt("memoryOutputTokens", 16),
-                memorySettleMillis = positiveLong("memorySettleMillis", 750),
-                maxPssGrowthKb = nonNegativeInt("maxPssGrowthKb", 131_072),
-            )
+    fun positiveInt(name: String, default: Int): Int =
+        string(name, default.toString()).toInt().also {
+            require(it > 0) { "$name must be positive" }
         }
+
+    fun nonNegativeInt(name: String, default: Int): Int =
+        string(name, default.toString()).toInt().also {
+            require(it >= 0) { "$name must not be negative" }
+        }
+
+    fun positiveLong(name: String, default: Long): Long =
+        string(name, default.toString()).toLong().also {
+            require(it > 0) { "$name must be positive" }
+        }
+
+    fun decoded(name: String, default: String): String {
+        val encoded = arguments.getString(name)?.takeIf { it.isNotBlank() } ?: return default
+        return Base64.decode(encoded, Base64.DEFAULT).toString(Charsets.UTF_8)
     }
 }
