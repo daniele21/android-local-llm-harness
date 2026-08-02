@@ -6,26 +6,42 @@ This file is the authoritative source for current implementation status. Detaile
 
 Pull request #13 and `agent/phase-1-consolidation` are the only active Phase 1 implementation line.
 
-### Verified in clean cumulative GitHub Actions runs
+### Verified in the final pre-merge GitHub Actions run
 
-Run #142 on commit `eea01c1492f1be66b1b0b6b6a2175e5a9de11e2f` completed successfully from a clean checkout. The current pull-request head must remain green after every subsequent documentation or tooling change.
+Run #155 on commit `201cf2e083cba4a31c95bd457b7dfa5cd50e1a54` completed successfully from a clean checkout.
 
 - [x] coding-agent navigation and llama.cpp pin guards
-- [x] shell-runner syntax and help-path validation
+- [x] shell and Python runner validation
 - [x] native host configuration, compilation and tests
 - [x] Spotless and ktlint formatting checks
 - [x] Detekt static analysis and model-artifact repository guard
 - [x] JVM unit tests
+- [x] simulated Phase 1 acceptance lifecycle using the real content-addressed model store and runtime orchestrator
 - [x] Android Lint for the debug and console internal variants
 - [x] explicit assembly of all Android library, console and device-test variants
+- [x] binary inspection of APK/AAR native packaging, ABI and ELF architecture
 - [x] publication of one internal console APK, the device-runner APK, its instrumentation APK and eight AARs
 - [x] publication of validation reports and the combined Android artifact-build log
 
-### CI gate
+### Pre-hardware merge gate
 
-- [x] complete one cumulative clean run that assembles and uploads every expected APK and AAR
+The repository may merge Phase 1 after the complete simulated and packaging gate is green. This gate does not claim that physical-device behavior has been proven.
 
-The artifact build uses explicit module-scoped Gradle tasks rather than the root `assembleDebug` fan-out. Its combined Gradle output is persisted as `build/android-artifacts.log` in the `validation-reports` artifact so future Android build failures can be diagnosed from the same run.
+- [x] import a deterministic model fixture through the real `FileSystemModelStore`
+- [x] verify SHA-256 identity, store lookup and model-store snapshot behavior
+- [x] prepare and load through the real `RuntimeOrchestrator`
+- [x] create a session and validate ordered streaming events
+- [x] cancel an active generation and receive the typed cancelled terminal event
+- [x] recover and complete a subsequent generation in the same runtime
+- [x] close the session and release its context
+- [x] unload an idle model through the Android memory-pressure policy
+- [x] reload the model and complete idempotent runtime shutdown
+- [x] build all APK/AAR variants from a clean checkout
+- [x] verify the device application APK and llama.cpp AAR contain only the expected `arm64-v8a` libraries
+- [x] verify every packaged native library is a 64-bit AArch64 ELF object
+- [x] verify the instrumentation APK does not duplicate the native payload
+
+These checks provide strong host-side evidence for orchestration, storage, cancellation, recovery and packaging. They cannot reproduce Android linker behavior, OEM memory management, real GGUF execution, thermal throttling or device-specific native failures.
 
 ### Branch and pull-request control
 
@@ -35,12 +51,13 @@ The artifact build uses explicit module-scoped Gradle tasks rather than the root
 - [x] close superseded implementation PRs #8 and #12 with recovery notes
 - [x] keep Dependabot infrastructure upgrades isolated from the functional consolidation
 - [x] document branch, stacked-PR and merge discipline in [`BRANCHING.md`](../BRANCHING.md)
-- [ ] delete superseded historical remote branches after #13 is merged and audited
+- [ ] merge PR #13 into `main`
+- [ ] delete superseded historical remote branches after the merge is audited
 - [ ] rebase or recreate dependency-only pull requests against the post-Phase-1 `main`
 
 Historical branches are retained temporarily for traceability only and must not receive new implementation commits.
 
-### Device evidence tooling
+### Physical-device tooling
 
 - [x] provide a physical-device runner that streams an external GGUF into app-private storage
 - [x] provide a privacy-safe evidence wrapper that captures logs, metrics, APK hashes, JNI inventory and selected memory/thermal snapshots
@@ -63,14 +80,18 @@ bash scripts/capture-device-e2e-evidence.sh \
 - [x] document streaming events, cancellation, shutdown, model switching, memory pressure and typed failures
 - [x] record current Phase 1 platform and integration limits in [`api-usage.md`](api-usage.md)
 
-### Device evidence still required
+### Post-merge production-readiness gate
+
+Physical-device evidence remains mandatory before the runtime is called production-ready, released to application consumers or used as the baseline for device performance claims.
 
 - [ ] execute the complete lifecycle on a physical Android `arm64-v8a` device with a supported external GGUF
 - [ ] verify cancellation during prefill and decode
 - [ ] collect repeated load/unload and generation memory evidence
-- [ ] confirm packaged JNI loading on representative devices
+- [ ] confirm runtime JNI loading on representative devices
 - [ ] record baseline latency, throughput, memory and thermal measurements
-- [ ] attach or reference the resulting evidence archive from PR #13
+- [ ] preserve or reference the resulting evidence archive from the release record
+
+Deferring this gate permits continued repository development and integration work. It does not convert simulated results into hardware evidence.
 
 ## Phase 0 — repository foundation
 
@@ -121,10 +142,10 @@ bash scripts/capture-device-e2e-evidence.sh \
 - [x] add device tests for generation lifecycle, active cancellation and optional PSS regression cycles
 - [x] add reproducible device-evidence capture without storing model, prompt, output or serial data
 - [x] document the embedded API and lifecycle with minimal usage examples
+- [x] add a simulated end-to-end acceptance lifecycle using the real store and runtime
+- [x] add exact native packaging and AArch64 ELF verification
 
-### Consolidation gate
-
-Phase 1 is functionally implemented but is not production-ready until all items below are complete.
+### Consolidation and merge gate
 
 - [x] create a root `AGENTS.md` navigation guide for coding agents
 - [x] add a repository guard for agent-document links and module discoverability
@@ -134,15 +155,21 @@ Phase 1 is functionally implemented but is not production-ready until all items 
 - [x] add reproducible real-device test and evidence tooling
 - [x] complete cumulative pull-request validation from a clean checkout
 - [x] reconcile the Phase 1 branch with the latest `main` history
-- [ ] run the end-to-end lifecycle on a real Android `arm64-v8a` device with a supported GGUF
-- [ ] verify repeated load/unload and generation do not show unbounded memory growth
-- [ ] verify cancellation during prefill and decode on device
-- [ ] verify the packaged APK/AAR loads the expected JNI libraries on representative devices
+- [x] pass the simulated lifecycle and post-cancellation recovery gate
+- [x] validate exact APK/AAR native packaging and ELF architecture
 - [x] publish feature-level API and lifecycle documentation with minimal usage examples
 - [ ] merge the consolidated Phase 1 work into `main`
 - [ ] delete historical Phase 0/1 branches and refresh deferred dependency pull requests
 
-The required device lifecycle is:
+### Production-readiness gate
+
+- [ ] run the end-to-end lifecycle on a real Android `arm64-v8a` device with a supported GGUF
+- [ ] verify repeated load/unload and generation do not show unbounded memory growth
+- [ ] verify cancellation during prefill and decode on device
+- [ ] verify the packaged runtime loads the expected JNI libraries on representative devices
+- [ ] record device-specific latency, throughput, memory and thermal baselines
+
+The required physical-device lifecycle is:
 
 ```text
 initialize
@@ -163,7 +190,7 @@ The embedded API is documented in [`api-usage.md`](api-usage.md). The executable
 
 ## Phase 2 — observability and health
 
-Begin only after the Phase 1 consolidation gate is complete.
+Phase 2 repository work may begin after the Phase 1 merge. Production claims remain blocked by the physical-device gate above.
 
 - [ ] Room-backed telemetry store
 - [ ] run timeline and structured log viewer
