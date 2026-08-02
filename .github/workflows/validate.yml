@@ -101,11 +101,22 @@ jobs:
       - name: Build Android artifacts
         shell: bash
         run: |
+          set -o pipefail
+          mkdir -p build
           "$GRADLE_COMMAND" \
             --stacktrace \
-            assembleDebug \
+            :core:contracts:assembleDebug \
+            :core:runtime-core:assembleDebug \
+            :models:model-profile:assembleDebug \
+            :models:model-store:assembleDebug \
+            :backends:llama-cpp:assembleDebug \
+            :observability:contracts:assembleDebug \
+            :observability:in-memory-store:assembleDebug \
+            :transports:in-process:assembleDebug \
             :apps:local-llm-console:assembleInternal \
-            :apps:device-test-runner:assembleDebugAndroidTest
+            :apps:device-test-runner:assembleDebug \
+            :apps:device-test-runner:assembleDebugAndroidTest \
+            2>&1 | tee build/android-artifacts.log
 
       - name: Upload console APKs
         if: always()
@@ -136,5 +147,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: validation-reports
-          path: "**/build/reports/**"
+          path: |
+            **/build/reports/**
+            build/android-artifacts.log
           if-no-files-found: warn
