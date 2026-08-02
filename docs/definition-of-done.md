@@ -1,0 +1,147 @@
+# Definition of Done
+
+A feature is complete only when its behavior, resource lifecycle, tests, observability and documentation are all complete.
+
+Passing compilation alone is not sufficient.
+
+## Functional completion
+
+- The intended behavior is implemented through the correct architectural boundary.
+- Public behavior is expressed through stable contracts rather than implementation details.
+- Normal, invalid-input, failure, cancellation and shutdown behavior is defined where relevant.
+- Partial failures leave the runtime in a recoverable state.
+- Resource ownership and release paths are explicit.
+- The implementation does not silently substitute models, profiles or policies.
+
+## Modularity and maintainability
+
+The project must remain modular, extensible and maintainable.
+
+Every module and component must have a clear, limited responsibility. Dependencies must follow an explicit direction and must not couple unrelated architectural layers.
+
+A feature is not complete when it:
+
+- duplicates existing domain logic;
+- couples `core/runtime-core` to Android UI, Capacitor or `llama.cpp` internals;
+- exposes native pointers, handles or backend structures through public APIs;
+- adds classes with unclear or mixed responsibilities;
+- requires the same domain behavior to be reimplemented in multiple integrations;
+- hides behavior in generic utilities without a clear domain concept;
+- introduces a speculative or empty module without implemented ownership;
+- makes a dependency difficult to replace or fake in tests;
+- increases architectural complexity without updating the relevant documentation.
+
+Prefer composition and dependency injection over global mutable state. Keep public APIs small, stable and documented. Backend, transport, model store, scheduler, telemetry store and cache policies must remain replaceable behind explicit interfaces where replacement is an intended architectural capability.
+
+Create a new module only when at least one of these conditions is real and current:
+
+1. it owns an autonomous responsibility;
+2. it establishes a necessary dependency boundary;
+3. it contains behavior reused by more than one consumer;
+4. it isolates a platform or third-party integration;
+5. it requires an independent testing or release boundary.
+
+Do not create modules merely to mirror a future architecture diagram.
+
+## Shared generation behavior
+
+Synchronous generation and streaming must reuse the same implementation for:
+
+- tokenization;
+- context-limit validation;
+- chat-template and prompt preparation;
+- sampler construction;
+- prefill;
+- decode;
+- token-to-text conversion;
+- stop-condition handling;
+- metric collection;
+- typed error mapping;
+- temporary resource ownership and cleanup.
+
+They may differ in how output is delivered and how cancellation is surfaced to the caller.
+
+Native code must be split by responsibility and linked normally through CMake. Do not include implementation `.cpp` files from other `.cpp` files to share behavior.
+
+## Test completion
+
+- New behavior has isolated automated tests at the lowest useful layer.
+- Regression tests fail before the fix and pass after it when the change fixes a defect.
+- Failure and cleanup paths are tested, not only the successful result.
+- Cancellation is tested while queued and during active native work when relevant.
+- Handle close/release operations are tested for idempotency.
+- Runtime state recovery is tested after backend or request failure.
+- Model-store changes test interruption, duplicate import and integrity failure where relevant.
+- Native changes include C++ tests for pure native behavior and Kotlin tests for the bridge contract.
+- Android/JNI/ABI changes are validated on an `arm64-v8a` device with a real supported GGUF before production readiness is claimed.
+
+## Validation completion
+
+The relevant narrow checks pass during development, and the complete repository gate passes before merge:
+
+```bash
+python3 scripts/verify-agent-navigation.py
+./gradlew spotlessCheck
+./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+./gradlew check
+./gradlew lintDebug :apps:local-llm-console:lintInternal
+./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
+cmake --build build/native-tests --parallel 2
+ctest --test-dir build/native-tests --output-on-failure
+```
+
+CI must pass from a clean checkout with the pinned JDK, Android SDK, NDK, Gradle and `llama.cpp` source.
+
+## Observability and privacy completion
+
+- Important lifecycle operations emit the required typed events and metrics.
+- Failures use stable error codes or typed failures where a contract exists.
+- Timings and statuses are recorded without persisting prompt or output content by default.
+- New diagnostic data has an explicit retention and privacy policy.
+- A behavior that affects model resolution, cache use, queueing, loading or cancellation is visible in diagnostics.
+
+## Documentation completion
+
+The same change updates the appropriate source of truth:
+
+- architecture and dependency boundaries in `docs/architecture.md`;
+- implementation scope or acceptance criteria in `docs/implementation-plan.md`;
+- completed, deferred or remaining work in `docs/roadmap.md`;
+- durable architectural decisions in `docs/adr/`;
+- coding-agent navigation, module ownership or validation commands in `AGENTS.md`;
+- public usage documentation and examples when APIs change.
+
+Feature documentation must cover, as applicable:
+
+- objective and problem solved;
+- public behavior and API;
+- lifecycle and resource ownership;
+- threading and cancellation;
+- errors and recovery;
+- observability;
+- files and modules involved;
+- tests and validation evidence;
+- limitations and deferred behavior;
+- a minimal usage example.
+
+Do not mark a roadmap item complete while its documentation or acceptance evidence is missing.
+
+## Merge checklist
+
+Before merge, verify:
+
+```text
+clear ownership and responsibilities
+unidirectional dependencies
+no significant domain duplication
+small and stable public APIs
+isolated and deterministic tests
+recoverable failure paths
+safe native resource lifecycle
+privacy-safe observability
+documentation updated
+all required validation gates passing
+```
+
+When duplication appears, identify the shared domain concept first and only then extract a reusable component. Do not move unrelated code into a generic helper merely to reduce line count.
