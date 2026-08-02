@@ -6,9 +6,9 @@ This file is the authoritative source for current implementation status. Detaile
 
 Pull request #13 and `agent/phase-1-consolidation` are the only active Phase 1 implementation line.
 
-### Verified in the final pre-merge GitHub Actions run
+### Verified in the pre-merge GitHub Actions runs
 
-Run #155 on commit `201cf2e083cba4a31c95bd457b7dfa5cd50e1a54` completed successfully from a clean checkout.
+Run #155 on commit `201cf2e083cba4a31c95bd457b7dfa5cd50e1a54` completed successfully from a clean checkout. Run #158 validates the final documentation and policy alignment on the current pull-request head.
 
 - [x] coding-agent navigation and llama.cpp pin guards
 - [x] shell and Python runner validation
