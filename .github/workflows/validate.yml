@@ -103,7 +103,8 @@ jobs:
           "$GRADLE_COMMAND" \
             --stacktrace \
             assembleDebug \
-            :apps:local-llm-console:assembleInternal
+            :apps:local-llm-console:assembleInternal \
+            :apps:device-test-runner:assembleDebugAndroidTest
 
       - name: Upload console APKs
         if: always()
@@ -111,6 +112,14 @@ jobs:
         with:
           name: local-llm-console-apks
           path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+
+      - name: Upload device test APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-llm-device-test-apks
+          path: apps/device-test-runner/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
       - name: Upload Android libraries
