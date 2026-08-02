@@ -15,7 +15,7 @@ bool require(bool condition, const char* expression, int line) {
 
 #define REQUIRE(expression) \
     do { \
-        if (!require((expression), #expression, __LINE__)) { \
+        if (!require(static_cast<bool>(expression), #expression, __LINE__)) { \
             return false; \
         } \
     } while (false)
