@@ -1,37 +1,33 @@
 # Android Local LLM Harness — Coding Agent Guide
 
-This file is the stable entry point for coding agents working in this repository.
-It explains where authoritative information lives, how to navigate the modules, which invariants must not be broken, and which checks are required before a change is considered complete.
-
-Do not use this file as a changelog or duplicate detailed implementation status here. Current progress belongs in [`docs/roadmap.md`](docs/roadmap.md).
+This file is the stable entry point for coding agents working in this repository. It describes authoritative sources, module ownership, architectural invariants and required validation. Current implementation status belongs in [`docs/roadmap.md`](docs/roadmap.md), not here.
 
 ## Start here
 
-Read these documents in order before making a non-trivial change:
+Read these documents before making a non-trivial change:
 
-1. [`README.md`](README.md) — product purpose, supported toolchain and top-level module map.
-2. [`docs/architecture.md`](docs/architecture.md) — data plane, control plane, lifecycle boundaries and runtime invariants.
-3. [`docs/roadmap.md`](docs/roadmap.md) — implemented work, consolidation gates and next priorities.
-4. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior, phase deliverables and acceptance criteria.
-5. [`docs/definition-of-done.md`](docs/definition-of-done.md) — quality, test and documentation requirements for every feature.
-6. [`docs/adr/README.md`](docs/adr/README.md) — architectural decision records and when to add one.
+1. [`README.md`](README.md) — product purpose, toolchain and top-level module map.
+2. [`docs/architecture.md`](docs/architecture.md) — data plane, control plane and runtime boundaries.
+3. [`docs/roadmap.md`](docs/roadmap.md) — current status and next priorities.
+4. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
+5. [`docs/definition-of-done.md`](docs/definition-of-done.md) — repository-wide completion requirements.
+6. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) — real-device GGUF validation.
+7. [`docs/adr/README.md`](docs/adr/README.md) — architectural decision records.
 
-When documents disagree, use this precedence:
+When sources disagree, use this precedence:
 
 1. public contracts and executable tests;
 2. accepted ADRs;
 3. `docs/architecture.md`;
 4. `docs/implementation-plan.md`;
 5. `docs/roadmap.md`;
-6. `README.md` and this navigation guide.
+6. `README.md` and this guide.
 
-Do not silently reconcile contradictions. Call them out and update the relevant source of truth in the same change.
+Do not silently reconcile contradictions. Surface them and update the correct source of truth in the same change.
 
 ## Product intent
 
-The project is a reusable Android infrastructure for running explicit local GGUF models through `llama.cpp`.
-
-The runtime is embedded in native or Capacitor applications first, while preserving a path to a future shared Android service. It is privacy-first, model-aware rather than model-selecting, observable, testable and designed for resource-constrained devices.
+The project is reusable Android infrastructure for running explicit local GGUF models through `llama.cpp`. The runtime is embedded in native or Capacitor applications first while preserving a transport boundary for a future shared Android service.
 
 Request resolution is explicit:
 
@@ -44,134 +40,97 @@ applicationId + useCaseId
         -> exact llama.cpp configuration
 ```
 
-The harness must never silently substitute a model.
+The harness must never silently select or substitute a model.
 
 ## Non-negotiable architecture invariants
 
 - Keep public contracts independent from Android UI, Capacitor and `llama.cpp` implementation types.
 - Never expose native pointers, `llama.cpp` structures or backend-owned handles outside the backend module.
-- Keep the runtime data plane independent from the transport. Embedded and future Binder deployments must execute the same orchestration logic.
+- Keep runtime orchestration independent from transport implementations.
 - Keep model selection explicit through application/use-case bindings.
 - Use stable identifiers and serializable DTOs at public boundaries.
-- Default to one loaded model and one active decode until measurement justifies a different policy.
+- Default to one loaded model and one active decode until benchmarks justify another policy.
 - Keep prompts and generated content out of telemetry by default.
 - Store GGUF artifacts by immutable SHA-256 identity and never commit model binaries.
-- Treat cancellation, shutdown and partial failure as resource-lifecycle paths, not exceptional afterthoughts.
+- Treat cancellation, shutdown and partial failure as normal resource-lifecycle paths.
 - Prefer composition and dependency injection over global mutable state.
-- Add a module only when it owns a real responsibility, dependency boundary, reuse boundary or independently testable behavior.
-- Do not fix duplication by creating generic utilities without a clear domain concept.
+- Add a module only for a real responsibility, dependency boundary, reuse boundary or independently testable behavior.
+- Do not create generic utilities without a clear domain concept merely to remove duplication.
 
 ## Repository map
 
 | Path | Responsibility | Typical changes |
 | --- | --- | --- |
-| `core/contracts` | Stable public requests, responses, events, sessions, metrics and errors | Public API evolution, serializable DTOs |
-| `core/runtime-core` | Runtime orchestration, scheduling, session/model/context lifecycle and memory policy | State transitions, generation flow, queueing, recovery |
-| `models/model-profile` | GGUF artifacts, load profiles, use-case profiles and app bindings | Binding rules, profile validation, explicit configuration |
-| `models/model-store` | Content-addressed storage and artifact integrity | Import, verification, deduplication, cleanup |
-| `backends/llama-cpp` | Kotlin/JNI/C++ backend implementation | GGUF inspection, native lifecycle, generation, streaming, cancellation |
-| `observability/contracts` | Telemetry, logging, health and dashboard contracts | Stable observability schemas |
-| `observability/in-memory-store` | Initial local telemetry implementation | Repository behavior and test doubles |
-| `transports/in-process` | Embedded transport implementation | Client-to-runtime delegation |
-| `apps/local-llm-console` | Developer console shell and future control plane | Diagnostics UI and runtime inspection |
-| `third_party/llama.cpp` | Pinned upstream submodule | Pin updates only; avoid untracked local edits |
-| `scripts` | Repository guards and reproducible validation helpers | CI-safe verification tooling |
-| `docs` | Architecture, implementation plan, roadmap, ADRs and completion rules | Decisions, boundaries, status and operational guidance |
+| `core/contracts` | Stable requests, responses, sessions, metrics and errors | Public API evolution and serializable DTOs |
+| `core/runtime-core` | Orchestration, scheduling, model/context/session lifecycle and memory policy | State transitions, queueing, generation and recovery |
+| `models/model-profile` | Artifacts, load profiles, use-case profiles and app bindings | Explicit configuration and validation |
+| `models/model-store` | Content-addressed storage and integrity | Import, verification, deduplication and cleanup |
+| `backends/llama-cpp` | Kotlin/JNI/C++ backend | Native lifecycle, GGUF inspection, generation and cancellation |
+| `observability/contracts` | Telemetry, logs, health and dashboard contracts | Stable observability schemas |
+| `observability/in-memory-store` | Initial telemetry implementation | Repository behavior and test doubles |
+| `transports/in-process` | Embedded transport | Client-to-runtime delegation |
+| `apps/local-llm-console` | Developer console and future control plane | Diagnostics UI and runtime inspection |
+| `apps/device-test-runner` | Real-device Phase 1 validation app | GGUF lifecycle, cancellation and memory instrumentation tests |
+| `third_party/llama.cpp` | Pinned upstream submodule | Controlled pin updates only |
+| `scripts` | Reproducible repository and device validation | CI guards and host runners |
+| `docs` | Architecture, plan, roadmap, ADRs and operations | Durable decisions and guidance |
 
-The Gradle module list in `settings.gradle.kts` is authoritative. Run `python3 scripts/verify-agent-navigation.py` after adding, removing or renaming a module; CI verifies that every configured module remains discoverable from this file.
+`settings.gradle.kts` is authoritative for the Gradle module list. Run `python3 scripts/verify-agent-navigation.py` after adding, removing or renaming a module.
 
 ## Task routing
 
-### Public API or contract change
+### Public contract change
 
-Start in `core/contracts`.
-
-Also inspect:
-
-- consumers in `core/runtime-core` and `transports/in-process`;
-- observability payloads if identifiers, statuses or errors change;
-- serialization and future Binder compatibility;
-- tests that pin public behavior.
-
-Do not put backend-specific types into contracts.
+Start in `core/contracts`. Inspect consumers in `core/runtime-core`, transports and observability. Preserve serialization and future Binder compatibility. Never put backend-specific types into public contracts.
 
 ### Runtime lifecycle or scheduling change
 
-Start in `core/runtime-core`.
-
-Inspect at minimum:
-
-- `RuntimeOrchestrator.kt`;
-- `InferenceBackend.kt`;
-- `SingleDecodeScheduler.kt`;
-- session/context ownership;
-- failure recovery;
-- cancellation and memory-pressure paths;
-- runtime tests using a fake backend.
-
-State mutations must remain serialized. A failed request must leave the runtime recoverable for a later valid request.
+Start in `core/runtime-core`. Inspect `RuntimeOrchestrator.kt`, `InferenceBackend.kt`, `SingleDecodeScheduler.kt`, session ownership, cancellation, memory-pressure paths and fake-backend tests. State mutations must remain serialized, and a failed request must leave the runtime recoverable.
 
 ### GGUF storage or integrity change
 
-Start in `models/model-store` and `models/model-profile`.
+Start in `models/model-store` and `models/model-profile`. Preserve streaming I/O, atomic staging, SHA-256 identity, duplicate detection, active-model protection and typed failures. Never read a complete model into memory merely to import or hash it.
 
-Preserve:
+### `llama.cpp`, JNI or generation change
 
-- streaming I/O for large files;
-- atomic staging-to-ready transitions;
-- SHA-256 identity;
-- duplicate detection;
-- active-model deletion protection;
-- typed integrity failures.
+Start in `backends/llama-cpp`. Preserve coarse-grained JNI calls, opaque handles, idempotent release, cleanup after partial failures, aggregated streaming, cooperative cancellation and typed Kotlin error mapping.
 
-Never load an entire model into memory merely to import or hash it.
-
-### `llama.cpp`, JNI or native generation change
-
-Start in `backends/llama-cpp`.
-
-Preserve:
-
-- coarse-grained JNI calls;
-- opaque, validated and idempotently closeable handles;
-- cleanup after partial allocation failures;
-- cooperative cancellation during prefill and decode;
-- aggregated streaming across JNI;
-- typed error mapping at the Kotlin boundary;
-- pinned upstream source and reproducible build flags.
-
-Synchronous generation and streaming must share tokenization, context validation, sampler construction, prefill, decode, token conversion, metrics, error mapping and resource ownership. They should differ only in output delivery and cancellation interaction.
-
-Do not include implementation `.cpp` files from other `.cpp` files. Split reusable native responsibilities behind headers and link them through CMake.
+Synchronous and streaming generation must share tokenization, context validation, sampler construction, prefill, decode, token conversion, metrics, error mapping and resource ownership. Do not include implementation `.cpp` files from other `.cpp` files.
 
 ### Observability or console change
 
-Start with `observability/contracts` before changing a store or UI.
+Start with `observability/contracts`. Store identifiers, sizes, timings, token counts, statuses and error codes by default; do not persist prompts or generated content without a separately designed diagnostic mode.
 
-Metrics and logs must remain privacy-safe by default. Record identifiers, sizes, timings, token counts, statuses and error codes; do not persist prompt or output content unless an explicit diagnostic mode is later designed and visibly enabled.
+### Android or Capacitor integration
 
-### New Android or Capacitor integration
+Keep product behavior in core modules and integrations thin. Do not duplicate model resolution, generation policy, validation, error mapping or telemetry across surfaces.
 
-Keep product behavior in core modules and make integrations thin adapters.
+### Real-device validation change
 
-Do not duplicate model resolution, generation policy, validation, error mapping or telemetry behavior across native Android and Capacitor surfaces.
+Start in `apps/device-test-runner`, `scripts/run-device-e2e.sh` and [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md). Keep GGUF files outside the repository and APKs. Device checks must use production store, runtime and backend implementations rather than test doubles.
 
 ## Change workflow
 
-1. Inspect the relevant contracts, implementation, tests and documentation before editing.
-2. Identify the architectural boundary that owns the behavior.
-3. Implement the smallest coherent change without speculative modules or abstractions.
-4. Add or update isolated tests for normal, failure, cancellation and lifecycle paths as relevant.
-5. Run the narrowest useful checks while iterating.
-6. Run the complete validation set before merge.
-7. Update the appropriate source of truth in the same change.
-8. Keep commits focused and describe behavior, not file movement.
+1. Inspect the relevant contracts, implementation, tests and documentation.
+2. Identify the module that owns the behavior.
+3. Implement the smallest coherent change without speculative abstractions.
+4. Add tests for normal, failure, cancellation and lifecycle paths as applicable.
+5. Run targeted checks while iterating.
+6. Run the complete relevant validation before merge.
+7. Update the correct source of truth in the same change.
+8. Keep commits focused and describe behavior rather than file movement.
 
-Do not mark a roadmap item complete before its acceptance criteria and required tests are satisfied.
+Do not mark a roadmap item complete before its acceptance criteria and required evidence are satisfied.
 
 ## Validation commands
 
-### Fast Kotlin/JVM checks
+### Repository navigation
+
+```bash
+python3 scripts/verify-agent-navigation.py
+```
+
+### Kotlin and JVM
 
 ```bash
 ./gradlew spotlessCheck
@@ -179,11 +138,12 @@ Do not mark a roadmap item complete before its acceptance criteria and required 
 ./gradlew check
 ```
 
-### Android validation
+### Android build and lint
 
 ```bash
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 ```
 
 ### Native host tests
@@ -197,56 +157,56 @@ cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
 ```
 
-### Repository navigation guard
+### Real Android device
 
 ```bash
-python3 scripts/verify-agent-navigation.py
+scripts/run-device-e2e.sh \
+  --model /absolute/path/to/model.gguf \
+  --architecture <architecture> \
+  --quantization <quantization>
 ```
 
-### Full local gate
-
-Run all commands above. CI in `.github/workflows/validate.yml` is the final reproducible gate, not a replacement for targeted local tests.
-
-Changes touching native loading, generation, memory management or ABI behavior also require an Android `arm64-v8a` device test with a real supported GGUF before they can be considered production-ready.
+Add `--memory-repeat 5` for repeated lifecycle and PSS regression validation. Real-device evidence is required for changes touching native loading, generation, cancellation, memory management, ABI packaging or JNI behavior.
 
 ## Testing expectations
 
-- Put domain logic behind interfaces so it can be tested without loading a real model where practical.
-- Use fake backends for orchestration, queueing, error and memory-pressure tests.
+- Put domain logic behind interfaces so orchestration can be tested without loading a model where practical.
+- Use fake backends for deterministic queueing, failure and memory-pressure tests.
 - Add native tests for handle registries, metadata parsing, cancellation registries and pure C++ behavior.
-- Add real-device tests for JNI linkage, ABI packaging, GGUF compatibility, repeated load/unload, generation, streaming, cancellation and memory stability.
-- Test cleanup after failures, not only successful output.
-- Test idempotent close/release behavior.
-- Avoid assertions that depend on timing unless the test owns a deterministic clock or scheduler.
+- Use `apps/device-test-runner` for JNI linkage, ABI packaging, real GGUF compatibility, streaming, cancellation and repeated lifecycle tests.
+- Test cleanup after failures and cancellation, not only successful output.
+- Test idempotent close and release behavior.
+- Avoid timing-dependent assertions unless a deterministic clock is owned by the test; real-device timeouts must be configurable.
 
 ## Documentation update matrix
 
 | Change | Documentation to update |
 | --- | --- |
-| Module boundary or dependency direction | `docs/architecture.md`, usually an ADR, and this file if navigation changes |
-| New public API or lifecycle behavior | API documentation, `docs/implementation-plan.md` if scope changes, examples |
-| Completed or deferred work | `docs/roadmap.md` only; do not duplicate status here |
-| New architectural trade-off or irreversible choice | New file under `docs/adr/` and ADR index |
-| New validation command or repository guard | This file, `README.md` when contributor-facing, and CI |
-| New module | `settings.gradle.kts`, this repository map, tests and relevant architecture docs |
-| Feature completion | `docs/definition-of-done.md` checklist plus feature-specific documentation |
+| Module boundary or dependency direction | `docs/architecture.md`, usually an ADR, and this guide |
+| New public API or lifecycle behavior | Feature documentation and `docs/implementation-plan.md` when scope changes |
+| Completed or deferred work | `docs/roadmap.md` |
+| Irreversible architectural choice | New ADR and ADR index |
+| New validation command or guard | This guide, relevant operational document and CI |
+| New module | `settings.gradle.kts`, repository map, tests and architecture docs |
+| Device test behavior or arguments | `docs/device-e2e-testing.md` and `scripts/run-device-e2e.sh` |
+| Feature completion | `docs/definition-of-done.md` and feature-specific evidence |
 
 ## Maintaining `AGENTS.md`
 
 Use the exact uppercase filename `AGENTS.md`. Do not add competing root files such as `agent.md` or `agents.md`.
 
-Keep this file stable and navigational:
+Keep this guide stable and navigational:
 
-- link to canonical documents instead of copying their full content;
-- describe durable invariants, ownership boundaries and commands;
-- keep current implementation status in `docs/roadmap.md`;
+- link to canonical documents instead of duplicating them;
+- describe durable invariants, ownership and commands;
+- keep current status in `docs/roadmap.md`;
 - update the repository map whenever `settings.gradle.kts` changes;
-- update task routing when ownership moves between modules;
-- update validation commands when CI changes;
-- keep links relative so they work in local checkouts and GitHub;
+- update task routing when ownership changes;
+- update validation commands when CI or device tooling changes;
+- keep links relative;
 - run `python3 scripts/verify-agent-navigation.py` after every edit.
 
-Add a nested `AGENTS.md` only when a subtree has substantial rules that would otherwise overload this root guide. A nested guide may refine instructions for its subtree but must not contradict root invariants. Link every nested guide from this file so agents can discover it without scanning the repository.
+Add a nested `AGENTS.md` only when a subtree has substantial additional rules. A nested guide may refine but must not contradict root invariants, and it must be linked from this file.
 
 ## Stop conditions
 
@@ -256,7 +216,7 @@ Pause and surface the issue rather than improvising when:
 - documentation and executable behavior disagree materially;
 - a model or upstream native dependency would need to be committed directly;
 - a change requires exposing backend-native state through public APIs;
-- tests reveal unbounded memory growth, use-after-close, data races or unrecoverable runtime state;
-- required Android/NDK tooling or a real-device validation step is unavailable.
+- tests show unbounded memory growth, use-after-close, data races or unrecoverable runtime state;
+- required Android/NDK tooling or real-device validation is unavailable.
 
-A partial, explicitly documented result is preferable to claiming a feature is complete without the required evidence.
+A partial, explicitly documented result is preferable to claiming completion without required evidence.
