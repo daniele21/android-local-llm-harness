@@ -2,6 +2,33 @@
 
 This file is the authoritative source for current implementation status. Detailed target behavior and acceptance criteria remain in [`implementation-plan.md`](implementation-plan.md).
 
+## Current execution status — August 2026
+
+Pull request #13 is the active Phase 1 consolidation line.
+
+### Verified in clean GitHub Actions runs
+
+- [x] coding-agent navigation and llama.cpp pin guards
+- [x] native host configuration, compilation and tests
+- [x] Spotless and ktlint formatting checks
+- [x] Detekt static analysis and model-artifact repository guard
+- [x] JVM unit tests
+- [x] Android Lint for the debug and console internal variants
+
+### Current CI gate
+
+- [ ] complete one cumulative clean run that also assembles and uploads every expected APK and AAR
+
+The artifact build uses explicit module-scoped Gradle tasks rather than the root `assembleDebug` fan-out. Its combined Gradle output is persisted as `build/android-artifacts.log` in the `validation-reports` artifact so a remaining Android build failure can be diagnosed from the same run.
+
+### Device evidence still required
+
+- [ ] execute the complete lifecycle on a physical Android `arm64-v8a` device with a supported external GGUF
+- [ ] verify cancellation during prefill and decode
+- [ ] collect repeated load/unload and generation memory evidence
+- [ ] confirm packaged JNI loading on representative devices
+- [ ] record baseline latency, throughput, memory and thermal measurements
+
 ## Phase 0 — repository foundation
 
 - [x] Gradle multi-module structure
@@ -19,11 +46,11 @@ This file is the authoritative source for current implementation status. Detaile
 - [x] Detekt CLI and Android Lint checks
 - [x] debug, internal and release console variants
 - [x] dependency locking configuration
-- [x] CI artifact publication
+- [x] CI artifact publication infrastructure
 - [x] CODEOWNERS, security, versioning and ADR foundations
 - [x] model-binary repository guard
 - [x] generated Gradle Wrapper committed and checksum-validated
-- [x] clean CI validation completed
+- [ ] clean cumulative CI validation completed
 
 ## Phase 1 — functional embedded runtime
 
