@@ -206,10 +206,7 @@ private class RuntimeFixture {
     )
     val runtime = RuntimeOrchestrator(registry, store, backend)
 
-    fun request(
-        id: String,
-        sessionId: io.github.daniele21.localllm.contracts.SessionId,
-    ): GenerationRequest = GenerationRequest(
+    fun request(id: String, sessionId: io.github.daniele21.localllm.contracts.SessionId): GenerationRequest = GenerationRequest(
         requestId = RequestId(id),
         sessionId = sessionId,
         applicationId = applicationId,
@@ -223,11 +220,7 @@ private class RuntimeFixture {
         modelFile.delete()
     }
 
-    private fun resolved(
-        useCaseId: UseCaseId,
-        profileId: String,
-        modelDigest: ModelDigest,
-    ): ResolvedUseCase {
+    private fun resolved(useCaseId: UseCaseId, profileId: String, modelDigest: ModelDigest): ResolvedUseCase {
         val model = GgufModelProfile(
             id = profileId,
             artifact = GgufArtifact(
@@ -268,18 +261,12 @@ private class RuntimeFixture {
     }
 }
 
-private class FakeRuntimeRegistry(
-    private val primary: ResolvedUseCase,
-    private val secondary: ResolvedUseCase,
-) : ModelProfileRegistry {
+private class FakeRuntimeRegistry(private val primary: ResolvedUseCase, private val secondary: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         if (useCaseId == primary.binding.useCaseId) primary else secondary
 }
 
-private class FakeRuntimeModelStore(
-    private val file: File,
-    private val available: Set<ModelDigest>,
-) : ModelStore {
+private class FakeRuntimeModelStore(private val file: File, private val available: Set<ModelDigest>) : ModelStore {
     var verificationCalls: Int = 0
 
     override fun find(digest: ModelDigest): StoredModel? = if (digest in available) {
@@ -288,10 +275,7 @@ private class FakeRuntimeModelStore(
         null
     }
 
-    override fun import(
-        source: File,
-        artifact: GgufArtifact,
-    ): StoredModel = error("Not used")
+    override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
 
     override fun verify(digest: ModelDigest): VerificationResult {
         verificationCalls += 1
@@ -309,9 +293,7 @@ private data class FakeBackendModel(
     override val loadDurationMs: Long = 12,
 ) : BackendModelHandle
 
-private data class FakeBackendContext(
-    override val model: BackendModelHandle,
-) : BackendContextHandle
+private data class FakeBackendContext(override val model: BackendModelHandle) : BackendContextHandle
 
 private class FakeInferenceBackend : InferenceBackend {
     override val id: String = "fake"
@@ -329,10 +311,7 @@ private class FakeInferenceBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(
-        storedModel: StoredModel,
-        profile: GgufModelProfile,
-    ): BackendModelHandle {
+    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
         return FakeBackendModel(storedModel.digest, profile.id)
     }
@@ -341,10 +320,7 @@ private class FakeInferenceBackend : InferenceBackend {
         unloadCalls += 1
     }
 
-    override fun createContext(
-        model: BackendModelHandle,
-        profile: GgufModelProfile,
-    ): BackendContextHandle = FakeBackendContext(model)
+    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle = FakeBackendContext(model)
 
     override fun releaseContext(context: BackendContextHandle) {
         releaseCalls += 1

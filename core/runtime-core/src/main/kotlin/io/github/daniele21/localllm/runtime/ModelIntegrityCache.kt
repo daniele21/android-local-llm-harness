@@ -39,11 +39,7 @@ class ModelIntegrityCache {
 
     fun size(): Int = verified.size
 
-    private data class VerificationStamp(
-        val absolutePath: String,
-        val sizeBytes: Long,
-        val lastModifiedMs: Long,
-    ) {
+    private data class VerificationStamp(val absolutePath: String, val sizeBytes: Long, val lastModifiedMs: Long) {
         companion object {
             fun from(storedModel: StoredModel): VerificationStamp = from(storedModel.sizeBytes, storedModel)
 

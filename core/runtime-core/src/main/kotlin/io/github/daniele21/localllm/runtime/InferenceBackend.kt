@@ -36,11 +36,7 @@ sealed interface BackendGenerationOutcome {
     data class Cancelled(val metrics: BackendGenerationMetrics) : BackendGenerationOutcome
 }
 
-class BackendException(
-    val code: String,
-    message: String,
-    cause: Throwable? = null,
-) : IllegalStateException(message, cause)
+class BackendException(val code: String, message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 
 interface InferenceBackend {
     val id: String

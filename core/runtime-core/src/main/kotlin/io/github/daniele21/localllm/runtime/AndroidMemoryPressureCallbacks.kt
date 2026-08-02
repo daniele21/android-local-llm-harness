@@ -9,9 +9,7 @@ fun interface SystemLowMemoryProbe {
     fun isLowMemory(): Boolean
 }
 
-class ActivityManagerLowMemoryProbe(
-    context: Context,
-) : SystemLowMemoryProbe {
+class ActivityManagerLowMemoryProbe(context: Context) : SystemLowMemoryProbe {
     private val activityManager = context.applicationContext.getSystemService(ActivityManager::class.java)
 
     override fun isLowMemory(): Boolean {

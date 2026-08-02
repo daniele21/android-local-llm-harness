@@ -37,7 +37,8 @@ class RuntimeOrchestrator(
     private val clock: MonotonicClock = MonotonicClock(System::nanoTime),
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
-) : LocalLlmClient, AutoCloseable {
+) : LocalLlmClient,
+    AutoCloseable {
     private val resourceLock = Any()
     private val state = AtomicReference(RuntimeState.IDLE)
     private val sessions = ConcurrentHashMap<SessionId, SessionDescriptor>()
@@ -104,10 +105,7 @@ class RuntimeOrchestrator(
         }
     }
 
-    override fun generate(
-        request: GenerationRequest,
-        listener: GenerationListener,
-    ): GenerationHandle {
+    override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle {
         if (closed.get()) {
             return failImmediately(request.requestId, listener, LocalLlmError.Configuration("Runtime is closed"))
         }
@@ -200,10 +198,12 @@ class RuntimeOrchestrator(
         val action = memoryPolicy.decide(pressure, memoryResourceSnapshot())
         return when (action) {
             RuntimeMemoryAction.NONE -> RuntimeMemoryResult(action, 0, false, false)
+
             RuntimeMemoryAction.UNLOAD_IDLE_MODEL -> {
                 val unloaded = unloadIdleModel()
                 RuntimeMemoryResult(action, 0, unloaded, deferred = !unloaded)
             }
+
             RuntimeMemoryAction.CANCEL_AND_RELEASE_ALL -> releaseForCriticalMemory(action)
         }
     }
@@ -247,12 +247,7 @@ class RuntimeOrchestrator(
         state.set(RuntimeState.IDLE)
     }
 
-    private fun executeGeneration(
-        request: GenerationRequest,
-        session: SessionDescriptor,
-        lifecycle: RequestLifecycle,
-        enqueuedAt: Long,
-    ) {
+    private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
         if (lifecycle.cancelRequested.get()) {
             lifecycle.finish(GenerationEvent.Failed(request.requestId, LocalLlmError.Cancelled()))
             return
@@ -431,11 +426,7 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun failImmediately(
-        requestId: RequestId,
-        listener: GenerationListener,
-        error: LocalLlmError,
-    ): GenerationHandle {
+    private fun failImmediately(requestId: RequestId, listener: GenerationListener, error: LocalLlmError): GenerationHandle {
         runCatching { listener.onEvent(GenerationEvent.Failed(requestId, error)) }
         return NoOpGenerationHandle(requestId)
     }
@@ -461,10 +452,7 @@ class RuntimeOrchestrator(
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
 
-    private data class LoadedModelDescriptor(
-        val profileId: String,
-        val handle: BackendModelHandle,
-    )
+    private data class LoadedModelDescriptor(val profileId: String, val handle: BackendModelHandle)
 
     private data class SessionDescriptor(
         val id: SessionId,
@@ -487,11 +475,7 @@ class RuntimeOrchestrator(
     }
 }
 
-private class RequestLifecycle(
-    val requestId: RequestId,
-    private val listener: GenerationListener,
-    private val onTerminal: () -> Unit,
-) {
+private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
     val cancelRequested = AtomicBoolean(false)
     private val terminal = AtomicBoolean(false)
 
@@ -524,8 +508,6 @@ private class RuntimeGenerationHandle(
     }
 }
 
-private class NoOpGenerationHandle(
-    override val requestId: RequestId,
-) : GenerationHandle {
+private class NoOpGenerationHandle(override val requestId: RequestId) : GenerationHandle {
     override fun cancel() = Unit
 }

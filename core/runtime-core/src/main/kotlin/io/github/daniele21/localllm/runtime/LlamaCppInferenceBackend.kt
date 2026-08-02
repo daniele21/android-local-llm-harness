@@ -40,10 +40,7 @@ class LlamaCppInferenceBackend(
         }
     }
 
-    override fun loadModel(
-        storedModel: StoredModel,
-        profile: GgufModelProfile,
-    ): BackendModelHandle {
+    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
         require(storedModel.digest == profile.artifact.digest) {
             "Stored model digest does not match profile ${profile.id}"
         }
@@ -61,10 +58,7 @@ class LlamaCppInferenceBackend(
         }
     }
 
-    override fun createContext(
-        model: BackendModelHandle,
-        profile: GgufModelProfile,
-    ): BackendContextHandle {
+    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle {
         val nativeModel = model.requireLlamaModel()
         return when (val result = generationBridge.createContext(nativeModel.delegate, profile)) {
             is ContextCreationResult.Success -> LlamaBackendContext(nativeModel, result.context)
@@ -115,18 +109,13 @@ class LlamaCppInferenceBackend(
         is StreamingCancelResult.Failure -> throw result.error.asBackendException()
     }
 
-    private data class LlamaBackendModel(
-        val delegate: LoadedNativeModel,
-    ) : BackendModelHandle {
+    private data class LlamaBackendModel(val delegate: LoadedNativeModel) : BackendModelHandle {
         override val digest = delegate.digest
         override val profileId = delegate.profileId
         override val loadDurationMs = delegate.loadDurationMs
     }
 
-    private data class LlamaBackendContext(
-        override val model: LlamaBackendModel,
-        val delegate: LoadedNativeContext,
-    ) : BackendContextHandle
+    private data class LlamaBackendContext(override val model: LlamaBackendModel, val delegate: LoadedNativeContext) : BackendContextHandle
 
     private fun BackendModelHandle.requireLlamaModel(): LlamaBackendModel = this as? LlamaBackendModel
         ?: throw BackendException("BACKEND_MISMATCH", "Model handle was not created by the llama.cpp backend")

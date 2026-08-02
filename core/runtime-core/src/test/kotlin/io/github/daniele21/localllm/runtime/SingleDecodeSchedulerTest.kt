@@ -66,7 +66,10 @@ class SingleDecodeSchedulerTest {
             scheduler.submit(
                 RequestId(id),
                 priority,
-                task = { order += id; completed.countDown() },
+                task = {
+                    order += id
+                    completed.countDown()
+                },
                 onQueuedCancellation = {},
                 onRunningCancellation = {},
             )
@@ -96,7 +99,10 @@ class SingleDecodeSchedulerTest {
         scheduler.submit(
             RequestId("active"),
             DecodePriority.FOREGROUND,
-            task = { firstStarted.countDown(); releaseFirst.await() },
+            task = {
+                firstStarted.countDown()
+                releaseFirst.await()
+            },
             onQueuedCancellation = {},
             onRunningCancellation = {},
         )
@@ -128,9 +134,15 @@ class SingleDecodeSchedulerTest {
         val submission = scheduler.submit(
             RequestId("running"),
             DecodePriority.FOREGROUND,
-            task = { started.countDown(); release.await() },
+            task = {
+                started.countDown()
+                release.await()
+            },
             onQueuedCancellation = {},
-            onRunningCancellation = { cancellation.countDown(); release.countDown() },
+            onRunningCancellation = {
+                cancellation.countDown()
+                release.countDown()
+            },
         )
 
         assertTrue(started.await(2, TimeUnit.SECONDS))
@@ -148,7 +160,10 @@ class SingleDecodeSchedulerTest {
         scheduler.submit(
             RequestId("active"),
             DecodePriority.FOREGROUND,
-            task = { started.countDown(); release.await() },
+            task = {
+                started.countDown()
+                release.await()
+            },
             onQueuedCancellation = {},
             onRunningCancellation = {},
         )

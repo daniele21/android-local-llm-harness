@@ -10,10 +10,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
-class FileSystemModelStore(
-    private val rootDirectory: File,
-    private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES,
-) : ModelStore {
+class FileSystemModelStore(private val rootDirectory: File, private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES) : ModelStore {
     init {
         require(bufferSizeBytes > 0) { "bufferSizeBytes must be positive" }
     }
@@ -180,11 +177,7 @@ class FileSystemModelStore(
         )
     }
 
-    private fun existingImport(
-        destination: File,
-        expectedDigest: ModelDigest,
-        expectedSize: Long,
-    ): StoredModel? {
+    private fun existingImport(destination: File, expectedDigest: ModelDigest, expectedSize: Long): StoredModel? {
         if (!destination.exists()) return null
         if (!destination.isFile) {
             throw destinationConflict(destination, "destination is not a regular file")
@@ -214,11 +207,10 @@ class FileSystemModelStore(
         )
     }
 
-    private fun destinationConflict(destination: File, detail: String): ModelImportException =
-        ModelImportException(
-            ModelImportErrorCode.DESTINATION_CONFLICT,
-            "Content-addressed destination conflict at ${destination.path}: $detail",
-        )
+    private fun destinationConflict(destination: File, detail: String): ModelImportException = ModelImportException(
+        ModelImportErrorCode.DESTINATION_CONFLICT,
+        "Content-addressed destination conflict at ${destination.path}: $detail",
+    )
 
     private fun copyAndDigest(source: File, destination: File): DigestedFile {
         val messageDigest = MessageDigest.getInstance(SHA_256)
@@ -285,8 +277,7 @@ class FileSystemModelStore(
         }
     }
 
-    private fun artifactFile(digest: ModelDigest): File =
-        File(rootDirectory, ModelStoreLayout.relativeArtifactPath(digest))
+    private fun artifactFile(digest: ModelDigest): File = File(rootDirectory, ModelStoreLayout.relativeArtifactPath(digest))
 
     private fun snapshotEntry(file: File): StoredModel? {
         val digestDirectory = file.parentFile ?: return null

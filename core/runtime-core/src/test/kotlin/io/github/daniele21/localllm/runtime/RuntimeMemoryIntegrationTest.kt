@@ -100,15 +100,13 @@ class RuntimeMemoryIntegrationTest {
         fixture.close()
     }
 
-    private fun terminalListener(
-        events: MutableList<GenerationEvent>,
-        terminals: CountDownLatch,
-    ): GenerationListener = GenerationListener { event ->
-        events += event
-        if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
-            terminals.countDown()
+    private fun terminalListener(events: MutableList<GenerationEvent>, terminals: CountDownLatch): GenerationListener =
+        GenerationListener { event ->
+            events += event
+            if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
+                terminals.countDown()
+            }
         }
-    }
 
     private fun eventually(timeoutMs: Long = 2_000, condition: () -> Boolean): Boolean {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
@@ -184,15 +182,11 @@ private class MemoryRuntimeFixture {
     }
 }
 
-private class MemoryRegistry(
-    private val resolved: ResolvedUseCase,
-) : ModelProfileRegistry {
+private class MemoryRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = resolved
 }
 
-private class MemoryModelStore(
-    private val file: File,
-) : ModelStore {
+private class MemoryModelStore(private val file: File) : ModelStore {
     override fun find(digest: ModelDigest): StoredModel = StoredModel(
         digest = digest,
         file = file,
@@ -215,9 +209,7 @@ private data class MemoryBackendModel(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class MemoryBackendContext(
-    override val model: BackendModelHandle,
-) : BackendContextHandle
+private data class MemoryBackendContext(override val model: BackendModelHandle) : BackendContextHandle
 
 private class MemoryFakeBackend : InferenceBackend {
     override val id: String = "memory-fake"
@@ -231,19 +223,14 @@ private class MemoryFakeBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(
-        storedModel: StoredModel,
-        profile: GgufModelProfile,
-    ): BackendModelHandle = MemoryBackendModel(storedModel.digest, profile.id)
+    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle =
+        MemoryBackendModel(storedModel.digest, profile.id)
 
     override fun unloadModel(model: BackendModelHandle) {
         unloadCalls += 1
     }
 
-    override fun createContext(
-        model: BackendModelHandle,
-        profile: GgufModelProfile,
-    ): BackendContextHandle = MemoryBackendContext(model)
+    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle = MemoryBackendContext(model)
 
     override fun releaseContext(context: BackendContextHandle) {
         releaseCalls += 1

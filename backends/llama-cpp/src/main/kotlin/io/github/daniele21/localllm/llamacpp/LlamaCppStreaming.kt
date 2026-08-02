@@ -42,9 +42,7 @@ class JniLlamaStreamingApi : NativeLlamaStreamingApi {
     external override fun cancel(requestId: String): Array<String>
 }
 
-class LlamaCppStreamingBridge(
-    private val nativeApi: NativeLlamaStreamingApi = JniLlamaStreamingApi(),
-) {
+class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = JniLlamaStreamingApi()) {
     fun generate(
         context: LoadedNativeContext,
         requestId: String,
@@ -101,11 +99,7 @@ class LlamaCppStreamingBridge(
         return StreamingCancelResult.Failure(decodeError(response))
     }
 
-    private fun validate(
-        requestId: String,
-        prompt: String,
-        config: NativeGenerationConfig,
-    ): StreamingNativeError? {
+    private fun validate(requestId: String, prompt: String, config: NativeGenerationConfig): StreamingNativeError? {
         if (requestId.isBlank()) {
             return StreamingNativeError(
                 code = StreamingNativeErrorCode.INVALID_ARGUMENT,
@@ -170,17 +164,9 @@ fun interface NativeStreamingListener {
     fun onChunk(chunk: NativeTextChunk): Boolean
 }
 
-data class NativeTextChunk(
-    val text: String,
-    val generatedTokens: Int,
-)
+data class NativeTextChunk(val text: String, val generatedTokens: Int)
 
-data class NativeStreamingMetrics(
-    val inputTokens: Int,
-    val outputTokens: Int,
-    val promptDurationMs: Long,
-    val generationDurationMs: Long,
-)
+data class NativeStreamingMetrics(val inputTokens: Int, val outputTokens: Int, val promptDurationMs: Long, val generationDurationMs: Long)
 
 sealed interface NativeStreamingResult {
     data class Completed(val metrics: NativeStreamingMetrics) : NativeStreamingResult
@@ -193,10 +179,7 @@ sealed interface StreamingCancelResult {
     data class Failure(val error: StreamingNativeError) : StreamingCancelResult
 }
 
-data class StreamingNativeError(
-    val code: StreamingNativeErrorCode,
-    val message: String,
-)
+data class StreamingNativeError(val code: StreamingNativeErrorCode, val message: String)
 
 enum class StreamingNativeErrorCode {
     INVALID_ARGUMENT,

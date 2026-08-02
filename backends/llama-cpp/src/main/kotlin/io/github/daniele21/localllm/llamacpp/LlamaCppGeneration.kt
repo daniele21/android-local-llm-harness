@@ -55,13 +55,8 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
     ): Array<String>
 }
 
-class LlamaCppGenerationBridge(
-    private val nativeApi: NativeLlamaGenerationApi = JniLlamaGenerationApi(),
-) {
-    fun createContext(
-        model: LoadedNativeModel,
-        profile: GgufModelProfile,
-    ): ContextCreationResult = decodeContextCreation(
+class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi = JniLlamaGenerationApi()) {
+    fun createContext(model: LoadedNativeModel, profile: GgufModelProfile): ContextCreationResult = decodeContextCreation(
         response = nativeApi.createContext(
             modelHandle = model.handle.value,
             contextSize = profile.contextSize,
@@ -78,11 +73,7 @@ class LlamaCppGenerationBridge(
         nativeApi.releaseContext(context.handle.value),
     )
 
-    fun generate(
-        context: LoadedNativeContext,
-        prompt: String,
-        config: NativeGenerationConfig,
-    ): NativeGenerationResult {
+    fun generate(context: LoadedNativeContext, prompt: String, config: NativeGenerationConfig): NativeGenerationResult {
         val validationError = config.validationError(prompt)
         if (validationError != null) {
             return NativeGenerationResult.Failure(validationError)
@@ -101,10 +92,7 @@ class LlamaCppGenerationBridge(
         )
     }
 
-    private fun decodeContextCreation(
-        response: Array<String>,
-        model: LoadedNativeModel,
-    ): ContextCreationResult {
+    private fun decodeContextCreation(response: Array<String>, model: LoadedNativeModel): ContextCreationResult {
         if (response.size == CONTEXT_CREATION_FIELD_COUNT && response[0] == OK) {
             return try {
                 ContextCreationResult.Success(
@@ -181,18 +169,9 @@ value class NativeContextHandle(val value: Long) {
     }
 }
 
-data class LoadedNativeContext(
-    val handle: NativeContextHandle,
-    val model: LoadedNativeModel,
-)
+data class LoadedNativeContext(val handle: NativeContextHandle, val model: LoadedNativeModel)
 
-data class NativeGenerationConfig(
-    val maxOutputTokens: Int,
-    val temperature: Float,
-    val topP: Float,
-    val topK: Int,
-    val seed: Long,
-) {
+data class NativeGenerationConfig(val maxOutputTokens: Int, val temperature: Float, val topP: Float, val topK: Int, val seed: Long) {
     internal fun validationError(prompt: String): GenerationNativeError? = when {
         prompt.isBlank() -> invalid("Prompt must not be blank")
         maxOutputTokens <= 0 -> invalid("Maximum output tokens must be positive")
@@ -209,18 +188,10 @@ data class NativeGenerationConfig(
     )
 }
 
-data class NativeGenerationMetrics(
-    val inputTokens: Int,
-    val outputTokens: Int,
-    val promptDurationMs: Long,
-    val generationDurationMs: Long,
-)
+data class NativeGenerationMetrics(val inputTokens: Int, val outputTokens: Int, val promptDurationMs: Long, val generationDurationMs: Long)
 
 sealed interface NativeGenerationResult {
-    data class Success(
-        val output: String,
-        val metrics: NativeGenerationMetrics,
-    ) : NativeGenerationResult
+    data class Success(val output: String, val metrics: NativeGenerationMetrics) : NativeGenerationResult
 
     data class Failure(val error: GenerationNativeError) : NativeGenerationResult
 }
@@ -235,10 +206,7 @@ sealed interface GenerationNativeOperationResult {
     data class Failure(val error: GenerationNativeError) : GenerationNativeOperationResult
 }
 
-data class GenerationNativeError(
-    val code: GenerationNativeErrorCode,
-    val message: String,
-)
+data class GenerationNativeError(val code: GenerationNativeErrorCode, val message: String)
 
 enum class GenerationNativeErrorCode {
     INVALID_ARGUMENT,

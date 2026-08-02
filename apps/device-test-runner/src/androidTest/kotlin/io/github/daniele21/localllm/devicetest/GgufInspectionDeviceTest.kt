@@ -35,6 +35,7 @@ class GgufInspectionDeviceTest {
                         "fileType=${result.metadata.fileType}",
                 )
             }
+
             is GgufInspectionResult.Failure -> throw AssertionError(
                 "GGUF inspection failed: ${result.error.code}: ${result.error.message}",
             )

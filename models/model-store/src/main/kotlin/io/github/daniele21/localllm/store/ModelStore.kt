@@ -18,11 +18,8 @@ data class VerificationResult(val valid: Boolean, val actualDigest: ModelDigest?
 
 data class ModelStoreSnapshot(val modelCount: Int, val totalBytes: Long, val entries: List<StoredModel>)
 
-class ModelImportException(
-    val code: ModelImportErrorCode,
-    message: String,
-    cause: Throwable? = null,
-) : IllegalStateException(message, cause)
+class ModelImportException(val code: ModelImportErrorCode, message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
 
 enum class ModelImportErrorCode {
     INVALID_SOURCE,

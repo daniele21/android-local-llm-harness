@@ -208,11 +208,7 @@ class LlamaCppBridgeTest {
         deleteOnExit()
     }
 
-    private fun testProfile(
-        gpuLayers: Int = 0,
-        useMmap: Boolean = true,
-        useMlock: Boolean = false,
-    ): GgufModelProfile = GgufModelProfile(
+    private fun testProfile(gpuLayers: Int = 0, useMmap: Boolean = true, useMlock: Boolean = false): GgufModelProfile = GgufModelProfile(
         id = "test-profile",
         artifact = GgufArtifact(
             digest = ModelDigest("sha256:test"),
@@ -264,12 +260,7 @@ private class FakeNativeLlamaApi(
         return shutdown
     }
 
-    override fun loadModel(
-        path: String,
-        nGpuLayers: Int,
-        useMmap: Boolean,
-        useMlock: Boolean,
-    ): Array<String> {
+    override fun loadModel(path: String, nGpuLayers: Int, useMmap: Boolean, useMlock: Boolean): Array<String> {
         lastModelLoad = listOf(path, nGpuLayers, useMmap, useMlock)
         return modelLoad
     }

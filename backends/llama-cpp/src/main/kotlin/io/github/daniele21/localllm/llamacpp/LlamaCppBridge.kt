@@ -119,11 +119,7 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
         return RuntimeInitializationResult.Failure(decodeStandardError(response))
     }
 
-    private fun decodeModelLoad(
-        response: Array<String>,
-        file: File,
-        profile: GgufModelProfile,
-    ): ModelLoadResult {
+    private fun decodeModelLoad(response: Array<String>, file: File, profile: GgufModelProfile): ModelLoadResult {
         if (response.size == MODEL_LOAD_FIELD_COUNT && response[0] == OK) {
             return try {
                 ModelLoadResult.Success(

@@ -172,8 +172,7 @@ class FileSystemModelStoreTest {
         }
     }
 
-    private fun writeSource(name: String, bytes: ByteArray): File =
-        temporaryFolder.newFile(name).apply { writeBytes(bytes) }
+    private fun writeSource(name: String, bytes: ByteArray): File = temporaryFolder.newFile(name).apply { writeBytes(bytes) }
 
     private fun artifact(digest: String, sizeBytes: Long): GgufArtifact = GgufArtifact(
         digest = ModelDigest(digest),

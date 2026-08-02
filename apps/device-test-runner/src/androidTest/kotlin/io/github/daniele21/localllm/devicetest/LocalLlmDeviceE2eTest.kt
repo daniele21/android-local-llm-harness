@@ -270,11 +270,7 @@ class LocalLlmDeviceE2eTest {
         }
     }
 
-    private fun request(
-        harness: DeviceHarness,
-        session: SessionId,
-        prompt: String,
-    ): GenerationRequest = GenerationRequest(
+    private fun request(harness: DeviceHarness, session: SessionId, prompt: String): GenerationRequest = GenerationRequest(
         requestId = RequestId(UUID.randomUUID().toString()),
         sessionId = session,
         applicationId = harness.applicationId,
@@ -307,15 +303,9 @@ class LocalLlmDeviceE2eTest {
     }
 }
 
-private data class DeviceHarness(
-    val runtime: RuntimeOrchestrator,
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+private data class DeviceHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
-private class SingleBindingRegistry(
-    private val resolved: ResolvedUseCase,
-) : ModelProfileRegistry {
+private class SingleBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
         require(applicationId == resolved.binding.applicationId) {
             "Unknown applicationId ${applicationId.value}"
@@ -402,16 +392,9 @@ private data class ModelArguments(
     }
 }
 
-private data class GenerationArguments(
-    val prompt: String,
-    val maxOutputTokens: Int,
-)
+private data class GenerationArguments(val prompt: String, val maxOutputTokens: Int)
 
-private data class CancellationArguments(
-    val enabled: Boolean,
-    val prompt: String,
-    val maxOutputTokens: Int,
-)
+private data class CancellationArguments(val enabled: Boolean, val prompt: String, val maxOutputTokens: Int)
 
 private data class MemoryArguments(
     val repeatCount: Int,
@@ -421,30 +404,23 @@ private data class MemoryArguments(
     val maxPssGrowthKb: Int,
 )
 
-private class InstrumentationArgumentReader(
-    private val arguments: android.os.Bundle,
-) {
-    fun string(name: String, default: String): String =
-        arguments.getString(name)?.takeIf { it.isNotBlank() } ?: default
+private class InstrumentationArgumentReader(private val arguments: android.os.Bundle) {
+    fun string(name: String, default: String): String = arguments.getString(name)?.takeIf { it.isNotBlank() } ?: default
 
-    fun requiredString(name: String): String =
-        arguments.getString(name)?.takeIf { it.isNotBlank() }
-            ?: error("Missing required instrumentation argument: $name")
+    fun requiredString(name: String): String = arguments.getString(name)?.takeIf { it.isNotBlank() }
+        ?: error("Missing required instrumentation argument: $name")
 
-    fun positiveInt(name: String, default: Int): Int =
-        string(name, default.toString()).toInt().also {
-            require(it > 0) { "$name must be positive" }
-        }
+    fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it > 0) { "$name must be positive" }
+    }
 
-    fun nonNegativeInt(name: String, default: Int): Int =
-        string(name, default.toString()).toInt().also {
-            require(it >= 0) { "$name must not be negative" }
-        }
+    fun nonNegativeInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it >= 0) { "$name must not be negative" }
+    }
 
-    fun positiveLong(name: String, default: Long): Long =
-        string(name, default.toString()).toLong().also {
-            require(it > 0) { "$name must be positive" }
-        }
+    fun positiveLong(name: String, default: Long): Long = string(name, default.toString()).toLong().also {
+        require(it > 0) { "$name must be positive" }
+    }
 
     fun decoded(name: String, default: String): String {
         val encoded = arguments.getString(name)?.takeIf { it.isNotBlank() } ?: return default

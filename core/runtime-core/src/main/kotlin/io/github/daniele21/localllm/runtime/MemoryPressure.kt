@@ -27,10 +27,7 @@ data class RuntimeMemoryResult(
 )
 
 class RuntimeMemoryPolicy {
-    fun decide(
-        pressure: RuntimeMemoryPressure,
-        resources: RuntimeMemoryResourceSnapshot,
-    ): RuntimeMemoryAction {
+    fun decide(pressure: RuntimeMemoryPressure, resources: RuntimeMemoryResourceSnapshot): RuntimeMemoryAction {
         if (!resources.modelLoaded && resources.activeSessions == 0 &&
             !resources.activeGeneration && resources.queuedGenerations == 0
         ) {

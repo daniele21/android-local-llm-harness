@@ -25,7 +25,10 @@ class LlamaCppStreamingTest {
             requestId = "request-1",
             prompt = "Prompt",
             config = testConfig(),
-            listener = NativeStreamingListener { chunk -> received += chunk; true },
+            listener = NativeStreamingListener { chunk ->
+                received += chunk
+                true
+            },
         )
 
         assertEquals(
@@ -84,7 +87,10 @@ class LlamaCppStreamingTest {
             "request-3",
             "Prompt",
             testConfig(),
-            NativeStreamingListener { listenerCalled = true; true },
+            NativeStreamingListener {
+                listenerCalled = true
+                true
+            },
         )
 
         assertTrue(result is NativeStreamingResult.Cancelled)

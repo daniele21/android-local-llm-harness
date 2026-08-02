@@ -83,9 +83,7 @@ class ModelIntegrityCacheTest {
     }
 }
 
-private class CountingModelStore(
-    private val valid: Boolean,
-) : ModelStore {
+private class CountingModelStore(private val valid: Boolean) : ModelStore {
     var verificationCalls: Int = 0
 
     override fun find(digest: ModelDigest): StoredModel? = null

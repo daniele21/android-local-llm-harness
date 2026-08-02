@@ -15,16 +15,9 @@ enum class DecodePriority(val rank: Int) {
     MAINTENANCE(3),
 }
 
-data class DecodeSchedulerSnapshot(
-    val activeRequest: RequestId?,
-    val queuedRequests: Int,
-    val closed: Boolean,
-)
+data class DecodeSchedulerSnapshot(val activeRequest: RequestId?, val queuedRequests: Int, val closed: Boolean)
 
-data class DecodeSubmission(
-    val queuePosition: Int,
-    val handle: DecodeTaskHandle,
-)
+data class DecodeSubmission(val queuePosition: Int, val handle: DecodeTaskHandle)
 
 interface DecodeTaskHandle {
     val requestId: RequestId
@@ -83,10 +76,12 @@ class SingleDecodeScheduler(
 
         when {
             work.started.get() -> work.onRunningCancellation()
+
             queue.remove(work) -> {
                 works.remove(requestId, work)
                 work.notifyQueuedCancellation()
             }
+
             work.started.get() -> work.onRunningCancellation()
         }
         return true
@@ -164,10 +159,7 @@ class SingleDecodeScheduler(
         }
     }
 
-    private class SchedulerHandle(
-        override val requestId: RequestId,
-        private val scheduler: SingleDecodeScheduler,
-    ) : DecodeTaskHandle {
+    private class SchedulerHandle(override val requestId: RequestId, private val scheduler: SingleDecodeScheduler) : DecodeTaskHandle {
         override fun cancel(): Boolean = scheduler.cancel(requestId)
     }
 }
