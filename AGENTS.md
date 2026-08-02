@@ -11,7 +11,7 @@ Read these documents before making a non-trivial change:
 3. [`docs/architecture.md`](docs/architecture.md) — data plane, control plane and runtime boundaries.
 4. [`docs/roadmap.md`](docs/roadmap.md) — current status and next priorities.
 5. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
-6. [`docs/definition-of-done.md`](docs/definition-of-done.md) — repository-wide completion requirements.
+6. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge-readiness and production-readiness requirements.
 7. [`docs/api-usage.md`](docs/api-usage.md) — implemented embedded API, lifecycle and usage examples.
 8. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) — real-device GGUF validation.
 9. [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) — privacy-safe acceptance-evidence collection.
@@ -60,6 +60,7 @@ The harness must never silently select or substitute a model.
 - Add a module only for a real responsibility, dependency boundary, reuse boundary or independently testable behavior.
 - Do not create generic utilities without a clear domain concept merely to remove duplication.
 - Keep one canonical implementation line per active phase; do not revive superseded branches or PRs.
+- Never present simulated acceptance as physical-device or production evidence.
 
 ## Repository map
 
@@ -76,7 +77,7 @@ The harness must never silently select or substitute a model.
 | `apps/local-llm-console` | Developer console and future control plane | Diagnostics UI and runtime inspection |
 | `apps/device-test-runner` | Real-device Phase 1 validation app | GGUF lifecycle, cancellation and memory instrumentation tests |
 | `third_party/llama.cpp` | Pinned upstream submodule | Controlled pin updates only |
-| `scripts` | Reproducible repository and device validation | CI guards, host runners and evidence capture |
+| `scripts` | Reproducible repository and device validation | CI guards, packaging checks, host runners and evidence capture |
 | `docs` | Architecture, plan, roadmap, ADRs, API and operations | Durable decisions and guidance |
 
 `settings.gradle.kts` is authoritative for the Gradle module list. Run `python3 scripts/verify-agent-navigation.py` after adding, removing or renaming a module.
@@ -93,7 +94,7 @@ Start in `core/contracts`. Inspect consumers in `core/runtime-core`, transports 
 
 ### Runtime lifecycle or scheduling change
 
-Start in `core/runtime-core`. Inspect `RuntimeOrchestrator.kt`, `InferenceBackend.kt`, `SingleDecodeScheduler.kt`, session ownership, cancellation, memory-pressure paths and fake-backend tests. State mutations must remain serialized, and a failed request must leave the runtime recoverable.
+Start in `core/runtime-core`. Inspect `RuntimeOrchestrator.kt`, `InferenceBackend.kt`, `SingleDecodeScheduler.kt`, `Phase1SimulatedAcceptanceTest.kt`, session ownership, cancellation, memory-pressure paths and fake-backend tests. State mutations must remain serialized, and a failed request must leave the runtime recoverable.
 
 ### GGUF storage or integrity change
 
@@ -113,6 +114,10 @@ Start with `observability/contracts`. Store identifiers, sizes, timings, token c
 
 Keep product behavior in core modules and integrations thin. Do not duplicate model resolution, generation policy, validation, error mapping or telemetry across surfaces. Keep [`docs/api-usage.md`](docs/api-usage.md) aligned with public API and lifecycle behavior.
 
+### Android packaging change
+
+Start in `backends/llama-cpp`, the consuming app module and `scripts/verify-android-packaging.py`. Preserve exact ABI ownership, fail on missing or unexpected native libraries and verify the ELF architecture rather than trusting filenames.
+
 ### Real-device validation change
 
 Start in `apps/device-test-runner`, `scripts/run-device-e2e.sh`, `scripts/capture-device-e2e-evidence.sh`, [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md). Keep GGUF files outside the repository, APKs and evidence bundles. Device checks must use production store, runtime and backend implementations rather than test doubles.
@@ -125,24 +130,26 @@ Start in `apps/device-test-runner`, `scripts/run-device-e2e.sh`, `scripts/captur
 4. Implement the smallest coherent change without speculative abstractions.
 5. Add tests for normal, failure, cancellation and lifecycle paths as applicable.
 6. Run targeted checks while iterating.
-7. Run the complete relevant validation before merge.
-8. Update the correct source of truth in the same change.
-9. Keep commits focused and describe behavior rather than file movement.
+7. Run the complete relevant merge-readiness validation.
+8. Record any deferred physical-device gate explicitly without claiming production readiness.
+9. Update the correct source of truth in the same change.
+10. Keep commits focused and describe behavior rather than file movement.
 
 Do not mark a roadmap item complete before its acceptance criteria and required evidence are satisfied.
 
 ## Validation commands
 
-### Repository navigation and shell runners
+### Repository navigation and scripts
 
 ```bash
 python3 scripts/verify-agent-navigation.py
 find scripts -type f -name '*.sh' -exec bash -n {} \;
+python3 -m py_compile scripts/*.py
 bash scripts/run-device-e2e.sh --help
 bash scripts/capture-device-e2e-evidence.sh --help
 ```
 
-### Kotlin and JVM
+### Kotlin, JVM and simulated acceptance
 
 ```bash
 ./gradlew spotlessCheck
@@ -150,12 +157,15 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew check
 ```
 
-### Android build and lint
+`./gradlew check` includes the Phase 1 simulated acceptance lifecycle using the real `FileSystemModelStore`, real `RuntimeOrchestrator` and a deterministic simulated backend.
+
+### Android build, lint and packaging
 
 ```bash
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
+python3 scripts/verify-android-packaging.py
 ```
 
 ### Native host tests
@@ -169,7 +179,7 @@ cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
 ```
 
-### Real Android device acceptance evidence
+### Real Android device production evidence
 
 ```bash
 bash scripts/capture-device-e2e-evidence.sh \
@@ -179,14 +189,16 @@ bash scripts/capture-device-e2e-evidence.sh \
   --memory-repeat 5
 ```
 
-Real-device evidence is required for changes touching native loading, generation, cancellation, memory management, ABI packaging or JNI behavior.
+Real-device evidence is mandatory before production readiness, application-consumer release or device-performance claims for changes touching native loading, generation, cancellation, memory management, ABI packaging or JNI behavior. It may be deferred until after merge only under the explicit conditions in [`docs/definition-of-done.md`](docs/definition-of-done.md).
 
 ## Testing expectations
 
 - Put domain logic behind interfaces so orchestration can be tested without loading a model where practical.
 - Use fake backends for deterministic queueing, failure and memory-pressure tests.
+- Maintain a cross-module simulated acceptance test using the real model store and runtime orchestrator.
 - Add native tests for handle registries, metadata parsing, cancellation registries and pure C++ behavior.
-- Use `apps/device-test-runner` for JNI linkage, ABI packaging, real GGUF compatibility, streaming, cancellation and repeated lifecycle tests.
+- Verify APK/AAR library names, ABI isolation and ELF architecture in CI.
+- Use `apps/device-test-runner` for JNI linkage, real GGUF compatibility, streaming, cancellation and repeated lifecycle tests.
 - Test cleanup after failures and cancellation, not only successful output.
 - Test idempotent close and release behavior.
 - Avoid timing-dependent assertions unless a deterministic clock is owned by the test; real-device timeouts must be configurable.
@@ -198,7 +210,8 @@ Real-device evidence is required for changes touching native loading, generation
 | Branch, PR stacking or merge process | `BRANCHING.md`, and this guide when routing changes |
 | Module boundary or dependency direction | `docs/architecture.md`, usually an ADR, and this guide |
 | New public API or lifecycle behavior | `docs/api-usage.md` and `docs/implementation-plan.md` when scope changes |
-| Completed or deferred work | `docs/roadmap.md` |
+| Completed, deferred or remaining work | `docs/roadmap.md` |
+| Merge-readiness or production-readiness policy | `docs/definition-of-done.md`, `docs/roadmap.md` and this guide |
 | Irreversible architectural choice | New ADR and ADR index |
 | New validation command or guard | This guide, relevant operational document and CI |
 | New module | `settings.gradle.kts`, repository map, tests and architecture docs |
@@ -231,7 +244,7 @@ Pause and surface the issue rather than improvising when:
 - a model or upstream native dependency would need to be committed directly;
 - a change requires exposing backend-native state through public APIs;
 - tests show unbounded memory growth, use-after-close, data races or unrecoverable runtime state;
-- required Android/NDK tooling or real-device validation is unavailable;
+- physical-device validation is unavailable and the requested action would claim production readiness or release the runtime to consumers;
 - a proposed branch or PR duplicates an active implementation line.
 
 A partial, explicitly documented result is preferable to claiming completion without required evidence.
