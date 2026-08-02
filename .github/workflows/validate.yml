@@ -7,15 +7,68 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: validate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  format:
+    name: Apply repository formatting
+    if: github.event_name == 'pull_request' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.0"
+
+      - name: Apply Spotless formatting
+        shell: bash
+        run: ./gradlew --no-configuration-cache spotlessApply
+
+      - name: Commit formatter output
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Repository is already formatted."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.kt' '*.kts'
+          git commit -m "Apply repository formatting"
+          git push origin HEAD:${{ github.head_ref }}
+
   build:
     name: Repository validation
+    if: github.event_name != 'pull_request' || github.actor == 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
