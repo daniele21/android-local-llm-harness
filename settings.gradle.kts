@@ -26,4 +26,5 @@ include(
     ":observability:in-memory-store",
     ":transports:in-process",
     ":apps:local-llm-console",
+    ":apps:device-test-runner",
 )

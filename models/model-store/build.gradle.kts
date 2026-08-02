@@ -27,4 +27,5 @@ android {
 dependencies {
     api(project(":core:contracts"))
     api(project(":models:model-profile"))
+    testImplementation(libs.junit4)
 }
