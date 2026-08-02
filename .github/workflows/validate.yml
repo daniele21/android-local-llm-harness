@@ -30,6 +30,15 @@ jobs:
       - name: Verify llama.cpp pin
         run: ./scripts/verify-llama-cpp-pin.sh
 
+      - name: Check shell script syntax
+        shell: bash
+        run: |
+          while IFS= read -r -d '' script; do
+            bash -n "$script"
+          done < <(find scripts -type f -name '*.sh' -print0)
+          bash scripts/run-device-e2e.sh --help >/dev/null
+          bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
+
       - name: Run native host tests
         shell: bash
         run: |
