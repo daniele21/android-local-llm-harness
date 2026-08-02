@@ -4,6 +4,15 @@ A feature is complete only when its behavior, resource lifecycle, tests, observa
 
 Passing compilation alone is not sufficient.
 
+## Completion levels
+
+The repository distinguishes two evidence levels:
+
+1. **Merge readiness** — deterministic automated tests, simulated acceptance, static analysis, Android builds and binary packaging checks pass from a clean checkout.
+2. **Production readiness** — all merge-readiness evidence passes and representative physical Android devices complete the real-GGUF lifecycle, cancellation, memory and JNI-loading gates.
+
+A merge-ready native feature may be integrated while physical-device evidence is explicitly deferred in the roadmap. It must not be described as production-ready, released to application consumers or used for device-performance claims until that evidence exists.
+
 ## Functional completion
 
 - The intended behavior is implemented through the correct architectural boundary.
@@ -68,11 +77,14 @@ Native code must be split by responsibility and linked normally through CMake. D
 - New behavior has isolated automated tests at the lowest useful layer.
 - Regression tests fail before the fix and pass after it when the change fixes a defect.
 - Failure and cleanup paths are tested, not only the successful result.
-- Cancellation is tested while queued and during active native work when relevant.
+- Cancellation is tested while queued and during active work when relevant.
 - Handle close/release operations are tested for idempotency.
 - Runtime state recovery is tested after backend or request failure.
 - Model-store changes test interruption, duplicate import and integrity failure where relevant.
 - Native changes include C++ tests for pure native behavior and Kotlin tests for the bridge contract.
+- The merge gate exercises the real content-addressed store and runtime orchestrator through a deterministic simulated backend.
+- The simulated acceptance lifecycle covers import, verification, prepare, session creation, streaming, active cancellation, recovery, context release, memory-pressure unload, reload and shutdown.
+- APK/AAR verification checks the exact native library set, ABI isolation and AArch64 ELF headers.
 - Android/JNI/ABI changes are validated on an `arm64-v8a` device with a real supported GGUF before production readiness is claimed.
 - Real-device validation uses the production model store, runtime orchestrator and backend rather than fake implementations.
 - Device evidence includes GGUF inspection, import verification, load, context creation, streaming generation, cancellation, release, unload and shutdown.
@@ -83,12 +95,13 @@ The relevant narrow checks pass during development, and the complete repository 
 
 ```bash
 python3 scripts/verify-agent-navigation.py
+python3 -m py_compile scripts/*.py
 ./gradlew spotlessCheck
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
-./gradlew assembleDebug :apps:local-llm-console:assembleInternal
-./gradlew :apps:device-test-runner:assembleDebugAndroidTest
+./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
+python3 scripts/verify-android-packaging.py
 cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
@@ -96,16 +109,25 @@ ctest --test-dir build/native-tests --output-on-failure
 
 CI must pass from a clean checkout with the pinned JDK, Android SDK, NDK, Gradle and `llama.cpp` source.
 
-Changes that affect Android native loading, GGUF compatibility, generation, cancellation, memory ownership or ABI packaging additionally require:
+Changes that affect Android native loading, GGUF compatibility, generation, cancellation, memory ownership or ABI packaging additionally require the following before production release or production-readiness claims:
 
 ```bash
-bash scripts/run-device-e2e.sh \
+bash scripts/capture-device-e2e-evidence.sh \
   --model /absolute/path/to/model.gguf \
   --architecture <architecture> \
-  --quantization <quantization>
+  --quantization <quantization> \
+  --memory-repeat 5
 ```
 
-Use `--memory-repeat` with a device-specific PSS budget when the change can affect model, context or native allocation lifetime. Store the device/model matrix and test output as review evidence; do not commit the GGUF.
+A physical-device gate may be deferred until after merge only when:
+
+- the simulated acceptance and packaging gates pass;
+- the deferral is explicit in `docs/roadmap.md` and the pull request;
+- no production-readiness or performance claim is made;
+- the device runner and evidence capture tooling are already present;
+- release or downstream application adoption remains blocked on the physical evidence.
+
+Use a device-specific PSS budget when the change can affect model, context or native allocation lifetime. Store the device/model matrix and privacy-safe test output as release evidence; do not commit the GGUF.
 
 ## Observability and privacy completion
 
@@ -140,7 +162,7 @@ Feature documentation must cover, as applicable:
 - limitations and deferred behavior;
 - a minimal usage example.
 
-Do not mark a roadmap item complete while its documentation or acceptance evidence is missing.
+Do not mark a roadmap item complete while its required evidence is missing. A deferred physical-device item must remain visibly incomplete until the evidence is captured.
 
 ## Merge checklist
 
@@ -152,11 +174,15 @@ unidirectional dependencies
 no significant domain duplication
 small and stable public APIs
 isolated and deterministic tests
-recoverable failure paths
+simulated end-to-end lifecycle passing
+recoverable cancellation and failure paths
 safe native resource lifecycle
+exact Android native packaging verified
 privacy-safe observability
-documentation updated
-all required validation gates passing
+documentation and deferred gates updated
+all required merge-readiness validation gates passing
 ```
+
+When physical-device validation is deferred, the merge record must state that production readiness is still blocked.
 
 When duplication appears, identify the shared domain concept first and only then extract a reusable component. Do not move unrelated code into a generic helper merely to reduce line count.
