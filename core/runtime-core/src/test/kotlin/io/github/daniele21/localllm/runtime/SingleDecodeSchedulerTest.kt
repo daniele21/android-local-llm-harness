@@ -182,8 +182,24 @@ class SingleDecodeSchedulerTest {
         assertFalse(snapshot.closed)
 
         release.countDown()
+        assertTrue(
+            awaitCondition(2, TimeUnit.SECONDS) {
+                scheduler.snapshot().activeRequest == null
+            },
+        )
         scheduler.close()
         assertTrue(scheduler.snapshot().closed)
         assertNull(scheduler.snapshot().activeRequest)
+    }
+
+    private fun awaitCondition(timeout: Long, unit: TimeUnit, condition: () -> Boolean): Boolean {
+        val deadline = System.nanoTime() + unit.toNanos(timeout)
+        while (System.nanoTime() < deadline) {
+            if (condition()) {
+                return true
+            }
+            Thread.sleep(10)
+        }
+        return condition()
     }
 }
