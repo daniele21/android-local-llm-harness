@@ -61,8 +61,8 @@ class LocalLlmDeviceE2eTest {
             val completed = generateAndAwait(runtime, harness, session, config.generation.prompt)
 
             assertTrue("Generation returned an empty output", completed.output.isNotBlank())
-            assertTrue(completed.metrics.inputTokens > 0)
-            assertTrue(completed.metrics.outputTokens > 0)
+            assertTrue("Input token count was unavailable or empty", (completed.metrics.inputTokens ?: 0) > 0)
+            assertTrue("Output token count was unavailable or empty", (completed.metrics.outputTokens ?: 0) > 0)
             assertNotNull(completed.metrics.timeToFirstTokenMs)
 
             closeSessionAndUnload(runtime, session)
