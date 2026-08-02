@@ -6,7 +6,9 @@ This file is the authoritative source for current implementation status. Detaile
 
 Pull request #13 is the active Phase 1 consolidation line.
 
-### Verified in clean GitHub Actions runs
+### Verified in a clean cumulative GitHub Actions run
+
+Run #141 on commit `da0366c282c40db8c40b9365983c39d62bdecd62` completed successfully from a clean checkout.
 
 - [x] coding-agent navigation and llama.cpp pin guards
 - [x] native host configuration, compilation and tests
@@ -14,12 +16,15 @@ Pull request #13 is the active Phase 1 consolidation line.
 - [x] Detekt static analysis and model-artifact repository guard
 - [x] JVM unit tests
 - [x] Android Lint for the debug and console internal variants
+- [x] explicit assembly of all Android library, console and device-test variants
+- [x] publication of one internal console APK, the device-runner APK, its instrumentation APK and eight AARs
+- [x] publication of validation reports and the combined Android artifact-build log
 
-### Current CI gate
+### CI gate
 
-- [ ] complete one cumulative clean run that also assembles and uploads every expected APK and AAR
+- [x] complete one cumulative clean run that assembles and uploads every expected APK and AAR
 
-The artifact build uses explicit module-scoped Gradle tasks rather than the root `assembleDebug` fan-out. Its combined Gradle output is persisted as `build/android-artifacts.log` in the `validation-reports` artifact so a remaining Android build failure can be diagnosed from the same run.
+The artifact build uses explicit module-scoped Gradle tasks rather than the root `assembleDebug` fan-out. Its combined Gradle output is persisted as `build/android-artifacts.log` in the `validation-reports` artifact so future Android build failures can be diagnosed from the same run.
 
 ### Device evidence still required
 
@@ -50,7 +55,7 @@ The artifact build uses explicit module-scoped Gradle tasks rather than the root
 - [x] CODEOWNERS, security, versioning and ADR foundations
 - [x] model-binary repository guard
 - [x] generated Gradle Wrapper committed and checksum-validated
-- [ ] clean cumulative CI validation completed
+- [x] clean cumulative CI validation completed
 
 ## Phase 1 — functional embedded runtime
 
@@ -85,7 +90,7 @@ Phase 1 is functionally implemented but is not production-ready until all items 
 - [x] add a repository guard for agent-document links and module discoverability
 - [x] document modularity and repository-wide Definition of Done
 - [x] add reproducible real-device test tooling and operational documentation
-- [ ] complete cumulative pull-request validation from a clean checkout
+- [x] complete cumulative pull-request validation from a clean checkout
 - [x] reconcile the Phase 1 branch with the latest `main` history
 - [ ] run the end-to-end lifecycle on a real Android `arm64-v8a` device with a supported GGUF
 - [ ] verify repeated load/unload and generation do not show unbounded memory growth
