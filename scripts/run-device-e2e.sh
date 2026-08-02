@@ -18,7 +18,7 @@ ADB="${ADB:-adb}"
 usage() {
     cat <<'EOF'
 Usage:
-  scripts/run-device-e2e.sh --model /absolute/path/model.gguf [options]
+  bash scripts/run-device-e2e.sh --model /absolute/path/model.gguf [options]
 
 Options:
   --architecture VALUE       GGUF architecture label used by the test profile.
@@ -107,14 +107,44 @@ if ! command -v "$ADB" >/dev/null 2>&1; then
     exit 2
 fi
 
+if ! command -v base64 >/dev/null 2>&1; then
+    echo "base64 is required to pass prompts safely to instrumentation" >&2
+    exit 2
+fi
+
 if [[ ! -x "$ROOT_DIR/gradlew" ]]; then
     echo "Gradle wrapper is missing or not executable: $ROOT_DIR/gradlew" >&2
     exit 2
 fi
 
-if [[ "$MEMORY_REPEAT_COUNT" =~ ^[0-9]+$ ]] && (( MEMORY_REPEAT_COUNT == 1 )); then
+require_non_negative_integer() {
+    local name="$1"
+    local value="$2"
+    if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+        echo "$name must be a non-negative integer: $value" >&2
+        exit 2
+    fi
+}
+
+require_positive_integer() {
+    local name="$1"
+    local value="$2"
+    require_non_negative_integer "$name" "$value"
+    if (( value == 0 )); then
+        echo "$name must be positive" >&2
+        exit 2
+    fi
+}
+
+require_non_negative_integer "--memory-repeat" "$MEMORY_REPEAT_COUNT"
+require_non_negative_integer "--max-pss-growth-kb" "$MAX_PSS_GROWTH_KB"
+require_positive_integer "--timeout-seconds" "$TIMEOUT_SECONDS"
+if (( MEMORY_REPEAT_COUNT == 1 )); then
     echo "--memory-repeat must be 0 or at least 2" >&2
     exit 2
+fi
+if [[ -n "$CPU_THREADS" ]]; then
+    require_positive_integer "--cpu-threads" "$CPU_THREADS"
 fi
 
 "$ADB" get-state >/dev/null
@@ -217,13 +247,13 @@ TEST_STATUS=$?
 set -e
 printf '%s\n' "$TEST_OUTPUT"
 
-if (( TEST_STATUS != 0 )) || grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_CODE: -1' <<< "$TEST_OUTPUT"; then
+if (( TEST_STATUS != 0 )) || grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg=' <<< "$TEST_OUTPUT"; then
     echo "Device E2E validation failed" >&2
     exit 1
 fi
 
-if ! grep -Eq '^OK \(|^INSTRUMENTATION_CODE: 0$' <<< "$TEST_OUTPUT"; then
-    echo "Instrumentation ended without an explicit success marker" >&2
+if ! grep -Eq '^OK \(' <<< "$TEST_OUTPUT" || ! grep -Eq '^INSTRUMENTATION_CODE: -1$' <<< "$TEST_OUTPUT"; then
+    echo "Instrumentation ended without the expected JUnit and Android success markers" >&2
     exit 1
 fi
 
