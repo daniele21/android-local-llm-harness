@@ -46,6 +46,9 @@ This file is the authoritative source for current implementation status. Detaile
 - [x] collect base runtime and generation metrics
 - [x] handle Android background and low-memory signals
 - [x] add Kotlin and native tests for the implemented behavior
+- [x] add a real-device test application using the production store, runtime and llama.cpp backend
+- [x] add an adb host runner that streams an external GGUF into app-private storage
+- [x] add device tests for generation lifecycle, active cancellation and optional PSS regression cycles
 
 ### Consolidation gate
 
@@ -54,6 +57,7 @@ Phase 1 is functionally implemented but is not production-ready until all items 
 - [x] create a root `AGENTS.md` navigation guide for coding agents
 - [x] add a repository guard for agent-document links and module discoverability
 - [x] document modularity and repository-wide Definition of Done
+- [x] add reproducible real-device test tooling and operational documentation
 - [ ] complete cumulative pull-request validation from a clean checkout
 - [x] reconcile the Phase 1 branch with the latest `main` history
 - [ ] run the end-to-end lifecycle on a real Android `arm64-v8a` device with a supported GGUF
@@ -79,6 +83,8 @@ release context
 unload
 shutdown
 ```
+
+The executable procedure and evidence requirements are documented in [`device-e2e-testing.md`](device-e2e-testing.md).
 
 ## Phase 2 — observability and health
 
