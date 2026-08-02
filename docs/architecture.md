@@ -39,6 +39,36 @@ The `local-llm-console` application is the initial developer control plane. It w
 
 During the embedded phase, apps will expose a signature-protected diagnostics bridge. In the shared phase, the console will query the central host directly.
 
+## Validation plane
+
+The `apps/device-test-runner` application is an isolated, debuggable validation surface for the embedded data plane. It does not own product behavior and must not introduce an alternative runtime implementation.
+
+Its instrumentation tests use the production implementations of:
+
+```text
+FileSystemModelStore
+        |
+RuntimeOrchestrator
+        |
+LlamaCppInferenceBackend
+        |
+JNI / llama.cpp
+```
+
+A host-side `adb` runner streams a developer-provided GGUF into the test application's private data directory. The model remains outside the repository and APK artifacts.
+
+The validation plane covers behavior that cannot be established by JVM or host-native tests alone:
+
+- Android ABI and JNI packaging;
+- GGUF inspection on device;
+- app-private import and integrity verification;
+- native model and context lifecycle;
+- streaming generation and metrics;
+- cooperative active cancellation;
+- repeated lifecycle and process-memory regression checks.
+
+Test configuration may describe a specific model and device, but it must preserve the same explicit binding path used by applications. Device tests may measure production code; they must not duplicate or bypass model resolution, store integrity or runtime ownership rules.
+
 ## Model identity
 
 A model is represented at three levels:
@@ -123,7 +153,7 @@ integrations
     thin native Android and Capacitor adapters
 
 apps
-    developer console and sample applications
+    developer console, sample applications and isolated device validation surfaces
 ```
 
 A new module is justified only when it owns a real responsibility, creates a necessary dependency boundary, provides actual reuse, isolates a platform or third-party dependency, or needs an independent testing/release boundary.
