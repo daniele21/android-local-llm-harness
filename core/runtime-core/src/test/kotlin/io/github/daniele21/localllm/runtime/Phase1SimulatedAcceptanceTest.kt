@@ -149,13 +149,12 @@ private class SimulatedAcceptanceFixture {
         return events.toList()
     }
 
-    fun terminalListener(events: MutableList<GenerationEvent>, terminal: CountDownLatch): GenerationListener =
-        GenerationListener { event ->
-            events += event
-            if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
-                terminal.countDown()
-            }
+    fun terminalListener(events: MutableList<GenerationEvent>, terminal: CountDownLatch): GenerationListener = GenerationListener { event ->
+        events += event
+        if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
+            terminal.countDown()
         }
+    }
 
     fun close() {
         backend.releaseBlockedGeneration()
