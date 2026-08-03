@@ -1,6 +1,6 @@
 # Health engine
 
-`observability/health-engine` is the Phase 2 control-plane boundary for independently testable health checks. It depends on stable observability and model-store contracts and does not depend on Android UI, transport implementations or `llama.cpp` internals.
+`observability/health-engine` is the Phase 2 control-plane boundary for independently testable health checks. It depends on stable runtime, observability and model-store contracts and does not depend on Android UI, transport implementations or `llama.cpp` internals.
 
 ## Responsibilities
 
@@ -12,20 +12,39 @@ The module:
 - aggregates the suite using the worst result (`FAIL`, `WARN`, `NOT_RUN`, `PASS`);
 - persists every result through `TelemetryRepository.saveHealth`;
 - converts unexpected exceptions into a privacy-safe failure;
-- exposes installed-model integrity through `ModelStore.verify`.
+- exposes installed-model integrity through `ModelStore.verify`;
+- executes configurable end-to-end generation sanity checks through `LocalLlmClient`.
 
-It does not own Room, runtime generation, console rendering, cross-application transport, benchmark history, memory or thermal probes.
+It does not own Room, console rendering, cross-application transport, benchmark history, memory or thermal probes.
 
 ## Core API
 
 ```kotlin
+val sanityCheck = GenerationSanityHealthCheck(
+    client = localLlmClient,
+    spec = GenerationSanitySpec(
+        applicationId = ApplicationId("com.example.app"),
+        useCaseId = UseCaseId("runtime-sanity"),
+        prompt = "Reply with LOCAL_LLM_OK and nothing else.",
+        expectedOutput = "LOCAL_LLM_OK",
+        outputMatch = SanityOutputMatch.EXACT,
+        maxOutputTokens = 8,
+        temperature = 0f,
+        seed = 0L,
+        timeoutMs = 30_000L,
+    ),
+)
+
 val engine = HealthEngine(
-    checks = listOf(ModelIntegrityHealthCheck(modelStore)),
+    checks = listOf(
+        ModelIntegrityHealthCheck(modelStore),
+        sanityCheck,
+    ),
     telemetryRepository = telemetryRepository,
 )
 
 val fullReport = engine.runAll()
-val selectedReport = engine.run(listOf("model-integrity"))
+val selectedReport = engine.run(listOf(sanityCheck.id))
 ```
 
 `HealthCheck` implementations return a `HealthAssessment` containing only a status and a privacy-safe summary. The engine converts it to the stable `HealthCheckResult` contract, records its duration and persists it.
@@ -44,6 +63,48 @@ Outcomes:
 
 The persisted detail includes aggregate counts only. It does not expose model paths, bytes, expected digests, actual digests or arbitrary verification details.
 
+## Generation sanity check
+
+`GenerationSanityHealthCheck` validates the functional runtime lifecycle behind the public `LocalLlmClient` contract. Each check is explicitly bound to one application and use case through `GenerationSanitySpec`.
+
+The lifecycle is:
+
+```text
+prepare
+create session
+generate deterministic request
+wait for Completed or Failed
+assert expected output
+close session
+```
+
+The check supports:
+
+- exact or substring matching;
+- case-sensitive or case-insensitive comparison;
+- explicit output-token limit;
+- deterministic temperature and seed, defaulting to `0`;
+- a bounded timeout;
+- cooperative cancellation when the timeout expires.
+
+The stable check ID is:
+
+```text
+generation-sanity:<applicationId>:<useCaseId>
+```
+
+Outcomes:
+
+- the model cannot be prepared: `FAIL`;
+- the session cannot be created: `FAIL`;
+- generation returns a typed failure: `FAIL` with the public error code only;
+- generation times out: the handle is cancelled and the check returns `FAIL`;
+- generation completes but does not match: `FAIL`;
+- generation and cleanup both succeed with a matching output: `PASS`;
+- session cleanup fails: `FAIL`, even when generation matched.
+
+This check is backend-agnostic. It does not depend on `RuntimeOrchestrator`, scheduler implementation details, JNI handles or `llama.cpp` types. It can therefore exercise the embedded runtime today and a future Binder-backed `LocalLlmClient` without changing the health contract.
+
 ## Failure isolation and privacy
 
 A check may fail independently without breaking inference or another health check. Unexpected exceptions are converted to:
@@ -55,11 +116,15 @@ detail = Health check failed unexpectedly
 
 The original exception message is deliberately excluded because it may contain private paths, prompts or implementation details.
 
+Generation sanity results never persist the configured prompt, generated output or backend error message. A typed generation failure exposes only its stable public error code. Output mismatches report only that the assertion failed.
+
 Persistence uses the existing `TelemetryRepository` boundary. The Room-backed implementation therefore makes health results available to the owning embedded application without coupling this module to Room.
 
 ## Threading
 
-`HealthEngine` executes checks synchronously on the caller's thread. Callers must choose an appropriate worker or control-plane executor for checks that perform file verification or other blocking work. This slice does not introduce hidden global executors.
+`HealthEngine` executes checks synchronously on the caller's thread. `GenerationSanityHealthCheck` blocks that caller until a terminal event or the configured timeout. Callers must run health suites on a dedicated worker or control-plane executor, never the Android main thread or the inference callback thread.
+
+The check does not introduce a hidden global executor. Generation itself remains owned by the supplied `LocalLlmClient` and its scheduler.
 
 ## Testing
 
@@ -71,15 +136,23 @@ The module includes deterministic tests for:
 - unknown check IDs;
 - privacy-safe exception handling;
 - no-model, valid-model and invalid-model integrity outcomes;
-- absence of private model paths from persisted details.
+- absence of private model paths from persisted details;
+- successful generation and expected-output matching;
+- deterministic generation overrides;
+- output mismatch without generated-text disclosure;
+- typed runtime failures without backend-message disclosure;
+- timeout cancellation;
+- preparation failure before session creation;
+- mandatory session cleanup and cleanup failure.
 
 The aggregate repository gate runs the tests, Android Lint and AAR assembly.
 
 ## Current limitations
 
-This slice provides the orchestration foundation and the first concrete integrity check. It does not yet provide:
+The generation sanity implementation is executable against a real `LocalLlmClient`, but repository CI uses deterministic contract fakes and does not prove behavior with a physical Android device and a real GGUF. That evidence remains part of the separate production-readiness gate.
 
-- generation sanity prompts and expected-output assertions;
+This module does not yet provide:
+
 - cache health checks;
 - memory or thermal checks;
 - cold-versus-warm benchmark classification;
