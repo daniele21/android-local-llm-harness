@@ -7,7 +7,6 @@ import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
-import io.github.daniele21.localllm.contracts.RuntimeState
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
@@ -26,7 +25,7 @@ class RuntimeTelemetryTest {
     @Test
     fun `completed generation persists a privacy-safe timeline and metrics`() {
         val repository = InMemoryTelemetryRepository()
-        val clock = SequenceEpochClock(1_000L, 1_001L, 1_002L, 1_003L, 1_004L)
+        val clock = SequenceEpochClock(1_000L, 1_001L, 1_002L, 1_003L, 1_004L, 1_005L)
         val telemetry = RuntimeTelemetry(repository, clock)
         val request = request(input = "secret prompt text")
 
@@ -75,7 +74,7 @@ class RuntimeTelemetryTest {
     @Test
     fun `cancelled generation receives a cancelled terminal run`() {
         val repository = InMemoryTelemetryRepository()
-        val telemetry = RuntimeTelemetry(repository, SequenceEpochClock(10L, 11L, 12L, 13L))
+        val telemetry = RuntimeTelemetry(repository, SequenceEpochClock(10L, 11L, 12L, 13L, 14L))
         val request = request(input = "do not persist me")
 
         telemetry.queued(request, ModelDigest("b".repeat(64)))
@@ -90,7 +89,10 @@ class RuntimeTelemetryTest {
 
     @Test
     fun `telemetry storage failures never fail runtime instrumentation`() {
-        val telemetry = RuntimeTelemetry(ThrowingTelemetryRepository, SequenceEpochClock(1L, 2L, 3L))
+        val telemetry = RuntimeTelemetry(
+            ThrowingTelemetryRepository,
+            SequenceEpochClock(1L, 2L, 3L, 4L, 5L),
+        )
         val request = request(input = "ignored")
 
         telemetry.queued(request, ModelDigest("c".repeat(64)))
@@ -135,11 +137,3 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
 
     private fun fail(): Nothing = throw IllegalStateException("telemetry unavailable")
 }
-
-@Suppress("unused")
-private val unusedRuntimeSnapshot = RuntimeSnapshot(
-    state = RuntimeState.IDLE,
-    loadedModel = null,
-    activeSessions = 0,
-    queuedRequests = 0,
-)
