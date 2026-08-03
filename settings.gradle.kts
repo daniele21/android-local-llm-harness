@@ -25,6 +25,7 @@ include(
     ":observability:contracts",
     ":observability:in-memory-store",
     ":observability:room-store",
+    ":observability:health-engine",
     ":transports:in-process",
     ":apps:local-llm-console",
     ":apps:device-test-runner",
