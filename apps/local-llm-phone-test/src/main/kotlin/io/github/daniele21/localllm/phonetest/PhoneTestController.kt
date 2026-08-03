@@ -40,10 +40,7 @@ internal interface PhoneTestListener {
 }
 
 @Suppress("TooManyFunctions", "LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth")
-internal class PhoneTestController(
-    context: Context,
-    private val listener: PhoneTestListener,
-) : AutoCloseable {
+internal class PhoneTestController(context: Context, private val listener: PhoneTestListener) : AutoCloseable {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
