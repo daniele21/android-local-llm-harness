@@ -1,0 +1,186 @@
+package io.github.daniele21.localllm.runtime
+
+import io.github.daniele21.localllm.contracts.GenerationMetrics
+import io.github.daniele21.localllm.contracts.GenerationRequest
+import io.github.daniele21.localllm.contracts.LocalLlmError
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.observability.GenerationRunRecord
+import io.github.daniele21.localllm.observability.LogLevel
+import io.github.daniele21.localllm.observability.RunStatus
+import io.github.daniele21.localllm.observability.StructuredLog
+import io.github.daniele21.localllm.observability.TelemetryRepository
+import java.util.concurrent.ConcurrentHashMap
+
+fun interface EpochClock {
+    fun nowEpochMs(): Long
+}
+
+internal class RuntimeTelemetry(
+    private val repository: TelemetryRepository,
+    private val clock: EpochClock,
+) {
+    private val activeRuns = ConcurrentHashMap<RequestId, GenerationRunRecord>()
+
+    fun queued(
+        request: GenerationRequest,
+        modelDigest: ModelDigest,
+    ) {
+        val run = GenerationRunRecord(
+            requestId = request.requestId,
+            applicationId = request.applicationId,
+            useCaseId = request.useCaseId,
+            modelDigest = modelDigest,
+            startedAtEpochMs = clock.nowEpochMs(),
+            completedAtEpochMs = null,
+            status = RunStatus.QUEUED,
+            queueMs = null,
+            modelLoadMs = null,
+            timeToFirstTokenMs = null,
+            totalMs = null,
+            inputTokens = null,
+            outputTokens = null,
+            decodeTokensPerSecond = null,
+            errorCode = null,
+        )
+        activeRuns[request.requestId] = run
+        persist(run)
+        log(
+            level = LogLevel.INFO,
+            event = "generation.queued",
+            requestId = request.requestId,
+            fields = mapOf(
+                "applicationId" to request.applicationId.value,
+                "useCaseId" to request.useCaseId.value,
+                "modelDigest" to modelDigest.sha256,
+            ),
+        )
+    }
+
+    fun queuedPosition(
+        requestId: RequestId,
+        position: Int,
+    ) {
+        log(
+            level = LogLevel.DEBUG,
+            event = "generation.queue_position",
+            requestId = requestId,
+            fields = mapOf("position" to position.toString()),
+        )
+    }
+
+    fun started(requestId: RequestId) {
+        val current = activeRuns[requestId] ?: return
+        val updated = current.copy(status = RunStatus.RUNNING)
+        activeRuns[requestId] = updated
+        persist(updated)
+        log(
+            level = LogLevel.INFO,
+            event = "generation.started",
+            requestId = requestId,
+        )
+    }
+
+    fun completed(
+        requestId: RequestId,
+        metrics: GenerationMetrics,
+    ) {
+        val current = activeRuns.remove(requestId) ?: return
+        val updated = current.copy(
+            completedAtEpochMs = clock.nowEpochMs(),
+            status = RunStatus.COMPLETED,
+            queueMs = metrics.queueMs,
+            modelLoadMs = metrics.modelLoadMs,
+            timeToFirstTokenMs = metrics.timeToFirstTokenMs,
+            totalMs = metrics.totalMs,
+            inputTokens = metrics.inputTokens,
+            outputTokens = metrics.outputTokens,
+            decodeTokensPerSecond = metrics.decodeTokensPerSecond,
+            prefillMs = metrics.prefillMs,
+            decodeMs = metrics.decodeMs,
+        )
+        persist(updated)
+        log(
+            level = LogLevel.INFO,
+            event = "generation.completed",
+            requestId = requestId,
+            fields = metricsFields(metrics),
+        )
+    }
+
+    fun failed(
+        requestId: RequestId,
+        error: LocalLlmError,
+    ) {
+        val current = activeRuns.remove(requestId)
+        if (current == null) {
+            rejected(requestId, error)
+            return
+        }
+        val status = if (error.code == "CANCELLED") RunStatus.CANCELLED else RunStatus.FAILED
+        val updated = current.copy(
+            completedAtEpochMs = clock.nowEpochMs(),
+            status = status,
+            errorCode = error.code,
+        )
+        persist(updated)
+        log(
+            level = if (status == RunStatus.CANCELLED) LogLevel.INFO else LogLevel.ERROR,
+            event = if (status == RunStatus.CANCELLED) "generation.cancelled" else "generation.failed",
+            requestId = requestId,
+            fields = mapOf("errorCode" to error.code),
+        )
+    }
+
+    fun rejected(
+        requestId: RequestId,
+        error: LocalLlmError,
+    ) {
+        log(
+            level = if (error.code == "CANCELLED") LogLevel.INFO else LogLevel.WARN,
+            event = "generation.rejected",
+            requestId = requestId,
+            fields = mapOf("errorCode" to error.code),
+        )
+    }
+
+    private fun persist(run: GenerationRunRecord) {
+        safely { repository.recordRun(run) }
+    }
+
+    private fun log(
+        level: LogLevel,
+        event: String,
+        requestId: RequestId,
+        fields: Map<String, String> = emptyMap(),
+    ) {
+        safely {
+            repository.appendLog(
+                StructuredLog(
+                    timestampEpochMs = clock.nowEpochMs(),
+                    level = level,
+                    component = "runtime",
+                    event = event,
+                    requestId = requestId,
+                    fields = fields,
+                ),
+            )
+        }
+    }
+
+    private fun metricsFields(metrics: GenerationMetrics): Map<String, String> = buildMap {
+        put("queueMs", metrics.queueMs.toString())
+        put("totalMs", metrics.totalMs.toString())
+        metrics.modelLoadMs?.let { put("modelLoadMs", it.toString()) }
+        metrics.timeToFirstTokenMs?.let { put("timeToFirstTokenMs", it.toString()) }
+        metrics.prefillMs?.let { put("prefillMs", it.toString()) }
+        metrics.decodeMs?.let { put("decodeMs", it.toString()) }
+        metrics.inputTokens?.let { put("inputTokens", it.toString()) }
+        metrics.outputTokens?.let { put("outputTokens", it.toString()) }
+        metrics.decodeTokensPerSecond?.let { put("decodeTokensPerSecond", it.toString()) }
+    }
+
+    private inline fun safely(operation: () -> Unit) {
+        runCatching(operation)
+    }
+}
