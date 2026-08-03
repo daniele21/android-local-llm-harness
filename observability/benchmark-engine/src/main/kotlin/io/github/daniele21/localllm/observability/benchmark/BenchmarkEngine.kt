@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package io.github.daniele21.localllm.observability.benchmark
 
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
@@ -14,6 +16,7 @@ fun interface BenchmarkEpochClock {
     fun nowEpochMs(): Long
 }
 
+@Suppress("LongParameterList")
 data class BenchmarkPolicy(
     val baselineWindowSize: Int = 20,
     val comparisonWindowSize: Int = 10,
@@ -74,6 +77,7 @@ class BenchmarkRegressionHealthCheck(
         key.modelLoadKind.name,
     ).joinToString(":")
 
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     override fun evaluate(): HealthAssessment {
         val baseline = repository.benchmarkBaselines().firstOrNull { it.key == key }
             ?: return HealthAssessment(HealthStatus.WARN, "Benchmark baseline is not available")
