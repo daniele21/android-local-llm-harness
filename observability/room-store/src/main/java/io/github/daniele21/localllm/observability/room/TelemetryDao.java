@@ -66,4 +66,25 @@ public interface TelemetryDao {
 
     @Query("SELECT * FROM health_results ORDER BY id ASC")
     List<TelemetryEntities.HealthCheckEntity> healthResults();
+
+    @Insert
+    long insertResourceSnapshot(TelemetryEntities.ResourceSnapshotEntity snapshot);
+
+    @Query(
+            "SELECT * FROM resource_snapshots "
+                    + "ORDER BY timestamp_epoch_ms DESC, id DESC LIMIT :limit")
+    List<TelemetryEntities.ResourceSnapshotEntity> recentResourceSnapshots(int limit);
+
+    @Query(
+            "DELETE FROM resource_snapshots WHERE id NOT IN ("
+                    + "SELECT id FROM resource_snapshots "
+                    + "ORDER BY timestamp_epoch_ms DESC, id DESC LIMIT :maxRows)")
+    void trimResourceSnapshots(int maxRows);
+
+    @Transaction
+    default void insertResourceSnapshotWithRetention(
+            TelemetryEntities.ResourceSnapshotEntity snapshot, int maxRows) {
+        insertResourceSnapshot(snapshot);
+        trimResourceSnapshots(maxRows);
+    }
 }
