@@ -4,9 +4,9 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks, selective sanity-rule recovery and the first read-only console observability slice.
+Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
 
-The current `main` head contains the Play-installable physical-device test application merged through pull request #29 and the module-aware validation workflow merged through pull request #30. Pull request #31 is the active draft line for the read-only developer console observability foundation.
+The current `main` head contains the work merged through pull request #29, including the ARM64 emulator preflight and the Google Play-installable physical-device validation app that does not require developer mode or ADB.
 
 The repository is merge-ready for continued development but is **not production-ready** until the physical-device GGUF evidence gate is completed.
 
@@ -20,8 +20,6 @@ The repository is merge-ready for continued development but is **not production-
 - [x] supersede the alternative Phase 2 health-control-plane line in PR #22
 - [x] recover only compatible sanity-assertion behavior on a fresh branch from current `main`
 - [x] merge the recovery and emulator-preflight line through PR #28
-- [x] merge the Play-installable physical-device test application through PR #29
-- [x] merge module-aware validation and separate packaging through PR #30
 - [ ] delete historical remote branches after their unique commits and recovery notes are audited
 
 Historical branches are read-only audit references. They must not receive new implementation commits and must never be used as the base for new feature work.
@@ -44,8 +42,6 @@ The cumulative validation gate covers:
 - [x] health-engine tests
 - [x] resource-observability tests
 - [x] benchmark-engine tests
-- [x] module-aware pull-request validation with downstream consumer compilation
-- [x] separate packaging workflow for distributable Android artifacts
 
 These checks provide host-side and simulated evidence. They do not prove Android linker behavior on representative physical devices, OEM memory management, real-device thermal throttling or device-specific native stability.
 
@@ -102,6 +98,7 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [x] Play-installable launcher app for physical-device validation without developer mode on PR #29
 - [x] Storage Access Framework GGUF selection and private content-addressed import in the phone-test app
 - [x] copyable and shareable privacy-safe PASS/FAIL report in the phone-test app
+- [x] external PKCS12 upload-key and macOS Keychain signing workflow
 - [ ] signed Play internal-testing release installed on a physical phone
 
 The clean ARM64 emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.
