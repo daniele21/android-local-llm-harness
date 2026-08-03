@@ -55,6 +55,22 @@ shutdown runtime
 
 The initial Phase 1 device gate is CPU-only and uses `gpuLayers = 0`.
 
+## ARM64 emulator preflight
+
+On an Apple Silicon host, an Android ARM64 AVD that reports `arm64-v8a` can run the same host script before physical-device validation. This preflight exercises APK installation, extracted JNI backend loading, GGUF inspection and import, generation, cancellation, repeated lifecycle and shutdown through the production implementations.
+
+Use the same commands and model requirements documented below. Confirm the active AVD before starting:
+
+```bash
+adb shell getprop ro.product.cpu.abi
+```
+
+The result must begin with `arm64-v8a`. An `x86_64` AVD is not supported by the current native artifacts.
+
+Emulator results do not establish OEM behavior, representative memory or thermal behavior, physical-device compatibility or production readiness. Keep the physical-device checklist in this document open until representative hardware evidence is captured with [`capture-device-e2e-evidence.sh`](../scripts/capture-device-e2e-evidence.sh).
+
+Recorded emulator preflight results are kept in [`emulator-e2e-results.md`](emulator-e2e-results.md).
+
 ## Run the standard lifecycle and cancellation suite
 
 ```bash

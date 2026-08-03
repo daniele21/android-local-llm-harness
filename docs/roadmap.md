@@ -93,6 +93,9 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [x] device tests for lifecycle, cancellation and optional PSS regression cycles
 - [x] privacy-safe device-evidence capture tooling
 - [x] embedded API and lifecycle documentation
+- [x] ARM64 emulator preflight with a real Qwen3 GGUF on PR #28
+
+The clean PR-head emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.
 
 ### Physical-device production-readiness gate
 
