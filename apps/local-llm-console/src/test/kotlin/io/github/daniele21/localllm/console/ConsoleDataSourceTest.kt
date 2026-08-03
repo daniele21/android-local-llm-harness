@@ -62,6 +62,22 @@ class ConsoleDataSourceTest {
     }
 
     @Test
+    fun `loads request run and chronological correlated timeline`() {
+        val repository = InMemoryTelemetryRepository()
+        val requestId = RequestId("request-1")
+        repository.recordRun(run(1))
+        repository.appendLog(log(30, requestId))
+        repository.appendLog(log(10, requestId))
+        repository.appendLog(log(20, RequestId("other-request")))
+
+        val detail = TelemetryConsoleDataSource(repository).loadRequest(requestId)
+
+        assertEquals(requestId, detail.run?.requestId)
+        assertEquals(listOf(10L, 30L), detail.timeline.map { it.timestampEpochMs })
+        assertNull(detail.sourceError)
+    }
+
+    @Test
     fun `returns privacy safe error without exposing repository failure`() {
         val dataSource = TelemetryConsoleDataSource(
             telemetryRepository = FailingTelemetryRepository(),
@@ -69,10 +85,14 @@ class ConsoleDataSourceTest {
         )
 
         val snapshot = dataSource.load()
+        val detail = dataSource.loadRequest(RequestId("request"))
 
         assertEquals("Telemetry source unavailable", snapshot.sourceError)
         assertEquals(emptyList<GenerationRunRecord>(), snapshot.runs)
         assertEquals("Not connected", snapshot.runtime.status)
+        assertEquals("Telemetry source unavailable", detail.sourceError)
+        assertNull(detail.run)
+        assertEquals(emptyList<StructuredLog>(), detail.timeline)
     }
 
     private fun run(index: Int) = GenerationRunRecord(
@@ -94,11 +114,12 @@ class ConsoleDataSourceTest {
         errorCode = null,
     )
 
-    private fun log(index: Int) = StructuredLog(
+    private fun log(index: Int, requestId: RequestId? = null) = StructuredLog(
         timestampEpochMs = index.toLong(),
         level = LogLevel.INFO,
         component = "runtime",
         event = "event-$index",
+        requestId = requestId,
     )
 
     private fun resource() = ResourceSnapshot(
@@ -129,5 +150,7 @@ class ConsoleDataSourceTest {
 
     private class FailingTelemetryRepository : TelemetryRepository by InMemoryTelemetryRepository() {
         override fun recentRuns(limit: Int): List<GenerationRunRecord> = error("private database path")
+
+        override fun findRun(requestId: RequestId): GenerationRunRecord? = error("private database path")
     }
 }
