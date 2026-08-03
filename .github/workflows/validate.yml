@@ -109,7 +109,8 @@ jobs:
           "$GRADLE_COMMAND" \
             --stacktrace \
             lintDebug \
-            :apps:local-llm-console:lintInternal
+            :apps:local-llm-console:lintInternal \
+            :apps:local-llm-phone-test:lintRelease
 
       - name: Build Android artifacts
         shell: bash
@@ -134,6 +135,8 @@ jobs:
             :apps:local-llm-console:assembleInternal \
             :apps:device-test-runner:assembleDebug \
             :apps:device-test-runner:assembleDebugAndroidTest \
+            :apps:local-llm-phone-test:assembleDebug \
+            :apps:local-llm-phone-test:bundleRelease \
             2>&1 | tee build/android-artifacts.log
 
       - name: Verify Android native packaging
@@ -154,6 +157,16 @@ jobs:
         with:
           name: local-llm-device-test-apks
           path: apps/device-test-runner/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+
+      - name: Upload phone test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-llm-phone-test-artifacts
+          path: |
+            apps/local-llm-phone-test/build/outputs/apk/**/*.apk
+            apps/local-llm-phone-test/build/outputs/bundle/**/*.aab
           if-no-files-found: warn
 
       - name: Upload Android libraries
