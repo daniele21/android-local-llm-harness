@@ -132,6 +132,24 @@ Pull request #24 adds a backend-agnostic generation sanity check through the pub
 
 The repository gate validates the reusable sanity implementation with deterministic contract fakes. Execution against a physical Android device and a real GGUF remains part of the separate production-readiness gate.
 
+### Phase 2 fourth vertical slice
+
+Pull request #25 adds a neutral cache-health contract and the first concrete probe for the runtime model-integrity cache.
+
+- [x] add `CacheHealthProbe` and `CacheHealthSnapshot` to stable observability contracts
+- [x] keep `runtime-core` independent from the health-engine implementation
+- [x] expose the model-integrity cache through a dedicated runtime-owned probe
+- [x] require the runtime and probe to share the same injected `ModelIntegrityCache` instance
+- [x] classify tracked entries as healthy, stale or orphaned without exposing paths or digests
+- [x] keep health snapshots observational and non-mutating
+- [x] map consistent snapshots to `PASS` and anomalous snapshots to `FAIL`
+- [x] re-hash a previously verified artifact after its cached file stamp changes
+- [x] add deterministic tests for empty, current, stale and orphaned cache states
+- [x] validate formatting, static analysis, JVM tests, Android Lint, Android artifacts and native packaging
+- [x] document ownership, wiring, privacy, concurrency and repair semantics in [`health-engine.md`](health-engine.md)
+
+This slice covers the model-integrity verification cache currently used by the runtime. It does not claim health coverage for future tokenizer, prompt, KV or downloaded-model caches that do not yet have independent contracts.
+
 ### Post-merge production-readiness gate
 
 Physical-device evidence remains mandatory before the runtime is called production-ready, released to application consumers or used as the baseline for device performance claims.
@@ -254,7 +272,8 @@ Phase 2 repository work may begin after the Phase 1 merge. Production claims rem
 - [x] model integrity checks exposed through the control plane
 - [x] reusable health-suite orchestration and persisted result aggregation
 - [x] generation sanity suites
-- [ ] cache health suites
+- [x] model-integrity cache health suite
+- [ ] health contracts for future tokenizer, prompt, KV or downloaded-model caches
 - [ ] benchmark baselines and regressions
 - [ ] redacted diagnostic bundle export
 
