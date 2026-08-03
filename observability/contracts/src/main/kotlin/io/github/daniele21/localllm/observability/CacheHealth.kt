@@ -1,10 +1,6 @@
 package io.github.daniele21.localllm.observability
 
-data class CacheHealthSnapshot(
-    val entryCount: Int,
-    val staleEntryCount: Int,
-    val orphanedEntryCount: Int,
-) {
+data class CacheHealthSnapshot(val entryCount: Int, val staleEntryCount: Int, val orphanedEntryCount: Int) {
     init {
         require(entryCount >= 0) { "Cache entry count must not be negative" }
         require(staleEntryCount >= 0) { "Stale cache entry count must not be negative" }
