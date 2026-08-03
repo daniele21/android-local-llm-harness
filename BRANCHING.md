@@ -9,7 +9,8 @@ As of August 2026:
 - `main` is the canonical integrated baseline;
 - pull request #13 merged the consolidated Phase 1 implementation into `main`;
 - pull requests #21, #23, #24, #25, #26 and #27 merged the current Phase 2 telemetry, health, resource and benchmark slices into `main`;
-- pull request #28 is the only active recovery line for the useful sanity-assertion behavior identified in superseded PR #22;
+- pull request #28 merged the useful sanity-assertion recovery and ARM64 emulator preflight;
+- pull request #29 merged the Google Play-installable physical-device validation app;
 - the physical-device GGUF gate remains open and blocks production readiness, releases to application consumers and device-performance claims.
 
 New work must start from the latest `main` unless an explicit, documented stacked dependency requires otherwise.

@@ -116,7 +116,8 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal :apps:local-llm-phone-test:lintRelease
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
-./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
+LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true \
+  ./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :observability:health-engine:assembleDebug
 ./gradlew :observability:android-resource-probe:assembleDebug
@@ -149,7 +150,7 @@ The model is streamed into the debuggable test application's private storage and
 
 `apps/local-llm-phone-test` is a normal launcher application intended for phones where developer mode or ADB is unavailable. It imports a GGUF through Android's Storage Access Framework, runs generation, cancellation and repeated memory cycles, then produces a privacy-safe report that can be copied or shared.
 
-Build and sign its release AAB outside the repository, upload it to the Google Play internal-testing track, install it with the tester account and follow [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md). Signing keys, credentials and GGUF files must never be committed.
+Configure the external PKCS12 upload keystore and macOS Keychain once by following [`docs/android-upload-key.md`](docs/android-upload-key.md), then build or sign its release AAB through `scripts/build-phone-test-release.sh`. Upload it to the Google Play internal-testing track, install it with the tester account and follow [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md). Signing keys, credentials and GGUF files must never be committed.
 
 ## Roadmap
 

@@ -96,7 +96,8 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
-./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
+LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true \
+  ./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
 ./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 python3 scripts/verify-android-packaging.py

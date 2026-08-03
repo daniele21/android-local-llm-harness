@@ -50,7 +50,9 @@ The selected document is first copied into a temporary private file and then imp
 
 The durable model is stored below the application's `noBackupFilesDir`, keyed by its SHA-256 digest. Removing the model from the UI deletes the content-addressed object and its saved metadata.
 
-## Build a signed Android App Bundle
+## Configure the upload key
+
+The concise creation, Keychain, signing and recovery procedure is available in [`android-upload-key.md`](android-upload-key.md). This section records the same configuration in the context of the complete Play internal-testing flow.
 
 The application ID is:
 
@@ -58,19 +60,91 @@ The application ID is:
 io.github.daniele21.localllm.phonetest
 ```
 
-The repository does not contain a keystore, passwords or signing credentials. Create and retain an upload key outside the repository.
+The upload key is a PKCS12 keystore stored outside the repository and separate from the app-signing key administered by Google Play App Signing. The default local configuration is:
 
-From Android Studio:
+```text
+keystore: ~/.keystore/local-llm-phone-test-upload.jks
+alias: local-llm-phone-test-upload
+```
 
-1. Open the repository.
-2. Select **Build → Generate Signed Bundle / APK**.
-3. Select **Android App Bundle**.
-4. Select the `local-llm-phone-test` module.
-5. Select or create the upload keystore.
-6. Select the `release` build type.
-7. Generate the `.aab`.
+The `.jks` suffix is only a filename convention; the store format must be `PKCS12`. The keystore and key use the same password. Create the keystore manually outside the repository before the first release:
 
-The unsigned CI bundle is useful only as a build artifact. The bundle uploaded to Google Play must be signed with the account's upload key. New Google Play applications use Play App Signing, which keeps the app-signing key separate from the upload key.
+```bash
+mkdir -p ~/.keystore
+keytool -genkeypair -v \
+  -storetype PKCS12 \
+  -keystore ~/.keystore/local-llm-phone-test-upload.jks \
+  -alias local-llm-phone-test-upload \
+  -keyalg RSA \
+  -keysize 4096 \
+  -validity 10000
+```
+
+`keytool` prompts for the password and certificate fields. Do not put passwords in command arguments, shell history, environment files or repository files. Keep an encrypted backup of the keystore outside the development machine and record who owns recovery and Play Console upload-key reset operations.
+
+On macOS, save the existing keystore password in the user's default Keychain:
+
+```bash
+bash scripts/build-phone-test-release.sh setup
+```
+
+The setup command does not create or modify the keystore. It only calls `security add-generic-password` and lets Keychain prompt for the password without printing it.
+
+## Build a signed Android App Bundle
+
+Create a signed bundle from the current source with:
+
+```bash
+bash scripts/build-phone-test-release.sh build
+```
+
+The helper resolves the Android SDK from `ANDROID_HOME`, `ANDROID_SDK_ROOT`, root `local.properties` or the standard macOS/Homebrew SDK locations. Set `ANDROID_HOME` explicitly when using a different location.
+
+The helper:
+
+1. verifies that the external keystore exists;
+2. reads its password from macOS Keychain;
+3. supplies the four signing variables only to the Gradle process;
+4. runs `:apps:local-llm-phone-test:bundleRelease`;
+5. clears its signing variables when the process exits.
+
+Gradle accepts release signing only through:
+
+```text
+LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE
+LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD
+LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS
+LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
+```
+
+All four values are required. A partial configuration fails explicitly. Packaging a release without signing also fails unless `LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true` is set explicitly; this exception is reserved for the CI job that publishes the reviewable unsigned artifact.
+
+The default signed output is:
+
+```text
+apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
+```
+
+Non-secret path and alias overrides may be supplied through `LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE` and `LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS`. Do not export either password manually for the normal macOS workflow.
+
+## Sign the unsigned CI bundle
+
+To preserve and sign the CI bundle already downloaded at the repository root:
+
+```bash
+bash scripts/build-phone-test-release.sh sign-ci-aab
+```
+
+The defaults are:
+
+```text
+input:  local-llm-phone-test-release-unsigned.aab
+output: local-llm-phone-test-release-signed.aab
+```
+
+The command signs a separate copy with `jarsigner`, then runs `jarsigner -verify -verbose -certs`. Input and output can be passed as the second and third arguments. Verify any published CI checksum before signing; signing necessarily changes the bundle digest.
+
+The bundle uploaded to Google Play must be signed with the registered upload key. New Google Play applications use Play App Signing, which keeps the distribution app-signing key separate from the developer-held upload key.
 
 Official references:
 
@@ -120,5 +194,6 @@ Google Play installation does not require developer mode or ADB. A company-manag
 - Increment `versionCode` for every uploaded Play build.
 - Keep the package name stable after the Play Console application is created.
 - Do not commit the GGUF, keystore, service-account JSON or passwords.
+- Restrict upload-keystore access, keep an encrypted external backup and test recovery before it is needed.
 - Record the app version, commit SHA, model SHA-256 and exact privacy-safe report in the evidence PR.
 - Do not mark the runtime production-ready from emulator evidence or from a single physical device.

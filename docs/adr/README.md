@@ -5,6 +5,9 @@ Architecture Decision Records capture decisions that materially constrain the ru
 ## Records
 
 - [`0001-room-backed-telemetry.md`](0001-room-backed-telemetry.md) — persistent telemetry ownership, threading, retention and privacy defaults
+- [`0002-build-and-quality-toolchain.md`](0002-build-and-quality-toolchain.md) — pinned Android, Gradle and quality-tool configuration
+- [`0003-no-model-binaries-in-source.md`](0003-no-model-binaries-in-source.md) — external GGUF/GGML artifact policy
+- [`0004-phone-test-upload-key-custody.md`](0004-phone-test-upload-key-custody.md) — external Play upload key, Keychain workflow and recovery policy
 
 ## Status values
 
