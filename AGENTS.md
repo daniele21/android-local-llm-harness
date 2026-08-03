@@ -44,11 +44,12 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `models/model-profile` | Artifacts, load profiles, use-case profiles and app bindings |
 | `models/model-store` | Content-addressed storage, import and integrity verification |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
-| `observability/contracts` | Stable telemetry, log, health, resource and dashboard schemas |
+| `observability/contracts` | Stable telemetry, log, health, resource, benchmark and dashboard schemas |
 | `observability/in-memory-store` | Bounded ephemeral telemetry implementation and deterministic tests |
 | `observability/room-store` | Persistent Android telemetry, retention, migrations and database lifecycle |
 | `observability/health-engine` | Health-suite orchestration, model-integrity checks and persisted control-plane results |
 | `observability/android-resource-probe` | Android process-memory and thermal snapshot collection behind stable contracts |
+| `observability/benchmark-engine` | Cold/warm baseline capture, deterministic statistics and regression health checks |
 | `transports/in-process` | Embedded client-to-runtime delegation |
 | `apps/local-llm-console` | Developer console and future cross-app control plane |
 | `apps/device-test-runner` | Real-device GGUF lifecycle, cancellation and memory validation |
@@ -64,7 +65,8 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and recovery after failure.
 - GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
 - JNI or generation changes start in `backends/llama-cpp`; preserve coarse-grained JNI calls, opaque handles, idempotent release and cooperative cancellation.
-- Telemetry schemas start in `observability/contracts`; persistence stays in `room-store`, ephemeral behavior in `in-memory-store`, Android resource collection in `android-resource-probe`, and check orchestration in `health-engine`.
+- Telemetry schemas start in `observability/contracts`; persistence stays in `room-store`, ephemeral behavior in `in-memory-store`, Android resource collection in `android-resource-probe`, benchmark analysis in `benchmark-engine`, and check orchestration in `health-engine`.
+- Benchmark baselines must compare the same application, use case, model digest and explicit cold/warm class. Do not mix `UNKNOWN`, cold and warm samples.
 - Health checks must return privacy-safe summaries, remain independently testable and persist through `TelemetryRepository`; a check failure must not break inference.
 - Console code must not open another application’s private Room database directly. Cross-app access requires the planned signature-protected diagnostics bridge.
 - Native and Capacitor integrations must remain thin and must not duplicate model resolution, validation, generation policy, error mapping or telemetry.
@@ -107,11 +109,12 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :observability:health-engine:assembleDebug
 ./gradlew :observability:android-resource-probe:assembleDebug
+./gradlew :observability:benchmark-engine:assembleDebug
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 python3 scripts/verify-android-packaging.py
 ```
 
-`./gradlew check` includes the simulated lifecycle, telemetry repository tests and health-engine tests. Telemetry and health failures must never fail or cancel generation.
+`./gradlew check` includes the simulated lifecycle, telemetry repository tests, health-engine tests and benchmark regression tests. Telemetry and health failures must never fail or cancel generation.
 
 ### Native host tests
 
@@ -143,6 +146,7 @@ Physical-device evidence is mandatory before production readiness, application-c
 - Avoid timing assertions without a deterministic clock.
 - Test telemetry retention, ordering, terminal replacement and privacy-safe persistence.
 - Test resource snapshot retention and unavailable-platform fallbacks without inventing measurements.
+- Test benchmark median and percentile behavior, cold/warm isolation, post-baseline windows and missing metrics.
 - Test health-suite aggregation, unknown checks, unexpected exceptions and persistence.
 - Model-integrity checks must not expose private paths, model bytes or arbitrary verification details.
 
