@@ -126,14 +126,11 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = fail()
 
-    override fun recentLogs(
-        limit: Int,
-        requestId: RequestId?,
-    ): List<StructuredLog> = fail()
+    override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = fail()
 
     override fun healthResults(): List<HealthCheckResult> = fail()
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = fail()
 
-    private fun fail(): Nothing = throw IllegalStateException("telemetry unavailable")
+    private fun fail(): Nothing = error("telemetry unavailable")
 }
