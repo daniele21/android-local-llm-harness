@@ -91,6 +91,7 @@ class ConsoleDataSourceTest {
         outputTokens = 5,
         decodeTokensPerSecond = 6.0,
         modelLoadKind = ModelLoadKind.WARM,
+        errorCode = null,
     )
 
     private fun log(index: Int) = StructuredLog(
