@@ -66,7 +66,13 @@ class BenchmarkRegressionHealthCheck(
     private val key: BenchmarkKey,
     private val policy: BenchmarkPolicy = BenchmarkPolicy(),
 ) : HealthCheck {
-    override val id: String = "benchmark-regression:${key.applicationId.value}:${key.useCaseId.value}:${key.modelLoadKind.name}"
+    override val id: String = listOf(
+        "benchmark-regression",
+        key.applicationId.value,
+        key.useCaseId.value,
+        key.modelDigest.sha256,
+        key.modelLoadKind.name,
+    ).joinToString(":")
 
     override fun evaluate(): HealthAssessment {
         val baseline = repository.benchmarkBaselines().firstOrNull { it.key == key }
