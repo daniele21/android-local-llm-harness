@@ -65,8 +65,11 @@ private class LoadClassificationFixture {
     val backend = LoadClassificationBackend()
     val repository = InMemoryTelemetryRepository()
     private val resolved = resolvedUseCase()
+    private val registry = object : ModelProfileRegistry {
+        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = resolved
+    }
     val runtime = RuntimeOrchestrator(
-        registry = ModelProfileRegistry { _, _ -> resolved },
+        registry = registry,
         modelStore = LoadClassificationStore(modelFile, digest),
         backend = backend,
         telemetryRepository = repository,
