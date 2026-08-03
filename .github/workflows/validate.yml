@@ -27,6 +27,7 @@ jobs:
       android: ${{ steps.scope.outputs.android }}
       native: ${{ steps.scope.outputs.native }}
       packaging: ${{ steps.scope.outputs.packaging }}
+      modules: ${{ steps.scope.outputs.modules }}
 
     steps:
       - uses: actions/checkout@v6
@@ -161,6 +162,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
+          # Internal PRs may populate the cache. Fork PRs remain read-only.
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Install ccache
         if: needs.scope.outputs.packaging == 'true'
@@ -198,40 +201,53 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Check repository formatting
-        run: ./gradlew --stacktrace spotlessCheck
-
-      - name: Run static analysis and repository guards
-        run: |
-          ./gradlew \
-            --no-configuration-cache \
-            --stacktrace \
-            detekt \
-            verifyNoModelArtifacts
-
-      - name: Test, lint and optionally package
+      - name: Run scoped Android validation
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          GRADLE_MODULES: ${{ needs.scope.outputs.modules }}
           RUN_PACKAGING: ${{ needs.scope.outputs.packaging }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build
 
-          gradle_args=(--stacktrace)
+          gradle_args=(--no-configuration-cache --stacktrace)
           if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then
             gradle_args+=(--profile)
           fi
 
-          tasks=(
-            check
-            lintDebug
-            :apps:local-llm-console:lintInternal
-            :apps:local-llm-phone-test:lintRelease
-            :apps:local-llm-console:compileInternalKotlin
-            :apps:device-test-runner:compileDebugKotlin
-            :apps:local-llm-phone-test:compileDebugKotlin
+          all_modules=(
+            core:contracts
+            core:runtime-core
+            models:model-profile
+            models:model-store
+            backends:llama-cpp
+            observability:contracts
+            observability:in-memory-store
+            observability:room-store
+            observability:health-engine
+            observability:android-resource-probe
+            observability:benchmark-engine
+            transports:in-process
+            apps:local-llm-console
+            apps:device-test-runner
+            apps:local-llm-phone-test
           )
+
+          if [[ "$GRADLE_MODULES" == "all" ]]; then
+            selected_modules=("${all_modules[@]}")
+          else
+            IFS=',' read -r -a selected_modules <<< "$GRADLE_MODULES"
+          fi
+
+          tasks=(spotlessCheck detekt verifyNoModelArtifacts)
+          for module in "${selected_modules[@]}"; do
+            [[ -n "$module" ]] || continue
+            tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            if [[ "$module" == "apps:local-llm-console" ]]; then
+              tasks+=(":apps:local-llm-console:lintInternal")
+            fi
+          done
 
           if [[ "$RUN_PACKAGING" == "true" ]]; then
             tasks+=(
@@ -241,8 +257,18 @@ jobs:
               :apps:device-test-runner:assembleDebugAndroidTest
               :apps:local-llm-phone-test:assembleDebug
             )
+          else
+            # Compile the downstream applications to catch API integration
+            # breakages without constructing APKs or native packages.
+            tasks+=(
+              :apps:local-llm-console:compileInternalKotlin
+              :apps:device-test-runner:compileDebugKotlin
+              :apps:local-llm-phone-test:compileDebugKotlin
+            )
           fi
 
+          printf 'Gradle modules: %s\n' "${selected_modules[*]}"
+          printf 'Gradle tasks: %s\n' "${tasks[*]}"
           ./gradlew "${gradle_args[@]}" "${tasks[@]}" \
             2>&1 | tee build/android-validation.log
 
