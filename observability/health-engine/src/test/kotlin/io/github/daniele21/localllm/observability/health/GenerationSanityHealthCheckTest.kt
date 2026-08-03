@@ -211,11 +211,7 @@ class GenerationSanityHealthCheckTest {
         ),
     )
 
-    private data class AssertionCase(
-        val output: String,
-        val expectedOutput: String,
-        val outputMatch: SanityOutputMatch,
-    )
+    private data class AssertionCase(val output: String, val expectedOutput: String, val outputMatch: SanityOutputMatch)
 
     private class FakeClient(
         private val prepared: Boolean = true,
