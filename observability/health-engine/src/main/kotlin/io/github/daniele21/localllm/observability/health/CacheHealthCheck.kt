@@ -3,9 +3,7 @@ package io.github.daniele21.localllm.observability.health
 import io.github.daniele21.localllm.observability.CacheHealthProbe
 import io.github.daniele21.localllm.observability.HealthStatus
 
-class CacheHealthCheck(
-    private val probe: CacheHealthProbe,
-) : HealthCheck {
+class CacheHealthCheck(private val probe: CacheHealthProbe) : HealthCheck {
     override val id: String = "cache-health:${probe.id}"
 
     override fun evaluate(): HealthAssessment {
