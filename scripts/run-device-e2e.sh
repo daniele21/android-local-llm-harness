@@ -191,8 +191,8 @@ fi
 "$ADB" install -r -t "$APP_APK"
 "$ADB" install -r -t "$TEST_APK"
 
-"$ADB" shell run-as "$APP_ID" sh -c 'mkdir -p files/e2e'
-"$ADB" exec-out run-as "$APP_ID" sh -c 'cat > files/e2e/model.gguf' < "$MODEL_PATH"
+"$ADB" shell run-as "$APP_ID" mkdir -p files/e2e
+"$ADB" shell -T run-as "$APP_ID" dd of=files/e2e/model.gguf bs=1048576 < "$MODEL_PATH"
 
 REMOTE_SIZE="$("$ADB" shell run-as "$APP_ID" stat -c %s files/e2e/model.gguf | tr -d '\r')"
 LOCAL_SIZE="$(wc -c < "$MODEL_PATH" | tr -d ' ')"

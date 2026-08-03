@@ -8,15 +8,17 @@ As of August 2026:
 
 - `main` is the canonical integrated baseline;
 - pull request #13 merged the consolidated Phase 1 implementation into `main`;
-- there is no active Phase 1 implementation branch;
-- the physical-device GGUF gate remains open and blocks production readiness, releases to application consumers and device-performance claims;
-- Phase 2 repository work may start from the latest `main` while the physical-device gate is completed independently.
+- pull requests #21, #23, #24, #25, #26 and #27 merged the current Phase 2 telemetry, health, resource and benchmark slices into `main`;
+- pull request #28 is the only active recovery line for the useful sanity-assertion behavior identified in superseded PR #22;
+- the physical-device GGUF gate remains open and blocks production readiness, releases to application consumers and device-performance claims.
 
-Do not reopen or continue a historical Phase 1 branch. New work must start from the current `main` unless an explicit, documented stacked dependency requires otherwise.
+New work must start from the latest `main` unless an explicit, documented stacked dependency requires otherwise.
 
-## Historical Phase 0 and Phase 1 branches
+## Archived historical branches
 
-The following branches are historical references and must not receive new commits:
+The following branches are historical references and must not receive new commits.
+
+### Phase 0 and Phase 1
 
 - `agent/phase-0-ci-validation`
 - `agent/phase-0-final-validation`
@@ -25,14 +27,32 @@ The following branches are historical references and must not receive new commit
 - `agent/phase-1-content-addressed-import`
 - `agent/phase-1-functional-runtime`
 - `agent/phase-1-consolidation`
+- `agent/post-phase-1-cleanup`
 
 Pull requests #8 and #12 were closed as superseded by #13. Pull request #13 is merged and its effective implementation is now part of `main`.
 
-Delete the historical remote branches after the post-merge cleanup has been reviewed and their remaining audit value has been confirmed. Do not rewrite them to point at newer commits because that would destroy their value as historical references.
+### Phase 2 merged implementation branches
 
-## Dependabot branches
+- `agent/phase-2-room-telemetry`
+- `agent/phase-2-health-engine`
+- `agent/phase-2-generation-sanity`
+- `agent/phase-2-cache-health`
+- `agent/phase-2-resource-observability`
+- `agent/phase-2-benchmark-regressions`
 
-Dependabot branches are infrastructure updates, not product implementation lines. Keep them isolated from runtime and feature changes.
+Their accepted implementation is part of `main`; these branches are retained only for audit until remote cleanup.
+
+### Phase 2 superseded branch
+
+- `agent/phase-2-health-control-plane`
+
+PR #22 is closed as superseded. Its alternative `HealthControlPlane`, multi-fixture DTO hierarchy and granular finding model are not canonical. The compatible assertion behavior is being recovered on PR #28 from current `main`. Do not merge, rebase or continue PR #22's branch.
+
+Delete historical remote branches only after their replacement is safely integrated, unique commits are audited and recovery notes are recorded. Do not rewrite historical refs to point at newer commits because that would destroy their audit value.
+
+## Dependabot and infrastructure branches
+
+Dependabot and infrastructure branches are not product implementation lines. Keep them isolated from runtime and feature changes.
 
 After a major integration into `main`:
 
@@ -40,6 +60,8 @@ After a major integration into `main`:
 - require the dependency branch to be based on the current `main` before review;
 - review major GitHub Actions upgrades individually, especially changes with runner, caching, security or licensing implications;
 - do not mix dependency-only updates with runtime, documentation or observability work.
+
+PR #20 remains the isolated review line for the `gradle/actions` v6 licensing and caching change.
 
 ## Rules for new work
 
@@ -51,7 +73,7 @@ After a major integration into `main`:
 6. Before opening a new implementation branch, compare the proposed scope with open pull requests and `docs/roadmap.md`.
 7. Keep dependency upgrades separate from feature and runtime changes.
 8. Sync the active implementation branch with its base before final validation, then run the cumulative clean CI gate.
-9. Close superseded pull requests with a comment identifying the canonical replacement and confirming whether any commit must be recovered.
+9. Close superseded pull requests with a note identifying the canonical replacement and any selectively recovered behavior.
 10. Delete merged or superseded remote branches after the replacement is safely integrated and audited.
 
 ## Required protection for `main`

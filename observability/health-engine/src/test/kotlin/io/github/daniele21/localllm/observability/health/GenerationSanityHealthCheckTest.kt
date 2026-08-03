@@ -44,6 +44,73 @@ class GenerationSanityHealthCheckTest {
     }
 
     @Test
+    fun `supports non empty forbidden marker and regex assertions`() {
+        val cases = listOf(
+            AssertionCase(
+                output = "generated response",
+                expectedOutput = "",
+                outputMatch = SanityOutputMatch.NON_EMPTY,
+            ),
+            AssertionCase(
+                output = "safe generated response",
+                expectedOutput = "FORBIDDEN",
+                outputMatch = SanityOutputMatch.NOT_CONTAINS,
+            ),
+            AssertionCase(
+                output = "local_llm_ok:42",
+                expectedOutput = "LOCAL_LLM_OK:[0-9]+",
+                outputMatch = SanityOutputMatch.MATCHES_REGEX,
+            ),
+        )
+
+        cases.forEach { case ->
+            val client = FakeClient { request ->
+                listOf(completed(request, case.output))
+            }
+            val result = check(
+                client = client,
+                expectedOutput = case.expectedOutput,
+                outputMatch = case.outputMatch,
+            ).evaluate()
+
+            assertEquals(HealthStatus.PASS, result.status)
+            assertTrue(client.sessionClosed)
+        }
+    }
+
+    @Test
+    fun `fails forbidden marker assertion without exposing generated output`() {
+        val client = FakeClient { request ->
+            listOf(completed(request, "private FORBIDDEN generated text"))
+        }
+
+        val result = check(
+            client = client,
+            expectedOutput = "FORBIDDEN",
+            outputMatch = SanityOutputMatch.NOT_CONTAINS,
+        ).evaluate()
+
+        assertEquals(HealthStatus.FAIL, result.status)
+        assertFalse("private" in result.detail)
+        assertFalse("FORBIDDEN" in result.detail)
+    }
+
+    @Test
+    fun `rejects invalid regex configuration`() {
+        val failure = runCatching {
+            GenerationSanitySpec(
+                applicationId = applicationId,
+                useCaseId = useCaseId,
+                prompt = "health prompt",
+                expectedOutput = "[",
+                outputMatch = SanityOutputMatch.MATCHES_REGEX,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
     fun `fails without exposing generated output when output does not match`() {
         val client = FakeClient { request ->
             listOf(completed(request, "private generated text"))
@@ -112,13 +179,19 @@ class GenerationSanityHealthCheckTest {
         assertEquals("Generation sanity session cleanup failed", result.detail)
     }
 
-    private fun check(client: LocalLlmClient, timeoutMs: Long = 100L): GenerationSanityHealthCheck = GenerationSanityHealthCheck(
+    private fun check(
+        client: LocalLlmClient,
+        timeoutMs: Long = 100L,
+        expectedOutput: String = "LOCAL_LLM_OK",
+        outputMatch: SanityOutputMatch = SanityOutputMatch.CONTAINS,
+    ): GenerationSanityHealthCheck = GenerationSanityHealthCheck(
         client = client,
         spec = GenerationSanitySpec(
             applicationId = applicationId,
             useCaseId = useCaseId,
             prompt = "health prompt",
-            expectedOutput = "LOCAL_LLM_OK",
+            expectedOutput = expectedOutput,
+            outputMatch = outputMatch,
             timeoutMs = timeoutMs,
         ),
         requestIdFactory = SanityRequestIdFactory { requestId },
@@ -137,6 +210,8 @@ class GenerationSanityHealthCheckTest {
             decodeTokensPerSecond = 1.0,
         ),
     )
+
+    private data class AssertionCase(val output: String, val expectedOutput: String, val outputMatch: SanityOutputMatch)
 
     private class FakeClient(
         private val prepared: Boolean = true,
