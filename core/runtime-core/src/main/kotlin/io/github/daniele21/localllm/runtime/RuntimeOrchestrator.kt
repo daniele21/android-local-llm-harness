@@ -16,6 +16,8 @@ import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
+import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
+import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.store.ModelStore
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -38,6 +40,8 @@ class RuntimeOrchestrator(
     private val clock: MonotonicClock = MonotonicClock(System::nanoTime),
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
+    telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
+    epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
 ) : LocalLlmClient,
     AutoCloseable {
     private val resourceLock = Any()
@@ -45,6 +49,7 @@ class RuntimeOrchestrator(
     private val sessions = ConcurrentHashMap<SessionId, SessionDescriptor>()
     private val closed = AtomicBoolean(false)
     private val deferredModelUnload = AtomicBoolean(false)
+    private val runtimeTelemetry = RuntimeTelemetry(telemetryRepository, epochClock)
 
     @Volatile
     private var backendInitialized = false
@@ -138,6 +143,7 @@ class RuntimeOrchestrator(
             onTerminal = { releaseSessionRequest(session) },
         )
         val enqueuedAt = clock.nowNanos()
+        runtimeTelemetry.queued(request, session.context.model.digest)
 
         val submission = try {
             scheduler.submit(
@@ -146,28 +152,23 @@ class RuntimeOrchestrator(
                 task = { executeGeneration(request, session, lifecycle, enqueuedAt) },
                 onQueuedCancellation = {
                     lifecycle.cancelRequested.set(true)
-                    lifecycle.finish(
-                        GenerationEvent.Failed(
-                            request.requestId,
-                            LocalLlmError.Cancelled("Generation cancelled before execution"),
-                        ),
-                    )
+                    val cancellation = LocalLlmError.Cancelled("Generation cancelled before execution")
+                    runtimeTelemetry.failed(request.requestId, cancellation)
+                    lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
                 },
                 onRunningCancellation = {
                     lifecycle.cancelRequested.set(true)
                     runCatching { backend.cancel(request.requestId.value) }
                 },
                 onQueued = { position ->
+                    runtimeTelemetry.queuedPosition(request.requestId, position)
                     lifecycle.emit(GenerationEvent.Queued(request.requestId, position))
                 },
             )
         } catch (error: Throwable) {
-            lifecycle.finish(
-                GenerationEvent.Failed(
-                    request.requestId,
-                    LocalLlmError.Configuration(error.message ?: "Unable to schedule generation"),
-                ),
-            )
+            val failure = LocalLlmError.Configuration(error.message ?: "Unable to schedule generation")
+            runtimeTelemetry.failed(request.requestId, failure)
+            lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
             return NoOpGenerationHandle(request.requestId)
         }
 
@@ -250,9 +251,16 @@ class RuntimeOrchestrator(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
+    private fun executeGeneration(
+        request: GenerationRequest,
+        session: SessionDescriptor,
+        lifecycle: RequestLifecycle,
+        enqueuedAt: Long,
+    ) {
         if (lifecycle.cancelRequested.get()) {
-            lifecycle.finish(GenerationEvent.Failed(request.requestId, LocalLlmError.Cancelled()))
+            val cancellation = LocalLlmError.Cancelled()
+            runtimeTelemetry.failed(request.requestId, cancellation)
+            lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
             return
         }
 
@@ -260,6 +268,7 @@ class RuntimeOrchestrator(
         val firstTokenAt = AtomicLong(0)
         val output = StringBuilder()
         state.set(RuntimeState.GENERATING)
+        runtimeTelemetry.started(request.requestId)
         lifecycle.emit(GenerationEvent.Started(request.requestId, session.context.model.digest))
 
         try {
@@ -291,37 +300,35 @@ class RuntimeOrchestrator(
             }
 
             if (lifecycle.cancelRequested.get() || outcome is BackendGenerationOutcome.Cancelled) {
-                lifecycle.finish(GenerationEvent.Failed(request.requestId, LocalLlmError.Cancelled()))
+                val cancellation = LocalLlmError.Cancelled()
+                runtimeTelemetry.failed(request.requestId, cancellation)
+                lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
             } else {
-                val metrics = (outcome as BackendGenerationOutcome.Completed).metrics
+                val backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics
+                val publicMetrics = backendMetrics.toPublicMetrics(
+                    queueMs = nanosToMillis(startedAt - enqueuedAt),
+                    modelLoadMs = session.modelLoadDurationMs,
+                    timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
+                        ?.let { nanosToMillis(it - startedAt) },
+                    totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
+                )
+                runtimeTelemetry.completed(request.requestId, publicMetrics)
                 lifecycle.finish(
                     GenerationEvent.Completed(
                         requestId = request.requestId,
                         output = output.toString(),
-                        metrics = metrics.toPublicMetrics(
-                            queueMs = nanosToMillis(startedAt - enqueuedAt),
-                            modelLoadMs = session.modelLoadDurationMs,
-                            timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
-                                ?.let { nanosToMillis(it - startedAt) },
-                            totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
-                        ),
+                        metrics = publicMetrics,
                     ),
                 )
             }
         } catch (error: BackendException) {
-            lifecycle.finish(
-                GenerationEvent.Failed(
-                    request.requestId,
-                    LocalLlmError.NativeRuntime("${error.code}: ${error.message}"),
-                ),
-            )
+            val failure = LocalLlmError.NativeRuntime("${error.code}: ${error.message}")
+            runtimeTelemetry.failed(request.requestId, failure)
+            lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: Throwable) {
-            lifecycle.finish(
-                GenerationEvent.Failed(
-                    request.requestId,
-                    LocalLlmError.NativeRuntime(error.message ?: "Unexpected local inference failure"),
-                ),
-            )
+            val failure = LocalLlmError.NativeRuntime(error.message ?: "Unexpected local inference failure")
+            runtimeTelemetry.failed(request.requestId, failure)
+            lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } finally {
             val unloaded = attemptDeferredModelUnload(ignoreActiveGeneration = true)
             if (!closed.get() && !unloaded) {
@@ -429,7 +436,12 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun failImmediately(requestId: RequestId, listener: GenerationListener, error: LocalLlmError): GenerationHandle {
+    private fun failImmediately(
+        requestId: RequestId,
+        listener: GenerationListener,
+        error: LocalLlmError,
+    ): GenerationHandle {
+        runtimeTelemetry.rejected(requestId, error)
         runCatching { listener.onEvent(GenerationEvent.Failed(requestId, error)) }
         return NoOpGenerationHandle(requestId)
     }
@@ -451,11 +463,16 @@ class RuntimeOrchestrator(
         } else {
             null
         },
+        prefillMs = promptDurationMs,
+        decodeMs = generationDurationMs,
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
 
-    private data class LoadedModelDescriptor(val profileId: String, val handle: BackendModelHandle)
+    private data class LoadedModelDescriptor(
+        val profileId: String,
+        val handle: BackendModelHandle,
+    )
 
     private data class SessionDescriptor(
         val id: SessionId,
@@ -478,7 +495,11 @@ class RuntimeOrchestrator(
     }
 }
 
-private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
+private class RequestLifecycle(
+    val requestId: RequestId,
+    private val listener: GenerationListener,
+    private val onTerminal: () -> Unit,
+) {
     val cancelRequested = AtomicBoolean(false)
     private val terminal = AtomicBoolean(false)
 
@@ -511,6 +532,8 @@ private class RuntimeGenerationHandle(
     }
 }
 
-private class NoOpGenerationHandle(override val requestId: RequestId) : GenerationHandle {
+private class NoOpGenerationHandle(
+    override val requestId: RequestId,
+) : GenerationHandle {
     override fun cancel() = Unit
 }
