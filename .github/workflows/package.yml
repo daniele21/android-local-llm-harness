@@ -101,7 +101,7 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Build Android packages
+      - name: Build and validate Android packages
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
         shell: bash
@@ -118,6 +118,7 @@ jobs:
             assembleDebug \
             :apps:local-llm-console:assembleInternal \
             :apps:device-test-runner:assembleDebugAndroidTest \
+            :apps:local-llm-phone-test:lintRelease \
             :apps:local-llm-phone-test:bundleRelease \
             :observability:room-store:assembleDebugAndroidTest \
             2>&1 | tee build/android-packaging.log
