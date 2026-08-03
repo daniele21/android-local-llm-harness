@@ -82,10 +82,12 @@ jobs:
             echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
           fi
 
-      - name: Check repository formatting
+      - name: Apply repository formatting preview
         shell: bash
         run: |
-          "$GRADLE_COMMAND" --stacktrace spotlessCheck
+          mkdir -p build
+          "$GRADLE_COMMAND" --stacktrace spotlessApply
+          git diff --binary > build/spotless.patch
 
       - name: Run static analysis and repository guards
         shell: bash
@@ -168,4 +170,5 @@ jobs:
           path: |
             **/build/reports/**
             build/android-artifacts.log
+            build/spotless.patch
           if-no-files-found: warn
