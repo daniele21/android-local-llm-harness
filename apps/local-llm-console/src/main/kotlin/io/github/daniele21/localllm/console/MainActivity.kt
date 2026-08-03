@@ -73,28 +73,34 @@ class MainActivity : Activity() {
     private fun buildActions(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
-        addView(Button(this@MainActivity).apply {
-            text = "Refresh"
-            isAllCaps = false
-            setOnClickListener { refresh() }
-        })
+        addView(
+            Button(this@MainActivity).apply {
+                text = "Refresh"
+                isAllCaps = false
+                setOnClickListener { refresh() }
+            },
+        )
     }
 
     private fun buildTabs(): HorizontalScrollView = HorizontalScrollView(this).apply {
         isHorizontalScrollBarEnabled = false
-        addView(LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            ConsoleTab.entries.forEach { tab ->
-                addView(Button(this@MainActivity).apply {
-                    text = tab.label
-                    isAllCaps = false
-                    setOnClickListener {
-                        selectedTab = tab
-                        render()
-                    }
-                })
-            }
-        })
+        addView(
+            LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                ConsoleTab.entries.forEach { tab ->
+                    addView(
+                        Button(this@MainActivity).apply {
+                            text = tab.label
+                            isAllCaps = false
+                            setOnClickListener {
+                                selectedTab = tab
+                                render()
+                            }
+                        },
+                    )
+                }
+            },
+        )
     }
 
     private fun refresh() {
