@@ -19,6 +19,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
+@Suppress("TooManyFunctions")
 class MainActivity :
     Activity(),
     PhoneTestListener {
