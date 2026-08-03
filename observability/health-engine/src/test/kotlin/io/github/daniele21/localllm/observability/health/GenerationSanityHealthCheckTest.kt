@@ -38,6 +38,8 @@ class GenerationSanityHealthCheckTest {
         assertEquals("generation-sanity:app:sanity", check.id)
         assertEquals("health prompt", client.lastRequest?.input)
         assertEquals(16, client.lastRequest?.overrides?.maxOutputTokens)
+        assertEquals(0f, client.lastRequest?.overrides?.temperature)
+        assertEquals(0L, client.lastRequest?.overrides?.seed)
         assertTrue(client.sessionClosed)
     }
 
