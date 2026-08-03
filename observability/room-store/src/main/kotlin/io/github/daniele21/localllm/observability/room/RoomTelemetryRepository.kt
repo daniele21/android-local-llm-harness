@@ -13,6 +13,7 @@ import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class RoomTelemetryRepository internal constructor(
@@ -25,7 +26,7 @@ class RoomTelemetryRepository internal constructor(
     private val closed = AtomicBoolean(false)
 
     override fun recordRun(run: GenerationRunRecord) {
-        executeBlocking {
+        executeAsync {
             dao.upsertRunWithRetention(
                 TelemetryEntityMapper.runEntity(run),
                 retention.maxRuns,
@@ -34,7 +35,7 @@ class RoomTelemetryRepository internal constructor(
     }
 
     override fun appendLog(log: StructuredLog) {
-        executeBlocking {
+        executeAsync {
             dao.insertLogWithRetention(
                 TelemetryEntityMapper.logEntity(log),
                 retention.maxLogs,
@@ -43,7 +44,7 @@ class RoomTelemetryRepository internal constructor(
     }
 
     override fun saveHealth(result: HealthCheckResult) {
-        executeBlocking {
+        executeAsync {
             dao.upsertHealth(TelemetryEntityMapper.healthEntity(result))
         }
     }
@@ -86,8 +87,24 @@ class RoomTelemetryRepository internal constructor(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        closeDatabase()
         executor.shutdown()
+        try {
+            if (!executor.awaitTermination(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                executor.shutdownNow()
+            }
+        } catch (error: InterruptedException) {
+            executor.shutdownNow()
+            Thread.currentThread().interrupt()
+        } finally {
+            closeDatabase()
+        }
+    }
+
+    private fun executeAsync(block: () -> Unit) {
+        check(!closed.get()) { "Telemetry repository is closed" }
+        executor.execute {
+            runCatching(block)
+        }
     }
 
     private fun <T> executeBlocking(block: () -> T): T {
@@ -111,6 +128,7 @@ class RoomTelemetryRepository internal constructor(
 
     companion object {
         const val DEFAULT_DATABASE_NAME: String = "local-llm-telemetry.db"
+        private const val CLOSE_TIMEOUT_SECONDS = 5L
 
         fun open(
             context: Context,
