@@ -15,7 +15,7 @@ import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseProfile
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 
-internal data class ImportedPhoneModel(
+data class ImportedPhoneModel(
     val digest: ModelDigest,
     val fileName: String,
     val sizeBytes: Long,
