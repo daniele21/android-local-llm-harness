@@ -14,21 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Repository validation
+  scope:
+    name: Validation scope and repository guards
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
+    outputs:
+      android: ${{ steps.scope.outputs.android }}
+      native: ${{ steps.scope.outputs.native }}
 
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 0
+
+      - name: Determine validation scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/detect_ci_scope.py \
+            --event "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Verify coding-agent navigation
         run: python3 scripts/verify-agent-navigation.py
-
-      - name: Verify llama.cpp pin
-        run: ./scripts/verify-llama-cpp-pin.sh
 
       - name: Check repository scripts
         shell: bash
@@ -37,9 +50,25 @@ jobs:
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
+          python3 scripts/test_detect_ci_scope.py
           bash scripts/test-verify-llama-cpp-pin.sh
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
+
+  native:
+    name: Native host tests
+    needs: scope
+    if: needs.scope.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
 
       - name: Run native host tests
         shell: bash
@@ -50,6 +79,21 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build/native-tests --parallel 2
           ctest --test-dir build/native-tests --output-on-failure
+
+  android:
+    name: Android validation
+    needs: scope
+    if: needs.scope.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
 
       - uses: actions/setup-java@v4
         with:
@@ -69,56 +113,32 @@ jobs:
             "ndk;28.2.13676358"
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.5.0"
 
-      - name: Select Gradle command
-        shell: bash
-        run: |
-          if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
-            chmod +x gradlew
-            echo "GRADLE_COMMAND=./gradlew" >> "$GITHUB_ENV"
-          else
-            echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
-          fi
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
 
       - name: Check repository formatting
-        shell: bash
-        run: |
-          "$GRADLE_COMMAND" --stacktrace spotlessCheck
+        run: ./gradlew --stacktrace spotlessCheck
 
       - name: Run static analysis and repository guards
-        shell: bash
         run: |
-          "$GRADLE_COMMAND" \
+          ./gradlew \
             --no-configuration-cache \
             --stacktrace \
             detekt \
             verifyNoModelArtifacts
 
-      - name: Run JVM unit and simulated acceptance tests
+      - name: Test, lint and build Android artifacts
         shell: bash
         run: |
           set -o pipefail
           mkdir -p build
-          "$GRADLE_COMMAND" --stacktrace check 2>&1 | tee build/jvm-check.log
-
-      - name: Run Android Lint
-        shell: bash
-        run: |
-          "$GRADLE_COMMAND" \
+          ./gradlew \
             --stacktrace \
+            check \
             lintDebug \
             :apps:local-llm-console:lintInternal \
-            :apps:local-llm-phone-test:lintRelease
-
-      - name: Build Android artifacts
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p build
-          "$GRADLE_COMMAND" \
-            --stacktrace \
+            :apps:local-llm-phone-test:lintRelease \
             :core:contracts:assembleDebug \
             :core:runtime-core:assembleDebug \
             :models:model-profile:assembleDebug \
@@ -137,30 +157,33 @@ jobs:
             :apps:device-test-runner:assembleDebugAndroidTest \
             :apps:local-llm-phone-test:assembleDebug \
             :apps:local-llm-phone-test:bundleRelease \
-            2>&1 | tee build/android-artifacts.log
+            2>&1 | tee build/android-validation.log
 
       - name: Verify Android native packaging
-        shell: bash
         run: python3 scripts/verify-android-packaging.py
 
       - name: Upload console APKs
-        if: always()
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@v4
         with:
           name: local-llm-console-apks
           path: apps/local-llm-console/build/outputs/apk/**/*.apk
           if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
 
       - name: Upload device test APKs
-        if: always()
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@v4
         with:
           name: local-llm-device-test-apks
           path: apps/device-test-runner/build/outputs/apk/**/*.apk
           if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
 
       - name: Upload phone test artifacts
-        if: always()
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@v4
         with:
           name: local-llm-phone-test-artifacts
@@ -168,22 +191,57 @@ jobs:
             apps/local-llm-phone-test/build/outputs/apk/**/*.apk
             apps/local-llm-phone-test/build/outputs/bundle/**/*.aab
           if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
 
       - name: Upload Android libraries
-        if: always()
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@v4
         with:
           name: local-llm-harness-aars
           path: "**/build/outputs/aar/*.aar"
           if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
 
-      - name: Upload reports
-        if: always()
+      - name: Upload failure reports
+        if: ${{ failure() && !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: validation-reports
           path: |
             **/build/reports/**
-            build/jvm-check.log
-            build/android-artifacts.log
+            build/android-validation.log
           if-no-files-found: warn
+          retention-days: 7
+
+  validation:
+    name: Repository validation
+    if: always()
+    needs: [scope, native, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Evaluate validation jobs
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$SCOPE_RESULT" != "success" ]]; then
+            echo "Validation scope and repository guards failed: $SCOPE_RESULT" >&2
+            exit 1
+          fi
+
+          for job_result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
+            if [[ "$job_result" != "success" && "$job_result" != "skipped" ]]; then
+              echo "Required validation job failed: $job_result" >&2
+              exit 1
+            fi
+          done
+
+          echo "Repository validation passed."
