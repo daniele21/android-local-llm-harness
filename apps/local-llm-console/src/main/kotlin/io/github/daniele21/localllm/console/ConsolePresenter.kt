@@ -167,11 +167,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         },
     )
 
-    private fun runCard(
-        run: GenerationRunRecord,
-        title: String? = null,
-        openRequest: Boolean = true,
-    ): ConsoleCard = ConsoleCard(
+    private fun runCard(run: GenerationRunRecord, title: String? = null, openRequest: Boolean = true): ConsoleCard = ConsoleCard(
         title = title ?: "${run.status.name} · ${shortId(run.requestId.value)}",
         lines = listOf(
             "Request: ${run.requestId.value}",
@@ -204,12 +200,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         openRequestId = log.requestId,
     )
 
-    private fun timelineCard(
-        log: StructuredLog,
-        originEpochMs: Long,
-        sequence: Int,
-        total: Int,
-    ): ConsoleCard = ConsoleCard(
+    private fun timelineCard(log: StructuredLog, originEpochMs: Long, sequence: Int, total: Int): ConsoleCard = ConsoleCard(
         title = "${String.format(Locale.US, "%02d", sequence)} · ${log.level.name} · ${log.event}",
         lines = listOf(
             "Sequence: $sequence / $total",
