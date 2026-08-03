@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Determine which validation jobs are required for the current change set."""
+"""Determine which validation jobs and Gradle modules are required."""
 
 from __future__ import annotations
 
@@ -77,12 +77,40 @@ PACKAGING_SUFFIXES = (
     ".gradle.kts",
 )
 
+GRADLE_MODULES = (
+    "core:contracts",
+    "core:runtime-core",
+    "models:model-profile",
+    "models:model-store",
+    "backends:llama-cpp",
+    "observability:contracts",
+    "observability:in-memory-store",
+    "observability:room-store",
+    "observability:health-engine",
+    "observability:android-resource-probe",
+    "observability:benchmark-engine",
+    "transports:in-process",
+    "apps:local-llm-console",
+    "apps:device-test-runner",
+    "apps:local-llm-phone-test",
+)
+MODULE_PREFIXES = tuple(
+    (module.replace(":", "/") + "/", module) for module in GRADLE_MODULES
+)
+GLOBAL_GRADLE_PATHS = {
+    "build.gradle.kts",
+    "gradle.properties",
+    "settings.gradle.kts",
+}
+GLOBAL_GRADLE_PREFIXES = ("build-logic/", "gradle/")
+
 
 @dataclass(frozen=True)
 class ValidationScope:
     android: bool
     native: bool
     packaging: bool
+    modules: tuple[str, ...]
     reason: str
 
 
@@ -119,6 +147,48 @@ def affects_packaging(path: str) -> bool:
     )
 
 
+def affected_gradle_modules(paths: Sequence[str]) -> tuple[str, ...]:
+    implementation_paths = tuple(path for path in paths if not is_docs_only(path))
+    if not implementation_paths:
+        return ()
+
+    if any(
+        path in FORCE_ALL_PATHS
+        or path in GLOBAL_GRADLE_PATHS
+        or path.startswith(GLOBAL_GRADLE_PREFIXES)
+        for path in implementation_paths
+    ):
+        return ("all",)
+
+    modules: set[str] = set()
+    unresolved: list[str] = []
+    for path in implementation_paths:
+        matched = False
+        for prefix, module in MODULE_PREFIXES:
+            module_root = prefix.removesuffix("/")
+            if path == module_root or path.startswith(prefix):
+                modules.add(module)
+                matched = True
+                break
+
+        if matched:
+            continue
+
+        if path == "third_party/llama.cpp" or path.startswith("third_party/llama.cpp/"):
+            modules.add("backends:llama-cpp")
+        elif path in NATIVE_PATHS:
+            modules.add("backends:llama-cpp")
+        else:
+            unresolved.append(path)
+
+    # Unknown implementation or repository paths fail safe. This prevents a
+    # new module or build convention from silently escaping validation.
+    if unresolved:
+        return ("all",)
+
+    return tuple(module for module in GRADLE_MODULES if module in modules)
+
+
 def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> ValidationScope:
     normalized = tuple(sorted({normalize_path(path) for path in paths if path.strip()}))
 
@@ -127,6 +197,7 @@ def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> Validati
             android=True,
             native=True,
             packaging=True,
+            modules=("all",),
             reason="manual validation",
         )
 
@@ -135,6 +206,7 @@ def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> Validati
             android=True,
             native=True,
             packaging=True,
+            modules=("all",),
             reason="no reliable diff available",
         )
 
@@ -143,12 +215,17 @@ def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> Validati
             android=True,
             native=True,
             packaging=True,
+            modules=("all",),
             reason="validation infrastructure changed",
         )
 
     native = any(affects_native(path) for path in normalized)
     android = native or any(not is_docs_only(path) for path in normalized)
     packaging = android and any(affects_packaging(path) for path in normalized)
+    modules = affected_gradle_modules(normalized) if android else ()
+
+    if android and not modules:
+        modules = ("all",)
 
     if native:
         reason = "native or JNI inputs changed"
@@ -163,6 +240,7 @@ def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> Validati
         android=android,
         native=native,
         packaging=packaging,
+        modules=modules,
         reason=reason,
     )
 
@@ -173,6 +251,7 @@ def adjust_for_event(scope: ValidationScope, event_name: str) -> ValidationScope
             android=scope.android,
             native=scope.native,
             packaging=False,
+            modules=scope.modules,
             reason=f"{scope.reason}; packaging delegated to package workflow",
         )
     return scope
@@ -215,6 +294,7 @@ def write_outputs(path: str, scope: ValidationScope) -> None:
         output.write(f"android={'true' if scope.android else 'false'}\n")
         output.write(f"native={'true' if scope.native else 'false'}\n")
         output.write(f"packaging={'true' if scope.packaging else 'false'}\n")
+        output.write(f"modules={','.join(scope.modules)}\n")
 
 
 def append_step_summary(paths: Sequence[str], scope: ValidationScope) -> None:
@@ -222,11 +302,13 @@ def append_step_summary(paths: Sequence[str], scope: ValidationScope) -> None:
     if not summary_path:
         return
 
+    modules = ", ".join(scope.modules) if scope.modules else "none"
     with open(summary_path, "a", encoding="utf-8") as summary:
         summary.write("## Validation scope\n\n")
         summary.write(f"- Android validation: **{scope.android}**\n")
         summary.write(f"- Native host tests: **{scope.native}**\n")
         summary.write(f"- Android packaging verification: **{scope.packaging}**\n")
+        summary.write(f"- Gradle modules: `{modules}`\n")
         summary.write(f"- Reason: {scope.reason}\n")
         summary.write(f"- Changed paths considered: {len(paths)}\n")
 
@@ -262,6 +344,7 @@ def main() -> int:
         f"android={str(scope.android).lower()} "
         f"native={str(scope.native).lower()} "
         f"packaging={str(scope.packaging).lower()} "
+        f"modules={','.join(scope.modules)} "
         f"reason={scope.reason}"
     )
     if paths:
