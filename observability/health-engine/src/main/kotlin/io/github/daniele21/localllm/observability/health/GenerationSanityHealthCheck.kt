@@ -28,12 +28,15 @@ data class GenerationSanitySpec(
     val outputMatch: SanityOutputMatch = SanityOutputMatch.CONTAINS,
     val caseSensitive: Boolean = false,
     val maxOutputTokens: Int = 16,
+    val temperature: Float = 0f,
+    val seed: Long = 0L,
     val timeoutMs: Long = 30_000L,
 ) {
     init {
         require(prompt.isNotBlank()) { "Sanity prompt must not be blank" }
         require(expectedOutput.isNotBlank()) { "Expected sanity output must not be blank" }
         require(maxOutputTokens > 0) { "Sanity max output tokens must be positive" }
+        require(temperature.isFinite() && temperature >= 0f) { "Sanity temperature must be finite and non-negative" }
         require(timeoutMs > 0) { "Sanity timeout must be positive" }
     }
 }
@@ -91,7 +94,11 @@ class GenerationSanityHealthCheck(
             applicationId = spec.applicationId,
             useCaseId = spec.useCaseId,
             input = spec.prompt,
-            overrides = GenerationOverrides(maxOutputTokens = spec.maxOutputTokens),
+            overrides = GenerationOverrides(
+                maxOutputTokens = spec.maxOutputTokens,
+                temperature = spec.temperature,
+                seed = spec.seed,
+            ),
         )
         val handle = client.generate(
             request,
