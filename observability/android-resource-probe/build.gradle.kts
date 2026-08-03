@@ -25,5 +25,6 @@ android {
 dependencies {
     api(project(":observability:contracts"))
 
+    testImplementation(project(":observability:in-memory-store"))
     testImplementation(libs.junit4)
 }
