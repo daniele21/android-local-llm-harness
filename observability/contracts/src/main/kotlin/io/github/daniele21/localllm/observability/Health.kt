@@ -4,21 +4,14 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 
-data class ModelIntegrityTarget(
-    val id: String,
-    val digest: ModelDigest,
-    val expectedSizeBytes: Long,
-) {
+data class ModelIntegrityTarget(val id: String, val digest: ModelDigest, val expectedSizeBytes: Long) {
     init {
         require(id.isNotBlank()) { "Model integrity target id must not be blank" }
         require(expectedSizeBytes >= 0L) { "Expected model size must not be negative" }
     }
 }
 
-data class SanitySuiteDefinition(
-    val id: String,
-    val fixtures: List<SanityFixture>,
-) {
+data class SanitySuiteDefinition(val id: String, val fixtures: List<SanityFixture>) {
     init {
         require(id.isNotBlank()) { "Sanity suite id must not be blank" }
         require(fixtures.isNotEmpty()) { "Sanity suite must contain at least one fixture" }
@@ -48,27 +41,19 @@ data class SanityFixture(
     }
 }
 
-data class SanityGenerationConfig(
-    val maxOutputTokens: Int = 64,
-    val temperature: Float = 0.0f,
-    val seed: Long = 0L,
-) {
+data class SanityGenerationConfig(val maxOutputTokens: Int = 64, val temperature: Float = 0.0f, val seed: Long = 0L) {
     init {
         require(maxOutputTokens > 0) { "Sanity maxOutputTokens must be positive" }
         require(temperature >= 0.0f) { "Sanity temperature must not be negative" }
     }
 }
 
-data class SanityRule(
-    val id: String,
-    val type: SanityRuleType,
-    val expectedText: String? = null,
-    val expectedInt: Int? = null,
-) {
+data class SanityRule(val id: String, val type: SanityRuleType, val expectedText: String? = null, val expectedInt: Int? = null) {
     init {
         require(id.isNotBlank()) { "Sanity rule id must not be blank" }
         when (type) {
             SanityRuleType.NON_EMPTY -> Unit
+
             SanityRuleType.CONTAINS,
             SanityRuleType.NOT_CONTAINS,
             SanityRuleType.EXACT,
