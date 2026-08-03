@@ -37,6 +37,7 @@ jobs:
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
+          bash scripts/test-verify-llama-cpp-pin.sh
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
 

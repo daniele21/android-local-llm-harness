@@ -23,15 +23,21 @@ class MainActivity : Activity() {
         container.addView(label("Local LLM Console", 30f, bold = true))
         container.addView(label("Embedded runtime developer control plane", 16f))
         container.addView(section("Runtime overview"))
-        container.addView(row("Status", "Scaffold ready"))
-        container.addView(row("Backend", "llama.cpp JNI stub"))
-        container.addView(row("Loaded model", "None"))
-        container.addView(row("Active sessions", "0"))
-        container.addView(row("Queue", "0"))
+        container.addView(row("Status", "Control plane shell"))
+        container.addView(row("Backend", "Runtime integration not connected"))
+        container.addView(row("Loaded model", "Unavailable"))
+        container.addView(row("Active sessions", "Unavailable"))
+        container.addView(row("Queue", "Unavailable"))
         container.addView(section("Planned views"))
         container.addView(label("Apps · Models · Runs · Logs · Cache · Health · Benchmarks · Device", 16f))
-        container.addView(section("Next implementation step"))
-        container.addView(label("Pin llama.cpp, inspect GGUF metadata and implement the content-addressed model store.", 16f))
+        container.addView(section("Current implementation focus"))
+        container.addView(
+            label(
+                "Connect Phase 2 telemetry, health and runtime-state sources. " +
+                    "Physical-device GGUF validation remains a release gate.",
+                16f,
+            ),
+        )
 
         return ScrollView(this).apply { addView(container) }
     }
