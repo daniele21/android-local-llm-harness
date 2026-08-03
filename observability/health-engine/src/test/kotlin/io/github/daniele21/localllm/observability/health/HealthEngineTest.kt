@@ -4,12 +4,15 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.GgufArtifact
+import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.ModelIntegrityTarget
+import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.SanityExecutionResult
 import io.github.daniele21.localllm.observability.SanityFixture
 import io.github.daniele21.localllm.observability.SanityRule
 import io.github.daniele21.localllm.observability.SanitySuiteDefinition
+import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
@@ -65,6 +68,50 @@ class HealthEngineTest {
         assertEquals(HealthStatus.FAIL, report.findings.first().status)
         assertTrue(report.findings.drop(1).all { it.status == HealthStatus.NOT_RUN })
         assertTrue(report.findings.first().remediation?.contains("Import") == true)
+    }
+
+    @Test
+    fun `digest mismatch fails integrity with remediation`() {
+        val expected = ModelDigest("c".repeat(64))
+        val actual = ModelDigest("d".repeat(64))
+        val file = modelFile("integrity-mismatch")
+        val stored = StoredModel(expected, file, file.length(), verified = false)
+        val engine = engine(
+            modelStore = FakeModelStore(stored, VerificationResult(false, actual, "mismatch")),
+            telemetry = InMemoryTelemetryRepository(),
+        )
+
+        val report = engine.runModelIntegrity(
+            ModelIntegrityTarget("corrupted-model", expected, file.length()),
+        )
+
+        val digestFinding = report.findings.single { it.id == "model.digest" }
+        assertEquals(HealthStatus.FAIL, report.status)
+        assertEquals(HealthStatus.FAIL, digestFinding.status)
+        assertTrue(digestFinding.remediation?.contains("reimport") == true)
+    }
+
+    @Test
+    fun `telemetry failure does not fail a health suite`() {
+        val telemetry = object : TelemetryRepository by NoOpTelemetryRepository {
+            override fun saveHealth(result: HealthCheckResult) {
+                error("telemetry unavailable")
+            }
+        }
+        val engine = engine(
+            modelStore = FakeModelStore(null, VerificationResult(false, null, "unused")),
+            telemetry = telemetry,
+        )
+
+        val report = engine.runSanitySuite(
+            SanitySuiteDefinition(
+                "failure-isolation",
+                listOf(fixture(listOf(SanityRule.nonEmpty("non-empty")))),
+            ),
+        )
+
+        assertEquals(HealthStatus.PASS, report.status)
+        assertTrue(report.findings.all { it.status == HealthStatus.PASS })
     }
 
     @Test
@@ -149,7 +196,7 @@ class HealthEngineTest {
 
     private fun engine(
         modelStore: ModelStore,
-        telemetry: InMemoryTelemetryRepository,
+        telemetry: TelemetryRepository,
         execution: SanityExecutionResult = SanityExecutionResult("ok", 1, 1L),
     ): HealthEngine {
         val nanos = AtomicLong(0L)
