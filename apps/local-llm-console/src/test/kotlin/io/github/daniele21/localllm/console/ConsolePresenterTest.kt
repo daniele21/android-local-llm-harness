@@ -13,6 +13,7 @@ import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.ZoneOffset
@@ -35,12 +36,52 @@ class ConsolePresenterTest {
         val snapshot = emptySnapshot().copy(runs = listOf(run()))
 
         val screen = presenter.present(ConsoleTab.RUNS, snapshot)
-        val text = screen.cards.single().lines.joinToString("\n")
+        val card = screen.cards.single()
+        val text = card.lines.joinToString("\n")
 
         assertTrue(text.contains("TTFT: 5 ms"))
         assertTrue(text.contains("Tokens: 4 in / 6 out"))
         assertFalse(text.contains("secret prompt"))
         assertFalse(text.contains("secret output"))
+        assertEquals(RequestId("request-1234567890"), card.openRequestId)
+    }
+
+    @Test
+    fun `request detail orders timeline and calculates offsets from run start`() {
+        val requestId = RequestId("request-1234567890")
+        val detail = ConsoleRequestDetail(
+            requestId = requestId,
+            run = run().copy(startedAtEpochMs = 100),
+            timeline = listOf(
+                log(timestampEpochMs = 125, event = "second", requestId = requestId),
+                log(timestampEpochMs = 110, event = "first", requestId = requestId),
+            ),
+        )
+
+        val screen = presenter.presentRequestDetail(detail)
+
+        assertEquals("Request metrics", screen.cards[0].title)
+        assertNull(screen.cards[0].openRequestId)
+        assertEquals("Timeline summary", screen.cards[1].title)
+        assertEquals("01 · INFO · first", screen.cards[2].title)
+        assertTrue(screen.cards[2].lines.contains("Offset: +10 ms"))
+        assertEquals("02 · INFO · second", screen.cards[3].title)
+        assertTrue(screen.cards[3].lines.contains("Offset: +25 ms"))
+    }
+
+    @Test
+    fun `request detail source failure remains privacy safe`() {
+        val screen = presenter.presentRequestDetail(
+            ConsoleRequestDetail(
+                requestId = RequestId("request"),
+                run = null,
+                timeline = emptyList(),
+                sourceError = "Telemetry source unavailable",
+            ),
+        )
+
+        assertEquals("Telemetry source", screen.cards.single().title)
+        assertEquals(listOf("Telemetry source unavailable"), screen.cards.single().lines)
     }
 
     @Test
@@ -80,6 +121,7 @@ class ConsolePresenterTest {
         val screen = presenter.present(ConsoleTab.LOGS, snapshot)
 
         assertTrue(screen.cards.single().lines.contains("Fields: a=first · z=last"))
+        assertEquals(RequestId("request"), screen.cards.single().openRequestId)
     }
 
     private fun emptySnapshot() = ConsoleSnapshot(
@@ -111,5 +153,17 @@ class ConsolePresenterTest {
         decodeMs = 8,
         modelLoadKind = ModelLoadKind.COLD,
         errorCode = null,
+    )
+
+    private fun log(
+        timestampEpochMs: Long,
+        event: String,
+        requestId: RequestId,
+    ) = StructuredLog(
+        timestampEpochMs = timestampEpochMs,
+        level = LogLevel.INFO,
+        component = "runtime",
+        event = event,
+        requestId = requestId,
     )
 }
