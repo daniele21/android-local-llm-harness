@@ -22,6 +22,8 @@ data class GenerationRunRecord(
     val outputTokens: Int?,
     val decodeTokensPerSecond: Double?,
     val errorCode: String?,
+    val prefillMs: Long? = null,
+    val decodeMs: Long? = null,
 )
 
 enum class RunStatus {
