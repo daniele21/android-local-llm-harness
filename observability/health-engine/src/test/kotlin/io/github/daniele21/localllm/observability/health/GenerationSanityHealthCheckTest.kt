@@ -44,34 +44,38 @@ class GenerationSanityHealthCheckTest {
     }
 
     @Test
-    fun `passes non empty assertion without expected output`() {
-        val client = FakeClient { request ->
-            listOf(completed(request, "generated response"))
+    fun `supports non empty forbidden marker and regex assertions`() {
+        val cases = listOf(
+            AssertionCase(
+                output = "generated response",
+                expectedOutput = "",
+                outputMatch = SanityOutputMatch.NON_EMPTY,
+            ),
+            AssertionCase(
+                output = "safe generated response",
+                expectedOutput = "FORBIDDEN",
+                outputMatch = SanityOutputMatch.NOT_CONTAINS,
+            ),
+            AssertionCase(
+                output = "local_llm_ok:42",
+                expectedOutput = "LOCAL_LLM_OK:[0-9]+",
+                outputMatch = SanityOutputMatch.MATCHES_REGEX,
+            ),
+        )
+
+        cases.forEach { case ->
+            val client = FakeClient { request ->
+                listOf(completed(request, case.output))
+            }
+            val result = check(
+                client = client,
+                expectedOutput = case.expectedOutput,
+                outputMatch = case.outputMatch,
+            ).evaluate()
+
+            assertEquals(HealthStatus.PASS, result.status)
+            assertTrue(client.sessionClosed)
         }
-
-        val result = check(
-            client = client,
-            expectedOutput = "",
-            outputMatch = SanityOutputMatch.NON_EMPTY,
-        ).evaluate()
-
-        assertEquals(HealthStatus.PASS, result.status)
-        assertTrue(client.sessionClosed)
-    }
-
-    @Test
-    fun `passes when forbidden marker is absent`() {
-        val client = FakeClient { request ->
-            listOf(completed(request, "safe generated response"))
-        }
-
-        val result = check(
-            client = client,
-            expectedOutput = "FORBIDDEN",
-            outputMatch = SanityOutputMatch.NOT_CONTAINS,
-        ).evaluate()
-
-        assertEquals(HealthStatus.PASS, result.status)
     }
 
     @Test
@@ -89,21 +93,6 @@ class GenerationSanityHealthCheckTest {
         assertEquals(HealthStatus.FAIL, result.status)
         assertFalse("private" in result.detail)
         assertFalse("FORBIDDEN" in result.detail)
-    }
-
-    @Test
-    fun `passes case insensitive regex assertion`() {
-        val client = FakeClient { request ->
-            listOf(completed(request, "local_llm_ok:42"))
-        }
-
-        val result = check(
-            client = client,
-            expectedOutput = "LOCAL_LLM_OK:[0-9]+",
-            outputMatch = SanityOutputMatch.MATCHES_REGEX,
-        ).evaluate()
-
-        assertEquals(HealthStatus.PASS, result.status)
     }
 
     @Test
@@ -220,6 +209,12 @@ class GenerationSanityHealthCheckTest {
             outputTokens = 1,
             decodeTokensPerSecond = 1.0,
         ),
+    )
+
+    private data class AssertionCase(
+        val output: String,
+        val expectedOutput: String,
+        val outputMatch: SanityOutputMatch,
     )
 
     private class FakeClient(
