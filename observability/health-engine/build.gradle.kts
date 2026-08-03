@@ -19,8 +19,6 @@ android {
     lint {
         lintConfig = rootProject.file("lint.xml")
         abortOnError = true
-        htmlReport = true
-        sarifReport = true
     }
 }
 
