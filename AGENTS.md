@@ -13,7 +13,7 @@ Read these sources before a non-trivial change:
 5. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
 6. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge and production readiness.
 7. [`docs/api-usage.md`](docs/api-usage.md) — embedded API and lifecycle.
-8. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) — physical-device validation.
+8. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) — Android validation paths.
 9. [`docs/adr/README.md`](docs/adr/README.md) — accepted architectural decisions.
 
 When sources disagree, use this precedence: executable contracts and tests, accepted ADRs, architecture, implementation plan, roadmap, README and this guide. Do not silently reconcile contradictions.
@@ -24,67 +24,57 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - Never expose native pointers, backend structures or backend-owned handles outside the backend module.
 - Keep runtime orchestration independent from transport and persistence implementations.
 - Resolve models explicitly through `applicationId + useCaseId`; never silently select or substitute a model.
-- Use stable identifiers and serializable DTOs at public boundaries.
 - Keep one loaded model and one active decode by default until measurements justify another policy.
-- Keep prompts and generated content out of normal telemetry.
-- Store GGUF artifacts by immutable SHA-256 identity and never commit model binaries.
+- Keep prompts and generated content out of normal telemetry and shared validation reports.
+- Store GGUF artifacts by immutable SHA-256 identity and never commit or bundle model binaries.
 - Treat cancellation, shutdown and partial failure as normal lifecycle paths.
 - Prefer composition and dependency injection over global mutable state.
-- Add a module only for a real responsibility, dependency boundary, reuse boundary or independently testable behavior.
-- Avoid generic utilities without a domain concept and avoid speculative empty modules.
-- Keep one canonical implementation line per active phase.
-- Never present simulated acceptance as physical-device or production evidence.
+- Native, phone-test and Capacitor integrations must remain thin and must not duplicate runtime policy.
+- Never present emulator evidence as physical-device or production evidence.
 
 ## Repository map
 
 | Path | Responsibility |
 | --- | --- |
-| `core/contracts` | Stable requests, responses, sessions, metrics and errors |
-| `core/runtime-core` | Orchestration, scheduling, model/context/session lifecycle and memory policy |
-| `models/model-profile` | Artifacts, load profiles, use-case profiles and app bindings |
-| `models/model-store` | Content-addressed storage, import and integrity verification |
+| `core/contracts` | Stable request, response, session, metric and error contracts |
+| `core/runtime-core` | Runtime orchestration, scheduling, lifecycle and memory policy |
+| `models/model-profile` | GGUF artifacts, load profiles, use cases and app bindings |
+| `models/model-store` | Content-addressed model import, storage and integrity verification |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
-| `observability/contracts` | Stable telemetry, log, health, resource, benchmark and dashboard schemas |
-| `observability/in-memory-store` | Bounded ephemeral telemetry implementation and deterministic tests |
-| `observability/room-store` | Persistent Android telemetry, retention, migrations and database lifecycle |
-| `observability/health-engine` | Health-suite orchestration, model-integrity checks and persisted control-plane results |
-| `observability/android-resource-probe` | Android process-memory and thermal snapshot collection behind stable contracts |
-| `observability/benchmark-engine` | Cold/warm baseline capture, deterministic statistics and regression health checks |
+| `observability/contracts` | Stable telemetry, health, resource and benchmark schemas |
+| `observability/in-memory-store` | Bounded ephemeral telemetry implementation |
+| `observability/room-store` | Persistent Android telemetry repository |
+| `observability/health-engine` | Health-suite orchestration and persisted checks |
+| `observability/android-resource-probe` | Android memory and thermal snapshot collection |
+| `observability/benchmark-engine` | Cold/warm baselines and regression checks |
 | `transports/in-process` | Embedded client-to-runtime delegation |
 | `apps/local-llm-console` | Developer console and future cross-app control plane |
-| `apps/device-test-runner` | Real-device GGUF lifecycle, cancellation and memory validation |
+| `apps/device-test-runner` | ADB/instrumentation GGUF lifecycle and memory validation |
+| `apps/local-llm-phone-test` | Play-installable physical-device validation without developer mode |
 | `third_party/llama.cpp` | Pinned upstream submodule |
 | `scripts` | Repository, packaging, device and evidence validation |
-| `docs` | Architecture, plans, roadmap, ADRs, API and operations |
+| `docs` | Architecture, plans, operations and evidence |
 
 `settings.gradle.kts` is authoritative for the Gradle module list. Run `python3 scripts/verify-agent-navigation.py` after adding, removing or renaming a module.
 
 ### Ownership and routing
 
 - Public API changes start in `core/contracts`; inspect all runtime, transport and observability consumers.
-- Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and recovery after failure.
+- Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and cleanup after failure.
 - GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
-- JNI or generation changes start in `backends/llama-cpp`; preserve coarse-grained JNI calls, opaque handles, idempotent release and cooperative cancellation.
-- Telemetry schemas start in `observability/contracts`; persistence stays in `room-store`, ephemeral behavior in `in-memory-store`, Android resource collection in `android-resource-probe`, benchmark analysis in `benchmark-engine`, and check orchestration in `health-engine`.
-- Benchmark baselines must compare the same application, use case, model digest and explicit cold/warm class. Do not mix `UNKNOWN`, cold and warm samples.
-- Health checks must return privacy-safe summaries, remain independently testable and persist through `TelemetryRepository`; a check failure must not break inference.
-- Console code must not open another application’s private Room database directly. Cross-app access requires the planned signature-protected diagnostics bridge.
-- Native and Capacitor integrations must remain thin and must not duplicate model resolution, validation, generation policy, error mapping or telemetry.
+- JNI or generation changes start in `backends/llama-cpp`; preserve opaque handles, idempotent release and cooperative cancellation.
+- The phone-test app may orchestrate existing contracts, import through Android's Storage Access Framework and format privacy-safe evidence, but must not own alternate inference policy.
+- Console code must not open another application's private database directly; cross-app access requires the planned signature-protected diagnostics bridge.
 
 ## Change workflow
 
 1. Confirm the canonical base and active pull requests.
 2. Read relevant contracts, implementation, tests and documentation.
-3. Identify the module that owns the behavior.
-4. Implement the smallest coherent vertical slice.
-5. Add deterministic tests for success, failure and lifecycle paths.
-6. Run targeted checks while iterating.
-7. Run the aggregate repository validation before merge.
-8. Record deferred physical-device evidence explicitly without claiming production readiness.
-9. Update architecture or ADRs for boundary changes and the roadmap only after acceptance criteria pass.
-10. Keep commits focused on behavior.
-
-A feature is not complete when it duplicates domain logic, couples core code to an integration, exposes native details, lacks isolated tests, makes dependencies hard to replace, or leaves documentation materially stale.
+3. Implement the smallest coherent vertical slice in the owning module.
+4. Add deterministic tests for success, failure and lifecycle paths.
+5. Run targeted checks while iterating, then the aggregate repository validation.
+6. Record deferred physical-device evidence explicitly without claiming production readiness.
+7. Keep model files, signing keys and credentials outside the repository.
 
 ## Validation commands
 
@@ -106,15 +96,11 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
+./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 ./gradlew :observability:room-store:assembleDebugAndroidTest
-./gradlew :observability:health-engine:assembleDebug
-./gradlew :observability:android-resource-probe:assembleDebug
-./gradlew :observability:benchmark-engine:assembleDebug
-./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 python3 scripts/verify-android-packaging.py
 ```
-
-`./gradlew check` includes the simulated lifecycle, telemetry repository tests, health-engine tests and benchmark regression tests. Telemetry and health failures must never fail or cancel generation.
 
 ### Native host tests
 
@@ -126,6 +112,8 @@ ctest --test-dir build/native-tests --output-on-failure
 
 ### Physical-device evidence
 
+Use `apps/local-llm-phone-test` for Play-installed validation when developer mode or ADB is unavailable. Use the ADB evidence script when device access permits it:
+
 ```bash
 bash scripts/capture-device-e2e-evidence.sh \
   --model /absolute/path/to/model.gguf \
@@ -134,21 +122,16 @@ bash scripts/capture-device-e2e-evidence.sh \
   --memory-repeat 5
 ```
 
-Physical-device evidence is mandatory before production readiness, application-consumer release or device-performance claims for native loading, generation, cancellation, memory, ABI or JNI changes.
+Physical-device evidence is mandatory before production readiness, application-consumer release or device-performance claims.
 
 ## Testing expectations
 
 - Keep domain logic behind interfaces and use fakes for deterministic orchestration tests.
-- Maintain cross-module simulated acceptance with the real model store and runtime orchestrator.
-- Add native tests for handle registries, metadata parsing and cancellation behavior.
-- Test cleanup after failure and cancellation, not only success.
+- Test cleanup after generation, failure and cancellation.
 - Test idempotent close and release behavior.
 - Avoid timing assertions without a deterministic clock.
-- Test telemetry retention, ordering, terminal replacement and privacy-safe persistence.
-- Test resource snapshot retention and unavailable-platform fallbacks without inventing measurements.
-- Test benchmark median and percentile behavior, cold/warm isolation, post-baseline windows and missing metrics.
-- Test health-suite aggregation, unknown checks, unexpected exceptions and persistence.
-- Model-integrity checks must not expose private paths, model bytes or arbitrary verification details.
+- Keep prompts, generated output, document URIs and private paths out of persisted or shared reports.
+- Verify the Play-installed app on representative `arm64-v8a` hardware with a real supported GGUF.
 
 ## Maintaining `AGENTS.md`
 
@@ -161,4 +144,4 @@ Use the exact uppercase filename. Keep this guide navigational and durable:
 - keep current completion status in `docs/roadmap.md`;
 - run the navigation guard after every edit.
 
-Pause and surface the issue rather than improvising when a change conflicts with public contracts or an ADR, would commit a model or native dependency, exposes backend state, duplicates an active implementation line, or would claim production readiness without physical-device evidence.
+Pause and surface the issue rather than improvising when a change conflicts with public contracts or an ADR, would commit a model, signing key or native dependency, exposes backend state, duplicates an active implementation line, or would claim production readiness without physical-device evidence.
