@@ -24,6 +24,7 @@ include(
     ":backends:llama-cpp",
     ":observability:contracts",
     ":observability:in-memory-store",
+    ":observability:room-store",
     ":transports:in-process",
     ":apps:local-llm-console",
     ":apps:device-test-runner",
