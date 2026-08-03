@@ -104,6 +104,7 @@ jobs:
       - name: Build and validate Android packages
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
         shell: bash
         run: |
           set -euo pipefail

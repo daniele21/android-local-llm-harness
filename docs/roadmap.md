@@ -6,7 +6,7 @@ This file is the authoritative source for current implementation status. Detaile
 
 Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
 
-The current `main` head contains the work merged through pull request #28, including the ARM64 emulator preflight. Pull request #29 is the active line for a Google Play-installable physical-device validation app that does not require developer mode or ADB.
+The current `main` head contains the work merged through pull request #29, including the ARM64 emulator preflight and the Google Play-installable physical-device validation app that does not require developer mode or ADB.
 
 The repository is merge-ready for continued development but is **not production-ready** until the physical-device GGUF evidence gate is completed.
 
@@ -98,6 +98,7 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [x] Play-installable launcher app for physical-device validation without developer mode on PR #29
 - [x] Storage Access Framework GGUF selection and private content-addressed import in the phone-test app
 - [x] copyable and shareable privacy-safe PASS/FAIL report in the phone-test app
+- [x] external PKCS12 upload-key and macOS Keychain signing workflow
 - [ ] signed Play internal-testing release installed on a physical phone
 
 The clean ARM64 emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.

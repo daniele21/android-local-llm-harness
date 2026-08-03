@@ -9,6 +9,9 @@
 .cxx/
 *.apk
 *.aab
+*.jks
+*.keystore
+keystore.properties
 models/
 *.gguf
 *.ggml
