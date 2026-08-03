@@ -37,11 +37,7 @@ class HealthEngine(
         telemetryRepository.healthResults()
     }.getOrDefault(emptyList())
 
-    private fun completeReport(
-        suiteId: String,
-        startedAt: Long,
-        findings: List<HealthFinding>,
-    ): HealthSuiteReport {
+    private fun completeReport(suiteId: String, startedAt: Long, findings: List<HealthFinding>): HealthSuiteReport {
         findings.forEach { finding -> persistFinding(suiteId, finding) }
         val completedAt = epochClock().coerceAtLeast(startedAt)
         return HealthSuiteReport(
