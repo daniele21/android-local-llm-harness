@@ -28,6 +28,56 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         ConsoleTab.BENCHMARKS -> benchmarks(snapshot)
     }
 
+    fun presentRequestDetail(detail: ConsoleRequestDetail): ConsoleScreen {
+        detail.sourceError?.let { error ->
+            return ConsoleScreen(
+                title = "Request ${shortId(detail.requestId.value)}",
+                subtitle = "Request-correlated telemetry unavailable",
+                cards = listOf(
+                    ConsoleCard(
+                        title = "Telemetry source",
+                        lines = listOf(error),
+                        emphasis = ConsoleEmphasis.NEGATIVE,
+                    ),
+                ),
+            )
+        }
+
+        val cards = mutableListOf<ConsoleCard>()
+        detail.run?.let { run -> cards += runCard(run, "Request metrics", openRequest = false) }
+            ?: run { cards += emptyCard("Run record not found", "Request metrics") }
+
+        val orderedTimeline = detail.timeline.sortedBy { it.timestampEpochMs }
+        if (orderedTimeline.isEmpty()) {
+            cards += emptyCard("No correlated structured logs recorded", "Request timeline")
+        } else {
+            val originEpochMs = detail.run?.startedAtEpochMs ?: orderedTimeline.first().timestampEpochMs
+            cards += ConsoleCard(
+                title = "Timeline summary",
+                lines = listOf(
+                    "Events: ${orderedTimeline.size}",
+                    "First event: ${formatTimestamp(orderedTimeline.first().timestampEpochMs)}",
+                    "Last event: ${formatTimestamp(orderedTimeline.last().timestampEpochMs)}",
+                    "Observed span: ${formatOffset(orderedTimeline.last().timestampEpochMs - originEpochMs)}",
+                ),
+            )
+            cards += orderedTimeline.mapIndexed { index, log ->
+                timelineCard(
+                    log = log,
+                    originEpochMs = originEpochMs,
+                    sequence = index + 1,
+                    total = orderedTimeline.size,
+                )
+            }
+        }
+
+        return ConsoleScreen(
+            title = "Request ${shortId(detail.requestId.value)}",
+            subtitle = "Chronological, privacy-safe request timeline",
+            cards = cards,
+        )
+    }
+
     private fun overview(snapshot: ConsoleSnapshot): ConsoleScreen {
         val cards = mutableListOf<ConsoleCard>()
         snapshot.sourceError?.let { error ->
@@ -78,7 +128,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
 
     private fun runs(snapshot: ConsoleSnapshot): ConsoleScreen = ConsoleScreen(
         title = "Generation runs",
-        subtitle = "Newest requests first; prompts and generated output are intentionally excluded",
+        subtitle = "Tap a request for its metrics and correlated timeline",
         cards = snapshot.runs.map { runCard(it) }.ifEmpty {
             listOf(emptyCard("No generation runs recorded"))
         },
@@ -117,7 +167,11 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         },
     )
 
-    private fun runCard(run: GenerationRunRecord, title: String? = null): ConsoleCard = ConsoleCard(
+    private fun runCard(
+        run: GenerationRunRecord,
+        title: String? = null,
+        openRequest: Boolean = true,
+    ): ConsoleCard = ConsoleCard(
         title = title ?: "${run.status.name} · ${shortId(run.requestId.value)}",
         lines = listOf(
             "Request: ${run.requestId.value}",
@@ -135,24 +189,37 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
             "Error code: ${run.errorCode ?: "None"}",
         ),
         emphasis = run.status.toEmphasis(),
+        openRequestId = run.requestId.takeIf { openRequest },
     )
 
-    private fun logCard(log: StructuredLog): ConsoleCard {
-        val fields = log.fields.entries
-            .sortedBy { it.key }
-            .joinToString(separator = " · ") { (key, value) -> "$key=$value" }
-            .ifEmpty { "None" }
-        return ConsoleCard(
-            title = "${log.level.name} · ${log.event}",
-            lines = listOf(
-                "Time: ${formatTimestamp(log.timestampEpochMs)}",
-                "Component: ${log.component}",
-                "Request: ${log.requestId?.value ?: "None"}",
-                "Fields: $fields",
-            ),
-            emphasis = log.level.toEmphasis(),
-        )
-    }
+    private fun logCard(log: StructuredLog): ConsoleCard = ConsoleCard(
+        title = "${log.level.name} · ${log.event}",
+        lines = listOf(
+            "Time: ${formatTimestamp(log.timestampEpochMs)}",
+            "Component: ${log.component}",
+            "Request: ${log.requestId?.value ?: "None"}",
+            "Fields: ${formatFields(log)}",
+        ),
+        emphasis = log.level.toEmphasis(),
+        openRequestId = log.requestId,
+    )
+
+    private fun timelineCard(
+        log: StructuredLog,
+        originEpochMs: Long,
+        sequence: Int,
+        total: Int,
+    ): ConsoleCard = ConsoleCard(
+        title = "${String.format(Locale.US, "%02d", sequence)} · ${log.level.name} · ${log.event}",
+        lines = listOf(
+            "Sequence: $sequence / $total",
+            "Time: ${formatTimestamp(log.timestampEpochMs)}",
+            "Offset: ${formatOffset(log.timestampEpochMs - originEpochMs)}",
+            "Component: ${log.component}",
+            "Fields: ${formatFields(log)}",
+        ),
+        emphasis = log.level.toEmphasis(),
+    )
 
     private fun healthSummaryCard(results: List<HealthCheckResult>): ConsoleCard {
         if (results.isEmpty()) return emptyCard("No health results recorded", "Health summary")
@@ -217,9 +284,16 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         emphasis = ConsoleEmphasis.WARNING,
     )
 
+    private fun formatFields(log: StructuredLog): String = log.fields.entries
+        .sortedBy { it.key }
+        .joinToString(separator = " · ") { (key, value) -> "$key=$value" }
+        .ifEmpty { "None" }
+
     private fun formatTimestamp(epochMs: Long): String = timestampFormatter.format(Instant.ofEpochMilli(epochMs))
 
     private fun formatDuration(value: Long?): String = value?.let { "$it ms" } ?: "Unavailable"
+
+    private fun formatOffset(value: Long): String = if (value >= 0) "+$value ms" else "$value ms"
 
     private fun formatRate(value: Double?): String = value?.let { String.format(Locale.US, "%.2f tok/s", it) }
         ?: "Unavailable"
