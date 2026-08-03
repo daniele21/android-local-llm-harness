@@ -110,33 +110,31 @@ class GenerationSanityHealthCheckTest {
         assertEquals("Generation sanity session cleanup failed", result.detail)
     }
 
-    private fun check(client: LocalLlmClient, timeoutMs: Long = 100L): GenerationSanityHealthCheck =
-        GenerationSanityHealthCheck(
-            client = client,
-            spec = GenerationSanitySpec(
-                applicationId = applicationId,
-                useCaseId = useCaseId,
-                prompt = "health prompt",
-                expectedOutput = "LOCAL_LLM_OK",
-                timeoutMs = timeoutMs,
-            ),
-            requestIdFactory = SanityRequestIdFactory { requestId },
-        )
+    private fun check(client: LocalLlmClient, timeoutMs: Long = 100L): GenerationSanityHealthCheck = GenerationSanityHealthCheck(
+        client = client,
+        spec = GenerationSanitySpec(
+            applicationId = applicationId,
+            useCaseId = useCaseId,
+            prompt = "health prompt",
+            expectedOutput = "LOCAL_LLM_OK",
+            timeoutMs = timeoutMs,
+        ),
+        requestIdFactory = SanityRequestIdFactory { requestId },
+    )
 
-    private fun completed(request: GenerationRequest, output: String): GenerationEvent.Completed =
-        GenerationEvent.Completed(
-            requestId = request.requestId,
-            output = output,
-            metrics = GenerationMetrics(
-                queueMs = 0L,
-                modelLoadMs = 0L,
-                timeToFirstTokenMs = 0L,
-                totalMs = 1L,
-                inputTokens = 2,
-                outputTokens = 1,
-                decodeTokensPerSecond = 1.0,
-            ),
-        )
+    private fun completed(request: GenerationRequest, output: String): GenerationEvent.Completed = GenerationEvent.Completed(
+        requestId = request.requestId,
+        output = output,
+        metrics = GenerationMetrics(
+            queueMs = 0L,
+            modelLoadMs = 0L,
+            timeToFirstTokenMs = 0L,
+            totalMs = 1L,
+            inputTokens = 2,
+            outputTokens = 1,
+            decodeTokensPerSecond = 1.0,
+        ),
+    )
 
     private class FakeClient(
         private val prepared: Boolean = true,
@@ -156,12 +154,11 @@ class GenerationSanityHealthCheckTest {
             queuedRequests = 0,
         )
 
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-            PrepareResult(
-                ready = prepared,
-                modelDigest = null,
-                detail = if (prepared) "ready" else "private preparation failure",
-            )
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult = PrepareResult(
+            ready = prepared,
+            modelDigest = null,
+            detail = if (prepared) "ready" else "private preparation failure",
+        )
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId {
             sessionCreated = true
