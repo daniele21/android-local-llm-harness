@@ -75,6 +75,14 @@ public final class TelemetryEntities {
         @Nullable
         @ColumnInfo(name = "error_code")
         public String errorCode;
+
+        @Nullable
+        @ColumnInfo(name = "prefill_ms")
+        public Long prefillMs;
+
+        @Nullable
+        @ColumnInfo(name = "decode_ms")
+        public Long decodeMs;
     }
 
     @Entity(
