@@ -125,6 +125,7 @@ jobs:
             :observability:in-memory-store:assembleDebug \
             :observability:room-store:assembleDebug \
             :observability:room-store:assembleDebugAndroidTest \
+            :observability:health-engine:assembleDebug \
             :transports:in-process:assembleDebug \
             :apps:local-llm-console:assembleInternal \
             :apps:device-test-runner:assembleDebug \
