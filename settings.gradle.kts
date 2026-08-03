@@ -27,6 +27,7 @@ include(
     ":observability:room-store",
     ":observability:health-engine",
     ":observability:android-resource-probe",
+    ":observability:benchmark-engine",
     ":transports:in-process",
     ":apps:local-llm-console",
     ":apps:device-test-runner",
