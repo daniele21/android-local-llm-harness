@@ -35,7 +35,14 @@ data class GenerationMetrics(
     val decodeTokensPerSecond: Double?,
     val prefillMs: Long? = null,
     val decodeMs: Long? = null,
+    val modelLoadKind: ModelLoadKind = ModelLoadKind.UNKNOWN,
 )
+
+enum class ModelLoadKind {
+    COLD,
+    WARM,
+    UNKNOWN,
+}
 
 sealed interface LocalLlmError {
     val code: String

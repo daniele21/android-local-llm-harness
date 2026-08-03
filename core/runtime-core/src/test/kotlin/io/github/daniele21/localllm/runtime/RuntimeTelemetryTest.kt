@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SessionId
@@ -12,6 +13,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
+import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
@@ -44,6 +46,7 @@ class RuntimeTelemetryTest {
                 decodeTokensPerSecond = 7.5,
                 prefillMs = 8,
                 decodeMs = 9,
+                modelLoadKind = ModelLoadKind.COLD,
             ),
         )
 
@@ -53,6 +56,7 @@ class RuntimeTelemetryTest {
         assertEquals(1_004L, run.completedAtEpochMs)
         assertEquals(8L, run.prefillMs)
         assertEquals(9L, run.decodeMs)
+        assertEquals(ModelLoadKind.COLD, run.modelLoadKind)
 
         val persistedText = repository.recentLogs()
             .flatMap { it.fields.entries }
@@ -122,6 +126,8 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
 
     override fun saveHealth(result: HealthCheckResult) = fail()
 
+    override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = fail()
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = fail()
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = fail()
@@ -129,6 +135,8 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
     override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = fail()
 
     override fun healthResults(): List<HealthCheckResult> = fail()
+
+    override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = fail()
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = fail()
 

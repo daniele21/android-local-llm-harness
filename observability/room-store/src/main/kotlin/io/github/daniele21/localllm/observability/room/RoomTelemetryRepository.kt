@@ -2,11 +2,14 @@ package io.github.daniele21.localllm.observability.room
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
+import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
@@ -50,6 +53,15 @@ class RoomTelemetryRepository internal constructor(
         }
     }
 
+    override fun recordResourceSnapshot(snapshot: ResourceSnapshot) {
+        executeAsync {
+            dao.insertResourceSnapshotWithRetention(
+                TelemetryEntityMapper.resourceEntity(snapshot),
+                retention.maxResourceSnapshots,
+            )
+        }
+    }
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = executeBlocking {
         dao.recentRuns(requirePositiveLimit(limit)).map(TelemetryEntityMapper::runRecord)
     }
@@ -72,12 +84,18 @@ class RoomTelemetryRepository internal constructor(
         dao.healthResults().map(TelemetryEntityMapper::healthResult)
     }
 
+    override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = executeBlocking {
+        dao.recentResourceSnapshots(requirePositiveLimit(limit)).map(TelemetryEntityMapper::resourceSnapshot)
+    }
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = executeBlocking {
         DeveloperDashboardSnapshot(
             runtime = runtime,
             recentRuns = dao.recentRuns(retention.maxRuns).map(TelemetryEntityMapper::runRecord),
             recentLogs = dao.recentLogs(retention.maxLogs).map(TelemetryEntityMapper::structuredLog),
             health = dao.healthResults().map(TelemetryEntityMapper::healthResult),
+            resources = dao.recentResourceSnapshots(retention.maxResourceSnapshots)
+                .map(TelemetryEntityMapper::resourceSnapshot),
             modelStoreBytes = 0L,
             modelCount = 0,
         )
@@ -135,6 +153,29 @@ class RoomTelemetryRepository internal constructor(
         const val DEFAULT_DATABASE_NAME: String = "local-llm-telemetry.db"
         private const val CLOSE_TIMEOUT_SECONDS = 5L
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE generation_runs ADD COLUMN model_load_kind TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS resource_snapshots (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "timestamp_epoch_ms INTEGER NOT NULL, " +
+                        "process_pss_bytes INTEGER, " +
+                        "native_heap_bytes INTEGER, " +
+                        "java_heap_used_bytes INTEGER, " +
+                        "available_memory_bytes INTEGER, " +
+                        "low_memory INTEGER, " +
+                        "thermal_status TEXT NOT NULL)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_resource_snapshots_timestamp_epoch_ms " +
+                        "ON resource_snapshots(timestamp_epoch_ms)",
+                )
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -145,7 +186,7 @@ class RoomTelemetryRepository internal constructor(
                 context.applicationContext,
                 TelemetryDatabase::class.java,
                 databaseName,
-            ).build()
+            ).addMigrations(MIGRATION_1_2).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
             }

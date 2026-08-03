@@ -99,7 +99,9 @@ jobs:
       - name: Run JVM unit and simulated acceptance tests
         shell: bash
         run: |
-          "$GRADLE_COMMAND" --stacktrace check
+          set -o pipefail
+          mkdir -p build
+          "$GRADLE_COMMAND" --stacktrace check 2>&1 | tee build/jvm-check.log
 
       - name: Run Android Lint
         shell: bash
@@ -126,6 +128,7 @@ jobs:
             :observability:room-store:assembleDebug \
             :observability:room-store:assembleDebugAndroidTest \
             :observability:health-engine:assembleDebug \
+            :observability:android-resource-probe:assembleDebug \
             :transports:in-process:assembleDebug \
             :apps:local-llm-console:assembleInternal \
             :apps:device-test-runner:assembleDebug \
@@ -167,5 +170,6 @@ jobs:
           name: validation-reports
           path: |
             **/build/reports/**
+            build/jvm-check.log
             build/android-artifacts.log
           if-no-files-found: warn

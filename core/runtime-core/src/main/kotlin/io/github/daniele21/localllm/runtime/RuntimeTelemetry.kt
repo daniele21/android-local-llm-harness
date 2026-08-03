@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.LogLevel
@@ -36,6 +37,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             outputTokens = null,
             decodeTokensPerSecond = null,
             errorCode = null,
+            modelLoadKind = ModelLoadKind.UNKNOWN,
         )
         activeRuns[request.requestId] = run
         persist(run)
@@ -86,6 +88,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             decodeTokensPerSecond = metrics.decodeTokensPerSecond,
             prefillMs = metrics.prefillMs,
             decodeMs = metrics.decodeMs,
+            modelLoadKind = metrics.modelLoadKind,
         )
         persist(updated)
         log(
@@ -148,6 +151,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
     private fun metricsFields(metrics: GenerationMetrics): Map<String, String> = buildMap {
         put("queueMs", metrics.queueMs.toString())
         put("totalMs", metrics.totalMs.toString())
+        put("modelLoadKind", metrics.modelLoadKind.name)
         metrics.modelLoadMs?.let { put("modelLoadMs", it.toString()) }
         metrics.timeToFirstTokenMs?.let { put("timeToFirstTokenMs", it.toString()) }
         metrics.prefillMs?.let { put("prefillMs", it.toString()) }

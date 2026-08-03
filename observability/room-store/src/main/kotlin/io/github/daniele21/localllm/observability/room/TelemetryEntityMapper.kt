@@ -2,17 +2,21 @@ package io.github.daniele21.localllm.observability.room
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.LogLevel
+import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
+import io.github.daniele21.localllm.observability.ThermalStatus
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
+@Suppress("TooManyFunctions")
 internal object TelemetryEntityMapper {
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
@@ -27,6 +31,7 @@ internal object TelemetryEntityMapper {
         status = run.status.name
         queueMs = run.queueMs
         modelLoadMs = run.modelLoadMs
+        modelLoadKind = run.modelLoadKind.name
         timeToFirstTokenMs = run.timeToFirstTokenMs
         totalMs = run.totalMs
         inputTokens = run.inputTokens
@@ -55,6 +60,7 @@ internal object TelemetryEntityMapper {
         errorCode = entity.errorCode,
         prefillMs = entity.prefillMs,
         decodeMs = entity.decodeMs,
+        modelLoadKind = ModelLoadKind.valueOf(entity.modelLoadKind),
     )
 
     fun logEntity(log: StructuredLog): TelemetryEntities.StructuredLogEntity = TelemetryEntities.StructuredLogEntity().apply {
@@ -87,6 +93,27 @@ internal object TelemetryEntityMapper {
         status = HealthStatus.valueOf(entity.status),
         detail = entity.detail,
         durationMs = entity.durationMs,
+    )
+
+    fun resourceEntity(snapshot: ResourceSnapshot): TelemetryEntities.ResourceSnapshotEntity =
+        TelemetryEntities.ResourceSnapshotEntity().apply {
+            timestampEpochMs = snapshot.timestampEpochMs
+            processPssBytes = snapshot.processPssBytes
+            nativeHeapBytes = snapshot.nativeHeapBytes
+            javaHeapUsedBytes = snapshot.javaHeapUsedBytes
+            availableMemoryBytes = snapshot.availableMemoryBytes
+            lowMemory = snapshot.lowMemory
+            thermalStatus = snapshot.thermalStatus.name
+        }
+
+    fun resourceSnapshot(entity: TelemetryEntities.ResourceSnapshotEntity): ResourceSnapshot = ResourceSnapshot(
+        timestampEpochMs = entity.timestampEpochMs,
+        processPssBytes = entity.processPssBytes,
+        nativeHeapBytes = entity.nativeHeapBytes,
+        javaHeapUsedBytes = entity.javaHeapUsedBytes,
+        availableMemoryBytes = entity.availableMemoryBytes,
+        lowMemory = entity.lowMemory,
+        thermalStatus = ThermalStatus.valueOf(entity.thermalStatus),
     )
 
     internal fun encodeFields(fields: Map<String, String>): String = fields.toSortedMap().entries.joinToString("\n") { entry ->

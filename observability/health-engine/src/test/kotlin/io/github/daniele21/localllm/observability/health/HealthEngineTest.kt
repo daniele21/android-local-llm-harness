@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
+import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import org.junit.Assert.assertEquals
@@ -85,6 +86,8 @@ class HealthEngineTest {
             health += result
         }
 
+        override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = Unit
+
         override fun recentRuns(limit: Int): List<GenerationRunRecord> = emptyList()
 
         override fun findRun(requestId: RequestId): GenerationRunRecord? = null
@@ -92,6 +95,8 @@ class HealthEngineTest {
         override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = emptyList()
 
         override fun healthResults(): List<HealthCheckResult> = health
+
+        override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = emptyList()
 
         override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = error("Not needed")
     }

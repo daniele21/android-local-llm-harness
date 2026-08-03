@@ -44,10 +44,11 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `models/model-profile` | Artifacts, load profiles, use-case profiles and app bindings |
 | `models/model-store` | Content-addressed storage, import and integrity verification |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
-| `observability/contracts` | Stable telemetry, log, health and dashboard schemas |
+| `observability/contracts` | Stable telemetry, log, health, resource and dashboard schemas |
 | `observability/in-memory-store` | Bounded ephemeral telemetry implementation and deterministic tests |
-| `observability/room-store` | Persistent Android telemetry, retention and database lifecycle |
+| `observability/room-store` | Persistent Android telemetry, retention, migrations and database lifecycle |
 | `observability/health-engine` | Health-suite orchestration, model-integrity checks and persisted control-plane results |
+| `observability/android-resource-probe` | Android process-memory and thermal snapshot collection behind stable contracts |
 | `transports/in-process` | Embedded client-to-runtime delegation |
 | `apps/local-llm-console` | Developer console and future cross-app control plane |
 | `apps/device-test-runner` | Real-device GGUF lifecycle, cancellation and memory validation |
@@ -63,7 +64,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and recovery after failure.
 - GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
 - JNI or generation changes start in `backends/llama-cpp`; preserve coarse-grained JNI calls, opaque handles, idempotent release and cooperative cancellation.
-- Telemetry schemas start in `observability/contracts`; persistence stays in `room-store`, ephemeral behavior in `in-memory-store`, and check orchestration in `health-engine`.
+- Telemetry schemas start in `observability/contracts`; persistence stays in `room-store`, ephemeral behavior in `in-memory-store`, Android resource collection in `android-resource-probe`, and check orchestration in `health-engine`.
 - Health checks must return privacy-safe summaries, remain independently testable and persist through `TelemetryRepository`; a check failure must not break inference.
 - Console code must not open another application’s private Room database directly. Cross-app access requires the planned signature-protected diagnostics bridge.
 - Native and Capacitor integrations must remain thin and must not duplicate model resolution, validation, generation policy, error mapping or telemetry.
@@ -105,6 +106,7 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :observability:health-engine:assembleDebug
+./gradlew :observability:android-resource-probe:assembleDebug
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 python3 scripts/verify-android-packaging.py
 ```
@@ -140,6 +142,7 @@ Physical-device evidence is mandatory before production readiness, application-c
 - Test idempotent close and release behavior.
 - Avoid timing assertions without a deterministic clock.
 - Test telemetry retention, ordering, terminal replacement and privacy-safe persistence.
+- Test resource snapshot retention and unavailable-platform fallbacks without inventing measurements.
 - Test health-suite aggregation, unknown checks, unexpected exceptions and persistence.
 - Model-integrity checks must not expose private paths, model bytes or arbitrary verification details.
 
