@@ -12,16 +12,17 @@ A local-first Android harness for running explicit GGUF models through `llama.cp
 - **Privacy by default:** telemetry stores metadata only; prompts and outputs are not persisted by default.
 - **Measured performance:** memory, cache and execution policies must be selected from device evidence rather than assumptions.
 
-## Initial modules
+## Modules
 
 ```text
 core/contracts                  Stable request, session and runtime contracts
-core/runtime-core               Runtime orchestration, scheduling and lifecycle
+core/runtime-core               Runtime orchestration, scheduling, lifecycle and telemetry emission
 models/model-profile            GGUF artifacts, load profiles and app bindings
 models/model-store              Content-addressed model storage and integrity
 backends/llama-cpp              Kotlin/JNI/C++ llama.cpp backend
-observability/contracts         Metrics, logs, health and dashboard snapshots
-observability/in-memory-store   Initial local telemetry repository
+observability/contracts         Metrics, logs, health, retention and dashboard contracts
+observability/in-memory-store   Bounded ephemeral telemetry and deterministic test implementation
+observability/room-store        Persistent Android Room telemetry repository
 transports/in-process           Embedded transport implementation
 apps/local-llm-console          Developer dashboard application shell
 apps/device-test-runner         Real-device GGUF lifecycle test application
@@ -51,9 +52,7 @@ The repository uses Android Gradle Plugin 9.3.0 and its built-in Kotlin support.
 
 ## Current state
 
-Phase 0 repository hardening is complete.
-
-The Phase 1 development line contains:
+Phase 1 is merged into `main` and provides:
 
 - a pinned `llama.cpp` submodule and Android `arm64-v8a` build;
 - GGUF metadata inspection;
@@ -63,11 +62,23 @@ The Phase 1 development line contains:
 - cooperative cancellation;
 - a single-decode scheduler with request priorities;
 - runtime orchestration, model reuse and model-switch protection;
-- base metrics and Android memory-pressure handling;
-- Kotlin and native tests for the implemented behavior;
+- Android memory-pressure handling;
+- Kotlin, native, simulated-acceptance and packaging tests;
 - a real-device test runner for GGUF lifecycle, cancellation and optional PSS regression checks.
 
-Phase 1 is not production-ready until cumulative CI validation and a successful end-to-end run on representative Android `arm64-v8a` devices with supported GGUF models are complete. See [`docs/roadmap.md`](docs/roadmap.md) for the authoritative consolidation checklist.
+Phase 2 has started with persistent, privacy-safe runtime telemetry:
+
+- `TelemetryRepository` supports bounded run, log and health queries;
+- `RoomTelemetryRepository` stores telemetry across process restarts;
+- the in-memory repository remains available for ephemeral use and deterministic tests;
+- runtime requests persist `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` or `CANCELLED` state;
+- queue, model-load, TTFT, prefill, decode, token and throughput metrics are retained;
+- prompt and generated-output content are not persisted;
+- telemetry failures cannot fail inference.
+
+The console run/log viewer, memory and thermal snapshots, health and sanity engines, cache suites, benchmark regression history and redacted diagnostic export remain Phase 2 work.
+
+The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
 
 ## Coding-agent navigation
 
@@ -90,6 +101,7 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew check
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native-tests --parallel 2
@@ -113,8 +125,8 @@ See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for arguments, ev
 
 ## Roadmap
 
-1. Consolidate and validate the functional embedded runtime on CI and representative Android `arm64-v8a` devices.
-2. Persist structured telemetry and expose run timelines, health, sanity and benchmark results.
+1. Complete the physical-device production-readiness evidence for the merged functional runtime.
+2. Continue Phase 2 with timeline views, snapshots, health, sanity, cache and benchmark suites, and diagnostic export.
 3. Add native Android and Capacitor integration surfaces as thin adapters.
 4. Add a Binder transport and promote the console app into the shared runtime host.
 
