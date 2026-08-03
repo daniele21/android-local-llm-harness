@@ -4,9 +4,9 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability and benchmark regression checks.
+Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
 
-The current `main` head contains the work merged through pull request #27. Repository validation run #269 completed successfully on that line.
+The current `main` head contains the work merged through pull request #28, including the ARM64 emulator preflight. Pull request #29 is the active line for a Google Play-installable physical-device validation app that does not require developer mode or ADB.
 
 The repository is merge-ready for continued development but is **not production-ready** until the physical-device GGUF evidence gate is completed.
 
@@ -19,6 +19,7 @@ The repository is merge-ready for continued development but is **not production-
 - [x] document branch and pull-request discipline in [`BRANCHING.md`](../BRANCHING.md)
 - [x] supersede the alternative Phase 2 health-control-plane line in PR #22
 - [x] recover only compatible sanity-assertion behavior on a fresh branch from current `main`
+- [x] merge the recovery and emulator-preflight line through PR #28
 - [ ] delete historical remote branches after their unique commits and recovery notes are audited
 
 Historical branches are read-only audit references. They must not receive new implementation commits and must never be used as the base for new feature work.
@@ -35,14 +36,14 @@ The cumulative validation gate covers:
 - [x] JVM unit tests
 - [x] simulated Phase 1 acceptance lifecycle using the real content-addressed model store and runtime orchestrator
 - [x] Android Lint
-- [x] explicit APK and AAR assembly
+- [x] explicit APK, AAB and AAR assembly
 - [x] binary inspection of native packaging, ABI and ELF architecture
 - [x] Room schema and repository tests
 - [x] health-engine tests
 - [x] resource-observability tests
 - [x] benchmark-engine tests
 
-These checks provide host-side and simulated evidence. They do not prove Android linker behavior, OEM memory management, real GGUF execution, thermal throttling or device-specific native stability.
+These checks provide host-side and simulated evidence. They do not prove Android linker behavior on representative physical devices, OEM memory management, real-device thermal throttling or device-specific native stability.
 
 ## Phase 0 — repository foundation
 
@@ -89,16 +90,21 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [x] simulated end-to-end acceptance lifecycle
 - [x] exact APK/AAR native packaging and AArch64 ELF verification
 - [x] physical-device test application using production store, runtime and backend
-- [x] adb host runner for streaming an external GGUF into app-private storage
+- [x] ADB host runner for streaming an external GGUF into app-private storage
 - [x] device tests for lifecycle, cancellation and optional PSS regression cycles
 - [x] privacy-safe device-evidence capture tooling
 - [x] embedded API and lifecycle documentation
 - [x] ARM64 emulator preflight with a real Qwen3 GGUF on PR #28
+- [x] Play-installable launcher app for physical-device validation without developer mode on PR #29
+- [x] Storage Access Framework GGUF selection and private content-addressed import in the phone-test app
+- [x] copyable and shareable privacy-safe PASS/FAIL report in the phone-test app
+- [ ] signed Play internal-testing release installed on a physical phone
 
-The clean PR-head emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.
+The clean ARM64 emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.
 
 ### Physical-device production-readiness gate
 
+- [ ] install the signed phone-test AAB through Google Play internal testing on representative Android hardware
 - [ ] execute the complete lifecycle on representative physical Android `arm64-v8a` devices
 - [ ] inspect and run a supported external GGUF through the real JNI backend
 - [ ] verify cancellation during both prefill and decode
@@ -124,7 +130,7 @@ unload
 shutdown
 ```
 
-Use [`device-e2e-testing.md`](device-e2e-testing.md) and [`device-e2e-evidence.md`](device-e2e-evidence.md) for execution and evidence requirements.
+Use [`device-e2e-testing.md`](device-e2e-testing.md), [`device-e2e-evidence.md`](device-e2e-evidence.md) and [`play-internal-phone-test.md`](play-internal-phone-test.md) for execution and evidence requirements.
 
 ## Phase 2 — observability and health
 
@@ -238,7 +244,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] Capacitor plugin with aggregated token streaming
 - [ ] Capacitor cancellation and typed error mapping
 - [ ] Capacitor sample application
-- [ ] Android `content://` model import source
+- [ ] reusable production Android `content://` model import adapter
 - [ ] streamed HTTP/on-demand model source
 - [ ] signature-protected app diagnostics bridge
 
