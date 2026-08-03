@@ -114,6 +114,8 @@ jobs:
 
       - name: Build Android artifacts
         shell: bash
+        env:
+          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
         run: |
           set -o pipefail
           mkdir -p build
