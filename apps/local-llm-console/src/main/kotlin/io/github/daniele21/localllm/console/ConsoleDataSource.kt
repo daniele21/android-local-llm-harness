@@ -6,6 +6,7 @@ fun interface ConsoleDataSource {
     fun load(): ConsoleSnapshot
 }
 
+@Suppress("TooGenericExceptionCaught")
 class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
