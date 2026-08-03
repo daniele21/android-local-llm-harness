@@ -19,7 +19,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-class MainActivity : Activity(), PhoneTestListener {
+class MainActivity :
+    Activity(),
+    PhoneTestListener {
     private lateinit var controller: PhoneTestController
     private lateinit var architectureInput: EditText
     private lateinit var quantizationInput: EditText
