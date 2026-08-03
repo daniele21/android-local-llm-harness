@@ -48,6 +48,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += setOf("**/*.gguf", "**/*.ggml")
         }

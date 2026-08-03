@@ -351,7 +351,7 @@ private data class DeviceTestConfig(
                         "cancellationPromptBase64",
                         "Write a numbered list from 1 to 1000. Continue until every number is written.",
                     ),
-                    maxOutputTokens = reader.positiveInt("cancellationMaxOutputTokens", 512),
+                    maxOutputTokens = reader.positiveInt("cancellationMaxOutputTokens", 256),
                 ),
                 memory = MemoryArguments(
                     repeatCount = reader.nonNegativeInt("memoryRepeatCount", 0),
