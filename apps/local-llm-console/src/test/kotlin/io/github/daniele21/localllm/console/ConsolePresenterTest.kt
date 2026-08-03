@@ -110,5 +110,6 @@ class ConsolePresenterTest {
         prefillMs = 7,
         decodeMs = 8,
         modelLoadKind = ModelLoadKind.COLD,
+        errorCode = null,
     )
 }
