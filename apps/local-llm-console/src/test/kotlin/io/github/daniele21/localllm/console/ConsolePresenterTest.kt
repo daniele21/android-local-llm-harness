@@ -45,13 +45,14 @@ class ConsolePresenterTest {
 
     @Test
     fun `health view orders failures before warnings and passes`() {
-        val snapshot = emptySnapshot().copy(
-            health = listOf(
-                HealthCheckResult("pass", HealthStatus.PASS, "ok", 1),
-                HealthCheckResult("warn", HealthStatus.WARN, "slow", 2),
-                HealthCheckResult("fail", HealthStatus.FAIL, "broken", 3),
-            ),
-        )
+        val snapshot =
+            emptySnapshot().copy(
+                health = listOf(
+                    HealthCheckResult("pass", HealthStatus.PASS, "ok", 1),
+                    HealthCheckResult("warn", HealthStatus.WARN, "slow", 2),
+                    HealthCheckResult("fail", HealthStatus.FAIL, "broken", 3),
+                ),
+            )
 
         val screen = presenter.present(ConsoleTab.HEALTH, snapshot)
 
@@ -62,51 +63,54 @@ class ConsolePresenterTest {
 
     @Test
     fun `log view sorts structured fields deterministically`() {
-        val snapshot = emptySnapshot().copy(
-            logs = listOf(
-                StructuredLog(
-                    timestampEpochMs = 0,
-                    level = LogLevel.INFO,
-                    component = "runtime",
-                    event = "completed",
-                    requestId = RequestId("request"),
-                    fields = linkedMapOf("z" to "last", "a" to "first"),
+        val snapshot =
+            emptySnapshot().copy(
+                logs = listOf(
+                    StructuredLog(
+                        timestampEpochMs = 0,
+                        level = LogLevel.INFO,
+                        component = "runtime",
+                        event = "completed",
+                        requestId = RequestId("request"),
+                        fields = linkedMapOf("z" to "last", "a" to "first"),
+                    ),
                 ),
-            ),
-        )
+            )
 
         val screen = presenter.present(ConsoleTab.LOGS, snapshot)
 
         assertTrue(screen.cards.single().lines.contains("Fields: a=first · z=last"))
     }
 
-    private fun emptySnapshot() = ConsoleSnapshot(
-        capturedAtEpochMs = 0,
-        runtime = DisconnectedRuntimeStateProvider.snapshot(),
-        runs = emptyList(),
-        logs = emptyList(),
-        health = emptyList(),
-        resources = emptyList(),
-        benchmarkBaselines = emptyList(),
-    )
+    private fun emptySnapshot() =
+        ConsoleSnapshot(
+            capturedAtEpochMs = 0,
+            runtime = DisconnectedRuntimeStateProvider.snapshot(),
+            runs = emptyList(),
+            logs = emptyList(),
+            health = emptyList(),
+            resources = emptyList(),
+            benchmarkBaselines = emptyList(),
+        )
 
-    private fun run() = GenerationRunRecord(
-        requestId = RequestId("request-1234567890"),
-        applicationId = ApplicationId("app"),
-        useCaseId = UseCaseId("chat"),
-        modelDigest = ModelDigest("c".repeat(64)),
-        startedAtEpochMs = 0,
-        completedAtEpochMs = 20,
-        status = RunStatus.COMPLETED,
-        queueMs = 1,
-        modelLoadMs = 2,
-        timeToFirstTokenMs = 5,
-        totalMs = 20,
-        inputTokens = 4,
-        outputTokens = 6,
-        decodeTokensPerSecond = 3.5,
-        prefillMs = 7,
-        decodeMs = 8,
-        modelLoadKind = ModelLoadKind.COLD,
-    )
+    private fun run() =
+        GenerationRunRecord(
+            requestId = RequestId("request-1234567890"),
+            applicationId = ApplicationId("app"),
+            useCaseId = UseCaseId("chat"),
+            modelDigest = ModelDigest("c".repeat(64)),
+            startedAtEpochMs = 0,
+            completedAtEpochMs = 20,
+            status = RunStatus.COMPLETED,
+            queueMs = 1,
+            modelLoadMs = 2,
+            timeToFirstTokenMs = 5,
+            totalMs = 20,
+            inputTokens = 4,
+            outputTokens = 6,
+            decodeTokensPerSecond = 3.5,
+            prefillMs = 7,
+            decodeMs = 8,
+            modelLoadKind = ModelLoadKind.COLD,
+        )
 }
