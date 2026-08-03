@@ -200,8 +200,7 @@ private class FakeTelemetryDao : TelemetryDao {
         baselines[baseline.baselineId] = baseline
     }
 
-    override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> =
-        baselines.values.sortedBy { it.baselineId }
+    override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> = baselines.values.sortedBy { it.baselineId }
 
     private fun sortedLogs(): List<TelemetryEntities.StructuredLogEntity> = logs.sortedWith(
         compareByDescending<TelemetryEntities.StructuredLogEntity> { it.timestampEpochMs }.thenByDescending { it.id },

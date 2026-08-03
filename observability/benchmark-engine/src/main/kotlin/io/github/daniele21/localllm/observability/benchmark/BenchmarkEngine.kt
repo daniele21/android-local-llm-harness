@@ -139,17 +139,16 @@ private fun matchingRuns(runs: List<GenerationRunRecord>, key: BenchmarkKey): Li
     .sortedByDescending { it.completedAtEpochMs }
     .toList()
 
-private fun List<GenerationRunRecord>.toBaseline(key: BenchmarkKey, capturedAtEpochMs: Long): BenchmarkBaseline =
-    BenchmarkBaseline(
-        key = key,
-        capturedAtEpochMs = capturedAtEpochMs,
-        sampleCount = size,
-        medianTimeToFirstTokenMs = mapNotNull(GenerationRunRecord::timeToFirstTokenMs).map(Long::toDouble).median(),
-        p95TimeToFirstTokenMs = mapNotNull(GenerationRunRecord::timeToFirstTokenMs).map(Long::toDouble).percentile95(),
-        medianTotalMs = mapNotNull(GenerationRunRecord::totalMs).map(Long::toDouble).median(),
-        p95TotalMs = mapNotNull(GenerationRunRecord::totalMs).map(Long::toDouble).percentile95(),
-        medianDecodeTokensPerSecond = mapNotNull(GenerationRunRecord::decodeTokensPerSecond).median(),
-    )
+private fun List<GenerationRunRecord>.toBaseline(key: BenchmarkKey, capturedAtEpochMs: Long): BenchmarkBaseline = BenchmarkBaseline(
+    key = key,
+    capturedAtEpochMs = capturedAtEpochMs,
+    sampleCount = size,
+    medianTimeToFirstTokenMs = mapNotNull(GenerationRunRecord::timeToFirstTokenMs).map(Long::toDouble).median(),
+    p95TimeToFirstTokenMs = mapNotNull(GenerationRunRecord::timeToFirstTokenMs).map(Long::toDouble).percentile95(),
+    medianTotalMs = mapNotNull(GenerationRunRecord::totalMs).map(Long::toDouble).median(),
+    p95TotalMs = mapNotNull(GenerationRunRecord::totalMs).map(Long::toDouble).percentile95(),
+    medianDecodeTokensPerSecond = mapNotNull(GenerationRunRecord::decodeTokensPerSecond).median(),
+)
 
 private fun List<GenerationRunRecord>.maxOfCompletedAt(): Long = maxOf { requireNotNull(it.completedAtEpochMs) }
 
