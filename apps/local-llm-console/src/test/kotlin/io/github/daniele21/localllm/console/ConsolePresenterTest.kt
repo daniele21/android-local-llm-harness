@@ -11,11 +11,11 @@ import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.LogLevel
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
-import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneOffset
 
 class ConsolePresenterTest {
     private val presenter = ConsolePresenter(ZoneOffset.UTC)
@@ -82,35 +82,33 @@ class ConsolePresenterTest {
         assertTrue(screen.cards.single().lines.contains("Fields: a=first · z=last"))
     }
 
-    private fun emptySnapshot() =
-        ConsoleSnapshot(
-            capturedAtEpochMs = 0,
-            runtime = DisconnectedRuntimeStateProvider.snapshot(),
-            runs = emptyList(),
-            logs = emptyList(),
-            health = emptyList(),
-            resources = emptyList(),
-            benchmarkBaselines = emptyList(),
-        )
+    private fun emptySnapshot() = ConsoleSnapshot(
+        capturedAtEpochMs = 0,
+        runtime = DisconnectedRuntimeStateProvider.snapshot(),
+        runs = emptyList(),
+        logs = emptyList(),
+        health = emptyList(),
+        resources = emptyList(),
+        benchmarkBaselines = emptyList(),
+    )
 
-    private fun run() =
-        GenerationRunRecord(
-            requestId = RequestId("request-1234567890"),
-            applicationId = ApplicationId("app"),
-            useCaseId = UseCaseId("chat"),
-            modelDigest = ModelDigest("c".repeat(64)),
-            startedAtEpochMs = 0,
-            completedAtEpochMs = 20,
-            status = RunStatus.COMPLETED,
-            queueMs = 1,
-            modelLoadMs = 2,
-            timeToFirstTokenMs = 5,
-            totalMs = 20,
-            inputTokens = 4,
-            outputTokens = 6,
-            decodeTokensPerSecond = 3.5,
-            prefillMs = 7,
-            decodeMs = 8,
-            modelLoadKind = ModelLoadKind.COLD,
-        )
+    private fun run() = GenerationRunRecord(
+        requestId = RequestId("request-1234567890"),
+        applicationId = ApplicationId("app"),
+        useCaseId = UseCaseId("chat"),
+        modelDigest = ModelDigest("c".repeat(64)),
+        startedAtEpochMs = 0,
+        completedAtEpochMs = 20,
+        status = RunStatus.COMPLETED,
+        queueMs = 1,
+        modelLoadMs = 2,
+        timeToFirstTokenMs = 5,
+        totalMs = 20,
+        inputTokens = 4,
+        outputTokens = 6,
+        decodeTokensPerSecond = 3.5,
+        prefillMs = 7,
+        decodeMs = 8,
+        modelLoadKind = ModelLoadKind.COLD,
+    )
 }
