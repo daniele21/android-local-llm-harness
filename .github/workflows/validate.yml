@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
   pull_request: {}
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Generate Gradle performance reports
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,21 +19,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Repository validation
+  scope:
+    name: Validation scope and repository guards
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
+    outputs:
+      android: ${{ steps.scope.outputs.android }}
+      native: ${{ steps.scope.outputs.native }}
+      packaging: ${{ steps.scope.outputs.packaging }}
+      modules: ${{ steps.scope.outputs.modules }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 1
+
+      - name: Determine validation scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          python3 scripts/detect_ci_scope.py \
+            --event "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Verify coding-agent navigation
         run: python3 scripts/verify-agent-navigation.py
-
-      - name: Verify llama.cpp pin
-        run: ./scripts/verify-llama-cpp-pin.sh
 
       - name: Check repository scripts
         shell: bash
@@ -37,9 +57,53 @@ jobs:
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
+          python3 scripts/test_detect_ci_scope.py
           bash scripts/test-verify-llama-cpp-pin.sh
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
+
+  native:
+    name: Native host tests
+    needs: scope
+    if: needs.scope.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+
+      - name: Determine native cache key
+        id: native-cache-key
+        shell: bash
+        run: |
+          echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore native compiler cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**', 'backends/llama-cpp/src/test-native/**') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-
+            ccache-${{ runner.os }}-
+
+      - name: Configure ccache
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.cache/ccache"
+          ccache --set-config=cache_dir="$HOME/.cache/ccache"
+          ccache --set-config=max_size=750M
+          ccache --set-config=compression=true
+          ccache --zero-stats
 
       - name: Run native host tests
         shell: bash
@@ -47,14 +111,41 @@ jobs:
           cmake \
             -S backends/llama-cpp/src/test-native \
             -B build/native-tests \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/native-tests --parallel 2
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build/native-tests --parallel "$(nproc)"
           ctest --test-dir build/native-tests --output-on-failure
 
-      - uses: actions/setup-java@v4
+      - name: Report native compiler cache
+        if: always()
+        run: ccache --show-stats
+
+  android:
+    name: Android validation
+    needs: scope
+    if: needs.scope.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Initialize native sources
+        if: needs.scope.outputs.packaging == 'true'
+        run: git submodule update --init --depth=1 --recursive
+
+      - name: Verify llama.cpp pin
+        if: needs.scope.outputs.packaging == 'true'
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+          check-latest: false
 
       - uses: android-actions/setup-android@v3
         with:
@@ -68,124 +159,174 @@ jobs:
             "build-tools;36.0.0" \
             "ndk;28.2.13676358"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.5.0"
+          cache-provider: basic
+          # Internal PRs may populate the cache. Fork PRs remain read-only.
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-      - name: Select Gradle command
+      - name: Install ccache
+        if: needs.scope.outputs.packaging == 'true'
+        run: sudo apt-get install -y ccache
+
+      - name: Determine Android native cache key
+        if: needs.scope.outputs.packaging == 'true'
+        id: android-native-cache-key
         shell: bash
         run: |
-          if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
-            chmod +x gradlew
-            echo "GRADLE_COMMAND=./gradlew" >> "$GITHUB_ENV"
-          else
-            echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
+          echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Android native compiler cache
+        if: needs.scope.outputs.packaging == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ccache
+          key: android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**') }}
+          restore-keys: |
+            android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-
+            android-ccache-${{ runner.os }}-
+
+      - name: Configure Android native compiler cache
+        if: needs.scope.outputs.packaging == 'true'
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.cache/ccache"
+          ccache --set-config=cache_dir="$HOME/.cache/ccache"
+          ccache --set-config=max_size=1G
+          ccache --set-config=compression=true
+          ccache --zero-stats
+          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
+
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Run scoped Android validation
+        env:
+          ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          GRADLE_MODULES: ${{ needs.scope.outputs.modules }}
+          RUN_PACKAGING: ${{ needs.scope.outputs.packaging }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+
+          gradle_args=(--no-configuration-cache --stacktrace)
+          if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then
+            gradle_args+=(--profile)
           fi
 
-      - name: Check repository formatting
-        shell: bash
-        run: |
-          "$GRADLE_COMMAND" --stacktrace spotlessCheck
+          all_modules=(
+            core:contracts
+            core:runtime-core
+            models:model-profile
+            models:model-store
+            backends:llama-cpp
+            observability:contracts
+            observability:in-memory-store
+            observability:room-store
+            observability:health-engine
+            observability:android-resource-probe
+            observability:benchmark-engine
+            transports:in-process
+            apps:local-llm-console
+            apps:device-test-runner
+            apps:local-llm-phone-test
+          )
 
-      - name: Run static analysis and repository guards
-        shell: bash
-        run: |
-          "$GRADLE_COMMAND" \
-            --no-configuration-cache \
-            --stacktrace \
-            detekt \
-            verifyNoModelArtifacts
+          if [[ "$GRADLE_MODULES" == "all" ]]; then
+            selected_modules=("${all_modules[@]}")
+          else
+            IFS=',' read -r -a selected_modules <<< "$GRADLE_MODULES"
+          fi
 
-      - name: Run JVM unit and simulated acceptance tests
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p build
-          "$GRADLE_COMMAND" --stacktrace check 2>&1 | tee build/jvm-check.log
+          tasks=(spotlessCheck detekt verifyNoModelArtifacts)
+          for module in "${selected_modules[@]}"; do
+            [[ -n "$module" ]] || continue
+            tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            if [[ "$module" == "apps:local-llm-console" ]]; then
+              tasks+=(":apps:local-llm-console:lintInternal")
+            fi
+          done
 
-      - name: Run Android Lint
-        shell: bash
-        run: |
-          "$GRADLE_COMMAND" \
-            --stacktrace \
-            lintDebug \
-            :apps:local-llm-console:lintInternal \
-            :apps:local-llm-phone-test:lintRelease
+          if [[ "$RUN_PACKAGING" == "true" ]]; then
+            tasks+=(
+              :backends:llama-cpp:assembleDebug
+              :apps:local-llm-console:assembleInternal
+              :apps:device-test-runner:assembleDebug
+              :apps:device-test-runner:assembleDebugAndroidTest
+              :apps:local-llm-phone-test:assembleDebug
+            )
+          else
+            # Compile the downstream applications to catch API integration
+            # breakages without constructing APKs or native packages.
+            tasks+=(
+              :apps:local-llm-console:compileInternalKotlin
+              :apps:device-test-runner:compileDebugKotlin
+              :apps:local-llm-phone-test:compileDebugKotlin
+            )
+          fi
 
-      - name: Build Android artifacts
-        shell: bash
-        env:
-          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
-        run: |
-          set -o pipefail
-          mkdir -p build
-          "$GRADLE_COMMAND" \
-            --stacktrace \
-            :core:contracts:assembleDebug \
-            :core:runtime-core:assembleDebug \
-            :models:model-profile:assembleDebug \
-            :models:model-store:assembleDebug \
-            :backends:llama-cpp:assembleDebug \
-            :observability:contracts:assembleDebug \
-            :observability:in-memory-store:assembleDebug \
-            :observability:room-store:assembleDebug \
-            :observability:room-store:assembleDebugAndroidTest \
-            :observability:health-engine:assembleDebug \
-            :observability:android-resource-probe:assembleDebug \
-            :observability:benchmark-engine:assembleDebug \
-            :transports:in-process:assembleDebug \
-            :apps:local-llm-console:assembleInternal \
-            :apps:device-test-runner:assembleDebug \
-            :apps:device-test-runner:assembleDebugAndroidTest \
-            :apps:local-llm-phone-test:assembleDebug \
-            :apps:local-llm-phone-test:bundleRelease \
-            2>&1 | tee build/android-artifacts.log
+          printf 'Gradle modules: %s\n' "${selected_modules[*]}"
+          printf 'Gradle tasks: %s\n' "${tasks[*]}"
+          ./gradlew "${gradle_args[@]}" "${tasks[@]}" \
+            2>&1 | tee build/android-validation.log
 
       - name: Verify Android native packaging
-        shell: bash
+        if: needs.scope.outputs.packaging == 'true'
         run: python3 scripts/verify-android-packaging.py
 
-      - name: Upload console APKs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-llm-console-apks
-          path: apps/local-llm-console/build/outputs/apk/**/*.apk
-          if-no-files-found: warn
+      - name: Report Android native compiler cache
+        if: always() && needs.scope.outputs.packaging == 'true'
+        run: ccache --show-stats
 
-      - name: Upload device test APKs
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload Gradle profile
+        if: always() && inputs.profile == true
+        uses: actions/upload-artifact@v7
         with:
-          name: local-llm-device-test-apks
-          path: apps/device-test-runner/build/outputs/apk/**/*.apk
+          name: gradle-validation-profile
+          path: build/reports/profile/**
           if-no-files-found: warn
+          retention-days: 7
 
-      - name: Upload phone test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-llm-phone-test-artifacts
-          path: |
-            apps/local-llm-phone-test/build/outputs/apk/**/*.apk
-            apps/local-llm-phone-test/build/outputs/bundle/**/*.aab
-          if-no-files-found: warn
-
-      - name: Upload Android libraries
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-llm-harness-aars
-          path: "**/build/outputs/aar/*.aar"
-          if-no-files-found: warn
-
-      - name: Upload reports
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload failure reports
+        if: failure() && !cancelled()
+        uses: actions/upload-artifact@v7
         with:
           name: validation-reports
           path: |
             **/build/reports/**
-            build/jvm-check.log
-            build/android-artifacts.log
+            build/android-validation.log
           if-no-files-found: warn
+          retention-days: 7
+
+  validation:
+    name: Repository validation
+    if: always()
+    needs: [scope, native, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Evaluate validation jobs
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$SCOPE_RESULT" != "success" ]]; then
+            echo "Validation scope and repository guards failed: $SCOPE_RESULT" >&2
+            exit 1
+          fi
+
+          for job_result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
+            if [[ "$job_result" != "success" && "$job_result" != "skipped" ]]; then
+              echo "Required validation job failed: $job_result" >&2
+              exit 1
+            fi
+          done
+
+          echo "Repository validation passed."

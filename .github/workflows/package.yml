@@ -1,0 +1,190 @@
+name: Package Android Artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "backends/**"
+      - "core/**"
+      - "models/**"
+      - "observability/**"
+      - "transports/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".gitmodules"
+      - "third_party/llama.cpp"
+      - "scripts/verify-android-packaging.py"
+      - ".github/workflows/package.yml"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Generate a Gradle performance report
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build distributable Android artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+
+      - name: Determine Android native cache key
+        id: android-native-cache-key
+        shell: bash
+        run: |
+          echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Android native compiler cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ccache
+          key: android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**') }}
+          restore-keys: |
+            android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-
+            android-ccache-${{ runner.os }}-
+
+      - name: Configure Android native compiler cache
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.cache/ccache"
+          ccache --set-config=cache_dir="$HOME/.cache/ccache"
+          ccache --set-config=max_size=1G
+          ccache --set-config=compression=true
+          ccache --zero-stats
+          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
+
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build and validate Android packages
+        env:
+          ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+
+          gradle_args=(--stacktrace)
+          if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then
+            gradle_args+=(--profile)
+          fi
+
+          ./gradlew "${gradle_args[@]}" \
+            assembleDebug \
+            :apps:local-llm-console:assembleInternal \
+            :apps:device-test-runner:assembleDebugAndroidTest \
+            :apps:local-llm-phone-test:lintRelease \
+            :apps:local-llm-phone-test:bundleRelease \
+            :observability:room-store:assembleDebugAndroidTest \
+            2>&1 | tee build/android-packaging.log
+
+      - name: Verify Android native packaging
+        run: python3 scripts/verify-android-packaging.py
+
+      - name: Report Android native compiler cache
+        if: always()
+        run: ccache --show-stats
+
+      - name: Upload console APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-console-apks
+          path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload device test APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-device-test-apks
+          path: apps/device-test-runner/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload phone test artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-phone-test-artifacts
+          path: |
+            apps/local-llm-phone-test/build/outputs/apk/**/*.apk
+            apps/local-llm-phone-test/build/outputs/bundle/**/*.aab
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload Android libraries
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-harness-aars
+          path: "**/build/outputs/aar/*.aar"
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload Gradle profile
+        if: always() && inputs.profile == true
+        uses: actions/upload-artifact@v7
+        with:
+          name: gradle-packaging-profile
+          path: build/reports/profile/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload failure reports
+        if: failure() && !cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaging-reports
+          path: |
+            **/build/reports/**
+            build/android-packaging.log
+          if-no-files-found: warn
+          retention-days: 7
