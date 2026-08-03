@@ -14,6 +14,7 @@ The module:
 - converts unexpected exceptions into a privacy-safe failure;
 - exposes installed-model integrity through `ModelStore.verify`;
 - executes configurable end-to-end generation sanity checks through `LocalLlmClient`;
+- supports positive, negative, structural and non-empty output assertions;
 - interprets neutral cache-health probes without coupling the runtime to the health engine.
 
 It does not own Room, console rendering, cross-application transport, benchmark history, memory or thermal probes.
@@ -95,18 +96,24 @@ prepare
 create session
 generate deterministic request
 wait for Completed or Failed
-assert expected output
+assert configured output rule
 close session
 ```
 
 The check supports:
 
-- exact or substring matching;
-- case-sensitive or case-insensitive comparison;
+- `NON_EMPTY` to require any non-blank generated output;
+- `EXACT` for an exact expected value;
+- `CONTAINS` for a required marker;
+- `NOT_CONTAINS` for a forbidden marker;
+- `MATCHES_REGEX` for a complete regular-expression match;
+- case-sensitive or case-insensitive text and regex comparison;
 - explicit output-token limit;
 - deterministic temperature and seed, defaulting to `0`;
 - a bounded timeout;
 - cooperative cancellation when the timeout expires.
+
+`expectedOutput` may be empty only for `NON_EMPTY`. Regex patterns are validated when `GenerationSanitySpec` is created, so an invalid health configuration fails before the runtime lifecycle starts.
 
 The stable check ID is:
 
@@ -120,9 +127,9 @@ Outcomes:
 - the session cannot be created: `FAIL`;
 - generation returns a typed failure: `FAIL` with the public error code only;
 - generation times out: the handle is cancelled and the check returns `FAIL`;
-- generation completes but does not match: `FAIL`;
-- generation and cleanup both succeed with a matching output: `PASS`;
-- session cleanup fails: `FAIL`, even when generation matched.
+- generation completes but does not satisfy the configured assertion: `FAIL`;
+- generation and cleanup both succeed with a satisfied assertion: `PASS`;
+- session cleanup fails: `FAIL`, even when the assertion passed.
 
 This check is backend-agnostic. It does not depend on `RuntimeOrchestrator`, scheduler implementation details, JNI handles or `llama.cpp` types. It can therefore exercise the embedded runtime today and a future Binder-backed `LocalLlmClient` without changing the health contract.
 
@@ -172,7 +179,7 @@ detail = Health check failed unexpectedly
 
 The original exception message is deliberately excluded because it may contain private paths, prompts or implementation details.
 
-Generation sanity results never persist the configured prompt, generated output or backend error message. A typed generation failure exposes only its stable public error code. Output mismatches report only that the assertion failed.
+Generation sanity results never persist the configured prompt, generated output, expected marker, regex or backend error message. A typed generation failure exposes only its stable public error code. Assertion failures report only that the configured rule was not satisfied.
 
 Cache-health results contain aggregate counts only. The internal cache stamp remains private to `runtime-core`.
 
@@ -198,8 +205,12 @@ The module and runtime include deterministic tests for:
 - no-model, valid-model and invalid-model integrity outcomes;
 - absence of private model paths from persisted details;
 - successful generation and expected-output matching;
+- non-empty output assertions;
+- required and forbidden output markers;
+- case-insensitive regular-expression assertions;
+- invalid regex rejection before generation;
 - deterministic generation overrides;
-- output mismatch without generated-text disclosure;
+- output mismatch without generated-text or assertion-value disclosure;
 - typed runtime failures without backend-message disclosure;
 - timeout cancellation;
 - preparation failure before session creation;
@@ -218,12 +229,13 @@ The generation sanity implementation is executable against a real `LocalLlmClien
 
 The cache-health slice covers the runtime's model-integrity verification cache. No other runtime cache with an independent health contract is currently implemented.
 
-This module does not yet provide:
+The health engine does not yet provide:
 
-- memory or thermal checks;
-- cold-versus-warm benchmark classification;
 - periodic scheduling;
 - console controls or visualization;
-- cross-application access.
+- cross-application access;
+- health contracts for future tokenizer, prompt, KV or downloaded-model caches.
+
+Resource snapshots, cold-versus-warm classification and benchmark regression checks are implemented in separate Phase 2 modules; they are not owned by the health engine itself.
 
 The separate console application still requires the planned signature-protected diagnostics bridge to access another application's private control-plane data.
