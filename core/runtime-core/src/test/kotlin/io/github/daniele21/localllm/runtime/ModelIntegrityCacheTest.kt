@@ -135,10 +135,11 @@ class ModelIntegrityCacheTest {
         val cache = ModelIntegrityCache()
         cache.verify(store, stored)
         store.entries = emptyList()
+        val probe = ModelIntegrityCacheHealthProbe(cache, store)
 
-        val snapshot = ModelIntegrityCacheHealthProbe(cache, store).snapshot()
+        val snapshot = probe.snapshot()
 
-        assertEquals("model-integrity", ModelIntegrityCacheHealthProbe(cache, store).id)
+        assertEquals("model-integrity", probe.id)
         assertEquals(1, snapshot.entryCount)
         assertEquals(0, snapshot.staleEntryCount)
         assertEquals(1, snapshot.orphanedEntryCount)
@@ -157,10 +158,7 @@ class ModelIntegrityCacheTest {
     }
 }
 
-private class CountingModelStore(
-    private val valid: Boolean,
-    entries: List<StoredModel> = emptyList(),
-) : ModelStore {
+private class CountingModelStore(private val valid: Boolean, entries: List<StoredModel> = emptyList()) : ModelStore {
     var verificationCalls: Int = 0
     var entries: List<StoredModel> = entries
 
