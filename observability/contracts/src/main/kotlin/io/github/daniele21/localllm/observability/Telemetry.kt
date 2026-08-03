@@ -93,12 +93,48 @@ fun interface ResourceSnapshotProvider {
     fun snapshot(): ResourceSnapshot
 }
 
+data class BenchmarkKey(
+    val applicationId: ApplicationId,
+    val useCaseId: UseCaseId,
+    val modelDigest: ModelDigest,
+    val modelLoadKind: ModelLoadKind,
+) {
+    init {
+        require(modelLoadKind != ModelLoadKind.UNKNOWN) { "Benchmark load kind must be explicit" }
+    }
+
+    val stableId: String
+        get() = listOf(
+            applicationId.value,
+            useCaseId.value,
+            modelDigest.sha256,
+            modelLoadKind.name,
+        ).joinToString("|")
+}
+
+data class BenchmarkBaseline(
+    val key: BenchmarkKey,
+    val capturedAtEpochMs: Long,
+    val sampleCount: Int,
+    val medianTimeToFirstTokenMs: Double?,
+    val p95TimeToFirstTokenMs: Double?,
+    val medianTotalMs: Double?,
+    val p95TotalMs: Double?,
+    val medianDecodeTokensPerSecond: Double?,
+) {
+    init {
+        require(capturedAtEpochMs >= 0) { "Benchmark capture timestamp must not be negative" }
+        require(sampleCount > 0) { "Benchmark sample count must be positive" }
+    }
+}
+
 data class DeveloperDashboardSnapshot(
     val runtime: RuntimeSnapshot,
     val recentRuns: List<GenerationRunRecord>,
     val recentLogs: List<StructuredLog>,
     val health: List<HealthCheckResult>,
     val resources: List<ResourceSnapshot> = emptyList(),
+    val benchmarkBaselines: List<BenchmarkBaseline> = emptyList(),
     val modelStoreBytes: Long,
     val modelCount: Int,
 )
@@ -120,6 +156,8 @@ interface TelemetryRepository {
 
     fun recordResourceSnapshot(snapshot: ResourceSnapshot)
 
+    fun saveBenchmarkBaseline(baseline: BenchmarkBaseline)
+
     fun recentRuns(limit: Int = 100): List<GenerationRunRecord>
 
     fun findRun(requestId: RequestId): GenerationRunRecord?
@@ -129,6 +167,8 @@ interface TelemetryRepository {
     fun healthResults(): List<HealthCheckResult>
 
     fun recentResourceSnapshots(limit: Int = 100): List<ResourceSnapshot>
+
+    fun benchmarkBaselines(): List<BenchmarkBaseline>
 
     fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot
 }
@@ -142,6 +182,8 @@ object NoOpTelemetryRepository : TelemetryRepository {
 
     override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = Unit
 
+    override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) = Unit
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = emptyList()
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = null
@@ -152,12 +194,15 @@ object NoOpTelemetryRepository : TelemetryRepository {
 
     override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = emptyList()
 
+    override fun benchmarkBaselines(): List<BenchmarkBaseline> = emptyList()
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = DeveloperDashboardSnapshot(
         runtime = runtime,
         recentRuns = emptyList(),
         recentLogs = emptyList(),
         health = emptyList(),
         resources = emptyList(),
+        benchmarkBaselines = emptyList(),
         modelStoreBytes = 0L,
         modelCount = 0,
     )
