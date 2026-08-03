@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate native Android packaging produced by the Phase 1 build."""
+"""Validate native Android packaging produced by the repository build."""
 
 from __future__ import annotations
 
@@ -113,10 +113,15 @@ def verify_instrumentation_apk(path: Path) -> None:
 
 def main() -> int:
     repository = Path(__file__).resolve().parents[1]
-    application_apk = find_single(
+    device_application_apk = find_single(
         repository,
         "apps/device-test-runner/build/outputs/apk/debug/*-debug.apk",
         "device-test application APK",
+    )
+    phone_application_apk = find_single(
+        repository,
+        "apps/local-llm-phone-test/build/outputs/apk/debug/*-debug.apk",
+        "phone-test application APK",
     )
     instrumentation_apk = find_single(
         repository,
@@ -129,7 +134,8 @@ def main() -> int:
         "llama.cpp debug AAR",
     )
 
-    verify_native_archive(application_apk, "lib/", "device-test application APK")
+    verify_native_archive(device_application_apk, "lib/", "device-test application APK")
+    verify_native_archive(phone_application_apk, "lib/", "phone-test application APK")
     verify_instrumentation_apk(instrumentation_apk)
     verify_native_archive(backend_aar, "jni/", "llama.cpp debug AAR")
     print("Android native packaging verification completed successfully")
