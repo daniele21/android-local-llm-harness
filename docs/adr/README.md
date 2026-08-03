@@ -5,6 +5,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 ## Records
 
 - [`0001-room-backed-telemetry.md`](0001-room-backed-telemetry.md) — persistent telemetry ownership, threading, retention and privacy defaults
+- [`0002-health-control-plane.md`](0002-health-control-plane.md) — model-integrity and deterministic sanity ownership, transport boundary and privacy rules
 
 ## Status values
 
