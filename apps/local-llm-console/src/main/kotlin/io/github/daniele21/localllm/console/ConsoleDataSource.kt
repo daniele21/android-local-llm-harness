@@ -1,9 +1,12 @@
 package io.github.daniele21.localllm.console
 
+import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.TelemetryRepository
 
-fun interface ConsoleDataSource {
+interface ConsoleDataSource {
     fun load(): ConsoleSnapshot
+
+    fun loadRequest(requestId: RequestId): ConsoleRequestDetail
 }
 
 @Suppress("TooGenericExceptionCaught")
@@ -44,14 +47,35 @@ class TelemetryConsoleDataSource(
                 health = emptyList(),
                 resources = emptyList(),
                 benchmarkBaselines = emptyList(),
-                sourceError = "Telemetry source unavailable",
+                sourceError = TELEMETRY_SOURCE_ERROR,
             )
         }
+    }
+
+    override fun loadRequest(requestId: RequestId): ConsoleRequestDetail = try {
+        ConsoleRequestDetail(
+            requestId = requestId,
+            run = telemetryRepository.findRun(requestId),
+            timeline = telemetryRepository
+                .recentLogs(logLimit, requestId)
+                .sortedBy { it.timestampEpochMs },
+        )
+    } catch (_: RuntimeException) {
+        ConsoleRequestDetail(
+            requestId = requestId,
+            run = null,
+            timeline = emptyList(),
+            sourceError = TELEMETRY_SOURCE_ERROR,
+        )
     }
 
     private fun safelyLoadRuntime(): ConsoleRuntimeState = try {
         runtimeStateProvider.snapshot()
     } catch (_: RuntimeException) {
         DisconnectedRuntimeStateProvider.snapshot()
+    }
+
+    private companion object {
+        const val TELEMETRY_SOURCE_ERROR = "Telemetry source unavailable"
     }
 }
