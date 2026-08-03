@@ -87,4 +87,10 @@ public interface TelemetryDao {
         insertResourceSnapshot(snapshot);
         trimResourceSnapshots(maxRows);
     }
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertBenchmarkBaseline(TelemetryEntities.BenchmarkBaselineEntity baseline);
+
+    @Query("SELECT * FROM benchmark_baselines ORDER BY baseline_id ASC")
+    List<TelemetryEntities.BenchmarkBaselineEntity> benchmarkBaselines();
 }

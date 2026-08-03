@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.observability.store
 
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -20,6 +21,7 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
     private val logs = ArrayDeque<StructuredLog>()
     private val health = linkedMapOf<String, HealthCheckResult>()
     private val resources = ArrayDeque<ResourceSnapshot>()
+    private val baselines = linkedMapOf<String, BenchmarkBaseline>()
 
     override fun recordRun(run: GenerationRunRecord) = synchronized(lock) {
         runs.removeAll { it.requestId == run.requestId }
@@ -39,6 +41,10 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
     override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = synchronized(lock) {
         resources.offerFirst(snapshot)
         while (resources.size > retention.maxResourceSnapshots) resources.removeLast()
+    }
+
+    override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) = synchronized(lock) {
+        baselines[baseline.key.stableId] = baseline
     }
 
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = synchronized(lock) {
@@ -64,6 +70,10 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
         resources.asSequence().take(requirePositiveLimit(limit)).toList()
     }
 
+    override fun benchmarkBaselines(): List<BenchmarkBaseline> = synchronized(lock) {
+        baselines.values.sortedBy { it.key.stableId }
+    }
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = synchronized(lock) {
         DeveloperDashboardSnapshot(
             runtime = runtime,
@@ -71,6 +81,7 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
             recentLogs = logs.toList(),
             health = health.values.toList(),
             resources = resources.toList(),
+            benchmarkBaselines = baselines.values.sortedBy { it.key.stableId },
             modelStoreBytes = 0L,
             modelCount = 0,
         )

@@ -8,9 +8,10 @@ import androidx.room.RoomDatabase;
             TelemetryEntities.GenerationRunEntity.class,
             TelemetryEntities.StructuredLogEntity.class,
             TelemetryEntities.HealthCheckEntity.class,
-            TelemetryEntities.ResourceSnapshotEntity.class
+            TelemetryEntities.ResourceSnapshotEntity.class,
+            TelemetryEntities.BenchmarkBaselineEntity.class
         },
-        version = 2,
+        version = 3,
         exportSchema = false)
 public abstract class TelemetryDatabase extends RoomDatabase {
     public abstract TelemetryDao telemetryDao();

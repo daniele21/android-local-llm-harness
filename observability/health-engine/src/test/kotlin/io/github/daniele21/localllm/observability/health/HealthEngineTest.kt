@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.observability.health
 
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -88,6 +89,8 @@ class HealthEngineTest {
 
         override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = Unit
 
+        override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) = Unit
+
         override fun recentRuns(limit: Int): List<GenerationRunRecord> = emptyList()
 
         override fun findRun(requestId: RequestId): GenerationRunRecord? = null
@@ -97,6 +100,8 @@ class HealthEngineTest {
         override fun healthResults(): List<HealthCheckResult> = health
 
         override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = emptyList()
+
+        override fun benchmarkBaselines(): List<BenchmarkBaseline> = emptyList()
 
         override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = error("Not needed")
     }

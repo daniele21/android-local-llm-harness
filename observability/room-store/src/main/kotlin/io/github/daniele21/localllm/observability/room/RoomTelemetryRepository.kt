@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -62,6 +63,12 @@ class RoomTelemetryRepository internal constructor(
         }
     }
 
+    override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) {
+        executeAsync {
+            dao.upsertBenchmarkBaseline(TelemetryEntityMapper.benchmarkEntity(baseline))
+        }
+    }
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = executeBlocking {
         dao.recentRuns(requirePositiveLimit(limit)).map(TelemetryEntityMapper::runRecord)
     }
@@ -88,6 +95,10 @@ class RoomTelemetryRepository internal constructor(
         dao.recentResourceSnapshots(requirePositiveLimit(limit)).map(TelemetryEntityMapper::resourceSnapshot)
     }
 
+    override fun benchmarkBaselines(): List<BenchmarkBaseline> = executeBlocking {
+        dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline)
+    }
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = executeBlocking {
         DeveloperDashboardSnapshot(
             runtime = runtime,
@@ -96,6 +107,7 @@ class RoomTelemetryRepository internal constructor(
             health = dao.healthResults().map(TelemetryEntityMapper::healthResult),
             resources = dao.recentResourceSnapshots(retention.maxResourceSnapshots)
                 .map(TelemetryEntityMapper::resourceSnapshot),
+            benchmarkBaselines = dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline),
             modelStoreBytes = 0L,
             modelCount = 0,
         )
@@ -176,6 +188,26 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS benchmark_baselines (" +
+                        "baseline_id TEXT NOT NULL PRIMARY KEY, " +
+                        "application_id TEXT NOT NULL, " +
+                        "use_case_id TEXT NOT NULL, " +
+                        "model_digest TEXT NOT NULL, " +
+                        "model_load_kind TEXT NOT NULL, " +
+                        "captured_at_epoch_ms INTEGER NOT NULL, " +
+                        "sample_count INTEGER NOT NULL, " +
+                        "median_time_to_first_token_ms REAL, " +
+                        "p95_time_to_first_token_ms REAL, " +
+                        "median_total_ms REAL, " +
+                        "p95_total_ms REAL, " +
+                        "median_decode_tokens_per_second REAL)",
+                )
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -186,7 +218,7 @@ class RoomTelemetryRepository internal constructor(
                 context.applicationContext,
                 TelemetryDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
             }

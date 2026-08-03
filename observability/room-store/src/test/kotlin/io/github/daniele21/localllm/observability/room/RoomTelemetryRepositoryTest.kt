@@ -5,6 +5,8 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -56,6 +58,10 @@ class RoomTelemetryRepositoryTest {
             repository.recordResourceSnapshot(resource(2L))
             repository.recordResourceSnapshot(resource(3L))
             assertEquals(listOf(3L, 2L), repository.recentResourceSnapshots().map { it.timestampEpochMs })
+
+            val baseline = benchmarkBaseline()
+            repository.saveBenchmarkBaseline(baseline)
+            assertEquals(listOf(baseline), repository.benchmarkBaselines())
         }
     }
 
@@ -111,6 +117,22 @@ class RoomTelemetryRepositoryTest {
         lowMemory = false,
         thermalStatus = ThermalStatus.LIGHT,
     )
+
+    private fun benchmarkBaseline(): BenchmarkBaseline = BenchmarkBaseline(
+        key = BenchmarkKey(
+            ApplicationId("app"),
+            UseCaseId("assistant"),
+            ModelDigest("a".repeat(64)),
+            ModelLoadKind.WARM,
+        ),
+        capturedAtEpochMs = 10L,
+        sampleCount = 5,
+        medianTimeToFirstTokenMs = 20.0,
+        p95TimeToFirstTokenMs = 30.0,
+        medianTotalMs = 40.0,
+        p95TotalMs = 50.0,
+        medianDecodeTokensPerSecond = 6.0,
+    )
 }
 
 private class FakeTelemetryDao : TelemetryDao {
@@ -118,6 +140,7 @@ private class FakeTelemetryDao : TelemetryDao {
     private val logs = mutableListOf<TelemetryEntities.StructuredLogEntity>()
     private val health = linkedMapOf<String, TelemetryEntities.HealthCheckEntity>()
     private val resources = mutableListOf<TelemetryEntities.ResourceSnapshotEntity>()
+    private val baselines = linkedMapOf<String, TelemetryEntities.BenchmarkBaselineEntity>()
     private var nextLogId = 1L
     private var nextResourceId = 1L
 
@@ -172,6 +195,12 @@ private class FakeTelemetryDao : TelemetryDao {
         val retained = recentResourceSnapshots(maxRows).mapTo(mutableSetOf()) { it.id }
         resources.removeAll { it.id !in retained }
     }
+
+    override fun upsertBenchmarkBaseline(baseline: TelemetryEntities.BenchmarkBaselineEntity) {
+        baselines[baseline.baselineId] = baseline
+    }
+
+    override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> = baselines.values.sortedBy { it.baselineId }
 
     private fun sortedLogs(): List<TelemetryEntities.StructuredLogEntity> = logs.sortedWith(
         compareByDescending<TelemetryEntities.StructuredLogEntity> { it.timestampEpochMs }.thenByDescending { it.id },

@@ -10,6 +10,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -128,6 +129,8 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
 
     override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = fail()
 
+    override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) = fail()
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = fail()
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = fail()
@@ -137,6 +140,8 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
     override fun healthResults(): List<HealthCheckResult> = fail()
 
     override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = fail()
+
+    override fun benchmarkBaselines(): List<BenchmarkBaseline> = fail()
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = fail()
 

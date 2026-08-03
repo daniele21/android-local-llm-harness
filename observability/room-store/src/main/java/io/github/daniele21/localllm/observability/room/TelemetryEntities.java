@@ -170,4 +170,54 @@ public final class TelemetryEntities {
         @ColumnInfo(name = "thermal_status")
         public String thermalStatus = "UNKNOWN";
     }
+
+    @Entity(tableName = "benchmark_baselines")
+    public static final class BenchmarkBaselineEntity {
+        @PrimaryKey
+        @NonNull
+        @ColumnInfo(name = "baseline_id")
+        public String baselineId = "";
+
+        @NonNull
+        @ColumnInfo(name = "application_id")
+        public String applicationId = "";
+
+        @NonNull
+        @ColumnInfo(name = "use_case_id")
+        public String useCaseId = "";
+
+        @NonNull
+        @ColumnInfo(name = "model_digest")
+        public String modelDigest = "";
+
+        @NonNull
+        @ColumnInfo(name = "model_load_kind")
+        public String modelLoadKind = "";
+
+        @ColumnInfo(name = "captured_at_epoch_ms")
+        public long capturedAtEpochMs;
+
+        @ColumnInfo(name = "sample_count")
+        public int sampleCount;
+
+        @Nullable
+        @ColumnInfo(name = "median_time_to_first_token_ms")
+        public Double medianTimeToFirstTokenMs;
+
+        @Nullable
+        @ColumnInfo(name = "p95_time_to_first_token_ms")
+        public Double p95TimeToFirstTokenMs;
+
+        @Nullable
+        @ColumnInfo(name = "median_total_ms")
+        public Double medianTotalMs;
+
+        @Nullable
+        @ColumnInfo(name = "p95_total_ms")
+        public Double p95TotalMs;
+
+        @Nullable
+        @ColumnInfo(name = "median_decode_tokens_per_second")
+        public Double medianDecodeTokensPerSecond;
+    }
 }

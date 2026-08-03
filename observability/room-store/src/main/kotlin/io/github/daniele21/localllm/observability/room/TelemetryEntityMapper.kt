@@ -5,6 +5,8 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -114,6 +116,38 @@ internal object TelemetryEntityMapper {
         availableMemoryBytes = entity.availableMemoryBytes,
         lowMemory = entity.lowMemory,
         thermalStatus = ThermalStatus.valueOf(entity.thermalStatus),
+    )
+
+    fun benchmarkEntity(baseline: BenchmarkBaseline): TelemetryEntities.BenchmarkBaselineEntity =
+        TelemetryEntities.BenchmarkBaselineEntity().apply {
+            baselineId = baseline.key.stableId
+            applicationId = baseline.key.applicationId.value
+            useCaseId = baseline.key.useCaseId.value
+            modelDigest = baseline.key.modelDigest.sha256
+            modelLoadKind = baseline.key.modelLoadKind.name
+            capturedAtEpochMs = baseline.capturedAtEpochMs
+            sampleCount = baseline.sampleCount
+            medianTimeToFirstTokenMs = baseline.medianTimeToFirstTokenMs
+            p95TimeToFirstTokenMs = baseline.p95TimeToFirstTokenMs
+            medianTotalMs = baseline.medianTotalMs
+            p95TotalMs = baseline.p95TotalMs
+            medianDecodeTokensPerSecond = baseline.medianDecodeTokensPerSecond
+        }
+
+    fun benchmarkBaseline(entity: TelemetryEntities.BenchmarkBaselineEntity): BenchmarkBaseline = BenchmarkBaseline(
+        key = BenchmarkKey(
+            applicationId = ApplicationId(entity.applicationId),
+            useCaseId = UseCaseId(entity.useCaseId),
+            modelDigest = ModelDigest(entity.modelDigest),
+            modelLoadKind = ModelLoadKind.valueOf(entity.modelLoadKind),
+        ),
+        capturedAtEpochMs = entity.capturedAtEpochMs,
+        sampleCount = entity.sampleCount,
+        medianTimeToFirstTokenMs = entity.medianTimeToFirstTokenMs,
+        p95TimeToFirstTokenMs = entity.p95TimeToFirstTokenMs,
+        medianTotalMs = entity.medianTotalMs,
+        p95TotalMs = entity.p95TotalMs,
+        medianDecodeTokensPerSecond = entity.medianDecodeTokensPerSecond,
     )
 
     internal fun encodeFields(fields: Map<String, String>): String = fields.toSortedMap().entries.joinToString("\n") { entry ->
