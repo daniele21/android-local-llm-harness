@@ -155,11 +155,7 @@ class ConsolePresenterTest {
         errorCode = null,
     )
 
-    private fun log(
-        timestampEpochMs: Long,
-        event: String,
-        requestId: RequestId,
-    ) = StructuredLog(
+    private fun log(timestampEpochMs: Long, event: String, requestId: RequestId) = StructuredLog(
         timestampEpochMs = timestampEpochMs,
         level = LogLevel.INFO,
         component = "runtime",
