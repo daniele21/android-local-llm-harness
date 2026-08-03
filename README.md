@@ -15,17 +15,20 @@ A local-first Android harness for running explicit GGUF models through `llama.cp
 ## Modules
 
 ```text
-core/contracts                  Stable request, session and runtime contracts
-core/runtime-core               Runtime orchestration, scheduling, lifecycle and telemetry emission
-models/model-profile            GGUF artifacts, load profiles and app bindings
-models/model-store              Content-addressed model storage and integrity
-backends/llama-cpp              Kotlin/JNI/C++ llama.cpp backend
-observability/contracts         Metrics, logs, health, retention and dashboard contracts
-observability/in-memory-store   Bounded ephemeral telemetry and deterministic test implementation
-observability/room-store        Persistent Android Room telemetry repository
-transports/in-process           Embedded transport implementation
-apps/local-llm-console          Developer dashboard application shell
-apps/device-test-runner         Real-device GGUF lifecycle test application
+core/contracts                         Stable request, session and runtime contracts
+core/runtime-core                      Runtime orchestration, scheduling, lifecycle and telemetry emission
+models/model-profile                   GGUF artifacts, load profiles and app bindings
+models/model-store                     Content-addressed model storage and integrity
+backends/llama-cpp                     Kotlin/JNI/C++ llama.cpp backend
+observability/contracts                Metrics, logs, health, retention and dashboard contracts
+observability/in-memory-store          Bounded ephemeral telemetry and deterministic test implementation
+observability/room-store               Persistent Android Room telemetry repository
+observability/health-engine            Health orchestration, model integrity, sanity and cache checks
+observability/android-resource-probe   Android memory and thermal snapshot provider
+observability/benchmark-engine         Baseline capture and performance regression checks
+transports/in-process                  Embedded transport implementation
+apps/local-llm-console                 Developer dashboard application shell
+apps/device-test-runner                Real-device GGUF lifecycle test application
 ```
 
 ## Request resolution
@@ -66,19 +69,29 @@ Phase 1 is merged into `main` and provides:
 - Kotlin, native, simulated-acceptance and packaging tests;
 - a real-device test runner for GGUF lifecycle, cancellation and optional PSS regression checks.
 
-Phase 2 has started with persistent, privacy-safe runtime telemetry:
+Phase 2 is substantially implemented in `main`:
 
-- `TelemetryRepository` supports bounded run, log and health queries;
-- `RoomTelemetryRepository` stores telemetry across process restarts;
-- the in-memory repository remains available for ephemeral use and deterministic tests;
+- `TelemetryRepository` supports bounded run, log, health, resource and benchmark queries;
+- `RoomTelemetryRepository` persists telemetry across process restarts with non-destructive schema migrations;
 - runtime requests persist `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` or `CANCELLED` state;
 - queue, model-load, TTFT, prefill, decode, token and throughput metrics are retained;
+- model loads are classified explicitly as `COLD`, `WARM` or `UNKNOWN`;
+- Android process PSS, native heap, Java heap, available-memory and thermal snapshots can be captured explicitly;
+- the health engine supports model-integrity, generation-sanity and model-integrity-cache checks;
+- generation sanity supports non-empty, exact, required-marker, forbidden-marker and regex assertions;
+- benchmark baselines and regression checks are persisted separately for cold and warm runs;
 - prompt and generated-output content are not persisted;
 - telemetry failures cannot fail inference.
 
-The console run/log viewer, memory and thermal snapshots, health and sanity engines, cache suites, benchmark regression history and redacted diagnostic export remain Phase 2 work.
+The main remaining Phase 2 work is:
 
-The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
+- a functional console run timeline and structured-log viewer;
+- console views and controls for health, resources, cache and benchmarks;
+- health contracts for future tokenizer, prompt, KV or downloaded-model caches;
+- a privacy-redacted diagnostic bundle export;
+- the signature-protected diagnostics bridge required for cross-application console access.
+
+The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. Host and simulated tests do not prove Android linker behavior, real GGUF execution, memory stability or thermal performance. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
 
 ## Coding-agent navigation
 
@@ -102,6 +115,9 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
 ./gradlew :observability:room-store:assembleDebugAndroidTest
+./gradlew :observability:health-engine:assembleDebug
+./gradlew :observability:android-resource-probe:assembleDebug
+./gradlew :observability:benchmark-engine:assembleDebug
 ./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native-tests --parallel 2
@@ -126,8 +142,9 @@ See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for arguments, ev
 ## Roadmap
 
 1. Complete the physical-device production-readiness evidence for the merged functional runtime.
-2. Continue Phase 2 with timeline views, snapshots, health, sanity, cache and benchmark suites, and diagnostic export.
-3. Add native Android and Capacitor integration surfaces as thin adapters.
-4. Add a Binder transport and promote the console app into the shared runtime host.
+2. Build the developer-console views and signature-protected diagnostics bridge over the Phase 2 data already available.
+3. Add the privacy-redacted diagnostic export and future cache-health contracts.
+4. Add native Android and Capacitor integration surfaces as thin adapters.
+5. Add a Binder transport and promote the console app into the shared runtime host.
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/roadmap.md`](docs/roadmap.md).
