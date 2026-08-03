@@ -235,14 +235,17 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] read-only generation metric cards
 - [x] read-only structured-log cards with deterministic field ordering
 - [x] read-only health, resource and benchmark cards
+- [x] selectable request detail from generation-run and correlated-log cards
+- [x] request-scoped run and structured-log queries
+- [x] chronological request timeline with event sequence and run-relative offsets
+- [x] privacy-safe missing-run, empty-timeline and source-error states
+- [x] refresh and back navigation without runtime mutation
 - [x] pure Kotlin presenter and data-source tests
 - [x] explicit documentation of standalone sandbox limitations
 - [ ] connect the standalone console to a real runtime or cross-application diagnostics source
 
 ### Remaining Phase 2 work
 
-- [ ] request-correlated run timeline
-- [ ] selectable request detail view
 - [ ] installed-model and active-runtime views
 - [ ] health and sanity execution controls
 - [ ] resource and thermal charts
