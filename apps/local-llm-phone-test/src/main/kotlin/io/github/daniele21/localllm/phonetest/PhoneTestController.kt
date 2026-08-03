@@ -332,17 +332,18 @@ internal class PhoneTestController(context: Context, private val listener: Phone
             input.buffered(COPY_BUFFER_BYTES).use { source ->
                 temporaryFile.outputStream().buffered(COPY_BUFFER_BYTES).use { destination ->
                     val buffer = ByteArray(COPY_BUFFER_BYTES)
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        if (read == 0) continue
-                        digest.update(buffer, 0, read)
-                        destination.write(buffer, 0, read)
-                        copied += read
-                        if (copied >= nextProgress) {
-                            progress(copyProgress(copied, metadata.sizeBytes))
-                            nextProgress += PROGRESS_INTERVAL_BYTES
+                    var read = source.read(buffer)
+                    while (read >= 0) {
+                        if (read > 0) {
+                            digest.update(buffer, 0, read)
+                            destination.write(buffer, 0, read)
+                            copied += read
+                            if (copied >= nextProgress) {
+                                progress(copyProgress(copied, metadata.sizeBytes))
+                                nextProgress += PROGRESS_INTERVAL_BYTES
+                            }
                         }
+                        read = source.read(buffer)
                     }
                 }
             }
