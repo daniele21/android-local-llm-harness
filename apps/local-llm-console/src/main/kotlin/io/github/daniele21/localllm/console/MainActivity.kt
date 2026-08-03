@@ -172,12 +172,12 @@ class MainActivity : Activity() {
         textSize = size
         if (bold) setTypeface(typeface, Typeface.BOLD)
     }
-
-    private val ConsoleEmphasis.label: String
-        get() = when (this) {
-            ConsoleEmphasis.NEUTRAL -> "[INFO]"
-            ConsoleEmphasis.POSITIVE -> "[PASS]"
-            ConsoleEmphasis.WARNING -> "[WARN]"
-            ConsoleEmphasis.NEGATIVE -> "[FAIL]"
-        }
 }
+
+private val ConsoleEmphasis.label: String
+    get() = when (this) {
+        ConsoleEmphasis.NEUTRAL -> "[INFO]"
+        ConsoleEmphasis.POSITIVE -> "[PASS]"
+        ConsoleEmphasis.WARNING -> "[WARN]"
+        ConsoleEmphasis.NEGATIVE -> "[FAIL]"
+    }
