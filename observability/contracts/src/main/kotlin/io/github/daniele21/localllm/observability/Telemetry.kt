@@ -147,6 +147,7 @@ data class TelemetryRetentionPolicy(val maxRuns: Int = 500, val maxLogs: Int = 2
     }
 }
 
+@Suppress("TooManyFunctions")
 interface TelemetryRepository {
     fun recordRun(run: GenerationRunRecord)
 
@@ -173,6 +174,7 @@ interface TelemetryRepository {
     fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot
 }
 
+@Suppress("TooManyFunctions")
 object NoOpTelemetryRepository : TelemetryRepository {
     override fun recordRun(run: GenerationRunRecord) = Unit
 
