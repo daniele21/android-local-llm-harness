@@ -114,6 +114,24 @@ Pull request #23 adds the health control-plane foundation and the first concrete
 - [x] validate Android Lint and the health-engine AAR in the aggregate repository gate
 - [x] document API, threading, ownership and current limitations in [`health-engine.md`](health-engine.md)
 
+### Phase 2 third vertical slice
+
+Pull request #24 adds a backend-agnostic generation sanity check through the public `LocalLlmClient` lifecycle.
+
+- [x] bind each sanity check explicitly to one application and use case
+- [x] prepare the configured model, create a session, generate and close the session
+- [x] support exact or substring output matching with configurable case sensitivity
+- [x] apply deterministic temperature and seed overrides by default
+- [x] bound generation with an explicit timeout and cancel timed-out requests cooperatively
+- [x] expose typed runtime failures by stable error code only
+- [x] keep prompts, generated output and backend exception messages out of persisted health details
+- [x] treat session cleanup failure as a failed sanity check
+- [x] add tests for success, mismatch, runtime failure, timeout, preparation failure and cleanup failure
+- [x] validate formatting, static analysis, JVM tests, Android Lint, AAR assembly and native packaging
+- [x] document configuration, lifecycle, threading, privacy and physical-device limitations in [`health-engine.md`](health-engine.md)
+
+The repository gate validates the reusable sanity implementation with deterministic contract fakes. Execution against a physical Android device and a real GGUF remains part of the separate production-readiness gate.
+
 ### Post-merge production-readiness gate
 
 Physical-device evidence remains mandatory before the runtime is called production-ready, released to application consumers or used as the baseline for device performance claims.
@@ -235,7 +253,7 @@ Phase 2 repository work may begin after the Phase 1 merge. Production claims rem
 - [ ] memory and thermal snapshots
 - [x] model integrity checks exposed through the control plane
 - [x] reusable health-suite orchestration and persisted result aggregation
-- [ ] generation sanity suites
+- [x] generation sanity suites
 - [ ] cache health suites
 - [ ] benchmark baselines and regressions
 - [ ] redacted diagnostic bundle export

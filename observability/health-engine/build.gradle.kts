@@ -23,6 +23,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:contracts"))
     api(project(":observability:contracts"))
     implementation(project(":models:model-store"))
 
