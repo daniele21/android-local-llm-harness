@@ -20,9 +20,10 @@ core/runtime-core               Runtime orchestration, scheduling, lifecycle and
 models/model-profile            GGUF artifacts, load profiles and app bindings
 models/model-store              Content-addressed model storage and integrity
 backends/llama-cpp              Kotlin/JNI/C++ llama.cpp backend
-observability/contracts         Metrics, logs, health, retention and dashboard contracts
+observability/contracts         Metrics, logs, health, sanity, retention and dashboard contracts
 observability/in-memory-store   Bounded ephemeral telemetry and deterministic test implementation
 observability/room-store        Persistent Android Room telemetry repository
+observability/health-engine     Model-integrity and deterministic sanity control plane
 transports/in-process           Embedded transport implementation
 apps/local-llm-console          Developer dashboard application shell
 apps/device-test-runner         Real-device GGUF lifecycle test application
@@ -66,17 +67,21 @@ Phase 1 is merged into `main` and provides:
 - Kotlin, native, simulated-acceptance and packaging tests;
 - a real-device test runner for GGUF lifecycle, cancellation and optional PSS regression checks.
 
-Phase 2 has started with persistent, privacy-safe runtime telemetry:
+Phase 2 currently provides persistent telemetry plus the first health control-plane slice:
 
 - `TelemetryRepository` supports bounded run, log and health queries;
 - `RoomTelemetryRepository` stores telemetry across process restarts;
 - the in-memory repository remains available for ephemeral use and deterministic tests;
 - runtime requests persist `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` or `CANCELLED` state;
 - queue, model-load, TTFT, prefill, decode, token and throughput metrics are retained;
-- prompt and generated-output content are not persisted;
-- telemetry failures cannot fail inference.
+- `HealthControlPlane` exposes model-integrity and deterministic sanity reports;
+- model integrity checks store presence, file state, declared size, streaming SHA-256 and snapshot consistency;
+- `LocalLlmSanityExecutor` uses the normal prepare/session/generate/cancel/close lifecycle;
+- deterministic sanity rules cover output presence, markers, exact/regex structure and token limits;
+- fixture prompts and generated outputs are not persisted;
+- telemetry failures cannot fail inference or health execution.
 
-The console run/log viewer, memory and thermal snapshots, health and sanity engines, cache suites, benchmark regression history and redacted diagnostic export remain Phase 2 work.
+The console run/log/health viewer, memory and thermal snapshots, GGUF metadata/load health, cache suites, benchmark regression history and redacted diagnostic export remain Phase 2 work.
 
 The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
 
@@ -102,6 +107,7 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
 ./gradlew :observability:room-store:assembleDebugAndroidTest
+./gradlew :observability:health-engine:assembleDebug
 ./gradlew :apps:device-test-runner:assembleDebugAndroidTest
 cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native-tests --parallel 2
@@ -126,7 +132,7 @@ See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for arguments, ev
 ## Roadmap
 
 1. Complete the physical-device production-readiness evidence for the merged functional runtime.
-2. Continue Phase 2 with timeline views, snapshots, health, sanity, cache and benchmark suites, and diagnostic export.
+2. Continue Phase 2 with console views, memory/thermal snapshots, metadata/load health, cache and benchmark suites, and diagnostic export.
 3. Add native Android and Capacitor integration surfaces as thin adapters.
 4. Add a Binder transport and promote the console app into the shared runtime host.
 
