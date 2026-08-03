@@ -52,6 +52,10 @@ public final class TelemetryEntities {
         @ColumnInfo(name = "model_load_ms")
         public Long modelLoadMs;
 
+        @NonNull
+        @ColumnInfo(name = "model_load_kind")
+        public String modelLoadKind = "UNKNOWN";
+
         @Nullable
         @ColumnInfo(name = "time_to_first_token_ms")
         public Long timeToFirstTokenMs;
@@ -130,5 +134,40 @@ public final class TelemetryEntities {
 
         @ColumnInfo(name = "duration_ms")
         public long durationMs;
+    }
+
+    @Entity(
+            tableName = "resource_snapshots",
+            indices = {@Index(value = {"timestamp_epoch_ms"})})
+    public static final class ResourceSnapshotEntity {
+        @PrimaryKey(autoGenerate = true)
+        public long id;
+
+        @ColumnInfo(name = "timestamp_epoch_ms")
+        public long timestampEpochMs;
+
+        @Nullable
+        @ColumnInfo(name = "process_pss_bytes")
+        public Long processPssBytes;
+
+        @Nullable
+        @ColumnInfo(name = "native_heap_bytes")
+        public Long nativeHeapBytes;
+
+        @Nullable
+        @ColumnInfo(name = "java_heap_used_bytes")
+        public Long javaHeapUsedBytes;
+
+        @Nullable
+        @ColumnInfo(name = "available_memory_bytes")
+        public Long availableMemoryBytes;
+
+        @Nullable
+        @ColumnInfo(name = "low_memory")
+        public Boolean lowMemory;
+
+        @NonNull
+        @ColumnInfo(name = "thermal_status")
+        public String thermalStatus = "UNKNOWN";
     }
 }
