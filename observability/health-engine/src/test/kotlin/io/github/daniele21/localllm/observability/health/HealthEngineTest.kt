@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.observability.health
 
+import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
@@ -7,7 +8,6 @@ import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
-import io.github.daniele21.localllm.contracts.RequestId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,6 +40,7 @@ class HealthEngineTest {
             checks = listOf(
                 object : HealthCheck {
                     override val id: String = "explodes"
+
                     override fun evaluate(): HealthAssessment = error("secret path and prompt")
                 },
             ),
@@ -72,6 +73,7 @@ class HealthEngineTest {
 
     private class SequenceClock(vararg values: Long) : HealthClock {
         private val iterator = values.iterator()
+
         override fun nowNanos(): Long = iterator.next()
     }
 
@@ -79,14 +81,21 @@ class HealthEngineTest {
         val health = mutableListOf<HealthCheckResult>()
 
         override fun recordRun(run: GenerationRunRecord) = Unit
+
         override fun appendLog(log: StructuredLog) = Unit
+
         override fun saveHealth(result: HealthCheckResult) {
             health += result
         }
+
         override fun recentRuns(limit: Int): List<GenerationRunRecord> = emptyList()
+
         override fun findRun(requestId: RequestId): GenerationRunRecord? = null
+
         override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = emptyList()
+
         override fun healthResults(): List<HealthCheckResult> = health
+
         override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = error("Not needed")
     }
 }
