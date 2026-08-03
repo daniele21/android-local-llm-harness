@@ -13,7 +13,7 @@ class ModelIntegrityCache {
     fun verify(modelStore: ModelStore, storedModel: StoredModel): VerificationResult {
         val current = VerificationStamp.from(storedModel)
         val cached = verified[storedModel.digest]
-        if (cached == current || cached == null && storedModel.verified) {
+        if (cached == current || (cached == null && storedModel.verified)) {
             verified[storedModel.digest] = current
             return VerificationResult(
                 valid = true,
