@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmError
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.PrepareResult
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
@@ -95,6 +96,10 @@ class RuntimeOrchestrator(
         check(!closed.get()) { "Runtime is closed" }
         val resolved = registry.resolve(applicationId, useCaseId)
         return synchronized(resourceLock) {
+            val requestedDigest = resolved.model.artifact.digest
+            val warm = loadedModel?.let { current ->
+                current.handle.digest == requestedDigest && current.profileId == resolved.model.id
+            } == true
             val model = ensureModelLoaded(resolved)
             val context = backend.createContext(model.handle, resolved.model)
             val sessionId = SessionId(UUID.randomUUID().toString())
@@ -104,7 +109,8 @@ class RuntimeOrchestrator(
                 useCaseId = useCaseId,
                 resolved = resolved,
                 context = context,
-                modelLoadDurationMs = model.handle.loadDurationMs,
+                modelLoadDurationMs = if (warm) null else model.handle.loadDurationMs,
+                modelLoadKind = if (warm) ModelLoadKind.WARM else ModelLoadKind.COLD,
             )
             state.set(RuntimeState.READY)
             sessionId
@@ -251,7 +257,12 @@ class RuntimeOrchestrator(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
+    private fun executeGeneration(
+        request: GenerationRequest,
+        session: SessionDescriptor,
+        lifecycle: RequestLifecycle,
+        enqueuedAt: Long,
+    ) {
         if (lifecycle.cancelRequested.get()) {
             val cancellation = LocalLlmError.Cancelled()
             runtimeTelemetry.failed(request.requestId, cancellation)
@@ -303,6 +314,7 @@ class RuntimeOrchestrator(
                 val publicMetrics = backendMetrics.toPublicMetrics(
                     queueMs = nanosToMillis(startedAt - enqueuedAt),
                     modelLoadMs = session.modelLoadDurationMs,
+                    modelLoadKind = session.modelLoadKind,
                     timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
                         ?.let { nanosToMillis(it - startedAt) },
                     totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
@@ -431,7 +443,11 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun failImmediately(requestId: RequestId, listener: GenerationListener, error: LocalLlmError): GenerationHandle {
+    private fun failImmediately(
+        requestId: RequestId,
+        listener: GenerationListener,
+        error: LocalLlmError,
+    ): GenerationHandle {
         runtimeTelemetry.rejected(requestId, error)
         runCatching { listener.onEvent(GenerationEvent.Failed(requestId, error)) }
         return NoOpGenerationHandle(requestId)
@@ -439,7 +455,8 @@ class RuntimeOrchestrator(
 
     private fun BackendGenerationMetrics.toPublicMetrics(
         queueMs: Long,
-        modelLoadMs: Long,
+        modelLoadMs: Long?,
+        modelLoadKind: ModelLoadKind,
         timeToFirstTokenMs: Long?,
         totalMs: Long,
     ): GenerationMetrics = GenerationMetrics(
@@ -456,6 +473,7 @@ class RuntimeOrchestrator(
         },
         prefillMs = promptDurationMs,
         decodeMs = generationDurationMs,
+        modelLoadKind = modelLoadKind,
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
@@ -468,7 +486,8 @@ class RuntimeOrchestrator(
         val useCaseId: UseCaseId,
         val resolved: ResolvedUseCase,
         val context: BackendContextHandle,
-        val modelLoadDurationMs: Long,
+        val modelLoadDurationMs: Long?,
+        val modelLoadKind: ModelLoadKind,
         val activeRequests: AtomicInteger = AtomicInteger(0),
         val closing: AtomicBoolean = AtomicBoolean(false),
         val released: AtomicBoolean = AtomicBoolean(false),
@@ -483,7 +502,11 @@ class RuntimeOrchestrator(
     }
 }
 
-private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
+private class RequestLifecycle(
+    val requestId: RequestId,
+    private val listener: GenerationListener,
+    private val onTerminal: () -> Unit,
+) {
     val cancelRequested = AtomicBoolean(false)
     private val terminal = AtomicBoolean(false)
 
