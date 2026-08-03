@@ -16,6 +16,7 @@ import io.github.daniele21.localllm.observability.ThermalStatus
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
+@Suppress("TooManyFunctions")
 internal object TelemetryEntityMapper {
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()

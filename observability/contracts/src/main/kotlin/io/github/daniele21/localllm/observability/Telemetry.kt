@@ -103,11 +103,7 @@ data class DeveloperDashboardSnapshot(
     val modelCount: Int,
 )
 
-data class TelemetryRetentionPolicy(
-    val maxRuns: Int = 500,
-    val maxLogs: Int = 2_000,
-    val maxResourceSnapshots: Int = 500,
-) {
+data class TelemetryRetentionPolicy(val maxRuns: Int = 500, val maxLogs: Int = 2_000, val maxResourceSnapshots: Int = 500) {
     init {
         require(maxRuns > 0) { "maxRuns must be positive" }
         require(maxLogs > 0) { "maxLogs must be positive" }

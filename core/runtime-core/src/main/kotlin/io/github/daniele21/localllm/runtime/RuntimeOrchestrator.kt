@@ -257,12 +257,7 @@ class RuntimeOrchestrator(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    private fun executeGeneration(
-        request: GenerationRequest,
-        session: SessionDescriptor,
-        lifecycle: RequestLifecycle,
-        enqueuedAt: Long,
-    ) {
+    private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
         if (lifecycle.cancelRequested.get()) {
             val cancellation = LocalLlmError.Cancelled()
             runtimeTelemetry.failed(request.requestId, cancellation)
@@ -443,11 +438,7 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun failImmediately(
-        requestId: RequestId,
-        listener: GenerationListener,
-        error: LocalLlmError,
-    ): GenerationHandle {
+    private fun failImmediately(requestId: RequestId, listener: GenerationListener, error: LocalLlmError): GenerationHandle {
         runtimeTelemetry.rejected(requestId, error)
         runCatching { listener.onEvent(GenerationEvent.Failed(requestId, error)) }
         return NoOpGenerationHandle(requestId)
@@ -502,11 +493,7 @@ class RuntimeOrchestrator(
     }
 }
 
-private class RequestLifecycle(
-    val requestId: RequestId,
-    private val listener: GenerationListener,
-    private val onTerminal: () -> Unit,
-) {
+private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
     val cancelRequested = AtomicBoolean(false)
     private val terminal = AtomicBoolean(false)
 

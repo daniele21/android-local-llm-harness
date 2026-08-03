@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import java.util.ArrayDeque
 
+@Suppress("TooManyFunctions")
 class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolicy = TelemetryRetentionPolicy()) : TelemetryRepository {
     constructor(maxRuns: Int, maxLogs: Int) : this(TelemetryRetentionPolicy(maxRuns, maxLogs))
 

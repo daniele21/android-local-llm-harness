@@ -49,10 +49,7 @@ class AndroidResourceSnapshotProvider(
     }
 }
 
-class ResourceSnapshotRecorder(
-    private val provider: ResourceSnapshotProvider,
-    private val repository: TelemetryRepository,
-) {
+class ResourceSnapshotRecorder(private val provider: ResourceSnapshotProvider, private val repository: TelemetryRepository) {
     fun capture(): ResourceSnapshot = provider.snapshot().also(repository::recordResourceSnapshot)
 }
 
