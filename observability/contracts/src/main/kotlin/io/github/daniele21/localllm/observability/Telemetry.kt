@@ -50,12 +50,7 @@ enum class LogLevel {
     ERROR,
 }
 
-data class HealthCheckResult(
-    val id: String,
-    val status: HealthStatus,
-    val detail: String,
-    val durationMs: Long,
-)
+data class HealthCheckResult(val id: String, val status: HealthStatus, val detail: String, val durationMs: Long)
 
 enum class HealthStatus {
     PASS,
@@ -73,10 +68,7 @@ data class DeveloperDashboardSnapshot(
     val modelCount: Int,
 )
 
-data class TelemetryRetentionPolicy(
-    val maxRuns: Int = 500,
-    val maxLogs: Int = 2_000,
-) {
+data class TelemetryRetentionPolicy(val maxRuns: Int = 500, val maxLogs: Int = 2_000) {
     init {
         require(maxRuns > 0) { "maxRuns must be positive" }
         require(maxLogs > 0) { "maxLogs must be positive" }
@@ -94,10 +86,7 @@ interface TelemetryRepository {
 
     fun findRun(requestId: RequestId): GenerationRunRecord?
 
-    fun recentLogs(
-        limit: Int = 500,
-        requestId: RequestId? = null,
-    ): List<StructuredLog>
+    fun recentLogs(limit: Int = 500, requestId: RequestId? = null): List<StructuredLog>
 
     fun healthResults(): List<HealthCheckResult>
 
@@ -115,10 +104,7 @@ object NoOpTelemetryRepository : TelemetryRepository {
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = null
 
-    override fun recentLogs(
-        limit: Int,
-        requestId: RequestId?,
-    ): List<StructuredLog> = emptyList()
+    override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = emptyList()
 
     override fun healthResults(): List<HealthCheckResult> = emptyList()
 
