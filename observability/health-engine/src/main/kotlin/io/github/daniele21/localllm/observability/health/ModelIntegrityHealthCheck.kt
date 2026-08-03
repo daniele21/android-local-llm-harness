@@ -3,9 +3,7 @@ package io.github.daniele21.localllm.observability.health
 import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.store.ModelStore
 
-class ModelIntegrityHealthCheck(
-    private val modelStore: ModelStore,
-) : HealthCheck {
+class ModelIntegrityHealthCheck(private val modelStore: ModelStore) : HealthCheck {
     override val id: String = "model-integrity"
 
     override fun evaluate(): HealthAssessment {
