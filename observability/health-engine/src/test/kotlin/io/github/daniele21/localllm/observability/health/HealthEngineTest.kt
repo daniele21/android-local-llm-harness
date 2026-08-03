@@ -64,10 +64,7 @@ class HealthEngineTest {
         assertEquals(0L, result.durationMs)
     }
 
-    private data class FixedCheck(
-        override val id: String,
-        val status: HealthStatus,
-    ) : HealthCheck {
+    private data class FixedCheck(override val id: String, val status: HealthStatus) : HealthCheck {
         override fun evaluate(): HealthAssessment = HealthAssessment(status, id)
     }
 
