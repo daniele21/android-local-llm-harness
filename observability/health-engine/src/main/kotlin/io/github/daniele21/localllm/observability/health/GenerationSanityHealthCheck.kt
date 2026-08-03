@@ -16,15 +16,18 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 enum class SanityOutputMatch {
+    NON_EMPTY,
     EXACT,
     CONTAINS,
+    NOT_CONTAINS,
+    MATCHES_REGEX,
 }
 
 data class GenerationSanitySpec(
     val applicationId: ApplicationId,
     val useCaseId: UseCaseId,
     val prompt: String,
-    val expectedOutput: String,
+    val expectedOutput: String = "",
     val outputMatch: SanityOutputMatch = SanityOutputMatch.CONTAINS,
     val caseSensitive: Boolean = false,
     val maxOutputTokens: Int = 16,
@@ -34,7 +37,14 @@ data class GenerationSanitySpec(
 ) {
     init {
         require(prompt.isNotBlank()) { "Sanity prompt must not be blank" }
-        require(expectedOutput.isNotBlank()) { "Expected sanity output must not be blank" }
+        if (outputMatch != SanityOutputMatch.NON_EMPTY) {
+            require(expectedOutput.isNotBlank()) { "Expected sanity output must not be blank" }
+        }
+        if (outputMatch == SanityOutputMatch.MATCHES_REGEX) {
+            require(runCatching { Regex(expectedOutput) }.isSuccess) {
+                "Expected sanity output must be a valid regex"
+            }
+        }
         require(maxOutputTokens > 0) { "Sanity max output tokens must be positive" }
         require(temperature.isFinite() && temperature >= 0f) { "Sanity temperature must be finite and non-negative" }
         require(timeoutMs > 0) { "Sanity timeout must be positive" }
@@ -126,19 +136,28 @@ class GenerationSanityHealthCheck(
     private fun completed(output: String): HealthAssessment = if (matches(output)) {
         HealthAssessment(
             status = HealthStatus.PASS,
-            detail = "Generation sanity completed and matched the expected output",
+            detail = "Generation sanity completed and satisfied the configured output assertion",
         )
     } else {
-        failed("Generation sanity completed but output did not match the expected result")
+        failed("Generation sanity completed but did not satisfy the configured output assertion")
     }
 
     private fun matches(output: String): Boolean {
         val actual = output.trim()
         val expected = spec.expectedOutput.trim()
         return when (spec.outputMatch) {
+            SanityOutputMatch.NON_EMPTY -> actual.isNotEmpty()
             SanityOutputMatch.EXACT -> actual.equals(expected, ignoreCase = !spec.caseSensitive)
             SanityOutputMatch.CONTAINS -> actual.contains(expected, ignoreCase = !spec.caseSensitive)
+            SanityOutputMatch.NOT_CONTAINS -> !actual.contains(expected, ignoreCase = !spec.caseSensitive)
+            SanityOutputMatch.MATCHES_REGEX -> regex(expected).matches(actual)
         }
+    }
+
+    private fun regex(pattern: String): Regex = if (spec.caseSensitive) {
+        Regex(pattern)
+    } else {
+        Regex(pattern, RegexOption.IGNORE_CASE)
     }
 
     private fun failed(detail: String): HealthAssessment = HealthAssessment(
