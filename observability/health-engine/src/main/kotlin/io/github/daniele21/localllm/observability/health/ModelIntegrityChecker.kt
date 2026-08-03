@@ -6,10 +6,7 @@ import io.github.daniele21.localllm.observability.ModelIntegrityTarget
 import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.StoredModel
 
-internal class ModelIntegrityChecker(
-    private val modelStore: ModelStore,
-    private val monotonicClock: () -> Long,
-) {
+internal class ModelIntegrityChecker(private val modelStore: ModelStore, private val monotonicClock: () -> Long) {
     fun run(target: ModelIntegrityTarget): List<HealthFinding> {
         val presence = timed("model.present") {
             modelStore.find(target.digest)?.let { model ->
@@ -146,20 +143,11 @@ internal class ModelIntegrityChecker(
         )
     }
 
-    private fun elapsedMillis(startedAtNanos: Long): Long =
-        (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
+    private fun elapsedMillis(startedAtNanos: Long): Long = (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
 
-    private data class CheckOutcome<T>(
-        val status: HealthStatus,
-        val detail: String,
-        val remediation: String? = null,
-        val value: T?,
-    )
+    private data class CheckOutcome<T>(val status: HealthStatus, val detail: String, val remediation: String? = null, val value: T?)
 
-    private data class TimedCheck<T>(
-        val finding: HealthFinding,
-        val value: T?,
-    )
+    private data class TimedCheck<T>(val finding: HealthFinding, val value: T?)
 
     private companion object {
         const val NANOS_PER_MILLISECOND = 1_000_000L
