@@ -40,9 +40,7 @@ class CacheHealthCheckTest {
         assertFalse("private" in result.detail)
     }
 
-    private class FixedProbe(
-        private val result: CacheHealthSnapshot,
-    ) : CacheHealthProbe {
+    private class FixedProbe(private val result: CacheHealthSnapshot) : CacheHealthProbe {
         override val id: String = "model-integrity"
 
         override fun snapshot(): CacheHealthSnapshot = result
