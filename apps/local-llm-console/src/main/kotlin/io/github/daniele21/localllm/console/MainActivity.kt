@@ -132,7 +132,7 @@ class MainActivity : Activity() {
         backButton.visibility = if (currentDetail == null) View.GONE else View.VISIBLE
         updatedAt.text = "Captured ${currentSnapshot.capturedAtEpochMs}"
         content.removeAllViews()
-        content.addView(section(screen.title))
+        content.addView(label(screen.title, 22f, bold = true).apply { setPadding(0, 20, 0, 10) })
         content.addView(label(screen.subtitle, 14f).apply { setPadding(0, 0, 0, 12) })
         screen.cards.forEach { card -> content.addView(card(card)) }
     }
@@ -161,10 +161,6 @@ class MainActivity : Activity() {
     private fun openRequest(requestId: RequestId) {
         requestDetail = dataSource.loadRequest(requestId)
         render()
-    }
-
-    private fun section(text: String): TextView = label(text, 22f, bold = true).apply {
-        setPadding(0, 20, 0, 10)
     }
 
     private fun label(text: String, size: Float, bold: Boolean = false): TextView = TextView(this).apply {
