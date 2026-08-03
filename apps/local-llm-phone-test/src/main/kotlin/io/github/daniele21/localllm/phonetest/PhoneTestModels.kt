@@ -32,11 +32,7 @@ internal data class ImportedPhoneModel(
     )
 }
 
-internal data class PhoneHarness(
-    val runtime: RuntimeOrchestrator,
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
 internal class SinglePhoneBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
