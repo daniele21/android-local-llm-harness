@@ -34,6 +34,8 @@ internal object TelemetryEntityMapper {
             outputTokens = run.outputTokens
             decodeTokensPerSecond = run.decodeTokensPerSecond
             errorCode = run.errorCode
+            prefillMs = run.prefillMs
+            decodeMs = run.decodeMs
         }
 
     fun runRecord(entity: TelemetryEntities.GenerationRunEntity): GenerationRunRecord =
@@ -53,6 +55,8 @@ internal object TelemetryEntityMapper {
             outputTokens = entity.outputTokens,
             decodeTokensPerSecond = entity.decodeTokensPerSecond,
             errorCode = entity.errorCode,
+            prefillMs = entity.prefillMs,
+            decodeMs = entity.decodeMs,
         )
 
     fun logEntity(log: StructuredLog): TelemetryEntities.StructuredLogEntity =
@@ -91,9 +95,10 @@ internal object TelemetryEntityMapper {
             durationMs = entity.durationMs,
         )
 
-    internal fun encodeFields(fields: Map<String, String>): String = fields.toSortedMap().entries.joinToString("\n") { entry ->
-        "${encode(entry.key)}=${encode(entry.value)}"
-    }
+    internal fun encodeFields(fields: Map<String, String>): String =
+        fields.toSortedMap().entries.joinToString("\n") { entry ->
+            "${encode(entry.key)}=${encode(entry.value)}"
+        }
 
     internal fun decodeFields(encoded: String): Map<String, String> {
         if (encoded.isEmpty()) return emptyMap()
