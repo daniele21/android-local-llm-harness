@@ -97,6 +97,23 @@ Pull request #21 establishes the persistent observability foundation without cla
 
 The separate console application cannot directly read another embedded application's private Room database. Cross-application viewing remains dependent on the signature-protected diagnostics bridge planned for Phase 3.
 
+### Phase 2 second vertical slice
+
+Pull request #23 adds the health control-plane foundation and the first concrete model-integrity check without claiming completion of generation sanity or cache-health suites.
+
+- [x] add `observability/health-engine` as an independently testable orchestration boundary
+- [x] register checks by stable, unique and non-blank IDs
+- [x] run complete or targeted suites and aggregate the worst status
+- [x] return explicit `NOT_RUN` results for unknown check IDs
+- [x] measure check duration through an injectable monotonic clock
+- [x] persist every result through `TelemetryRepository`
+- [x] convert unexpected exceptions into privacy-safe failure summaries
+- [x] verify every installed artifact through `ModelStore.verify()`
+- [x] expose aggregate model-integrity outcomes without paths, bytes or verification details
+- [x] add deterministic orchestration, persistence, privacy and integrity tests
+- [x] validate Android Lint and the health-engine AAR in the aggregate repository gate
+- [x] document API, threading, ownership and current limitations in [`health-engine.md`](health-engine.md)
+
 ### Post-merge production-readiness gate
 
 Physical-device evidence remains mandatory before the runtime is called production-ready, released to application consumers or used as the baseline for device performance claims.
@@ -216,7 +233,8 @@ Phase 2 repository work may begin after the Phase 1 merge. Production claims rem
 - [x] queue, model-load, TTFT, prefill, decode, token-count and throughput metrics
 - [ ] explicit cold-versus-warm load classification and comparison
 - [ ] memory and thermal snapshots
-- [ ] model integrity checks exposed through the control plane
+- [x] model integrity checks exposed through the control plane
+- [x] reusable health-suite orchestration and persisted result aggregation
 - [ ] generation sanity suites
 - [ ] cache health suites
 - [ ] benchmark baselines and regressions
