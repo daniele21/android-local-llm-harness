@@ -72,7 +72,8 @@ The harness must never silently select or substitute a model.
 | `models/model-store` | Content-addressed storage and integrity | Import, verification, deduplication and cleanup |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend | Native lifecycle, GGUF inspection, generation and cancellation |
 | `observability/contracts` | Telemetry, logs, health and dashboard contracts | Stable observability schemas |
-| `observability/in-memory-store` | Initial telemetry implementation | Repository behavior and test doubles |
+| `observability/in-memory-store` | Bounded in-memory telemetry implementation | Repository behavior, tests and ephemeral diagnostics |
+| `observability/room-store` | Persistent Android Room telemetry implementation | Run timelines, structured logs, retention and database lifecycle |
 | `transports/in-process` | Embedded transport | Client-to-runtime delegation |
 | `apps/local-llm-console` | Developer console and future control plane | Diagnostics UI and runtime inspection |
 | `apps/device-test-runner` | Real-device Phase 1 validation app | GGUF lifecycle, cancellation and memory instrumentation tests |
@@ -108,7 +109,7 @@ Synchronous and streaming generation must share tokenization, context validation
 
 ### Observability or console change
 
-Start with `observability/contracts`. Store identifiers, sizes, timings, token counts, statuses and error codes by default; do not persist prompts or generated content without a separately designed diagnostic mode.
+Start with `observability/contracts`. Use `observability/in-memory-store` for bounded ephemeral behavior and deterministic tests; use `observability/room-store` for persistent Android telemetry. Store identifiers, sizes, timings, token counts, statuses and error codes by default; do not persist prompts or generated content without a separately designed diagnostic mode. Telemetry failures must not break inference.
 
 ### Android or Capacitor integration
 
@@ -157,13 +158,14 @@ bash scripts/capture-device-e2e-evidence.sh --help
 ./gradlew check
 ```
 
-`./gradlew check` includes the Phase 1 simulated acceptance lifecycle using the real `FileSystemModelStore`, real `RuntimeOrchestrator` and a deterministic simulated backend.
+`./gradlew check` includes the Phase 1 simulated acceptance lifecycle using the real `FileSystemModelStore`, real `RuntimeOrchestrator` and a deterministic simulated backend. It also compiles Room annotation processing and runs the Phase 2 telemetry repository and runtime-lifecycle tests.
 
 ### Android build, lint and packaging
 
 ```bash
 ./gradlew lintDebug :apps:local-llm-console:lintInternal
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 python3 scripts/verify-android-packaging.py
 ```
@@ -202,6 +204,8 @@ Real-device evidence is mandatory before production readiness, application-consu
 - Test cleanup after failures and cancellation, not only successful output.
 - Test idempotent close and release behavior.
 - Avoid timing-dependent assertions unless a deterministic clock is owned by the test; real-device timeouts must be configurable.
+- Test telemetry retention, ordering, terminal-state replacement and privacy-safe field persistence.
+- Ensure a failing telemetry implementation cannot fail or cancel a generation.
 
 ## Documentation update matrix
 
