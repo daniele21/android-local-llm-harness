@@ -9,41 +9,20 @@ data class GenerationRequest(
     val overrides: GenerationOverrides = GenerationOverrides(),
 )
 
-data class GenerationOverrides(
-    val maxOutputTokens: Int? = null,
-    val temperature: Float? = null,
-    val seed: Long? = null,
-)
+data class GenerationOverrides(val maxOutputTokens: Int? = null, val temperature: Float? = null, val seed: Long? = null)
 
 sealed interface GenerationEvent {
     val requestId: RequestId
 
-    data class Queued(
-        override val requestId: RequestId,
-        val position: Int,
-    ) : GenerationEvent
+    data class Queued(override val requestId: RequestId, val position: Int) : GenerationEvent
 
-    data class Started(
-        override val requestId: RequestId,
-        val modelDigest: ModelDigest,
-    ) : GenerationEvent
+    data class Started(override val requestId: RequestId, val modelDigest: ModelDigest) : GenerationEvent
 
-    data class TextDelta(
-        override val requestId: RequestId,
-        val text: String,
-        val generatedTokens: Int,
-    ) : GenerationEvent
+    data class TextDelta(override val requestId: RequestId, val text: String, val generatedTokens: Int) : GenerationEvent
 
-    data class Completed(
-        override val requestId: RequestId,
-        val output: String,
-        val metrics: GenerationMetrics,
-    ) : GenerationEvent
+    data class Completed(override val requestId: RequestId, val output: String, val metrics: GenerationMetrics) : GenerationEvent
 
-    data class Failed(
-        override val requestId: RequestId,
-        val error: LocalLlmError,
-    ) : GenerationEvent
+    data class Failed(override val requestId: RequestId, val error: LocalLlmError) : GenerationEvent
 }
 
 data class GenerationMetrics(
@@ -62,27 +41,19 @@ sealed interface LocalLlmError {
     val code: String
     val message: String
 
-    data class Configuration(
-        override val message: String,
-    ) : LocalLlmError {
+    data class Configuration(override val message: String) : LocalLlmError {
         override val code: String = "CONFIGURATION"
     }
 
-    data class ModelUnavailable(
-        override val message: String,
-    ) : LocalLlmError {
+    data class ModelUnavailable(override val message: String) : LocalLlmError {
         override val code: String = "MODEL_UNAVAILABLE"
     }
 
-    data class NativeRuntime(
-        override val message: String,
-    ) : LocalLlmError {
+    data class NativeRuntime(override val message: String) : LocalLlmError {
         override val code: String = "NATIVE_RUNTIME"
     }
 
-    data class Cancelled(
-        override val message: String = "Generation cancelled",
-    ) : LocalLlmError {
+    data class Cancelled(override val message: String = "Generation cancelled") : LocalLlmError {
         override val code: String = "CANCELLED"
     }
 }
