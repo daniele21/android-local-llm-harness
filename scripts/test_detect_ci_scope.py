@@ -23,8 +23,18 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
 
+    def test_mixed_documentation_and_code_runs_android(self) -> None:
+        scope = classify_paths(["README.md", "core/contracts/src/main/kotlin/Request.kt"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+
     def test_native_change_runs_both_expensive_jobs(self) -> None:
         scope = classify_paths(["backends/llama-cpp/src/main/cpp/runtime.cpp"])
+        self.assertTrue(scope.android)
+        self.assertTrue(scope.native)
+
+    def test_windows_native_path_is_normalized(self) -> None:
+        scope = classify_paths([r"backends\llama-cpp\src\main\cpp\runtime.cpp"])
         self.assertTrue(scope.android)
         self.assertTrue(scope.native)
 
