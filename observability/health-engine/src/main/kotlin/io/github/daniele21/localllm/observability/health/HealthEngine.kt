@@ -8,10 +8,7 @@ fun interface HealthClock {
     fun nowNanos(): Long
 }
 
-data class HealthAssessment(
-    val status: HealthStatus,
-    val detail: String,
-)
+data class HealthAssessment(val status: HealthStatus, val detail: String)
 
 interface HealthCheck {
     val id: String
@@ -19,9 +16,7 @@ interface HealthCheck {
     fun evaluate(): HealthAssessment
 }
 
-data class HealthSuiteReport(
-    val results: List<HealthCheckResult>,
-) {
+data class HealthSuiteReport(val results: List<HealthCheckResult>) {
     val status: HealthStatus = when {
         results.any { it.status == HealthStatus.FAIL } -> HealthStatus.FAIL
         results.any { it.status == HealthStatus.WARN } -> HealthStatus.WARN
