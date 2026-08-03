@@ -1,6 +1,6 @@
 # Device validation evidence bundle
 
-Use `scripts/capture-device-e2e-evidence.sh` for Phase 1 physical-device acceptance runs. It wraps `scripts/run-device-e2e.sh`, preserves the original exit status and produces a timestamped evidence directory plus a compressed archive.
+Use `scripts/capture-device-e2e-evidence.sh` for physical-device acceptance runs. It wraps `scripts/run-device-e2e.sh`, preserves the original exit status and produces a timestamped evidence directory plus a compressed archive.
 
 ## Standard command
 
@@ -46,23 +46,23 @@ Only the model filename, byte size, SHA-256 digest and declared diagnostic profi
 
 ## Evidence review
 
-A Phase 1 evidence record is acceptable only when:
+A physical-device evidence record is acceptable only when:
 
 1. `runner_exit_code=0` in `manifest.txt`;
 2. `test-markers.txt` includes both a successful JUnit marker and `INSTRUMENTATION_CODE: -1`;
 3. `metrics.txt` contains generation and cancellation markers, plus memory markers for memory-validation runs;
 4. `apk-inventory.txt` confirms the expected JNI and llama.cpp shared libraries are packaged for `arm64-v8a`;
-5. the repository commit matches the reviewed pull-request head and `repository_dirty=false`;
+5. the repository commit matches the reviewed pull-request head or release-candidate commit and `repository_dirty=false`;
 6. no native crash, instrumentation failure or unrecoverable runtime state appears in `instrumentation.log`;
 7. repeated runs on the same matrix entry do not show unbounded PSS growth or severe unexplained thermal/performance regression.
 
 ## Device/model matrix
 
-Record at least one primary supported matrix entry before Phase 1 merge:
+Record at least one primary supported matrix entry before the first production-ready release, before distributing the runtime to application consumers or before making device-performance claims:
 
 | Field | Required value |
 | --- | --- |
-| Repository commit | Exact PR head SHA |
+| Repository commit | Exact reviewed PR-head or release-candidate SHA |
 | Device | Manufacturer, model and codename |
 | Android | Release and SDK level |
 | ABI | `arm64-v8a` |
@@ -70,8 +70,10 @@ Record at least one primary supported matrix entry before Phase 1 merge:
 | Runtime | CPU thread count, timeout and memory-cycle settings |
 | Results | TTFT, total time, decode tokens/s, cancellation and PSS growth |
 
+Evidence may be captured from a review branch or from the current `main`, provided the exact clean commit is recorded and is the commit being evaluated for release or support claims.
+
 Additional representative devices should be added before claiming broad production support. A single device proves the acceptance path for that matrix entry, not universal compatibility.
 
 ## Failure handling
 
-The wrapper preserves evidence even when the underlying runner fails. Attach the archive to the relevant issue or pull-request discussion only after checking that the logs contain no private local paths or other environment-specific information that should not be shared.
+The wrapper preserves evidence even when the underlying runner fails. Attach the archive to the relevant issue, pull-request discussion or release record only after checking that the logs contain no private local paths or other environment-specific information that should not be shared.
