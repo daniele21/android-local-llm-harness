@@ -4,9 +4,9 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
+Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks, selective sanity-rule recovery and the first read-only console observability slice.
 
-The current `main` head contains the work merged through pull request #28, including the ARM64 emulator preflight. Pull request #29 is the active line for a Google Play-installable physical-device validation app that does not require developer mode or ADB.
+The current `main` head contains the Play-installable physical-device test application merged through pull request #29 and the module-aware validation workflow merged through pull request #30. Pull request #31 is the active draft line for the read-only developer console observability foundation.
 
 The repository is merge-ready for continued development but is **not production-ready** until the physical-device GGUF evidence gate is completed.
 
@@ -20,6 +20,8 @@ The repository is merge-ready for continued development but is **not production-
 - [x] supersede the alternative Phase 2 health-control-plane line in PR #22
 - [x] recover only compatible sanity-assertion behavior on a fresh branch from current `main`
 - [x] merge the recovery and emulator-preflight line through PR #28
+- [x] merge the Play-installable physical-device test application through PR #29
+- [x] merge module-aware validation and separate packaging through PR #30
 - [ ] delete historical remote branches after their unique commits and recovery notes are audited
 
 Historical branches are read-only audit references. They must not receive new implementation commits and must never be used as the base for new feature work.
@@ -42,6 +44,8 @@ The cumulative validation gate covers:
 - [x] health-engine tests
 - [x] resource-observability tests
 - [x] benchmark-engine tests
+- [x] module-aware pull-request validation with downstream consumer compilation
+- [x] separate packaging workflow for distributable Android artifacts
 
 These checks provide host-side and simulated evidence. They do not prove Android linker behavior on representative physical devices, OEM memory management, real-device thermal throttling or device-specific native stability.
 
@@ -224,16 +228,31 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
+### Read-only console observability foundation — PR #31
+
+- [x] tabbed console navigation for overview, runs, logs, health, resources and benchmarks
+- [x] `ConsoleDataSource` boundary over existing observability contracts
+- [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
+- [x] bounded run, log and resource queries
+- [x] privacy-safe disconnected and telemetry-failure states
+- [x] read-only generation metric cards
+- [x] read-only structured-log cards with deterministic field ordering
+- [x] read-only health, resource and benchmark cards
+- [x] pure Kotlin presenter and data-source tests
+- [x] explicit documentation of standalone sandbox limitations
+- [ ] connect the standalone console to a real runtime or cross-application diagnostics source
+
 ### Remaining Phase 2 work
 
-- [ ] console run timeline
-- [ ] structured-log viewer
-- [ ] request detail view
+- [ ] request-correlated run timeline
+- [ ] selectable request detail view
 - [ ] installed-model and active-runtime views
 - [ ] health and sanity execution controls
 - [ ] resource and thermal charts
 - [ ] cache-health view and repair actions
-- [ ] benchmark baseline and regression views
+- [ ] benchmark regression comparison and baseline history views
+- [ ] model-management console
+- [ ] manual inference playground
 - [ ] privacy-redacted diagnostic bundle export
 - [ ] signature-protected diagnostics bridge for cross-application console access
 
