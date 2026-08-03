@@ -56,11 +56,7 @@ class LocalLlmSanityExecutor(
         }
     }
 
-    private fun generate(
-        fixture: SanityFixture,
-        sessionId: SessionId,
-        startedAt: Long,
-    ): SanityExecutionResult {
+    private fun generate(fixture: SanityFixture, sessionId: SessionId, startedAt: Long): SanityExecutionResult {
         val terminal = AtomicReference<GenerationEvent?>()
         val completed = CountDownLatch(1)
         val request = GenerationRequest(
@@ -124,17 +120,16 @@ class LocalLlmSanityExecutor(
         }
     }
 
-    private fun failure(startedAt: Long, code: String, detail: String?): SanityExecutionResult =
-        SanityExecutionResult(
-            output = null,
-            outputTokens = null,
-            durationMs = elapsedMillis(startedAt),
-            errorCode = code,
-            errorDetail = detail,
-        )
+    private fun failure(startedAt: Long, code: String, detail: String?): SanityExecutionResult = SanityExecutionResult(
+        output = null,
+        outputTokens = null,
+        durationMs = elapsedMillis(startedAt),
+        errorCode = code,
+        errorDetail = detail,
+    )
 
     private fun elapsedMillis(startedAtNanos: Long): Long =
-        ((monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND)
+        (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
 
     private companion object {
         const val NANOS_PER_MILLISECOND = 1_000_000L
