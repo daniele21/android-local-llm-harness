@@ -19,7 +19,10 @@ The implementation will:
 
 - keep Room entities, DAO and database types out of observability contracts and runtime orchestration;
 - use Java Room entities and DAO types with the standard Java annotation processor;
-- execute all database work on one dedicated executor while preserving the current synchronous repository API;
+- serialize database work through one dedicated executor;
+- enqueue lifecycle writes without blocking the generation caller;
+- execute queries as ordered barriers after prior queued writes;
+- drain queued writes before closing the database;
 - replace the run record for a stable request ID as lifecycle state advances;
 - append structured log events correlated by request ID;
 - retain only the latest bounded number of runs and logs;
@@ -37,12 +40,15 @@ The separate developer console will not directly open another application's priv
 - Telemetry survives process restarts without coupling runtime orchestration to Android APIs.
 - The in-memory and Room implementations share query and retention semantics.
 - Room owns schema verification and generated database code.
-- A single serialized database executor provides deterministic ordering and avoids main-thread access.
+- A single serialized database executor provides deterministic ordering and avoids main-thread database access.
+- Generation submission is not delayed by Room writes.
 - Future console or diagnostics transports can query stable repository contracts rather than database internals.
 
 ### Costs and constraints
 
-- The synchronous repository contract blocks the calling thread until the dedicated database executor completes. Callers must avoid high-volume token-level writes; the runtime records lifecycle transitions and aggregated metrics only.
+- Write failures are best-effort and are not returned synchronously to the generation caller. A later health surface must expose persistent-store degradation.
+- Query methods wait for earlier queued writes and then for their own database result. They must not be used as high-frequency UI polling APIs.
+- Callers must avoid token-level writes; the runtime records lifecycle transitions and aggregated metrics only.
 - Schema changes require explicit Room migrations after version 1 is released.
 - The Room database is scoped to its Android application sandbox during the embedded phase.
 - Health, benchmark and diagnostic-export schemas will extend this domain and must preserve privacy defaults.
