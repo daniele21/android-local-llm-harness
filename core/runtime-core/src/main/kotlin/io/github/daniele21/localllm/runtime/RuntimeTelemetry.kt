@@ -16,16 +16,10 @@ fun interface EpochClock {
     fun nowEpochMs(): Long
 }
 
-internal class RuntimeTelemetry(
-    private val repository: TelemetryRepository,
-    private val clock: EpochClock,
-) {
+internal class RuntimeTelemetry(private val repository: TelemetryRepository, private val clock: EpochClock) {
     private val activeRuns = ConcurrentHashMap<RequestId, GenerationRunRecord>()
 
-    fun queued(
-        request: GenerationRequest,
-        modelDigest: ModelDigest,
-    ) {
+    fun queued(request: GenerationRequest, modelDigest: ModelDigest) {
         val run = GenerationRunRecord(
             requestId = request.requestId,
             applicationId = request.applicationId,
@@ -57,10 +51,7 @@ internal class RuntimeTelemetry(
         )
     }
 
-    fun queuedPosition(
-        requestId: RequestId,
-        position: Int,
-    ) {
+    fun queuedPosition(requestId: RequestId, position: Int) {
         log(
             level = LogLevel.DEBUG,
             event = "generation.queue_position",
@@ -81,10 +72,7 @@ internal class RuntimeTelemetry(
         )
     }
 
-    fun completed(
-        requestId: RequestId,
-        metrics: GenerationMetrics,
-    ) {
+    fun completed(requestId: RequestId, metrics: GenerationMetrics) {
         val current = activeRuns.remove(requestId) ?: return
         val updated = current.copy(
             completedAtEpochMs = clock.nowEpochMs(),
@@ -108,10 +96,7 @@ internal class RuntimeTelemetry(
         )
     }
 
-    fun failed(
-        requestId: RequestId,
-        error: LocalLlmError,
-    ) {
+    fun failed(requestId: RequestId, error: LocalLlmError) {
         val current = activeRuns.remove(requestId)
         if (current == null) {
             rejected(requestId, error)
@@ -132,10 +117,7 @@ internal class RuntimeTelemetry(
         )
     }
 
-    fun rejected(
-        requestId: RequestId,
-        error: LocalLlmError,
-    ) {
+    fun rejected(requestId: RequestId, error: LocalLlmError) {
         log(
             level = if (error.code == "CANCELLED") LogLevel.INFO else LogLevel.WARN,
             event = "generation.rejected",
@@ -148,12 +130,7 @@ internal class RuntimeTelemetry(
         safely { repository.recordRun(run) }
     }
 
-    private fun log(
-        level: LogLevel,
-        event: String,
-        requestId: RequestId,
-        fields: Map<String, String> = emptyMap(),
-    ) {
+    private fun log(level: LogLevel, event: String, requestId: RequestId, fields: Map<String, String> = emptyMap()) {
         safely {
             repository.appendLog(
                 StructuredLog(
