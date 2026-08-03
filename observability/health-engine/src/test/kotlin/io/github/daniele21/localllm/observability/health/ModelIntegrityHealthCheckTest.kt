@@ -7,9 +7,9 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
 
 class ModelIntegrityHealthCheckTest {
     @Test
@@ -45,10 +45,8 @@ class ModelIntegrityHealthCheckTest {
         return StoredModel(digest, File("/private/$value/model.gguf"), 10L, verified = false)
     }
 
-    private class FakeModelStore(
-        private val models: List<StoredModel>,
-        private val invalidDigests: Set<ModelDigest> = emptySet(),
-    ) : ModelStore {
+    private class FakeModelStore(private val models: List<StoredModel>, private val invalidDigests: Set<ModelDigest> = emptySet()) :
+        ModelStore {
         override fun find(digest: ModelDigest): StoredModel? = models.find { it.digest == digest }
 
         override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not needed")
