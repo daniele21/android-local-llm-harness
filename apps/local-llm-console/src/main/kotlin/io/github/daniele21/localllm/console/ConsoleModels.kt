@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.console
 
+import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -50,9 +51,21 @@ data class ConsoleSnapshot(
     val sourceError: String? = null,
 )
 
+data class ConsoleRequestDetail(
+    val requestId: RequestId,
+    val run: GenerationRunRecord?,
+    val timeline: List<StructuredLog>,
+    val sourceError: String? = null,
+)
+
 data class ConsoleScreen(val title: String, val subtitle: String, val cards: List<ConsoleCard>)
 
-data class ConsoleCard(val title: String, val lines: List<String>, val emphasis: ConsoleEmphasis = ConsoleEmphasis.NEUTRAL)
+data class ConsoleCard(
+    val title: String,
+    val lines: List<String>,
+    val emphasis: ConsoleEmphasis = ConsoleEmphasis.NEUTRAL,
+    val openRequestId: RequestId? = null,
+)
 
 enum class ConsoleEmphasis {
     NEUTRAL,
