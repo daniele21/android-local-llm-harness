@@ -55,9 +55,43 @@ Normal telemetry may contain:
 - timestamps and durations;
 - queue, model-load, TTFT, prefill and decode timings;
 - token counts and decode throughput;
-- bounded structured metadata fields.
+- bounded structured metadata fields;
+- health status, generic detail and remediation.
 
-Normal telemetry must not contain prompts, generated output, arbitrary exception messages or model bytes. Telemetry persistence is best-effort: a database or diagnostic failure must never fail, cancel or corrupt inference.
+Normal telemetry must not contain prompts, sanity fixture inputs, generated output, arbitrary exception messages or model bytes. Telemetry persistence is best-effort: a database or diagnostic failure must never fail, cancel or corrupt inference or health execution.
+
+## Health control plane
+
+Health behavior is separated from both runtime orchestration and the console:
+
+```text
+ModelIntegrityTarget                 SanitySuiteDefinition
+          |                                   |
+          v                                   v
+       ModelStore                    LocalLlmSanityExecutor
+          |                                   |
+          +----------> HealthEngine <---------+
+                         |
+                  HealthSuiteReport
+                         |
+                TelemetryRepository
+```
+
+Stable model-integrity, sanity-fixture, rule, finding and suite-report DTOs live in `observability/contracts`. `observability/health-engine` implements `HealthControlPlane` and owns orchestration, rule evaluation and privacy-safe persistence.
+
+Static model integrity currently checks:
+
+- expected content-addressed digest is present;
+- resolved path is a regular file;
+- stored and on-disk sizes match the declared artifact size;
+- streaming SHA-256 verification matches the expected digest;
+- model-store snapshot metadata is consistent.
+
+`LocalLlmSanityExecutor` adapts `LocalLlmClient` without bypassing normal prepare, session, generation, cancellation or close behavior. Fixture input and generated output exist only in memory while the fixture runs. Persisted findings contain no prompt or output content.
+
+The initial deterministic rule set supports non-empty output, required and forbidden markers, intentionally version-locked exact output, regex structure and output-token limits. GGUF metadata compatibility, native load health, memory recovery, cache health and benchmark regression checks remain separate follow-up suites.
+
+The boundary and privacy decision is recorded in [`adr/0002-health-control-plane.md`](adr/0002-health-control-plane.md).
 
 ## Control plane
 
@@ -138,7 +172,8 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - No undeclared model substitution.
 - Every generation has stable application, use-case, session and request identifiers.
 - Prompt/output persistence is disabled by default.
-- Telemetry failures are non-fatal to inference.
+- Sanity fixture input/output persistence is disabled by default.
+- Telemetry failures are non-fatal to inference and health execution.
 - Native handles are never exposed outside the backend module.
 - Large payloads will not cross the future Binder boundary inline.
 - State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
@@ -185,13 +220,16 @@ backends/llama-cpp
     Kotlin/JNI/C++ implementation specific to llama.cpp
 
 observability/contracts
-    stable telemetry, log, health, retention and query contracts
+    stable telemetry, log, health, sanity, retention and query contracts
 
 observability/in-memory-store
     bounded ephemeral implementation and deterministic test double
 
 observability/room-store
     Android Room schema, persistence, retention and database lifecycle
+
+observability/health-engine
+    model-integrity orchestration, deterministic sanity execution and remediation
 
 transports
     in-process communication now and Binder later
@@ -207,7 +245,7 @@ A new module is justified only when it owns a real responsibility, creates a nec
 
 Do not introduce empty modules merely to anticipate the target architecture. Do not solve duplication by moving unrelated code into generic utility packages. Shared abstractions must represent a clear domain concept.
 
-Public APIs must remain small and stable. Backend, transport, model store, scheduler, telemetry store and cache policies should be replaceable behind explicit interfaces when replacement is part of the architecture.
+Public APIs must remain small and stable. Backend, transport, model store, scheduler, telemetry store, health and cache policies should be replaceable behind explicit interfaces when replacement is part of the architecture.
 
 ## Shared generation engine
 
