@@ -29,6 +29,7 @@ DOC_ONLY_PREFIXES = ("docs/",)
 DOC_ONLY_SUFFIXES = (".md", ".mdx", ".rst")
 
 FORCE_ALL_PATHS = {
+    ".github/workflows/package.yml",
     ".github/workflows/validate.yml",
     "scripts/detect_ci_scope.py",
     "scripts/test_detect_ci_scope.py",
@@ -57,11 +58,31 @@ NATIVE_SUFFIXES = (
     ".hxx",
 )
 
+PACKAGING_PATHS = {
+    ".gitmodules",
+    "build.gradle.kts",
+    "gradle.properties",
+    "settings.gradle.kts",
+    "scripts/verify-android-packaging.py",
+    "third_party/llama.cpp",
+}
+PACKAGING_PREFIXES = (
+    "apps/",
+    "backends/llama-cpp/",
+    "gradle/",
+    "third_party/llama.cpp/",
+)
+PACKAGING_SUFFIXES = (
+    ".gradle",
+    ".gradle.kts",
+)
+
 
 @dataclass(frozen=True)
 class ValidationScope:
     android: bool
     native: bool
+    packaging: bool
     reason: str
 
 
@@ -87,39 +108,101 @@ def affects_native(path: str) -> bool:
     )
 
 
+def affects_packaging(path: str) -> bool:
+    filename = PurePosixPath(path).name
+    return (
+        affects_native(path)
+        or path in PACKAGING_PATHS
+        or path.startswith(PACKAGING_PREFIXES)
+        or path.endswith(PACKAGING_SUFFIXES)
+        or filename == "AndroidManifest.xml"
+    )
+
+
 def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> ValidationScope:
     normalized = tuple(sorted({normalize_path(path) for path in paths if path.strip()}))
 
     if force_all:
-        return ValidationScope(android=True, native=True, reason="manual validation")
+        return ValidationScope(
+            android=True,
+            native=True,
+            packaging=True,
+            reason="manual validation",
+        )
 
     if not normalized:
-        return ValidationScope(android=True, native=True, reason="no reliable diff available")
+        return ValidationScope(
+            android=True,
+            native=True,
+            packaging=True,
+            reason="no reliable diff available",
+        )
 
     if any(path in FORCE_ALL_PATHS for path in normalized):
-        return ValidationScope(android=True, native=True, reason="validation infrastructure changed")
+        return ValidationScope(
+            android=True,
+            native=True,
+            packaging=True,
+            reason="validation infrastructure changed",
+        )
 
     native = any(affects_native(path) for path in normalized)
     android = native or any(not is_docs_only(path) for path in normalized)
+    packaging = android and any(affects_packaging(path) for path in normalized)
 
     if native:
         reason = "native or JNI inputs changed"
+    elif packaging:
+        reason = "Android packaging inputs changed"
     elif android:
         reason = "Android or repository implementation changed"
     else:
         reason = "documentation or repository metadata only"
 
-    return ValidationScope(android=android, native=native, reason=reason)
+    return ValidationScope(
+        android=android,
+        native=native,
+        packaging=packaging,
+        reason=reason,
+    )
 
 
-def git_changed_files(event_name: str, base_sha: str, head_sha: str) -> Sequence[str]:
-    if not base_sha or not head_sha or base_sha == ZERO_SHA:
+def adjust_for_event(scope: ValidationScope, event_name: str) -> ValidationScope:
+    if event_name == "push" and scope.packaging:
+        return ValidationScope(
+            android=scope.android,
+            native=scope.native,
+            packaging=False,
+            reason=f"{scope.reason}; packaging delegated to package workflow",
+        )
+    return scope
+
+
+def ensure_commit_available(sha: str) -> None:
+    if not sha or sha == ZERO_SHA:
         raise ValueError("missing or unusable comparison SHA")
 
-    separator = "..." if event_name == "pull_request" else ".."
-    revision_range = f"{base_sha}{separator}{head_sha}"
+    present = subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if present.returncode == 0:
+        return
+
+    subprocess.run(
+        ["git", "fetch", "--no-tags", "--depth=1", "origin", sha],
+        check=True,
+    )
+
+
+def git_changed_files(base_sha: str, head_sha: str) -> Sequence[str]:
+    ensure_commit_available(base_sha)
+    ensure_commit_available(head_sha)
+
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=ACMRD", revision_range],
+        ["git", "diff", "--name-only", "--diff-filter=ACMRD", base_sha, head_sha],
         check=True,
         capture_output=True,
         text=True,
@@ -131,6 +214,7 @@ def write_outputs(path: str, scope: ValidationScope) -> None:
     with open(path, "a", encoding="utf-8") as output:
         output.write(f"android={'true' if scope.android else 'false'}\n")
         output.write(f"native={'true' if scope.native else 'false'}\n")
+        output.write(f"packaging={'true' if scope.packaging else 'false'}\n")
 
 
 def append_step_summary(paths: Sequence[str], scope: ValidationScope) -> None:
@@ -142,6 +226,7 @@ def append_step_summary(paths: Sequence[str], scope: ValidationScope) -> None:
         summary.write("## Validation scope\n\n")
         summary.write(f"- Android validation: **{scope.android}**\n")
         summary.write(f"- Native host tests: **{scope.native}**\n")
+        summary.write(f"- Android packaging verification: **{scope.packaging}**\n")
         summary.write(f"- Reason: {scope.reason}\n")
         summary.write(f"- Changed paths considered: {len(paths)}\n")
 
@@ -163,11 +248,11 @@ def main() -> int:
         scope = classify_paths((), force_all=True)
     else:
         try:
-            paths = git_changed_files(args.event, args.base_sha, args.head_sha)
-            scope = classify_paths(paths)
+            paths = git_changed_files(args.base_sha, args.head_sha)
+            scope = adjust_for_event(classify_paths(paths), args.event)
         except (ValueError, subprocess.CalledProcessError) as exc:
             print(f"warning: unable to determine changed files: {exc}", file=sys.stderr)
-            scope = classify_paths(())
+            scope = adjust_for_event(classify_paths(()), args.event)
 
     write_outputs(args.github_output, scope)
     append_step_summary(paths, scope)
@@ -176,6 +261,7 @@ def main() -> int:
         "validation scope: "
         f"android={str(scope.android).lower()} "
         f"native={str(scope.native).lower()} "
+        f"packaging={str(scope.packaging).lower()} "
         f"reason={scope.reason}"
     )
     if paths:
