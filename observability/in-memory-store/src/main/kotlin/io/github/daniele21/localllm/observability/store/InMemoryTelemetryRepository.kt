@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
+import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
@@ -17,6 +18,7 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
     private val runs = ArrayDeque<GenerationRunRecord>()
     private val logs = ArrayDeque<StructuredLog>()
     private val health = linkedMapOf<String, HealthCheckResult>()
+    private val resources = ArrayDeque<ResourceSnapshot>()
 
     override fun recordRun(run: GenerationRunRecord) = synchronized(lock) {
         runs.removeAll { it.requestId == run.requestId }
@@ -31,6 +33,11 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
 
     override fun saveHealth(result: HealthCheckResult) = synchronized(lock) {
         health[result.id] = result
+    }
+
+    override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = synchronized(lock) {
+        resources.offerFirst(snapshot)
+        while (resources.size > retention.maxResourceSnapshots) resources.removeLast()
     }
 
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = synchronized(lock) {
@@ -52,12 +59,17 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
         health.values.toList()
     }
 
+    override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = synchronized(lock) {
+        resources.asSequence().take(requirePositiveLimit(limit)).toList()
+    }
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = synchronized(lock) {
         DeveloperDashboardSnapshot(
             runtime = runtime,
             recentRuns = runs.toList(),
             recentLogs = logs.toList(),
             health = health.values.toList(),
+            resources = resources.toList(),
             modelStoreBytes = 0L,
             modelCount = 0,
         )
