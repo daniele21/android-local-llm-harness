@@ -176,10 +176,7 @@ class HealthEngineTest {
     }
 }
 
-private class FakeModelStore(
-    private val storedModel: StoredModel?,
-    private val verification: VerificationResult,
-) : ModelStore {
+private class FakeModelStore(private val storedModel: StoredModel?, private val verification: VerificationResult) : ModelStore {
     override fun find(digest: ModelDigest): StoredModel? = storedModel?.takeIf { it.digest == digest }
 
     override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not required by this test")
