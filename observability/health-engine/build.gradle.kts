@@ -29,5 +29,6 @@ dependencies {
     implementation(project(":core:contracts"))
     implementation(project(":models:model-store"))
 
-    testImplementation(libs.junit)
+    testImplementation(project(":observability:in-memory-store"))
+    testImplementation(libs.junit4)
 }
