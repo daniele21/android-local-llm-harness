@@ -11,15 +11,53 @@ Native app / Capacitor plugin
             |
     RuntimeOrchestrator
       |       |       |
- App registry |   Telemetry sink
+ App registry |   TelemetryRepository
+      |       |      /              \
+ Model profile|  in-memory       Room store
       |       |
- Model profile|
       |    Model store
       |       |
       +--- llama.cpp JNI ---> GGUF
 ```
 
 The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change.
+
+Runtime orchestration depends only on `observability/contracts`. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+
+## Persistent observability
+
+Generation observability follows the same request identifiers and lifecycle as the data plane:
+
+```text
+GenerationRequest
+      |
+      +-- QUEUED
+      +-- RUNNING
+      +-- COMPLETED / FAILED / CANCELLED
+                    |
+             TelemetryRepository
+               /          \
+      bounded memory     Room database
+```
+
+The persistent schema owns three separate domains:
+
+1. generation run records, keyed by request ID;
+2. append-only structured logs with request correlation;
+3. latest health result per health-check ID.
+
+Run updates replace the record for the same request ID, while logs remain ordered timeline events. Retention is bounded independently for runs and logs. Room operations execute on a dedicated single-thread executor so the current synchronous inspection API never requires main-thread database access.
+
+Normal telemetry may contain:
+
+- stable application, use-case, request and model identifiers;
+- lifecycle status and error codes;
+- timestamps and durations;
+- queue, model-load, TTFT, prefill and decode timings;
+- token counts and decode throughput;
+- bounded structured metadata fields.
+
+Normal telemetry must not contain prompts, generated output, arbitrary exception messages or model bytes. Telemetry persistence is best-effort: a database or diagnostic failure must never fail, cancel or corrupt inference.
 
 ## Control plane
 
@@ -38,6 +76,8 @@ The `local-llm-console` application is the initial developer control plane. It w
 - privacy-safe diagnostic export.
 
 During the embedded phase, apps will expose a signature-protected diagnostics bridge. In the shared phase, the console will query the central host directly.
+
+A Room database stored in one embedded application's private directory is not directly readable by the separate console application. The Room repository establishes persistence and query semantics now; cross-application viewing remains dependent on the protected diagnostics bridge planned for the integration phase.
 
 ## Validation plane
 
@@ -98,6 +138,7 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - No undeclared model substitution.
 - Every generation has stable application, use-case, session and request identifiers.
 - Prompt/output persistence is disabled by default.
+- Telemetry failures are non-fatal to inference.
 - Native handles are never exposed outside the backend module.
 - Large payloads will not cross the future Binder boundary inline.
 - State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
@@ -132,7 +173,7 @@ core/contracts
     public contracts and backend-independent DTOs
 
 core/runtime-core
-    orchestration, sessions, scheduling and lifecycle
+    orchestration, sessions, scheduling, lifecycle and telemetry emission
 
 models/model-profile
     model, use-case and application binding configuration
@@ -143,11 +184,17 @@ models/model-store
 backends/llama-cpp
     Kotlin/JNI/C++ implementation specific to llama.cpp
 
+observability/contracts
+    stable telemetry, log, health, retention and query contracts
+
+observability/in-memory-store
+    bounded ephemeral implementation and deterministic test double
+
+observability/room-store
+    Android Room schema, persistence, retention and database lifecycle
+
 transports
     in-process communication now and Binder later
-
-observability
-    metrics, logs, health, benchmarks and diagnostic state
 
 integrations
     thin native Android and Capacitor adapters

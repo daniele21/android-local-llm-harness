@@ -53,7 +53,7 @@ These checks provide strong host-side evidence for orchestration, storage, cance
 - [x] document branch, stacked-PR and merge discipline in [`BRANCHING.md`](../BRANCHING.md)
 - [x] merge PR #13 into `main`
 - [ ] delete superseded historical remote branches after the merge is audited
-- [ ] rebase or recreate dependency-only pull requests against the post-Phase-1 `main`
+- [x] recreate the deferred `gradle/actions` dependency review against the post-Phase-1 `main` as PR #20
 
 Historical branches are retained temporarily for traceability only and must not receive new implementation commits.
 
@@ -79,6 +79,23 @@ bash scripts/capture-device-e2e-evidence.sh \
 - [x] provide minimal Android assembly, import, prepare, session and generation examples
 - [x] document streaming events, cancellation, shutdown, model switching, memory pressure and typed failures
 - [x] record current Phase 1 platform and integration limits in [`api-usage.md`](api-usage.md)
+
+### Phase 2 first vertical slice
+
+Pull request #21 establishes the persistent observability foundation without claiming completion of the entire phase.
+
+- [x] add `observability/room-store` as the Android persistence boundary behind `TelemetryRepository`
+- [x] persist generation run state across `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` and `CANCELLED`
+- [x] persist correlated, bounded structured logs without prompt or generated-output content
+- [x] retain queue, model-load, TTFT, prefill, decode, token-count and throughput metrics
+- [x] expose bounded run, request-timeline and health query APIs through stable contracts
+- [x] keep Room writes serialized and non-blocking for the generation caller
+- [x] make telemetry failures non-fatal to inference
+- [x] add retention, ordering, mapping, lifecycle and privacy tests
+- [x] compile and validate the Room AAR and Android test APK in the aggregate repository gate
+- [x] document Room ownership, sandbox constraints and shutdown behavior in ADR 0001 and the embedded API guide
+
+The separate console application cannot directly read another embedded application's private Room database. Cross-application viewing remains dependent on the signature-protected diagnostics bridge planned for Phase 3.
 
 ### Post-merge production-readiness gate
 
@@ -159,7 +176,8 @@ Deferring this gate permits continued repository development and integration wor
 - [x] validate exact APK/AAR native packaging and ELF architecture
 - [x] publish feature-level API and lifecycle documentation with minimal usage examples
 - [x] merge the consolidated Phase 1 work into `main`
-- [ ] delete historical Phase 0/1 branches and refresh deferred dependency pull requests
+- [ ] delete historical Phase 0/1 branches
+- [x] refresh the deferred dependency review against current `main`
 
 ### Production-readiness gate
 
@@ -192,9 +210,11 @@ The embedded API is documented in [`api-usage.md`](api-usage.md). The executable
 
 Phase 2 repository work may begin after the Phase 1 merge. Production claims remain blocked by the physical-device gate above.
 
-- [ ] Room-backed telemetry store
-- [ ] run timeline and structured log viewer
-- [ ] cold/warm load, TTFT, prefill and decode metrics
+- [x] Room-backed telemetry store with bounded retention
+- [x] persistent run lifecycle and request-correlated structured-log query APIs
+- [ ] console run timeline and structured log viewer
+- [x] queue, model-load, TTFT, prefill, decode, token-count and throughput metrics
+- [ ] explicit cold-versus-warm load classification and comparison
 - [ ] memory and thermal snapshots
 - [ ] model integrity checks exposed through the control plane
 - [ ] generation sanity suites

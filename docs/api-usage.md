@@ -1,6 +1,6 @@
-# Phase 1 embedded API and lifecycle
+# Embedded API and lifecycle
 
-This document describes the implemented Phase 1 embedded runtime API. It is based on the current public contracts and production runtime classes; it does not describe the future Binder service or Capacitor plugin.
+This document describes the implemented embedded runtime API. It is based on the current public contracts and production runtime classes; it does not describe the future Binder service or Capacitor plugin.
 
 The current integration is intentionally explicit. An application owns:
 
@@ -9,6 +9,7 @@ The current integration is intentionally explicit. An application owns:
 - the model and generation profiles;
 - the model store location;
 - the `RuntimeOrchestrator` lifetime;
+- the telemetry repository and retention policy;
 - the mapping from runtime events to its own UI or domain state.
 
 ## Module responsibilities
@@ -20,8 +21,11 @@ Use these modules from an embedded Android application:
 | `core/contracts` | Stable identifiers, client interface, requests, events, metrics and typed public errors |
 | `models/model-profile` | Exact GGUF, model-load and use-case configuration |
 | `models/model-store` | SHA-256 content-addressed import, lookup, verification and removal |
-| `core/runtime-core` | Lifecycle orchestration, single-decode scheduling and memory policy |
+| `core/runtime-core` | Lifecycle orchestration, single-decode scheduling, memory policy and telemetry emission |
 | `backends/llama-cpp` | Pinned `llama.cpp` JNI implementation |
+| `observability/contracts` | Run, log, health, retention and query contracts |
+| `observability/in-memory-store` | Bounded ephemeral telemetry and deterministic test implementation |
+| `observability/room-store` | Persistent Android Room telemetry repository |
 | `transports/in-process` | Thin embedded transport exposing `LocalLlmClient` |
 
 Do not call JNI classes directly from product code. Product code should depend on `LocalLlmClient` and profile/store contracts; runtime assembly belongs in an Android integration layer.
@@ -42,7 +46,7 @@ The runtime does not discover, substitute or silently downgrade models. A missin
 
 ## Minimal runtime assembly
 
-The following example wires one application/use-case pair to one imported GGUF. The digest must be the real lowercase SHA-256 of the file, and `sizeBytes` must match the file exactly.
+The following example wires one application/use-case pair to one imported GGUF and one private persistent telemetry database. The digest must be the real lowercase SHA-256 of the file, and `sizeBytes` must match the file exactly.
 
 ```kotlin
 import android.content.Context
@@ -59,6 +63,8 @@ import io.github.daniele21.localllm.models.OutputMode
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseProfile
+import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
+import io.github.daniele21.localllm.observability.room.RoomTelemetryRepository
 import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.store.FileSystemModelStore
@@ -136,6 +142,14 @@ class EmbeddedLocalLlm(
         File(context.noBackupFilesDir, "local-llm"),
     )
 
+    private val telemetry = RoomTelemetryRepository.open(
+        context = context,
+        retention = TelemetryRetentionPolicy(
+            maxRuns = 500,
+            maxLogs = 2_000,
+        ),
+    )
+
     private val runtime: RuntimeOrchestrator
 
     val client: InProcessLocalLlmClient
@@ -148,17 +162,21 @@ class EmbeddedLocalLlm(
             registry = registry,
             modelStore = modelStore,
             backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
+            telemetryRepository = telemetry,
         )
         client = InProcessLocalLlmClient(runtime)
     }
 
     override fun close() {
         runtime.close()
+        telemetry.close()
     }
 }
 ```
 
 `FileSystemModelStore.import` copies and hashes the source through a staging file, validates size and digest, and publishes it under the content-addressed store. Reimporting an identical verified artifact is deduplicated. The source GGUF should remain outside the APK unless a separate bundled-asset installation flow is designed.
+
+`RoomTelemetryRepository` owns an app-private database and a dedicated database executor. Close the runtime before closing telemetry so no terminal lifecycle write can race with database shutdown.
 
 ## Prepare and create a session
 
@@ -228,7 +246,9 @@ val handle = localLlm.client.generate(
             is GenerationEvent.Completed -> {
                 val output = event.output
                 val metrics = event.metrics
-                // Persist only the data allowed by the application's privacy policy.
+                metrics.prefillMs
+                metrics.decodeMs
+                // Persist content only under the application's separate privacy policy.
             }
 
             is GenerationEvent.Failed -> {
@@ -245,6 +265,47 @@ val handle = localLlm.client.generate(
 Listener callbacks are not an Android main-thread API. Dispatch UI updates to the application's main-thread mechanism.
 
 A request receives one terminal event: `Completed` or `Failed`. Applications should treat `Queued`, `Started` and `TextDelta` as intermediate events and finalize UI/resource state only on a terminal event.
+
+## Persistent telemetry
+
+When a telemetry repository is injected, the runtime records one evolving `GenerationRunRecord` for each accepted request:
+
+```text
+QUEUED -> RUNNING -> COMPLETED
+                  -> FAILED
+                  -> CANCELLED
+```
+
+The terminal record may contain:
+
+- application, use-case, request and model identifiers;
+- queue and model-load duration;
+- time to first token;
+- prefill and decode duration;
+- total duration;
+- input/output token counts;
+- decode tokens per second;
+- terminal status and typed error code.
+
+It does not contain the request input, generated output or free-form exception message.
+
+The repository also stores correlated `StructuredLog` entries. Query them without exposing Room types:
+
+```kotlin
+val recentRuns = telemetry.recentRuns(limit = 100)
+val run = telemetry.findRun(request.requestId)
+val timeline = telemetry.recentLogs(
+    limit = 100,
+    requestId = request.requestId,
+)
+val health = telemetry.healthResults()
+```
+
+Retention is applied transactionally after run and log writes. A later state for the same request ID replaces the prior run record; logs remain separate ordered events.
+
+Telemetry writes are best-effort. If the database is unavailable, generation and its public listener events continue normally. Applications may surface telemetry degradation separately, but must not infer that a missing telemetry record means inference failed.
+
+An embedded application's Room database is private to that Android application. The separate console application cannot open it directly; cross-application inspection requires the planned signature-protected diagnostics bridge or the future shared runtime host.
 
 ## Cancellation
 
@@ -295,7 +356,7 @@ Backend pointers and `llama.cpp` structures must never cross the public contract
 
 ## Model switching
 
-Phase 1 defaults to one loaded model and one active decode. A different resolved model cannot replace the loaded model while sessions, queued requests or active generation own runtime resources.
+The embedded runtime defaults to one loaded model and one active decode. A different resolved model cannot replace the loaded model while sessions, queued requests or active generation own runtime resources.
 
 To switch models safely:
 
@@ -326,9 +387,9 @@ Public generation failures use these stable categories:
 
 Model import failures are reported separately through `ModelImportException` and `ModelImportErrorCode`, including invalid source, invalid digest, size mismatch, digest mismatch, destination conflict and I/O failure.
 
-Do not parse free-form error messages to drive product behavior. Use the typed error/category first and retain messages for diagnostics.
+Do not parse free-form error messages to drive product behavior. Use the typed error/category first and retain messages for diagnostics. Normal telemetry persists the stable error code, not the free-form message.
 
-## Current Phase 1 limits
+## Current limits
 
 - embedded in-process runtime only;
 - Android `arm64-v8a` CPU backend;
@@ -337,6 +398,7 @@ Do not parse free-form error messages to drive product behavior. Use the typed e
 - no Capacitor plugin yet;
 - no automatic model download manager;
 - no automatic model selection or fallback;
+- no cross-application console access before the protected diagnostics bridge;
 - no guarantee of broad device/model compatibility without matrix evidence.
 
 Validate the exact target device, model and quantization through [`device-e2e-testing.md`](device-e2e-testing.md) and capture acceptance evidence with [`device-e2e-evidence.md`](device-e2e-evidence.md).

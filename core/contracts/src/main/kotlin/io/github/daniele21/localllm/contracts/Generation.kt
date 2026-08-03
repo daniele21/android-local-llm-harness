@@ -33,6 +33,8 @@ data class GenerationMetrics(
     val inputTokens: Int?,
     val outputTokens: Int?,
     val decodeTokensPerSecond: Double?,
+    val prefillMs: Long? = null,
+    val decodeMs: Long? = null,
 )
 
 sealed interface LocalLlmError {
@@ -62,5 +64,6 @@ fun interface GenerationListener {
 
 interface GenerationHandle {
     val requestId: RequestId
+
     fun cancel()
 }

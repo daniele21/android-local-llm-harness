@@ -2,6 +2,10 @@
 
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
+## Records
+
+- [`0001-room-backed-telemetry.md`](0001-room-backed-telemetry.md) — persistent telemetry ownership, threading, retention and privacy defaults
+
 ## Status values
 
 - Proposed

@@ -123,6 +123,8 @@ jobs:
             :backends:llama-cpp:assembleDebug \
             :observability:contracts:assembleDebug \
             :observability:in-memory-store:assembleDebug \
+            :observability:room-store:assembleDebug \
+            :observability:room-store:assembleDebugAndroidTest \
             :transports:in-process:assembleDebug \
             :apps:local-llm-console:assembleInternal \
             :apps:device-test-runner:assembleDebug \
