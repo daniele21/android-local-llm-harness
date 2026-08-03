@@ -16,6 +16,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+@Suppress("TooManyFunctions")
 class RoomTelemetryRepository internal constructor(
     private val dao: TelemetryDao,
     private val retention: TelemetryRetentionPolicy,
@@ -57,10 +58,7 @@ class RoomTelemetryRepository internal constructor(
         dao.findRun(requestId.value)?.let(TelemetryEntityMapper::runRecord)
     }
 
-    override fun recentLogs(
-        limit: Int,
-        requestId: RequestId?,
-    ): List<StructuredLog> = executeBlocking {
+    override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = executeBlocking {
         val validatedLimit = requirePositiveLimit(limit)
         val entities = if (requestId == null) {
             dao.recentLogs(validatedLimit)
@@ -112,13 +110,20 @@ class RoomTelemetryRepository internal constructor(
         return try {
             executor.submit<T> { block() }.get()
         } catch (error: InterruptedException) {
-            Thread.currentThread().interrupt()
-            throw IllegalStateException("Telemetry operation was interrupted", error)
+            interruptedFailure(error)
         } catch (error: ExecutionException) {
-            val cause = error.cause ?: error
-            if (cause is RuntimeException) throw cause
-            throw IllegalStateException("Telemetry operation failed", cause)
+            throw executionFailure(error)
         }
+    }
+
+    private fun interruptedFailure(error: InterruptedException): Nothing {
+        Thread.currentThread().interrupt()
+        throw IllegalStateException("Telemetry operation was interrupted", error)
+    }
+
+    private fun executionFailure(error: ExecutionException): RuntimeException {
+        val cause = error.cause ?: error
+        return cause as? RuntimeException ?: IllegalStateException("Telemetry operation failed", cause)
     }
 
     private fun requirePositiveLimit(limit: Int): Int {
