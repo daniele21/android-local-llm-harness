@@ -10,9 +10,7 @@ import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import java.util.ArrayDeque
 
-class InMemoryTelemetryRepository(
-    private val retention: TelemetryRetentionPolicy = TelemetryRetentionPolicy(),
-) : TelemetryRepository {
+class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolicy = TelemetryRetentionPolicy()) : TelemetryRepository {
     constructor(maxRuns: Int, maxLogs: Int) : this(TelemetryRetentionPolicy(maxRuns, maxLogs))
 
     private val lock = Any()
@@ -43,10 +41,7 @@ class InMemoryTelemetryRepository(
         runs.firstOrNull { it.requestId == requestId }
     }
 
-    override fun recentLogs(
-        limit: Int,
-        requestId: RequestId?,
-    ): List<StructuredLog> = synchronized(lock) {
+    override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = synchronized(lock) {
         logs.asSequence()
             .filter { requestId == null || it.requestId == requestId }
             .take(requirePositiveLimit(limit))
