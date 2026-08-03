@@ -28,7 +28,8 @@ observability/android-resource-probe   Android memory and thermal snapshot provi
 observability/benchmark-engine         Baseline capture and performance regression checks
 transports/in-process                  Embedded transport implementation
 apps/local-llm-console                 Developer dashboard application shell
-apps/device-test-runner                Real-device GGUF lifecycle test application
+apps/device-test-runner                ADB/instrumentation GGUF lifecycle test application
+apps/local-llm-phone-test              Play-installable physical-device validation application
 ```
 
 ## Request resolution
@@ -67,7 +68,8 @@ Phase 1 is merged into `main` and provides:
 - runtime orchestration, model reuse and model-switch protection;
 - Android memory-pressure handling;
 - Kotlin, native, simulated-acceptance and packaging tests;
-- a real-device test runner for GGUF lifecycle, cancellation and optional PSS regression checks.
+- an ADB/instrumentation runner for GGUF lifecycle, cancellation and optional PSS regression checks;
+- an ARM64 emulator preflight with a real Qwen3 0.6B GGUF.
 
 Phase 2 is substantially implemented in `main`:
 
@@ -91,7 +93,7 @@ The main remaining Phase 2 work is:
 - a privacy-redacted diagnostic bundle export;
 - the signature-protected diagnostics bridge required for cross-application console access.
 
-The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. Host and simulated tests do not prove Android linker behavior, real GGUF execution, memory stability or thermal performance. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
+The runtime is not production-ready until the physical-device gate is completed on representative Android `arm64-v8a` devices with supported GGUF models. Host, simulated and emulator tests do not prove OEM memory management, physical-device native stability or representative thermal performance. See [`docs/roadmap.md`](docs/roadmap.md) for authoritative status.
 
 ## Coding-agent navigation
 
@@ -112,8 +114,9 @@ python3 scripts/verify-agent-navigation.py
 ./gradlew spotlessCheck
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
 ./gradlew check
-./gradlew lintDebug :apps:local-llm-console:lintInternal
+./gradlew lintDebug :apps:local-llm-console:lintInternal :apps:local-llm-phone-test:lintRelease
 ./gradlew assembleDebug :apps:local-llm-console:assembleInternal
+./gradlew :apps:local-llm-phone-test:assembleDebug :apps:local-llm-phone-test:bundleRelease
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 ./gradlew :observability:health-engine:assembleDebug
 ./gradlew :observability:android-resource-probe:assembleDebug
@@ -124,20 +127,29 @@ cmake --build build/native-tests --parallel 2
 ctest --test-dir build/native-tests --output-on-failure
 ```
 
-## Real-device GGUF validation
+## Physical-device GGUF validation
+
+Two validation paths exercise the same production model-store, runtime and backend contracts.
+
+### ADB and instrumentation
 
 Connect a physical `arm64-v8a` device with USB debugging enabled, then run:
 
 ```bash
 bash scripts/run-device-e2e.sh \
   --model /absolute/path/to/model.gguf \
-  --architecture qwen2 \
-  --quantization Q4_K_M
+  --architecture qwen3 \
+  --quantization Q4_K_M \
+  --memory-repeat 5
 ```
 
-Add `--memory-repeat 5` to execute repeated load/generate/unload cycles with the default PSS-growth budget. The model is streamed into the debuggable test application's private storage and is never committed or packaged.
+The model is streamed into the debuggable test application's private storage and is never committed or packaged. See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md).
 
-See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for arguments, evidence requirements and interpretation of the memory check.
+### Google Play internal testing without developer mode
+
+`apps/local-llm-phone-test` is a normal launcher application intended for phones where developer mode or ADB is unavailable. It imports a GGUF through Android's Storage Access Framework, runs generation, cancellation and repeated memory cycles, then produces a privacy-safe report that can be copied or shared.
+
+Build and sign its release AAB outside the repository, upload it to the Google Play internal-testing track, install it with the tester account and follow [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md). Signing keys, credentials and GGUF files must never be committed.
 
 ## Roadmap
 
@@ -147,4 +159,4 @@ See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for arguments, ev
 4. Add native Android and Capacitor integration surfaces as thin adapters.
 5. Add a Binder transport and promote the console app into the shared runtime host.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/roadmap.md`](docs/roadmap.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) and [`docs/roadmap.md`](docs/roadmap.md).
