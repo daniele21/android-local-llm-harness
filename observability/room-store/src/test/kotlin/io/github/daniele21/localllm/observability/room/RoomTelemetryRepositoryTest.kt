@@ -11,10 +11,10 @@ import io.github.daniele21.localllm.observability.LogLevel
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
-import java.util.concurrent.Executors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.concurrent.Executors
 
 class RoomTelemetryRepositoryTest {
     @Test
@@ -122,10 +122,8 @@ private class FakeTelemetryDao : TelemetryDao {
 
     override fun recentLogs(limit: Int): List<TelemetryEntities.StructuredLogEntity> = sortedLogs().take(limit)
 
-    override fun recentLogsForRequest(
-        requestId: String,
-        limit: Int,
-    ): List<TelemetryEntities.StructuredLogEntity> = sortedLogs().filter { it.requestId == requestId }.take(limit)
+    override fun recentLogsForRequest(requestId: String, limit: Int): List<TelemetryEntities.StructuredLogEntity> =
+        sortedLogs().filter { it.requestId == requestId }.take(limit)
 
     override fun trimLogs(maxRows: Int) {
         val retained = recentLogs(maxRows).mapTo(mutableSetOf()) { it.id }
