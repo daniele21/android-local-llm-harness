@@ -145,7 +145,7 @@ jobs:
 
       - name: Upload console APKs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-llm-console-apks
           path: apps/local-llm-console/build/outputs/apk/**/*.apk
@@ -153,7 +153,7 @@ jobs:
 
       - name: Upload device test APKs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-llm-device-test-apks
           path: apps/device-test-runner/build/outputs/apk/**/*.apk
@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload phone test artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-llm-phone-test-artifacts
           path: |
@@ -171,7 +171,7 @@ jobs:
 
       - name: Upload Android libraries
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-llm-harness-aars
           path: "**/build/outputs/aar/*.aar"
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validation-reports
           path: |
