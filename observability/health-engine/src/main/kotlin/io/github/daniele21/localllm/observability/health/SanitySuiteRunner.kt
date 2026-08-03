@@ -9,12 +9,8 @@ import io.github.daniele21.localllm.observability.SanityRule
 import io.github.daniele21.localllm.observability.SanityRuleType
 import io.github.daniele21.localllm.observability.SanitySuiteDefinition
 
-internal class SanitySuiteRunner(
-    private val sanityExecutor: SanityExecutor,
-    private val monotonicClock: () -> Long,
-) {
-    fun run(definition: SanitySuiteDefinition): List<HealthFinding> =
-        definition.fixtures.flatMap(::runFixture)
+internal class SanitySuiteRunner(private val sanityExecutor: SanityExecutor, private val monotonicClock: () -> Long) {
+    fun run(definition: SanitySuiteDefinition): List<HealthFinding> = definition.fixtures.flatMap(::runFixture)
 
     private fun runFixture(fixture: SanityFixture): List<HealthFinding> {
         val execution = runCatching { sanityExecutor.execute(fixture) }
@@ -56,12 +52,7 @@ internal class SanitySuiteRunner(
         }
     }
 
-    private fun evaluateRule(
-        fixture: SanityFixture,
-        rule: SanityRule,
-        output: String,
-        outputTokens: Int?,
-    ): HealthFinding {
+    private fun evaluateRule(fixture: SanityFixture, rule: SanityRule, output: String, outputTokens: Int?): HealthFinding {
         val startedAt = monotonicClock()
         val evaluation = when (rule.type) {
             SanityRuleType.NON_EMPTY -> ruleEvaluation(
@@ -150,12 +141,7 @@ internal class SanitySuiteRunner(
         )
     }
 
-    private fun ruleEvaluation(
-        passed: Boolean,
-        passDetail: String,
-        failDetail: String,
-        remediation: String,
-    ): RuleEvaluation = if (passed) {
+    private fun ruleEvaluation(passed: Boolean, passDetail: String, failDetail: String, remediation: String): RuleEvaluation = if (passed) {
         RuleEvaluation(
             status = HealthStatus.PASS,
             detail = passDetail,
@@ -176,14 +162,9 @@ internal class SanitySuiteRunner(
         remediation = "Resolve the fixture execution failure, then rerun the suite.",
     )
 
-    private fun elapsedMillis(startedAtNanos: Long): Long =
-        (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
+    private fun elapsedMillis(startedAtNanos: Long): Long = (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
 
-    private data class RuleEvaluation(
-        val status: HealthStatus,
-        val detail: String,
-        val remediation: String? = null,
-    )
+    private data class RuleEvaluation(val status: HealthStatus, val detail: String, val remediation: String? = null)
 
     private companion object {
         const val NANOS_PER_MILLISECOND = 1_000_000L
