@@ -50,13 +50,17 @@ class ModelIntegrityHealthCheckTest {
         private val invalidDigests: Set<ModelDigest> = emptySet(),
     ) : ModelStore {
         override fun find(digest: ModelDigest): StoredModel? = models.find { it.digest == digest }
+
         override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not needed")
+
         override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(
             valid = digest !in invalidDigests,
             actualDigest = digest,
             detail = "ignored",
         )
+
         override fun remove(digest: ModelDigest): Boolean = false
+
         override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(
             modelCount = models.size,
             totalBytes = models.sumOf(StoredModel::sizeBytes),
