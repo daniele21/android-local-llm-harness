@@ -97,6 +97,24 @@ Pull request #21 establishes the persistent observability foundation without cla
 
 The separate console application cannot directly read another embedded application's private Room database. Cross-application viewing remains dependent on the signature-protected diagnostics bridge planned for Phase 3.
 
+### Phase 2 second vertical slice
+
+Pull request #22 establishes the backend-independent health control-plane foundation without claiming completion of all Phase 2 health work.
+
+- [x] add stable model-integrity, sanity-fixture, rule, finding and suite-report contracts
+- [x] add `observability/health-engine` behind `HealthControlPlane`
+- [x] check exact model-store presence, regular-file state, declared size, streaming SHA-256 and snapshot consistency
+- [x] adapt deterministic sanity execution to the normal `LocalLlmClient` prepare, session, generate, cancel and close lifecycle
+- [x] support non-empty, required-marker, forbidden-marker, exact, regex-structure and output-token assertions
+- [x] persist privacy-safe status, duration, generic detail and remediation without fixture input or generated output
+- [x] keep telemetry-storage failures non-fatal to health execution
+- [x] mark dependent assertions `NOT_RUN` when their prerequisite execution fails
+- [x] test valid, missing and corrupted model artifacts, deterministic assertions, timeout cancellation, privacy and failure isolation
+- [x] compile and validate the health-engine AAR in aggregate repository gate #222
+- [x] document ownership and privacy constraints in ADR 0002 and [`health-control-plane.md`](health-control-plane.md)
+
+This slice does not yet prove GGUF architecture, quantization, tokenizer or chat-template compatibility; native load/context/unload health; memory return; thermal behavior; cache correctness; benchmark regression policy; or physical-device sanity outcomes.
+
 ### Post-merge production-readiness gate
 
 Physical-device evidence remains mandatory before the runtime is called production-ready, released to application consumers or used as the baseline for device performance claims.
@@ -216,8 +234,10 @@ Phase 2 repository work may begin after the Phase 1 merge. Production claims rem
 - [x] queue, model-load, TTFT, prefill, decode, token-count and throughput metrics
 - [ ] explicit cold-versus-warm load classification and comparison
 - [ ] memory and thermal snapshots
-- [ ] model integrity checks exposed through the control plane
-- [ ] generation sanity suites
+- [x] static model-integrity checks exposed through the control plane
+- [x] deterministic generation sanity-suite engine and runtime adapter
+- [ ] GGUF metadata and native load/context/unload health suites
+- [ ] representative versioned fixture catalogue and physical-device sanity evidence
 - [ ] cache health suites
 - [ ] benchmark baselines and regressions
 - [ ] redacted diagnostic bundle export
