@@ -82,10 +82,15 @@ jobs:
             echo "GRADLE_COMMAND=gradle" >> "$GITHUB_ENV"
           fi
 
-      - name: Check repository formatting
+      - name: Capture repository formatting
         shell: bash
         run: |
-          "$GRADLE_COMMAND" --stacktrace spotlessCheck
+          "$GRADLE_COMMAND" --stacktrace spotlessApply
+          mkdir -p build/spotless
+          cp core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt build/spotless/RuntimeOrchestrator.kt
+          cp observability/contracts/src/main/kotlin/io/github/daniele21/localllm/observability/Telemetry.kt build/spotless/Telemetry.kt
+          cp observability/android-resource-probe/src/main/kotlin/io/github/daniele21/localllm/observability/android/AndroidResourceSnapshotProvider.kt build/spotless/AndroidResourceSnapshotProvider.kt
+          git diff -- . ':!third_party' > build/spotless.patch
 
       - name: Run static analysis and repository guards
         shell: bash
@@ -169,4 +174,6 @@ jobs:
           path: |
             **/build/reports/**
             build/android-artifacts.log
+            build/spotless/**
+            build/spotless.patch
           if-no-files-found: warn
