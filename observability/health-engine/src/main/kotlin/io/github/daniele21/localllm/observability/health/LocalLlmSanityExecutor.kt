@@ -128,8 +128,7 @@ class LocalLlmSanityExecutor(
         errorDetail = detail,
     )
 
-    private fun elapsedMillis(startedAtNanos: Long): Long =
-        (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
+    private fun elapsedMillis(startedAtNanos: Long): Long = (monotonicClock() - startedAtNanos).coerceAtLeast(0L) / NANOS_PER_MILLISECOND
 
     private companion object {
         const val NANOS_PER_MILLISECOND = 1_000_000L
