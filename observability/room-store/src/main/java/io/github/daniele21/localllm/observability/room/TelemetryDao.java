@@ -5,6 +5,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+import androidx.room.Transaction;
 import java.util.List;
 
 @Dao
@@ -27,6 +28,13 @@ public interface TelemetryDao {
                     + "ORDER BY started_at_epoch_ms DESC, request_id DESC LIMIT :maxRows)")
     void trimRuns(int maxRows);
 
+    @Transaction
+    default void upsertRunWithRetention(
+            TelemetryEntities.GenerationRunEntity run, int maxRows) {
+        upsertRun(run);
+        trimRuns(maxRows);
+    }
+
     @Insert
     long insertLog(TelemetryEntities.StructuredLogEntity log);
 
@@ -45,6 +53,13 @@ public interface TelemetryDao {
                     + "SELECT id FROM structured_logs "
                     + "ORDER BY timestamp_epoch_ms DESC, id DESC LIMIT :maxRows)")
     void trimLogs(int maxRows);
+
+    @Transaction
+    default void insertLogWithRetention(
+            TelemetryEntities.StructuredLogEntity log, int maxRows) {
+        insertLog(log);
+        trimLogs(maxRows);
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsertHealth(TelemetryEntities.HealthCheckEntity result);
