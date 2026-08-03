@@ -50,17 +50,9 @@ data class ConsoleSnapshot(
     val sourceError: String? = null,
 )
 
-data class ConsoleScreen(
-    val title: String,
-    val subtitle: String,
-    val cards: List<ConsoleCard>,
-)
+data class ConsoleScreen(val title: String, val subtitle: String, val cards: List<ConsoleCard>)
 
-data class ConsoleCard(
-    val title: String,
-    val lines: List<String>,
-    val emphasis: ConsoleEmphasis = ConsoleEmphasis.NEUTRAL,
-)
+data class ConsoleCard(val title: String, val lines: List<String>, val emphasis: ConsoleEmphasis = ConsoleEmphasis.NEUTRAL)
 
 enum class ConsoleEmphasis {
     NEUTRAL,
