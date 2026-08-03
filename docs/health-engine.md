@@ -13,15 +13,35 @@ The module:
 - persists every result through `TelemetryRepository.saveHealth`;
 - converts unexpected exceptions into a privacy-safe failure;
 - exposes installed-model integrity through `ModelStore.verify`;
-- executes configurable end-to-end generation sanity checks through `LocalLlmClient`.
+- executes configurable end-to-end generation sanity checks through `LocalLlmClient`;
+- interprets neutral cache-health probes without coupling the runtime to the health engine.
 
 It does not own Room, console rendering, cross-application transport, benchmark history, memory or thermal probes.
 
 ## Core API
 
+The same `ModelIntegrityCache` instance must be supplied to the runtime and its health probe. This makes the probe observe the cache that inference actually uses rather than an empty diagnostic copy.
+
 ```kotlin
+val integrityCache = ModelIntegrityCache()
+val runtime = RuntimeOrchestrator(
+    registry = registry,
+    modelStore = modelStore,
+    backend = backend,
+    scheduler = scheduler,
+    telemetry = telemetry,
+    integrityCache = integrityCache,
+)
+
+val cacheHealthCheck = CacheHealthCheck(
+    ModelIntegrityCacheHealthProbe(
+        cache = integrityCache,
+        modelStore = modelStore,
+    ),
+)
+
 val sanityCheck = GenerationSanityHealthCheck(
-    client = localLlmClient,
+    client = runtime,
     spec = GenerationSanitySpec(
         applicationId = ApplicationId("com.example.app"),
         useCaseId = UseCaseId("runtime-sanity"),
@@ -38,13 +58,14 @@ val sanityCheck = GenerationSanityHealthCheck(
 val engine = HealthEngine(
     checks = listOf(
         ModelIntegrityHealthCheck(modelStore),
+        cacheHealthCheck,
         sanityCheck,
     ),
     telemetryRepository = telemetryRepository,
 )
 
 val fullReport = engine.runAll()
-val selectedReport = engine.run(listOf(sanityCheck.id))
+val selectedReport = engine.run(listOf(cacheHealthCheck.id, sanityCheck.id))
 ```
 
 `HealthCheck` implementations return a `HealthAssessment` containing only a status and a privacy-safe summary. The engine converts it to the stable `HealthCheckResult` contract, records its duration and persists it.
@@ -105,6 +126,41 @@ Outcomes:
 
 This check is backend-agnostic. It does not depend on `RuntimeOrchestrator`, scheduler implementation details, JNI handles or `llama.cpp` types. It can therefore exercise the embedded runtime today and a future Binder-backed `LocalLlmClient` without changing the health contract.
 
+## Model-integrity cache health
+
+The cache-health boundary is split deliberately:
+
+- `CacheHealthProbe` and `CacheHealthSnapshot` live in `observability/contracts`;
+- `ModelIntegrityCacheHealthProbe` lives beside `ModelIntegrityCache` in `runtime-core`;
+- `CacheHealthCheck` lives in `observability/health-engine` and maps the neutral snapshot to a health result.
+
+This dependency direction keeps the runtime independent from the health-engine implementation.
+
+`ModelIntegrityCacheHealthProbe` compares every cached verification stamp with the current `ModelStore.snapshot()` and the artifact's current file stamp.
+
+An entry is:
+
+- **healthy** when its digest is still installed and its path, file size and last-modified timestamp match the cached stamp;
+- **stale** when the model is still installed but its current file stamp differs;
+- **orphaned** when the digest is no longer present in the model store.
+
+The snapshot is observational and non-mutating. Running the check does not clear, invalidate or re-verify entries. Cache repair remains owned by the runtime lifecycle and the next explicit verification.
+
+The stable check ID is:
+
+```text
+cache-health:model-integrity
+```
+
+Outcomes:
+
+- an empty or fully consistent cache: `PASS`;
+- one or more stale or orphaned entries: `FAIL`.
+
+Only aggregate counts are persisted. Paths, digests, model bytes and file timestamps are not included in the health detail.
+
+A verified atomic import may seed the cache without a second hash while no prior cache stamp exists. Once cached, a changed file stamp can no longer reuse the import's `verified` flag: the next runtime verification calls `ModelStore.verify()` again. This prevents a modified artifact from remaining trusted indefinitely.
+
 ## Failure isolation and privacy
 
 A check may fail independently without breaking inference or another health check. Unexpected exceptions are converted to:
@@ -118,17 +174,21 @@ The original exception message is deliberately excluded because it may contain p
 
 Generation sanity results never persist the configured prompt, generated output or backend error message. A typed generation failure exposes only its stable public error code. Output mismatches report only that the assertion failed.
 
+Cache-health results contain aggregate counts only. The internal cache stamp remains private to `runtime-core`.
+
 Persistence uses the existing `TelemetryRepository` boundary. The Room-backed implementation therefore makes health results available to the owning embedded application without coupling this module to Room.
 
 ## Threading
 
 `HealthEngine` executes checks synchronously on the caller's thread. `GenerationSanityHealthCheck` blocks that caller until a terminal event or the configured timeout. Callers must run health suites on a dedicated worker or control-plane executor, never the Android main thread or the inference callback thread.
 
-The check does not introduce a hidden global executor. Generation itself remains owned by the supplied `LocalLlmClient` and its scheduler.
+The cache probe copies the concurrent cache entries before evaluating them and does not acquire an inference-wide lock. Its result is a bounded point-in-time observation and may become outdated immediately if the runtime changes the cache concurrently.
+
+The health engine does not introduce a hidden global executor. Generation itself remains owned by the supplied `LocalLlmClient` and its scheduler.
 
 ## Testing
 
-The module includes deterministic tests for:
+The module and runtime include deterministic tests for:
 
 - suite aggregation;
 - duration measurement;
@@ -143,17 +203,23 @@ The module includes deterministic tests for:
 - typed runtime failures without backend-message disclosure;
 - timeout cancellation;
 - preparation failure before session creation;
-- mandatory session cleanup and cleanup failure.
+- mandatory session cleanup and cleanup failure;
+- empty and fully consistent cache snapshots;
+- stale file-stamp detection;
+- orphaned entry detection after model-store removal;
+- aggregate privacy-safe cache-health summaries;
+- re-hashing a previously verified artifact after its file stamp changes.
 
-The aggregate repository gate runs the tests, Android Lint and AAR assembly.
+The aggregate repository gate runs the tests, Android Lint, Android artifacts and native packaging verification.
 
 ## Current limitations
 
 The generation sanity implementation is executable against a real `LocalLlmClient`, but repository CI uses deterministic contract fakes and does not prove behavior with a physical Android device and a real GGUF. That evidence remains part of the separate production-readiness gate.
 
+The cache-health slice covers the runtime's model-integrity verification cache. No other runtime cache with an independent health contract is currently implemented.
+
 This module does not yet provide:
 
-- cache health checks;
 - memory or thermal checks;
 - cold-versus-warm benchmark classification;
 - periodic scheduling;

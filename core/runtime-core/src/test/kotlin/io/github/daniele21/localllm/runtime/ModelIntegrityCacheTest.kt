@@ -36,8 +36,7 @@ class ModelIntegrityCacheTest {
         val cache = ModelIntegrityCache()
 
         cache.verify(store, StoredModel(digest, file, file.length(), verified = false))
-        file.appendText("d")
-        file.setLastModified(file.lastModified() + 1_000)
+        mutate(file)
         cache.verify(store, StoredModel(digest, file, file.length(), verified = false))
 
         assertEquals(2, store.verificationCalls)
@@ -77,16 +76,93 @@ class ModelIntegrityCacheTest {
         file.delete()
     }
 
+    @Test
+    fun `verified atomic import is rehashed after its file stamp changes`() {
+        val file = temporaryModel("abc")
+        val digest = ModelDigest("e".repeat(64))
+        val store = CountingModelStore(valid = true)
+        val cache = ModelIntegrityCache()
+
+        cache.verify(store, StoredModel(digest, file, file.length(), verified = true))
+        mutate(file)
+        cache.verify(store, StoredModel(digest, file, file.length(), verified = true))
+
+        assertEquals(1, store.verificationCalls)
+        file.delete()
+    }
+
+    @Test
+    fun `health snapshot reports current cache entries as healthy`() {
+        val file = temporaryModel("abc")
+        val stored = StoredModel(ModelDigest("f".repeat(64)), file, file.length(), verified = true)
+        val store = CountingModelStore(valid = true, entries = listOf(stored))
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stored)
+
+        val snapshot = cache.healthSnapshot(store)
+
+        assertEquals(1, snapshot.entryCount)
+        assertEquals(1, snapshot.healthyEntryCount)
+        assertEquals(0, snapshot.staleEntryCount)
+        assertEquals(0, snapshot.orphanedEntryCount)
+        assertTrue(snapshot.healthy)
+        file.delete()
+    }
+
+    @Test
+    fun `health snapshot detects stale cached file stamps`() {
+        val file = temporaryModel("abc")
+        val stored = StoredModel(ModelDigest("1".repeat(64)), file, file.length(), verified = true)
+        val store = CountingModelStore(valid = true, entries = listOf(stored))
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stored)
+        mutate(file)
+
+        val snapshot = cache.healthSnapshot(store)
+
+        assertEquals(1, snapshot.entryCount)
+        assertEquals(1, snapshot.staleEntryCount)
+        assertEquals(0, snapshot.orphanedEntryCount)
+        assertFalse(snapshot.healthy)
+        file.delete()
+    }
+
+    @Test
+    fun `health snapshot detects entries whose model was removed`() {
+        val file = temporaryModel("abc")
+        val stored = StoredModel(ModelDigest("2".repeat(64)), file, file.length(), verified = true)
+        val store = CountingModelStore(valid = true, entries = listOf(stored))
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stored)
+        store.entries = emptyList()
+        val probe = ModelIntegrityCacheHealthProbe(cache, store)
+
+        val snapshot = probe.snapshot()
+
+        assertEquals("model-integrity", probe.id)
+        assertEquals(1, snapshot.entryCount)
+        assertEquals(0, snapshot.staleEntryCount)
+        assertEquals(1, snapshot.orphanedEntryCount)
+        assertFalse(snapshot.healthy)
+        file.delete()
+    }
+
     private fun temporaryModel(content: String): File = File.createTempFile("integrity-cache", ".gguf").apply {
         writeText(content)
         deleteOnExit()
     }
+
+    private fun mutate(file: File) {
+        file.appendText("d")
+        file.setLastModified(file.lastModified() + 1_000)
+    }
 }
 
-private class CountingModelStore(private val valid: Boolean) : ModelStore {
+private class CountingModelStore(private val valid: Boolean, entries: List<StoredModel> = emptyList()) : ModelStore {
     var verificationCalls: Int = 0
+    var entries: List<StoredModel> = entries
 
-    override fun find(digest: ModelDigest): StoredModel? = null
+    override fun find(digest: ModelDigest): StoredModel? = entries.find { it.digest == digest }
 
     override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
 
@@ -101,5 +177,9 @@ private class CountingModelStore(private val valid: Boolean) : ModelStore {
 
     override fun remove(digest: ModelDigest): Boolean = false
 
-    override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(0, 0, emptyList())
+    override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(
+        modelCount = entries.size,
+        totalBytes = entries.sumOf(StoredModel::sizeBytes),
+        entries = entries,
+    )
 }
