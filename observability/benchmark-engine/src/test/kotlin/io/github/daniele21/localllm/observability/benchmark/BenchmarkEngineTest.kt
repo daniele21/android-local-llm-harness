@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package io.github.daniele21.localllm.observability.benchmark
 
 import io.github.daniele21.localllm.contracts.ApplicationId
