@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.observability
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -24,6 +25,7 @@ data class GenerationRunRecord(
     val errorCode: String?,
     val prefillMs: Long? = null,
     val decodeMs: Long? = null,
+    val modelLoadKind: ModelLoadKind = ModelLoadKind.UNKNOWN,
 )
 
 enum class RunStatus {
@@ -59,19 +61,57 @@ enum class HealthStatus {
     NOT_RUN,
 }
 
+data class ResourceSnapshot(
+    val timestampEpochMs: Long,
+    val processPssBytes: Long?,
+    val nativeHeapBytes: Long?,
+    val javaHeapUsedBytes: Long?,
+    val availableMemoryBytes: Long?,
+    val lowMemory: Boolean?,
+    val thermalStatus: ThermalStatus,
+) {
+    init {
+        require(timestampEpochMs >= 0) { "Resource snapshot timestamp must not be negative" }
+        listOf(processPssBytes, nativeHeapBytes, javaHeapUsedBytes, availableMemoryBytes).forEach { value ->
+            require(value == null || value >= 0) { "Resource snapshot byte values must not be negative" }
+        }
+    }
+}
+
+enum class ThermalStatus {
+    NONE,
+    LIGHT,
+    MODERATE,
+    SEVERE,
+    CRITICAL,
+    EMERGENCY,
+    SHUTDOWN,
+    UNKNOWN,
+}
+
+fun interface ResourceSnapshotProvider {
+    fun snapshot(): ResourceSnapshot
+}
+
 data class DeveloperDashboardSnapshot(
     val runtime: RuntimeSnapshot,
     val recentRuns: List<GenerationRunRecord>,
     val recentLogs: List<StructuredLog>,
     val health: List<HealthCheckResult>,
+    val resources: List<ResourceSnapshot> = emptyList(),
     val modelStoreBytes: Long,
     val modelCount: Int,
 )
 
-data class TelemetryRetentionPolicy(val maxRuns: Int = 500, val maxLogs: Int = 2_000) {
+data class TelemetryRetentionPolicy(
+    val maxRuns: Int = 500,
+    val maxLogs: Int = 2_000,
+    val maxResourceSnapshots: Int = 500,
+) {
     init {
         require(maxRuns > 0) { "maxRuns must be positive" }
         require(maxLogs > 0) { "maxLogs must be positive" }
+        require(maxResourceSnapshots > 0) { "maxResourceSnapshots must be positive" }
     }
 }
 
@@ -82,6 +122,8 @@ interface TelemetryRepository {
 
     fun saveHealth(result: HealthCheckResult)
 
+    fun recordResourceSnapshot(snapshot: ResourceSnapshot)
+
     fun recentRuns(limit: Int = 100): List<GenerationRunRecord>
 
     fun findRun(requestId: RequestId): GenerationRunRecord?
@@ -89,6 +131,8 @@ interface TelemetryRepository {
     fun recentLogs(limit: Int = 500, requestId: RequestId? = null): List<StructuredLog>
 
     fun healthResults(): List<HealthCheckResult>
+
+    fun recentResourceSnapshots(limit: Int = 100): List<ResourceSnapshot>
 
     fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot
 }
@@ -100,6 +144,8 @@ object NoOpTelemetryRepository : TelemetryRepository {
 
     override fun saveHealth(result: HealthCheckResult) = Unit
 
+    override fun recordResourceSnapshot(snapshot: ResourceSnapshot) = Unit
+
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = emptyList()
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = null
@@ -108,11 +154,14 @@ object NoOpTelemetryRepository : TelemetryRepository {
 
     override fun healthResults(): List<HealthCheckResult> = emptyList()
 
+    override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = emptyList()
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = DeveloperDashboardSnapshot(
         runtime = runtime,
         recentRuns = emptyList(),
         recentLogs = emptyList(),
         health = emptyList(),
+        resources = emptyList(),
         modelStoreBytes = 0L,
         modelCount = 0,
     )
