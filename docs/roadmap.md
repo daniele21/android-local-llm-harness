@@ -207,7 +207,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] non-destructive Room schema migration
 - [ ] physical-device memory and thermal evidence under a real GGUF workload
 
-### Benchmark baselines and regressions — PR #27
+### Benchmark baselines and regressions — PR #27 and PR #33
 
 - [x] benchmark key by application, use case, model digest and cold/warm classification
 - [x] reject `UNKNOWN` classification for baseline creation
@@ -216,14 +216,18 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] median total latency
 - [x] nearest-rank p95 total latency
 - [x] median decode throughput
-- [x] persisted baseline storage in memory and Room
+- [x] persisted active baseline storage in memory and Room
 - [x] non-destructive Room schema migration
 - [x] post-baseline regression comparison
 - [x] `WARN` for missing baseline or insufficient samples
 - [x] `FAIL` for policy regressions
 - [x] privacy-safe metric-class summaries
+- [x] bounded retained baseline history in memory and Room
+- [x] separate active baseline and immutable history semantics
+- [x] non-destructive Room schema 3→4 migration that seeds existing active baselines into history
+- [x] structured comparison results with values, ratios, thresholds and metric regression flags
+- [x] partial non-actionable comparison previews before minimum sample readiness
 - [ ] physical-device baseline collection on representative devices
-- [ ] baseline history beyond the current active baseline per key
 
 ### Console observability, controls and cache repair — PR #31
 
@@ -275,11 +279,65 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
+### Benchmark regression and baseline history console — PR #33
+
+- [x] stacked branch and draft PR based on PR #31
+- [x] `BenchmarkComparisonEvaluator` shared by health checks and console presentation
+- [x] comparison lookback independent from the visible Runs limit
+- [x] active-key and PASS/WARN/FAIL summary
+- [x] baseline/current metric values, ratios and policy thresholds
+- [x] explicit ready, preview, regression, within-policy and unavailable states
+- [x] retained baseline cards with active-capture identification
+- [x] chronological median TTFT history chart
+- [x] chronological p95 total-latency history chart
+- [x] chronological median decode-throughput history chart
+- [x] nullable history metrics rendered as gaps rather than zero values
+- [x] in-memory and Room active/history persistence tests
+- [x] evaluator, data-source and presenter tests
+- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
+- [ ] rebase or retarget onto `main` after PR #31 is merged
+
+### Explicit model management console — PR #34
+
+- [x] stacked branch and draft PR based on PR #31
+- [x] `ConsoleModelControl` boundary over existing `ModelStore` import, verify and remove operations
+- [x] observational inventory kept separate from mutating capabilities
+- [x] Storage Access Framework GGUF selection and private staging
+- [x] streaming SHA-256 and provider-size validation before import
+- [x] existing content-addressed store reused for digest, size, deduplication and conflict checks
+- [x] import, verification and removal outside the Android main thread
+- [x] model actions disabled while an operation is active
+- [x] explicit confirmation before removal
+- [x] loaded-model removal blocked in presenter and control layers when runtime identity is available
+- [x] fixed privacy-safe import, verification, removal and source failures
+- [x] staged-file cleanup after success and failure
+- [x] control, presenter and data-source tests
+- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
+- [ ] rebase or retarget onto `main` after PR #31 is merged
+
+### Manual inference playground — PR #35
+
+- [x] stacked branch and draft PR based on PR #31
+- [x] `ConsoleInferenceControl` boundary over the public `LocalLlmClient` contract
+- [x] explicit application/use-case target registration supplied by the embedding application
+- [x] one-shot prepare, session creation and generation lifecycle
+- [x] target, prompt, maximum-output-token, temperature and seed request dialog
+- [x] queued, started, streaming, completed, failed and cancelled state mapping
+- [x] bounded 131,072-character in-memory output with explicit truncation state
+- [x] queue, load, TTFT, prefill, decode, total, token and throughput metric presentation
+- [x] cooperative cancellation through the runtime `GenerationHandle`
+- [x] race-safe synchronous terminal and cancellation callbacks
+- [x] session cleanup after completed, failed and cancelled terminal events
+- [x] cleanup failure overrides the terminal result with a privacy-safe failure state
+- [x] prompts excluded from console snapshots, telemetry and saved state
+- [x] generated output retained only in bounded in-memory playground state
+- [x] standalone console remains explicitly disconnected because it owns no configured runtime targets
+- [x] control, presenter and data-source tests
+- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
+- [ ] rebase or retarget onto `main` after PR #31 is merged
+
 ### Remaining Phase 2 work
 
-- [ ] benchmark regression comparison and baseline history views
-- [ ] model-management console
-- [ ] manual inference playground
 - [ ] privacy-redacted diagnostic bundle export
 - [ ] signature-protected diagnostics bridge for cross-application console access
 
