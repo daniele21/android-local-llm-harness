@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
@@ -17,13 +18,19 @@ import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.ThermalStatus
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.store.ModelStore
+import io.github.daniele21.localllm.store.ModelStoreSnapshot
+import io.github.daniele21.localllm.store.StoredModel
+import io.github.daniele21.localllm.store.VerificationResult
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.io.File
 
 class ConsoleDataSourceTest {
     @Test
-    fun `loads bounded telemetry and runtime state`() {
+    fun `loads bounded telemetry runtime state and model inventory`() {
         val repository = InMemoryTelemetryRepository()
         repeat(3) { index -> repository.recordRun(run(index)) }
         repeat(4) { index -> repository.appendLog(log(index)) }
@@ -43,6 +50,7 @@ class ConsoleDataSourceTest {
                     source = "In process",
                 )
             },
+            modelInventoryProvider = ConsoleModelInventoryProvider { inventory() },
             clockEpochMs = { 99L },
             runLimit = 2,
             logLimit = 3,
@@ -53,12 +61,42 @@ class ConsoleDataSourceTest {
 
         assertEquals(99L, snapshot.capturedAtEpochMs)
         assertEquals("Ready", snapshot.runtime.status)
+        assertEquals(1, snapshot.modelInventory.modelCount)
         assertEquals(2, snapshot.runs.size)
         assertEquals(3, snapshot.logs.size)
         assertEquals(1, snapshot.health.size)
         assertEquals(1, snapshot.resources.size)
         assertEquals(1, snapshot.benchmarkBaselines.size)
         assertNull(snapshot.sourceError)
+    }
+
+    @Test
+    fun `maps model store snapshot without exposing private file paths`() {
+        val digest = ModelDigest("d".repeat(64))
+        val provider = ModelStoreInventoryProvider(
+            modelStore = SnapshotModelStore(
+                ModelStoreSnapshot(
+                    modelCount = 1,
+                    totalBytes = 1_024,
+                    entries = listOf(
+                        StoredModel(
+                            digest = digest,
+                            file = File("/private/runtime/models/model.gguf"),
+                            sizeBytes = 1_024,
+                            verified = false,
+                        ),
+                    ),
+                ),
+            ),
+            source = "Embedded runtime",
+        )
+
+        val inventory = provider.snapshot()
+
+        assertEquals(1, inventory.modelCount)
+        assertEquals(digest, inventory.entries.single().digest)
+        assertEquals(ConsoleModelIntegrity.NOT_CHECKED, inventory.entries.single().integrity)
+        assertFalse(inventory.toString().contains("/private/runtime"))
     }
 
     @Test
@@ -78,9 +116,10 @@ class ConsoleDataSourceTest {
     }
 
     @Test
-    fun `returns privacy safe error without exposing repository failure`() {
+    fun `returns privacy safe errors without exposing source failures`() {
         val dataSource = TelemetryConsoleDataSource(
             telemetryRepository = FailingTelemetryRepository(),
+            modelInventoryProvider = ConsoleModelInventoryProvider { error("private model path") },
             clockEpochMs = { 7L },
         )
 
@@ -90,10 +129,26 @@ class ConsoleDataSourceTest {
         assertEquals("Telemetry source unavailable", snapshot.sourceError)
         assertEquals(emptyList<GenerationRunRecord>(), snapshot.runs)
         assertEquals("Not connected", snapshot.runtime.status)
+        assertEquals("Model inventory unavailable", snapshot.modelInventory.sourceError)
+        assertFalse(snapshot.modelInventory.toString().contains("private model path"))
         assertEquals("Telemetry source unavailable", detail.sourceError)
         assertNull(detail.run)
         assertEquals(emptyList<StructuredLog>(), detail.timeline)
     }
+
+    private fun inventory() = ConsoleModelInventory(
+        available = true,
+        modelCount = 1,
+        totalBytes = 2_048,
+        entries = listOf(
+            ConsoleInstalledModel(
+                digest = ModelDigest("c".repeat(64)),
+                sizeBytes = 2_048,
+                integrity = ConsoleModelIntegrity.VERIFIED,
+            ),
+        ),
+        source = "In process",
+    )
 
     private fun run(index: Int) = GenerationRunRecord(
         requestId = RequestId("request-$index"),
@@ -152,5 +207,17 @@ class ConsoleDataSourceTest {
         override fun recentRuns(limit: Int): List<GenerationRunRecord> = error("private database path")
 
         override fun findRun(requestId: RequestId): GenerationRunRecord? = error("private database path")
+    }
+
+    private class SnapshotModelStore(private val value: ModelStoreSnapshot) : ModelStore {
+        override fun find(digest: ModelDigest): StoredModel? = null
+
+        override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
+
+        override fun verify(digest: ModelDigest): VerificationResult = error("Not used")
+
+        override fun remove(digest: ModelDigest): Boolean = false
+
+        override fun snapshot(): ModelStoreSnapshot = value
     }
 }
