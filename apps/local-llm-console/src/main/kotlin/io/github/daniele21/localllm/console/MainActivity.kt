@@ -34,6 +34,7 @@ class MainActivity : Activity() {
             source = "Local console sandbox",
         )
     }
+    private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl
     private val dataSource: ConsoleDataSource by lazy {
         TelemetryConsoleDataSource(
             telemetryRepository = telemetryRepository,
@@ -42,17 +43,21 @@ class MainActivity : Activity() {
                 source = "Local console sandbox",
             ),
             healthControl = healthControl,
+            cacheControl = cacheControl,
         )
     }
-    private val healthExecutor = Executors.newSingleThreadExecutor()
+    private val diagnosticExecutor = Executors.newSingleThreadExecutor()
     private lateinit var content: LinearLayout
     private lateinit var updatedAt: TextView
     private lateinit var backButton: Button
     private var selectedTab: ConsoleTab = ConsoleTab.OVERVIEW
     private var snapshot: ConsoleSnapshot? = null
     private var requestDetail: ConsoleRequestDetail? = null
-    private var healthExecutionInProgress = false
+    private var actionExecutionInProgress = false
+    private var activeActionType: ConsoleActionType? = null
     private var healthExecutionError: String? = null
+    private var cacheExecutionError: String? = null
+    private var lastCacheRepair: ConsoleCacheRepairOutcome? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,7 +71,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        healthExecutor.shutdownNow()
+        diagnosticExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -78,9 +83,9 @@ class MainActivity : Activity() {
         addView(label("Android local inference control plane", 16f))
         addView(
             label(
-                "Read-only Phase 2 observability, local model inventory and explicit sandbox health controls. " +
-                    "Cross-application access remains disconnected until the signature-protected diagnostics " +
-                    "bridge is implemented.",
+                "Phase 2 observability, local model inventory and explicit sandbox health controls. " +
+                    "Runtime cache diagnostics and cross-application access remain disconnected until a real " +
+                    "embedded source or signature-protected diagnostics bridge is supplied.",
                 14f,
             ).apply { setPadding(0, 8, 0, 16) },
         )
@@ -182,8 +187,13 @@ class MainActivity : Activity() {
         val currentSnapshot = snapshot ?: return null
         return currentSnapshot.copy(
             healthControl = currentSnapshot.healthControl.copy(
-                executionInProgress = healthExecutionInProgress,
+                executionInProgress = actionExecutionInProgress && activeActionType in HEALTH_ACTION_TYPES,
                 sourceError = healthExecutionError ?: currentSnapshot.healthControl.sourceError,
+            ),
+            cacheControl = currentSnapshot.cacheControl.copy(
+                executionInProgress = actionExecutionInProgress && activeActionType == ConsoleActionType.REPAIR_CACHE,
+                lastRepair = lastCacheRepair,
+                sourceError = cacheExecutionError ?: currentSnapshot.cacheControl.sourceError,
             ),
         )
     }
@@ -209,29 +219,55 @@ class MainActivity : Activity() {
         text = action.label
         isAllCaps = false
         isEnabled = action.enabled
-        setOnClickListener { executeHealthAction(action) }
+        setOnClickListener { executeAction(action) }
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply { setMargins(0, 0, 0, 12) }
     }
 
-    private fun executeHealthAction(action: ConsoleAction) {
-        if (healthExecutionInProgress || !action.enabled) return
-        healthExecutionInProgress = true
-        healthExecutionError = null
-        render()
-        healthExecutor.execute {
-            val outcome = when (action.type) {
-                ConsoleActionType.RUN_ALL_HEALTH_CHECKS -> healthControl.runAll()
-                ConsoleActionType.RUN_HEALTH_CHECKS -> healthControl.run(action.healthCheckIds)
-            }
+    private fun executeAction(action: ConsoleAction) {
+        if (actionExecutionInProgress || !action.enabled) return
+        beginAction(action.type)
+        diagnosticExecutor.execute {
+            val completion = performAction(action)
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                healthExecutionInProgress = false
-                healthExecutionError = outcome.sourceError
+                completeAction(completion)
                 refresh()
             }
+        }
+    }
+
+    private fun beginAction(type: ConsoleActionType) {
+        actionExecutionInProgress = true
+        activeActionType = type
+        if (type in HEALTH_ACTION_TYPES) healthExecutionError = null
+        if (type == ConsoleActionType.REPAIR_CACHE) cacheExecutionError = null
+        render()
+    }
+
+    private fun performAction(action: ConsoleAction): ConsoleActionCompletion = when (action.type) {
+        ConsoleActionType.RUN_ALL_HEALTH_CHECKS -> ConsoleActionCompletion(
+            healthError = healthControl.runAll().sourceError,
+        )
+
+        ConsoleActionType.RUN_HEALTH_CHECKS -> ConsoleActionCompletion(
+            healthError = healthControl.run(action.healthCheckIds).sourceError,
+        )
+
+        ConsoleActionType.REPAIR_CACHE -> ConsoleActionCompletion(
+            cacheRepair = cacheControl.repair(requireNotNull(action.cacheId)),
+        )
+    }
+
+    private fun completeAction(completion: ConsoleActionCompletion) {
+        actionExecutionInProgress = false
+        activeActionType = null
+        completion.healthError?.let { error -> healthExecutionError = error }
+        completion.cacheRepair?.let { outcome ->
+            lastCacheRepair = outcome
+            cacheExecutionError = outcome.sourceError
         }
     }
 
@@ -266,7 +302,19 @@ class MainActivity : Activity() {
         textSize = size
         if (bold) setTypeface(typeface, Typeface.BOLD)
     }
+
+    private companion object {
+        val HEALTH_ACTION_TYPES = setOf(
+            ConsoleActionType.RUN_ALL_HEALTH_CHECKS,
+            ConsoleActionType.RUN_HEALTH_CHECKS,
+        )
+    }
 }
+
+private data class ConsoleActionCompletion(
+    val healthError: String? = null,
+    val cacheRepair: ConsoleCacheRepairOutcome? = null,
+)
 
 private val ConsoleEmphasis.label: String
     get() = when (this) {
