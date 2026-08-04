@@ -22,6 +22,7 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
     private val health = linkedMapOf<String, HealthCheckResult>()
     private val resources = ArrayDeque<ResourceSnapshot>()
     private val baselines = linkedMapOf<String, BenchmarkBaseline>()
+    private val baselineHistory = ArrayDeque<BenchmarkBaseline>()
 
     override fun recordRun(run: GenerationRunRecord) = synchronized(lock) {
         runs.removeAll { it.requestId == run.requestId }
@@ -45,6 +46,8 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
 
     override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) = synchronized(lock) {
         baselines[baseline.key.stableId] = baseline
+        baselineHistory.offerFirst(baseline)
+        while (baselineHistory.size > retention.maxBenchmarkBaselines) baselineHistory.removeLast()
     }
 
     override fun recentRuns(limit: Int): List<GenerationRunRecord> = synchronized(lock) {
@@ -72,6 +75,10 @@ class InMemoryTelemetryRepository(private val retention: TelemetryRetentionPolic
 
     override fun benchmarkBaselines(): List<BenchmarkBaseline> = synchronized(lock) {
         baselines.values.sortedBy { it.key.stableId }
+    }
+
+    override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = synchronized(lock) {
+        baselineHistory.asSequence().take(requirePositiveLimit(limit)).toList()
     }
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = synchronized(lock) {
