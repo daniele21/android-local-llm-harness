@@ -13,6 +13,8 @@ import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,6 +50,7 @@ class BenchmarkEngineTest {
         assertEquals(500.0, baseline.p95TotalMs)
         assertEquals(98.0, baseline.medianDecodeTokensPerSecond)
         assertEquals(listOf(baseline), repository.benchmarkBaselines())
+        assertEquals(listOf(baseline), repository.benchmarkBaselineHistory())
     }
 
     @Test
@@ -73,9 +76,24 @@ class BenchmarkEngineTest {
         ).forEach(repository::recordRun)
 
         val result = BenchmarkRegressionHealthCheck(repository, warmKey, policy).evaluate()
+        val comparison = BenchmarkComparisonEvaluator(policy).compare(
+            key = warmKey,
+            baseline = repository.benchmarkBaselines().single(),
+            runs = repository.recentRuns(),
+        )
 
         assertEquals(HealthStatus.PASS, result.status)
         assertTrue("3 comparable metric" in result.detail)
+        assertEquals(HealthStatus.PASS, comparison.status)
+        assertTrue(comparison.comparisonReady)
+        assertEquals(3, comparison.availableSamples)
+        assertEquals(3, comparison.metrics.size)
+        assertEquals(
+            1.1,
+            comparison.metrics.single { it.metric == BenchmarkMetric.MEDIAN_TIME_TO_FIRST_TOKEN }.ratio!!,
+            0.0001,
+        )
+        assertFalse(comparison.metrics.any(BenchmarkMetricComparison::regressed))
     }
 
     @Test
@@ -88,12 +106,36 @@ class BenchmarkEngineTest {
         ).forEach(repository::recordRun)
 
         val result = BenchmarkRegressionHealthCheck(repository, warmKey, policy).evaluate()
+        val comparison = BenchmarkComparisonEvaluator(policy).compare(
+            key = warmKey,
+            baseline = repository.benchmarkBaselines().single(),
+            runs = repository.recentRuns(),
+        )
 
         assertEquals(HealthStatus.FAIL, result.status)
         assertTrue("median TTFT" in result.detail)
         assertTrue("p95 total latency" in result.detail)
         assertTrue("median decode throughput" in result.detail)
         assertTrue(digest.sha256 !in result.detail)
+        assertEquals(3, comparison.metrics.count(BenchmarkMetricComparison::regressed))
+    }
+
+    @Test
+    fun `keeps partial comparison metrics as a non actionable preview`() {
+        val repository = baselineRepository()
+        repository.recordRun(run("current", 130, 1_300, 80.0, 101))
+
+        val comparison = BenchmarkComparisonEvaluator(policy).compare(
+            key = warmKey,
+            baseline = repository.benchmarkBaselines().single(),
+            runs = repository.recentRuns(),
+        )
+
+        assertEquals(HealthStatus.WARN, comparison.status)
+        assertFalse(comparison.comparisonReady)
+        assertEquals(1, comparison.availableSamples)
+        assertNotNull(comparison.current)
+        assertTrue(comparison.metrics.all(BenchmarkMetricComparison::comparable))
     }
 
     @Test
