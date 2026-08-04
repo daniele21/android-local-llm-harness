@@ -4,10 +4,11 @@
 
 The console implementation turns `apps/local-llm-console` from a static shell into an observability, runtime-inspection and explicit diagnostics-control application.
 
-It provides nine primary views:
+It provides ten primary views:
 
 - overview;
 - installed models;
+- manual inference playground;
 - active runtime;
 - generation runs;
 - structured logs;
@@ -29,10 +30,12 @@ MainActivity
     ├── ConsoleCacheControl
     │       ├── CacheHealthProbe
     │       └── CacheMaintenanceControl
+    ├── ConsoleInferenceControl → LocalLlmClient
     └── presenters
             ├── ConsolePresenter
             ├── ConsoleHealthPresenter
             ├── ConsoleCachePresenter
+            ├── ConsoleInferencePresenter
             ├── ConsoleInventoryPresenter
             └── ConsoleResourceChartPresenter
                     ↓
@@ -45,14 +48,17 @@ MainActivity
             ├── ConsoleRuntimeStateProvider
             ├── ConsoleModelInventoryProvider
             ├── ConsoleHealthControl.snapshot()
-            └── ConsoleCacheControl.snapshot()
+            ├── ConsoleCacheControl.snapshot()
+            └── ConsoleInferenceControl.snapshot()
 ```
 
-`ConsoleDataSource` is the application-facing read boundary. Runtime state, model inventory, health controls, cache diagnostics and persisted telemetry are loaded independently. Failure in one source does not prevent the remaining sources from rendering.
+`ConsoleDataSource` is the application-facing read boundary. Runtime state, model inventory, health controls, cache diagnostics, inference state and persisted telemetry are loaded independently. Failure in one source does not prevent the remaining sources from rendering.
 
 `ConsoleHealthControl` is the explicit health-execution boundary. Reading registered-check state does not execute a check, and executing a check does not bypass `HealthEngine` persistence, aggregation or exception isolation.
 
 `ConsoleCacheControl` is the explicit cache-diagnostics boundary. It separates observational `CacheHealthProbe` instances from mutating `CacheMaintenanceControl` capabilities. Reading cache state never repairs or clears a cache.
+
+`ConsoleInferenceControl` is the explicit manual-generation boundary. Reading its snapshot never prepares a model, creates a session or starts generation. `LocalLlmConsoleInferenceControl` adapts the public `LocalLlmClient` contract and does not depend on `RuntimeOrchestrator`, Room, Binder, JNI or backend implementation types.
 
 Runtime state remains behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStateProvider` adapts the public `LocalLlmClient.runtimeSnapshot()` contract and does not depend on `RuntimeOrchestrator`, Room, Binder or backend implementation types.
 
@@ -71,6 +77,30 @@ It distinguishes:
 - inventory-source failure.
 
 `ModelStore.snapshot()` is observational and does not hash every artifact. An entry with `verified = false` is shown as `Not checked`, not as corrupt. Explicit integrity execution remains owned by `HealthEngine`.
+
+## Manual inference playground
+
+The Playground view performs explicit one-shot generation through a connected `LocalLlmClient`.
+
+An embedding application supplies one or more `ConsoleInferenceTarget` values. Each target identifies an existing application/use-case binding, so the runtime continues to resolve the correct model, system-prompt version, context parameters and cache policy through its normal registry. The console does not construct arbitrary runtime profiles from model digests.
+
+The request dialog accepts:
+
+- target application/use case;
+- prompt;
+- maximum output tokens;
+- temperature;
+- seed.
+
+Starting a request performs `prepare`, creates one session and submits one generation. Runtime events map to `PREPARING`, `QUEUED`, `GENERATING`, `COMPLETED`, `FAILED` or `CANCELLED`. Text deltas update bounded in-memory output, terminal metrics are displayed, and every terminal event triggers session cleanup.
+
+The Start action remains visible but disabled while a generation or session is active. Cancel is capability driven by the returned `GenerationHandle` and remains cooperative: a cancellation request is not reported as terminal until the runtime emits its cancelled terminal event.
+
+Visible generated output is bounded to 131,072 characters. Additional output is omitted from console state and reported through `outputTruncated` rather than allowing unbounded UI memory growth.
+
+The standalone console intentionally uses `DisconnectedConsoleInferenceControl`. It owns no configured inference runtime or application/use-case registry and therefore does not invent a runnable target.
+
+Detailed lifecycle, race handling, privacy behavior and embedding requirements are documented in [`console-inference-playground.md`](console-inference-playground.md).
 
 ## Active-runtime view
 
@@ -185,9 +215,9 @@ The standalone console currently uses:
 - an in-memory telemetry repository inside its Android sandbox;
 - a `FileSystemModelStore` rooted in its private files directory;
 - a `HealthEngine` containing `ModelIntegrityHealthCheck` over that store;
-- disconnected runtime and cache-control providers.
+- disconnected runtime, cache-control and inference-control providers.
 
-It can inspect and verify only its own model-store namespace. It cannot inspect another application's runtime, telemetry, resources, model store or runtime-owned caches. It also cannot run generation sanity without a connected runtime.
+It can inspect and verify only its own model-store namespace. It cannot inspect another application's runtime, telemetry, resources, model store or runtime-owned caches. It also cannot run generation sanity or manual inference without a connected runtime and explicit application/use-case targets.
 
 An application embedding the console data layer in the same process can provide:
 
@@ -195,13 +225,16 @@ An application embedding the console data layer in the same process can provide:
 - `ModelStoreInventoryProvider` over its real `ModelStore`;
 - `HealthEngineConsoleHealthControl` over registered health and sanity checks;
 - `ContractConsoleCacheControl` over runtime-owned cache probes and maintenance controls;
+- `LocalLlmConsoleInferenceControl` over its `LocalLlmClient` and explicit targets;
 - its persistent or in-memory `TelemetryRepository`.
 
 A signature-protected diagnostics bridge remains required for legitimate cross-application access.
 
 ## Privacy and failures
 
-The presenters do not receive or render prompts, generated output, model bytes, document URIs, private filesystem paths or arbitrary backend exception messages.
+Normal observability presenters do not receive or render prompts, generated output, model bytes, document URIs, private filesystem paths or arbitrary backend exception messages.
+
+The Playground presenter is the deliberate exception for generated output: it receives only bounded in-memory output from `ConsoleInferenceState` so the user can inspect the requested result. The prompt is never copied into `ConsoleInferenceState` or `ConsoleSnapshot`, and playground output is not persisted by the console to telemetry, structured logs, Room or saved instance state.
 
 Failures are converted to fixed messages:
 
@@ -209,11 +242,17 @@ Failures are converted to fixed messages:
 - `Model inventory unavailable`;
 - `Health execution unavailable`;
 - `Cache health unavailable`;
-- `Cache repair unavailable`.
+- `Cache repair unavailable`;
+- `Inference playground unavailable`;
+- `Model preparation failed`;
+- `Inference session creation failed`;
+- `Generation could not be started`;
+- `Generation cancellation failed`;
+- `Inference session cleanup failed`.
 
-A cache-source failure does not suppress telemetry, model inventory, runtime state or persisted health results. One failing cache probe does not hide other cache snapshots. A repair exception clears the running state and produces a fixed error without exposing the original exception text.
+A cache-source or inference-source failure does not suppress telemetry, model inventory, runtime state or persisted health results. One failing cache probe does not hide other cache snapshots. Cache repair and inference exceptions clear or update their own execution state without exposing the original exception text.
 
-Destroying the activity interrupts pending executor work through `shutdownNow()`. Generation-sanity timeout and cooperative cancellation remain owned by `GenerationSanityHealthCheck`.
+Destroying the activity closes the inference control and interrupts pending executor work through `shutdownNow()`. The inference control best-effort cancels its active handle and closes its session. Generation-sanity timeout and cooperative cancellation remain owned by `GenerationSanityHealthCheck`.
 
 ## Testing
 
@@ -234,9 +273,17 @@ Pure JVM tests cover:
 - stale entry revalidation;
 - orphaned and invalid entry removal;
 - failed revalidation retention;
-- privacy-safe cache-source and repair errors.
+- privacy-safe cache-source and repair errors;
+- inference-target discovery and source isolation;
+- prepare, session creation, streaming and terminal metric mapping;
+- bounded output and truncation;
+- explicit cancellation and terminal race behavior;
+- session cleanup after completion, failure and cancellation;
+- cleanup-failure handling;
+- prompt exclusion from console state;
+- disconnected, idle, generating and completed playground presentation.
 
-The repository validation gate compiles and packages the Android controls and chart view, runs JVM tests, Spotless, Detekt and Android Lint, verifies native packaging and confirms that no model artifact is introduced.
+The repository validation gate compiles and packages the Android controls, request dialog and chart view, runs JVM tests, Spotless, Detekt and Android Lint, verifies native packaging and confirms that no model artifact is introduced.
 
 ## Deferred slices
 
@@ -245,6 +292,5 @@ The following remain separate work:
 - persistent console-local Room wiring when the console owns an embedded runtime;
 - benchmark regression comparison and baseline history;
 - installed-model mutation and management;
-- manual inference playground;
 - privacy-redacted diagnostic export;
 - signature-protected cross-application diagnostics bridge.
