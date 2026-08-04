@@ -66,9 +66,9 @@ class RoomTelemetryRepository internal constructor(
     override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) {
         executeAsync {
             dao.saveBenchmarkBaselineWithHistory(
-                activeBaseline = TelemetryEntityMapper.benchmarkEntity(baseline),
-                historicalBaseline = TelemetryEntityMapper.benchmarkHistoryEntity(baseline),
-                maxRows = retention.maxBenchmarkBaselines,
+                TelemetryEntityMapper.benchmarkEntity(baseline),
+                TelemetryEntityMapper.benchmarkHistoryEntity(baseline),
+                retention.maxBenchmarkBaselines,
             )
         }
     }
@@ -100,11 +100,11 @@ class RoomTelemetryRepository internal constructor(
     }
 
     override fun benchmarkBaselines(): List<BenchmarkBaseline> = executeBlocking {
-        dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline)
+        dao.benchmarkBaselines().map { TelemetryEntityMapper.benchmarkBaseline(it) }
     }
 
     override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = executeBlocking {
-        dao.benchmarkBaselineHistory(requirePositiveLimit(limit)).map(TelemetryEntityMapper::benchmarkBaseline)
+        dao.benchmarkBaselineHistory(requirePositiveLimit(limit)).map { TelemetryEntityMapper.benchmarkBaseline(it) }
     }
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = executeBlocking {
@@ -115,7 +115,7 @@ class RoomTelemetryRepository internal constructor(
             health = dao.healthResults().map(TelemetryEntityMapper::healthResult),
             resources = dao.recentResourceSnapshots(retention.maxResourceSnapshots)
                 .map(TelemetryEntityMapper::resourceSnapshot),
-            benchmarkBaselines = dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline),
+            benchmarkBaselines = dao.benchmarkBaselines().map { TelemetryEntityMapper.benchmarkBaseline(it) },
             modelStoreBytes = 0L,
             modelCount = 0,
         )
