@@ -69,17 +69,21 @@ class CatalogJsonCodec(
         }
     }
 
-    override fun encode(document: CatalogModelDocument): CatalogEncodeResult = try {
-        val bytes = CatalogJsonWriter.encode(encodeDocument(document))
-        if (bytes.size > maxDocumentBytes) {
-            CatalogEncodeResult.Failure(CatalogCodecError(CatalogCodecErrorCode.ENCODED_DOCUMENT_TOO_LARGE, ROOT_PATH))
-        } else {
-            CatalogEncodeResult.Success(bytes)
+    override fun encode(document: CatalogModelDocument): CatalogEncodeResult {
+        return try {
+            val bytes = CatalogJsonWriter.encode(encodeDocument(document))
+            if (bytes.size > maxDocumentBytes) {
+                CatalogEncodeResult.Failure(
+                    CatalogCodecError(CatalogCodecErrorCode.ENCODED_DOCUMENT_TOO_LARGE, ROOT_PATH),
+                )
+            } else {
+                CatalogEncodeResult.Success(bytes)
+            }
+        } catch (error: CatalogMappingException) {
+            CatalogEncodeResult.Failure(CatalogCodecError(error.code, error.path))
+        } catch (error: CatalogJsonWriteException) {
+            CatalogEncodeResult.Failure(CatalogCodecError(error.code, ROOT_PATH))
         }
-    } catch (error: CatalogMappingException) {
-        CatalogEncodeResult.Failure(CatalogCodecError(error.code, error.path))
-    } catch (error: CatalogJsonWriteException) {
-        CatalogEncodeResult.Failure(CatalogCodecError(error.code, ROOT_PATH))
     }
 
     internal fun decodeValue(value: CatalogJsonValue): CatalogModelDocument = decodeDocument(value)
@@ -116,15 +120,21 @@ class CatalogJsonCodec(
                 "$path.compatibility",
             ),
             availability = objectValue.requiredEnum<CatalogAvailability>("availability", path),
-            allowedTargets = objectValue.requiredArray("allowedTargets", path).values.mapIndexed { targetIndex, target ->
-                decodeTarget(target, "$path.allowedTargets[$targetIndex]")
-            }.requireDistinct("$path.allowedTargets"),
+            allowedTargets = decodeTargets(objectValue, path),
             profileKey = ModelProfileKey(objectValue.requiredString("profileKey", path)),
             license = decodeLicense(objectValue.requiredObject("license", path), "$path.license"),
             replacement = objectValue.optionalObject("replacement", path)?.let { replacement ->
                 decodeReleaseId(replacement, "$path.replacement")
             },
         )
+    }
+
+    private fun decodeTargets(objectValue: CatalogJsonObject, path: String): Set<CatalogTarget> {
+        val values = objectValue.requiredArray("allowedTargets", path).values
+        val targets = values.mapIndexed { targetIndex, target ->
+            decodeTarget(target, "$path.allowedTargets[$targetIndex]")
+        }
+        return targets.requireDistinct("$path.allowedTargets")
     }
 
     private fun decodeArtifact(value: CatalogJsonObject, path: String): CatalogGgufArtifact {
@@ -244,14 +254,17 @@ class CatalogJsonCodec(
         "version" to CatalogJsonString(id.version.value),
     )
 
-    private fun parseUri(value: String, path: String): URI = try {
-        URI(value)
-    } catch (_: java.net.URISyntaxException) {
-        throw CatalogMappingException(CatalogCodecErrorCode.INVALID_URI, path)
+    private fun parseUri(value: String, path: String): URI {
+        return try {
+            URI(value)
+        } catch (_: java.net.URISyntaxException) {
+            throw CatalogMappingException(CatalogCodecErrorCode.INVALID_URI, path)
+        }
     }
 
-    private fun jsonStringArray(values: Set<String>): CatalogJsonArray =
-        CatalogJsonArray(values.sorted().map(::CatalogJsonString))
+    private fun jsonStringArray(values: Set<String>): CatalogJsonArray {
+        return CatalogJsonArray(values.sorted().map(::CatalogJsonString))
+    }
 
     private fun jsonNumber(value: Number): CatalogJsonNumber = CatalogJsonNumber(value.toString())
 
@@ -263,8 +276,12 @@ class CatalogJsonCodec(
         return CatalogJsonObject(values)
     }
 
-    private fun failure(code: CatalogCodecErrorCode, path: String = ROOT_PATH): CatalogDecodeResult.Failure =
-        CatalogDecodeResult.Failure(CatalogCodecError(code, path))
+    private fun failure(
+        code: CatalogCodecErrorCode,
+        path: String = ROOT_PATH,
+    ): CatalogDecodeResult.Failure {
+        return CatalogDecodeResult.Failure(CatalogCodecError(code, path))
+    }
 
     private companion object {
         const val ROOT_PATH = "$"
@@ -272,15 +289,44 @@ class CatalogJsonCodec(
         const val DEFAULT_MAX_JSON_DEPTH = 16
         const val DEFAULT_MAX_JSON_NODES = 20_000
         const val DEFAULT_MAX_JSON_STRING_CHARS = 8_192
-        val DOCUMENT_FIELDS = setOf("schemaVersion", "catalogId", "revision", "generatedAtEpochMs", "expiresAtEpochMs", "entries")
-        val RELEASE_FIELDS = setOf(
-            "modelId", "version", "displayName", "description", "artifact", "compatibility",
-            "availability", "allowedTargets", "profileKey", "license", "replacement",
+        val DOCUMENT_FIELDS = setOf(
+            "schemaVersion",
+            "catalogId",
+            "revision",
+            "generatedAtEpochMs",
+            "expiresAtEpochMs",
+            "entries",
         )
-        val ARTIFACT_FIELDS = setOf("sha256", "sizeBytes", "downloadUrl", "architecture", "quantization", "fileName")
+        val RELEASE_FIELDS = setOf(
+            "modelId",
+            "version",
+            "displayName",
+            "description",
+            "artifact",
+            "compatibility",
+            "availability",
+            "allowedTargets",
+            "profileKey",
+            "license",
+            "replacement",
+        )
+        val ARTIFACT_FIELDS = setOf(
+            "sha256",
+            "sizeBytes",
+            "downloadUrl",
+            "architecture",
+            "quantization",
+            "fileName",
+        )
         val COMPATIBILITY_FIELDS = setOf(
-            "minSdk", "supportedAbis", "minRamBytes", "recommendedRamBytes", "minFreeStorageBytes",
-            "minHarnessVersion", "maxHarnessVersionExclusive", "supportedBackendIds",
+            "minSdk",
+            "supportedAbis",
+            "minRamBytes",
+            "recommendedRamBytes",
+            "minFreeStorageBytes",
+            "minHarnessVersion",
+            "maxHarnessVersionExclusive",
+            "supportedBackendIds",
         )
         val TARGET_FIELDS = setOf("applicationId", "useCaseId")
         val LICENSE_FIELDS = setOf("id", "displayName", "sourceUrl", "licenseUrl")
@@ -302,17 +348,21 @@ private fun CatalogJsonObject.requireFields(expected: Set<String>, path: String)
     if (missing != null) throw CatalogMappingException(CatalogCodecErrorCode.MISSING_FIELD, "$path.$missing")
 }
 
-private fun CatalogJsonObject.requiredValue(name: String, path: String): CatalogJsonValue =
-    fields[name] ?: throw CatalogMappingException(CatalogCodecErrorCode.MISSING_FIELD, "$path.$name")
+private fun CatalogJsonObject.requiredValue(name: String, path: String): CatalogJsonValue {
+    return fields[name] ?: throw CatalogMappingException(CatalogCodecErrorCode.MISSING_FIELD, "$path.$name")
+}
 
-private fun CatalogJsonObject.requiredString(name: String, path: String): String =
-    (requiredValue(name, path) as? CatalogJsonString)?.value
+private fun CatalogJsonObject.requiredString(name: String, path: String): String {
+    return (requiredValue(name, path) as? CatalogJsonString)?.value
         ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+}
 
-private fun CatalogJsonObject.optionalString(name: String, path: String): String? = when (val value = requiredValue(name, path)) {
-    CatalogJsonNull -> null
-    is CatalogJsonString -> value.value
-    else -> throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+private fun CatalogJsonObject.optionalString(name: String, path: String): String? {
+    return when (val value = requiredValue(name, path)) {
+        CatalogJsonNull -> null
+        is CatalogJsonString -> value.value
+        else -> throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+    }
 }
 
 private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
@@ -324,9 +374,11 @@ private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
     return raw.toLongOrNull() ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
 }
 
-private fun CatalogJsonObject.optionalLong(name: String, path: String): Long? = when (requiredValue(name, path)) {
-    CatalogJsonNull -> null
-    else -> requiredLong(name, path)
+private fun CatalogJsonObject.optionalLong(name: String, path: String): Long? {
+    return when (requiredValue(name, path)) {
+        CatalogJsonNull -> null
+        else -> requiredLong(name, path)
+    }
 }
 
 private fun CatalogJsonObject.requiredInt(name: String, path: String): Int {
@@ -335,21 +387,25 @@ private fun CatalogJsonObject.requiredInt(name: String, path: String): Int {
         ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
 }
 
-private fun CatalogJsonObject.requiredArray(name: String, path: String): CatalogJsonArray =
-    requiredValue(name, path) as? CatalogJsonArray
+private fun CatalogJsonObject.requiredArray(name: String, path: String): CatalogJsonArray {
+    return requiredValue(name, path) as? CatalogJsonArray
         ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+}
 
-private fun CatalogJsonObject.requiredObject(name: String, path: String): CatalogJsonObject =
-    requiredValue(name, path) as? CatalogJsonObject
+private fun CatalogJsonObject.requiredObject(name: String, path: String): CatalogJsonObject {
+    return requiredValue(name, path) as? CatalogJsonObject
         ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+}
 
 private fun CatalogJsonObject.optionalObject(
     name: String,
     path: String,
-): CatalogJsonObject? = when (val value = requiredValue(name, path)) {
-    CatalogJsonNull -> null
-    is CatalogJsonObject -> value
-    else -> throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+): CatalogJsonObject? {
+    return when (val value = requiredValue(name, path)) {
+        CatalogJsonNull -> null
+        is CatalogJsonObject -> value
+        else -> throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+    }
 }
 
 private inline fun <reified T : Enum<T>> CatalogJsonObject.requiredEnum(name: String, path: String): T {
@@ -358,11 +414,13 @@ private inline fun <reified T : Enum<T>> CatalogJsonObject.requiredEnum(name: St
         ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_ENUM, "$path.$name")
 }
 
-private fun CatalogJsonObject.requiredStringSet(name: String, path: String): Set<String> =
-    requiredArray(name, path).values.mapIndexed { index, value ->
+private fun CatalogJsonObject.requiredStringSet(name: String, path: String): Set<String> {
+    val values = requiredArray(name, path).values.mapIndexed { index, value ->
         (value as? CatalogJsonString)?.value
             ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name[$index]")
-    }.requireDistinct("$path.$name")
+    }
+    return values.requireDistinct("$path.$name")
+}
 
 private fun <T> List<T>.requireDistinct(path: String): Set<T> {
     val distinct = toSet()

@@ -125,8 +125,12 @@ class FileModelCatalogRepository(
     ): CatalogReplaceResult = synchronized(lock) {
         ensureLoaded(nowEpochMs)
         val validation = validator.validate(document, nowEpochMs)
-        if (!validation.valid) return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_DOCUMENT)
-        if (!validMetadata(metadata)) return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_METADATA)
+        if (!validation.valid) {
+            return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_DOCUMENT)
+        }
+        if (!validMetadata(metadata)) {
+            return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_METADATA)
+        }
 
         val incomingBytes = when (val encoded = codec.encode(document)) {
             is CatalogEncodeResult.Success -> encoded.bytes
@@ -317,8 +321,11 @@ class FileModelCatalogRepository(
         "occurredAtEpochMs" to jsonNumber(value.occurredAtEpochMs),
     )
 
-    private fun validMetadata(metadata: CatalogSyncMetadata): Boolean =
-        metadata.fetchedAtEpochMs >= 0 && validOptionalHeader(metadata.etag) && validOptionalHeader(metadata.lastModified)
+    private fun validMetadata(metadata: CatalogSyncMetadata): Boolean {
+        val validEtag = validOptionalHeader(metadata.etag)
+        val validLastModified = validOptionalHeader(metadata.lastModified)
+        return metadata.fetchedAtEpochMs >= 0 && validEtag && validLastModified
+    }
 
     private fun validOptionalHeader(value: String?): Boolean = value == null ||
         (value.length <= MAX_METADATA_VALUE_LENGTH && value.none(Char::isISOControl) && value.hasValidSurrogates())
@@ -374,8 +381,10 @@ class FileModelCatalogRepository(
     }
 
     private fun cleanupTemporaryFiles() {
-        rootDirectory.listFiles { file -> file.name.startsWith(TEMP_FILE_PREFIX) && file.name.endsWith(TEMP_FILE_SUFFIX) }
-            ?.forEach(File::delete)
+        val temporaryFiles = rootDirectory.listFiles { file ->
+            file.name.startsWith(TEMP_FILE_PREFIX) && file.name.endsWith(TEMP_FILE_SUFFIX)
+        }
+        temporaryFiles?.forEach(File::delete)
     }
 
     private fun stateFile(): File = File(rootDirectory, stateFileName)
@@ -425,10 +434,20 @@ class FileModelCatalogRepository(
         const val STATE_READ_BUFFER_BYTES = 16 * 1024
         const val TEMP_FILE_PREFIX = "catalog-state-"
         const val TEMP_FILE_SUFFIX = ".tmp"
-        val STATE_FIELDS = setOf("storageSchemaVersion", "persistedAtEpochMs", "syncMetadata", "lastFailure", "catalogJson")
+        val STATE_FIELDS = setOf(
+            "storageSchemaVersion",
+            "persistedAtEpochMs",
+            "syncMetadata",
+            "lastFailure",
+            "catalogJson",
+        )
         val METADATA_FIELDS = setOf("fetchedAtEpochMs", "etag", "lastModified")
         val FAILURE_FIELDS = setOf("code", "occurredAtEpochMs")
-        val STATE_PARSER = BoundedCatalogJsonParser(maxDepth = 8, maxNodes = 256, maxStringChars = DEFAULT_MAX_STATE_BYTES)
+        val STATE_PARSER = BoundedCatalogJsonParser(
+            maxDepth = 8,
+            maxNodes = 256,
+            maxStringChars = DEFAULT_MAX_STATE_BYTES,
+        )
     }
 }
 
@@ -446,26 +465,34 @@ private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
     if (value.fields.keys != expected) throw IllegalArgumentException("Unexpected catalog state fields")
 }
 
-private fun requiredValue(value: CatalogJsonObject, name: String): CatalogJsonValue =
-    value.fields[name] ?: throw IllegalArgumentException("Missing catalog state field")
+private fun requiredValue(value: CatalogJsonObject, name: String): CatalogJsonValue {
+    return value.fields[name] ?: throw IllegalArgumentException("Missing catalog state field")
+}
 
-private fun requiredString(value: CatalogJsonObject, name: String): String =
-    (requiredValue(value, name) as? CatalogJsonString)?.value ?: throw IllegalArgumentException("Invalid catalog state string")
+private fun requiredString(value: CatalogJsonObject, name: String): String {
+    return (requiredValue(value, name) as? CatalogJsonString)?.value
+        ?: throw IllegalArgumentException("Invalid catalog state string")
+}
 
-private fun optionalString(value: CatalogJsonObject, name: String): String? = when (val field = requiredValue(value, name)) {
-    CatalogJsonNull -> null
-    is CatalogJsonString -> field.value
-    else -> throw IllegalArgumentException("Invalid optional catalog state string")
+private fun optionalString(value: CatalogJsonObject, name: String): String? {
+    return when (val field = requiredValue(value, name)) {
+        CatalogJsonNull -> null
+        is CatalogJsonString -> field.value
+        else -> throw IllegalArgumentException("Invalid optional catalog state string")
+    }
 }
 
 private fun requiredLong(value: CatalogJsonObject, name: String): Long {
-    val raw = (requiredValue(value, name) as? CatalogJsonNumber)?.raw ?: throw IllegalArgumentException("Invalid catalog state number")
+    val raw = (requiredValue(value, name) as? CatalogJsonNumber)?.raw
+        ?: throw IllegalArgumentException("Invalid catalog state number")
     if (raw.any { it == '.' || it == 'e' || it == 'E' }) throw IllegalArgumentException("Invalid catalog state integer")
     return raw.toLongOrNull() ?: throw IllegalArgumentException("Catalog state integer out of range")
 }
 
-private fun optionalObject(value: CatalogJsonObject, name: String): CatalogJsonObject? = when (val field = requiredValue(value, name)) {
-    CatalogJsonNull -> null
-    is CatalogJsonObject -> field
-    else -> throw IllegalArgumentException("Invalid optional catalog state object")
+private fun optionalObject(value: CatalogJsonObject, name: String): CatalogJsonObject? {
+    return when (val field = requiredValue(value, name)) {
+        CatalogJsonNull -> null
+        is CatalogJsonObject -> field
+        else -> throw IllegalArgumentException("Invalid optional catalog state object")
+    }
 }

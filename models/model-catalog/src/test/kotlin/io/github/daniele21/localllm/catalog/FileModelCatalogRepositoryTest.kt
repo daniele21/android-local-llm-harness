@@ -16,7 +16,12 @@ class FileModelCatalogRepositoryTest {
         val document = validCatalogDocument(expiresAtEpochMs = 10_000)
         val repository = repository(directory)
 
-        assertTrue(repository.replace(document, CatalogSyncMetadata(2_000, "etag-1", "date-1"), 2_000) is CatalogReplaceResult.Stored)
+        val stored = repository.replace(
+            document,
+            CatalogSyncMetadata(2_000, "etag-1", "date-1"),
+            2_000,
+        )
+        assertTrue(stored is CatalogReplaceResult.Stored)
         val reloaded = repository(directory).current(2_100)
 
         assertEquals(document, reloaded.document)
@@ -112,8 +117,12 @@ class FileModelCatalogRepositoryTest {
         assertFalse(snapshot.canAuthorizeDownloads)
     }
 
-    private fun repository(directory: File, staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L) =
-        FileModelCatalogRepository(directory, codec, validator, staleGracePeriodMs)
+    private fun repository(
+        directory: File,
+        staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L,
+    ): FileModelCatalogRepository {
+        return FileModelCatalogRepository(directory, codec, validator, staleGracePeriodMs)
+    }
 
     private fun withTemporaryDirectory(block: (File) -> Unit) {
         val directory = Files.createTempDirectory("model-catalog-test").toFile()

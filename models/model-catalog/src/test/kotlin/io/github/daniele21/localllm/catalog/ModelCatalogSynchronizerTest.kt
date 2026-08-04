@@ -27,16 +27,19 @@ class ModelCatalogSynchronizerTest {
     }
 
     @Test
-    fun notModifiedUpdatesMetadataWithoutReauthorizingStaleCatalog() = withFixture(staleGracePeriodMs = 1_000) { repository, _ ->
-        repository.replace(validCatalogDocument(expiresAtEpochMs = 3_000), CatalogSyncMetadata(2_000, "old"), 2_000)
-        val source = QueueCatalogSource(CatalogFetchResult.NotModified(CatalogResponseMetadata(etag = "new")))
+    fun notModifiedUpdatesMetadataWithoutReauthorizingStaleCatalog() {
+        withFixture(staleGracePeriodMs = 1_000) { repository, _ ->
+            repository.replace(validCatalogDocument(expiresAtEpochMs = 3_000), CatalogSyncMetadata(2_000, "old"), 2_000)
+            val source = QueueCatalogSource(CatalogFetchResult.NotModified(CatalogResponseMetadata(etag = "new")))
 
-        val result = synchronizer(source, repository, nowEpochMs = 3_100).refresh() as CatalogRefreshResult.NotModified
+            val refreshed = synchronizer(source, repository, nowEpochMs = 3_100).refresh()
+            val result = refreshed as CatalogRefreshResult.NotModified
 
-        assertEquals(CatalogFreshness.STALE, result.snapshot.freshness)
-        assertFalse(result.snapshot.canAuthorizeDownloads)
-        assertEquals("new", result.snapshot.syncMetadata?.etag)
-        assertEquals(7L, source.requests.single().currentRevision)
+            assertEquals(CatalogFreshness.STALE, result.snapshot.freshness)
+            assertFalse(result.snapshot.canAuthorizeDownloads)
+            assertEquals("new", result.snapshot.syncMetadata?.etag)
+            assertEquals(7L, source.requests.single().currentRevision)
+        }
     }
 
     @Test
@@ -82,11 +85,17 @@ class ModelCatalogSynchronizerTest {
         assertEquals(CatalogFailureCode.INTERNAL_FAILURE, result.failure.code)
     }
 
-    private fun synchronizer(source: ModelCatalogSource, repository: ModelCatalogRepository, nowEpochMs: Long) =
-        ModelCatalogSynchronizer(source, repository, codec, validator, CatalogClock { nowEpochMs })
+    private fun synchronizer(
+        source: ModelCatalogSource,
+        repository: ModelCatalogRepository,
+        nowEpochMs: Long,
+    ): ModelCatalogSynchronizer {
+        return ModelCatalogSynchronizer(source, repository, codec, validator, CatalogClock { nowEpochMs })
+    }
 
-    private fun encode(document: CatalogModelDocument): ByteArray =
-        (codec.encode(document) as CatalogEncodeResult.Success).bytes
+    private fun encode(document: CatalogModelDocument): ByteArray {
+        return (codec.encode(document) as CatalogEncodeResult.Success).bytes
+    }
 
     private fun withFixture(
         staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L,

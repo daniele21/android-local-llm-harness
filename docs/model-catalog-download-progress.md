@@ -6,7 +6,7 @@
 
 **Branch:** `agent/model-catalog-persistence`
 
-**Pull request:** pending creation after the pre-push gate
+**Pull request:** [#42](https://github.com/daniele21/android-local-llm-harness/pull/42)
 
 **Last updated:** 2026-08-05
 
@@ -90,7 +90,9 @@ The execution environment cannot resolve GitHub or Maven hosts from the local sh
 - a standalone deterministic runner executed 20 codec, persistence and synchronization scenarios successfully;
 - line length, trailing whitespace, imports, public boundaries and the complete diff were reviewed manually;
 - no Android, network, model-store or runtime dependency was added;
-- no GGUF artifact, credential, URL secret or private path was added.
+- no GGUF artifact, credential, URL secret or private path was added;
+- after run `30958031076` identified formatting-only differences, all six affected files were rewritten conservatively;
+- production compilation, test-source compilation, the 20-scenario runner, the invalid-Unicode runner and source-hygiene checks passed again before the corrective commit.
 
 Repository CI remains the final clean-checkout confirmation and is not counted as passed in this tracker until it completes.
 
@@ -105,6 +107,7 @@ Repository CI remains the final clean-checkout confirmation and is not counted a
 | `30954976390` | passed | Foundation guards, Spotless, Detekt, tests, lint, downstream compilation, native tests and packaging passed |
 | `30955361481` | passed | Public module README and full validation matrix passed |
 | `30955750296` | passed | Final foundation head passed repository validation before PR #41 merge |
+| `30958031076` | failed | Persistence slice reached the Android gate but stopped only at ktlint formatting; no functional validation was claimed |
 
 ## Next implementation slice
 

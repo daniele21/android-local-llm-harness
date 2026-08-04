@@ -37,14 +37,16 @@ internal class BoundedCatalogJsonParser(
         return value
     }
 
-    private fun decodeUtf8(bytes: ByteArray): String = try {
-        StandardCharsets.UTF_8.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableCharacter(CodingErrorAction.REPORT)
-            .decode(ByteBuffer.wrap(bytes))
-            .toString()
-    } catch (_: java.nio.charset.CharacterCodingException) {
-        throw CatalogJsonSyntaxException(CatalogCodecErrorCode.INVALID_UTF8, 0)
+    private fun decodeUtf8(bytes: ByteArray): String {
+        return try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        } catch (_: java.nio.charset.CharacterCodingException) {
+            throw CatalogJsonSyntaxException(CatalogCodecErrorCode.INVALID_UTF8, 0)
+        }
     }
 
     @Suppress("TooManyFunctions")
@@ -234,7 +236,9 @@ internal class BoundedCatalogJsonParser(
 internal class CatalogJsonWriteException(val code: CatalogCodecErrorCode) : IllegalArgumentException()
 
 internal object CatalogJsonWriter {
-    fun encode(value: CatalogJsonValue): ByteArray = buildString { appendValue(value) }.toByteArray(StandardCharsets.UTF_8)
+    fun encode(value: CatalogJsonValue): ByteArray {
+        return buildString { appendValue(value) }.toByteArray(StandardCharsets.UTF_8)
+    }
 
     private fun StringBuilder.appendValue(value: CatalogJsonValue) {
         when (value) {
