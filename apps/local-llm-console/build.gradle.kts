@@ -59,6 +59,7 @@ android {
 
 dependencies {
     implementation(project(":core:contracts"))
+    implementation(project(":models:model-store"))
     implementation(project(":observability:contracts"))
     implementation(project(":observability:in-memory-store"))
 
