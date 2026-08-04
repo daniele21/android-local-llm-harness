@@ -207,7 +207,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] non-destructive Room schema migration
 - [ ] physical-device memory and thermal evidence under a real GGUF workload
 
-### Benchmark baselines and regressions — PR #27
+### Benchmark baselines and regressions — PR #27 and PR #33
 
 - [x] benchmark key by application, use case, model digest and cold/warm classification
 - [x] reject `UNKNOWN` classification for baseline creation
@@ -216,68 +216,60 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] median total latency
 - [x] nearest-rank p95 total latency
 - [x] median decode throughput
-- [x] persisted baseline storage in memory and Room
-- [x] non-destructive Room schema migration
+- [x] persisted active baseline storage in memory and Room
 - [x] post-baseline regression comparison
 - [x] `WARN` for missing baseline or insufficient samples
 - [x] `FAIL` for policy regressions
 - [x] privacy-safe metric-class summaries
+- [x] bounded retained baseline history in memory and Room
+- [x] separate active baseline and immutable history semantics
+- [x] non-destructive Room schema 3→4 migration that seeds existing active baselines into history
+- [x] structured comparison results with values, ratios, thresholds and metric regression flags
+- [x] partial non-actionable comparison previews before minimum sample readiness
 - [ ] physical-device baseline collection on representative devices
-- [ ] baseline history beyond the current active baseline per key
 
 ### Console observability, controls and cache repair — PR #31
 
 - [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, caches, resources and benchmarks
 - [x] `ConsoleDataSource` boundary over existing observability contracts
-- [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
-- [x] runtime adapter over the public `LocalLlmClient.runtimeSnapshot()` contract
-- [x] model-inventory provider boundary over the existing content-addressed `ModelStore.snapshot()` contract
-- [x] model-store adapter that removes private backing-file paths before presentation
-- [x] explicit disconnected, connected-empty and source-failure inventory states
+- [x] runtime-state and model-inventory provider boundaries
 - [x] active installed-model correlation against the runtime snapshot
-- [x] standalone wiring limited to the console application's private `FileSystemModelStore`
+- [x] standalone wiring limited to the console application's private model store
 - [x] bounded run, log and resource queries
-- [x] privacy-safe disconnected and telemetry-failure states
-- [x] read-only generation metric cards
-- [x] read-only structured-log cards with deterministic field ordering
-- [x] read-only health, resource and benchmark cards
-- [x] selectable request detail from generation-run and correlated-log cards
-- [x] request-scoped run and structured-log queries
-- [x] chronological request timeline with event sequence and run-relative offsets
-- [x] privacy-safe missing-run, empty-timeline and source-error states
-- [x] process PSS, native heap and Java heap trend chart
-- [x] available-device-memory trend chart
-- [x] discrete Android thermal-pressure chart with low-memory signal count
-- [x] nullable measurements and unknown thermal states rendered as gaps rather than zero values
-- [x] chart rendering from persisted explicit captures without timers or hidden polling
-- [x] `ConsoleHealthControl` execution boundary over the existing `HealthEngine`
-- [x] explicit run-all and targeted per-check actions
-- [x] standalone `ModelIntegrityHealthCheck` execution against the console sandbox store
-- [x] automatic targeted controls for registered generation-sanity check IDs
-- [x] health execution outside the Android main thread through a single-thread executor
-- [x] action disabling while a health suite is in progress
-- [x] persisted-result refresh through the existing telemetry repository
-- [x] fixed privacy-safe health-control failure states
-- [x] neutral `CacheMaintenanceControl` contract separate from observational cache probes
-- [x] `ConsoleCacheControl` discovery and targeted-repair boundary
-- [x] independent cache-source loading and privacy-safe failure isolation
-- [x] disconnected, connected-empty, healthy, unhealthy and unavailable cache states
-- [x] repair actions exposed only for unhealthy caches with a registered maintenance capability
-- [x] runtime-owned model-integrity repair that revalidates stale entries and removes orphaned or invalid entries
-- [x] failed revalidation remains visible as an unresolved stale entry
-- [x] cache actions executed outside the Android main thread and disabled while running
-- [x] before/after, revalidated, removed and failed repair counts
-- [x] standalone cache control remains explicitly disconnected because the console does not own the runtime cache
-- [x] fixed privacy-safe cache-health and cache-repair error states
-- [x] refresh and back navigation without implicit runtime, model or cache mutation
-- [x] pure Kotlin presenter, data-source, adapter, health-control, cache-control and chart-model tests
-- [x] Android controls and custom-view compilation, lint and packaging validation
-- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
+- [x] privacy-safe disconnected and source-failure states
+- [x] generation, log, health, resource and benchmark cards
+- [x] selectable request detail with chronological request timeline
+- [x] process-memory, available-memory and thermal charts
+- [x] chart gaps for nullable measurements and unknown thermal states
+- [x] explicit health execution through `HealthEngine`
+- [x] standalone model-integrity check and capability-driven generation sanity controls
+- [x] neutral cache-maintenance contract and targeted model-integrity repair
+- [x] cache actions outside the main thread and disabled while running
+- [x] privacy-safe cache-health and repair states
+- [x] pure Kotlin presenter, data-source, adapter, control and chart tests
+- [x] Android compilation, lint and packaging validation
 - [ ] connect the standalone console to a real cross-application diagnostics source
+
+### Benchmark regression and baseline history console — PR #33
+
+- [x] stacked branch and draft PR based on PR #31
+- [x] `BenchmarkComparisonEvaluator` shared by health checks and console presentation
+- [x] comparison lookback independent from the visible Runs limit
+- [x] active-key and PASS/WARN/FAIL summary
+- [x] baseline/current metric values, ratios and policy thresholds
+- [x] explicit ready, preview, regression, within-policy and unavailable states
+- [x] retained baseline cards with active-capture identification
+- [x] chronological median TTFT history chart
+- [x] chronological p95 total-latency history chart
+- [x] chronological median decode-throughput history chart
+- [x] nullable history metrics rendered as gaps rather than zero values
+- [x] in-memory and Room active/history persistence tests
+- [x] evaluator, data-source and presenter tests
+- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
+- [ ] rebase or retarget onto `main` after PR #31 is merged
 
 ### Remaining Phase 2 work
 
-- [ ] benchmark regression comparison and baseline history views
 - [ ] model-management console
 - [ ] manual inference playground
 - [ ] privacy-redacted diagnostic bundle export
