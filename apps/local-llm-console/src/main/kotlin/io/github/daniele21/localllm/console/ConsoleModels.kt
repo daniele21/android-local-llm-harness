@@ -85,6 +85,7 @@ data class ConsoleSnapshot(
     val resources: List<ResourceSnapshot>,
     val benchmarkBaselines: List<BenchmarkBaseline>,
     val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
+    val modelControl: ConsoleModelControlState = DisconnectedModelControl.snapshot(),
     val healthControl: ConsoleHealthControlState = DisconnectedHealthControl.snapshot(),
     val cacheControl: ConsoleCacheControlState = DisconnectedCacheControl.snapshot(),
     val sourceError: String? = null,
@@ -130,6 +131,9 @@ enum class ConsoleActionType {
     RUN_ALL_HEALTH_CHECKS,
     RUN_HEALTH_CHECKS,
     REPAIR_CACHE,
+    IMPORT_MODEL,
+    VERIFY_MODEL,
+    REMOVE_MODEL,
 }
 
 data class ConsoleAction(
@@ -137,6 +141,7 @@ data class ConsoleAction(
     val label: String,
     val healthCheckIds: List<String> = emptyList(),
     val cacheId: String? = null,
+    val modelDigest: ModelDigest? = null,
     val enabled: Boolean = true,
 )
 
