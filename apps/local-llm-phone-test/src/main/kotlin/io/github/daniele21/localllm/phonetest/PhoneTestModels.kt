@@ -93,18 +93,21 @@ internal data class PlaygroundState(
 internal data class PlaygroundRequestOptions(val maxOutputTokens: Int, val temperature: Float, val seed: Long) {
     companion object {
         fun parse(maxOutputTokens: String, temperature: String, seed: String): PlaygroundRequestOptions {
-            val parsedMaxOutputTokens = maxOutputTokens.trim().toIntOrNull()
-                ?: throw IllegalArgumentException("Maximum output tokens must be an integer")
+            val parsedMaxOutputTokens = requireNotNull(maxOutputTokens.trim().toIntOrNull()) {
+                "Maximum output tokens must be an integer"
+            }
             require(parsedMaxOutputTokens in MIN_OUTPUT_TOKENS..MAX_OUTPUT_TOKENS) {
                 "Maximum output tokens must be between $MIN_OUTPUT_TOKENS and $MAX_OUTPUT_TOKENS"
             }
-            val parsedTemperature = temperature.trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Temperature must be a number")
+            val parsedTemperature = requireNotNull(temperature.trim().toFloatOrNull()) {
+                "Temperature must be a number"
+            }
             require(parsedTemperature in MIN_TEMPERATURE..MAX_TEMPERATURE) {
                 "Temperature must be between $MIN_TEMPERATURE and $MAX_TEMPERATURE"
             }
-            val parsedSeed = seed.trim().toLongOrNull()
-                ?: throw IllegalArgumentException("Seed must be an integer")
+            val parsedSeed = requireNotNull(seed.trim().toLongOrNull()) {
+                "Seed must be an integer"
+            }
             return PlaygroundRequestOptions(
                 maxOutputTokens = parsedMaxOutputTokens,
                 temperature = parsedTemperature,
