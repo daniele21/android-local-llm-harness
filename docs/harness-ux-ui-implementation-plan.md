@@ -1,9 +1,9 @@
 # Harness Android UX/UI implementation plan
 
-**Status:** Proposed implementation plan  
-**Target repository:** `daniele21/android-local-llm-harness`  
-**Primary target application:** `apps/local-llm-phone-test`, branded in-product as **Harness — Local AI Console**  
-**Supporting source application:** `apps/local-llm-console`  
+**Status:** Proposed implementation plan
+**Target repository:** `daniele21/android-local-llm-harness`
+**Primary target application:** `apps/local-llm-phone-test`, branded in-product as **Harness — Local AI Console**
+**Supporting source application:** `apps/local-llm-console`
 **Last updated:** 2026-08-04
 
 ## 1. Purpose
@@ -29,15 +29,15 @@ The following images are directional product mockups. They define information hi
 
 <table>
 <tr>
-<td align="center"><strong>Overview</strong><br><img src="./assets/ux-ui/harness-overview.webp" width="280" alt="Harness Overview mockup"></td>
-<td align="center"><strong>Playground</strong><br><img src="./assets/ux-ui/harness-playground.webp" width="280" alt="Harness Playground mockup"></td>
+<td align="center"><strong>Overview</strong><br><img src="assets/ux-ui/harness-overview.webp" width="280" alt="Harness Overview mockup"></td>
+<td align="center"><strong>Playground</strong><br><img src="assets/ux-ui/harness-playground.webp" width="280" alt="Harness Playground mockup"></td>
 </tr>
 <tr>
-<td align="center"><strong>Models</strong><br><img src="./assets/ux-ui/harness-models.webp" width="280" alt="Harness Models mockup"></td>
-<td align="center"><strong>Diagnostics</strong><br><img src="./assets/ux-ui/harness-diagnostics.webp" width="280" alt="Harness Diagnostics mockup"></td>
+<td align="center"><strong>Models</strong><br><img src="assets/ux-ui/harness-models.webp" width="280" alt="Harness Models mockup"></td>
+<td align="center"><strong>Diagnostics</strong><br><img src="assets/ux-ui/harness-diagnostics.webp" width="280" alt="Harness Diagnostics mockup"></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><strong>Settings and brand</strong><br><img src="./assets/ux-ui/harness-settings.webp" width="280" alt="Harness Settings mockup"></td>
+<td align="center" colspan="2"><strong>Settings and brand</strong><br><img src="assets/ux-ui/harness-settings.webp" width="280" alt="Harness Settings mockup"></td>
 </tr>
 </table>
 
@@ -165,6 +165,8 @@ It will own or provide:
 
 This removes the current duplication where playground and validation independently construct runtime objects while still preserving explicit session and request lifecycles.
 
+Critical unification requirement: both `PhoneTestController` and `PhonePlaygroundController` currently create their own independent `FileSystemModelStore` instance against the same `local-llm-phone-test` directory. `HarnessRuntimeGraph` must provide a single shared `FileSystemModelStore` and a single `RuntimeOrchestrator` instance to all consumers. The current `RuntimeOrchestrator` construction in both controllers does not inject a `TelemetryRepository`; `HarnessRuntimeGraph` must construct the orchestrator with a real `TelemetryRepository` (Room-backed or in-memory) so that generation runs, structured logs, and health results are observable through the Diagnostics screens.
+
 The graph must remain lazy. Importing a model or opening a screen must not load the model. Model loading occurs only when an operation explicitly requires it.
 
 ## 5. Scope
@@ -260,143 +262,179 @@ Sensitive identifiers are passed as navigation arguments only when needed and ar
 
 ## 7. Brand kit
 
-## 7.1 Brand foundation
+This section integrates the canonical [Harness Brand Guidelines](file:///Users/moltisantid/Personal/android-local-llm-harness/docs/harness-brand-guidelines.md) into the UX/UI implementation plan.
 
-**Name:** Harness  
-**Descriptor:** Local AI Console  
-**Core promise:** local execution with visible control and measurable behavior  
-**Tagline candidate:** Run local. Measure everything.
+### 7.1 Brand foundation
 
-Brand attributes:
+**Brand:** Harness
+**Descriptor:** Local AI Console
+**Tagline:** Run local. Measure everything.
+**Version:** 1.0 (Approved direction)
 
-- controlled;
-- private;
-- technical;
-- measurable;
-- reliable;
-- modern without looking experimental or “hacker themed”.
+**Brand promise:** Execute AI models locally while maintaining control, privacy, and full visibility into runtime behavior.
 
-### 7.2 Logo direction
+**Positioning statement:** Harness is a Local AI Console for Android that enables importing, executing, measuring, and diagnosing GGUF models directly on-device without cloud dependencies.
 
-The mockup uses a geometric `H` built from two mirrored blocks. The intended symbolism is:
+**Brand attributes:**
 
-- outer blocks: the harness around a runtime;
-- central bridge: controlled token flow;
-- symmetrical shape: predictable lifecycle and instrumentation.
+| Attribute | Product meaning |
+| --- | --- |
+| **Privacy-first** | Prompts, outputs, and GGUF artifacts stay on the device |
+| **Local** | Local-only inference directly on native hardware |
+| **Technical** | Metrics, runtime internals, and diagnostic timelines are fully visible |
+| **Modular** | Clean decoupling between UI, runtime orchestration, backend, and persistence |
+| **Reliable** | Explicit states, error codes, and bounds without silent fallbacks |
+| **Measurable** | TTFT, token/s, memory PSS, thermal pressure, and benchmark regressions are observable |
 
-Implementation sequence:
+**Naming rules:**
+- Product name: `Harness` (always capital `H`).
+- Descriptor: `Local AI Console` (used under wordmark, onboarding, and documentation).
+- Prohibited public names: `Local LLM Phone Test`, `Local LLM Console`, `Llama Console`. (These remain strictly as internal module/package names).
 
-1. use a temporary repository-owned vector placeholder derived from simple geometric paths;
-2. create adaptive launcher foreground/background resources;
-3. validate legibility at 16, 24, 32, 48, and 108 px;
-4. commission or finalize a production SVG before public distribution;
-5. retain monochrome and single-color variants for Android themed icons.
+### 7.2 Logo & graphic assets derivation
 
-Do not use a brain, robot, sparkles-only mark, or vendor/model-specific symbol as the primary logo.
+The visual identity is defined in the approved Brand Kit overview (`docs/assets/ux-ui/harness-brand-kit.png` / `harness-brand-guidelines.md`). **All production graphic assets and vector drawables must be derived directly from this reference image and specification.**
 
-### 7.3 Color tokens
+```text
+Visual Brand Kit Image
+         │
+         ├──> Symbol Mark (.svg / VectorDrawable) ──> H-logo (Purple #7C5CFC + Teal #25C2A0 bridge)
+         ├──> Wordmark Lockup ─────────────────────> "Harness Local AI Console" (Horizontal & Vertical)
+         ├──> App Icon (Tile) ─────────────────────> Adaptive Launcher Icon (Foreground + Dark Tile Background)
+         ├──> Monochrome Icon ─────────────────────> High-contrast monochrome vector
+         └──> Android Themed Icon ─────────────────> Tintable single-color mark for Android 13+
+```
 
-Dark theme target tokens:
+**Logo symbolism:**
+- Mirrored outer blocks: the protective harness surrounding the runtime.
+- Central bridge: controlled token flow between application and model.
+- Left block: Purple (`#7C5CFC`); Right block: Teal (`#25C2A0`).
 
-| Token | Value | Use |
+**Derivation & implementation workflow:**
+1. **Vector master generation:** Extract/author authoritative SVG vector source files (`harness-symbol.svg`, `harness-wordmark.svg`, `harness-lockup.svg`, `harness-app-icon.svg`) directly matching the shapes, proportions, and gradients of the Brand Kit visual.
+2. **Android VectorDrawables:** Convert master SVGs into clean, repository-owned `VectorDrawable` XMLs in `ui/design-system` and launcher app modules (`ic_launcher_foreground.xml`, `ic_launcher_background.xml`, `ic_monochrome.xml`).
+3. **Adaptive App Icon:** Implement standard Android Adaptive Icon specs with a dark surface tile background (`#121821` / `#0B0F14`) and the gradient H-symbol foreground.
+4. **Themed Icon:** Provide monochrome single-color vector mark for Android 13+ Material You launcher tinting.
+5. **Clearance & Scaling:** Maintain a clear margin around the symbol at least equal to the width of the central bridge. Validate legibility at 16, 20, 24, 32, 48, and 108 dp.
+
+**Prohibited logo modifications:** Do not deform, rotate, add heavy drop shadows, alter block proportions, or substitute the primary logo with brains, robots, or generic AI sparkle icons.
+
+### 7.3 Color system & semantic hierarchy
+
+Harness is a **dark-first** application. Light and system themes must preserve the exact same semantic relationships.
+
+| Token | Hex | Role |
 | --- | --- | --- |
-| `brandBackground` | `#0B0F14` | primary app background |
-| `brandSurface` | `#121821` | cards and lower surfaces |
-| `brandSurfaceElevated` | `#19212C` | sheets, menus, dialogs |
-| `brandPrimary` | `#7C5CFC` | primary actions and selection |
-| `brandPrimaryContainer` | `#2A2057` | selected navigation/card accents |
-| `brandSecondary` | `#25C2A0` | local, active, private, connected |
-| `brandSecondaryContainer` | `#103D36` | local/privacy badges |
-| `brandTextPrimary` | `#F5F7FA` | primary text |
-| `brandTextSecondary` | `#98A2B3` | labels and metadata |
-| `brandOutline` | `#2B3543` | card and input borders |
-| `brandSuccess` | `#38C172` | healthy/completed |
-| `brandWarning` | `#F4B740` | warnings/thermal pressure |
-| `brandError` | `#EF5B5B` | failures/destructive actions |
+| `brandBackground` | `#0B0F14` | Primary screen background |
+| `brandSurface` | `#121821` | Cards and lower containers |
+| `brandSurfaceElevated` | `#19212C` | Sheets, dialogs, menus |
+| `brandPrimary` | `#7C5CFC` | Primary CTA, selection, navigation focus |
+| `brandPrimaryContainer` | `#2A2057` | Active navigation item background, selected card accent |
+| `brandSecondary` | `#25C2A0` | Local inference, active runtime, connected state, live metrics |
+| `brandSecondaryContainer` | `#103D36` | Local / privacy badges and containers |
+| `brandTextPrimary` | `#F5F7FA` | Headings, primary text |
+| `brandTextSecondary` | `#98A2B3` | Labels, caption metadata |
+| `brandOutline` | `#2B3543` | Borders, card outlines, input strokes |
+| `brandSuccess` | `#38C172` | Healthy checks, verified integrity, completed state |
+| `brandWarning` | `#F4B740` | Warnings, thermal pressure, warm runtime state |
+| `brandError` | `#EF5B5B` | Failures, errors, destructive actions, cancel/stop |
 
-A light theme must be derived as a complete semantic theme, not by inverting colors mechanically. The default first-run behavior should follow system theme; the internal-test release may default to dark only if explicitly documented and tested.
+**Semantic color distinction (Teal vs Green):**
+- **Teal (`#25C2A0` / `brandSecondary`):** Communicates local, active, private, or live connected execution.
+- **Green (`#38C172` / `brandSuccess`):** Communicates positive operation outcome or passed verification (`Healthy`, `Completed`, `Verified`).
+- *Teal and Green are not interchangeable.*
+
+**Approved gradient:**
+- Gradient: `#7C5CFC` → `#25C2A0` (Purple to Teal).
+- Usage: Symbol logo mark, app icon tile, hero status card, high-emphasis primary CTA.
+- Prohibited on: body copy, metrics, error states, technical charts, or large background surfaces.
+
+**Contrast:** All text and interactive controls must achieve WCAG AA contrast (4.5:1 normal text, 3:1 large text & UI boundaries). Color must never be the sole status indicator.
 
 ### 7.4 Typography
 
-Initial offline implementation:
+**UI Font:** `Inter` (Regular 400, Medium 500, SemiBold 600, Bold 700) for titles, body copy, navigation, buttons, labels, and status messages.
+**Technical / Data Font:** `JetBrains Mono` (Regular 400, Medium 500) exclusively for metrics (TTFT, tok/s, latency), SHA-256 digests, structured logs, code snippets, version strings, and technical IDs.
 
-- UI: Android system sans-serif;
-- technical identifiers and logs: Android system monospace.
+**Type scale:**
 
-Target brand typography after license review:
+| Role | Font | Weight | Size / Line Height | Usage |
+| --- | --- | ---: | --- | --- |
+| Display | Inter | 700 | 36 / 44 sp | Hero & onboarding |
+| H1 / Page title | Inter | 700 | 32 / 40 sp | Top-level screen title |
+| H2 / Section title | Inter | 600 | 20 / 28 sp | Section headers |
+| H3 / Card title | Inter | 600 | 16 / 24 sp | Card & modal titles |
+| Body large | Inter | 400 | 16 / 24 sp | Primary body text |
+| Body | Inter | 400 | 14 / 20 sp | Secondary body text |
+| Label | Inter | 500 | 13 / 18 sp | Buttons, input labels, chips |
+| Caption | Inter | 400 | 12 / 16 sp | Metadata & timestamps |
+| Metric | JetBrains Mono | 500 | 14 / 20 sp | Technical metric values |
+| Log | JetBrains Mono | 400 | 12 / 18 sp | Logs, hashes, identifiers |
 
-- UI: Inter;
-- technical data: JetBrains Mono.
+**Typography rules:**
+- Use sentence case for all titles and labels. Avoid ALL-CAPS titles.
+- Limit visual hierarchy to a maximum of 3 levels per screen.
+- Use tabular numbers (`fontFeatureSettings = "tnum"`) for metrics and comparisons.
+- No downloadable runtime font dependency. System font fallbacks used until offline font binaries pass licensing review.
 
-No downloadable font dependency should be required at runtime. No font binary is added until licensing, bundle size, and offline behavior have been reviewed.
+### 7.5 Shape, spacing, and elevation
 
-Type scale:
+**Radius:**
+- Card: `16 dp`
+- Input / Button: `12 dp`
+- Chip: `999 dp` (pill)
+- Dialog: `20 dp`
+- Bottom Sheet: `24 dp` top radius
 
-| Role | Size | Weight |
+**Spacing scale:** `4 / 8 / 12 / 16 / 24 / 32 / 40 / 48 dp`
+- Screen horizontal padding: `16 dp` (compact), `24 dp` (medium), `32 dp` (expanded)
+- Card internal padding: `16–20 dp`
+- Minimum touch target: `48 x 48 dp`
+
+**Elevation:** Flat dark surfaces (`#121821` / `#19212C`) with subtle outlines (`#2B3543`) over heavy drop shadows or glows.
+
+### 7.6 Iconography & status badges
+
+**Style:** Linear, geometric, rounded corners, 20–24 dp scale (Material Symbols Rounded reference).
+
+| Function | Icon symbol | Color semantic |
 | --- | --- | --- |
-| display / hero | 32 sp | 700 |
-| page title | 28 sp | 700 |
-| section title | 20 sp | 600 |
-| card title | 16 sp | 600 |
-| body | 15–16 sp | 400 |
-| label | 13–14 sp | 500 |
-| metadata | 12–13 sp | 400 |
-| metric value | 18–22 sp | 600 |
+| Overview | `home` / `grid_view` | Primary (when active) |
+| Playground | `code` / `terminal` | Primary (when active) |
+| Models | `deployed_code` / `view_in_ar` | Primary (when active) |
+| Diagnostics | `monitoring` | Primary (when active) |
+| Settings | `settings` | Text Secondary |
+| Privacy | `lock` | Secondary (Teal) |
+| Runtime | `memory` | Secondary (Teal) |
+| Thermal | `device_thermostat` | Warning (Yellow/Orange) |
+| Logs | `description` | Text Secondary |
+| Benchmark | `speed` | Primary (Purple) |
+| Health | `health_and_safety` | Success (Green) |
+| Import | `add` / `upload_file` | Primary (Purple) |
 
-All text must respect user font scaling. Fixed-height containers that clip scaled text are forbidden.
+**Status Badge Semantics:**
+- `Local`: Secondary (Teal) container & text — Executed or stored on-device.
+- `Healthy`: Success (Green) container & text — Check passed / verified.
+- `Warm`: Warning (Yellow) container & text — Loaded model context retained.
+- `Cold`: Neutral (Outline/Text Secondary) — Initial model load needed.
+- `Warning`: Warning (Yellow/Orange) container & text — Thermal/memory pressure or degraded state.
+- `Failed`: Error (Red) container & text — Operation or check failure.
+- `Disconnected`: Neutral (Text Secondary) — Capability unavailable.
 
-### 7.5 Shape and spacing
+### 7.7 Motion & tone of voice
 
-```text
-spacing: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 dp
-screen horizontal padding: 16 dp compact, 24 dp medium, 32 dp expanded
-card radius: 16 dp
-button radius: 12 dp
-input radius: 12 dp
-bottom-sheet top radius: 24 dp
-minimum touch target: 48 x 48 dp
-```
+**Motion rules:**
+- Micro interactions: `100–150 ms`
+- State transitions: `150–250 ms`
+- Navigation transitions: `200–300 ms`
+- Bottom sheets: `250–350 ms`
+- Mandatory support for platform `Remove animations` / reduced motion settings.
+- No continuous decorative animations. No artificial typing effect beyond real token streaming.
 
-### 7.6 Iconography
-
-Use Material Symbols / Material Icons through a pinned Android dependency or repository-owned vectors for the small required set.
-
-Primary mapping:
-
-| Concept | Icon direction |
-| --- | --- |
-| Overview | home / dashboard |
-| Playground | chat / terminal |
-| Models | deployed code / cube |
-| Diagnostics | monitoring / pulse |
-| Runtime | memory / developer board |
-| Privacy | lock / shield |
-| Health | health and safety / verified |
-| Import | file download / add box |
-| Logs | receipt long / list |
-| Settings | settings |
-
-Color must not be the only status indicator. Every semantic state includes text and/or an icon.
-
-### 7.7 Motion
-
-Allowed:
-
-- 150–250 ms destination transitions;
-- subtle state fades;
-- determinate progress transitions;
-- streaming cursor or waveform with reduced-motion fallback;
-- card expansion/collapse.
-
-Not allowed:
-
-- continuous decorative animation;
-- parallax;
-- particle effects;
-- animation that hides runtime latency;
-- animation that continues while the app is backgrounded.
-
-Respect the platform animation scale and reduced-motion preference where available.
+**Tone of voice:** Clear, technical, calm, direct.
+- *Approved phrasing:* `Model ready`, `Generating locally`, `Integrity verified`, `Runtime unavailable`, `Generation cancelled`.
+- *Forbidden phrasing:* `Amazing! Your AI is ready!`, `Super-fast local intelligence`, `Magic is happening`, `Something went wrong :(`.
+- Error messages must state: (1) what happened, (2) actionable remedy, (3) fixed privacy-safe error code. Never show raw backend stack traces or private filesystem URIs.
 
 ## 8. Design-system module
 
@@ -478,6 +516,30 @@ Add pinned version-catalog entries for a mutually compatible set of:
 - Kotlin coroutines Android;
 - Compose UI test JUnit4 and test manifest;
 - optional adaptive navigation/window-size artifacts after compatibility review.
+
+### 9.1 Kotlin and Compose compiler compatibility
+
+AGP 9.3 bundles a specific Kotlin version. The Compose compiler plugin must be compatible with that Kotlin version. The foundation PR must:
+
+- verify the exact Kotlin version provided by AGP 9.3;
+- add the Kotlin Compose compiler plugin (`kotlin("plugin.compose")`) to the version catalog and apply it to all Compose-enabled modules;
+- document the validated Kotlin ↔ Compose BOM mapping in the PR description;
+- fail fast if the bundled Kotlin version is incompatible with the selected Compose BOM.
+
+### 9.2 Observability dependencies for the phone-test app
+
+The current `apps/local-llm-phone-test/build.gradle.kts` depends only on `core:contracts`, `core:runtime-core`, `models:model-profile`, `models:model-store`, and `backends:llama-cpp`. The connected Harness experience requires adding observability dependencies before PR UX-06:
+
+```kotlin
+implementation(project(":observability:contracts"))
+implementation(project(":observability:room-store"))      // or :observability:in-memory-store for first iteration
+implementation(project(":observability:health-engine"))
+implementation(project(":observability:android-resource-probe"))
+implementation(project(":observability:benchmark-engine"))
+implementation(project(":transports:in-process"))
+```
+
+The initial connected iteration may use `in-memory-store` to avoid Room migration complexity in the phone-test app. The transition to `room-store` for persistent telemetry across app restarts should be a documented follow-up decision. The choice must be explicit in PR UX-06.
 
 Required application configuration:
 
@@ -592,6 +654,23 @@ Migration must be incremental:
 5. delete the programmatic View UI after the Compose path is validated on-device.
 
 Do not combine the UI rewrite with a simultaneous complete runtime rewrite.
+
+### 10.4 Concurrency model transition
+
+The existing controllers use `Executors.newSingleThreadExecutor()` and callback-based listeners. The new ViewModels will use Kotlin coroutines (`viewModelScope`, `StateFlow`). The transition boundary is:
+
+- ViewModels may use coroutines internally for state collection and UI-thread safety;
+- wrapped legacy controllers keep their `Executors` and callback interfaces during the parity phase;
+- the full transition from `Executors` to coroutine-based dispatchers in the controllers happens only after all parity tests pass and the legacy View UI is removed;
+- do not mix coroutine scopes and executor-based callbacks within the same lifecycle operation.
+
+### 10.5 Activity result API migration
+
+The current `MainActivity` uses the deprecated `startActivityForResult` / `onActivityResult` pattern for Storage Access Framework document selection. Converting to `ComponentActivity` enables the modern `registerForActivityResult` API with `ActivityResultContracts.OpenDocument`. This migration must happen during PR UX-02 or PR UX-04 at the latest, because:
+
+- `ComponentActivity` supports `registerForActivityResult` natively;
+- Navigation Compose and the Compose lifecycle do not interact well with the legacy `onActivityResult` callback;
+- the SAF document picker integration in Models/import must use the modern contract.
 
 ## 11. Screen specifications
 
@@ -937,6 +1016,10 @@ No raw backend exception, prompt, output, private path, document URI, or model b
 
 ### Sections
 
+**Brand**
+
+Read-only informational card showing the Harness logo, product name, descriptor, and brand palette colors. This section is presentational only and does not contain user-configurable options. It establishes brand identity within the settings context as shown in the mockup.
+
 **Appearance**
 
 - System / Dark / Light;
@@ -1157,6 +1240,8 @@ Changes:
 
 - add ADR describing the connected-app decision;
 - add Compose and lifecycle dependencies to the version catalog;
+- verify the Kotlin version bundled by AGP 9.3 and add the Kotlin Compose compiler plugin;
+- document the validated Kotlin ↔ Compose BOM version mapping;
 - add `ui:design-system` module;
 - add theme tokens and preview-only sample components;
 - add module to `settings.gradle.kts`;
@@ -1168,6 +1253,7 @@ Acceptance:
 - both applications still compile;
 - no runtime/model behavior changes;
 - design-system unit and Compose preview compilation passes;
+- Kotlin Compose compiler plugin resolves without version conflicts;
 - no model or font binary committed.
 
 ## PR UX-02 — Harness shell, brand, and adaptive navigation
@@ -1176,7 +1262,8 @@ Acceptance:
 
 Changes:
 
-- convert launcher Activity to `ComponentActivity`;
+- convert launcher Activity from `Activity` to `ComponentActivity`;
+- migrate SAF document selection from `startActivityForResult` / `onActivityResult` to `registerForActivityResult` with `ActivityResultContracts.OpenDocument`;
 - introduce `HarnessTheme`, `HarnessApp`, `HarnessNavHost`;
 - add Overview, Playground, Models, Diagnostics, Settings placeholder routes;
 - bottom navigation on compact, navigation rail on wider windows;
@@ -1187,6 +1274,7 @@ Acceptance:
 
 - navigation survives rotation without sensitive state persistence;
 - package/application ID unchanged;
+- SAF model selection works through the modern ActivityResult API;
 - all existing import, playground, validation, report functions remain reachable;
 - back behavior and insets work on compact and tablet widths.
 
@@ -1259,19 +1347,25 @@ Acceptance:
 
 **Goal:** connect the Play app to real in-process telemetry and diagnostic capabilities.
 
+Prerequisite: PR #31 (console observability, controls and cache repair) must be merged into `main` before starting this PR. The `ConsoleDataSource`, `ConsoleHealthControl`, `ConsoleCacheControl`, and `ConsoleSourceAdapters` contracts defined in PR #31 are the extraction targets for reuse in the connected Harness app. If PR #31 cannot be merged as-is, the relevant contracts and adapters must be extracted into a fresh branch from current `main` before this PR begins.
+
 Changes:
 
-- introduce/refine `HarnessRuntimeGraph`;
-- inject telemetry repository into runtime composition;
+- add observability dependencies to `apps/local-llm-phone-test/build.gradle.kts` (see §9.2);
+- introduce/refine `HarnessRuntimeGraph` with a single shared `FileSystemModelStore` and `RuntimeOrchestrator`;
+- construct `RuntimeOrchestrator` with a real `TelemetryRepository` (Room-backed or in-memory; document the choice and rationale);
 - expose `LocalLlmClient.runtimeSnapshot()`;
 - register health checks against the same model store/runtime;
 - connect resource probes and cache controls;
-- reuse/extract console data-source and presenter boundaries;
+- reuse/extract console data-source and presenter boundaries from PR #31;
 - keep standalone console disconnected where it lacks capabilities.
+
+Telemetry persistence decision: the first iteration may use `in-memory-store` to avoid introducing a Room database and schema migrations into the phone-test app. This is acceptable if the trade-off (telemetry lost on process death) is documented. The transition to `room-store` for persistent cross-restart telemetry should be a documented follow-up.
 
 Acceptance:
 
 - no parallel model store or runtime in the connected app;
+- `RuntimeOrchestrator` receives a `TelemetryRepository` and generation runs produce observable metrics;
 - prompt/output absent from telemetry;
 - source failures isolated;
 - physical generation produces inspectable privacy-safe run metrics.

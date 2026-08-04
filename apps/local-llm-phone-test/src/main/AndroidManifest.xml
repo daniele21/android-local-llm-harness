@@ -3,7 +3,7 @@
     <application
         android:allowBackup="false"
         android:extractNativeLibs="true"
-        android:label="Local LLM Phone Test"
+        android:label="Harness"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity

@@ -1,32 +1,25 @@
 package io.github.daniele21.localllm.phonetest
 
-import android.content.Context
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
-import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
-import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
-import io.github.daniele21.localllm.store.FileSystemModelStore
-import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
-internal class PhonePlaygroundController(context: Context, private val listener: (PlaygroundState) -> Unit) : AutoCloseable {
-    private val appContext = context.applicationContext
-    private val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
+internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntimeGraph, private val listener: (PlaygroundState) -> Unit) :
+    AutoCloseable {
     private val executor = Executors.newSingleThreadExecutor()
     private val lock = Any()
 
     private var state = PlaygroundState()
     private var harness: PhoneHarness? = null
-    private var harnessModelDigest: ModelDigest? = null
     private var activeSession: SessionId? = null
     private var activeRequestId: RequestId? = null
     private var activeHandle: GenerationHandle? = null
@@ -88,7 +81,6 @@ internal class PhonePlaygroundController(context: Context, private val listener:
             if (state.active || activeSession != null) return false
             val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
             harness = null
-            harnessModelDigest = null
             activeSession = null
             activeRequestId = null
             activeHandle = null
@@ -100,7 +92,8 @@ internal class PhonePlaygroundController(context: Context, private val listener:
         }
         publish(snapshot())
         executor.execute {
-            closeResources(resources)
+            closeSessionResources(resources)
+            runtimeGraph.unloadIdleModel()
             val current = synchronized(lock) {
                 state = PlaygroundState()
                 state
@@ -115,22 +108,22 @@ internal class PhonePlaygroundController(context: Context, private val listener:
         val resources = synchronized(lock) {
             val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
             harness = null
-            harnessModelDigest = null
             activeSession = null
             activeRequestId = null
             activeHandle = null
             state = PlaygroundState()
             result
         }
-        closeResources(resources)
+        closeSessionResources(resources)
         executor.shutdownNow()
     }
 
     private fun startOnWorker(model: ImportedPhoneModel, requestId: RequestId, prompt: String, options: PlaygroundRequestOptions) {
         try {
-            val verification = modelStore.verify(model.digest)
+            val verification = runtimeGraph.modelStore.verify(model.digest)
             check(verification.valid) { "Model integrity verification failed" }
-            val currentHarness = ensureHarness(model)
+            val currentHarness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
+            synchronized(lock) { harness = currentHarness }
             val prepared = currentHarness.runtime.prepare(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
@@ -161,39 +154,6 @@ internal class PhonePlaygroundController(context: Context, private val listener:
         } catch (_: Throwable) {
             failStart(requestId)
         }
-    }
-
-    private fun ensureHarness(model: ImportedPhoneModel): PhoneHarness {
-        synchronized(lock) {
-            val current = harness
-            if (current != null && harnessModelDigest == model.digest) return current
-        }
-        val previous = synchronized(lock) {
-            val current = harness?.runtime
-            harness = null
-            harnessModelDigest = null
-            current
-        }
-        runCatching { previous?.close() }
-        val resolved = resolvedPhonePlaygroundUseCase(model)
-        val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
-        require(nativeLibraryDirectory.isDirectory) {
-            "Native library directory is unavailable"
-        }
-        val created = PhoneHarness(
-            runtime = RuntimeOrchestrator(
-                registry = SinglePhoneBindingRegistry(resolved),
-                modelStore = modelStore,
-                backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
-            ),
-            applicationId = resolved.binding.applicationId,
-            useCaseId = resolved.binding.useCaseId,
-        )
-        synchronized(lock) {
-            harness = created
-            harnessModelDigest = model.digest
-        }
-        return created
     }
 
     private fun registerSession(requestId: RequestId, session: SessionId) {
@@ -325,10 +285,9 @@ internal class PhonePlaygroundController(context: Context, private val listener:
         publish(current)
     }
 
-    private fun closeResources(resources: RuntimeResources) {
+    private fun closeSessionResources(resources: RuntimeResources) {
         runCatching { resources.handle?.cancel() }
         runCatching { resources.session?.let { resources.runtime?.closeSession(it) } }
-        runCatching { resources.runtime?.close() }
     }
 
     private fun publish(current: PlaygroundState) {
@@ -338,7 +297,6 @@ internal class PhonePlaygroundController(context: Context, private val listener:
     private data class RuntimeResources(val runtime: RuntimeOrchestrator?, val session: SessionId?, val handle: GenerationHandle?)
 
     private companion object {
-        const val MODEL_STORE_DIRECTORY = "local-llm-phone-test"
         const val MAX_PROMPT_CHARACTERS = 32_768
         const val MAX_OUTPUT_CHARACTERS = 131_072
     }

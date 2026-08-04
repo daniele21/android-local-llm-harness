@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
 }
 
 val phoneTestUploadSigningEnvironment =
@@ -40,13 +41,19 @@ android {
     namespace = "io.github.daniele21.localllm.phonetest"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     signingConfigs {
@@ -66,7 +73,6 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
-
         release {
             isDebuggable = false
             isMinifyEnabled = false
@@ -74,6 +80,10 @@ android {
                 signingConfig = signingConfigs.getByName("upload")
             }
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -101,10 +111,35 @@ android {
 }
 
 dependencies {
+    val composeBom = platform(libs.androidx.compose.bom)
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
     implementation(project(":core:contracts"))
     implementation(project(":core:runtime-core"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
     implementation(project(":backends:llama-cpp"))
+    implementation(project(":observability:contracts"))
+    implementation(project(":observability:in-memory-store"))
+    implementation(project(":observability:health-engine"))
+    implementation(project(":observability:android-resource-probe"))
+    implementation(project(":observability:benchmark-engine"))
+    implementation(project(":transports:in-process"))
+    implementation(project(":ui:design-system"))
+
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+
     testImplementation(libs.junit4)
 }

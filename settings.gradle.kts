@@ -29,6 +29,7 @@ include(
     ":observability:android-resource-probe",
     ":observability:benchmark-engine",
     ":transports:in-process",
+    ":ui:design-system",
     ":apps:local-llm-console",
     ":apps:device-test-runner",
     ":apps:local-llm-phone-test",
