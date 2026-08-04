@@ -100,11 +100,7 @@ class BenchmarkBaselineRecorder(
 }
 
 class BenchmarkComparisonEvaluator(private val policy: BenchmarkPolicy = BenchmarkPolicy()) {
-    fun compare(
-        key: BenchmarkKey,
-        baseline: BenchmarkBaseline?,
-        runs: List<GenerationRunRecord>,
-    ): BenchmarkComparison {
+    fun compare(key: BenchmarkKey, baseline: BenchmarkBaseline?, runs: List<GenerationRunRecord>): BenchmarkComparison {
         if (baseline == null) {
             return BenchmarkComparison(
                 key = key,
