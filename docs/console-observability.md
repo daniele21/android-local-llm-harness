@@ -2,11 +2,13 @@
 
 ## Scope
 
-The console implementation turns `apps/local-llm-console` from a static shell into a read-only observability application.
+The console implementation turns `apps/local-llm-console` from a static shell into a read-only observability and runtime-inspection application.
 
-It provides six primary views:
+It provides eight primary views:
 
 - overview;
+- installed models;
+- active runtime;
 - generation runs;
 - structured logs;
 - health and sanity results;
@@ -15,7 +17,7 @@ It provides six primary views:
 
 Generation-run and request-correlated log cards can open a request detail view containing the complete persisted run metrics and a chronological event timeline.
 
-The console uses the existing contracts from `observability/contracts`. It does not introduce alternate telemetry schemas or runtime policy.
+The console reuses the existing contracts from `observability/contracts`, `core/contracts` and `models/model-store`. It does not introduce alternate telemetry schemas, model registries or runtime policy.
 
 ## Architecture
 
@@ -23,6 +25,8 @@ The console uses the existing contracts from `observability/contracts`. It does 
 MainActivity
     ↓
 ConsolePresenter
+    ├── ConsoleInventoryPresenter
+    └── request and observability presentation
     ↓
 ConsoleSnapshot / ConsoleRequestDetail
     ↑
@@ -30,10 +34,13 @@ ConsoleDataSource
     ↑
 TelemetryConsoleDataSource
     ├── TelemetryRepository
-    └── ConsoleRuntimeStateProvider
+    ├── ConsoleRuntimeStateProvider
+    └── ConsoleModelInventoryProvider
+            ↑
+            ModelStoreInventoryProvider → ModelStore.snapshot()
 ```
 
-`ConsoleDataSource` is the application-facing read boundary. The Android activity receives already collected data and delegates all formatting, ordering and grouping to the pure Kotlin `ConsolePresenter`.
+`ConsoleDataSource` is the application-facing read boundary. The Android activity receives already collected data and delegates formatting, ordering and grouping to pure Kotlin presenters.
 
 `TelemetryConsoleDataSource.load()` reads bounded collections from `TelemetryRepository`:
 
@@ -43,9 +50,49 @@ TelemetryConsoleDataSource
 - recent resource snapshots;
 - active benchmark baselines.
 
+It also loads runtime and model-inventory snapshots through independent providers. A failure in one source does not prevent the remaining sources from rendering.
+
 `TelemetryConsoleDataSource.loadRequest()` resolves one request through `findRun(requestId)` and retrieves only its correlated structured logs. Events are sorted by timestamp before they reach the presenter.
 
-Runtime state is deliberately separated behind `ConsoleRuntimeStateProvider`. This prevents the console UI from depending directly on `RuntimeOrchestrator`, `llama.cpp`, Room or a future Binder transport.
+Runtime state remains separated behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStateProvider` adapts the public `LocalLlmClient.runtimeSnapshot()` contract and therefore does not depend on `RuntimeOrchestrator`, `llama.cpp`, Room or Binder implementation types.
+
+Model inventory remains separated behind `ConsoleModelInventoryProvider`. `ModelStoreInventoryProvider` maps the existing content-addressed `ModelStoreSnapshot` into UI-safe values and deliberately drops `StoredModel.file`, so private filesystem paths never reach the presenter.
+
+## Installed-model view
+
+The installed-model view shows:
+
+- whether the inventory source is available;
+- model count;
+- aggregate stored bytes;
+- source identity;
+- active runtime model;
+- full SHA-256 digest per model;
+- model size;
+- integrity state;
+- whether the model is installed or currently loaded.
+
+The view distinguishes three different states:
+
+- inventory source not connected;
+- connected inventory with zero installed models;
+- inventory source failure.
+
+`ModelStore.snapshot()` is observational and does not hash every artifact. An entry returned with `verified = false` is therefore shown as `Not checked`, not as corrupt or invalid. Explicit integrity execution remains owned by the health-engine slice.
+
+## Active-runtime view
+
+The active-runtime view shows only fields available from the public runtime snapshot:
+
+- connection state;
+- runtime state;
+- backend identity supplied by the adapter;
+- loaded model digest;
+- active session count;
+- queued-request count;
+- source identity.
+
+The UI explicitly states that session descriptors, context parameters and active-request identity are not exposed by the current `RuntimeSnapshot`. It does not infer or fabricate these values. Runtime controls remain outside this read-only slice.
 
 ## Request detail and timeline
 
@@ -74,25 +121,27 @@ The request detail supports explicit empty states for:
 
 ## Current wiring
 
-The standalone console currently uses an in-memory repository inside its own Android sandbox and the disconnected runtime-state provider.
+The standalone console currently uses:
 
-This is intentional. The console must not open another application's private Room database. Until a signature-protected diagnostics bridge is available, the UI shows unavailable runtime values explicitly rather than inventing a backend, loaded model, session count or queue depth.
+- an in-memory telemetry repository inside its own Android sandbox;
+- a `FileSystemModelStore` rooted in the console application's private files directory;
+- the disconnected runtime-state provider.
 
-The current slices therefore validate:
+This means the standalone console can accurately inspect its own local model-store namespace, including an empty store, but it cannot inspect a different application's model store or runtime.
 
-- console navigation and rendering;
-- telemetry query boundaries;
-- request selection and back navigation;
-- request-correlated timeline reconstruction;
-- privacy-safe empty and failure states;
-- deterministic formatting and ordering;
-- compatibility with future in-process or cross-application data sources.
+This is intentional. The console must not open another application's private Room database or private model directory. Until a signature-protected diagnostics bridge is available, cross-application runtime values remain explicitly unavailable.
 
-They do not claim that the standalone console can already inspect another application.
+An application embedding the console data layer in the same process can provide:
+
+- `LocalLlmRuntimeStateProvider` over its `LocalLlmClient`;
+- `ModelStoreInventoryProvider` over its real `ModelStore`;
+- its own persistent or in-memory `TelemetryRepository`.
+
+The UI and presenters do not need to change when these providers replace the standalone wiring.
 
 ## Privacy
 
-The presenter uses the existing privacy-safe telemetry records. It does not receive or render:
+The presenters do not receive or render:
 
 - prompts;
 - generated output;
@@ -101,17 +150,19 @@ The presenter uses the existing privacy-safe telemetry records. It does not rece
 - private filesystem paths;
 - arbitrary backend exception messages.
 
-Repository failures are converted to the fixed message `Telemetry source unavailable`. Raw exception messages are not shown.
+Telemetry failures are converted to `Telemetry source unavailable`. Model-store failures are converted to `Model inventory unavailable`. Raw exception messages are not shown.
 
-Model digests are shortened in visual lists while the full request identifier remains available in the request detail.
+Model inventory mapping retains digest, size and integrity state but drops the backing `File` reference before the data reaches the presentation layer.
 
 ## Failure behavior
 
 If runtime-state collection fails, the console falls back to the disconnected state.
 
-If a summary telemetry query fails, the snapshot contains empty collections and a fixed source error. If request-detail loading fails, the detail contains no run or events and the same fixed error. The activity remains usable and does not crash because an observability source is unavailable.
+If model-inventory collection fails, the model source becomes unavailable with a fixed privacy-safe error while telemetry remains usable.
 
-Refreshing while a request detail is open reloads both the summary snapshot and that request's correlated telemetry. Changing tab or using Back closes the detail without mutating runtime state.
+If a summary telemetry query fails, the snapshot contains empty telemetry collections and a fixed source error while runtime and model inventory remain available. If request-detail loading fails, the detail contains no run or events and the same fixed telemetry error.
+
+Refreshing while a request detail is open reloads both the summary snapshot and that request's correlated telemetry. Changing tab or using Back closes the detail without mutating runtime or model state.
 
 ## Testing
 
@@ -119,10 +170,14 @@ Pure JVM tests cover:
 
 - bounded repository queries;
 - runtime-state mapping;
+- model-inventory provider mapping;
+- removal of private model paths at the adapter boundary;
+- connected, disconnected and empty inventory states;
+- active-model correlation;
+- explicit runtime-contract gaps;
 - request lookup and request-scoped log filtering;
 - chronological timeline ordering;
-- privacy-safe repository failure handling;
-- disconnected runtime empty states;
+- privacy-safe source failure handling;
 - run metric rendering;
 - request-card selection metadata;
 - timeline sequence and offsets;
@@ -135,12 +190,11 @@ Pure JVM tests cover:
 The following remain separate implementation work:
 
 - persistent console-local Room wiring when the console owns an embedded runtime;
-- installed-model and active-runtime views;
 - health and sanity execution controls;
 - memory and thermal charts;
 - cache-health inspection and repair actions;
 - benchmark regression comparison and history;
-- installed-model management;
+- installed-model mutation and management;
 - manual inference playground;
 - privacy-redacted diagnostic export;
 - signature-protected cross-application diagnostics bridge.
