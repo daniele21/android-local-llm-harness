@@ -114,29 +114,19 @@ class ConsoleBenchmarkPresenterTest {
         benchmarkBaselines = emptyList(),
     )
 
-    private fun baseline(
-        capturedAt: Long,
-        medianTtft: Double,
-        p95Total: Double?,
-        throughput: Double,
-    ): BenchmarkBaseline = BenchmarkBaseline(
-        key = key,
-        capturedAtEpochMs = capturedAt,
-        sampleCount = 5,
-        medianTimeToFirstTokenMs = medianTtft,
-        p95TimeToFirstTokenMs = medianTtft + 10,
-        medianTotalMs = p95Total?.minus(100),
-        p95TotalMs = p95Total,
-        medianDecodeTokensPerSecond = throughput,
-    )
+    private fun baseline(capturedAt: Long, medianTtft: Double, p95Total: Double?, throughput: Double): BenchmarkBaseline =
+        BenchmarkBaseline(
+            key = key,
+            capturedAtEpochMs = capturedAt,
+            sampleCount = 5,
+            medianTimeToFirstTokenMs = medianTtft,
+            p95TimeToFirstTokenMs = medianTtft + 10,
+            medianTotalMs = p95Total?.minus(100),
+            p95TotalMs = p95Total,
+            medianDecodeTokensPerSecond = throughput,
+        )
 
-    private fun run(
-        id: String,
-        completedAt: Long,
-        ttft: Long,
-        total: Long,
-        throughput: Double,
-    ): GenerationRunRecord = GenerationRunRecord(
+    private fun run(id: String, completedAt: Long, ttft: Long, total: Long, throughput: Double): GenerationRunRecord = GenerationRunRecord(
         requestId = RequestId(id),
         applicationId = key.applicationId,
         useCaseId = key.useCaseId,
