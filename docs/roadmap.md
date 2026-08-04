@@ -4,7 +4,7 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
+Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks, console observability and explicit sandbox model management.
 
 The current `main` head contains the work merged through pull request #29, including the ARM64 emulator preflight and the Google Play-installable physical-device validation app that does not require developer mode or ADB.
 
@@ -275,10 +275,30 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
+### Model management console — PR #34
+
+- [x] sibling stacked branch and draft PR based on PR #31
+- [x] `ConsoleModelControl` mutation boundary separate from observational inventory
+- [x] independent model-management capability discovery and source-failure isolation
+- [x] explicit Storage Access Framework GGUF selection
+- [x] private staging with streamed SHA-256 and optional source-size verification
+- [x] import through the existing content-addressed `ModelStore`
+- [x] explicit per-model verification
+- [x] explicit removal with an Android confirmation dialog
+- [x] loaded-model removal disabled in presentation and rejected by the control boundary when a runtime digest is supplied
+- [x] model operations outside the Android main thread through the single-thread diagnostics executor
+- [x] all model actions disabled while an operation is active
+- [x] staging-file cleanup after success or failure
+- [x] fixed privacy-safe import, verification, removal and source errors
+- [x] latest explicit verification shown without inventing durable snapshot state
+- [x] control, presenter and data-source tests
+- [x] Android compilation, Detekt, lint and packaging validation
+- [x] explicit documentation of sandbox, profile-persistence and runtime-loading limitations
+- [ ] rebase or retarget onto `main` after PR #31 is merged
+
 ### Remaining Phase 2 work
 
 - [ ] benchmark regression comparison and baseline history views
-- [ ] model-management console
 - [ ] manual inference playground
 - [ ] privacy-redacted diagnostic bundle export
 - [ ] signature-protected diagnostics bridge for cross-application console access
