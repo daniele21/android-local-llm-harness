@@ -37,7 +37,7 @@ class ConsoleInferencePresenterTest {
     }
 
     @Test
-    fun `generating playground exposes cancel and streaming output`() {
+    fun `generating playground exposes cancel streaming output and disabled start`() {
         val snapshot = emptySnapshot().copy(
             inference = state(ConsoleInferencePhase.GENERATING).copy(
                 activeTargetId = target.id,
@@ -49,9 +49,10 @@ class ConsoleInferencePresenterTest {
         )
 
         val screen = presenter.present(ConsoleTab.PLAYGROUND, snapshot)
+        val start = screen.actions.single { it.type == ConsoleActionType.START_INFERENCE }
 
-        assertTrue(screen.actions.any { it.type == ConsoleActionType.CANCEL_INFERENCE })
-        assertFalse(screen.actions.any { it.type == ConsoleActionType.START_INFERENCE })
+        assertFalse(start.enabled)
+        assertTrue(screen.actions.any { it.type == ConsoleActionType.CANCEL_INFERENCE && it.enabled })
         assertTrue(screen.cards.any { it.lines.contains("partial output") })
     }
 
