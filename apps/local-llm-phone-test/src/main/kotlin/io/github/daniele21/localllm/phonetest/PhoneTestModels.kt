@@ -33,11 +33,7 @@ data class ImportedPhoneModel(
     )
 }
 
-internal data class PhoneHarness(
-    val runtime: RuntimeOrchestrator,
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
 internal enum class PlaygroundPhase {
     IDLE,
@@ -94,11 +90,7 @@ internal data class PlaygroundState(
             phase == PlaygroundPhase.GENERATING
 }
 
-internal data class PlaygroundRequestOptions(
-    val maxOutputTokens: Int,
-    val temperature: Float,
-    val seed: Long,
-) {
+internal data class PlaygroundRequestOptions(val maxOutputTokens: Int, val temperature: Float, val seed: Long) {
     companion object {
         fun parse(maxOutputTokens: String, temperature: String, seed: String): PlaygroundRequestOptions {
             val parsedMaxOutputTokens = maxOutputTokens.trim().toIntOrNull()
