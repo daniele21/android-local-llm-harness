@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.catalog
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,7 +72,9 @@ class CatalogCompatibilityEvaluatorTest {
 
     @Test
     fun includesDoubleStagingAndSafetyMarginInStorageRequirement() {
-        val release = validCatalogRelease(sizeBytes = 100L * 1024L * 1024L)
+        val release = validCatalogRelease { current ->
+            current.copy(artifact = current.artifact.copy(sizeBytes = 100L * 1024L * 1024L))
+        }
         val result =
             evaluator.evaluate(
                 release = release,
@@ -88,7 +91,9 @@ class CatalogCompatibilityEvaluatorTest {
     fun blocksRevokedRelease() {
         val result =
             evaluator.evaluate(
-                release = validCatalogRelease(availability = CatalogAvailability.REVOKED),
+                release = validCatalogRelease { current ->
+                    current.copy(availability = CatalogAvailability.REVOKED)
+                },
                 target = testTarget,
                 device = compatibleDevice(),
             )
@@ -101,7 +106,9 @@ class CatalogCompatibilityEvaluatorTest {
     fun exposesDeprecatedReleaseAsWarning() {
         val result =
             evaluator.evaluate(
-                release = validCatalogRelease(availability = CatalogAvailability.DEPRECATED),
+                release = validCatalogRelease { current ->
+                    current.copy(availability = CatalogAvailability.DEPRECATED)
+                },
                 target = testTarget,
                 device = compatibleDevice(),
             )
@@ -121,13 +128,19 @@ class CatalogCompatibilityEvaluatorTest {
             validCatalogDocument(
                 entries =
                 listOf(
-                    validCatalogRelease(modelId = "allowed"),
-                    validCatalogRelease(
-                        modelId = "other",
-                        version = "2.0.0",
-                        digest = "b".repeat(64),
-                        allowedTargets = setOf(otherTarget),
-                    ),
+                    validCatalogRelease { current ->
+                        current.copy(id = current.id.copy(modelId = CatalogModelId("allowed")))
+                    },
+                    validCatalogRelease { current ->
+                        current.copy(
+                            id = CatalogReleaseId(
+                                modelId = CatalogModelId("other"),
+                                version = CatalogModelVersion("2.0.0"),
+                            ),
+                            artifact = current.artifact.copy(digest = ModelDigest("b".repeat(64))),
+                            allowedTargets = setOf(otherTarget),
+                        )
+                    },
                 ),
             )
 
