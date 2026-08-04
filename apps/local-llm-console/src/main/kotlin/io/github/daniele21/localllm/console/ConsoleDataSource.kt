@@ -14,6 +14,7 @@ class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
     private val modelInventoryProvider: ConsoleModelInventoryProvider = DisconnectedModelInventoryProvider,
+    private val modelControl: ConsoleModelControl = DisconnectedModelControl,
     private val healthControl: ConsoleHealthControl = DisconnectedHealthControl,
     private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl,
     private val clockEpochMs: () -> Long = System::currentTimeMillis,
@@ -31,6 +32,7 @@ class TelemetryConsoleDataSource(
         val capturedAt = clockEpochMs()
         val runtime = safelyLoadRuntime()
         val modelInventory = safelyLoadModelInventory()
+        val modelControlState = safelyLoadModelControl()
         val healthControlState = safelyLoadHealthControl()
         val cacheControlState = safelyLoadCacheControl()
 
@@ -44,6 +46,7 @@ class TelemetryConsoleDataSource(
                 resources = telemetryRepository.recentResourceSnapshots(resourceLimit),
                 benchmarkBaselines = telemetryRepository.benchmarkBaselines(),
                 modelInventory = modelInventory,
+                modelControl = modelControlState,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
             )
@@ -57,6 +60,7 @@ class TelemetryConsoleDataSource(
                 resources = emptyList(),
                 benchmarkBaselines = emptyList(),
                 modelInventory = modelInventory,
+                modelControl = modelControlState,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
                 sourceError = TELEMETRY_SOURCE_ERROR,
@@ -96,6 +100,15 @@ class TelemetryConsoleDataSource(
         )
     }
 
+    private fun safelyLoadModelControl(): ConsoleModelControlState = try {
+        modelControl.snapshot()
+    } catch (_: RuntimeException) {
+        DisconnectedModelControl.snapshot().copy(
+            source = "Unavailable",
+            sourceError = MODEL_MANAGEMENT_SOURCE_ERROR,
+        )
+    }
+
     private fun safelyLoadHealthControl(): ConsoleHealthControlState = try {
         healthControl.snapshot()
     } catch (_: RuntimeException) {
@@ -117,5 +130,6 @@ class TelemetryConsoleDataSource(
     private companion object {
         const val TELEMETRY_SOURCE_ERROR = "Telemetry source unavailable"
         const val MODEL_INVENTORY_SOURCE_ERROR = "Model inventory unavailable"
+        const val MODEL_MANAGEMENT_SOURCE_ERROR = "Model management unavailable"
     }
 }
