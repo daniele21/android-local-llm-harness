@@ -45,11 +45,7 @@ object DisconnectedRuntimeStateProvider : ConsoleRuntimeStateProvider {
     )
 }
 
-data class ConsoleInstalledModel(
-    val digest: ModelDigest,
-    val sizeBytes: Long,
-    val integrity: ConsoleModelIntegrity,
-)
+data class ConsoleInstalledModel(val digest: ModelDigest, val sizeBytes: Long, val integrity: ConsoleModelIntegrity)
 
 enum class ConsoleModelIntegrity {
     VERIFIED,
