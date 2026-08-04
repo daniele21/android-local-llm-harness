@@ -11,10 +11,7 @@ data class CatalogModelId(val value: String)
 
 data class CatalogModelVersion(val value: String)
 
-data class CatalogReleaseId(
-    val modelId: CatalogModelId,
-    val version: CatalogModelVersion,
-)
+data class CatalogReleaseId(val modelId: CatalogModelId, val version: CatalogModelVersion)
 
 data class ModelProfileKey(val value: String)
 
@@ -60,17 +57,9 @@ data class CatalogCompatibility(
     val supportedBackendIds: Set<String> = emptySet(),
 )
 
-data class CatalogTarget(
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+data class CatalogTarget(val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
-data class CatalogLicense(
-    val id: String,
-    val displayName: String,
-    val sourceUri: URI? = null,
-    val licenseUri: URI? = null,
-)
+data class CatalogLicense(val id: String, val displayName: String, val sourceUri: URI? = null, val licenseUri: URI? = null)
 
 enum class CatalogAvailability {
     ACTIVE,
@@ -115,11 +104,7 @@ enum class CatalogCompatibilityWarning {
 }
 
 interface CatalogVersionMatcher {
-    fun isInRange(
-        currentVersion: String,
-        minimumInclusive: String?,
-        maximumExclusive: String?,
-    ): Boolean
+    fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean
 }
 
 interface CatalogProfileResolver {
