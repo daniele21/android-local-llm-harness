@@ -2,9 +2,9 @@
 
 ## Scope
 
-The console implementation turns `apps/local-llm-console` from a static shell into an observability, runtime-inspection and explicit health-control application.
+The console implementation turns `apps/local-llm-console` from a static shell into an observability, runtime-inspection and explicit diagnostics-control application.
 
-It provides eight primary views:
+It provides nine primary views:
 
 - overview;
 - installed models;
@@ -12,12 +12,13 @@ It provides eight primary views:
 - generation runs;
 - structured logs;
 - health and sanity results and controls;
+- cache health and repair controls;
 - memory and thermal trends;
 - benchmark baselines.
 
-Generation-run and request-correlated log cards can open a request detail view containing the complete persisted run metrics and a chronological event timeline.
+Generation-run and request-correlated log cards can open a request detail view containing complete persisted run metrics and a chronological event timeline.
 
-The console reuses the existing contracts from `observability/contracts`, `observability/health-engine`, `core/contracts` and `models/model-store`. It does not introduce alternate telemetry schemas, model registries, health-check execution semantics or runtime policy.
+The console reuses the existing contracts from `observability/contracts`, `observability/health-engine`, `core/contracts`, `core/runtime-core` and `models/model-store`. It does not introduce alternate telemetry schemas, model registries, health-check semantics, cache registries or runtime policy.
 
 ## Architecture
 
@@ -25,9 +26,13 @@ The console reuses the existing contracts from `observability/contracts`, `obser
 MainActivity
     ├── ConsoleChartView
     ├── ConsoleHealthControl → HealthEngine
+    ├── ConsoleCacheControl
+    │       ├── CacheHealthProbe
+    │       └── CacheMaintenanceControl
     └── presenters
             ├── ConsolePresenter
             ├── ConsoleHealthPresenter
+            ├── ConsoleCachePresenter
             ├── ConsoleInventoryPresenter
             └── ConsoleResourceChartPresenter
                     ↓
@@ -39,118 +44,124 @@ MainActivity
             ├── TelemetryRepository
             ├── ConsoleRuntimeStateProvider
             ├── ConsoleModelInventoryProvider
-            └── ConsoleHealthControl.snapshot()
-                    ↑
-                    ModelStoreInventoryProvider → ModelStore.snapshot()
+            ├── ConsoleHealthControl.snapshot()
+            └── ConsoleCacheControl.snapshot()
 ```
 
-`ConsoleDataSource` is the application-facing read boundary. The Android activity receives already collected data and delegates formatting, ordering and grouping to pure Kotlin presenters.
+`ConsoleDataSource` is the application-facing read boundary. Runtime state, model inventory, health controls, cache diagnostics and persisted telemetry are loaded independently. Failure in one source does not prevent the remaining sources from rendering.
 
-`ConsoleHealthControl` is a separate execution boundary. Reading registered-check state does not execute a check, and executing a check does not bypass `HealthEngine` persistence, status aggregation or error-isolation behavior.
+`ConsoleHealthControl` is the explicit health-execution boundary. Reading registered-check state does not execute a check, and executing a check does not bypass `HealthEngine` persistence, aggregation or exception isolation.
 
-`TelemetryConsoleDataSource.load()` reads bounded collections from `TelemetryRepository`:
+`ConsoleCacheControl` is the explicit cache-diagnostics boundary. It separates observational `CacheHealthProbe` instances from mutating `CacheMaintenanceControl` capabilities. Reading cache state never repairs or clears a cache.
 
-- recent generation runs;
-- recent structured logs;
-- persisted health results;
-- recent resource snapshots;
-- active benchmark baselines.
+Runtime state remains behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStateProvider` adapts the public `LocalLlmClient.runtimeSnapshot()` contract and does not depend on `RuntimeOrchestrator`, Room, Binder or backend implementation types.
 
-It also loads runtime, model-inventory and health-control snapshots through independent providers. A failure in one source does not prevent the remaining sources from rendering.
-
-`TelemetryConsoleDataSource.loadRequest()` resolves one request through `findRun(requestId)` and retrieves only its correlated structured logs. Events are sorted by timestamp before they reach the presenter.
-
-Runtime state remains separated behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStateProvider` adapts the public `LocalLlmClient.runtimeSnapshot()` contract and therefore does not depend on `RuntimeOrchestrator`, `llama.cpp`, Room or Binder implementation types.
-
-Model inventory remains separated behind `ConsoleModelInventoryProvider`. `ModelStoreInventoryProvider` maps the existing content-addressed `ModelStoreSnapshot` into UI-safe values and deliberately drops `StoredModel.file`, so private filesystem paths never reach the presenter.
-
-`HealthEngineConsoleHealthControl` adapts the existing `HealthEngine.availableChecks()`, `runAll()` and targeted `run(checkIds)` contracts. It does not invoke individual `HealthCheck` implementations directly.
+Model inventory remains behind `ConsoleModelInventoryProvider`. `ModelStoreInventoryProvider` maps `ModelStoreSnapshot` into UI-safe values and deliberately drops `StoredModel.file`, so private filesystem paths never reach the presenter.
 
 `ConsoleResourceChartPresenter` transforms persisted `ResourceSnapshot` values into Android-independent chart models. `ConsoleChartView` renders those models with Android Canvas primitives and does not query resource APIs, schedule timers or own telemetry collection.
 
 ## Installed-model view
 
-The installed-model view shows:
+The Models view shows source availability, aggregate model count and size, the active runtime model, full model digests, model size and integrity state.
 
-- whether the inventory source is available;
-- model count;
-- aggregate stored bytes;
-- source identity;
-- active runtime model;
-- full SHA-256 digest per model;
-- model size;
-- integrity state;
-- whether the model is installed or currently loaded.
+It distinguishes:
 
-The view distinguishes three different states:
-
-- inventory source not connected;
+- source not connected;
 - connected inventory with zero installed models;
-- inventory source failure.
+- inventory-source failure.
 
-`ModelStore.snapshot()` is observational and does not hash every artifact. An entry returned with `verified = false` is therefore shown as `Not checked`, not as corrupt or invalid. Explicit integrity execution remains owned by the health-engine slice.
+`ModelStore.snapshot()` is observational and does not hash every artifact. An entry with `verified = false` is shown as `Not checked`, not as corrupt. Explicit integrity execution remains owned by `HealthEngine`.
 
 ## Active-runtime view
 
-The active-runtime view shows only fields available from the public runtime snapshot:
+The Runtime view shows only values exposed by the public runtime snapshot:
 
-- connection state;
-- runtime state;
+- connection and runtime state;
 - backend identity supplied by the adapter;
 - loaded model digest;
 - active session count;
 - queued-request count;
 - source identity.
 
-The UI explicitly states that session descriptors, context parameters and active-request identity are not exposed by the current `RuntimeSnapshot`. It does not infer or fabricate these values. Runtime mutation remains outside this slice.
+Session descriptors, context parameters and active-request identity are not exposed by the current `RuntimeSnapshot` and are not inferred or fabricated.
 
-## Health and sanity execution controls
+## Health and sanity controls
 
-The Health view combines persisted results with explicit execution controls. When a connected `ConsoleHealthControl` reports registered checks, the view provides:
+The Health view combines persisted results with explicit execution controls. A connected `ConsoleHealthControl` can expose:
 
 - `Run all checks`;
 - one targeted action for each registered check ID;
-- source identity;
-- ready or running state;
-- registered-check count and IDs;
+- source and execution state;
 - persisted results ordered by severity.
 
-Execution is user initiated. Opening the view, refreshing the console or reading `ConsoleHealthControlState` never starts a health check.
+Opening or refreshing the view never starts a check. Health work runs through a single-thread executor outside the Android main thread, and actions are disabled while execution is active. Completion reloads the same `TelemetryRepository`, so `HealthEngine` remains the only result owner.
 
-The Android activity runs health work through a dedicated single-thread executor rather than the main thread. While one suite is running, all health actions are disabled. Completion reloads the same `TelemetryRepository`, so results persisted by `HealthEngine` become visible without a parallel result store.
+The standalone console registers `ModelIntegrityHealthCheck` against its own sandboxed `FileSystemModelStore`. Generation-sanity actions are capability driven: registered `generation-sanity:<applicationId>:<useCaseId>` IDs appear automatically when an embedded runtime provides the corresponding checks. The standalone console does not create them because it has no connected `LocalLlmClient` or application/use-case binding.
 
-The standalone console registers `ModelIntegrityHealthCheck` against its own sandboxed `FileSystemModelStore`. It can therefore run a real integrity check only for artifacts owned by the console application.
+The adapter preserves `HealthEngine` behavior for complete and targeted execution, worst-status aggregation, `NOT_RUN` results for unknown IDs, duration measurement, persistence and individual-check exception isolation.
 
-Generation sanity controls are capability driven rather than hard-coded into the UI. An embedded runtime can provide a `HealthEngineConsoleHealthControl` whose engine contains one or more `GenerationSanityHealthCheck` instances. Their stable `generation-sanity:<applicationId>:<useCaseId>` IDs then appear automatically as targeted actions. The standalone console does not create generation sanity checks because it has no connected `LocalLlmClient`, application/use-case binding or runtime-owned model lifecycle.
+## Cache health and repair controls
 
-The control adapter retains `HealthEngine` behavior for:
+The Caches view reports each registered cache independently:
 
-- complete and targeted execution;
-- worst-status aggregation;
-- explicit `NOT_RUN` results for unknown IDs;
-- duration measurement;
-- persisted privacy-safe results;
-- individual check exception isolation.
+- cache identifier;
+- total, healthy, stale and orphaned entry counts;
+- health status;
+- whether repair capability is available;
+- source and execution state;
+- last repair outcome.
 
-The console does not add cancellation or concurrent-suite execution semantics that are absent from the current `HealthEngine` contract.
+The view distinguishes:
+
+- diagnostics source not connected;
+- connected source with no registered probes;
+- healthy cache;
+- unhealthy cache;
+- individual probe failure;
+- repair failure.
+
+A repair action is rendered only when all of the following are true:
+
+- the cache has a registered health probe;
+- the latest snapshot is available;
+- the cache is unhealthy;
+- a matching `CacheMaintenanceControl` is registered.
+
+Cache repair is explicit and runs through the same single-thread diagnostics executor used by health actions. No mutation occurs during discovery, refresh or overview rendering. While repair is running, the action is disabled.
+
+### Model-integrity cache repair
+
+`ModelIntegrityCacheMaintenanceControl` operates on the runtime-owned `ModelIntegrityCache` and its injected `ModelStore`.
+
+Repair behavior is targeted:
+
+- stale entries are revalidated through `ModelStore.verify()`;
+- successfully revalidated entries receive a current file stamp;
+- stale entries whose model verification fails are removed from the cache;
+- orphaned entries whose model no longer exists are removed;
+- revalidation exceptions are counted as failures and leave the stale entry visible for a later retry.
+
+The result reports before and after snapshots plus revalidated, removed and failed counts.
+
+The console does not expose `ModelIntegrityCache.clear()` as repair. Blindly clearing the cache would discard the historical file stamp used to detect that an artifact changed and could cause an unchanged `StoredModel.verified` flag to seed the cache again without the intended re-hash.
+
+Concurrent changes are handled with conditional `ConcurrentHashMap.remove(key, value)` and `replace(key, oldValue, newValue)` operations. A repair does not overwrite an entry that changed after the snapshot was captured.
+
+The standalone console intentionally uses `DisconnectedCacheControl`: its process does not own the embedded runtime's integrity cache. An embedding application can provide `ContractConsoleCacheControl` with `ModelIntegrityCacheHealthProbe` and `ModelIntegrityCacheMaintenanceControl` over the same runtime-owned cache instance.
 
 ## Resource and thermal charts
 
-The Resources view retains the individual persisted snapshot cards and adds three chronological charts:
+The Resources view retains persisted snapshot cards and adds three chronological charts:
 
-- process memory, with process PSS, native heap and Java heap series;
+- process PSS, native heap and Java heap;
 - available device memory;
 - Android thermal pressure from `NONE` through `SHUTDOWN`.
 
-Byte measurements are converted to MiB only in the presentation layer. Samples are ordered by `timestampEpochMs`, while the horizontal axis shows elapsed time from the first persisted sample.
+Byte measurements are converted to MiB only in the presentation layer. Samples are ordered by timestamp and the horizontal axis shows elapsed time from the first sample.
 
-Nullable measurements are preserved as gaps. A missing PSS, heap or available-memory value does not become zero and does not connect line segments across unavailable observations. `ThermalStatus.UNKNOWN` is also rendered as a gap rather than being assigned an invented severity.
+Nullable measurements remain gaps. Missing memory values are not converted to zero, line segments do not bridge unavailable observations and `ThermalStatus.UNKNOWN` is not assigned an invented severity. The thermal chart also reports persisted `lowMemory = true` samples without interpreting `null` as false.
 
-The thermal chart additionally reports how many persisted samples carried `lowMemory = true`. It does not reinterpret `null` as false.
-
-Charts are derived only from snapshots already returned by `TelemetryRepository.recentResourceSnapshots()`. The console does not install a timer, start background polling or invoke the Android resource probe. Capture cadence remains explicitly owned by the embedding application or runtime control plane.
-
-If no resource snapshots exist, no placeholder graph is created and the existing empty-state card remains authoritative.
+Charts are derived only from snapshots returned by `TelemetryRepository.recentResourceSnapshots()`. The console does not start polling or invoke the Android resource probe.
 
 ## Request detail and timeline
 
@@ -158,123 +169,81 @@ A selectable run or correlated log opens a detail screen with:
 
 - application and use-case identity;
 - model digest prefix and load classification;
-- queue and model-load duration;
-- TTFT, prefill, decode and total latency;
-- input and output token counts;
-- decode throughput;
+- queue, model-load, TTFT, prefill, decode and total latency;
+- token counts and decode throughput;
 - terminal status and typed error code;
 - chronological structured-log events;
-- event sequence number;
-- absolute timestamp;
-- offset from the run start, or from the first event when the run record is unavailable;
+- sequence number, absolute timestamp and run-relative offset;
 - component and deterministically ordered structured fields.
 
-The timeline is reconstructed exclusively from persisted telemetry. It does not infer missing lifecycle transitions and does not fabricate events.
-
-The request detail supports explicit empty states for:
-
-- a request identifier without a matching run record;
-- a run without correlated structured logs;
-- an unavailable telemetry source.
+The timeline is reconstructed exclusively from persisted telemetry. Missing lifecycle transitions are not inferred. Explicit empty states cover a missing run, a run without logs and an unavailable telemetry source.
 
 ## Current wiring
 
 The standalone console currently uses:
 
-- an in-memory telemetry repository inside its own Android sandbox;
-- a `FileSystemModelStore` rooted in the console application's private files directory;
-- a `HealthEngine` containing `ModelIntegrityHealthCheck` over that same store;
-- the disconnected runtime-state provider.
+- an in-memory telemetry repository inside its Android sandbox;
+- a `FileSystemModelStore` rooted in its private files directory;
+- a `HealthEngine` containing `ModelIntegrityHealthCheck` over that store;
+- disconnected runtime and cache-control providers.
 
-This means the standalone console can accurately inspect and verify its own local model-store namespace, including an empty store, but it cannot inspect or verify a different application's model store. It also cannot run generation sanity without a connected runtime. The chart layer is complete, but the standalone in-memory repository contains no resource history until a real diagnostics source is connected.
-
-This is intentional. The console must not open another application's private Room database or private model directory. Until a signature-protected diagnostics bridge is available, cross-application runtime values, health execution, model inventory and resource history remain explicitly unavailable.
+It can inspect and verify only its own model-store namespace. It cannot inspect another application's runtime, telemetry, resources, model store or runtime-owned caches. It also cannot run generation sanity without a connected runtime.
 
 An application embedding the console data layer in the same process can provide:
 
 - `LocalLlmRuntimeStateProvider` over its `LocalLlmClient`;
 - `ModelStoreInventoryProvider` over its real `ModelStore`;
-- `HealthEngineConsoleHealthControl` over its registered integrity and generation-sanity checks;
-- its own persistent or in-memory `TelemetryRepository`.
+- `HealthEngineConsoleHealthControl` over registered health and sanity checks;
+- `ContractConsoleCacheControl` over runtime-owned cache probes and maintenance controls;
+- its persistent or in-memory `TelemetryRepository`.
 
-The UI, chart renderer and presenters do not need to change when these providers replace the standalone wiring.
+A signature-protected diagnostics bridge remains required for legitimate cross-application access.
 
-## Privacy
+## Privacy and failures
 
-The presenters do not receive or render:
+The presenters do not receive or render prompts, generated output, model bytes, document URIs, private filesystem paths or arbitrary backend exception messages.
 
-- prompts;
-- generated output;
-- model bytes;
-- document URIs;
-- private filesystem paths;
-- arbitrary backend exception messages.
+Failures are converted to fixed messages:
 
-Telemetry failures are converted to `Telemetry source unavailable`. Model-store failures are converted to `Model inventory unavailable`. Health-control failures are converted to `Health execution unavailable`. Raw exception messages are not shown.
+- `Telemetry source unavailable`;
+- `Model inventory unavailable`;
+- `Health execution unavailable`;
+- `Cache health unavailable`;
+- `Cache repair unavailable`.
 
-Model inventory mapping retains digest, size and integrity state but drops the backing `File` reference before the data reaches the presentation layer.
+A cache-source failure does not suppress telemetry, model inventory, runtime state or persisted health results. One failing cache probe does not hide other cache snapshots. A repair exception clears the running state and produces a fixed error without exposing the original exception text.
 
-Health execution renders only the privacy-safe `HealthCheckResult` values already produced by `HealthEngine`. The console does not add prompts, generated output or backend exception text to those records.
-
-Resource charts contain only the numeric process and device measurements already present in `ResourceSnapshot`; they do not add identifiers, file paths or content payloads.
-
-## Failure behavior
-
-If runtime-state collection fails, the console falls back to the disconnected state.
-
-If model-inventory collection fails, the model source becomes unavailable with a fixed privacy-safe error while telemetry remains usable.
-
-If health-control discovery fails, execution controls become unavailable with a fixed privacy-safe error while persisted telemetry remains readable. If suite execution fails at the adapter boundary, the UI clears the running state and displays the same fixed error.
-
-If a summary telemetry query fails, the snapshot contains empty telemetry collections and a fixed source error while runtime, model inventory and health-control discovery remain independently available. If request-detail loading fails, the detail contains no run or events and the same fixed telemetry error.
-
-Refreshing while a request detail is open reloads both the summary snapshot and that request's correlated telemetry. Changing tab or using Back closes the detail without mutating runtime or model state.
-
-Destroying the activity interrupts pending executor work through `shutdownNow()`. Individual generation-sanity timeout and cooperative cancellation remain owned by `GenerationSanityHealthCheck`.
+Destroying the activity interrupts pending executor work through `shutdownNow()`. Generation-sanity timeout and cooperative cancellation remain owned by `GenerationSanityHealthCheck`.
 
 ## Testing
 
 Pure JVM tests cover:
 
-- bounded repository queries;
-- runtime-state mapping;
-- model-inventory provider mapping;
-- removal of private model paths at the adapter boundary;
+- bounded telemetry queries and independent source failures;
+- runtime and model-store adapter mapping;
+- private path removal;
 - connected, disconnected and empty inventory states;
-- active-model correlation;
-- explicit runtime-contract gaps;
-- health-control state discovery and isolation;
-- complete and targeted health execution through `HealthEngine`;
-- persisted health results;
-- worst-status propagation;
-- disconnected health execution with a fixed error;
-- connected and disconnected action presentation;
-- action disabling during execution;
-- deterministic persisted-result severity ordering;
-- request lookup and request-scoped log filtering;
-- chronological timeline ordering;
-- privacy-safe source failure handling;
-- run metric rendering;
-- request-card selection metadata;
-- timeline sequence and offsets;
-- exclusion of prompt and output content;
-- deterministic structured-field ordering;
-- chronological resource-sample ordering;
-- byte-to-MiB conversion;
-- missing-value gaps without invented zeros;
-- discrete thermal-state mapping and `UNKNOWN` gaps;
-- low-memory signal counting;
-- empty resource history without placeholder charts.
+- health discovery, complete and targeted execution and persistence;
+- request lookup, filtering, ordering and timeline offsets;
+- chart ordering, MiB conversion, nullable gaps and thermal mapping;
+- cache-probe ordering and per-probe failure isolation;
+- maintenance capability matching;
+- disconnected, empty, healthy, unhealthy and running cache presentation;
+- repair-action eligibility and disabling;
+- repair before/after presentation;
+- stale entry revalidation;
+- orphaned and invalid entry removal;
+- failed revalidation retention;
+- privacy-safe cache-source and repair errors.
 
-The repository validation gate also compiles and packages the Android health controls and custom chart view, runs Android Lint and Detekt, and verifies that no model artifact is introduced.
+The repository validation gate compiles and packages the Android controls and chart view, runs JVM tests, Spotless, Detekt and Android Lint, verifies native packaging and confirms that no model artifact is introduced.
 
 ## Deferred slices
 
-The following remain separate implementation work:
+The following remain separate work:
 
 - persistent console-local Room wiring when the console owns an embedded runtime;
-- cache-health inspection and repair actions;
-- benchmark regression comparison and history;
+- benchmark regression comparison and baseline history;
 - installed-model mutation and management;
 - manual inference playground;
 - privacy-redacted diagnostic export;
