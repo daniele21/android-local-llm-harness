@@ -18,10 +18,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
-internal class PhonePlaygroundController(
-    context: Context,
-    private val listener: (PlaygroundState) -> Unit,
-) : AutoCloseable {
+internal class PhonePlaygroundController(context: Context, private val listener: (PlaygroundState) -> Unit) : AutoCloseable {
     private val appContext = context.applicationContext
     private val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
     private val executor = Executors.newSingleThreadExecutor()
@@ -129,12 +126,7 @@ internal class PhonePlaygroundController(
         executor.shutdownNow()
     }
 
-    private fun startOnWorker(
-        model: ImportedPhoneModel,
-        requestId: RequestId,
-        prompt: String,
-        options: PlaygroundRequestOptions,
-    ) {
+    private fun startOnWorker(model: ImportedPhoneModel, requestId: RequestId, prompt: String, options: PlaygroundRequestOptions) {
         try {
             val verification = modelStore.verify(model.digest)
             check(verification.valid) { "Model integrity verification failed" }
@@ -343,11 +335,7 @@ internal class PhonePlaygroundController(
         listener(current)
     }
 
-    private data class RuntimeResources(
-        val runtime: RuntimeOrchestrator?,
-        val session: SessionId?,
-        val handle: GenerationHandle?,
-    )
+    private data class RuntimeResources(val runtime: RuntimeOrchestrator?, val session: SessionId?, val handle: GenerationHandle?)
 
     private companion object {
         const val MODEL_STORE_DIRECTORY = "local-llm-phone-test"
