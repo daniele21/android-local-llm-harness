@@ -374,8 +374,9 @@ class LocalLlmConsoleInferenceControl(
     )
 
     private fun cleanupSessionAfterTerminal() {
-        val session = synchronized(lock) { activeSession } ?: return
+        val session = synchronized(lock) { activeSession } ?: return clearTerminalListener()
         val failure = runCatching { client.closeSession(session) }.exceptionOrNull()
+        val listener: ConsoleInferenceListener?
         val current = synchronized(lock) {
             if (activeSession == session && failure == null) {
                 activeSession = null
@@ -391,31 +392,53 @@ class LocalLlmConsoleInferenceControl(
                     sourceError = SESSION_CLEANUP_ERROR,
                 )
             }
+            listener = activeListener
+            activeListener = null
             state
         }
-        publish(current)
+        listener?.onStateChanged(current)
     }
 
     private fun terminalFailure(
         detail: String,
         cleanupSession: Boolean = false,
     ): ConsoleInferenceOperationOutcome {
-        if (cleanupSession) cleanupSessionAfterTerminal()
+        val cleanupFailed = if (cleanupSession) closeSessionForStartFailure() else false
+        val finalDetail = if (cleanupFailed) SESSION_CLEANUP_ERROR else detail
+        val listener: ConsoleInferenceListener?
         val current = synchronized(lock) {
+            listener = activeListener
             activeHandle = null
             activeRequestId = null
             activeListener = null
             state = state.copy(
                 phase = ConsoleInferencePhase.FAILED,
+                sessionActive = cleanupFailed,
                 cancellationAvailable = false,
-                errorCode = "INFERENCE_START_FAILED",
-                detail = detail,
-                sourceError = detail,
+                errorCode = if (cleanupFailed) "SESSION_CLEANUP_FAILED" else "INFERENCE_START_FAILED",
+                detail = finalDetail,
+                sourceError = finalDetail,
             )
             state
         }
-        publish(current)
-        return ConsoleInferenceOperationOutcome(false, current, detail)
+        listener?.onStateChanged(current)
+        return ConsoleInferenceOperationOutcome(false, current, finalDetail)
+    }
+
+    private fun closeSessionForStartFailure(): Boolean {
+        val session = synchronized(lock) { activeSession } ?: return false
+        val failure = runCatching { client.closeSession(session) }.isFailure
+        synchronized(lock) {
+            if (!failure && activeSession == session) {
+                activeSession = null
+                state = state.copy(sessionActive = false)
+            }
+        }
+        return failure
+    }
+
+    private fun clearTerminalListener() {
+        synchronized(lock) { activeListener = null }
     }
 
     private fun failedOperation(detail: String): ConsoleInferenceOperationOutcome {
