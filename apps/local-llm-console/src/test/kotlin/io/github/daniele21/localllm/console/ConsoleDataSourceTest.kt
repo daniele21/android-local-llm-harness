@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkKey
+import io.github.daniele21.localllm.observability.CacheHealthSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -30,7 +31,7 @@ import java.io.File
 
 class ConsoleDataSourceTest {
     @Test
-    fun `loads bounded telemetry runtime state and model inventory`() {
+    fun `loads bounded telemetry runtime model and cache state`() {
         val repository = InMemoryTelemetryRepository()
         repeat(3) { index -> repository.recordRun(run(index)) }
         repeat(4) { index -> repository.appendLog(log(index)) }
@@ -51,6 +52,21 @@ class ConsoleDataSourceTest {
                 )
             },
             modelInventoryProvider = ConsoleModelInventoryProvider { inventory() },
+            cacheControl = object : ConsoleCacheControl {
+                override fun snapshot(): ConsoleCacheControlState = ConsoleCacheControlState(
+                    available = true,
+                    source = "In process",
+                    caches = listOf(
+                        ConsoleCacheDescriptor(
+                            id = "model-integrity",
+                            snapshot = CacheHealthSnapshot(1, 0, 0),
+                            repairAvailable = true,
+                        ),
+                    ),
+                )
+
+                override fun repair(cacheId: String): ConsoleCacheRepairOutcome = error("Not used")
+            },
             clockEpochMs = { 99L },
             runLimit = 2,
             logLimit = 3,
@@ -62,6 +78,8 @@ class ConsoleDataSourceTest {
         assertEquals(99L, snapshot.capturedAtEpochMs)
         assertEquals("Ready", snapshot.runtime.status)
         assertEquals(1, snapshot.modelInventory.modelCount)
+        assertEquals(1, snapshot.cacheControl.caches.size)
+        assertEquals("model-integrity", snapshot.cacheControl.caches.single().id)
         assertEquals(2, snapshot.runs.size)
         assertEquals(3, snapshot.logs.size)
         assertEquals(1, snapshot.health.size)
@@ -117,9 +135,15 @@ class ConsoleDataSourceTest {
 
     @Test
     fun `returns privacy safe errors without exposing source failures`() {
+        val failingCacheControl = object : ConsoleCacheControl {
+            override fun snapshot(): ConsoleCacheControlState = error("private cache path")
+
+            override fun repair(cacheId: String): ConsoleCacheRepairOutcome = error("Not used")
+        }
         val dataSource = TelemetryConsoleDataSource(
             telemetryRepository = FailingTelemetryRepository(),
             modelInventoryProvider = ConsoleModelInventoryProvider { error("private model path") },
+            cacheControl = failingCacheControl,
             clockEpochMs = { 7L },
         )
 
@@ -131,6 +155,8 @@ class ConsoleDataSourceTest {
         assertEquals("Not connected", snapshot.runtime.status)
         assertEquals("Model inventory unavailable", snapshot.modelInventory.sourceError)
         assertFalse(snapshot.modelInventory.toString().contains("private model path"))
+        assertEquals("Cache health unavailable", snapshot.cacheControl.sourceError)
+        assertFalse(snapshot.cacheControl.toString().contains("private cache path"))
         assertEquals("Telemetry source unavailable", detail.sourceError)
         assertNull(detail.run)
         assertEquals(emptyList<StructuredLog>(), detail.timeline)
