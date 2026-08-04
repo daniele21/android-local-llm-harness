@@ -18,6 +18,7 @@ import io.github.daniele21.localllm.store.FileSystemModelStore
 @Suppress("MagicNumber")
 class MainActivity : Activity() {
     private val presenter = ConsolePresenter()
+    private val resourceChartPresenter = ConsoleResourceChartPresenter()
     private val dataSource: ConsoleDataSource by lazy {
         TelemetryConsoleDataSource(
             telemetryRepository = InMemoryTelemetryRepository(),
@@ -134,13 +135,30 @@ class MainActivity : Activity() {
     private fun render() {
         val currentSnapshot = snapshot ?: return
         val currentDetail = requestDetail
-        val screen = currentDetail?.let(presenter::presentRequestDetail)
+        val baseScreen = currentDetail?.let(presenter::presentRequestDetail)
             ?: presenter.present(selectedTab, currentSnapshot)
+        val screen = if (currentDetail == null && selectedTab == ConsoleTab.RESOURCES) {
+            baseScreen.copy(
+                subtitle = "Persisted memory and thermal trends from explicit resource captures",
+                charts = resourceChartPresenter.charts(currentSnapshot.resources),
+            )
+        } else {
+            baseScreen
+        }
         backButton.visibility = if (currentDetail == null) View.GONE else View.VISIBLE
         updatedAt.text = "Captured ${currentSnapshot.capturedAtEpochMs}"
         content.removeAllViews()
         content.addView(label(screen.title, 22f, bold = true).apply { setPadding(0, 20, 0, 10) })
         content.addView(label(screen.subtitle, 14f).apply { setPadding(0, 0, 0, 12) })
+        screen.charts.forEach { chart ->
+            content.addView(
+                ConsoleChartView(this, chart),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { setMargins(0, 0, 0, 20) },
+            )
+        }
         screen.cards.forEach { card -> content.addView(card(card)) }
     }
 
