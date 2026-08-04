@@ -48,10 +48,7 @@ object DisconnectedHealthControl : ConsoleHealthControl {
 }
 
 @Suppress("TooGenericExceptionCaught")
-class HealthEngineConsoleHealthControl(
-    private val healthEngine: HealthEngine,
-    private val source: String,
-) : ConsoleHealthControl {
+class HealthEngineConsoleHealthControl(private val healthEngine: HealthEngine, private val source: String) : ConsoleHealthControl {
     init {
         require(source.isNotBlank()) { "Health control source must not be blank" }
     }
@@ -81,10 +78,7 @@ class HealthEngineConsoleHealthControl(
         return execute(requested) { healthEngine.run(requested) }
     }
 
-    private fun execute(
-        requestedCheckIds: List<String>,
-        execution: () -> HealthSuiteReport,
-    ): ConsoleHealthRunOutcome = try {
+    private fun execute(requestedCheckIds: List<String>, execution: () -> HealthSuiteReport): ConsoleHealthRunOutcome = try {
         val report = execution()
         ConsoleHealthRunOutcome(
             requestedCheckIds = requestedCheckIds,
