@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.observability.StructuredLog
 enum class ConsoleTab(val label: String) {
     OVERVIEW("Overview"),
     MODELS("Models"),
+    PLAYGROUND("Playground"),
     RUNTIME("Runtime"),
     RUNS("Runs"),
     LOGS("Logs"),
@@ -87,6 +88,7 @@ data class ConsoleSnapshot(
     val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
     val healthControl: ConsoleHealthControlState = DisconnectedHealthControl.snapshot(),
     val cacheControl: ConsoleCacheControlState = DisconnectedCacheControl.snapshot(),
+    val inference: ConsoleInferenceState = DisconnectedConsoleInferenceControl.snapshot(),
     val sourceError: String? = null,
 )
 
@@ -130,6 +132,9 @@ enum class ConsoleActionType {
     RUN_ALL_HEALTH_CHECKS,
     RUN_HEALTH_CHECKS,
     REPAIR_CACHE,
+    START_INFERENCE,
+    CANCEL_INFERENCE,
+    CLEAR_INFERENCE,
 }
 
 data class ConsoleAction(
