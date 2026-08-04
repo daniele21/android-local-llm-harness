@@ -147,6 +147,70 @@ class ModelIntegrityCacheTest {
         file.delete()
     }
 
+    @Test
+    fun `repair revalidates stale entries and removes orphaned entries`() {
+        val staleFile = temporaryModel("stale")
+        val orphanedFile = temporaryModel("orphaned")
+        val stale = StoredModel(ModelDigest("3".repeat(64)), staleFile, staleFile.length(), verified = true)
+        val orphaned = StoredModel(ModelDigest("4".repeat(64)), orphanedFile, orphanedFile.length(), verified = true)
+        val store = CountingModelStore(valid = true, entries = listOf(stale, orphaned))
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stale)
+        cache.verify(store, orphaned)
+        mutate(staleFile)
+        store.entries = listOf(stale)
+
+        val result = ModelIntegrityCacheMaintenanceControl(cache, store).repair()
+
+        assertEquals(1, result.before.staleEntryCount)
+        assertEquals(1, result.before.orphanedEntryCount)
+        assertEquals(1, result.revalidatedEntryCount)
+        assertEquals(1, result.removedEntryCount)
+        assertEquals(0, result.failedEntryCount)
+        assertEquals(1, result.after.entryCount)
+        assertTrue(result.after.healthy)
+        assertTrue(result.successful)
+        assertEquals(1, store.verificationCalls)
+        staleFile.delete()
+        orphanedFile.delete()
+    }
+
+    @Test
+    fun `repair removes stale cache entry when model verification fails`() {
+        val file = temporaryModel("abc")
+        val stored = StoredModel(ModelDigest("5".repeat(64)), file, file.length(), verified = true)
+        val store = CountingModelStore(valid = false, entries = listOf(stored))
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stored)
+        mutate(file)
+
+        val result = cache.repair(store)
+
+        assertEquals(1, result.removedEntryCount)
+        assertEquals(0, result.failedEntryCount)
+        assertEquals(0, result.after.entryCount)
+        assertTrue(result.after.healthy)
+        file.delete()
+    }
+
+    @Test
+    fun `repair preserves stale entry when verification throws`() {
+        val file = temporaryModel("abc")
+        val stored = StoredModel(ModelDigest("6".repeat(64)), file, file.length(), verified = true)
+        val store = CountingModelStore(valid = true, entries = listOf(stored), throwOnVerify = true)
+        val cache = ModelIntegrityCache()
+        cache.verify(store, stored)
+        mutate(file)
+
+        val result = cache.repair(store)
+
+        assertEquals(0, result.changedEntryCount)
+        assertEquals(1, result.failedEntryCount)
+        assertEquals(1, result.after.staleEntryCount)
+        assertFalse(result.successful)
+        file.delete()
+    }
+
     private fun temporaryModel(content: String): File = File.createTempFile("integrity-cache", ".gguf").apply {
         writeText(content)
         deleteOnExit()
@@ -158,7 +222,11 @@ class ModelIntegrityCacheTest {
     }
 }
 
-private class CountingModelStore(private val valid: Boolean, entries: List<StoredModel> = emptyList()) : ModelStore {
+private class CountingModelStore(
+    private val valid: Boolean,
+    entries: List<StoredModel> = emptyList(),
+    private val throwOnVerify: Boolean = false,
+) : ModelStore {
     var verificationCalls: Int = 0
     var entries: List<StoredModel> = entries
 
@@ -168,6 +236,7 @@ private class CountingModelStore(private val valid: Boolean, entries: List<Store
 
     override fun verify(digest: ModelDigest): VerificationResult {
         verificationCalls += 1
+        if (throwOnVerify) error("verification failed")
         return VerificationResult(
             valid = valid,
             actualDigest = if (valid) digest else null,

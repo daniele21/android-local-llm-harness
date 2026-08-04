@@ -225,16 +225,61 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
+### Console observability, controls and cache repair — PR #31
+
+- [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, caches, resources and benchmarks
+- [x] `ConsoleDataSource` boundary over existing observability contracts
+- [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
+- [x] runtime adapter over the public `LocalLlmClient.runtimeSnapshot()` contract
+- [x] model-inventory provider boundary over the existing content-addressed `ModelStore.snapshot()` contract
+- [x] model-store adapter that removes private backing-file paths before presentation
+- [x] explicit disconnected, connected-empty and source-failure inventory states
+- [x] active installed-model correlation against the runtime snapshot
+- [x] standalone wiring limited to the console application's private `FileSystemModelStore`
+- [x] bounded run, log and resource queries
+- [x] privacy-safe disconnected and telemetry-failure states
+- [x] read-only generation metric cards
+- [x] read-only structured-log cards with deterministic field ordering
+- [x] read-only health, resource and benchmark cards
+- [x] selectable request detail from generation-run and correlated-log cards
+- [x] request-scoped run and structured-log queries
+- [x] chronological request timeline with event sequence and run-relative offsets
+- [x] privacy-safe missing-run, empty-timeline and source-error states
+- [x] process PSS, native heap and Java heap trend chart
+- [x] available-device-memory trend chart
+- [x] discrete Android thermal-pressure chart with low-memory signal count
+- [x] nullable measurements and unknown thermal states rendered as gaps rather than zero values
+- [x] chart rendering from persisted explicit captures without timers or hidden polling
+- [x] `ConsoleHealthControl` execution boundary over the existing `HealthEngine`
+- [x] explicit run-all and targeted per-check actions
+- [x] standalone `ModelIntegrityHealthCheck` execution against the console sandbox store
+- [x] automatic targeted controls for registered generation-sanity check IDs
+- [x] health execution outside the Android main thread through a single-thread executor
+- [x] action disabling while a health suite is in progress
+- [x] persisted-result refresh through the existing telemetry repository
+- [x] fixed privacy-safe health-control failure states
+- [x] neutral `CacheMaintenanceControl` contract separate from observational cache probes
+- [x] `ConsoleCacheControl` discovery and targeted-repair boundary
+- [x] independent cache-source loading and privacy-safe failure isolation
+- [x] disconnected, connected-empty, healthy, unhealthy and unavailable cache states
+- [x] repair actions exposed only for unhealthy caches with a registered maintenance capability
+- [x] runtime-owned model-integrity repair that revalidates stale entries and removes orphaned or invalid entries
+- [x] failed revalidation remains visible as an unresolved stale entry
+- [x] cache actions executed outside the Android main thread and disabled while running
+- [x] before/after, revalidated, removed and failed repair counts
+- [x] standalone cache control remains explicitly disconnected because the console does not own the runtime cache
+- [x] fixed privacy-safe cache-health and cache-repair error states
+- [x] refresh and back navigation without implicit runtime, model or cache mutation
+- [x] pure Kotlin presenter, data-source, adapter, health-control, cache-control and chart-model tests
+- [x] Android controls and custom-view compilation, lint and packaging validation
+- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
+- [ ] connect the standalone console to a real cross-application diagnostics source
+
 ### Remaining Phase 2 work
 
-- [ ] console run timeline
-- [ ] structured-log viewer
-- [ ] request detail view
-- [ ] installed-model and active-runtime views
-- [ ] health and sanity execution controls
-- [ ] resource and thermal charts
-- [ ] cache-health view and repair actions
-- [ ] benchmark baseline and regression views
+- [ ] benchmark regression comparison and baseline history views
+- [ ] model-management console
+- [ ] manual inference playground
 - [ ] privacy-redacted diagnostic bundle export
 - [ ] signature-protected diagnostics bridge for cross-application console access
 
