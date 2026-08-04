@@ -11,7 +11,7 @@ interface ConsoleDataSource {
     fun loadRequest(requestId: RequestId): ConsoleRequestDetail
 }
 
-@Suppress("TooGenericExceptionCaught")
+@Suppress("LongParameterList", "TooGenericExceptionCaught")
 class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
