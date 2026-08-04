@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.StructuredLog
+import io.github.daniele21.localllm.observability.benchmark.BenchmarkComparison
 
 enum class ConsoleTab(val label: String) {
     OVERVIEW("Overview"),
@@ -84,6 +85,8 @@ data class ConsoleSnapshot(
     val health: List<HealthCheckResult>,
     val resources: List<ResourceSnapshot>,
     val benchmarkBaselines: List<BenchmarkBaseline>,
+    val benchmarkHistory: List<BenchmarkBaseline> = emptyList(),
+    val benchmarkComparisons: List<BenchmarkComparison> = emptyList(),
     val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
     val healthControl: ConsoleHealthControlState = DisconnectedHealthControl.snapshot(),
     val cacheControl: ConsoleCacheControlState = DisconnectedCacheControl.snapshot(),
