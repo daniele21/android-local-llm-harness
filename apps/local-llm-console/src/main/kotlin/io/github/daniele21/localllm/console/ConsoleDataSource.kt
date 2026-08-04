@@ -9,13 +9,14 @@ interface ConsoleDataSource {
     fun loadRequest(requestId: RequestId): ConsoleRequestDetail
 }
 
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "LongParameterList")
 class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
     private val modelInventoryProvider: ConsoleModelInventoryProvider = DisconnectedModelInventoryProvider,
     private val healthControl: ConsoleHealthControl = DisconnectedHealthControl,
     private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl,
+    private val inferenceControl: ConsoleInferenceControl = DisconnectedConsoleInferenceControl,
     private val clockEpochMs: () -> Long = System::currentTimeMillis,
     private val runLimit: Int = 100,
     private val logLimit: Int = 500,
@@ -33,6 +34,7 @@ class TelemetryConsoleDataSource(
         val modelInventory = safelyLoadModelInventory()
         val healthControlState = safelyLoadHealthControl()
         val cacheControlState = safelyLoadCacheControl()
+        val inferenceState = safelyLoadInference()
 
         return try {
             ConsoleSnapshot(
@@ -46,6 +48,7 @@ class TelemetryConsoleDataSource(
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
+                inference = inferenceState,
             )
         } catch (_: RuntimeException) {
             ConsoleSnapshot(
@@ -59,6 +62,7 @@ class TelemetryConsoleDataSource(
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
+                inference = inferenceState,
                 sourceError = TELEMETRY_SOURCE_ERROR,
             )
         }
@@ -114,8 +118,18 @@ class TelemetryConsoleDataSource(
         )
     }
 
+    private fun safelyLoadInference(): ConsoleInferenceState = try {
+        inferenceControl.snapshot()
+    } catch (_: RuntimeException) {
+        DisconnectedConsoleInferenceControl.snapshot().copy(
+            source = "Unavailable",
+            sourceError = INFERENCE_SOURCE_ERROR,
+        )
+    }
+
     private companion object {
         const val TELEMETRY_SOURCE_ERROR = "Telemetry source unavailable"
         const val MODEL_INVENTORY_SOURCE_ERROR = "Model inventory unavailable"
+        const val INFERENCE_SOURCE_ERROR = "Inference playground unavailable"
     }
 }

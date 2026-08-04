@@ -35,6 +35,8 @@ class MainActivity : Activity() {
         )
     }
     private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl
+    private val inferenceControl: ConsoleInferenceControl = DisconnectedConsoleInferenceControl
+    private val inferenceDialog by lazy { ConsoleInferenceRequestDialog(this) }
     private val dataSource: ConsoleDataSource by lazy {
         TelemetryConsoleDataSource(
             telemetryRepository = telemetryRepository,
@@ -44,6 +46,7 @@ class MainActivity : Activity() {
             ),
             healthControl = healthControl,
             cacheControl = cacheControl,
+            inferenceControl = inferenceControl,
         )
     }
     private val diagnosticExecutor = Executors.newSingleThreadExecutor()
@@ -71,6 +74,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        inferenceControl.close()
         diagnosticExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -83,9 +87,9 @@ class MainActivity : Activity() {
         addView(label("Android local inference control plane", 16f))
         addView(
             label(
-                "Phase 2 observability, local model inventory and explicit sandbox health controls. " +
-                    "Runtime cache diagnostics and cross-application access remain disconnected until a real " +
-                    "embedded source or signature-protected diagnostics bridge is supplied.",
+                "Phase 2 observability, local model inventory, explicit diagnostics and capability-driven inference. " +
+                    "The standalone sandbox does not invent a runtime target; playground execution, cache diagnostics " +
+                    "and cross-application access require a real embedded source or protected bridge.",
                 14f,
             ).apply { setPadding(0, 8, 0, 16) },
         )
@@ -220,23 +224,67 @@ class MainActivity : Activity() {
         text = action.label
         isAllCaps = false
         isEnabled = action.enabled
-        setOnClickListener { executeAction(action) }
+        setOnClickListener { dispatchAction(action) }
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply { setMargins(0, 0, 0, 12) }
     }
 
-    private fun executeAction(action: ConsoleAction) {
+    private fun dispatchAction(action: ConsoleAction) {
         if (actionExecutionInProgress || !action.enabled) return
+        if (action.type == ConsoleActionType.START_INFERENCE) {
+            snapshot?.inference?.let { state ->
+                inferenceDialog.show(state, ::executeInferenceStart)
+            }
+        } else {
+            executeAction(action)
+        }
+    }
+
+    private fun executeInferenceStart(request: ConsoleInferenceRequest) {
+        if (actionExecutionInProgress) return
+        beginAction(ConsoleActionType.START_INFERENCE)
+        diagnosticExecutor.execute {
+            val outcome = runCatching {
+                inferenceControl.start(
+                    request,
+                    ConsoleInferenceListener(::publishInferenceState),
+                )
+            }.getOrElse {
+                ConsoleInferenceOperationOutcome(
+                    success = false,
+                    state = inferenceControl.snapshot().copy(sourceError = INFERENCE_SOURCE_ERROR),
+                    sourceError = INFERENCE_SOURCE_ERROR,
+                )
+            }
+            publishCompletion(ConsoleActionCompletion(inferenceOutcome = outcome))
+        }
+    }
+
+    private fun executeAction(action: ConsoleAction) {
         beginAction(action.type)
         diagnosticExecutor.execute {
-            val completion = performAction(action)
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                completeAction(completion)
-                refresh()
-            }
+            publishCompletion(performAction(action))
+        }
+    }
+
+    private fun publishCompletion(completion: ConsoleActionCompletion) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            completeAction(completion)
+            refresh()
+        }
+    }
+
+    private fun publishInferenceState(state: ConsoleInferenceState) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            snapshot = snapshot?.copy(
+                capturedAtEpochMs = System.currentTimeMillis(),
+                inference = state,
+            )
+            render()
         }
     }
 
@@ -260,6 +308,16 @@ class MainActivity : Activity() {
         ConsoleActionType.REPAIR_CACHE -> ConsoleActionCompletion(
             cacheRepair = cacheControl.repair(requireNotNull(action.cacheId)),
         )
+
+        ConsoleActionType.CANCEL_INFERENCE -> ConsoleActionCompletion(
+            inferenceOutcome = inferenceControl.cancel(),
+        )
+
+        ConsoleActionType.CLEAR_INFERENCE -> ConsoleActionCompletion(
+            inferenceOutcome = inferenceControl.clear(),
+        )
+
+        ConsoleActionType.START_INFERENCE -> error("Inference start requires a request dialog")
     }
 
     private fun completeAction(completion: ConsoleActionCompletion) {
@@ -269,6 +327,9 @@ class MainActivity : Activity() {
         completion.cacheRepair?.let { outcome ->
             lastCacheRepair = outcome
             cacheExecutionError = outcome.sourceError
+        }
+        completion.inferenceOutcome?.let { outcome ->
+            snapshot = snapshot?.copy(inference = outcome.state)
         }
     }
 
@@ -305,6 +366,7 @@ class MainActivity : Activity() {
     }
 
     private companion object {
+        const val INFERENCE_SOURCE_ERROR = "Inference playground unavailable"
         val HEALTH_ACTION_TYPES = setOf(
             ConsoleActionType.RUN_ALL_HEALTH_CHECKS,
             ConsoleActionType.RUN_HEALTH_CHECKS,
@@ -312,7 +374,11 @@ class MainActivity : Activity() {
     }
 }
 
-private data class ConsoleActionCompletion(val healthError: String? = null, val cacheRepair: ConsoleCacheRepairOutcome? = null)
+private data class ConsoleActionCompletion(
+    val healthError: String? = null,
+    val cacheRepair: ConsoleCacheRepairOutcome? = null,
+    val inferenceOutcome: ConsoleInferenceOperationOutcome? = null,
+)
 
 private val ConsoleEmphasis.label: String
     get() = when (this) {

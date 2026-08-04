@@ -17,6 +17,7 @@ import java.util.Locale
 class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     private val inventoryPresenter = ConsoleInventoryPresenter()
     private val cachePresenter = ConsoleCachePresenter()
+    private val inferencePresenter = ConsoleInferencePresenter()
     private val timestampFormatter = DateTimeFormatter
         .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
         .withZone(zoneId)
@@ -24,6 +25,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     fun present(tab: ConsoleTab, snapshot: ConsoleSnapshot): ConsoleScreen = when (tab) {
         ConsoleTab.OVERVIEW -> overview(snapshot)
         ConsoleTab.MODELS -> inventoryPresenter.models(snapshot)
+        ConsoleTab.PLAYGROUND -> inferencePresenter.present(snapshot)
         ConsoleTab.RUNTIME -> inventoryPresenter.runtime(snapshot)
         ConsoleTab.RUNS -> runs(snapshot)
         ConsoleTab.LOGS -> logs(snapshot)
@@ -109,6 +111,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
             },
         )
         cards += inventoryPresenter.inventorySummary(snapshot)
+        cards += inferencePresenter.overview(snapshot)
         cards += cachePresenter.summary(snapshot)
         cards += ConsoleCard(
             title = "Telemetry",
@@ -128,7 +131,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         }
         return ConsoleScreen(
             title = "Overview",
-            subtitle = "Runtime, cache and observability summary",
+            subtitle = "Runtime, playground, cache and observability summary",
             cards = cards,
         )
     }
