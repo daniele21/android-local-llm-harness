@@ -16,6 +16,7 @@ import java.util.Locale
 @Suppress("TooManyFunctions")
 class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     private val inventoryPresenter = ConsoleInventoryPresenter()
+    private val cachePresenter = ConsoleCachePresenter()
     private val timestampFormatter = DateTimeFormatter
         .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
         .withZone(zoneId)
@@ -27,6 +28,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         ConsoleTab.RUNS -> runs(snapshot)
         ConsoleTab.LOGS -> logs(snapshot)
         ConsoleTab.HEALTH -> health(snapshot)
+        ConsoleTab.CACHES -> cachePresenter.present(snapshot)
         ConsoleTab.RESOURCES -> resources(snapshot)
         ConsoleTab.BENCHMARKS -> benchmarks(snapshot)
     }
@@ -107,6 +109,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
             },
         )
         cards += inventoryPresenter.inventorySummary(snapshot)
+        cards += cachePresenter.summary(snapshot)
         cards += ConsoleCard(
             title = "Telemetry",
             lines = listOf(
@@ -125,7 +128,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         }
         return ConsoleScreen(
             title = "Overview",
-            subtitle = "Read-only runtime and observability summary",
+            subtitle = "Runtime, cache and observability summary",
             cards = cards,
         )
     }
@@ -148,7 +151,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
 
     private fun health(snapshot: ConsoleSnapshot): ConsoleScreen = ConsoleScreen(
         title = "Health and sanity",
-        subtitle = "Persisted results; execution controls remain a separate slice",
+        subtitle = "Persisted health and sanity results",
         cards = snapshot.health
             .sortedWith(compareBy<HealthCheckResult> { healthRank(it.status) }.thenBy { it.id })
             .map { healthCard(it) }
@@ -157,7 +160,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
 
     private fun resources(snapshot: ConsoleSnapshot): ConsoleScreen = ConsoleScreen(
         title = "Memory and thermal",
-        subtitle = "Raw snapshots; charts and sampling controls remain a separate slice",
+        subtitle = "Persisted resource snapshots",
         cards = snapshot.resources.map { resourceCard(it) }.ifEmpty {
             listOf(emptyCard("No resource snapshots recorded"))
         },
