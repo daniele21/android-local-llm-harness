@@ -1,0 +1,59 @@
+name: Catalog format sandbox
+
+on:
+  push:
+    branches:
+      - agent/model-catalog-format-sandbox
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Apply and verify repository formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+          ./gradlew --no-configuration-cache spotlessCheck
+          mkdir -p build
+          git diff --check
+          git diff -- models/model-catalog > build/catalog-format.patch
+
+      - name: Upload formatted catalog files
+        uses: actions/upload-artifact@v7
+        with:
+          name: formatted-model-catalog
+          path: |
+            models/model-catalog/src/**/*.kt
+            build/catalog-format.patch
+          if-no-files-found: error
+          retention-days: 2
