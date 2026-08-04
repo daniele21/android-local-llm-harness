@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import io.github.daniele21.localllm.contracts.ModelDigest
 import java.io.File
+import java.io.InputStream
 import java.security.MessageDigest
 
 @Suppress("TooGenericExceptionCaught")
@@ -18,38 +19,18 @@ class AndroidModelImportStager(context: Context, private val bufferSizeBytes: In
     fun stage(uri: Uri, architecture: String, quantization: String): ConsoleModelImportRequest {
         val metadata = queryMetadata(uri)
         require(metadata.fileName.lowercase().endsWith(".gguf")) { "Select a .gguf model file" }
-        val stagingDirectory = File(appContext.cacheDir, STAGING_DIRECTORY)
-        check(stagingDirectory.isDirectory || stagingDirectory.mkdirs()) { "Model staging directory is unavailable" }
-        val stagedFile = File.createTempFile("console-model-", ".gguf", stagingDirectory)
+        val stagedFile = createStagingFile()
 
         return try {
-            val digest = MessageDigest.getInstance(SHA_256)
-            var copiedBytes = 0L
-            val input = requireNotNull(appContext.contentResolver.openInputStream(uri)) {
-                "Selected model cannot be opened"
-            }
-            input.buffered(bufferSizeBytes).use { source ->
-                stagedFile.outputStream().buffered(bufferSizeBytes).use { destination ->
-                    val buffer = ByteArray(bufferSizeBytes)
-                    var read = source.read(buffer)
-                    while (read >= 0) {
-                        if (read > 0) {
-                            digest.update(buffer, 0, read)
-                            destination.write(buffer, 0, read)
-                            copiedBytes += read
-                        }
-                        read = source.read(buffer)
-                    }
-                }
-            }
+            val staged = copyAndDigest(uri, stagedFile)
             metadata.sizeBytes?.let { expected ->
-                check(expected == copiedBytes) { "Selected model size changed while staging" }
+                check(expected == staged.sizeBytes) { "Selected model size changed while staging" }
             }
             ConsoleModelImportRequest(
                 source = stagedFile,
                 fileName = metadata.fileName,
-                digest = ModelDigest(digest.digest().toHex()),
-                sizeBytes = copiedBytes,
+                digest = staged.digest,
+                sizeBytes = staged.sizeBytes,
                 architecture = architecture,
                 quantization = quantization,
             )
@@ -57,6 +38,43 @@ class AndroidModelImportStager(context: Context, private val bufferSizeBytes: In
             stagedFile.delete()
             throw error
         }
+    }
+
+    private fun createStagingFile(): File {
+        val stagingDirectory = File(appContext.cacheDir, STAGING_DIRECTORY)
+        check(stagingDirectory.isDirectory || stagingDirectory.mkdirs()) { "Model staging directory is unavailable" }
+        return File.createTempFile("console-model-", ".gguf", stagingDirectory)
+    }
+
+    private fun copyAndDigest(uri: Uri, destination: File): StagedContent {
+        val digest = MessageDigest.getInstance(SHA_256)
+        val input = requireNotNull(appContext.contentResolver.openInputStream(uri)) {
+            "Selected model cannot be opened"
+        }
+        val copiedBytes = input.buffered(bufferSizeBytes).use { source ->
+            destination.outputStream().buffered(bufferSizeBytes).use { output ->
+                copy(source, output::write, digest)
+            }
+        }
+        return StagedContent(
+            digest = ModelDigest(digest.digest().toHex()),
+            sizeBytes = copiedBytes,
+        )
+    }
+
+    private fun copy(input: InputStream, write: (ByteArray, Int, Int) -> Unit, digest: MessageDigest): Long {
+        val buffer = ByteArray(bufferSizeBytes)
+        var copiedBytes = 0L
+        var read = input.read(buffer)
+        while (read >= 0) {
+            if (read > 0) {
+                digest.update(buffer, 0, read)
+                write(buffer, 0, read)
+                copiedBytes += read
+            }
+            read = input.read(buffer)
+        }
+        return copiedBytes
     }
 
     private fun queryMetadata(uri: Uri): DocumentMetadata {
@@ -91,6 +109,8 @@ class AndroidModelImportStager(context: Context, private val bufferSizeBytes: In
         }
         return String(result)
     }
+
+    private data class StagedContent(val digest: ModelDigest, val sizeBytes: Long)
 
     private data class DocumentMetadata(val fileName: String, val sizeBytes: Long?)
 
