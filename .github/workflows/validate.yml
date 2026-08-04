@@ -201,6 +201,18 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
+      - name: Capture exact Spotless patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          ./gradlew --no-configuration-cache spotlessApply
+          git diff -- models/model-catalog > build/spotless-model-catalog.patch
+          if [[ -s build/spotless-model-catalog.patch ]]; then
+            cat build/spotless-model-catalog.patch
+            exit 1
+          fi
+
       - name: Run scoped Android validation
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
@@ -298,6 +310,7 @@ jobs:
           path: |
             **/build/reports/**
             build/android-validation.log
+            build/spotless-model-catalog.patch
           if-no-files-found: warn
           retention-days: 7
 
