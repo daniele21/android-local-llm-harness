@@ -72,27 +72,18 @@ class ConsoleInferencePresenter {
             "Cancellation available: ${state.cancellationAvailable}",
             "Source: ${state.source}",
         ),
-        emphasis = when (state.phase) {
-            ConsoleInferencePhase.COMPLETED -> ConsoleEmphasis.POSITIVE
-            ConsoleInferencePhase.FAILED -> ConsoleEmphasis.NEGATIVE
-            ConsoleInferencePhase.CANCELLED,
-            ConsoleInferencePhase.PREPARING,
-            ConsoleInferencePhase.QUEUED,
-            ConsoleInferencePhase.GENERATING,
-            -> ConsoleEmphasis.WARNING
-
-            ConsoleInferencePhase.DISCONNECTED -> ConsoleEmphasis.WARNING
-            ConsoleInferencePhase.IDLE -> ConsoleEmphasis.NEUTRAL
-        },
+        emphasis = phaseEmphasis(state.phase),
     )
 
     private fun targetsCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
         title = "Registered inference targets",
-        lines = state.targets.map { target ->
-            val active = target.id == state.activeTargetId
-            "${if (active) "ACTIVE · " else ""}${target.label} · ${target.applicationId.value}/${target.useCaseId.value}"
-        },
+        lines = state.targets.map { target -> targetLine(target, state.activeTargetId) },
     )
+
+    private fun targetLine(target: ConsoleInferenceTarget, activeTargetId: String?): String {
+        val prefix = if (target.id == activeTargetId) "ACTIVE · " else ""
+        return "$prefix${target.label} · ${target.applicationId.value}/${target.useCaseId.value}"
+    }
 
     private fun outputCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
         title = "Generated output",
@@ -156,14 +147,25 @@ class ConsoleInferencePresenter {
         ?.label
         ?: "None"
 
-    private fun hasResult(state: ConsoleInferenceState): Boolean = state.output.isNotEmpty() ||
-        state.metrics != null ||
-        state.errorCode != null ||
-        state.phase in setOf(
-            ConsoleInferencePhase.COMPLETED,
-            ConsoleInferencePhase.FAILED,
-            ConsoleInferencePhase.CANCELLED,
-        )
+    private fun hasResult(state: ConsoleInferenceState): Boolean {
+        val terminal = state.phase == ConsoleInferencePhase.COMPLETED ||
+            state.phase == ConsoleInferencePhase.FAILED ||
+            state.phase == ConsoleInferencePhase.CANCELLED
+        return state.output.isNotEmpty() || state.metrics != null || state.errorCode != null || terminal
+    }
+
+    private fun phaseEmphasis(phase: ConsoleInferencePhase): ConsoleEmphasis = when (phase) {
+        ConsoleInferencePhase.COMPLETED -> ConsoleEmphasis.POSITIVE
+        ConsoleInferencePhase.FAILED -> ConsoleEmphasis.NEGATIVE
+        ConsoleInferencePhase.DISCONNECTED,
+        ConsoleInferencePhase.PREPARING,
+        ConsoleInferencePhase.QUEUED,
+        ConsoleInferencePhase.GENERATING,
+        ConsoleInferencePhase.CANCELLED,
+        -> ConsoleEmphasis.WARNING
+
+        ConsoleInferencePhase.IDLE -> ConsoleEmphasis.NEUTRAL
+    }
 
     private fun formatDuration(value: Long?): String = value?.let { "$it ms" } ?: "Unavailable"
 
