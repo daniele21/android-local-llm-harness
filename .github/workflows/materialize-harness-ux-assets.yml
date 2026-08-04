@@ -25,7 +25,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p docs/assets/ux-ui
-          cat .ux-upload/final.*.part | base64 --decode > /tmp/harness-ux-assets.tar.gz
+          cat \
+            .ux-upload/repair-00-00.part \
+            .ux-upload/repair-00-01.part \
+            .ux-upload/repair-00-02.part \
+            .ux-upload/repair-00-03.part \
+            .ux-upload/final.01.part \
+            .ux-upload/final.02.part \
+            .ux-upload/final.03.part \
+            .ux-upload/repair-04-00.part \
+            .ux-upload/repair-04-01.part \
+            .ux-upload/repair-04-02.part \
+            .ux-upload/repair-04-03.part \
+            | base64 --decode > /tmp/harness-ux-assets.tar.gz
           tar -xzf /tmp/harness-ux-assets.tar.gz -C /tmp
           cp /tmp/HARNESS_UX_UI_IMPLEMENTATION_PLAN.md docs/harness-ux-ui-implementation-plan.md
           cp /tmp/harness-overview.webp docs/assets/ux-ui/harness-overview.webp
