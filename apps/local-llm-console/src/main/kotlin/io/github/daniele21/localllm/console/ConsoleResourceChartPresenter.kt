@@ -57,19 +57,16 @@ class ConsoleResourceChartPresenter {
         )
     }
 
-    private fun memorySeries(
-        label: String,
-        snapshots: List<ResourceSnapshot>,
-        value: (ResourceSnapshot) -> Long?,
-    ): ConsoleChartSeries = ConsoleChartSeries(
-        label = label,
-        points = snapshots.map { snapshot ->
-            ConsoleChartPoint(
-                timestampEpochMs = snapshot.timestampEpochMs,
-                value = value(snapshot)?.toDouble()?.div(BYTES_PER_MIB),
-            )
-        },
-    )
+    private fun memorySeries(label: String, snapshots: List<ResourceSnapshot>, value: (ResourceSnapshot) -> Long?): ConsoleChartSeries =
+        ConsoleChartSeries(
+            label = label,
+            points = snapshots.map { snapshot ->
+                ConsoleChartPoint(
+                    timestampEpochMs = snapshot.timestampEpochMs,
+                    value = value(snapshot)?.toDouble()?.div(BYTES_PER_MIB),
+                )
+            },
+        )
 
     private fun ThermalStatus.levelOrNull(): Double? = when (this) {
         ThermalStatus.NONE -> 0.0
