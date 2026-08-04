@@ -11,6 +11,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@Suppress("TooManyFunctions")
 class ConsoleBenchmarkPresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     private val timestampFormatter = DateTimeFormatter
         .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
