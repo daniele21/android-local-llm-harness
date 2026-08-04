@@ -12,7 +12,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import java.util.UUID
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "ReturnCount")
 class LocalLlmConsoleInferenceControl(
     private val client: LocalLlmClient,
     targets: List<ConsoleInferenceTarget>,
