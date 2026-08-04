@@ -128,10 +128,7 @@ class LocalLlmConsoleInferenceControl(
         runCatching { resources.session?.let(client::closeSession) }
     }
 
-    private fun beginPreparation(
-        target: ConsoleInferenceTarget,
-        listener: ConsoleInferenceListener,
-    ): RequestId? {
+    private fun beginPreparation(target: ConsoleInferenceTarget, listener: ConsoleInferenceListener): RequestId? {
         val result = synchronized(lock) {
             if (state.executionActive || activeSession != null) return null
             val requestId = requestIdFactory.create()
@@ -190,7 +187,9 @@ class LocalLlmConsoleInferenceControl(
                 )
 
                 is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)
+
                 is GenerationEvent.Completed -> completedState(event.output, event.metrics)
+
                 is GenerationEvent.Failed -> failedState(event.error)
             }
             if (terminal) activeHandle = null
