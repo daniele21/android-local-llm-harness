@@ -15,12 +15,15 @@ import java.util.Locale
 
 @Suppress("TooManyFunctions")
 class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
+    private val inventoryPresenter = ConsoleInventoryPresenter()
     private val timestampFormatter = DateTimeFormatter
         .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
         .withZone(zoneId)
 
     fun present(tab: ConsoleTab, snapshot: ConsoleSnapshot): ConsoleScreen = when (tab) {
         ConsoleTab.OVERVIEW -> overview(snapshot)
+        ConsoleTab.MODELS -> inventoryPresenter.models(snapshot)
+        ConsoleTab.RUNTIME -> inventoryPresenter.runtime(snapshot)
         ConsoleTab.RUNS -> runs(snapshot)
         ConsoleTab.LOGS -> logs(snapshot)
         ConsoleTab.HEALTH -> health(snapshot)
@@ -103,6 +106,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
                 ConsoleEmphasis.NEUTRAL
             },
         )
+        cards += inventoryPresenter.inventorySummary(snapshot)
         cards += ConsoleCard(
             title = "Telemetry",
             lines = listOf(
