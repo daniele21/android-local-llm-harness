@@ -1,0 +1,75 @@
+name: Export Phone Test AAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/export-phone-test-aab.yml"
+      - "apps/local-llm-phone-test/**"
+      - "backends/**"
+      - "core/**"
+      - "models/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".gitmodules"
+      - "third_party/llama.cpp"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Build unsigned phone-test AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build release bundle
+        env:
+          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
+        run: |
+          chmod +x gradlew
+          ./gradlew \
+            :apps:local-llm-phone-test:lintRelease \
+            :apps:local-llm-phone-test:bundleRelease
+
+      - name: Upload phone-test AAB
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-phone-test-0.2.0-unsigned-aab
+          path: apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
