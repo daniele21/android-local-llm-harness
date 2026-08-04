@@ -78,23 +78,19 @@ class ConsoleCacheControlTest {
         assertEquals("Cache repair unavailable", outcome.sourceError)
     }
 
-    private fun probe(
-        id: String,
-        snapshot: CacheHealthSnapshot = CacheHealthSnapshot(1, 0, 0),
-    ): CacheHealthProbe = object : CacheHealthProbe {
-        override val id: String = id
+    private fun probe(id: String, snapshot: CacheHealthSnapshot = CacheHealthSnapshot(1, 0, 0)): CacheHealthProbe =
+        object : CacheHealthProbe {
+            override val id: String = id
 
-        override fun snapshot(): CacheHealthSnapshot = snapshot
-    }
+            override fun snapshot(): CacheHealthSnapshot = snapshot
+        }
 
-    private fun maintenance(
-        id: String,
-        result: CacheRepairResult = repairResult(),
-    ): CacheMaintenanceControl = object : CacheMaintenanceControl {
-        override val id: String = id
+    private fun maintenance(id: String, result: CacheRepairResult = repairResult()): CacheMaintenanceControl =
+        object : CacheMaintenanceControl {
+            override val id: String = id
 
-        override fun repair(): CacheRepairResult = result
-    }
+            override fun repair(): CacheRepairResult = result
+        }
 
     private fun repairResult(): CacheRepairResult = CacheRepairResult(
         before = CacheHealthSnapshot(entryCount = 2, staleEntryCount = 1, orphanedEntryCount = 1),
