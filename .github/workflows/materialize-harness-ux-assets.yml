@@ -28,8 +28,14 @@ jobs:
           cat \
             .ux-upload/repair-00-00.part \
             .ux-upload/repair-00-01.part \
-            .ux-upload/repair-00-02.part \
-            .ux-upload/repair-00-03.part \
+            .ux-upload/exact-00-02-00.part \
+            .ux-upload/exact-00-02-01.part \
+            .ux-upload/exact-00-02-02.part \
+            .ux-upload/exact-00-02-03.part \
+            .ux-upload/exact-00-03-00.part \
+            .ux-upload/exact-00-03-01.part \
+            .ux-upload/exact-00-03-02.part \
+            .ux-upload/exact-00-03-03.part \
             .ux-upload/final.01.part \
             .ux-upload/final.02.part \
             .ux-upload/final.03.part \
