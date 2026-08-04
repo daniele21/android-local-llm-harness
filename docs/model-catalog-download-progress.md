@@ -27,7 +27,7 @@
 | Catalog validation | `[x]` | Fail-closed validation and deterministic tests passed run `30954976390` |
 | Target filtering | `[x]` | Exact application/use-case filtering passed run `30954976390` |
 | Compatibility evaluation | `[x]` | API, ABI, backend, profile, RAM and storage policy passed run `30954976390` |
-| Public module documentation | `[-]` | `models/model-catalog/README.md` added; documentation validation pending |
+| Public module documentation | `[x]` | `models/model-catalog/README.md` passed repository validation run `30955361481` |
 | Catalog parsing and codec | `[ ]` | No JSON or signed-manifest codec yet |
 | Catalog persistence and refresh | `[ ]` | Not started |
 | Secure model download | `[ ]` | Not started |
@@ -65,7 +65,9 @@
 - [x] calculate storage using download and import copies plus safety margin
 - [x] add deterministic validator and compatibility tests
 - [x] validate with repository CI
-- [-] validate public module documentation
+- [x] document and validate the public module API
+
+**Phase status:** `[x]`
 
 ## Validation history
 
@@ -80,7 +82,7 @@
 | `30954312737` | failed | Markdown and native checks passed; Detekt found one long test fixture and two compatibility-validation complexity findings |
 | `30954629742` | failed | Detekt refactor submitted; Spotless required one single-line fixture signature before analysis could continue |
 | `30954976390` | passed | Repository guards, Spotless, Detekt, catalog tests, Android Lint, downstream compilation, native tests and packaging all passed |
-| current | running | Public module README and validated progress state submitted |
+| `30955361481` | passed | Public module README, final progress state and the full repository validation matrix passed |
 
 ## Key commits
 
@@ -102,11 +104,9 @@
 | `0388727346aa` | Decompose compatibility validation into bounded checks | Passed Detekt in run `30954976390` |
 | `3267ecac0306` | Replace long-parameter fixture with transform-based fixture | Passed Detekt in run `30954976390` |
 | `4aac5a2ff32a` | Apply exact Spotless fixture format | Passed Spotless in run `30954976390` |
-| `cfcb4e0bc533` | Add public module README | Validation pending |
+| `cfcb4e0bc533` | Add public module README | Passed in run `30955361481` |
 
 ## Next implementation slice
-
-After the README validation completes:
 
 1. add a bounded catalog codec contract and deterministic JSON implementation;
 2. add app-private atomic catalog persistence;
@@ -125,6 +125,6 @@ After the README validation completes:
 - [x] native host tests
 - [x] Android native packaging
 - [x] aggregate required `Repository validation` check
-- [-] documentation-only follow-up validation
+- [x] public documentation validation
 
-No task marked `[-]` becomes `[x]` solely because code exists.
+No task becomes `[x]` solely because code exists.
