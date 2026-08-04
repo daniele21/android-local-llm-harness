@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.console
 
+import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
@@ -9,6 +10,8 @@ import io.github.daniele21.localllm.observability.StructuredLog
 
 enum class ConsoleTab(val label: String) {
     OVERVIEW("Overview"),
+    MODELS("Models"),
+    RUNTIME("Runtime"),
     RUNS("Runs"),
     LOGS("Logs"),
     HEALTH("Health"),
@@ -23,6 +26,7 @@ data class ConsoleRuntimeState(
     val activeSessions: Int?,
     val queueDepth: Int?,
     val source: String,
+    val connected: Boolean = true,
 )
 
 fun interface ConsoleRuntimeStateProvider {
@@ -37,6 +41,41 @@ object DisconnectedRuntimeStateProvider : ConsoleRuntimeStateProvider {
         activeSessions = null,
         queueDepth = null,
         source = "Local console sandbox",
+        connected = false,
+    )
+}
+
+data class ConsoleInstalledModel(
+    val digest: ModelDigest,
+    val sizeBytes: Long,
+    val integrity: ConsoleModelIntegrity,
+)
+
+enum class ConsoleModelIntegrity {
+    VERIFIED,
+    NOT_CHECKED,
+}
+
+data class ConsoleModelInventory(
+    val available: Boolean,
+    val modelCount: Int,
+    val totalBytes: Long,
+    val entries: List<ConsoleInstalledModel>,
+    val source: String,
+    val sourceError: String? = null,
+)
+
+fun interface ConsoleModelInventoryProvider {
+    fun snapshot(): ConsoleModelInventory
+}
+
+object DisconnectedModelInventoryProvider : ConsoleModelInventoryProvider {
+    override fun snapshot(): ConsoleModelInventory = ConsoleModelInventory(
+        available = false,
+        modelCount = 0,
+        totalBytes = 0,
+        entries = emptyList(),
+        source = "Not connected",
     )
 }
 
@@ -48,6 +87,7 @@ data class ConsoleSnapshot(
     val health: List<HealthCheckResult>,
     val resources: List<ResourceSnapshot>,
     val benchmarkBaselines: List<BenchmarkBaseline>,
+    val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
     val sourceError: String? = null,
 )
 
