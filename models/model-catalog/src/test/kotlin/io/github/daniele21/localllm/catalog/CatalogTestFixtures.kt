@@ -22,9 +22,7 @@ internal fun validCatalogDocument(
     entries = entries,
 )
 
-internal fun validCatalogRelease(
-    transform: (CatalogModelRelease) -> CatalogModelRelease = { it },
-): CatalogModelRelease = transform(
+internal fun validCatalogRelease(transform: (CatalogModelRelease) -> CatalogModelRelease = { it }): CatalogModelRelease = transform(
     CatalogModelRelease(
         id = CatalogReleaseId(
             modelId = CatalogModelId("qwen-small"),
