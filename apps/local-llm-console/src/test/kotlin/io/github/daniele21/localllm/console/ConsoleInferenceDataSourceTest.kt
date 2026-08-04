@@ -37,10 +37,8 @@ class ConsoleInferenceDataSourceTest {
         val failing = object : ConsoleInferenceControl {
             override fun snapshot(): ConsoleInferenceState = error("private runtime path")
 
-            override fun start(
-                request: ConsoleInferenceRequest,
-                listener: ConsoleInferenceListener,
-            ): ConsoleInferenceOperationOutcome = error("Not used")
+            override fun start(request: ConsoleInferenceRequest, listener: ConsoleInferenceListener): ConsoleInferenceOperationOutcome =
+                error("Not used")
 
             override fun cancel(): ConsoleInferenceOperationOutcome = error("Not used")
 
@@ -62,10 +60,8 @@ class ConsoleInferenceDataSourceTest {
     private class FixedInferenceControl(private val state: ConsoleInferenceState) : ConsoleInferenceControl {
         override fun snapshot(): ConsoleInferenceState = state
 
-        override fun start(
-            request: ConsoleInferenceRequest,
-            listener: ConsoleInferenceListener,
-        ): ConsoleInferenceOperationOutcome = error("Not used")
+        override fun start(request: ConsoleInferenceRequest, listener: ConsoleInferenceListener): ConsoleInferenceOperationOutcome =
+            error("Not used")
 
         override fun cancel(): ConsoleInferenceOperationOutcome = error("Not used")
 
