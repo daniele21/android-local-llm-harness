@@ -225,9 +225,9 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
-### Console observability, model inventory, runtime, resource charts and health controls — PR #31
+### Console observability, controls and cache repair — PR #31
 
-- [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, resources and benchmarks
+- [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, caches, resources and benchmarks
 - [x] `ConsoleDataSource` boundary over existing observability contracts
 - [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
 - [x] runtime adapter over the public `LocalLlmClient.runtimeSnapshot()` contract
@@ -258,15 +258,25 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] action disabling while a health suite is in progress
 - [x] persisted-result refresh through the existing telemetry repository
 - [x] fixed privacy-safe health-control failure states
-- [x] refresh and back navigation without runtime or model mutation
-- [x] pure Kotlin presenter, data-source, adapter, health-control and chart-model tests
-- [x] Android control and custom-view compilation, lint and packaging validation
-- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability and resource-history limitations
+- [x] neutral `CacheMaintenanceControl` contract separate from observational cache probes
+- [x] `ConsoleCacheControl` discovery and targeted-repair boundary
+- [x] independent cache-source loading and privacy-safe failure isolation
+- [x] disconnected, connected-empty, healthy, unhealthy and unavailable cache states
+- [x] repair actions exposed only for unhealthy caches with a registered maintenance capability
+- [x] runtime-owned model-integrity repair that revalidates stale entries and removes orphaned or invalid entries
+- [x] failed revalidation remains visible as an unresolved stale entry
+- [x] cache actions executed outside the Android main thread and disabled while running
+- [x] before/after, revalidated, removed and failed repair counts
+- [x] standalone cache control remains explicitly disconnected because the console does not own the runtime cache
+- [x] fixed privacy-safe cache-health and cache-repair error states
+- [x] refresh and back navigation without implicit runtime, model or cache mutation
+- [x] pure Kotlin presenter, data-source, adapter, health-control, cache-control and chart-model tests
+- [x] Android controls and custom-view compilation, lint and packaging validation
+- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
 ### Remaining Phase 2 work
 
-- [ ] cache-health view and repair actions
 - [ ] benchmark regression comparison and baseline history views
 - [ ] model-management console
 - [ ] manual inference playground
