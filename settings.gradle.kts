@@ -21,6 +21,7 @@ include(
     ":core:runtime-core",
     ":models:model-profile",
     ":models:model-store",
+    ":models:model-catalog",
     ":backends:llama-cpp",
     ":observability:contracts",
     ":observability:in-memory-store",
