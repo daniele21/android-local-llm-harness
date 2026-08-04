@@ -11,18 +11,15 @@ class CatalogCompatibilityEvaluatorTest {
     private val evaluator =
         CatalogCompatibilityEvaluator(
             versionMatcher =
-                object : CatalogVersionMatcher {
-                    override fun isInRange(
-                        currentVersion: String,
-                        minimumInclusive: String?,
-                        maximumExclusive: String?,
-                    ): Boolean = currentVersion == "1.5.0"
-                },
+            object : CatalogVersionMatcher {
+                override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean =
+                    currentVersion == "1.5.0"
+            },
             profileResolver =
-                object : CatalogProfileResolver {
-                    override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
-                        profileKey.value == "qwen-playground" && target == testTarget
-                },
+            object : CatalogProfileResolver {
+                override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
+                    profileKey.value == "qwen-playground" && target == testTarget
+            },
         )
 
     @Test
@@ -123,15 +120,15 @@ class CatalogCompatibilityEvaluatorTest {
         val document =
             validCatalogDocument(
                 entries =
-                    listOf(
-                        validCatalogRelease(modelId = "allowed"),
-                        validCatalogRelease(
-                            modelId = "other",
-                            version = "2.0.0",
-                            digest = "b".repeat(64),
-                            allowedTargets = setOf(otherTarget),
-                        ),
+                listOf(
+                    validCatalogRelease(modelId = "allowed"),
+                    validCatalogRelease(
+                        modelId = "other",
+                        version = "2.0.0",
+                        digest = "b".repeat(64),
+                        allowedTargets = setOf(otherTarget),
                     ),
+                ),
             )
 
         val result = CatalogQueries.releasesForTarget(document, testTarget)
@@ -143,13 +140,12 @@ class CatalogCompatibilityEvaluatorTest {
         supportedAbis: Set<String> = setOf("arm64-v8a"),
         totalMemoryBytes: Long? = 4L * 1024L * 1024L * 1024L,
         availableStorageBytes: Long = 2L * 1024L * 1024L * 1024L,
-    ): CatalogDeviceProfile =
-        CatalogDeviceProfile(
-            sdkInt = 36,
-            supportedAbis = supportedAbis,
-            totalMemoryBytes = totalMemoryBytes,
-            availableStorageBytes = availableStorageBytes,
-            harnessVersion = "1.5.0",
-            backendId = "llama.cpp",
-        )
+    ): CatalogDeviceProfile = CatalogDeviceProfile(
+        sdkInt = 36,
+        supportedAbis = supportedAbis,
+        totalMemoryBytes = totalMemoryBytes,
+        availableStorageBytes = availableStorageBytes,
+        harnessVersion = "1.5.0",
+        backendId = "llama.cpp",
+    )
 }
