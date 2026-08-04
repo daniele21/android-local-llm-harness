@@ -69,8 +69,8 @@ class ConsoleHealthControlTest {
         source = "test source",
     )
 
-    private fun check(id: String, status: HealthStatus = HealthStatus.PASS): HealthCheck = object : HealthCheck {
-        override val id: String = id
+    private fun check(checkId: String, status: HealthStatus = HealthStatus.PASS): HealthCheck = object : HealthCheck {
+        override val id: String = checkId
 
         override fun evaluate(): HealthAssessment = HealthAssessment(status, "safe detail")
     }
