@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
@@ -34,6 +35,93 @@ data class ImportedPhoneModel(
 
 internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
+internal enum class PlaygroundPhase {
+    IDLE,
+    PREPARING,
+    QUEUED,
+    GENERATING,
+    COMPLETED,
+    FAILED,
+    CANCELLED,
+}
+
+internal data class PlaygroundMetrics(
+    val queueMs: Long?,
+    val modelLoadMs: Long?,
+    val timeToFirstTokenMs: Long?,
+    val prefillMs: Long?,
+    val decodeMs: Long?,
+    val totalMs: Long?,
+    val inputTokens: Int?,
+    val outputTokens: Int?,
+    val decodeTokensPerSecond: Double?,
+    val modelLoadKind: String,
+) {
+    companion object {
+        fun from(metrics: GenerationMetrics): PlaygroundMetrics = PlaygroundMetrics(
+            queueMs = metrics.queueMs,
+            modelLoadMs = metrics.modelLoadMs,
+            timeToFirstTokenMs = metrics.timeToFirstTokenMs,
+            prefillMs = metrics.prefillMs,
+            decodeMs = metrics.decodeMs,
+            totalMs = metrics.totalMs,
+            inputTokens = metrics.inputTokens,
+            outputTokens = metrics.outputTokens,
+            decodeTokensPerSecond = metrics.decodeTokensPerSecond,
+            modelLoadKind = metrics.modelLoadKind.name,
+        )
+    }
+}
+
+internal data class PlaygroundState(
+    val phase: PlaygroundPhase = PlaygroundPhase.IDLE,
+    val output: String = "",
+    val outputTruncated: Boolean = false,
+    val generatedTokens: Int? = null,
+    val cancellationAvailable: Boolean = false,
+    val cancellationRequested: Boolean = false,
+    val metrics: PlaygroundMetrics? = null,
+    val errorCode: String? = null,
+    val detail: String = "Ready",
+) {
+    val active: Boolean
+        get() = phase == PlaygroundPhase.PREPARING ||
+            phase == PlaygroundPhase.QUEUED ||
+            phase == PlaygroundPhase.GENERATING
+}
+
+internal data class PlaygroundRequestOptions(val maxOutputTokens: Int, val temperature: Float, val seed: Long) {
+    companion object {
+        fun parse(maxOutputTokens: String, temperature: String, seed: String): PlaygroundRequestOptions {
+            val parsedMaxOutputTokens = requireNotNull(maxOutputTokens.trim().toIntOrNull()) {
+                "Maximum output tokens must be an integer"
+            }
+            require(parsedMaxOutputTokens in MIN_OUTPUT_TOKENS..MAX_OUTPUT_TOKENS) {
+                "Maximum output tokens must be between $MIN_OUTPUT_TOKENS and $MAX_OUTPUT_TOKENS"
+            }
+            val parsedTemperature = requireNotNull(temperature.trim().toFloatOrNull()) {
+                "Temperature must be a number"
+            }
+            require(parsedTemperature in MIN_TEMPERATURE..MAX_TEMPERATURE) {
+                "Temperature must be between $MIN_TEMPERATURE and $MAX_TEMPERATURE"
+            }
+            val parsedSeed = requireNotNull(seed.trim().toLongOrNull()) {
+                "Seed must be an integer"
+            }
+            return PlaygroundRequestOptions(
+                maxOutputTokens = parsedMaxOutputTokens,
+                temperature = parsedTemperature,
+                seed = parsedSeed,
+            )
+        }
+
+        private const val MIN_OUTPUT_TOKENS = 1
+        private const val MAX_OUTPUT_TOKENS = 512
+        private const val MIN_TEMPERATURE = 0f
+        private const val MAX_TEMPERATURE = 2f
+    }
+}
+
 internal class SinglePhoneBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
         require(applicationId == resolved.binding.applicationId) {
@@ -46,16 +134,22 @@ internal class SinglePhoneBindingRegistry(private val resolved: ResolvedUseCase)
     }
 }
 
-internal fun resolvedPhoneUseCase(model: ImportedPhoneModel, maxOutputTokens: Int): ResolvedUseCase {
+internal fun resolvedPhoneUseCase(
+    model: ImportedPhoneModel,
+    maxOutputTokens: Int,
+    useCaseValue: String = "physical-device-validation",
+    profileSuffix: String = "validation",
+    contextSize: Int = 512,
+): ResolvedUseCase {
     val applicationId = ApplicationId("play-internal-phone-test")
-    val useCaseId = UseCaseId("physical-device-validation")
-    val modelProfileId = "play-internal-phone-model"
-    val useCaseProfileId = "play-internal-phone-use-case"
+    val useCaseId = UseCaseId(useCaseValue)
+    val modelProfileId = "play-internal-phone-model-$profileSuffix"
+    val useCaseProfileId = "play-internal-phone-use-case-$profileSuffix"
     val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1).coerceAtMost(4)
     val modelProfile = GgufModelProfile(
         id = modelProfileId,
         artifact = model.artifact(),
-        contextSize = 512,
+        contextSize = contextSize,
         batchSize = 128,
         microBatchSize = 64,
         cpuThreads = availableProcessors,
@@ -65,7 +159,7 @@ internal fun resolvedPhoneUseCase(model: ImportedPhoneModel, maxOutputTokens: In
     val useCase = UseCaseProfile(
         id = useCaseProfileId,
         modelProfileId = modelProfileId,
-        systemPromptVersion = "play-internal-phone-v1",
+        systemPromptVersion = "play-internal-phone-$profileSuffix-v1",
         generationDefaults = GenerationDefaults(
             maxOutputTokens = maxOutputTokens,
             temperature = 0f,
@@ -75,7 +169,7 @@ internal fun resolvedPhoneUseCase(model: ImportedPhoneModel, maxOutputTokens: In
         ),
         outputMode = OutputMode.TEXT,
         cachePolicy = UseCaseCachePolicy(0, false, false, false),
-        healthSuiteId = "play-internal-phone-health",
+        healthSuiteId = "play-internal-phone-$profileSuffix-health",
     )
     return ResolvedUseCase(
         binding = AppModelBinding(applicationId, useCaseId, useCase.id),
@@ -83,3 +177,11 @@ internal fun resolvedPhoneUseCase(model: ImportedPhoneModel, maxOutputTokens: In
         model = modelProfile,
     )
 }
+
+internal fun resolvedPhonePlaygroundUseCase(model: ImportedPhoneModel): ResolvedUseCase = resolvedPhoneUseCase(
+    model = model,
+    maxOutputTokens = 128,
+    useCaseValue = "manual-inference-playground",
+    profileSuffix = "playground",
+    contextSize = 2048,
+)
