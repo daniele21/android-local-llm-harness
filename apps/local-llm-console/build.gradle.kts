@@ -61,6 +61,7 @@ dependencies {
     implementation(project(":core:contracts"))
     implementation(project(":models:model-store"))
     implementation(project(":observability:contracts"))
+    implementation(project(":observability:benchmark-engine"))
     implementation(project(":observability:health-engine"))
     implementation(project(":observability:in-memory-store"))
 
