@@ -11,10 +11,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 @Suppress("MagicNumber", "TooManyFunctions")
-class ConsoleChartView(
-    context: Context,
-    private val chart: ConsoleChart,
-) : View(context) {
+class ConsoleChartView(context: Context, private val chart: ConsoleChart) : View(context) {
     private val density = resources.displayMetrics.density
     private val textColor = resolveTextColor()
     private val axisColor = Color.argb(90, Color.red(textColor), Color.green(textColor), Color.blue(textColor))
