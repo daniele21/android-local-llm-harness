@@ -17,10 +17,11 @@ class CatalogValidatorTest {
 
     @Test
     fun rejectsExpiredCatalog() {
-        val result = validator.validate(
-            validCatalogDocument(expiresAtEpochMs = 1_400),
-            nowEpochMs = 1_500,
-        )
+        val result =
+            validator.validate(
+                validCatalogDocument(expiresAtEpochMs = 1_400),
+                nowEpochMs = 1_500,
+            )
 
         assertFalse(result.valid)
         assertTrue(result.has(CatalogViolationCode.DOCUMENT_EXPIRED))
@@ -50,10 +51,11 @@ class CatalogValidatorTest {
     fun rejectsDuplicateReleaseIdentity() {
         val release = validCatalogRelease()
 
-        val result = validator.validate(
-            validCatalogDocument(entries = listOf(release, release)),
-            nowEpochMs = 1_500,
-        )
+        val result =
+            validator.validate(
+                validCatalogDocument(entries = listOf(release, release)),
+                nowEpochMs = 1_500,
+            )
 
         assertFalse(result.valid)
         assertTrue(result.has(CatalogViolationCode.DUPLICATE_RELEASE))
@@ -64,10 +66,11 @@ class CatalogValidatorTest {
         val first = validCatalogRelease(version = "1.0.0", sizeBytes = 10)
         val second = validCatalogRelease(version = "1.1.0", sizeBytes = 11)
 
-        val result = validator.validate(
-            validCatalogDocument(entries = listOf(first, second)),
-            nowEpochMs = 1_500,
-        )
+        val result =
+            validator.validate(
+                validCatalogDocument(entries = listOf(first, second)),
+                nowEpochMs = 1_500,
+            )
 
         assertFalse(result.valid)
         assertTrue(result.has(CatalogViolationCode.CONFLICTING_DIGEST_METADATA))
