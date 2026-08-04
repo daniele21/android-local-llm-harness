@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.console
 
 import java.util.Locale
 
+@Suppress("TooManyFunctions")
 class ConsoleInferencePresenter {
     fun present(snapshot: ConsoleSnapshot): ConsoleScreen {
         val inference = snapshot.inference
