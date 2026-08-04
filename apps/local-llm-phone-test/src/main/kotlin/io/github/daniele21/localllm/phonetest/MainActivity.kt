@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -19,26 +20,38 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongMethod", "CyclomaticComplexMethod")
 class MainActivity :
     Activity(),
     PhoneTestListener {
     private lateinit var controller: PhoneTestController
+    private lateinit var playgroundController: PhonePlaygroundController
     private lateinit var architectureInput: EditText
     private lateinit var quantizationInput: EditText
+    private lateinit var promptInput: EditText
+    private lateinit var maxTokensInput: EditText
+    private lateinit var temperatureInput: EditText
+    private lateinit var seedInput: EditText
     private lateinit var selectButton: Button
-    private lateinit var runButton: Button
+    private lateinit var validationButton: Button
     private lateinit var removeButton: Button
+    private lateinit var playgroundRunButton: Button
+    private lateinit var playgroundCancelButton: Button
     private lateinit var copyButton: Button
     private lateinit var shareButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var modelStatus: TextView
+    private lateinit var playgroundStatus: TextView
+    private lateinit var playgroundOutput: TextView
+    private lateinit var playgroundMetrics: TextView
     private lateinit var operationStatus: TextView
     private lateinit var resultText: TextView
     private lateinit var scrollView: ScrollView
 
     private var importedModel: ImportedPhoneModel? = null
     private var latestReport: String = ""
+    private var controllerBusy: Boolean = false
+    private var playgroundState: PlaygroundState = PlaygroundState()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +64,8 @@ class MainActivity :
             shareButton.isEnabled = true
         }
         controller = PhoneTestController(this, this)
+        playgroundController = PhonePlaygroundController(this, ::onPlaygroundStateChanged)
+        onPlaygroundStateChanged(playgroundController.snapshot())
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -59,6 +74,7 @@ class MainActivity :
     }
 
     override fun onDestroy() {
+        playgroundController.close()
         controller.close()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
@@ -69,20 +85,19 @@ class MainActivity :
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQUEST_MODEL_DOCUMENT || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
-        controller.importModel(
-            uri = uri,
-            architecture = architectureInput.text.toString(),
-            quantization = quantizationInput.text.toString(),
-        )
+        afterPlaygroundRuntimeReleased {
+            controller.importModel(
+                uri = uri,
+                architecture = architectureInput.text.toString(),
+                quantization = quantizationInput.text.toString(),
+            )
+        }
     }
 
     override fun onBusyChanged(busy: Boolean) {
+        controllerBusy = busy
         progressBar.visibility = if (busy) View.VISIBLE else View.GONE
-        selectButton.isEnabled = !busy
-        runButton.isEnabled = !busy && importedModel != null
-        removeButton.isEnabled = !busy && importedModel != null
-        architectureInput.isEnabled = !busy
-        quantizationInput.isEnabled = !busy
+        updateControls()
     }
 
     override fun onProgress(message: String) {
@@ -108,8 +123,7 @@ class MainActivity :
                 append("${formatBytes(model.sizeBytes)} · ${model.digest.sha256.take(16)}…")
             }
         }
-        runButton.isEnabled = model != null
-        removeButton.isEnabled = model != null
+        updateControls()
     }
 
     override fun onReport(report: String) {
@@ -120,15 +134,31 @@ class MainActivity :
         scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
     }
 
+    private fun onPlaygroundStateChanged(state: PlaygroundState) {
+        runOnUiThread {
+            playgroundState = state
+            playgroundStatus.text = state.detail
+            playgroundOutput.text = when {
+                state.output.isNotBlank() && state.outputTruncated -> state.output + "\n\n[Output truncated]"
+                state.output.isNotBlank() -> state.output
+                state.phase == PlaygroundPhase.IDLE -> "No playground output yet"
+                else -> state.detail
+            }
+            playgroundMetrics.text = formatPlaygroundMetrics(state)
+            updateControls()
+            scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+        }
+    }
+
     private fun buildContent(): ScrollView {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(24), dp(20), dp(32))
         }
-        container.addView(label("Local LLM Phone Test", 28f, bold = true))
+        container.addView(label("Local LLM Android", 28f, bold = true))
         container.addView(
             label(
-                "Installable through Google Play internal testing. The GGUF stays on this device.",
+                "Import a GGUF, run prompts locally and validate the runtime on this device.",
                 15f,
             ),
         )
@@ -144,6 +174,60 @@ class MainActivity :
         modelStatus.setPadding(0, dp(12), 0, 0)
         container.addView(modelStatus)
 
+        container.addView(section("Local inference playground"))
+        container.addView(
+            label(
+                "The model remains loaded between prompts, so repeated runs expose cold and warm behavior. " +
+                    "Prompts and generated text are not persisted.",
+                14f,
+            ),
+        )
+        promptInput = multiLineInput(
+            hint = "Prompt",
+            value = "Explain in two sentences why local inference improves privacy.",
+        )
+        container.addView(promptInput)
+        maxTokensInput = input(
+            hint = "Maximum output tokens",
+            value = DEFAULT_MAX_OUTPUT_TOKENS,
+            inputType = InputType.TYPE_CLASS_NUMBER,
+        )
+        temperatureInput = input(
+            hint = "Temperature",
+            value = DEFAULT_TEMPERATURE,
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL,
+        )
+        seedInput = input(
+            hint = "Seed",
+            value = DEFAULT_SEED,
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED,
+        )
+        container.addView(maxTokensInput)
+        container.addView(temperatureInput)
+        container.addView(seedInput)
+
+        playgroundRunButton = actionButton("Run local prompt") { startPlayground() }.apply {
+            isEnabled = false
+        }
+        playgroundCancelButton = actionButton("Cancel generation") {
+            if (!playgroundController.cancel()) {
+                Toast.makeText(this@MainActivity, "No cancellable generation is active", Toast.LENGTH_SHORT).show()
+            }
+        }.apply { isEnabled = false }
+        container.addView(playgroundRunButton)
+        container.addView(playgroundCancelButton)
+
+        playgroundStatus = label("Ready", 14f, bold = true).apply {
+            setPadding(0, dp(14), 0, dp(8))
+        }
+        container.addView(playgroundStatus)
+        playgroundOutput = codeBlock("No playground output yet")
+        container.addView(playgroundOutput)
+        playgroundMetrics = label("No metrics yet", 13f).apply {
+            setPadding(0, dp(10), 0, 0)
+        }
+        container.addView(playgroundMetrics)
+
         container.addView(section("Physical-device validation"))
         container.addView(
             label(
@@ -152,17 +236,19 @@ class MainActivity :
                 14f,
             ),
         )
-        runButton = actionButton("Run full validation") {
-            latestReport = ""
-            resultText.text = "Starting validation…"
-            copyButton.isEnabled = false
-            shareButton.isEnabled = false
-            controller.runFullValidation()
+        validationButton = actionButton("Run full validation") {
+            afterPlaygroundRuntimeReleased {
+                latestReport = ""
+                resultText.text = "Starting validation…"
+                copyButton.isEnabled = false
+                shareButton.isEnabled = false
+                controller.runFullValidation()
+            }
         }.apply { isEnabled = false }
-        removeButton = actionButton("Remove imported model") { controller.removeModel() }.apply {
-            isEnabled = false
-        }
-        container.addView(runButton)
+        removeButton = actionButton("Remove imported model") {
+            afterPlaygroundRuntimeReleased { controller.removeModel() }
+        }.apply { isEnabled = false }
+        container.addView(validationButton)
         container.addView(removeButton)
 
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -178,13 +264,8 @@ class MainActivity :
         operationStatus = label("Ready", 14f, bold = true)
         container.addView(operationStatus)
 
-        container.addView(section("Privacy-safe result"))
-        resultText = label("No validation report yet", 13f).apply {
-            setTypeface(Typeface.MONOSPACE)
-            setTextIsSelectable(true)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setBackgroundColor(0xffeeeeee.toInt())
-        }
+        container.addView(section("Privacy-safe validation result"))
+        resultText = codeBlock("No validation report yet")
         container.addView(resultText)
 
         copyButton = actionButton("Copy report") { copyReport() }.apply { isEnabled = false }
@@ -194,6 +275,70 @@ class MainActivity :
 
         scrollView = ScrollView(this).apply { addView(container) }
         return scrollView
+    }
+
+    private fun startPlayground() {
+        val model = importedModel
+        if (model == null) {
+            Toast.makeText(this, "Import a GGUF model first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val options = runCatching {
+            PlaygroundRequestOptions.parse(
+                maxOutputTokens = maxTokensInput.text.toString(),
+                temperature = temperatureInput.text.toString(),
+                seed = seedInput.text.toString(),
+            )
+        }.getOrElse {
+            Toast.makeText(this, it.message ?: "Invalid generation settings", Toast.LENGTH_LONG).show()
+            return
+        }
+        val started = runCatching {
+            playgroundController.start(model, promptInput.text.toString(), options)
+        }.getOrElse {
+            Toast.makeText(this, it.message ?: "Unable to start local inference", Toast.LENGTH_LONG).show()
+            false
+        }
+        if (!started) {
+            Toast.makeText(this, "Another playground operation is still active", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun afterPlaygroundRuntimeReleased(action: () -> Unit) {
+        val accepted = playgroundController.releaseRuntime {
+            runOnUiThread(action)
+        }
+        if (!accepted) {
+            Toast.makeText(this, "Cancel or wait for the active generation", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateControls() {
+        if (!::playgroundController.isInitialized) return
+        val playgroundBusy = playgroundController.active
+        val anyBusy = controllerBusy || playgroundBusy
+        val hasModel = importedModel != null
+        selectButton.isEnabled = !anyBusy
+        validationButton.isEnabled = !anyBusy && hasModel
+        removeButton.isEnabled = !anyBusy && hasModel
+        architectureInput.isEnabled = !anyBusy
+        quantizationInput.isEnabled = !anyBusy
+        promptInput.isEnabled = !anyBusy
+        maxTokensInput.isEnabled = !anyBusy
+        temperatureInput.isEnabled = !anyBusy
+        seedInput.isEnabled = !anyBusy
+        playgroundRunButton.isEnabled = !anyBusy && hasModel
+        playgroundCancelButton.isEnabled = playgroundState.cancellationAvailable
+    }
+
+    private fun formatPlaygroundMetrics(state: PlaygroundState): String {
+        val metrics = state.metrics ?: return state.generatedTokens?.let { "Generated tokens: $it" } ?: "No metrics yet"
+        return buildString {
+            appendLine("Load: ${metrics.modelLoadKind} · ${metrics.modelLoadMs ?: "n/a"} ms")
+            appendLine("TTFT: ${metrics.timeToFirstTokenMs ?: "n/a"} ms · Total: ${metrics.totalMs ?: "n/a"} ms")
+            appendLine("Input/output tokens: ${metrics.inputTokens ?: "n/a"}/${metrics.outputTokens ?: "n/a"}")
+            append("Decode: ${metrics.decodeTokensPerSecond?.let { "%.2f".format(it) } ?: "n/a"} tok/s")
+        }
     }
 
     private fun openModelDocument() {
@@ -231,10 +376,25 @@ class MainActivity :
         setPadding(0, dp(28), 0, dp(10))
     }
 
-    private fun input(hint: String, value: String): EditText = EditText(this).apply {
+    private fun input(
+        hint: String,
+        value: String,
+        inputType: Int = InputType.TYPE_CLASS_TEXT,
+    ): EditText = EditText(this).apply {
         this.hint = hint
+        this.inputType = inputType
         setText(value)
         isSingleLine = true
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+    }
+
+    private fun multiLineInput(hint: String, value: String): EditText = EditText(this).apply {
+        this.hint = hint
+        setText(value)
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        minLines = 4
+        maxLines = 10
+        gravity = Gravity.TOP or Gravity.START
         setPadding(dp(12), dp(10), dp(12), dp(10))
     }
 
@@ -257,6 +417,13 @@ class MainActivity :
         if (bold) setTypeface(typeface, Typeface.BOLD)
     }
 
+    private fun codeBlock(text: String): TextView = label(text, 13f).apply {
+        setTypeface(Typeface.MONOSPACE)
+        setTextIsSelectable(true)
+        setPadding(dp(12), dp(12), dp(12), dp(12))
+        setBackgroundColor(0xffeeeeee.toInt())
+    }
+
     private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -266,5 +433,8 @@ class MainActivity :
         const val STATE_REPORT = "report"
         const val DEFAULT_ARCHITECTURE = "qwen3"
         const val DEFAULT_QUANTIZATION = "Q4_K_M"
+        const val DEFAULT_MAX_OUTPUT_TOKENS = "128"
+        const val DEFAULT_TEMPERATURE = "0.2"
+        const val DEFAULT_SEED = "42"
     }
 }
