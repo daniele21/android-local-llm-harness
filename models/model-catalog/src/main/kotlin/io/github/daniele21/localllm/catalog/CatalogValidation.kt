@@ -171,9 +171,11 @@ class CatalogValidator(
     ) {
         val invalidRam = compatibility.minRamBytes?.let { it <= 0 } == true ||
             compatibility.recommendedRamBytes?.let { it <= 0 } == true ||
-            compatibility.minRamBytes != null &&
-            compatibility.recommendedRamBytes != null &&
-            compatibility.recommendedRamBytes < compatibility.minRamBytes
+            (
+                compatibility.minRamBytes != null &&
+                    compatibility.recommendedRamBytes != null &&
+                    compatibility.recommendedRamBytes < compatibility.minRamBytes
+            )
         val invalidVersions = compatibility.minHarnessVersion?.isBlank() == true ||
             compatibility.maxHarnessVersionExclusive?.isBlank() == true
         val invalidBackends = compatibility.supportedBackendIds.any { !validIdentifier(it) }
