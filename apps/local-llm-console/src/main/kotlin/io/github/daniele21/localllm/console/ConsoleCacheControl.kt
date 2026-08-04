@@ -21,11 +21,7 @@ data class ConsoleCacheControlState(
     val sourceError: String? = null,
 )
 
-data class ConsoleCacheRepairOutcome(
-    val cacheId: String,
-    val result: CacheRepairResult?,
-    val sourceError: String? = null,
-)
+data class ConsoleCacheRepairOutcome(val cacheId: String, val result: CacheRepairResult?, val sourceError: String? = null)
 
 interface ConsoleCacheControl {
     fun snapshot(): ConsoleCacheControlState
@@ -47,6 +43,7 @@ object DisconnectedCacheControl : ConsoleCacheControl {
     )
 }
 
+@Suppress("TooGenericExceptionCaught")
 class ContractConsoleCacheControl(
     probes: List<CacheHealthProbe>,
     maintenanceControls: List<CacheMaintenanceControl>,
