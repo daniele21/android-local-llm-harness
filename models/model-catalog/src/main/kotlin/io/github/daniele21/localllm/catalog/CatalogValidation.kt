@@ -2,10 +2,7 @@ package io.github.daniele21.localllm.catalog
 
 import java.net.URI
 
-data class CatalogViolation(
-    val code: CatalogViolationCode,
-    val path: String,
-)
+data class CatalogViolation(val code: CatalogViolationCode, val path: String)
 
 data class CatalogValidationResult(val violations: List<CatalogViolation>) {
     val valid: Boolean
@@ -63,11 +60,7 @@ class CatalogValidator(
         return CatalogValidationResult(violations)
     }
 
-    private fun validateDocument(
-        document: CatalogModelDocument,
-        nowEpochMs: Long,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateDocument(document: CatalogModelDocument, nowEpochMs: Long, violations: MutableList<CatalogViolation>) {
         if (document.schemaVersion !in supportedSchemaVersions) {
             violations += violation(CatalogViolationCode.UNSUPPORTED_SCHEMA, "schemaVersion")
         }
@@ -87,10 +80,7 @@ class CatalogValidator(
         }
     }
 
-    private fun validateEntries(
-        entries: List<CatalogModelRelease>,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateEntries(entries: List<CatalogModelRelease>, violations: MutableList<CatalogViolation>) {
         val releaseIds = mutableSetOf<CatalogReleaseId>()
         val digestSizes = mutableMapOf<String, Long>()
         entries.forEachIndexed { index, release ->
@@ -110,11 +100,7 @@ class CatalogValidator(
         }
     }
 
-    private fun validateRelease(
-        release: CatalogModelRelease,
-        path: String,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateRelease(release: CatalogModelRelease, path: String, violations: MutableList<CatalogViolation>) {
         if (!validIdentifier(release.id.modelId.value)) {
             violations += violation(CatalogViolationCode.INVALID_MODEL_ID, "$path.id.modelId")
         }
@@ -139,11 +125,7 @@ class CatalogValidator(
         }
     }
 
-    private fun validateArtifact(
-        artifact: CatalogGgufArtifact,
-        path: String,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateArtifact(artifact: CatalogGgufArtifact, path: String, violations: MutableList<CatalogViolation>) {
         if (!SHA_256.matches(artifact.digest.sha256)) {
             violations += violation(CatalogViolationCode.INVALID_DIGEST, "$path.digest")
         }
@@ -164,18 +146,14 @@ class CatalogValidator(
         }
     }
 
-    private fun validateCompatibility(
-        compatibility: CatalogCompatibility,
-        path: String,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateCompatibility(compatibility: CatalogCompatibility, path: String, violations: MutableList<CatalogViolation>) {
         val invalidRam = compatibility.minRamBytes?.let { it <= 0 } == true ||
             compatibility.recommendedRamBytes?.let { it <= 0 } == true ||
             (
                 compatibility.minRamBytes != null &&
                     compatibility.recommendedRamBytes != null &&
                     compatibility.recommendedRamBytes < compatibility.minRamBytes
-            )
+                )
         val invalidVersions = compatibility.minHarnessVersion?.isBlank() == true ||
             compatibility.maxHarnessVersionExclusive?.isBlank() == true
         val invalidBackends = compatibility.supportedBackendIds.any { !validIdentifier(it) }
@@ -192,11 +170,7 @@ class CatalogValidator(
         }
     }
 
-    private fun validateTargets(
-        targets: Set<CatalogTarget>,
-        path: String,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateTargets(targets: Set<CatalogTarget>, path: String, violations: MutableList<CatalogViolation>) {
         if (targets.isEmpty()) {
             violations += violation(CatalogViolationCode.MISSING_TARGET, path)
         }
@@ -207,11 +181,7 @@ class CatalogValidator(
         }
     }
 
-    private fun validateLicense(
-        license: CatalogLicense,
-        path: String,
-        violations: MutableList<CatalogViolation>,
-    ) {
+    private fun validateLicense(license: CatalogLicense, path: String, violations: MutableList<CatalogViolation>) {
         if (!validIdentifier(license.id) || !validText(license.displayName, maxDisplayNameLength)) {
             violations += violation(CatalogViolationCode.INVALID_LICENSE, path)
         }
@@ -222,28 +192,24 @@ class CatalogValidator(
         }
     }
 
-    private fun validIdentifier(value: String): Boolean =
-        value.length in 1..maxIdentifierLength && IDENTIFIER.matches(value)
+    private fun validIdentifier(value: String): Boolean = value.length in 1..maxIdentifierLength && IDENTIFIER.matches(value)
 
     private fun validText(value: String, maximumLength: Int): Boolean =
         value.isNotBlank() && value.length <= maximumLength && value.none(Char::isISOControl)
 
-    private fun validHttpsUri(uri: URI): Boolean =
-        uri.isAbsolute &&
-            uri.scheme.equals(HTTPS, ignoreCase = true) &&
-            !uri.host.isNullOrBlank() &&
-            uri.rawUserInfo == null
+    private fun validHttpsUri(uri: URI): Boolean = uri.isAbsolute &&
+        uri.scheme.equals(HTTPS, ignoreCase = true) &&
+        !uri.host.isNullOrBlank() &&
+        uri.rawUserInfo == null
 
-    private fun validFileName(value: String): Boolean =
-        value.length in 1..maxIdentifierLength &&
-            value.lowercase().endsWith(GGUF_SUFFIX) &&
-            !value.contains('/') &&
-            !value.contains('\\') &&
-            value != "." &&
-            value != ".."
+    private fun validFileName(value: String): Boolean = value.length in 1..maxIdentifierLength &&
+        value.lowercase().endsWith(GGUF_SUFFIX) &&
+        !value.contains('/') &&
+        !value.contains('\\') &&
+        value != "." &&
+        value != ".."
 
-    private fun violation(code: CatalogViolationCode, path: String): CatalogViolation =
-        CatalogViolation(code = code, path = path)
+    private fun violation(code: CatalogViolationCode, path: String): CatalogViolation = CatalogViolation(code = code, path = path)
 
     private companion object {
         const val CURRENT_SCHEMA_VERSION = 1
