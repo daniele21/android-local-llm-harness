@@ -14,11 +14,11 @@ It provides nine primary views:
 - health and sanity results and controls;
 - cache health and repair controls;
 - memory and thermal trends;
-- benchmark baselines.
+- benchmark regressions and retained baseline history.
 
 Generation-run and request-correlated log cards can open a request detail view containing complete persisted run metrics and a chronological event timeline.
 
-The console reuses the existing contracts from `observability/contracts`, `observability/health-engine`, `core/contracts`, `core/runtime-core` and `models/model-store`. It does not introduce alternate telemetry schemas, model registries, health-check semantics, cache registries or runtime policy.
+The console reuses the existing contracts from `observability/contracts`, `observability/health-engine`, `observability/benchmark-engine`, `core/contracts`, `core/runtime-core` and `models/model-store`. It does not introduce alternate telemetry schemas, benchmark policies, model registries, health-check semantics, cache registries or runtime policy.
 
 ## Architecture
 
@@ -33,6 +33,7 @@ MainActivity
             ├── ConsolePresenter
             ├── ConsoleHealthPresenter
             ├── ConsoleCachePresenter
+            ├── ConsoleBenchmarkPresenter
             ├── ConsoleInventoryPresenter
             └── ConsoleResourceChartPresenter
                     ↓
@@ -42,6 +43,7 @@ MainActivity
                     ↑
         TelemetryConsoleDataSource
             ├── TelemetryRepository
+            ├── BenchmarkComparisonEvaluator
             ├── ConsoleRuntimeStateProvider
             ├── ConsoleModelInventoryProvider
             ├── ConsoleHealthControl.snapshot()
@@ -58,7 +60,7 @@ Runtime state remains behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStat
 
 Model inventory remains behind `ConsoleModelInventoryProvider`. `ModelStoreInventoryProvider` maps `ModelStoreSnapshot` into UI-safe values and deliberately drops `StoredModel.file`, so private filesystem paths never reach the presenter.
 
-`ConsoleResourceChartPresenter` transforms persisted `ResourceSnapshot` values into Android-independent chart models. `ConsoleChartView` renders those models with Android Canvas primitives and does not query resource APIs, schedule timers or own telemetry collection.
+`ConsoleResourceChartPresenter` transforms persisted `ResourceSnapshot` values into Android-independent chart models. `ConsoleBenchmarkPresenter` transforms structured comparisons and retained baseline captures into cards and the same generic chart models. `ConsoleChartView` renders those models with Android Canvas primitives and does not query resource APIs, schedule timers or own telemetry collection.
 
 ## Installed-model view
 
@@ -111,23 +113,9 @@ The Caches view reports each registered cache independently:
 - source and execution state;
 - last repair outcome.
 
-The view distinguishes:
+The view distinguishes diagnostics not connected, connected with no probes, healthy, unhealthy, individual probe failure and repair failure.
 
-- diagnostics source not connected;
-- connected source with no registered probes;
-- healthy cache;
-- unhealthy cache;
-- individual probe failure;
-- repair failure.
-
-A repair action is rendered only when all of the following are true:
-
-- the cache has a registered health probe;
-- the latest snapshot is available;
-- the cache is unhealthy;
-- a matching `CacheMaintenanceControl` is registered.
-
-Cache repair is explicit and runs through the same single-thread diagnostics executor used by health actions. No mutation occurs during discovery, refresh or overview rendering. While repair is running, the action is disabled.
+A repair action is rendered only when the cache has an available unhealthy snapshot and a matching `CacheMaintenanceControl`. Repair is explicit, runs outside the main thread and is disabled while active. No mutation occurs during discovery, refresh or overview rendering.
 
 ### Model-integrity cache repair
 
@@ -137,17 +125,15 @@ Repair behavior is targeted:
 
 - stale entries are revalidated through `ModelStore.verify()`;
 - successfully revalidated entries receive a current file stamp;
-- stale entries whose model verification fails are removed from the cache;
-- orphaned entries whose model no longer exists are removed;
-- revalidation exceptions are counted as failures and leave the stale entry visible for a later retry.
+- stale entries whose verification fails are removed;
+- orphaned entries are removed;
+- revalidation exceptions are counted as failures and leave the stale entry visible for retry.
 
-The result reports before and after snapshots plus revalidated, removed and failed counts.
+The result reports before and after snapshots plus revalidated, removed and failed counts. The console does not expose `ModelIntegrityCache.clear()` as repair because blind clearing would discard the historical stamp used to detect changed artifacts.
 
-The console does not expose `ModelIntegrityCache.clear()` as repair. Blindly clearing the cache would discard the historical file stamp used to detect that an artifact changed and could cause an unchanged `StoredModel.verified` flag to seed the cache again without the intended re-hash.
+Conditional concurrent-map remove and replace operations prevent a repair from overwriting an entry changed after snapshot capture.
 
-Concurrent changes are handled with conditional `ConcurrentHashMap.remove(key, value)` and `replace(key, oldValue, newValue)` operations. A repair does not overwrite an entry that changed after the snapshot was captured.
-
-The standalone console intentionally uses `DisconnectedCacheControl`: its process does not own the embedded runtime's integrity cache. An embedding application can provide `ContractConsoleCacheControl` with `ModelIntegrityCacheHealthProbe` and `ModelIntegrityCacheMaintenanceControl` over the same runtime-owned cache instance.
+The standalone console intentionally uses `DisconnectedCacheControl`: its process does not own the embedded runtime cache. An embedding application can provide probes and maintenance controls over the same runtime-owned cache instance.
 
 ## Resource and thermal charts
 
@@ -163,18 +149,38 @@ Nullable measurements remain gaps. Missing memory values are not converted to ze
 
 Charts are derived only from snapshots returned by `TelemetryRepository.recentResourceSnapshots()`. The console does not start polling or invoke the Android resource probe.
 
+## Benchmark regressions and baseline history
+
+The Benchmarks view combines one active baseline per benchmark key with bounded retained capture history.
+
+The view includes:
+
+- active-key, retained-capture, PASS, WARN and FAIL summary counts;
+- one comparison card per active benchmark key;
+- application, use case, model digest prefix and cold/warm load class;
+- active-baseline timestamp and sample count;
+- available and required post-baseline sample counts;
+- baseline and current values for median TTFT, p95 total latency and median decode throughput;
+- current-to-baseline ratios and configured policy thresholds;
+- explicit `Within policy`, `Regression`, `Preview` or `Unavailable` metric states;
+- one card per retained baseline capture, including whether that capture remains active;
+- chronological history charts for median TTFT, p95 total latency and median decode throughput.
+
+`TelemetryConsoleDataSource` uses `BenchmarkComparisonEvaluator`, the same evaluator used by `BenchmarkRegressionHealthCheck`. The console therefore does not duplicate matching rules, sample readiness or threshold logic.
+
+The comparison lookback is independent from the visible Runs limit. Reducing the number of generation cards shown in the console does not silently reduce the benchmark comparison window.
+
+Only completed post-baseline runs matching application, use case, immutable model digest and explicit cold/warm load class are compared. When the minimum comparison window is not complete, available aggregates and ratios are shown only as a non-actionable preview. They do not become PASS or FAIL evidence.
+
+Retained history is bounded by `TelemetryRetentionPolicy.maxBenchmarkBaselines`. The active baseline remains stored separately, so history retention never removes the current comparison anchor. Room schema version 4 adds a history table through a non-destructive migration and copies existing active baselines into that history.
+
+Nullable historical metrics remain chart gaps. A missing p95 or throughput value is not converted to zero or connected across unavailable observations.
+
+The standalone console can render benchmark data only when its telemetry repository contains baseline captures and matching post-baseline runs. It does not create baselines or execute workloads implicitly.
+
 ## Request detail and timeline
 
-A selectable run or correlated log opens a detail screen with:
-
-- application and use-case identity;
-- model digest prefix and load classification;
-- queue, model-load, TTFT, prefill, decode and total latency;
-- token counts and decode throughput;
-- terminal status and typed error code;
-- chronological structured-log events;
-- sequence number, absolute timestamp and run-relative offset;
-- component and deterministically ordered structured fields.
+A selectable run or correlated log opens a detail screen with application/use-case identity, model digest prefix, load classification, latency metrics, token counts, throughput, terminal state and a chronological structured-log timeline.
 
 The timeline is reconstructed exclusively from persisted telemetry. Missing lifecycle transitions are not inferred. Explicit empty states cover a missing run, a run without logs and an unavailable telemetry source.
 
@@ -194,8 +200,8 @@ An application embedding the console data layer in the same process can provide:
 - `LocalLlmRuntimeStateProvider` over its `LocalLlmClient`;
 - `ModelStoreInventoryProvider` over its real `ModelStore`;
 - `HealthEngineConsoleHealthControl` over registered health and sanity checks;
-- `ContractConsoleCacheControl` over runtime-owned cache probes and maintenance controls;
-- its persistent or in-memory `TelemetryRepository`.
+- cache probes and maintenance controls over runtime-owned caches;
+- its persistent or in-memory `TelemetryRepository` with active baselines and retained history.
 
 A signature-protected diagnostics bridge remains required for legitimate cross-application access.
 
@@ -203,15 +209,7 @@ A signature-protected diagnostics bridge remains required for legitimate cross-a
 
 The presenters do not receive or render prompts, generated output, model bytes, document URIs, private filesystem paths or arbitrary backend exception messages.
 
-Failures are converted to fixed messages:
-
-- `Telemetry source unavailable`;
-- `Model inventory unavailable`;
-- `Health execution unavailable`;
-- `Cache health unavailable`;
-- `Cache repair unavailable`.
-
-A cache-source failure does not suppress telemetry, model inventory, runtime state or persisted health results. One failing cache probe does not hide other cache snapshots. A repair exception clears the running state and produces a fixed error without exposing the original exception text.
+Failures are converted to fixed telemetry, inventory, health and cache errors. A cache-source failure does not suppress telemetry, model inventory, runtime state or persisted health results. Benchmark comparison uses only structured latency, throughput, identifiers and load classification already permitted by telemetry contracts.
 
 Destroying the activity interrupts pending executor work through `shutdownNow()`. Generation-sanity timeout and cooperative cancellation remain owned by `GenerationSanityHealthCheck`.
 
@@ -220,30 +218,28 @@ Destroying the activity interrupts pending executor work through `shutdownNow()`
 Pure JVM tests cover:
 
 - bounded telemetry queries and independent source failures;
-- runtime and model-store adapter mapping;
-- private path removal;
-- connected, disconnected and empty inventory states;
-- health discovery, complete and targeted execution and persistence;
+- runtime and model-store adapter mapping and private-path removal;
+- health discovery, execution and persistence;
 - request lookup, filtering, ordering and timeline offsets;
-- chart ordering, MiB conversion, nullable gaps and thermal mapping;
-- cache-probe ordering and per-probe failure isolation;
-- maintenance capability matching;
-- disconnected, empty, healthy, unhealthy and running cache presentation;
-- repair-action eligibility and disabling;
-- repair before/after presentation;
-- stale entry revalidation;
-- orphaned and invalid entry removal;
-- failed revalidation retention;
-- privacy-safe cache-source and repair errors.
+- resource-chart ordering, MiB conversion, nullable gaps and thermal mapping;
+- cache probe isolation, maintenance matching and repair outcomes;
+- benchmark active-baseline replacement and bounded history retention;
+- Room active/history transactional persistence;
+- structured benchmark PASS, WARN and FAIL comparisons;
+- multi-metric regression ratios and thresholds;
+- partial non-actionable previews;
+- comparison lookback independent from visible run limits;
+- chronological benchmark history cards and charts;
+- nullable benchmark metrics preserved as chart gaps;
+- privacy-safe benchmark health details.
 
-The repository validation gate compiles and packages the Android controls and chart view, runs JVM tests, Spotless, Detekt and Android Lint, verifies native packaging and confirms that no model artifact is introduced.
+The repository validation gate compiles and packages the Android controls and chart views, runs JVM tests, Spotless, Detekt and Android Lint, verifies native packaging and confirms that no model artifact is introduced.
 
 ## Deferred slices
 
 The following remain separate work:
 
 - persistent console-local Room wiring when the console owns an embedded runtime;
-- benchmark regression comparison and baseline history;
 - installed-model mutation and management;
 - manual inference playground;
 - privacy-redacted diagnostic export;
