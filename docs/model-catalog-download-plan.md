@@ -1,60 +1,71 @@
 # Admin-managed model catalog and secure GGUF download plan
 
-**Status:** Active implementation tracker  
-**Canonical base:** `main`  
-**Base commit audited:** `dfba2a05ed8166ef79a12261089078e13fd3902e`  
-**Implementation branch:** `agent/model-catalog-download-implementation`  
+**Status:** Active implementation tracker
+
+**Canonical base:** `main`
+
+**Base commit audited:** `dfba2a05ed8166ef79a12261089078e13fd3902e`
+
+**Implementation branch:** `agent/model-catalog-download-implementation`
+
 **Last updated:** 2026-08-04
 
 ## 1. Purpose
 
-This document defines and tracks the implementation of an administrator-managed catalog of downloadable GGUF models for the Android Local LLM Harness.
+This document defines the implementation plan for an administrator-managed catalog of downloadable GGUF models in the Android Local LLM Harness.
 
-An administrator publishes a controlled set of model artifacts. The Android application retrieves that catalog, shows only entries allowed for the current application and use case, evaluates device compatibility, lets the user explicitly download a model, verifies the downloaded bytes and installs the artifact into the existing content-addressed `ModelStore`.
+An administrator publishes a controlled set of supported model releases. The Android application retrieves the catalog, filters releases by application and use case, evaluates device compatibility, lets the user explicitly download a model, verifies the downloaded artifact and installs it through the existing content-addressed `ModelStore`.
 
-The feature must preserve the repository's existing model identity and runtime invariants:
+The catalog is a distribution control plane. It must not become part of the inference data plane.
 
 ```text
-applicationId + useCaseId
-        -> explicit application-owned binding/profile policy
-        -> exact GGUF artifact digest
-        -> verified content-addressed ModelStore object
-        -> RuntimeOrchestrator
-        -> llama.cpp
+Admin catalog
+    -> validated catalog document
+    -> application/use-case filtering
+    -> device compatibility evaluation
+    -> explicit user download
+    -> private temporary file
+    -> byte-size and SHA-256 verification
+    -> GGUF inspection
+    -> ModelStore.import()
+    -> ModelStore.verify()
+    -> installed release metadata
+    -> explicit model selection
+    -> existing RuntimeOrchestrator
 ```
 
-A download URL is only a distribution location. It is never a model identity and must never be passed directly to the inference backend.
+A remote URL is only a download location. Model identity remains the immutable SHA-256 digest.
 
----
+## 2. Main-branch baseline
 
-## 2. Main-branch baseline audit
+This plan is based only on the current `main` branch. Historical or open feature branches are not implementation dependencies.
 
-This plan is based only on the current `main` branch. Historical feature branches are not implementation bases.
+### 2.1 Existing capabilities that must be reused
 
-### 2.1 Existing foundations in `main`
+The current repository already provides:
 
-The following capabilities already exist and must be reused rather than duplicated:
+- a pinned `llama.cpp` Android backend;
+- GGUF metadata inspection;
+- model profiles and application/use-case binding concepts;
+- SHA-256 content-addressed model import;
+- streaming hashing and expected-size validation;
+- atomic or fail-closed publication into app-private storage;
+- model lookup, verification, removal and inventory snapshots;
+- embedded runtime orchestration;
+- deterministic and streaming generation;
+- cancellation and session lifecycle handling;
+- integrity caching and health checks;
+- telemetry, resource and benchmark foundations;
+- a Play-installable phone application;
+- Storage Access Framework GGUF import;
+- a manual local inference playground;
+- a merged UX/UI plan that identifies `apps/local-llm-phone-test` as the first connected surface.
 
-- [x] pinned `llama.cpp` Android backend;
-- [x] GGUF metadata inspection without full model loading;
-- [x] `GgufArtifact`, model profile and application/use-case binding concepts;
-- [x] streaming SHA-256 content-addressed model import;
-- [x] deterministic artifact path derived from SHA-256;
-- [x] size and digest verification during import;
-- [x] existing-object deduplication and destination conflict protection;
-- [x] explicit `find`, `verify`, `remove` and `snapshot` operations on `ModelStore`;
-- [x] atomic or fail-closed publication into app-private model storage;
-- [x] embedded runtime orchestration, generation, streaming and cancellation;
-- [x] model integrity cache and health checks;
-- [x] model inventory presentation through console boundaries;
-- [x] Play-installable Android application with Storage Access Framework GGUF import;
-- [x] manual on-device inference playground using a selected imported GGUF;
-- [x] privacy-safe telemetry, health, resource and benchmark foundations;
-- [x] a repository-approved Harness UX/UI implementation plan targeting `apps/local-llm-phone-test`.
+These foundations must not be duplicated.
 
-### 2.2 Current `ModelStore` boundary
+### 2.2 Existing `ModelStore` authority
 
-The current contract is intentionally artifact-oriented:
+The current model-store contract remains authoritative for final GGUF bytes:
 
 ```kotlin
 interface ModelStore {
@@ -66,103 +77,89 @@ interface ModelStore {
 }
 ```
 
-This boundary remains authoritative for installed GGUF bytes.
+The catalog feature must never:
 
-The catalog implementation must not:
-
-- create another final artifact directory;
-- invent another digest identity;
+- create an alternative final model directory;
+- derive identity from a URL or display name;
 - write directly into `models/sha256/...`;
-- duplicate `FileSystemModelStore` hashing, conflict or atomic-publication logic;
-- mark a model installed before `ModelStore.import()` completes successfully.
+- duplicate the import and conflict logic in `FileSystemModelStore`;
+- report a model as installed before `ModelStore.import()` and verification succeed.
 
-### 2.3 Missing capabilities on `main`
+### 2.3 Missing capabilities
 
-The following do not yet exist on `main`:
+The following still need implementation:
 
-- [ ] a remote model-catalog contract;
-- [ ] a catalog parser and validator;
-- [ ] catalog synchronization and local cache;
-- [ ] persistent user-facing model metadata beyond the raw artifact store;
-- [ ] application/use-case filtering of remote entries;
-- [ ] device compatibility evaluation before download;
-- [ ] an HTTPS model downloader;
-- [ ] partial-download state and cleanup policy;
-- [ ] explicit download cancellation and progress reporting;
-- [ ] remote byte-size and SHA-256 enforcement before installation;
-- [ ] update, replacement, deprecation and revocation semantics;
-- [ ] downloaded-model cache health;
-- [ ] catalog and download screens connected to the real phone runtime;
-- [ ] manifest authenticity beyond ordinary HTTPS transport;
-- [ ] real-device evidence for remote download and installation.
+- remote catalog contracts and decoding;
+- strict catalog validation;
+- catalog synchronization and local caching;
+- persistent release metadata separate from raw model bytes;
+- application/use-case filtering;
+- device compatibility evaluation;
+- HTTPS model download;
+- private partial-download state;
+- progress and cancellation;
+- downloaded byte-size and digest enforcement;
+- GGUF inspection before installation registration;
+- update, deprecation and revocation behavior;
+- catalog and download health checks;
+- phone-app catalog UI;
+- signed-manifest verification and key rotation;
+- physical-device download and offline-inference evidence.
 
-### 2.4 Overlapping work that is not part of `main`
+### 2.4 Unmerged overlap
 
-Open draft branches and pull requests must not be treated as dependencies.
+Open PRs and branches are reference material only.
 
-In particular:
+- PR #34 contains standalone-console model mutation work but is not merged.
+- PR #40 contains a large connected Compose implementation but is not merged.
+- The merged Harness UX plan currently excludes internet model download.
 
-- PR #34 contains standalone-console model mutation work but is not merged;
-- PR #40 contains a large connected Compose implementation but is not merged;
-- the current `main` UX plan explicitly excluded internet model download.
-
-Therefore this feature must:
-
-1. compile and test against `main` alone;
-2. avoid copying code from unmerged branches unless it is deliberately recovered and reviewed;
-3. keep UI-independent catalog/download logic outside app screens;
-4. make later integration with the connected Compose work possible without depending on it;
-5. update the UX scope when the actual download UI is introduced.
-
----
+The new implementation must compile from `main` without either PR. UI-independent logic must remain reusable when those lines of work are later reconciled.
 
 ## 3. Product behavior
 
-### 3.1 Administrator behavior
+### 3.1 Administrator responsibilities
 
-An administrator can publish a versioned catalog containing approved model releases.
+For every model release, the administrator defines:
 
-For every release the administrator defines:
-
-- stable catalog model ID;
+- stable model ID;
 - release version;
-- user-facing name and description;
-- exact GGUF SHA-256;
-- exact expected byte size;
+- display name and description;
+- exact SHA-256 digest;
+- expected byte size;
 - HTTPS download URL;
 - architecture and quantization metadata;
-- supported application IDs and use-case IDs;
+- allowed application IDs and use-case IDs;
 - minimum Android API;
 - supported ABIs;
 - minimum and recommended memory;
-- minimum required free storage;
+- minimum free-storage requirement;
 - compatible Harness/runtime version range;
-- license identifier and attribution/source links;
-- lifecycle state such as active, deprecated, revoked or unavailable;
+- license and source metadata;
+- lifecycle status;
 - optional replacement release;
-- profile key understood by the application.
+- application-reviewed profile key.
 
-The remote catalog is data. It must not be able to inject executable code, arbitrary file paths, arbitrary Android intents or unrestricted runtime configuration.
+The catalog is data only. It cannot inject executable code, arbitrary paths, Android intents, prompts or unrestricted backend settings.
 
-### 3.2 User behavior
+### 3.2 User responsibilities
 
 The user can:
 
-1. refresh the approved catalog;
-2. inspect model name, size, quantization, compatibility and license information;
-3. see why an incompatible model cannot be downloaded;
-4. explicitly start a download;
-5. observe byte and percentage progress when total size is known;
-6. cancel an active download;
-7. retry a recoverable failure;
-8. see verification and installation phases separately;
-9. select an installed compatible model for an application-owned use case;
-10. verify or remove an installed model through existing model-management capabilities;
-11. see update, deprecation or revocation states.
+- refresh the approved catalog;
+- inspect release size, quantization, license and compatibility;
+- see explicit incompatibility reasons;
+- confirm a large download;
+- monitor progress;
+- cancel or retry;
+- distinguish downloading, verification and installation;
+- select an installed model for an authorized use case;
+- verify or remove an installed model;
+- see update, deprecation and revocation states.
 
-The application must not silently download large model files on refresh, navigation or startup.
+The application must not silently download model files on startup, navigation or catalog refresh.
 
-### 3.3 Canonical state flow
+### 3.3 Canonical lifecycle
 
 ```text
 NOT_PRESENT
@@ -175,7 +172,7 @@ NOT_PRESENT
     -> INSTALLED
 ```
 
-Terminal or recoverable states:
+Recoverable or terminal states include:
 
 ```text
 CANCELLED
@@ -187,36 +184,26 @@ FAILED_GGUF
 FAILED_COMPATIBILITY
 FAILED_STORAGE
 FAILED_IMPORT
-REVOKED
 DEPRECATED
+REVOKED
 UPDATE_AVAILABLE
 ```
 
-A model is `INSTALLED` only when the exact digest exists in `ModelStore` and passes the required installation verification.
-
----
+A release is `INSTALLED` only when its exact digest exists in `ModelStore` and passes required verification.
 
 ## 4. Architecture
 
-### 4.1 Target module boundaries
-
-Introduce modules only when their implementation is added:
+### 4.1 Target modules
 
 ```text
 models/
-├── model-profile        existing
+├── model-profile        existing application-owned profiles
 ├── model-store          existing final artifact owner
-├── model-catalog        new pure catalog domain and policy
-└── model-download       new Android download and installation orchestration
+├── model-catalog        new catalog domain, validation and policy
+└── model-download       new Android transfer and installation orchestration
 ```
 
-Potential later module, only if persistence grows beyond the first implementation:
-
-```text
-models/model-catalog-store
-```
-
-The initial implementation may keep catalog persistence inside `model-catalog` behind a neutral repository interface. Android-specific persistence must remain outside pure domain types.
+Modules are introduced only when they contain real behavior.
 
 ### 4.2 Dependency direction
 
@@ -237,7 +224,6 @@ model-download
 
 model-catalog
         +--> core contracts
-        +--> model-profile identifiers where required
 
 model-store
         X--> model-catalog
@@ -245,9 +231,9 @@ model-store
         X--> UI
 ```
 
-`core/runtime-core` must not depend on remote URLs, HTTP clients, catalog JSON or Android download state.
+`core/runtime-core` must not depend on HTTP clients, catalog JSON, remote URLs or download state.
 
-### 4.3 Data plane separation
+### 4.3 Distribution versus inference
 
 ```text
 Remote catalog and download control plane
@@ -255,69 +241,45 @@ Remote catalog and download control plane
         -> existing local inference data plane
 ```
 
-Inference remains possible without network access after a model is installed.
+Inference must continue offline after installation. Catalog or network failure must not break a healthy installed model.
 
-Catalog refresh or download failure must not break already-installed model inference.
+### 4.4 First connected surface
 
-### 4.4 First connected product surface
+The first product integration targets `apps/local-llm-phone-test` because it already owns the real app-private model store and embedded runtime.
 
-The first connected implementation targets:
+The standalone developer console may consume neutral catalog contracts later. Cross-application installation remains deferred until a protected bridge or shared runtime exists.
 
-```text
-apps/local-llm-phone-test
+## 5. Catalog domain model
+
+### 5.1 Document
+
+```kotlin
+data class CatalogModelDocument(
+    val schemaVersion: Int,
+    val catalogId: CatalogId,
+    val revision: Long,
+    val generatedAtEpochMs: Long,
+    val expiresAtEpochMs: Long,
+    val entries: List<CatalogModelRelease>,
+)
 ```
 
-Reasoning:
+Document rules:
 
-- it is already Play-installable;
-- it owns the real app-private `FileSystemModelStore`;
-- it already imports and runs external GGUF files;
-- it already provides the manual playground;
-- the merged UX plan designates it as the first connected Harness surface.
-
-The standalone `apps/local-llm-console` may consume the same neutral contracts later, but cross-application model installation remains deferred until the protected diagnostics/shared-runtime architecture exists.
-
----
-
-## 5. Domain model
-
-### 5.1 Catalog document
-
-Proposed logical shape:
-
-```json
-{
-  "schemaVersion": 1,
-  "catalogId": "harness-public-models",
-  "revision": 42,
-  "generatedAtEpochMs": 1785880800000,
-  "expiresAtEpochMs": 1786485600000,
-  "entries": []
-}
-```
-
-Required document rules:
-
-- supported `schemaVersion`;
-- non-empty stable `catalogId`;
-- monotonically comparable revision;
-- bounded number of entries;
+- supported schema version;
+- stable non-empty catalog ID;
+- non-negative revision;
+- valid generation and expiry window;
+- bounded entry count;
 - unique release identity;
-- no duplicate model ID and version pairs;
-- no duplicate artifact digest with conflicting size;
-- valid temporal window;
-- unknown fields ignored only when forward-compatible;
-- invalid required fields reject the affected entry;
-- document-level trust failure rejects the whole refresh.
+- no conflicting size metadata for one digest;
+- expired or untrusted documents cannot authorize new downloads.
 
-### 5.2 Catalog release
-
-Proposed Kotlin domain model:
+### 5.2 Release
 
 ```kotlin
 data class CatalogModelRelease(
-    val modelId: CatalogModelId,
-    val version: CatalogModelVersion,
+    val id: CatalogReleaseId,
     val displayName: String,
     val description: String,
     val artifact: CatalogGgufArtifact,
@@ -330,7 +292,7 @@ data class CatalogModelRelease(
 )
 ```
 
-Artifact metadata:
+### 5.3 Artifact
 
 ```kotlin
 data class CatalogGgufArtifact(
@@ -343,20 +305,20 @@ data class CatalogGgufArtifact(
 )
 ```
 
-The URI is never used as identity. Equality and installation correlation use the digest.
+The digest is the identity. The URL is mutable distribution metadata.
 
-### 5.3 Allowed target
+### 5.4 Target
 
 ```kotlin
 data class CatalogTarget(
-    val applicationId: String,
-    val useCaseId: String,
+    val applicationId: ApplicationId,
+    val useCaseId: UseCaseId,
 )
 ```
 
-Filtering must be exact and fail closed. Wildcards are deferred unless a concrete product need is documented.
+Target matching is exact and fail closed. Wildcards are deferred.
 
-### 5.4 Availability
+### 5.5 Availability
 
 ```kotlin
 enum class CatalogAvailability {
@@ -367,105 +329,51 @@ enum class CatalogAvailability {
 }
 ```
 
-Semantics:
+- `ACTIVE`: downloadable and selectable when compatible.
+- `DEPRECATED`: allowed with warning and optional replacement.
+- `REVOKED`: new download and selection blocked.
+- `UNAVAILABLE`: temporarily not downloadable.
 
-- `ACTIVE`: can be offered and downloaded;
-- `DEPRECATED`: installed use may continue, but the UI recommends replacement;
-- `REVOKED`: new download and activation are blocked; already-installed handling follows explicit policy;
-- `UNAVAILABLE`: temporarily not downloadable, without implying a security incident.
+### 5.6 Application-owned profile resolution
 
-### 5.5 Application-owned profile mapping
-
-The catalog must not define arbitrary prompts or unrestricted runtime settings.
-
-The application owns a registry such as:
+Remote catalog data cannot define arbitrary runtime behavior.
 
 ```kotlin
 interface CatalogProfileResolver {
-    fun resolve(
-        release: CatalogModelRelease,
-        target: CatalogTarget,
-    ): ResolvedCatalogProfile
+    fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean
 }
 ```
 
-`profileKey` selects an application-reviewed configuration template.
+A later resolver produces or validates application-owned model and use-case profiles. Unknown profile keys fail before download or selection.
 
-The resolver is responsible for producing or validating:
+## 6. Catalog validation
 
-- `GgufModelProfile`;
-- context-size bounds;
-- CPU thread bounds;
-- GPU-layer policy;
-- chat template policy;
-- use-case prompt and generation policy;
-- explicit application/use-case binding.
+Validation is fail closed and bounded.
 
-Unknown profile keys fail closed before download or activation.
+Required checks:
 
----
+- schema version;
+- identifier syntax and length;
+- document revision and time window;
+- maximum entry count;
+- duplicate model/version pairs;
+- conflicting digest metadata;
+- exact 64-character hexadecimal SHA-256;
+- positive bounded byte size;
+- HTTPS download URL;
+- no URL user information;
+- safe `.gguf` file name without path separators;
+- non-empty architecture and quantization;
+- valid compatibility fields;
+- at least one allowed target;
+- valid license metadata;
+- no release that replaces itself.
 
-## 6. Catalog synchronization
-
-### 6.1 Catalog source
-
-```kotlin
-interface ModelCatalogSource {
-    fun fetch(request: CatalogFetchRequest): CatalogFetchResult
-}
-```
-
-The HTTP implementation must support:
-
-- HTTPS only;
-- configured catalog endpoint rather than user-entered arbitrary URLs;
-- connect and read timeouts;
-- response-size limit;
-- conditional requests through ETag and/or Last-Modified when available;
-- explicit status handling;
-- cancellation;
-- fixed privacy-safe errors;
-- no prompt, generated output or model contents in logs.
-
-### 6.2 Local catalog repository
-
-```kotlin
-interface ModelCatalogRepository {
-    fun current(): CatalogSnapshot
-    fun replace(document: ModelCatalogDocument, metadata: CatalogSyncMetadata)
-    fun markRefreshFailure(failure: CatalogFailure)
-    fun clearExpiredTemporaryState()
-}
-```
-
-The persisted snapshot must contain enough information to render a previously validated catalog offline.
-
-Persistence must be:
-
-- app-private;
-- schema-versioned;
-- written through temporary file plus atomic replacement where supported;
-- bounded;
-- recoverable when the newest file is malformed;
-- independent from model bytes;
-- free of secrets and authentication tokens.
-
-### 6.3 Refresh policy
-
-Initial policy:
-
-- user-triggered refresh is always available;
-- application startup may read the cached catalog but does not automatically download models;
-- optional foreground refresh can occur only when stale and explicitly enabled;
-- no background periodic refresh in the first slice;
-- expired cached entries remain visible with an explicit stale state but cannot authorize a new download when policy requires a fresh catalog;
-- installed models remain discoverable from local metadata even when the catalog endpoint is unavailable.
-
----
+Invalid entries cannot become downloadable releases. Document-level trust failure rejects the whole refresh.
 
 ## 7. Compatibility evaluation
 
-### 7.1 Device inputs
+### 7.1 Device profile
 
 ```kotlin
 data class CatalogDeviceProfile(
@@ -475,74 +383,106 @@ data class CatalogDeviceProfile(
     val availableStorageBytes: Long,
     val harnessVersion: String,
     val backendId: String,
-    val backendVersion: String,
 )
 ```
 
-### 7.2 Compatibility result
+### 7.2 Hard blockers
 
-```kotlin
-data class CatalogCompatibilityResult(
-    val compatible: Boolean,
-    val reasons: List<CatalogCompatibilityReason>,
-    val warnings: List<CatalogCompatibilityWarning>,
-)
-```
-
-Hard blockers:
-
+- target not allowed;
+- revoked or unavailable release;
 - unsupported Android API;
-- no compatible ABI;
+- unsupported ABI;
+- unsupported backend;
 - unsupported Harness version;
-- unsupported backend/profile key;
-- insufficient storage including staging overhead;
-- known unsupported architecture or quantization;
-- revoked release;
-- target not authorized.
+- unknown profile key;
+- total RAM below hard minimum;
+- insufficient storage;
+- storage arithmetic overflow.
 
-Warnings:
+### 7.3 Warnings
 
-- total RAM below recommendation but above hard minimum;
-- catalog nearing expiry;
 - deprecated release;
+- RAM below recommendation but above minimum;
+- stale or expiring catalog;
 - expected slow performance;
-- model size close to remaining storage budget.
+- low remaining storage headroom.
 
-### 7.3 Storage calculation
+### 7.4 Storage policy
 
-Before download, require at least:
+Before download, required storage includes:
 
 ```text
-expected GGUF size
-+ partial/staging file overhead
-+ ModelStore import staging overhead
+partial download copy
++ ModelStore import staging copy
++ catalog-declared minimum free storage
 + configurable safety margin
 ```
 
-Because the current `ModelStore.import()` copies the source into its own staging file, the first implementation may temporarily require close to two additional copies during installation. The UI and compatibility policy must account for this honestly.
+The current implementation uses two artifact-size copies plus a 128 MiB safety margin. This reflects the current `ModelStore.import()` copy behavior. Any future adopt-file or verified-stream optimization requires a separate integrity review.
 
-A later optimization may add a verified-stream or adopt-file import API, but that change must preserve `ModelStore` integrity guarantees and requires its own design review.
+## 8. Catalog synchronization
 
----
+### 8.1 Source boundary
 
-## 8. Download engine
+```kotlin
+interface ModelCatalogSource {
+    fun fetch(request: CatalogFetchRequest): CatalogFetchResult
+}
+```
 
-### 8.1 First implementation strategy
+The HTTP implementation must enforce:
 
-Use an explicit application-owned download engine rather than Android `DownloadManager`.
+- HTTPS only;
+- configured endpoint;
+- timeout limits;
+- response-size limit;
+- conditional requests where available;
+- typed status handling;
+- cancellation;
+- privacy-safe errors;
+- no sensitive headers or response bodies in logs.
 
-Reasoning:
+### 8.2 Repository boundary
 
-- exact redirect and host policy is required;
-- byte-size and SHA-256 must be computed under Harness control;
-- temporary files must remain app-private;
-- cancellation and phase reporting must integrate with installation;
-- model bytes must never be published before verification;
-- download state must map to typed domain events.
+```kotlin
+interface ModelCatalogRepository {
+    fun current(): CatalogSnapshot
+    fun replace(document: CatalogModelDocument, metadata: CatalogSyncMetadata)
+    fun markRefreshFailure(failure: CatalogFailure)
+}
+```
 
-The first slice may use `HttpsURLConnection` behind a transport interface to avoid coupling domain logic to a third-party HTTP library.
+Persistence must be app-private, schema-versioned, bounded and atomically replaced. A failed refresh cannot corrupt the last validated snapshot.
 
-### 8.2 Download contract
+### 8.3 Refresh policy
+
+Initial policy:
+
+- explicit user refresh;
+- cached catalog readable offline;
+- no model download during refresh;
+- no periodic background refresh in the first slice;
+- stale state shown explicitly;
+- installed models remain discoverable when the endpoint is unavailable.
+
+## 9. Secure download engine
+
+### 9.1 Strategy
+
+Use an application-owned download client behind an interface rather than Android `DownloadManager` for the first implementation.
+
+Reasons:
+
+- strict host and redirect policy;
+- app-private temporary files;
+- integrated byte counting and SHA-256;
+- typed phase events;
+- cooperative cancellation;
+- verification before publication.
+
+The first implementation may use `HttpsURLConnection` behind a transport abstraction.
+
+### 9.2 Contract
 
 ```kotlin
 interface ModelDownloadClient {
@@ -553,49 +493,39 @@ interface ModelDownloadClient {
 }
 ```
 
-Events:
+Events include:
 
-```kotlin
-sealed interface ModelDownloadEvent {
-    data object Queued : ModelDownloadEvent
-    data class Started(val totalBytes: Long?) : ModelDownloadEvent
-    data class Progress(val downloadedBytes: Long, val totalBytes: Long?) : ModelDownloadEvent
-    data object Verifying : ModelDownloadEvent
-    data object Inspecting : ModelDownloadEvent
-    data object Importing : ModelDownloadEvent
-    data class Installed(val digest: ModelDigest) : ModelDownloadEvent
-    data object Cancelled : ModelDownloadEvent
-    data class Failed(val code: ModelDownloadErrorCode) : ModelDownloadEvent
-}
-```
+- queued;
+- started;
+- progress;
+- verifying;
+- inspecting;
+- importing;
+- installed;
+- cancelled;
+- failed with stable code.
 
-### 8.3 Network policy
+### 9.3 Network controls
 
-Mandatory controls:
-
-- only `https` scheme;
+- HTTPS scheme only;
 - default-deny host allowlist;
 - explicit port policy;
-- maximum redirect count;
-- redirect only to HTTPS;
-- redirect target must remain allowlisted;
-- no URL user info;
-- no local, loopback or link-local hosts in production configuration;
-- connect/read timeout;
+- bounded redirects;
+- HTTPS redirect targets only;
+- every redirect target allowlisted;
+- no URL user information;
+- no loopback, local or link-local production hosts;
+- connect and read timeouts;
 - maximum response size;
-- `Content-Length` validation when present;
-- actual byte count validation regardless of header;
-- no transparent content decompression for GGUF artifacts;
-- reject unexpected content encoding;
-- fixed user agent without sensitive identifiers;
-- authentication headers supplied only by a scoped provider and never persisted.
+- content-length validation when present;
+- actual byte-count validation always;
+- unexpected content encoding rejected;
+- no credentials in persisted state or telemetry.
 
-### 8.4 Partial files
-
-Temporary layout:
+### 9.4 Temporary files
 
 ```text
-<app files or no-backup>/model-downloads/
+<app-private>/model-downloads/
     <release-id>/
         artifact.part
         state.tmp
@@ -603,60 +533,46 @@ Temporary layout:
 
 Rules:
 
-- a partial file is never visible through `ModelStore.snapshot()`;
-- cancellation closes streams promptly;
-- failed digest/size files are deleted;
-- stale partial files are removed by explicit maintenance and startup recovery;
-- partial state contains no signed URLs or authorization headers;
-- first release may restart from zero after process death;
-- HTTP range resume is a later slice and requires validator support such as ETag.
+- partial files never appear in `ModelStore.snapshot()`;
+- cancellation closes streams;
+- failed size or digest files are deleted;
+- stale partials are cleaned during recovery;
+- signed URLs and authorization headers are never persisted;
+- the first release may restart from zero after process death;
+- range resume is deferred until validator support exists.
 
-### 8.5 Concurrency
+### 9.5 Concurrency
 
 Initial policy:
 
 - one active model download per app process;
-- additional requests receive a typed busy result or enter a bounded queue;
-- model inference may continue using an already-installed model while another model downloads, subject to storage and memory policies;
-- installation/import is serialized with other model mutations;
-- removal of the digest being installed is rejected;
+- bounded or rejected additional requests;
+- import and removal serialized;
+- removal of an installing digest rejected;
+- inference using another installed model may continue;
 - download cancellation does not cancel inference.
 
----
+## 10. Verification and installation
 
-## 9. Verification and installation
-
-### 9.1 Required sequence
+Required sequence:
 
 ```text
-network copy to private partial file
-    -> exact byte count
-    -> SHA-256 comparison
-    -> GGUF metadata inspection
-    -> catalog metadata consistency checks
-    -> ModelStore.import(partial, GgufArtifact)
-    -> ModelStore.verify(digest)
-    -> installed metadata update
-    -> partial cleanup
+copy to private partial file
+    -> count bytes
+    -> compare SHA-256
+    -> inspect GGUF
+    -> compare inspectable metadata
+    -> ModelStore.import()
+    -> ModelStore.verify()
+    -> persist installed release metadata
+    -> delete partial state
 ```
-
-### 9.2 GGUF consistency
-
-At minimum compare inspected metadata with catalog policy for:
-
-- valid GGUF structure;
-- supported architecture;
-- quantization when reliably available;
-- context or tensor metadata needed by the backend;
-- chat-template presence only when required by the application profile.
 
 Catalog metadata is descriptive until verified against the artifact where possible.
 
-### 9.3 Installed metadata repository
+### 10.1 Installed metadata
 
-The raw `ModelStore` intentionally does not persist user-facing release metadata.
-
-Add a separate repository:
+Raw model storage intentionally does not own user-facing release metadata.
 
 ```kotlin
 interface InstalledModelCatalog {
@@ -668,47 +584,20 @@ interface InstalledModelCatalog {
 }
 ```
 
-Suggested record:
+Records contain release identity, digest, display metadata, profile key, timestamps, selected targets and catalog revision. They do not persist private absolute paths.
 
-```kotlin
-data class InstalledModelRecord(
-    val releaseId: CatalogReleaseId,
-    val digest: ModelDigest,
-    val displayName: String,
-    val version: String,
-    val architecture: String,
-    val quantization: String,
-    val sizeBytes: Long,
-    val profileKey: ModelProfileKey,
-    val installedAtEpochMs: Long,
-    val lastVerifiedAtEpochMs: Long,
-    val selectedTargets: Set<CatalogTarget>,
-    val catalogRevision: Long,
-)
-```
+### 10.2 Reconciliation
 
-This repository must not store private absolute file paths. The digest resolves the artifact through `ModelStore`.
+- metadata without artifact becomes orphaned and repairable;
+- artifact without metadata remains visible as manually imported;
+- integrity failure blocks activation;
+- duplicate metadata collapses by digest and release identity;
+- removed remote release does not silently delete local bytes;
+- revocation follows explicit policy.
 
-### 9.4 Reconciliation
+## 11. Selection and activation
 
-On startup or explicit refresh:
-
-- metadata record with missing artifact -> mark orphaned metadata and repair/remove;
-- artifact without metadata -> show as manually imported/unknown catalog artifact;
-- digest mismatch -> fail integrity and block activation;
-- duplicate records -> collapse by digest and release identity;
-- catalog release removed -> retain installed metadata with unavailable status;
-- revoked digest -> apply explicit revocation policy.
-
----
-
-## 10. Selection and activation
-
-Downloading and selecting are separate actions.
-
-Installation must not automatically replace an active model binding.
-
-Selection flow:
+Installation and selection are separate.
 
 ```text
 installed release
@@ -716,103 +605,70 @@ installed release
     -> target authorization
     -> compatibility re-check
     -> explicit user selection
-    -> binding/selection persistence
-    -> runtime prepare on next explicit inference
+    -> selection persistence
+    -> existing runtime preparation on inference
 ```
 
 Rules:
 
-- runtime model switches remain governed by existing active-session protection;
-- selection does not load a model immediately;
-- unknown or changed profile key blocks selection;
-- revoked releases cannot become newly selected;
-- replacing the selected model must not remove the old artifact automatically;
-- installed models can serve different application-owned targets only when explicitly allowed.
+- installing does not load or activate the model;
+- runtime model switches respect existing active-session protection;
+- unknown profile keys block selection;
+- revoked releases cannot be newly selected;
+- replacing selection does not remove the previous artifact;
+- selection remains explicit per application/use case.
 
----
+## 12. Updates, deprecation and revocation
 
-## 11. Update, deprecation and revocation
+### 12.1 Update detection
 
-### 11.1 Update detection
+An update exists when the same stable model ID has a newer active, allowed and compatible release with a different digest.
 
-An update is available when:
+Version ordering must use a documented parser rather than lexical comparison.
 
-- the same stable model ID has a newer allowed release;
-- the newer release has a different digest;
-- the current target and device remain compatible;
-- the release is active.
+### 12.2 Side-by-side update
 
-Version ordering must use a documented parser. Do not rely on lexical string comparison.
+1. Download and verify the new digest.
+2. Install it independently.
+3. Let the user select it.
+4. Retain the previous artifact until explicit removal or approved retention policy.
+5. Never delete the only working model before replacement succeeds.
 
-### 11.2 Replacement policy
+### 12.3 Revocation decision
 
-Updates are side-by-side installs:
+Before production release, define:
 
-1. download and verify the new digest;
-2. install it independently;
-3. allow explicit selection;
-4. keep the previous artifact until the user removes it or retention policy is applied;
-5. never delete the only working model before the replacement is installed and selectable.
-
-### 11.3 Revocation policy
-
-The first production policy must explicitly decide:
-
-- whether revoked installed models remain runnable offline;
-- whether only new selection is blocked;
+- whether an already-installed revoked model can run offline;
+- whether new selection is blocked;
 - whether current selection is disabled;
 - whether removal is recommended or mandatory;
-- how emergency catalog trust works when the device is offline.
+- how stale offline catalog state affects emergency revocation.
 
-Until that decision is approved, implementation must fail safe for new downloads and new selections without silently deleting local user data.
+Until approved, new download and new selection fail closed, while local user data is not silently deleted.
 
----
+## 13. Phone-app UI integration
 
-## 12. UI integration
-
-### 12.1 Models destination
-
-The connected Models screen must distinguish:
+The connected Models destination must distinguish:
 
 - installed models;
-- available catalog models;
-- incompatible catalog models;
+- catalog models available for download;
+- incompatible releases;
 - active download;
-- verification/import phase;
+- verification and import phases;
 - update available;
-- deprecated/revoked models;
-- manually imported artifacts without catalog metadata;
-- stale/offline catalog state.
+- deprecated and revoked releases;
+- manually imported artifacts;
+- stale or offline catalog.
 
-### 12.2 Model card
+Before download, show:
 
-Minimum content:
+- expected download size;
+- temporary storage requirement;
+- available storage;
+- license and source information;
+- confirmation that inference remains local after installation.
 
-- display name;
-- model/release version;
-- architecture and quantization;
-- download or installed size;
-- compatibility status;
-- license summary;
-- installed/selected/update state;
-- exact action appropriate for the current state.
-
-Do not display raw full SHA-256 by default. Provide a shortened identifier and an explicit details view.
-
-### 12.3 Download confirmation
-
-Before starting:
-
-- display exact expected download size;
-- display temporary storage requirement;
-- display available storage;
-- explain that inference remains local after installation;
-- show license/source information;
-- require explicit confirmation.
-
-### 12.4 Progress UI
-
-Show distinct labels:
+Progress labels must remain distinct:
 
 ```text
 Downloading
@@ -822,538 +678,379 @@ Installing locally
 Installed
 ```
 
-Do not show 100% downloaded as installed while hashing or import is still running.
+Manual SAF import remains an advanced local option.
 
-### 12.5 Existing UX plan update
+The existing UX plan must be updated when the UI slice lands because it currently excludes internet model download.
 
-The merged Harness UX/UI plan currently excludes internet model download. When this implementation reaches the UI slice, update that document to:
+## 14. Observability and privacy
 
-- include catalog-backed models;
-- preserve manual SAF import as an advanced/local option;
-- define offline and stale-catalog states;
-- add download confirmation and progress;
-- document network permission and privacy changes;
-- retain GGUF-only scope.
+### 14.1 Safe events
 
----
-
-## 13. Observability and privacy
-
-### 13.1 Structured events
-
-Record privacy-safe events such as:
-
-- catalog refresh started/completed/failed;
-- catalog cache used/stale/expired;
+- catalog refresh started, completed or failed;
+- cached catalog used, stale or expired;
 - compatibility evaluated;
-- download queued/started/progress/completed/cancelled/failed;
-- byte-size verification passed/failed;
-- SHA-256 verification passed/failed;
-- GGUF inspection passed/failed;
-- import started/completed/failed;
-- installed metadata reconciled;
-- update/deprecation/revocation detected.
+- download queued, started, progressed, completed, cancelled or failed;
+- size and digest verification result;
+- GGUF inspection result;
+- import result;
+- metadata reconciliation result;
+- update, deprecation or revocation detected.
 
-### 13.2 Allowed fields
+### 14.2 Allowed fields
 
 - catalog ID and revision;
 - stable release ID;
-- shortened or structured digest identifier where policy permits;
 - expected and actual byte counts;
 - duration;
-- HTTP status class, not sensitive response body;
+- HTTP status class;
 - typed error code;
 - compatibility reason codes;
-- phase and terminal status.
+- lifecycle phase.
 
-### 13.3 Forbidden fields
+### 14.3 Forbidden fields
 
 - signed URLs;
-- query parameters containing credentials;
 - authorization headers;
 - cookies;
 - private file paths;
-- arbitrary server response bodies;
+- arbitrary server bodies;
 - GGUF bytes;
 - prompts or generated output;
-- stack traces in normal telemetry;
 - unrestricted exception messages.
 
-### 13.4 Health and cache integration
+Health checks remain observational unless explicit repair is invoked.
 
-Add later health checks for:
+## 15. Security model
 
-- catalog cache validity;
-- installed metadata vs `ModelStore` reconciliation;
-- stale partial downloads;
-- catalog-selected digest integrity;
-- revoked selected release;
-- download directory size and orphaned state.
+Untrusted inputs include catalog bytes, strings, numbers, URLs, redirects, headers, file names, model bytes and partial state.
 
-Checks remain observational unless an explicit repair capability is invoked.
+Mandatory protections:
 
----
-
-## 14. Security model
-
-### 14.1 Trust boundaries
-
-Untrusted inputs include:
-
-- catalog response bytes;
-- all catalog strings and numbers;
-- redirects;
-- HTTP headers;
-- downloaded model bytes;
-- server-provided file names;
-- license/source URLs;
-- stale local partial state.
-
-### 14.2 Mandatory validation
-
-- strict schema bounds;
-- maximum string lengths;
-- maximum entries per catalog;
-- exact SHA-256 syntax;
-- positive bounded size;
-- HTTPS URI validation;
-- host allowlist;
-- file name normalization without path separators;
+- bounded schema and strings;
+- bounded entry count and response size;
+- strict SHA-256 syntax;
+- positive size with overflow checks;
+- HTTPS and host allowlist;
 - no destination path derived from server file name;
-- explicit integer-overflow checks;
-- no trust in `Content-Length` alone;
-- GGUF inspection before install registration;
-- catalog target and profile-key allowlists;
-- fixed error mapping.
+- no final publication before verification;
+- application-owned profile allowlist;
+- fixed privacy-safe error mapping;
+- signed catalog before production third-party distribution;
+- key rotation and rollback protection.
 
-### 14.3 Manifest authenticity
-
-Implementation stages:
-
-1. development fixture and ordinary HTTPS transport;
-2. production endpoint with strict host policy;
-3. detached or embedded signed catalog document;
-4. embedded public-key trust store with key IDs and rotation policy;
-5. rollback protection through revision and issuance metadata.
-
-The feature is not production-ready for third-party catalog distribution until signed-manifest verification and key rotation are validated.
-
-### 14.4 Network permission
-
-`apps/local-llm-phone-test` currently operates without internet permission for its local model path.
-
-Adding catalog download requires an explicit review of:
+Adding model download also requires explicit review of:
 
 - `android.permission.INTERNET`;
-- network security configuration;
-- cleartext traffic disabled;
-- backup/no-backup location for catalog and partial state;
+- cleartext-traffic prohibition;
+- Android network-security configuration;
+- app backup/no-backup placement;
 - Play privacy disclosures;
-- behavior when a managed device blocks the endpoint;
-- offline-first behavior after installation.
+- managed-network behavior;
+- offline-first operation after installation.
 
-No analytics permission or remote inference endpoint is introduced by this feature.
+No remote inference capability is introduced.
 
----
+## 16. Stable error model
 
-## 15. Error model
+Catalog errors include:
 
-Proposed stable codes:
-
-```kotlin
-enum class CatalogErrorCode {
-    NETWORK_UNAVAILABLE,
-    TIMEOUT,
-    HTTP_REJECTED,
-    RESPONSE_TOO_LARGE,
-    MALFORMED_DOCUMENT,
-    UNSUPPORTED_SCHEMA,
-    TRUST_FAILURE,
-    EXPIRED_DOCUMENT,
-    ROLLBACK_REJECTED,
-    PERSISTENCE_FAILURE,
-}
-
-enum class ModelDownloadErrorCode {
-    BUSY,
-    NOT_AUTHORIZED_FOR_TARGET,
-    INCOMPATIBLE_DEVICE,
-    INVALID_DOWNLOAD_URI,
-    REDIRECT_REJECTED,
-    NETWORK_UNAVAILABLE,
-    TIMEOUT,
-    HTTP_REJECTED,
-    UNEXPECTED_CONTENT_ENCODING,
-    RESPONSE_TOO_LARGE,
-    INSUFFICIENT_STORAGE,
-    SIZE_MISMATCH,
-    DIGEST_MISMATCH,
-    INVALID_GGUF,
-    METADATA_MISMATCH,
-    IMPORT_FAILURE,
-    VERIFICATION_FAILURE,
-    CANCELLED,
-    INTERNAL_FAILURE,
-}
+```text
+NETWORK_UNAVAILABLE
+TIMEOUT
+HTTP_REJECTED
+RESPONSE_TOO_LARGE
+MALFORMED_DOCUMENT
+UNSUPPORTED_SCHEMA
+TRUST_FAILURE
+EXPIRED_DOCUMENT
+ROLLBACK_REJECTED
+PERSISTENCE_FAILURE
 ```
 
-User-visible messages must be stable and privacy-safe. Diagnostic details may use structured safe fields but not arbitrary exception text.
+Download errors include:
 
----
+```text
+BUSY
+NOT_AUTHORIZED_FOR_TARGET
+INCOMPATIBLE_DEVICE
+INVALID_DOWNLOAD_URI
+REDIRECT_REJECTED
+NETWORK_UNAVAILABLE
+TIMEOUT
+HTTP_REJECTED
+UNEXPECTED_CONTENT_ENCODING
+RESPONSE_TOO_LARGE
+INSUFFICIENT_STORAGE
+SIZE_MISMATCH
+DIGEST_MISMATCH
+INVALID_GGUF
+METADATA_MISMATCH
+IMPORT_FAILURE
+VERIFICATION_FAILURE
+CANCELLED
+INTERNAL_FAILURE
+```
 
-## 16. Testing strategy
+User-visible messages are stable and privacy-safe.
 
-### 16.1 `model-catalog` unit tests
+## 17. Testing strategy
 
-- valid document parsing;
+### 17.1 Catalog unit tests
+
+- valid document;
 - unsupported schema;
-- missing required fields;
-- duplicate release identity;
+- invalid time window and expiry;
+- duplicate release;
 - conflicting digest metadata;
-- invalid SHA-256;
-- invalid size;
-- non-HTTPS URI;
-- target filtering;
-- profile-key rejection;
-- active/deprecated/revoked semantics;
-- revision rollback;
-- expiry handling;
-- persistence atomicity and recovery;
-- compatibility reason ordering;
+- invalid digest and size;
+- non-HTTPS URL;
+- unsafe file name;
+- invalid targets and profile key;
+- active, deprecated, unavailable and revoked behavior;
+- exact target filtering;
+- API, ABI, backend and Harness compatibility;
+- RAM minimum and warning;
+- storage requirement and overflow;
 - version ordering.
 
-### 16.2 `model-download` unit tests
+### 17.2 Download unit tests
 
-Use fake transport and temporary files for:
+Use fake transport and temporary directories for:
 
-- successful download;
-- progress ordering;
+- successful transfer;
 - unknown content length;
-- content length mismatch;
-- downloaded byte limit;
-- cancellation before connect;
-- cancellation during copy;
-- timeout;
-- rejected status;
-- redirect limit;
-- redirect host rejection;
-- content encoding rejection;
+- header and actual size mismatch;
+- maximum byte limit;
+- cancellation before and during copy;
+- timeout and HTTP rejection;
+- redirect limit and host rejection;
+- unexpected encoding;
 - insufficient storage;
-- SHA-256 mismatch;
+- digest mismatch;
 - cleanup after every failure;
 - concurrent request policy;
-- no final-store visibility before import.
+- no `ModelStore` visibility before import.
 
-### 16.3 Installation integration tests
+### 17.3 Integration tests
 
-- real `FileSystemModelStore` import from downloaded temporary artifact;
-- deduplication when digest is already installed;
-- destination conflict propagation;
+- downloaded artifact imported through real `FileSystemModelStore`;
+- already-installed digest deduplicated;
+- destination conflicts propagated;
 - post-import verification;
-- installed metadata write only after success;
-- reconciliation of artifact without metadata;
-- reconciliation of metadata without artifact;
-- replacement side-by-side installation;
-- removal interaction;
-- selected/loaded model protection.
+- metadata written only after success;
+- metadata/artifact reconciliation;
+- side-by-side replacement;
+- removal and active-model protection.
 
-### 16.4 HTTP test server
+### 17.4 Android tests
 
-Use an in-process deterministic test server or a narrow fake socket server to validate:
+- catalog survives Activity recreation;
+- no download from navigation or refresh alone;
+- confirmation and progress states;
+- cancellation and retry;
+- process restart cleanup;
+- offline and storage errors;
+- installed model works offline;
+- privacy-safe state and accessibility.
 
-- status codes;
-- redirects;
-- truncated response;
-- delayed response;
-- range behavior when later implemented;
-- incorrect content length;
-- unexpected encoding;
-- connection interruption.
+### 17.5 Physical-device evidence
 
-Avoid live internet dependencies in unit and CI tests.
-
-### 16.5 Android tests
-
-- catalog cache survives Activity recreation;
-- explicit download confirmation;
-- progress and cancellation states;
-- no download on navigation or refresh alone;
-- process restart recovery/cleanup policy;
-- network unavailable state;
-- storage unavailable state;
-- selected model remains usable offline;
-- prompt/output privacy remains unchanged;
-- accessibility labels and dynamic text;
-- compact and expanded layout behavior when the Compose surface is available.
-
-### 16.6 Physical-device evidence
-
-Required before production readiness:
+Before production readiness:
 
 - download a real supported GGUF over HTTPS;
-- cancel an active model download;
+- cancel an active transfer;
 - recover after network loss;
-- verify exact digest and size;
-- install into app-private content-addressed storage;
+- verify exact size and digest;
+- install into app-private storage;
 - select and run inference offline;
-- install an update side-by-side;
+- install an update side by side;
 - remove a non-active model;
-- confirm storage cleanup;
-- capture download, install and inference resource baselines;
-- validate on a managed/restricted network where possible.
+- confirm partial-file cleanup;
+- capture resource baselines.
 
----
-
-## 17. Implementation phases and progress
+## 18. Implementation phases
 
 ### Status legend
 
-| Marker | Meaning |
-|---|---|
-| `[ ]` | not started |
-| `[-]` | in progress |
-| `[x]` | completed and validated |
-| `[!]` | blocked or awaiting a decision |
+- `[ ]` not started;
+- `[-]` in progress or awaiting validation;
+- `[x]` implemented and validated;
+- `[!]` blocked by a decision.
 
-### Phase 0 — main audit and branch control
+### Phase 0 — Main audit and architecture
 
-- [x] confirm `main` is the canonical base;
-- [x] audit current roadmap and merged capabilities;
-- [x] audit `ModelStore` and `FileSystemModelStore` behavior;
-- [x] identify existing phone app and UX-plan integration point;
-- [x] identify PR #34 and PR #40 as unmerged, non-authoritative overlap;
-- [x] create `agent/model-catalog-download-implementation` from current `main`;
-- [x] rewrite this plan against the current main baseline;
-- [ ] add an ADR for catalog/download ownership and trust boundaries.
+- [x] audit current `main`;
+- [x] inspect existing model store and phone app;
+- [x] identify unmerged overlap;
+- [x] create branch from current `main`;
+- [x] rewrite the plan from `main`;
+- [-] validate and review ADR 0005.
 
-**Phase status:** `[-]`
+### Phase 1 — Catalog domain and compatibility
 
-### Phase 1 — catalog contracts and validation
+- [-] register `models/model-catalog`;
+- [-] define document and release contracts;
+- [-] define target and profile resolver boundaries;
+- [-] implement fail-closed validation;
+- [-] implement exact target filtering;
+- [-] implement device compatibility;
+- [-] add deterministic tests;
+- [ ] pass repository CI;
+- [ ] document stable public API.
 
-- [ ] add `models/model-catalog` module;
-- [ ] define stable IDs and catalog document models;
-- [ ] define availability, target, license and compatibility models;
-- [ ] define parser/codec boundary;
-- [ ] implement structural and semantic validation;
-- [ ] implement application/use-case filtering;
-- [ ] implement profile-key allowlist/resolver boundary;
-- [ ] add unit tests;
-- [ ] document public contracts.
+### Phase 2 — Catalog codec and persistence
 
-**Acceptance:** malformed or unauthorized entries cannot become downloadable releases.
+- [ ] add bounded deterministic JSON codec;
+- [ ] add source and repository interfaces;
+- [ ] persist app-private validated snapshot;
+- [ ] implement revision, expiry and stale state;
+- [ ] add ETag/Last-Modified metadata;
+- [ ] ensure failed refresh cannot corrupt cache;
+- [ ] add tests and safe events.
 
-### Phase 2 — cached catalog synchronization
+### Phase 3 — Secure download
 
-- [ ] define `ModelCatalogSource`;
-- [ ] define `ModelCatalogRepository`;
-- [ ] implement app-private atomic catalog persistence;
-- [ ] implement revision, expiry and stale-state handling;
-- [ ] implement ETag/Last-Modified metadata;
-- [ ] implement typed refresh outcomes;
-- [ ] add fake-source and persistence tests;
-- [ ] add privacy-safe events.
-
-**Acceptance:** the last validated catalog remains readable offline and a failed refresh cannot corrupt it.
-
-### Phase 3 — compatibility evaluator
-
-- [ ] define device profile provider boundary;
-- [ ] implement target authorization;
-- [ ] implement API and ABI checks;
-- [ ] implement Harness/backend/profile compatibility;
-- [ ] implement RAM and storage policy;
-- [ ] calculate double-staging storage overhead;
-- [ ] expose ordered blockers and warnings;
+- [ ] add `models/model-download`;
+- [ ] define request, event, handle and errors;
+- [ ] implement HTTPS transport boundary;
+- [ ] enforce host and redirect policy;
+- [ ] implement timeouts and response limits;
+- [ ] implement partial files and cancellation;
+- [ ] stream byte count and SHA-256;
+- [ ] serialize mutations;
 - [ ] add deterministic tests.
 
-**Acceptance:** incompatible models are blocked before any network transfer begins.
+### Phase 4 — Verified installation and metadata
 
-### Phase 4 — secure download engine
+- [ ] inspect GGUF before registration;
+- [ ] compare inspectable metadata;
+- [ ] import through existing `ModelStore`;
+- [ ] verify after import;
+- [ ] add installed release metadata;
+- [ ] reconcile metadata and store;
+- [ ] retain manual-import visibility;
+- [ ] add integration tests.
 
-- [ ] add `models/model-download` module;
-- [ ] define request, event, handle and error contracts;
-- [ ] implement HTTPS transport boundary;
-- [ ] implement allowlisted redirect policy;
-- [ ] implement timeout and response-size limits;
-- [ ] implement app-private partial files;
-- [ ] implement streaming byte count and SHA-256;
-- [ ] implement cooperative cancellation;
-- [ ] serialize concurrent download/mutation operations;
-- [ ] implement cleanup and startup recovery;
-- [ ] add deterministic transport tests.
+### Phase 5 — Phone-app integration
 
-**Acceptance:** no unverified bytes can enter `ModelStore`, and cancellation/failure leaves no published artifact.
-
-### Phase 5 — GGUF inspection, installation and metadata
-
-- [ ] inspect downloaded GGUF before registration;
-- [ ] compare inspectable metadata with catalog policy;
-- [ ] call the existing `ModelStore.import()`;
-- [ ] call post-import `ModelStore.verify()`;
-- [ ] add `InstalledModelCatalog` contract;
-- [ ] implement app-private metadata persistence;
-- [ ] implement store/metadata reconciliation;
-- [ ] handle manual-import artifacts;
-- [ ] add integration tests with real `FileSystemModelStore`;
-- [ ] document temporary storage overhead.
-
-**Acceptance:** installed status is derived from a verified content-addressed artifact, never from download completion alone.
-
-### Phase 6 — selection and phone-app integration
-
-- [ ] wire catalog services into the phone app composition root;
-- [ ] preserve current manual SAF import as an advanced path;
-- [ ] expose cached/remote catalog state;
-- [ ] expose download confirmation;
-- [ ] expose progress and cancellation;
+- [ ] wire catalog services into phone app;
+- [ ] preserve manual SAF import;
+- [ ] expose refresh and stale states;
+- [ ] expose confirmation, progress and cancellation;
 - [ ] implement application-owned profile resolution;
-- [ ] separate install from select;
-- [ ] persist selected release by target;
-- [ ] reuse existing playground/runtime path;
-- [ ] prove installed model inference works offline;
-- [ ] add UI/presenter tests.
+- [ ] separate install and selection;
+- [ ] persist selection per target;
+- [ ] run selected model through existing playground offline.
 
-**Acceptance:** an explicitly selected downloaded model can run through the existing local playground without network access.
+### Phase 6 — Updates and lifecycle
 
-### Phase 7 — updates and lifecycle policy
-
-- [ ] implement semantic version ordering;
-- [ ] detect updates;
-- [ ] install replacements side-by-side;
+- [ ] implement version ordering;
+- [ ] detect compatible updates;
+- [ ] install side by side;
 - [ ] render deprecation;
-- [ ] define and implement revocation policy;
-- [ ] protect active/loaded models from removal;
-- [ ] reconcile catalog deletion with local installation;
+- [ ] define revocation policy;
+- [ ] protect active models from removal;
 - [ ] add lifecycle tests.
 
-**Acceptance:** updating never deletes the currently working model before the replacement is installed and explicitly selected.
+### Phase 7 — Observability and health
 
-### Phase 8 — observability, health and repair
-
-- [ ] emit catalog/download/install structured events;
-- [ ] add catalog cache health;
+- [ ] emit safe structured events;
+- [ ] add catalog-cache health;
 - [ ] add partial-download health;
-- [ ] add installed metadata reconciliation health;
-- [ ] add explicit cleanup/repair controls;
-- [ ] keep health observational by default;
-- [ ] update diagnostic documentation;
-- [ ] verify no sensitive URL/header/path leakage.
+- [ ] add metadata reconciliation health;
+- [ ] add explicit cleanup and repair;
+- [ ] verify no secret or private-path leakage.
 
-**Acceptance:** failures are diagnosable through typed safe data without exposing credentials or private content.
+### Phase 8 — Trust hardening
 
-### Phase 9 — manifest signing and production hardening
-
-- [ ] choose signature algorithm and canonical serialization;
-- [ ] implement trusted key IDs;
-- [ ] verify signatures before repository replacement;
+- [ ] select signature algorithm and canonical encoding;
+- [ ] verify trusted key IDs;
 - [ ] implement key rotation;
 - [ ] implement rollback protection;
-- [ ] add signature and tampering tests;
-- [ ] review Play privacy/network disclosure;
-- [ ] review network-security configuration;
-- [ ] complete threat-model review.
+- [ ] add tampering tests;
+- [ ] review network and Play privacy configuration.
 
-**Acceptance:** a modified or replayed unauthorized catalog cannot authorize a model download.
-
-### Phase 10 — cumulative validation and physical evidence
+### Phase 9 — Cumulative validation
 
 - [ ] repository guards;
-- [ ] Spotless/ktlint;
+- [ ] Spotless and ktlint;
 - [ ] Detekt;
-- [ ] JVM tests;
+- [ ] catalog unit tests;
 - [ ] Android Lint;
-- [ ] app and AAR compilation;
-- [ ] native packaging verification;
+- [ ] downstream application compilation;
+- [ ] native tests and packaging;
 - [ ] Android integration tests;
-- [ ] real HTTPS GGUF physical-device run;
-- [ ] cancellation and network-loss evidence;
-- [ ] offline inference evidence;
-- [ ] update/removal/storage-cleanup evidence;
+- [ ] real-device evidence;
 - [ ] roadmap and Definition of Done update.
 
-**Acceptance:** all repository gates pass and privacy-safe physical-device evidence is recorded.
+## 19. Pull-request sequence
 
----
+Prefer reviewable vertical slices from `main`:
 
-## 18. Pull-request sequence
-
-Prefer small, reviewable vertical slices from `main`:
-
-1. **Catalog domain and ADR**  
-   contracts, validation, filtering and tests.
-
-2. **Catalog repository and compatibility**  
-   cached synchronization boundaries, persistence and device policy.
-
-3. **Secure download and verified installation**  
-   transport, progress, cancellation, hash, GGUF inspection and `ModelStore` integration.
-
-4. **Installed metadata and selection**  
-   durable release metadata, reconciliation and application-owned profile mapping.
-
-5. **Connected Models UI**  
-   phone-app wiring, confirmation, progress, selection and offline inference.
-
-6. **Updates, health and trust hardening**  
-   lifecycle policy, repair, signed manifests and physical evidence.
+1. **Catalog domain and ADR**
+   Contracts, validation, filtering and tests.
+2. **Catalog persistence and compatibility**
+   Codec, cache, synchronization and device policy.
+3. **Secure download and installation**
+   Transport, progress, cancellation, hashing, GGUF inspection and `ModelStore` integration.
+4. **Installed metadata and selection**
+   Durable release metadata, reconciliation and application-owned profile mapping.
+5. **Connected Models UI**
+   Phone-app wiring, confirmation, progress, selection and offline inference.
+6. **Updates, health and trust hardening**
+   Lifecycle policy, repair, signatures and physical evidence.
 
 Do not accumulate the whole feature in one unreviewable pull request.
 
----
+## 20. Definition of Done
 
-## 19. Definition of Done
+The complete feature requires:
 
-The feature is complete only when:
+- implementation based on current `main`;
+- no dependency on historical branches;
+- validated cached catalog available offline;
+- exact authorized target filtering;
+- compatibility checked before transfer;
+- explicit, cancellable and bounded download;
+- fail-closed HTTPS, redirect and host policy;
+- exact byte count and SHA-256 verification;
+- GGUF inspection before installed metadata;
+- final publication through existing `ModelStore`;
+- URL never used as model identity;
+- installed metadata reconciled with store contents;
+- install and selection separated;
+- selected model runs offline through existing runtime;
+- explicit update, deprecation and revocation behavior;
+- privacy-safe telemetry;
+- documented contracts and failure modes;
+- all repository gates green;
+- physical-device evidence recorded;
+- authoritative roadmap updated.
 
-- [ ] the implementation is based on current `main`;
-- [ ] no historical feature branch is required to build it;
-- [ ] a validated cached catalog can be rendered offline;
-- [ ] only authorized application/use-case releases are offered;
-- [ ] incompatible models are blocked before download;
-- [ ] every download is explicit, cancellable and bounded;
-- [ ] HTTPS, redirect and host policies fail closed;
-- [ ] byte count and SHA-256 are verified;
-- [ ] GGUF inspection succeeds before installed metadata is written;
-- [ ] final artifact publication uses the existing `ModelStore`;
-- [ ] download URL is never treated as model identity;
-- [ ] installed metadata reconciles with raw store contents;
-- [ ] install and selection remain separate;
-- [ ] the existing runtime and playground run the selected artifact offline;
-- [ ] update/deprecation/revocation behavior is explicit;
-- [ ] normal telemetry contains no secrets, private paths, prompts or output;
-- [ ] all new contracts and failure modes are documented;
-- [ ] all repository validation gates pass;
-- [ ] real-device download, install, cancellation and offline-inference evidence is recorded;
-- [ ] the authoritative roadmap is updated with exact validated status.
-
----
-
-## 20. Open decisions
+## 21. Open decisions
 
 | Decision | Status | Required before |
-|---|---|---|
-| Production catalog endpoint and host allowlist | `[!]` | real network integration |
-| Catalog authentication requirement | `[!]` | authenticated/private catalogs |
-| Signed-manifest algorithm and canonical encoding | `[!]` | production hardening |
-| Key rotation and rollback policy | `[!]` | production hardening |
-| Revoked installed-model behavior while offline | `[!]` | lifecycle implementation |
-| Hard minimum RAM policy per release | `[!]` | compatibility production policy |
-| Exact storage safety margin | `[!]` | download release |
-| First-slice persistence format | `[ ]` | Phase 2 implementation |
-| Process-death download resume requirement | `[ ]` | download contract finalization |
-| Whether to recover or supersede PR #34 | `[!]` | model-management consolidation |
-| Integration sequencing with open PR #40 | `[!]` | connected Compose UI |
+|---|---:|---|
+| Production endpoint and host allowlist | `[!]` | Real network integration |
+| Catalog authentication | `[!]` | Private catalogs |
+| Signature algorithm and canonical encoding | `[!]` | Production hardening |
+| Key rotation and rollback policy | `[!]` | Production hardening |
+| Offline behavior for revoked installed models | `[!]` | Lifecycle implementation |
+| Hard RAM policy per release | `[!]` | Production compatibility policy |
+| Exact storage safety margin | `[-]` | Download release |
+| Catalog persistence format | `[ ]` | Phase 2 |
+| Process-death resume requirement | `[ ]` | Download contract finalization |
+| PR #34 recovery or replacement | `[!]` | Model-management consolidation |
+| PR #40 integration sequence | `[!]` | Connected Compose UI |
 
-Decisions that are not required for the current slice must not block pure contracts and deterministic tests.
+Decisions not required for the current slice do not block pure contracts and deterministic tests.
 
----
+## 22. Progress log
 
-## 21. Progress log
-
-| Date | Branch/commit | Update | Validation |
+| Date | Branch or commit | Update | Validation |
 |---|---|---|---|
-| 2026-08-04 | `main` at `dfba2a05...` | Audited current runtime, `ModelStore`, phone app, merged console and UX direction | Repository source and merged PR state inspected |
-| 2026-08-04 | `agent/model-catalog-download-implementation` | Created a fresh feature branch directly from current `main` | Branch creation confirmed |
-| 2026-08-04 | pending commit | Replaced the historical-branch plan with this main-based implementation plan and tracker | Documentation review pending |
+| 2026-08-04 | `main` at `dfba2a05...` | Audited merged runtime, store, phone app and UX direction | Source and merged PR state inspected |
+| 2026-08-04 | `agent/model-catalog-download-implementation` | Created a fresh feature branch from current `main` | Branch confirmed |
+| 2026-08-04 | PR #41 | Added catalog domain, validation, compatibility, tests, ADR and CI coverage | Repository validation in progress |
 
-Update this table after every validated implementation commit or pull request. A task marker changes to `[x]` only after its tests and acceptance criterion pass.
+The separate progress file is updated after every validated implementation slice. A task becomes `[x]` only after tests and acceptance criteria pass.
