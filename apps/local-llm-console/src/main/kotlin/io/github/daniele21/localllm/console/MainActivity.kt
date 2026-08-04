@@ -13,13 +13,20 @@ import android.widget.ScrollView
 import android.widget.TextView
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.store.FileSystemModelStore
 
 @Suppress("MagicNumber")
 class MainActivity : Activity() {
     private val presenter = ConsolePresenter()
-    private val dataSource: ConsoleDataSource = TelemetryConsoleDataSource(
-        telemetryRepository = InMemoryTelemetryRepository(),
-    )
+    private val dataSource: ConsoleDataSource by lazy {
+        TelemetryConsoleDataSource(
+            telemetryRepository = InMemoryTelemetryRepository(),
+            modelInventoryProvider = ModelStoreInventoryProvider(
+                modelStore = FileSystemModelStore(filesDir),
+                source = "Local console sandbox",
+            ),
+        )
+    }
     private lateinit var content: LinearLayout
     private lateinit var updatedAt: TextView
     private lateinit var backButton: Button
@@ -46,8 +53,8 @@ class MainActivity : Activity() {
         addView(label("Android local inference control plane", 16f))
         addView(
             label(
-                "Read-only Phase 2 observability. Cross-application access remains disconnected " +
-                    "until the signature-protected diagnostics bridge is implemented.",
+                "Read-only Phase 2 observability and local model inventory. Cross-application access " +
+                    "remains disconnected until the signature-protected diagnostics bridge is implemented.",
                 14f,
             ).apply { setPadding(0, 8, 0, 16) },
         )
