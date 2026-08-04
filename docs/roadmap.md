@@ -225,11 +225,17 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
-### Read-only console observability foundation — PR #31
+### Read-only console observability, model inventory and runtime foundation — PR #31
 
-- [x] tabbed console navigation for overview, runs, logs, health, resources and benchmarks
+- [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, resources and benchmarks
 - [x] `ConsoleDataSource` boundary over existing observability contracts
 - [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
+- [x] runtime adapter over the public `LocalLlmClient.runtimeSnapshot()` contract
+- [x] model-inventory provider boundary over the existing content-addressed `ModelStore.snapshot()` contract
+- [x] model-store adapter that removes private backing-file paths before presentation
+- [x] explicit disconnected, connected-empty and source-failure inventory states
+- [x] active installed-model correlation against the runtime snapshot
+- [x] standalone wiring limited to the console application's private `FileSystemModelStore`
 - [x] bounded run, log and resource queries
 - [x] privacy-safe disconnected and telemetry-failure states
 - [x] read-only generation metric cards
@@ -239,14 +245,13 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] request-scoped run and structured-log queries
 - [x] chronological request timeline with event sequence and run-relative offsets
 - [x] privacy-safe missing-run, empty-timeline and source-error states
-- [x] refresh and back navigation without runtime mutation
-- [x] pure Kotlin presenter and data-source tests
-- [x] explicit documentation of standalone sandbox limitations
-- [ ] connect the standalone console to a real runtime or cross-application diagnostics source
+- [x] refresh and back navigation without runtime or model mutation
+- [x] pure Kotlin presenter, data-source and adapter tests
+- [x] explicit documentation of standalone sandbox and runtime-contract limitations
+- [ ] connect the standalone console to a real cross-application diagnostics source
 
 ### Remaining Phase 2 work
 
-- [ ] installed-model and active-runtime views
 - [ ] health and sanity execution controls
 - [ ] resource and thermal charts
 - [ ] cache-health view and repair actions
