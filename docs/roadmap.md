@@ -225,7 +225,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
-### Read-only console observability, model inventory, runtime and resource charts — PR #31
+### Console observability, model inventory, runtime, resource charts and health controls — PR #31
 
 - [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, resources and benchmarks
 - [x] `ConsoleDataSource` boundary over existing observability contracts
@@ -250,15 +250,22 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] discrete Android thermal-pressure chart with low-memory signal count
 - [x] nullable measurements and unknown thermal states rendered as gaps rather than zero values
 - [x] chart rendering from persisted explicit captures without timers or hidden polling
+- [x] `ConsoleHealthControl` execution boundary over the existing `HealthEngine`
+- [x] explicit run-all and targeted per-check actions
+- [x] standalone `ModelIntegrityHealthCheck` execution against the console sandbox store
+- [x] automatic targeted controls for registered generation-sanity check IDs
+- [x] health execution outside the Android main thread through a single-thread executor
+- [x] action disabling while a health suite is in progress
+- [x] persisted-result refresh through the existing telemetry repository
+- [x] fixed privacy-safe health-control failure states
 - [x] refresh and back navigation without runtime or model mutation
-- [x] pure Kotlin presenter, data-source, adapter and chart-model tests
-- [x] Android custom-view compilation, lint and packaging validation
-- [x] explicit documentation of standalone sandbox, runtime-contract and resource-history limitations
+- [x] pure Kotlin presenter, data-source, adapter, health-control and chart-model tests
+- [x] Android control and custom-view compilation, lint and packaging validation
+- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
 ### Remaining Phase 2 work
 
-- [ ] health and sanity execution controls
 - [ ] cache-health view and repair actions
 - [ ] benchmark regression comparison and baseline history views
 - [ ] model-management console
