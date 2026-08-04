@@ -1,8 +1,13 @@
 # Model catalog and secure download progress
 
-**Canonical plan:** [`model-catalog-download-plan.md`](model-catalog-download-plan.md)  
-**Base:** `main` at `dfba2a05ed8166ef79a12261089078e13fd3902e`  
-**Branch:** `agent/model-catalog-download-implementation`  
+**Canonical plan:** [`model-catalog-download-plan.md`](model-catalog-download-plan.md)
+
+**Base:** `main` at `dfba2a05ed8166ef79a12261089078e13fd3902e`
+
+**Branch:** `agent/model-catalog-download-implementation`
+
+**Pull request:** #41
+
 **Last updated:** 2026-08-04
 
 ## Status legend
@@ -10,30 +15,30 @@
 - `[ ]` not started
 - `[-]` in progress or awaiting validation
 - `[x]` implemented and validated
-- `[!]` blocked or awaiting an architectural/product decision
+- `[!]` blocked or awaiting an architectural or product decision
 
 ## Overall progress
 
 | Workstream | Status | Current evidence |
 |---|---:|---|
 | Main audit and branch control | `[x]` | Fresh branch created from current `main`; historical branches excluded as dependencies |
-| Architecture decision | `[-]` | ADR 0005 added with Proposed status; CI/review pending |
+| Architecture decision | `[-]` | ADR 0005 added with Proposed status; CI and review pending |
 | Catalog domain contracts | `[-]` | `models/model-catalog` and public domain types added; CI pending |
 | Catalog validation | `[-]` | Fail-closed document and release validation added; CI pending |
 | Target filtering | `[-]` | Exact application/use-case filtering added; CI pending |
 | Compatibility evaluation | `[-]` | API, ABI, backend, profile, RAM and double-staging storage checks added; CI pending |
-| Catalog parsing/codec | `[ ]` | No JSON or signed-manifest codec yet |
+| Catalog parsing and codec | `[ ]` | No JSON or signed-manifest codec yet |
 | Catalog persistence and refresh | `[ ]` | Not started |
 | Secure model download | `[ ]` | Not started |
 | GGUF installation orchestration | `[ ]` | Not started |
 | Installed release metadata | `[ ]` | Not started |
 | Phone-app integration | `[ ]` | Not started |
-| Update/deprecation/revocation | `[ ]` | Not started |
+| Update, deprecation and revocation | `[ ]` | Not started |
 | Health and repair | `[ ]` | Not started |
 | Manifest signing | `[ ]` | Not started |
 | Physical-device evidence | `[ ]` | Not started |
 
-## Phase 0 — main audit and ownership
+## Phase 0 — Main audit and ownership
 
 - [x] use current `main` as the only implementation base
 - [x] audit current roadmap and merged pull requests
@@ -42,9 +47,9 @@
 - [x] identify PR #34 and PR #40 as unmerged overlap only
 - [x] create `agent/model-catalog-download-implementation`
 - [x] rewrite the implementation plan against `main`
-- [-] add ADR 0005 and obtain validation/review
+- [-] add ADR 0005 and obtain validation and review
 
-## Phase 1 — catalog domain and policy
+## Phase 1 — Catalog domain and policy
 
 - [-] register `:models:model-catalog`
 - [-] define catalog, release, artifact, target, license and availability models
@@ -55,17 +60,29 @@
 - [-] detect conflicting metadata for the same digest
 - [-] filter releases by exact application and use case
 - [-] evaluate availability, API, ABI, backend, Harness version and profile support
-- [-] evaluate minimum/recommended RAM
-- [-] calculate storage using download/import copies plus safety margin
+- [-] evaluate minimum and recommended RAM
+- [-] calculate storage using download and import copies plus safety margin
 - [-] add deterministic validator and compatibility tests
 - [ ] validate with repository CI
 - [ ] document the public API after CI stabilizes
 
-## Commits
+## Validation history
+
+| Run | Result | Finding or evidence |
+|---|---:|---|
+| `30952159115` | failed | Agent navigation required the new module in `AGENTS.md` |
+| `30952241203` | failed | Kotlin formatting issues detected |
+| `30953021399` | failed | CI matrix updated to execute catalog tests and lint; remaining formatting issues found |
+| `30953242237` | diagnostic | Exact Spotless patch captured; mixed RAM condition identified |
+| `30953487818` | diagnostic | Exact formatter output captured after condition fix |
+| `30953791509` | failed | Kotlin passed; remaining failure limited to Markdown trailing whitespace |
+| current | running | Consolidated plan and normalized Markdown tracker submitted |
+
+## Key commits
 
 | Commit | Change | Validation |
 |---|---|---|
-| `639a9d4f99da` | Main-based implementation plan | Source review complete |
+| `639a9d4f99da` | Main-based implementation plan | Replaced by consolidated plan |
 | `a906b5b3dde4` | Add model-catalog module | CI pending |
 | `15b7121e6730` | Register module in settings | CI pending |
 | `0a69d294315f` | Add catalog domain contracts | CI pending |
@@ -76,6 +93,10 @@
 | `ff00a710166d` | Add compatibility tests | CI pending |
 | `e336989d3eea` | Add ADR 0005 | CI pending |
 | `2fa827594cbc` | Index ADR 0005 | CI pending |
+| `0fce18d1cfec` | Map module in `AGENTS.md` | Navigation guard passed |
+| `6273639690b0` | Include catalog module in CI matrix | Scope confirmed by later run |
+| `488f17c06fc3` | Restore final CI workflow after formatting diagnostics | Native tests passed; Markdown cleanup required |
+| `ddef21a1de1e` | Consolidate and normalize main-based plan | Current CI pending |
 
 ## Next implementation slice
 
@@ -91,12 +112,13 @@ After the current module is green:
 
 The current slice is not complete until all relevant checks pass:
 
-- [ ] repository navigation and artifact guards
-- [ ] Spotless and ktlint
-- [ ] Detekt
-- [ ] `:models:model-catalog:testDebugUnitTest`
-- [ ] Android Lint for `model-catalog`
-- [ ] downstream application compilation
+- [x] repository navigation and script guards
+- [-] Spotless and ktlint
+- [-] Detekt
+- [-] `:models:model-catalog:testDebugUnitTest`
+- [-] Android Lint for `model-catalog`
+- [-] downstream application compilation
+- [-] native host tests
 - [ ] aggregate required `Repository validation` check
 
-No task marked `[-]` may be changed to `[x]` solely because code exists.
+No task marked `[-]` becomes `[x]` solely because code exists.
