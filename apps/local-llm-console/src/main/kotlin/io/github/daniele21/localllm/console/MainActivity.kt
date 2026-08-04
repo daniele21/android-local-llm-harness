@@ -1,12 +1,16 @@
 package io.github.daniele21.localllm.console
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -25,6 +29,13 @@ class MainActivity : Activity() {
     private val resourceChartPresenter = ConsoleResourceChartPresenter()
     private val telemetryRepository by lazy { InMemoryTelemetryRepository() }
     private val modelStore by lazy { FileSystemModelStore(filesDir) }
+    private val modelControl: ConsoleModelControl by lazy {
+        ModelStoreConsoleModelControl(
+            modelStore = modelStore,
+            source = "Local console sandbox",
+        )
+    }
+    private val modelImportStager by lazy { AndroidModelImportStager(this) }
     private val healthControl: ConsoleHealthControl by lazy {
         HealthEngineConsoleHealthControl(
             healthEngine = HealthEngine(
@@ -42,6 +53,7 @@ class MainActivity : Activity() {
                 modelStore = modelStore,
                 source = "Local console sandbox",
             ),
+            modelControl = modelControl,
             healthControl = healthControl,
             cacheControl = cacheControl,
         )
@@ -57,7 +69,10 @@ class MainActivity : Activity() {
     private var activeActionType: ConsoleActionType? = null
     private var healthExecutionError: String? = null
     private var cacheExecutionError: String? = null
+    private var modelExecutionError: String? = null
     private var lastCacheRepair: ConsoleCacheRepairOutcome? = null
+    private var lastModelOperation: ConsoleModelOperationOutcome? = null
+    private var pendingImportProfile: PendingModelProfile? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +83,16 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::content.isInitialized) refresh()
+    }
+
+    @Deprecated("Deprecated in Android framework but retained for minSdk-compatible document selection")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_MODEL_DOCUMENT) return
+        val profile = pendingImportProfile
+        pendingImportProfile = null
+        if (resultCode != RESULT_OK || profile == null) return
+        data?.data?.let { uri -> executeModelImport(uri, profile) }
     }
 
     override fun onDestroy() {
@@ -83,7 +108,7 @@ class MainActivity : Activity() {
         addView(label("Android local inference control plane", 16f))
         addView(
             label(
-                "Phase 2 observability, local model inventory and explicit sandbox health controls. " +
+                "Phase 2 observability, explicit sandbox model management and health controls. " +
                     "Runtime cache diagnostics and cross-application access remain disconnected until a real " +
                     "embedded source or signature-protected diagnostics bridge is supplied.",
                 14f,
@@ -186,7 +211,13 @@ class MainActivity : Activity() {
     private fun displaySnapshot(): ConsoleSnapshot? {
         val currentSnapshot = snapshot ?: return null
         val healthActionInProgress = activeActionType?.let(HEALTH_ACTION_TYPES::contains) == true
+        val modelActionInProgress = activeActionType?.let(MODEL_ACTION_TYPES::contains) == true
         return currentSnapshot.copy(
+            modelControl = currentSnapshot.modelControl.copy(
+                executionInProgress = actionExecutionInProgress && modelActionInProgress,
+                lastOperation = lastModelOperation,
+                sourceError = modelExecutionError ?: currentSnapshot.modelControl.sourceError,
+            ),
             healthControl = currentSnapshot.healthControl.copy(
                 executionInProgress = actionExecutionInProgress && healthActionInProgress,
                 sourceError = healthExecutionError ?: currentSnapshot.healthControl.sourceError,
@@ -220,23 +251,112 @@ class MainActivity : Activity() {
         text = action.label
         isAllCaps = false
         isEnabled = action.enabled
-        setOnClickListener { executeAction(action) }
+        setOnClickListener { dispatchAction(action) }
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply { setMargins(0, 0, 0, 12) }
     }
 
-    private fun executeAction(action: ConsoleAction) {
+    private fun dispatchAction(action: ConsoleAction) {
         if (actionExecutionInProgress || !action.enabled) return
+        when (action.type) {
+            ConsoleActionType.IMPORT_MODEL -> showImportProfileDialog()
+            ConsoleActionType.REMOVE_MODEL -> confirmModelRemoval(action)
+            else -> executeAction(action)
+        }
+    }
+
+    private fun showImportProfileDialog() {
+        val architectureInput = EditText(this).apply {
+            hint = "Architecture"
+            setText(DEFAULT_MODEL_ARCHITECTURE)
+            isSingleLine = true
+        }
+        val quantizationInput = EditText(this).apply {
+            hint = "Quantization"
+            setText(DEFAULT_MODEL_QUANTIZATION)
+            isSingleLine = true
+        }
+        val fields = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 8, 32, 0)
+            addView(architectureInput)
+            addView(quantizationInput)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Import GGUF")
+            .setMessage("Architecture and quantization describe the import artifact but are not persisted by ModelStore.")
+            .setView(fields)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Select file") { _, _ ->
+                pendingImportProfile = PendingModelProfile(
+                    architecture = architectureInput.text.toString().trim().ifBlank { DEFAULT_MODEL_ARCHITECTURE },
+                    quantization = quantizationInput.text.toString().trim().ifBlank { DEFAULT_MODEL_QUANTIZATION },
+                )
+                openModelDocument()
+            }
+            .show()
+    }
+
+    private fun openModelDocument() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf("application/octet-stream", "application/gguf", "application/x-gguf"),
+            )
+        }
+        startActivityForResult(intent, REQUEST_MODEL_DOCUMENT)
+    }
+
+    private fun confirmModelRemoval(action: ConsoleAction) {
+        val digest = requireNotNull(action.modelDigest)
+        AlertDialog.Builder(this)
+            .setTitle("Remove installed model?")
+            .setMessage("This permanently removes ${digest.sha256} from the connected model store.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Remove") { _, _ -> executeAction(action) }
+            .show()
+    }
+
+    private fun executeAction(action: ConsoleAction) {
         beginAction(action.type)
         diagnosticExecutor.execute {
             val completion = performAction(action)
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                completeAction(completion)
-                refresh()
+            publishCompletion(completion)
+        }
+    }
+
+    private fun executeModelImport(uri: Uri, profile: PendingModelProfile) {
+        if (actionExecutionInProgress) return
+        beginAction(ConsoleActionType.IMPORT_MODEL)
+        diagnosticExecutor.execute {
+            var request: ConsoleModelImportRequest? = null
+            val outcome = try {
+                request = modelImportStager.stage(uri, profile.architecture, profile.quantization)
+                modelControl.importModel(request)
+            } catch (_: RuntimeException) {
+                ConsoleModelOperationOutcome(
+                    operation = ConsoleModelOperation.IMPORT,
+                    digest = request?.digest,
+                    success = false,
+                    detail = MODEL_MANAGEMENT_ERROR,
+                    sourceError = MODEL_MANAGEMENT_ERROR,
+                )
+            } finally {
+                request?.source?.delete()
             }
+            publishCompletion(ConsoleActionCompletion(modelOperation = outcome))
+        }
+    }
+
+    private fun publishCompletion(completion: ConsoleActionCompletion) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            completeAction(completion)
+            refresh()
         }
     }
 
@@ -245,6 +365,7 @@ class MainActivity : Activity() {
         activeActionType = type
         if (type in HEALTH_ACTION_TYPES) healthExecutionError = null
         if (type == ConsoleActionType.REPAIR_CACHE) cacheExecutionError = null
+        if (type in MODEL_ACTION_TYPES) modelExecutionError = null
         render()
     }
 
@@ -260,6 +381,24 @@ class MainActivity : Activity() {
         ConsoleActionType.REPAIR_CACHE -> ConsoleActionCompletion(
             cacheRepair = cacheControl.repair(requireNotNull(action.cacheId)),
         )
+
+        ConsoleActionType.VERIFY_MODEL -> ConsoleActionCompletion(
+            modelOperation = modelControl.verify(requireNotNull(action.modelDigest)),
+        )
+
+        ConsoleActionType.REMOVE_MODEL -> ConsoleActionCompletion(
+            modelOperation = modelControl.remove(requireNotNull(action.modelDigest)),
+        )
+
+        ConsoleActionType.IMPORT_MODEL -> ConsoleActionCompletion(
+            modelOperation = ConsoleModelOperationOutcome(
+                operation = ConsoleModelOperation.IMPORT,
+                digest = null,
+                success = false,
+                detail = MODEL_MANAGEMENT_ERROR,
+                sourceError = MODEL_MANAGEMENT_ERROR,
+            ),
+        )
     }
 
     private fun completeAction(completion: ConsoleActionCompletion) {
@@ -269,6 +408,10 @@ class MainActivity : Activity() {
         completion.cacheRepair?.let { outcome ->
             lastCacheRepair = outcome
             cacheExecutionError = outcome.sourceError
+        }
+        completion.modelOperation?.let { outcome ->
+            lastModelOperation = outcome
+            modelExecutionError = outcome.sourceError
         }
     }
 
@@ -305,14 +448,29 @@ class MainActivity : Activity() {
     }
 
     private companion object {
+        const val REQUEST_MODEL_DOCUMENT = 8101
+        const val DEFAULT_MODEL_ARCHITECTURE = "unknown"
+        const val DEFAULT_MODEL_QUANTIZATION = "unknown"
+        const val MODEL_MANAGEMENT_ERROR = "Model management unavailable"
         val HEALTH_ACTION_TYPES = setOf(
             ConsoleActionType.RUN_ALL_HEALTH_CHECKS,
             ConsoleActionType.RUN_HEALTH_CHECKS,
         )
+        val MODEL_ACTION_TYPES = setOf(
+            ConsoleActionType.IMPORT_MODEL,
+            ConsoleActionType.VERIFY_MODEL,
+            ConsoleActionType.REMOVE_MODEL,
+        )
     }
 }
 
-private data class ConsoleActionCompletion(val healthError: String? = null, val cacheRepair: ConsoleCacheRepairOutcome? = null)
+private data class PendingModelProfile(val architecture: String, val quantization: String)
+
+private data class ConsoleActionCompletion(
+    val healthError: String? = null,
+    val cacheRepair: ConsoleCacheRepairOutcome? = null,
+    val modelOperation: ConsoleModelOperationOutcome? = null,
+)
 
 private val ConsoleEmphasis.label: String
     get() = when (this) {
