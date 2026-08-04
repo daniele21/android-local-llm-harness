@@ -13,6 +13,7 @@ interface ConsoleDataSource {
 class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
+    private val modelInventoryProvider: ConsoleModelInventoryProvider = DisconnectedModelInventoryProvider,
     private val clockEpochMs: () -> Long = System::currentTimeMillis,
     private val runLimit: Int = 100,
     private val logLimit: Int = 500,
@@ -27,6 +28,7 @@ class TelemetryConsoleDataSource(
     override fun load(): ConsoleSnapshot {
         val capturedAt = clockEpochMs()
         val runtime = safelyLoadRuntime()
+        val modelInventory = safelyLoadModelInventory()
 
         return try {
             ConsoleSnapshot(
@@ -37,6 +39,7 @@ class TelemetryConsoleDataSource(
                 health = telemetryRepository.healthResults(),
                 resources = telemetryRepository.recentResourceSnapshots(resourceLimit),
                 benchmarkBaselines = telemetryRepository.benchmarkBaselines(),
+                modelInventory = modelInventory,
             )
         } catch (_: RuntimeException) {
             ConsoleSnapshot(
@@ -47,6 +50,7 @@ class TelemetryConsoleDataSource(
                 health = emptyList(),
                 resources = emptyList(),
                 benchmarkBaselines = emptyList(),
+                modelInventory = modelInventory,
                 sourceError = TELEMETRY_SOURCE_ERROR,
             )
         }
@@ -75,7 +79,17 @@ class TelemetryConsoleDataSource(
         DisconnectedRuntimeStateProvider.snapshot()
     }
 
+    private fun safelyLoadModelInventory(): ConsoleModelInventory = try {
+        modelInventoryProvider.snapshot()
+    } catch (_: RuntimeException) {
+        DisconnectedModelInventoryProvider.snapshot().copy(
+            source = "Unavailable",
+            sourceError = MODEL_INVENTORY_SOURCE_ERROR,
+        )
+    }
+
     private companion object {
         const val TELEMETRY_SOURCE_ERROR = "Telemetry source unavailable"
+        const val MODEL_INVENTORY_SOURCE_ERROR = "Model inventory unavailable"
     }
 }
