@@ -1,0 +1,53 @@
+name: Materialize Harness UX assets
+
+on:
+  pull_request:
+    paths:
+      - ".ux-upload/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 1
+
+      - name: Decode documentation and mockups
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/assets/ux-ui
+          cat .ux-upload/archive.*.part | base64 --decode > /tmp/harness-ux-assets.tar.gz
+          tar -xzf /tmp/harness-ux-assets.tar.gz -C /tmp
+          cp /tmp/HARNESS_UX_UI_IMPLEMENTATION_PLAN.md docs/harness-ux-ui-implementation-plan.md
+          cp /tmp/harness-overview.webp docs/assets/ux-ui/harness-overview.webp
+          cp /tmp/harness-playground.webp docs/assets/ux-ui/harness-playground.webp
+          cp /tmp/harness-models.webp docs/assets/ux-ui/harness-models.webp
+          cp /tmp/harness-diagnostics.webp docs/assets/ux-ui/harness-diagnostics.webp
+          cp /tmp/harness-settings.webp docs/assets/ux-ui/harness-settings.webp
+          test -s docs/harness-ux-ui-implementation-plan.md
+          test -s docs/assets/ux-ui/harness-overview.webp
+          test -s docs/assets/ux-ui/harness-playground.webp
+          test -s docs/assets/ux-ui/harness-models.webp
+          test -s docs/assets/ux-ui/harness-diagnostics.webp
+          test -s docs/assets/ux-ui/harness-settings.webp
+
+      - name: Replace staging files with repository assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .ux-upload
+          rm -f .github/workflows/materialize-harness-ux-assets.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/harness-ux-ui-implementation-plan.md docs/assets/ux-ui .ux-upload .github/workflows/materialize-harness-ux-assets.yml
+          git commit -m "Add Harness UX/UI implementation plan and mockups"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
