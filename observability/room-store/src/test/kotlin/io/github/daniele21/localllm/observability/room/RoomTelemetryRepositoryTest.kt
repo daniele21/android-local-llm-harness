@@ -216,8 +216,7 @@ private class FakeTelemetryDao : TelemetryDao {
         baselines[baseline.baselineId] = baseline
     }
 
-    override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> =
-        baselines.values.sortedBy { it.baselineId }
+    override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> = baselines.values.sortedBy { it.baselineId }
 
     override fun insertBenchmarkBaselineHistory(baseline: TelemetryEntities.BenchmarkBaselineHistoryEntity): Long {
         baseline.id = nextBaselineHistoryId++
