@@ -8,48 +8,51 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogCompatibilityEvaluatorTest {
-    private val evaluator = CatalogCompatibilityEvaluator(
-        versionMatcher = object : CatalogVersionMatcher {
-            override fun isInRange(
-                currentVersion: String,
-                minimumInclusive: String?,
-                maximumExclusive: String?,
-            ): Boolean = currentVersion == "1.5.0"
-        },
-        profileResolver = object : CatalogProfileResolver {
-            override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
-                profileKey.value == "qwen-playground" && target == testTarget
-        },
-    )
+    private val evaluator =
+        CatalogCompatibilityEvaluator(
+            versionMatcher =
+                object : CatalogVersionMatcher {
+                    override fun isInRange(
+                        currentVersion: String,
+                        minimumInclusive: String?,
+                        maximumExclusive: String?,
+                    ): Boolean = currentVersion == "1.5.0"
+                },
+            profileResolver =
+                object : CatalogProfileResolver {
+                    override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
+                        profileKey.value == "qwen-playground" && target == testTarget
+                },
+        )
 
     @Test
     fun acceptsCompatibleReleaseAndReportsRecommendedRamWarning() {
-        val result = evaluator.evaluate(
-            release = validCatalogRelease(),
-            target = testTarget,
-            device = compatibleDevice(totalMemoryBytes = 1536L * 1024L * 1024L),
-        )
+        val result =
+            evaluator.evaluate(
+                release = validCatalogRelease(),
+                target = testTarget,
+                device = compatibleDevice(totalMemoryBytes = 1536L * 1024L * 1024L),
+            )
 
         assertTrue(result.reasons.toString(), result.compatible)
-        assertEquals(
-            listOf(CatalogCompatibilityWarning.RAM_BELOW_RECOMMENDED),
-            result.warnings,
-        )
+        assertEquals(listOf(CatalogCompatibilityWarning.RAM_BELOW_RECOMMENDED), result.warnings)
         assertTrue(requireNotNull(result.requiredStorageBytes) > validCatalogRelease().artifact.sizeBytes)
     }
 
     @Test
     fun blocksUnauthorizedTarget() {
-        val otherTarget = CatalogTarget(
-            applicationId = ApplicationId("other-app"),
-            useCaseId = UseCaseId("playground"),
-        )
+        val otherTarget =
+            CatalogTarget(
+                applicationId = ApplicationId("other-app"),
+                useCaseId = UseCaseId("playground"),
+            )
 
-        val result = evaluator.evaluate(
-            release = validCatalogRelease(),
-            target = otherTarget,
-            device = compatibleDevice(),
-        )
+        val result =
+            evaluator.evaluate(
+                release = validCatalogRelease(),
+                target = otherTarget,
+                device = compatibleDevice(),
+            )
 
         assertFalse(result.compatible)
         assertTrue(CatalogCompatibilityReason.TARGET_NOT_ALLOWED in result.reasons)
@@ -58,11 +61,12 @@ class CatalogCompatibilityEvaluatorTest {
 
     @Test
     fun blocksUnsupportedAbi() {
-        val result = evaluator.evaluate(
-            release = validCatalogRelease(),
-            target = testTarget,
-            device = compatibleDevice(supportedAbis = setOf("x86_64")),
-        )
+        val result =
+            evaluator.evaluate(
+                release = validCatalogRelease(),
+                target = testTarget,
+                device = compatibleDevice(supportedAbis = setOf("x86_64")),
+            )
 
         assertFalse(result.compatible)
         assertTrue(CatalogCompatibilityReason.UNSUPPORTED_ABI in result.reasons)
@@ -71,11 +75,12 @@ class CatalogCompatibilityEvaluatorTest {
     @Test
     fun includesDoubleStagingAndSafetyMarginInStorageRequirement() {
         val release = validCatalogRelease(sizeBytes = 100L * 1024L * 1024L)
-        val result = evaluator.evaluate(
-            release = release,
-            target = testTarget,
-            device = compatibleDevice(availableStorageBytes = 300L * 1024L * 1024L),
-        )
+        val result =
+            evaluator.evaluate(
+                release = release,
+                target = testTarget,
+                device = compatibleDevice(availableStorageBytes = 300L * 1024L * 1024L),
+            )
 
         assertFalse(result.compatible)
         assertTrue(CatalogCompatibilityReason.INSUFFICIENT_STORAGE in result.reasons)
@@ -84,11 +89,12 @@ class CatalogCompatibilityEvaluatorTest {
 
     @Test
     fun blocksRevokedRelease() {
-        val result = evaluator.evaluate(
-            release = validCatalogRelease(availability = CatalogAvailability.REVOKED),
-            target = testTarget,
-            device = compatibleDevice(),
-        )
+        val result =
+            evaluator.evaluate(
+                release = validCatalogRelease(availability = CatalogAvailability.REVOKED),
+                target = testTarget,
+                device = compatibleDevice(),
+            )
 
         assertFalse(result.compatible)
         assertTrue(CatalogCompatibilityReason.RELEASE_REVOKED in result.reasons)
@@ -96,11 +102,12 @@ class CatalogCompatibilityEvaluatorTest {
 
     @Test
     fun exposesDeprecatedReleaseAsWarning() {
-        val result = evaluator.evaluate(
-            release = validCatalogRelease(availability = CatalogAvailability.DEPRECATED),
-            target = testTarget,
-            device = compatibleDevice(),
-        )
+        val result =
+            evaluator.evaluate(
+                release = validCatalogRelease(availability = CatalogAvailability.DEPRECATED),
+                target = testTarget,
+                device = compatibleDevice(),
+            )
 
         assertTrue(result.compatible)
         assertTrue(CatalogCompatibilityWarning.RELEASE_DEPRECATED in result.warnings)
@@ -108,21 +115,24 @@ class CatalogCompatibilityEvaluatorTest {
 
     @Test
     fun filtersCatalogByExactApplicationAndUseCase() {
-        val otherTarget = CatalogTarget(
-            applicationId = ApplicationId("other-app"),
-            useCaseId = UseCaseId("other-use-case"),
-        )
-        val document = validCatalogDocument(
-            entries = listOf(
-                validCatalogRelease(modelId = "allowed"),
-                validCatalogRelease(
-                    modelId = "other",
-                    version = "2.0.0",
-                    digest = "b".repeat(64),
-                    allowedTargets = setOf(otherTarget),
-                ),
-            ),
-        )
+        val otherTarget =
+            CatalogTarget(
+                applicationId = ApplicationId("other-app"),
+                useCaseId = UseCaseId("other-use-case"),
+            )
+        val document =
+            validCatalogDocument(
+                entries =
+                    listOf(
+                        validCatalogRelease(modelId = "allowed"),
+                        validCatalogRelease(
+                            modelId = "other",
+                            version = "2.0.0",
+                            digest = "b".repeat(64),
+                            allowedTargets = setOf(otherTarget),
+                        ),
+                    ),
+            )
 
         val result = CatalogQueries.releasesForTarget(document, testTarget)
 
@@ -133,12 +143,13 @@ class CatalogCompatibilityEvaluatorTest {
         supportedAbis: Set<String> = setOf("arm64-v8a"),
         totalMemoryBytes: Long? = 4L * 1024L * 1024L * 1024L,
         availableStorageBytes: Long = 2L * 1024L * 1024L * 1024L,
-    ): CatalogDeviceProfile = CatalogDeviceProfile(
-        sdkInt = 36,
-        supportedAbis = supportedAbis,
-        totalMemoryBytes = totalMemoryBytes,
-        availableStorageBytes = availableStorageBytes,
-        harnessVersion = "1.5.0",
-        backendId = "llama.cpp",
-    )
+    ): CatalogDeviceProfile =
+        CatalogDeviceProfile(
+            sdkInt = 36,
+            supportedAbis = supportedAbis,
+            totalMemoryBytes = totalMemoryBytes,
+            availableStorageBytes = availableStorageBytes,
+            harnessVersion = "1.5.0",
+            backendId = "llama.cpp",
+        )
 }
