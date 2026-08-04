@@ -147,28 +147,37 @@ class CatalogValidator(
     }
 
     private fun validateCompatibility(compatibility: CatalogCompatibility, path: String, violations: MutableList<CatalogViolation>) {
-        val invalidRam = compatibility.minRamBytes?.let { it <= 0 } == true ||
-            compatibility.recommendedRamBytes?.let { it <= 0 } == true ||
-            (
-                compatibility.minRamBytes != null &&
-                    compatibility.recommendedRamBytes != null &&
-                    compatibility.recommendedRamBytes < compatibility.minRamBytes
-                )
-        val invalidVersions = compatibility.minHarnessVersion?.isBlank() == true ||
-            compatibility.maxHarnessVersionExclusive?.isBlank() == true
-        val invalidBackends = compatibility.supportedBackendIds.any { !validIdentifier(it) }
-        if (
-            compatibility.minSdk < 1 ||
-            compatibility.supportedAbis.isEmpty() ||
-            compatibility.supportedAbis.any { !validIdentifier(it) } ||
-            compatibility.minFreeStorageBytes < 0 ||
-            invalidRam ||
-            invalidVersions ||
-            invalidBackends
-        ) {
+        var invalid = invalidPlatformCompatibility(compatibility)
+        if (invalidRamCompatibility(compatibility)) invalid = true
+        if (invalidVersionCompatibility(compatibility)) invalid = true
+        if (invalidBackendCompatibility(compatibility)) invalid = true
+        if (compatibility.minFreeStorageBytes < 0) invalid = true
+        if (invalid) {
             violations += violation(CatalogViolationCode.INVALID_COMPATIBILITY, path)
         }
     }
+
+    private fun invalidPlatformCompatibility(compatibility: CatalogCompatibility): Boolean {
+        if (compatibility.minSdk < 1) return true
+        if (compatibility.supportedAbis.isEmpty()) return true
+        return compatibility.supportedAbis.any { !validIdentifier(it) }
+    }
+
+    private fun invalidRamCompatibility(compatibility: CatalogCompatibility): Boolean {
+        val minimum = compatibility.minRamBytes
+        val recommended = compatibility.recommendedRamBytes
+        if (minimum != null && minimum <= 0) return true
+        if (recommended != null && recommended <= 0) return true
+        return minimum != null && recommended != null && recommended < minimum
+    }
+
+    private fun invalidVersionCompatibility(compatibility: CatalogCompatibility): Boolean {
+        if (compatibility.minHarnessVersion?.isBlank() == true) return true
+        return compatibility.maxHarnessVersionExclusive?.isBlank() == true
+    }
+
+    private fun invalidBackendCompatibility(compatibility: CatalogCompatibility): Boolean =
+        compatibility.supportedBackendIds.any { !validIdentifier(it) }
 
     private fun validateTargets(targets: Set<CatalogTarget>, path: String, violations: MutableList<CatalogViolation>) {
         if (targets.isEmpty()) {
