@@ -12,7 +12,7 @@ It provides eight primary views:
 - generation runs;
 - structured logs;
 - health and sanity results;
-- memory and thermal snapshots;
+- memory and thermal trends;
 - benchmark baselines.
 
 Generation-run and request-correlated log cards can open a request detail view containing the complete persisted run metrics and a chronological event timeline.
@@ -23,21 +23,22 @@ The console reuses the existing contracts from `observability/contracts`, `core/
 
 ```text
 MainActivity
-    ↓
-ConsolePresenter
-    ├── ConsoleInventoryPresenter
-    └── request and observability presentation
-    ↓
-ConsoleSnapshot / ConsoleRequestDetail
-    ↑
-ConsoleDataSource
-    ↑
-TelemetryConsoleDataSource
-    ├── TelemetryRepository
-    ├── ConsoleRuntimeStateProvider
-    └── ConsoleModelInventoryProvider
-            ↑
-            ModelStoreInventoryProvider → ModelStore.snapshot()
+    ├── ConsoleChartView
+    └── ConsolePresenter
+            ├── ConsoleInventoryPresenter
+            ├── ConsoleResourceChartPresenter
+            └── request and observability presentation
+                    ↓
+        ConsoleSnapshot / ConsoleRequestDetail
+                    ↑
+            ConsoleDataSource
+                    ↑
+        TelemetryConsoleDataSource
+            ├── TelemetryRepository
+            ├── ConsoleRuntimeStateProvider
+            └── ConsoleModelInventoryProvider
+                    ↑
+                    ModelStoreInventoryProvider → ModelStore.snapshot()
 ```
 
 `ConsoleDataSource` is the application-facing read boundary. The Android activity receives already collected data and delegates formatting, ordering and grouping to pure Kotlin presenters.
@@ -57,6 +58,8 @@ It also loads runtime and model-inventory snapshots through independent provider
 Runtime state remains separated behind `ConsoleRuntimeStateProvider`. `LocalLlmRuntimeStateProvider` adapts the public `LocalLlmClient.runtimeSnapshot()` contract and therefore does not depend on `RuntimeOrchestrator`, `llama.cpp`, Room or Binder implementation types.
 
 Model inventory remains separated behind `ConsoleModelInventoryProvider`. `ModelStoreInventoryProvider` maps the existing content-addressed `ModelStoreSnapshot` into UI-safe values and deliberately drops `StoredModel.file`, so private filesystem paths never reach the presenter.
+
+`ConsoleResourceChartPresenter` transforms persisted `ResourceSnapshot` values into Android-independent chart models. `ConsoleChartView` renders those models with Android Canvas primitives and does not query resource APIs, schedule timers or own telemetry collection.
 
 ## Installed-model view
 
@@ -94,6 +97,24 @@ The active-runtime view shows only fields available from the public runtime snap
 
 The UI explicitly states that session descriptors, context parameters and active-request identity are not exposed by the current `RuntimeSnapshot`. It does not infer or fabricate these values. Runtime controls remain outside this read-only slice.
 
+## Resource and thermal charts
+
+The Resources view retains the individual persisted snapshot cards and adds three chronological charts:
+
+- process memory, with process PSS, native heap and Java heap series;
+- available device memory;
+- Android thermal pressure from `NONE` through `SHUTDOWN`.
+
+Byte measurements are converted to MiB only in the presentation layer. Samples are ordered by `timestampEpochMs`, while the horizontal axis shows elapsed time from the first persisted sample.
+
+Nullable measurements are preserved as gaps. A missing PSS, heap or available-memory value does not become zero and does not connect line segments across unavailable observations. `ThermalStatus.UNKNOWN` is also rendered as a gap rather than being assigned an invented severity.
+
+The thermal chart additionally reports how many persisted samples carried `lowMemory = true`. It does not reinterpret `null` as false.
+
+Charts are derived only from snapshots already returned by `TelemetryRepository.recentResourceSnapshots()`. The console does not install a timer, start background polling or invoke the Android resource probe. Capture cadence remains explicitly owned by the embedding application or runtime control plane.
+
+If no resource snapshots exist, no placeholder graph is created and the existing empty-state card remains authoritative.
+
 ## Request detail and timeline
 
 A selectable run or correlated log opens a detail screen with:
@@ -127,9 +148,9 @@ The standalone console currently uses:
 - a `FileSystemModelStore` rooted in the console application's private files directory;
 - the disconnected runtime-state provider.
 
-This means the standalone console can accurately inspect its own local model-store namespace, including an empty store, but it cannot inspect a different application's model store or runtime.
+This means the standalone console can accurately inspect its own local model-store namespace, including an empty store, but it cannot inspect a different application's model store or runtime. The chart layer is complete, but the standalone in-memory repository contains no resource history until a real diagnostics source is connected.
 
-This is intentional. The console must not open another application's private Room database or private model directory. Until a signature-protected diagnostics bridge is available, cross-application runtime values remain explicitly unavailable.
+This is intentional. The console must not open another application's private Room database or private model directory. Until a signature-protected diagnostics bridge is available, cross-application runtime values and resource history remain explicitly unavailable.
 
 An application embedding the console data layer in the same process can provide:
 
@@ -137,7 +158,7 @@ An application embedding the console data layer in the same process can provide:
 - `ModelStoreInventoryProvider` over its real `ModelStore`;
 - its own persistent or in-memory `TelemetryRepository`.
 
-The UI and presenters do not need to change when these providers replace the standalone wiring.
+The UI, chart renderer and presenters do not need to change when these providers replace the standalone wiring.
 
 ## Privacy
 
@@ -153,6 +174,8 @@ The presenters do not receive or render:
 Telemetry failures are converted to `Telemetry source unavailable`. Model-store failures are converted to `Model inventory unavailable`. Raw exception messages are not shown.
 
 Model inventory mapping retains digest, size and integrity state but drops the backing `File` reference before the data reaches the presentation layer.
+
+Resource charts contain only the numeric process and device measurements already present in `ResourceSnapshot`; they do not add identifiers, file paths or content payloads.
 
 ## Failure behavior
 
@@ -183,7 +206,15 @@ Pure JVM tests cover:
 - timeline sequence and offsets;
 - exclusion of prompt and output content;
 - deterministic health ordering;
-- deterministic structured-field ordering.
+- deterministic structured-field ordering;
+- chronological resource-sample ordering;
+- byte-to-MiB conversion;
+- missing-value gaps without invented zeros;
+- discrete thermal-state mapping and `UNKNOWN` gaps;
+- low-memory signal counting;
+- empty resource history without placeholder charts.
+
+The repository validation gate also compiles and packages the custom Android chart view, runs Android Lint and Detekt, and verifies that no model artifact is introduced.
 
 ## Deferred slices
 
@@ -191,7 +222,6 @@ The following remain separate implementation work:
 
 - persistent console-local Room wiring when the console owns an embedded runtime;
 - health and sanity execution controls;
-- memory and thermal charts;
 - cache-health inspection and repair actions;
 - benchmark regression comparison and history;
 - installed-model mutation and management;
