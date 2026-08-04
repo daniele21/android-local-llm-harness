@@ -2,6 +2,8 @@ package io.github.daniele21.localllm.console
 
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.observability.TelemetryRepository
+import io.github.daniele21.localllm.observability.benchmark.BenchmarkComparisonEvaluator
+import io.github.daniele21.localllm.observability.benchmark.BenchmarkPolicy
 
 interface ConsoleDataSource {
     fun load(): ConsoleSnapshot
@@ -20,11 +22,14 @@ class TelemetryConsoleDataSource(
     private val runLimit: Int = 100,
     private val logLimit: Int = 500,
     private val resourceLimit: Int = 100,
+    private val benchmarkHistoryLimit: Int = 100,
+    private val benchmarkPolicy: BenchmarkPolicy = BenchmarkPolicy(),
 ) : ConsoleDataSource {
     init {
         require(runLimit > 0) { "runLimit must be positive" }
         require(logLimit > 0) { "logLimit must be positive" }
         require(resourceLimit > 0) { "resourceLimit must be positive" }
+        require(benchmarkHistoryLimit > 0) { "benchmarkHistoryLimit must be positive" }
     }
 
     override fun load(): ConsoleSnapshot {
@@ -35,14 +40,28 @@ class TelemetryConsoleDataSource(
         val cacheControlState = safelyLoadCacheControl()
 
         return try {
+            val runs = telemetryRepository.recentRuns(runLimit)
+            val baselines = telemetryRepository.benchmarkBaselines()
+            val comparisonRuns = if (baselines.isEmpty()) {
+                emptyList()
+            } else {
+                telemetryRepository.recentRuns(
+                    maxOf(runLimit, benchmarkPolicy.comparisonWindowSize * BENCHMARK_RUN_LOOKBACK_MULTIPLIER),
+                )
+            }
+            val evaluator = BenchmarkComparisonEvaluator(benchmarkPolicy)
             ConsoleSnapshot(
                 capturedAtEpochMs = capturedAt,
                 runtime = runtime,
-                runs = telemetryRepository.recentRuns(runLimit),
+                runs = runs,
                 logs = telemetryRepository.recentLogs(logLimit),
                 health = telemetryRepository.healthResults(),
                 resources = telemetryRepository.recentResourceSnapshots(resourceLimit),
-                benchmarkBaselines = telemetryRepository.benchmarkBaselines(),
+                benchmarkBaselines = baselines,
+                benchmarkHistory = telemetryRepository.benchmarkBaselineHistory(benchmarkHistoryLimit),
+                benchmarkComparisons = baselines.map { baseline ->
+                    evaluator.compare(baseline.key, baseline, comparisonRuns)
+                },
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
@@ -56,6 +75,8 @@ class TelemetryConsoleDataSource(
                 health = emptyList(),
                 resources = emptyList(),
                 benchmarkBaselines = emptyList(),
+                benchmarkHistory = emptyList(),
+                benchmarkComparisons = emptyList(),
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
                 cacheControl = cacheControlState,
@@ -117,5 +138,6 @@ class TelemetryConsoleDataSource(
     private companion object {
         const val TELEMETRY_SOURCE_ERROR = "Telemetry source unavailable"
         const val MODEL_INVENTORY_SOURCE_ERROR = "Model inventory unavailable"
+        const val BENCHMARK_RUN_LOOKBACK_MULTIPLIER = 10
     }
 }
