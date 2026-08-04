@@ -24,7 +24,7 @@
 | Main audit and branch control | `[x]` | Fresh branch created from current `main`; historical branches excluded as dependencies |
 | Architecture decision | `[-]` | ADR 0005 added with Proposed status; CI and review pending |
 | Catalog domain contracts | `[-]` | `models/model-catalog` and public domain types added; CI pending |
-| Catalog validation | `[-]` | Fail-closed document and release validation added; CI pending |
+| Catalog validation | `[-]` | Fail-closed validation implemented and decomposed to satisfy complexity limits; CI pending |
 | Target filtering | `[-]` | Exact application/use-case filtering added; CI pending |
 | Compatibility evaluation | `[-]` | API, ABI, backend, profile, RAM and double-staging storage checks added; CI pending |
 | Catalog parsing and codec | `[ ]` | No JSON or signed-manifest codec yet |
@@ -76,7 +76,9 @@
 | `30953242237` | diagnostic | Exact Spotless patch captured; mixed RAM condition identified |
 | `30953487818` | diagnostic | Exact formatter output captured after condition fix |
 | `30953791509` | failed | Kotlin passed; remaining failure limited to Markdown trailing whitespace |
-| current | running | Consolidated plan and normalized Markdown tracker submitted |
+| `30954312737` | failed | Markdown and native checks passed; Detekt found one long test fixture and two compatibility-validation complexity findings |
+| `30954629742` | failed | Detekt refactor submitted; Spotless required one single-line fixture signature before analysis could continue |
+| current | running | Exact fixture format applied and tracker updated to trigger validation on the latest branch state |
 
 ## Key commits
 
@@ -86,17 +88,21 @@
 | `a906b5b3dde4` | Add model-catalog module | CI pending |
 | `15b7121e6730` | Register module in settings | CI pending |
 | `0a69d294315f` | Add catalog domain contracts | CI pending |
-| `74173e1c275e` | Add fail-closed catalog validation | CI pending |
+| `74173e1c275e` | Add fail-closed catalog validation | Refactored by later commits |
 | `9e8fe0b6fa26` | Add target filtering and compatibility evaluation | CI pending |
-| `4db85c723cfb` | Add test fixtures | CI pending |
+| `4db85c723cfb` | Add test fixtures | Refactored by later commits |
 | `df61f7fba777` | Add validator tests | CI pending |
 | `ff00a710166d` | Add compatibility tests | CI pending |
 | `e336989d3eea` | Add ADR 0005 | CI pending |
 | `2fa827594cbc` | Index ADR 0005 | CI pending |
 | `0fce18d1cfec` | Map module in `AGENTS.md` | Navigation guard passed |
-| `6273639690b0` | Include catalog module in CI matrix | Scope confirmed by later run |
+| `6273639690b0` | Include catalog module in CI matrix | Scope confirmed by later runs |
 | `488f17c06fc3` | Restore final CI workflow after formatting diagnostics | Native tests passed; Markdown cleanup required |
-| `ddef21a1de1e` | Consolidate and normalize main-based plan | Current CI pending |
+| `ddef21a1de1e` | Consolidate and normalize main-based plan | Markdown guard passed in later run |
+| `0388727346aa` | Decompose compatibility validation into bounded checks | Detekt pending |
+| `3267ecac0306` | Replace long-parameter fixture with transform-based fixture | Detekt pending |
+| `d0dfbc3ac58f` | Adapt compatibility tests to transformed fixtures | Spotless identified one fixture signature only |
+| `4aac5a2ff32a` | Apply exact Spotless fixture format | Validation trigger pending |
 
 ## Next implementation slice
 
@@ -118,7 +124,7 @@ The current slice is not complete until all relevant checks pass:
 - [-] `:models:model-catalog:testDebugUnitTest`
 - [-] Android Lint for `model-catalog`
 - [-] downstream application compilation
-- [-] native host tests
+- [x] native host tests
 - [ ] aggregate required `Repository validation` check
 
 No task marked `[-]` becomes `[x]` solely because code exists.
