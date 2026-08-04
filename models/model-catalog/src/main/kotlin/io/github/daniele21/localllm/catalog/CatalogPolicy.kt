@@ -1,10 +1,8 @@
 package io.github.daniele21.localllm.catalog
 
 object CatalogQueries {
-    fun releasesForTarget(
-        document: CatalogModelDocument,
-        target: CatalogTarget,
-    ): List<CatalogModelRelease> = document.entries.filter { target in it.allowedTargets }
+    fun releasesForTarget(document: CatalogModelDocument, target: CatalogTarget): List<CatalogModelRelease> =
+        document.entries.filter { target in it.allowedTargets }
 }
 
 class CatalogCompatibilityEvaluator(
@@ -34,8 +32,7 @@ class CatalogCompatibilityEvaluator(
         if (!hasCompatibleAbi(release.compatibility.supportedAbis, device.supportedAbis)) {
             reasons += CatalogCompatibilityReason.UNSUPPORTED_ABI
         }
-        if (
-            release.compatibility.supportedBackendIds.isNotEmpty() &&
+        if (release.compatibility.supportedBackendIds.isNotEmpty() &&
             device.backendId !in release.compatibility.supportedBackendIds
         ) {
             reasons += CatalogCompatibilityReason.UNSUPPORTED_BACKEND
@@ -92,17 +89,15 @@ class CatalogCompatibilityEvaluator(
         }
     }
 
-    private fun supportsHarnessVersion(
-        compatibility: CatalogCompatibility,
-        harnessVersion: String,
-    ): Boolean {
-        val constrained = compatibility.minHarnessVersion != null ||
-            compatibility.maxHarnessVersionExclusive != null
-        return !constrained || versionMatcher.isInRange(
-            currentVersion = harnessVersion,
-            minimumInclusive = compatibility.minHarnessVersion,
-            maximumExclusive = compatibility.maxHarnessVersionExclusive,
-        )
+    private fun supportsHarnessVersion(compatibility: CatalogCompatibility, harnessVersion: String): Boolean {
+        val constrained =
+            compatibility.minHarnessVersion != null || compatibility.maxHarnessVersionExclusive != null
+        return !constrained ||
+            versionMatcher.isInRange(
+                currentVersion = harnessVersion,
+                minimumInclusive = compatibility.minHarnessVersion,
+                maximumExclusive = compatibility.maxHarnessVersionExclusive,
+            )
     }
 
     private fun hasCompatibleAbi(required: Set<String>, available: Set<String>): Boolean {
