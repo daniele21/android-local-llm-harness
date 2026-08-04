@@ -38,44 +38,25 @@ class ModelIntegrityCache {
         return buildHealthSnapshot(installedByDigest, cachedEntries)
     }
 
-    @Suppress("TooGenericExceptionCaught")
     fun repair(modelStore: ModelStore): CacheRepairResult {
         val installedByDigest = modelStore.snapshot().entries.associateBy(StoredModel::digest)
         val cachedEntries = verified.entries.map { it.key to it.value }
         val before = buildHealthSnapshot(installedByDigest, cachedEntries)
-        var revalidatedEntryCount = 0
-        var removedEntryCount = 0
-        var failedEntryCount = 0
-
-        cachedEntries.forEach { (digest, stamp) ->
-            val installed = installedByDigest[digest]
-            when {
-                installed == null -> {
-                    if (verified.remove(digest, stamp)) removedEntryCount += 1
-                }
-
-                stamp != VerificationStamp.from(installed) -> {
-                    try {
-                        val result = modelStore.verify(digest)
-                        if (result.valid) {
-                            val current = VerificationStamp.from(installed)
-                            if (verified.replace(digest, stamp, current)) revalidatedEntryCount += 1
-                        } else if (verified.remove(digest, stamp)) {
-                            removedEntryCount += 1
-                        }
-                    } catch (_: RuntimeException) {
-                        failedEntryCount += 1
-                    }
-                }
-            }
+        val outcomes = cachedEntries.map { (digest, stamp) ->
+            repairEntry(
+                digest = digest,
+                stamp = stamp,
+                installed = installedByDigest[digest],
+                modelStore = modelStore,
+            )
         }
 
         return CacheRepairResult(
             before = before,
             after = healthSnapshot(modelStore),
-            revalidatedEntryCount = revalidatedEntryCount,
-            removedEntryCount = removedEntryCount,
-            failedEntryCount = failedEntryCount,
+            revalidatedEntryCount = outcomes.count { it == RepairEntryOutcome.REVALIDATED },
+            removedEntryCount = outcomes.count { it == RepairEntryOutcome.REMOVED },
+            failedEntryCount = outcomes.count { it == RepairEntryOutcome.FAILED },
         )
     }
 
@@ -88,6 +69,42 @@ class ModelIntegrityCache {
     }
 
     fun size(): Int = verified.size
+
+    private fun repairEntry(
+        digest: ModelDigest,
+        stamp: VerificationStamp,
+        installed: StoredModel?,
+        modelStore: ModelStore,
+    ): RepairEntryOutcome = when {
+        installed == null -> removeEntry(digest, stamp)
+        stamp == VerificationStamp.from(installed) -> RepairEntryOutcome.UNCHANGED
+        else -> revalidateEntry(digest, stamp, installed, modelStore)
+    }
+
+    private fun removeEntry(digest: ModelDigest, stamp: VerificationStamp): RepairEntryOutcome =
+        if (verified.remove(digest, stamp)) RepairEntryOutcome.REMOVED else RepairEntryOutcome.UNCHANGED
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun revalidateEntry(
+        digest: ModelDigest,
+        stamp: VerificationStamp,
+        installed: StoredModel,
+        modelStore: ModelStore,
+    ): RepairEntryOutcome = try {
+        val result = modelStore.verify(digest)
+        if (result.valid) {
+            val current = VerificationStamp.from(installed)
+            if (verified.replace(digest, stamp, current)) {
+                RepairEntryOutcome.REVALIDATED
+            } else {
+                RepairEntryOutcome.UNCHANGED
+            }
+        } else {
+            removeEntry(digest, stamp)
+        }
+    } catch (_: RuntimeException) {
+        RepairEntryOutcome.FAILED
+    }
 
     private fun buildHealthSnapshot(
         installedByDigest: Map<ModelDigest, StoredModel>,
@@ -108,6 +125,13 @@ class ModelIntegrityCache {
             staleEntryCount = staleEntryCount,
             orphanedEntryCount = orphanedEntryCount,
         )
+    }
+
+    private enum class RepairEntryOutcome {
+        REVALIDATED,
+        REMOVED,
+        FAILED,
+        UNCHANGED,
     }
 
     private data class VerificationStamp(val absolutePath: String, val sizeBytes: Long, val lastModifiedMs: Long) {
