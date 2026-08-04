@@ -15,6 +15,7 @@ class TelemetryConsoleDataSource(
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
     private val modelInventoryProvider: ConsoleModelInventoryProvider = DisconnectedModelInventoryProvider,
     private val healthControl: ConsoleHealthControl = DisconnectedHealthControl,
+    private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl,
     private val clockEpochMs: () -> Long = System::currentTimeMillis,
     private val runLimit: Int = 100,
     private val logLimit: Int = 500,
@@ -31,6 +32,7 @@ class TelemetryConsoleDataSource(
         val runtime = safelyLoadRuntime()
         val modelInventory = safelyLoadModelInventory()
         val healthControlState = safelyLoadHealthControl()
+        val cacheControlState = safelyLoadCacheControl()
 
         return try {
             ConsoleSnapshot(
@@ -43,6 +45,7 @@ class TelemetryConsoleDataSource(
                 benchmarkBaselines = telemetryRepository.benchmarkBaselines(),
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
+                cacheControl = cacheControlState,
             )
         } catch (_: RuntimeException) {
             ConsoleSnapshot(
@@ -55,6 +58,7 @@ class TelemetryConsoleDataSource(
                 benchmarkBaselines = emptyList(),
                 modelInventory = modelInventory,
                 healthControl = healthControlState,
+                cacheControl = cacheControlState,
                 sourceError = TELEMETRY_SOURCE_ERROR,
             )
         }
@@ -98,6 +102,15 @@ class TelemetryConsoleDataSource(
         DisconnectedHealthControl.snapshot().copy(
             source = "Unavailable",
             sourceError = HEALTH_EXECUTION_SOURCE_ERROR,
+        )
+    }
+
+    private fun safelyLoadCacheControl(): ConsoleCacheControlState = try {
+        cacheControl.snapshot()
+    } catch (_: RuntimeException) {
+        DisconnectedCacheControl.snapshot().copy(
+            source = "Unavailable",
+            sourceError = CACHE_HEALTH_SOURCE_ERROR,
         )
     }
 
