@@ -4,7 +4,6 @@ import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkComparison
-import io.github.daniele21.localllm.observability.benchmark.BenchmarkMetric
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkMetricComparison
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkThresholdDirection
 import java.time.Instant
@@ -52,10 +51,7 @@ class ConsoleBenchmarkPresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         )
     }
 
-    private fun summaryCard(
-        comparisons: List<BenchmarkComparison>,
-        history: List<BenchmarkBaseline>,
-    ): ConsoleCard = ConsoleCard(
+    private fun summaryCard(comparisons: List<BenchmarkComparison>, history: List<BenchmarkBaseline>): ConsoleCard = ConsoleCard(
         title = "Benchmark summary",
         lines = listOf(
             "Active keys: ${comparisons.size}",
@@ -86,10 +82,7 @@ class ConsoleBenchmarkPresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         )
     }
 
-    private fun historyCard(
-        baseline: BenchmarkBaseline,
-        activeBaselines: List<BenchmarkBaseline>,
-    ): ConsoleCard = ConsoleCard(
+    private fun historyCard(baseline: BenchmarkBaseline, activeBaselines: List<BenchmarkBaseline>): ConsoleCard = ConsoleCard(
         title = "Baseline · ${formatTimestamp(baseline.capturedAtEpochMs)}",
         lines = listOf(
             "Application: ${baseline.key.applicationId.value}",
