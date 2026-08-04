@@ -225,7 +225,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [ ] physical-device baseline collection on representative devices
 - [ ] baseline history beyond the current active baseline per key
 
-### Read-only console observability, model inventory and runtime foundation — PR #31
+### Read-only console observability, model inventory, runtime and resource charts — PR #31
 
 - [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, resources and benchmarks
 - [x] `ConsoleDataSource` boundary over existing observability contracts
@@ -245,15 +245,20 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] request-scoped run and structured-log queries
 - [x] chronological request timeline with event sequence and run-relative offsets
 - [x] privacy-safe missing-run, empty-timeline and source-error states
+- [x] process PSS, native heap and Java heap trend chart
+- [x] available-device-memory trend chart
+- [x] discrete Android thermal-pressure chart with low-memory signal count
+- [x] nullable measurements and unknown thermal states rendered as gaps rather than zero values
+- [x] chart rendering from persisted explicit captures without timers or hidden polling
 - [x] refresh and back navigation without runtime or model mutation
-- [x] pure Kotlin presenter, data-source and adapter tests
-- [x] explicit documentation of standalone sandbox and runtime-contract limitations
+- [x] pure Kotlin presenter, data-source, adapter and chart-model tests
+- [x] Android custom-view compilation, lint and packaging validation
+- [x] explicit documentation of standalone sandbox, runtime-contract and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
 ### Remaining Phase 2 work
 
 - [ ] health and sanity execution controls
-- [ ] resource and thermal charts
 - [ ] cache-health view and repair actions
 - [ ] benchmark regression comparison and baseline history views
 - [ ] model-management console
