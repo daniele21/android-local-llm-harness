@@ -185,9 +185,10 @@ class MainActivity : Activity() {
 
     private fun displaySnapshot(): ConsoleSnapshot? {
         val currentSnapshot = snapshot ?: return null
+        val healthActionInProgress = activeActionType?.let(HEALTH_ACTION_TYPES::contains) == true
         return currentSnapshot.copy(
             healthControl = currentSnapshot.healthControl.copy(
-                executionInProgress = actionExecutionInProgress && activeActionType in HEALTH_ACTION_TYPES,
+                executionInProgress = actionExecutionInProgress && healthActionInProgress,
                 sourceError = healthExecutionError ?: currentSnapshot.healthControl.sourceError,
             ),
             cacheControl = currentSnapshot.cacheControl.copy(
@@ -311,10 +312,7 @@ class MainActivity : Activity() {
     }
 }
 
-private data class ConsoleActionCompletion(
-    val healthError: String? = null,
-    val cacheRepair: ConsoleCacheRepairOutcome? = null,
-)
+private data class ConsoleActionCompletion(val healthError: String? = null, val cacheRepair: ConsoleCacheRepairOutcome? = null)
 
 private val ConsoleEmphasis.label: String
     get() = when (this) {
