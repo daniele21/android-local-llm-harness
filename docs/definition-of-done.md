@@ -91,6 +91,25 @@ Native code must be split by responsibility and linked normally through CMake. D
 
 ## Validation completion
 
+### Pre-push validation discipline
+
+An implementation change is not ready to be pushed to an active pull request until the contributor or agent has completed the strongest locally reproducible gate for the affected scope.
+
+Before each push:
+
+- review the complete staged diff against the real contracts, existing APIs and direct consumers;
+- run the formatter and static analysis for every changed source set;
+- compile the affected production and test sources;
+- run the targeted tests for the changed behavior;
+- run relevant navigation, script, packaging, ABI or native checks when those areas are affected;
+- resolve every locally reproducible failure.
+
+GitHub Actions is the final clean-checkout and integration confirmation. It must not be used as the primary debugger for formatter, static-analysis, compilation or test failures that can be detected locally.
+
+When a required check cannot be executed locally, document the limitation before pushing, run the strongest available equivalent validation and do not describe the change as validated. Documentation-only changes may use a narrower documentation and navigation gate, but still require complete diff review.
+
+After a CI-only failure, reproduce and verify the fix locally where possible before the next push.
+
 The relevant narrow checks pass during development, and the complete repository gate passes before merge:
 
 ```bash

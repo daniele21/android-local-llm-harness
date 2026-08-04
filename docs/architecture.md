@@ -1,5 +1,7 @@
 # Architecture
 
+![Architecture Diagram](assets/architecture.png)
+
 ## Data plane
 
 ```text

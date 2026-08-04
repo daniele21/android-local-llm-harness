@@ -12,14 +12,13 @@ import android.provider.OpenableColumns
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationMetrics
+import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
-import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
-import io.github.daniele21.localllm.store.FileSystemModelStore
 import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
@@ -40,13 +39,17 @@ internal interface PhoneTestListener {
 }
 
 @Suppress("TooManyFunctions", "LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth")
-internal class PhoneTestController(context: Context, private val listener: PhoneTestListener) : AutoCloseable {
+internal class PhoneTestController(
+    context: Context,
+    private val runtimeGraph: HarnessRuntimeGraph,
+    private val listener: PhoneTestListener,
+) : AutoCloseable {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
     private val busy = AtomicBoolean(false)
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    private val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
+    private val modelStore = runtimeGraph.modelStore
 
     @Volatile
     private var currentModel: ImportedPhoneModel? = restoreModel()
@@ -90,6 +93,7 @@ internal class PhoneTestController(context: Context, private val listener: Phone
         runExclusive {
             val model = currentModel ?: return@runExclusive
             progress("Removing the imported model")
+            runtimeGraph.releaseModel(model.digest)
             modelStore.remove(model.digest)
             preferences.edit().clear().apply()
             currentModel = null
@@ -162,56 +166,48 @@ internal class PhoneTestController(context: Context, private val listener: Phone
     }
 
     private fun runGeneration(model: ImportedPhoneModel, maxOutputTokens: Int): GenerationSummary {
-        val harness = buildHarness(model, maxOutputTokens)
+        val harness = buildHarness(model)
         val runtime = harness.runtime
-        return try {
-            val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
-            check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
-            val session = runtime.createSession(harness.applicationId, harness.useCaseId)
-            val completed = generateAndAwait(runtime, harness, session, GENERATION_PROMPT)
-            check(completed.output.isNotBlank()) { "Generation returned an empty output" }
-            closeSessionAndUnload(runtime, session)
-            GenerationSummary.from(completed.metrics)
-        } finally {
-            runtime.close()
-        }
+        val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
+        check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
+        val session = runtime.createSession(harness.applicationId, harness.useCaseId)
+        val completed = generateAndAwait(runtime, harness, session, GENERATION_PROMPT, maxOutputTokens)
+        check(completed.output.isNotBlank()) { "Generation returned an empty output" }
+        closeSessionAndUnload(runtime, session)
+        return GenerationSummary.from(completed.metrics)
     }
 
     private fun runCancellation(model: ImportedPhoneModel) {
-        val harness = buildHarness(model, CANCELLATION_OUTPUT_TOKENS)
+        val harness = buildHarness(model)
         val runtime = harness.runtime
-        try {
-            val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
-            check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
-            val session = runtime.createSession(harness.applicationId, harness.useCaseId)
-            val firstDelta = CountDownLatch(1)
-            val terminal = CountDownLatch(1)
-            val terminalEvent = AtomicReference<GenerationEvent>()
-            val handle = runtime.generate(
-                request(harness, session, CANCELLATION_PROMPT),
-                GenerationListener { event ->
-                    if (event is GenerationEvent.TextDelta) firstDelta.countDown()
-                    if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
-                        terminalEvent.compareAndSet(null, event)
-                        terminal.countDown()
-                    }
-                },
-            )
-            check(firstDelta.await(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                "No streaming delta arrived before the cancellation timeout"
-            }
-            handle.cancel()
-            check(terminal.await(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                "Cancellation did not reach a terminal event"
-            }
-            val result = terminalEvent.get()
-            check(result is GenerationEvent.Failed && result.error is LocalLlmError.Cancelled) {
-                "Expected a cancelled terminal event"
-            }
-            closeSessionAndUnload(runtime, session)
-        } finally {
-            runtime.close()
+        val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
+        check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
+        val session = runtime.createSession(harness.applicationId, harness.useCaseId)
+        val firstDelta = CountDownLatch(1)
+        val terminal = CountDownLatch(1)
+        val terminalEvent = AtomicReference<GenerationEvent>()
+        val handle = runtime.generate(
+            request(harness, session, CANCELLATION_PROMPT, CANCELLATION_OUTPUT_TOKENS),
+            GenerationListener { event ->
+                if (event is GenerationEvent.TextDelta) firstDelta.countDown()
+                if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
+                    terminalEvent.compareAndSet(null, event)
+                    terminal.countDown()
+                }
+            },
+        )
+        check(firstDelta.await(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            "No streaming delta arrived before the cancellation timeout"
         }
+        handle.cancel()
+        check(terminal.await(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            "Cancellation did not reach a terminal event"
+        }
+        val result = terminalEvent.get()
+        check(result is GenerationEvent.Failed && result.error is LocalLlmError.Cancelled) {
+            "Expected a cancelled terminal event"
+        }
+        closeSessionAndUnload(runtime, session)
     }
 
     private fun runMemoryCycles(model: ImportedPhoneModel): MemorySummary {
@@ -230,33 +226,20 @@ internal class PhoneTestController(context: Context, private val listener: Phone
         return MemorySummary(samples, growth)
     }
 
-    private fun buildHarness(model: ImportedPhoneModel, maxOutputTokens: Int): PhoneHarness {
-        val resolved = resolvedPhoneUseCase(model, maxOutputTokens)
-        val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
-        require(nativeLibraryDirectory.isDirectory) {
-            "Native library directory is unavailable"
-        }
-        return PhoneHarness(
-            runtime = RuntimeOrchestrator(
-                registry = SinglePhoneBindingRegistry(resolved),
-                modelStore = modelStore,
-                backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
-            ),
-            applicationId = resolved.binding.applicationId,
-            useCaseId = resolved.binding.useCaseId,
-        )
-    }
+    private fun buildHarness(model: ImportedPhoneModel): PhoneHarness =
+        runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PHYSICAL_VALIDATION)
 
     private fun generateAndAwait(
         runtime: RuntimeOrchestrator,
         harness: PhoneHarness,
         session: SessionId,
         prompt: String,
+        maxOutputTokens: Int,
     ): GenerationEvent.Completed {
         val terminal = CountDownLatch(1)
         val terminalEvent = AtomicReference<GenerationEvent>()
         runtime.generate(
-            request(harness, session, prompt),
+            request(harness, session, prompt, maxOutputTokens),
             GenerationListener { event ->
                 if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
                     terminalEvent.compareAndSet(null, event)
@@ -274,20 +257,22 @@ internal class PhoneTestController(context: Context, private val listener: Phone
         }
     }
 
-    private fun request(harness: PhoneHarness, session: SessionId, prompt: String): GenerationRequest = GenerationRequest(
-        requestId = RequestId(UUID.randomUUID().toString()),
-        sessionId = session,
-        applicationId = harness.applicationId,
-        useCaseId = harness.useCaseId,
-        input = prompt,
-    )
+    private fun request(harness: PhoneHarness, session: SessionId, prompt: String, maxOutputTokens: Int): GenerationRequest =
+        GenerationRequest(
+            requestId = RequestId(UUID.randomUUID().toString()),
+            sessionId = session,
+            applicationId = harness.applicationId,
+            useCaseId = harness.useCaseId,
+            input = prompt,
+            overrides = GenerationOverrides(maxOutputTokens = maxOutputTokens),
+        )
 
     private fun closeSessionAndUnload(runtime: RuntimeOrchestrator, session: SessionId) {
         runtime.closeSession(session)
         check(eventually { runtime.runtimeSnapshot().activeSessions == 0 }) {
             "Session context was not released"
         }
-        check(runtime.unloadIdleModel()) { "Idle model was not unloaded" }
+        check(runtimeGraph.unloadIdleModel()) { "Idle model was not unloaded" }
     }
 
     private fun eventually(condition: () -> Boolean): Boolean {
@@ -507,7 +492,6 @@ internal class PhoneTestController(context: Context, private val listener: Phone
 
     private companion object {
         const val PREFERENCES_NAME = "phone-test-model"
-        const val MODEL_STORE_DIRECTORY = "local-llm-phone-test"
         const val IMPORT_DIRECTORY = "phone-test-import"
         const val KEY_DIGEST = "digest"
         const val KEY_FILE_NAME = "file-name"

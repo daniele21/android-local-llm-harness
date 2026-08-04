@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-EXPECTED_LIBRARIES = {
+EXPECTED_RUNTIME_LIBRARIES = {
     "libc++_shared.so",
     "libggml-base.so",
     "libggml-cpu-android_armv8.0_1.so",
@@ -21,6 +21,9 @@ EXPECTED_LIBRARIES = {
     "libggml.so",
     "libllama.so",
     "liblocal_llm_jni.so",
+}
+PHONE_TEST_NATIVE_LIBRARIES = EXPECTED_RUNTIME_LIBRARIES | {
+    "libandroidx.graphics.path.so",
 }
 EXPECTED_ABI = "arm64-v8a"
 EM_AARCH64 = 183
@@ -62,7 +65,12 @@ def verify_aarch64_elf(archive: ZipFile, entry: str) -> None:
         raise PackagingError(f"{entry} targets ELF machine {machine}, expected AArch64")
 
 
-def verify_native_archive(path: Path, prefix: str, label: str) -> None:
+def verify_native_archive(
+    path: Path,
+    prefix: str,
+    label: str,
+    expected_libraries: set[str] = EXPECTED_RUNTIME_LIBRARIES,
+) -> None:
     try:
         with ZipFile(path) as archive:
             entries = native_entries(archive, prefix)
@@ -80,8 +88,8 @@ def verify_native_archive(path: Path, prefix: str, label: str) -> None:
                 raise PackagingError(f"{label} contains duplicate native library names")
 
             actual_libraries = set(library_names)
-            missing = sorted(EXPECTED_LIBRARIES - actual_libraries)
-            unexpected = sorted(actual_libraries - EXPECTED_LIBRARIES)
+            missing = sorted(expected_libraries - actual_libraries)
+            unexpected = sorted(actual_libraries - expected_libraries)
             if missing or unexpected:
                 raise PackagingError(
                     f"{label} native library mismatch; missing={missing}, unexpected={unexpected}"
@@ -94,7 +102,7 @@ def verify_native_archive(path: Path, prefix: str, label: str) -> None:
 
     print(f"Verified {label}: {path}")
     print(f"  ABI: {EXPECTED_ABI}")
-    print(f"  native libraries: {len(EXPECTED_LIBRARIES)}")
+    print(f"  native libraries: {len(expected_libraries)}")
 
 
 def verify_instrumentation_apk(path: Path) -> None:
@@ -135,7 +143,12 @@ def main() -> int:
     )
 
     verify_native_archive(device_application_apk, "lib/", "device-test application APK")
-    verify_native_archive(phone_application_apk, "lib/", "phone-test application APK")
+    verify_native_archive(
+        phone_application_apk,
+        "lib/",
+        "phone-test application APK",
+        PHONE_TEST_NATIVE_LIBRARIES,
+    )
     verify_instrumentation_apk(instrumentation_apk)
     verify_native_archive(backend_aar, "jni/", "llama.cpp debug AAR")
     print("Android native packaging verification completed successfully")

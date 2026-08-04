@@ -48,6 +48,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `observability/android-resource-probe` | Android memory and thermal snapshot collection |
 | `observability/benchmark-engine` | Cold/warm baselines and regression checks |
 | `transports/in-process` | Embedded client-to-runtime delegation |
+| `ui/design-system` | Shared Compose theme, visual tokens and reusable Harness components |
 | `apps/local-llm-console` | Developer console and future cross-app control plane |
 | `apps/device-test-runner` | ADB/instrumentation GGUF lifecycle and memory validation |
 | `apps/local-llm-phone-test` | Play-installable physical-device validation without developer mode |
@@ -72,9 +73,40 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 2. Read relevant contracts, implementation, tests and documentation.
 3. Implement the smallest coherent vertical slice in the owning module.
 4. Add deterministic tests for success, failure and lifecycle paths.
-5. Run targeted checks while iterating, then the aggregate repository validation.
-6. Record deferred physical-device evidence explicitly without claiming production readiness.
-7. Keep model files, signing keys and credentials outside the repository.
+5. Run targeted local checks while iterating.
+6. Before every push, review the complete diff and run the formatter, static analysis, compilation and targeted tests that cover the changed modules.
+7. Push only after those local checks pass. GitHub Actions is the final clean-checkout confirmation, not the first debugger for locally reproducible failures.
+8. Run the aggregate repository validation before merge.
+9. Record deferred physical-device evidence explicitly without claiming production readiness.
+10. Keep model files, signing keys and credentials outside the repository.
+
+### Mandatory pre-push gate
+
+Do not push an implementation commit merely to discover formatter, Detekt, compilation or unit-test errors in `validate.yml`.
+
+Before pushing, the agent or contributor must:
+
+1. inspect the complete staged diff and verify that the implementation matches the real contracts and existing APIs;
+2. run `spotlessCheck` or `spotlessApply` followed by `spotlessCheck` for the affected Kotlin/Markdown sources;
+3. run Detekt for the affected scope;
+4. compile the affected production and test sources;
+5. run the targeted unit tests for the changed behavior;
+6. run any relevant repository, packaging or script guard when the change touches modules, ABI configuration, native code, workflows or documentation navigation;
+7. resolve all locally reproducible failures before pushing.
+
+The exact command may be narrower than the full repository gate while iterating, but it must cover every changed module and its direct consumers. Examples:
+
+```bash
+./gradlew spotlessCheck
+./gradlew --no-configuration-cache detekt
+./gradlew :apps:local-llm-phone-test:compileDebugKotlin \
+  :apps:local-llm-phone-test:compileDebugUnitTestKotlin \
+  :apps:local-llm-phone-test:testDebugUnitTest
+```
+
+For changes spanning multiple modules or touching shared contracts, run `./gradlew check` before pushing unless there is a documented environment limitation. When the local environment cannot execute a required check, state that limitation before the push, perform the strongest available equivalent validation, and do not describe the change as validated.
+
+A CI failure may still reveal clean-checkout, runner, packaging or integration-only issues. It must not be used as a substitute for code review and checks that can be run locally.
 
 ## Validation commands
 
