@@ -1,9 +1,9 @@
 package io.github.daniele21.localllm.catalog
 
-import java.net.URI
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.URI
 
 class CatalogValidatorTest {
     private val validator = CatalogValidator()
@@ -87,6 +87,5 @@ class CatalogValidatorTest {
         assertTrue(result.has(CatalogViolationCode.SELF_REPLACEMENT))
     }
 
-    private fun CatalogValidationResult.has(code: CatalogViolationCode): Boolean =
-        violations.any { it.code == code }
+    private fun CatalogValidationResult.has(code: CatalogViolationCode): Boolean = violations.any { it.code == code }
 }
