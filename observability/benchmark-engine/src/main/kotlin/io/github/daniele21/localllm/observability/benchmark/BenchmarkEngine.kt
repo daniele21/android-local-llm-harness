@@ -122,7 +122,7 @@ class BenchmarkComparisonEvaluator(private val policy: BenchmarkPolicy = Benchma
         val currentRuns = matchingRuns(runs, key)
             .filter { (it.completedAtEpochMs ?: Long.MIN_VALUE) > baseline.capturedAtEpochMs }
             .take(policy.comparisonWindowSize)
-        val current = currentRuns.takeIf(List<GenerationRunRecord>::isNotEmpty)
+        val current = currentRuns.takeIf { it.isNotEmpty() }
             ?.toBaseline(key, capturedAtEpochMs = currentRuns.maxOfCompletedAt())
         val metrics = metricComparisons(baseline, current, policy)
 
