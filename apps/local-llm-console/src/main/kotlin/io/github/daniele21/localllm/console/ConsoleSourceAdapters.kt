@@ -3,10 +3,7 @@ package io.github.daniele21.localllm.console
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.store.ModelStore
 
-class ModelStoreInventoryProvider(
-    private val modelStore: ModelStore,
-    private val source: String,
-) : ConsoleModelInventoryProvider {
+class ModelStoreInventoryProvider(private val modelStore: ModelStore, private val source: String) : ConsoleModelInventoryProvider {
     override fun snapshot(): ConsoleModelInventory {
         val snapshot = modelStore.snapshot()
         return ConsoleModelInventory(
