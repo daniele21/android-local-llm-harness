@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p docs/assets/ux-ui
-          cat .ux-upload/archive.*.part | base64 --decode > /tmp/harness-ux-assets.tar.gz
+          cat .ux-upload/final.*.part | base64 --decode > /tmp/harness-ux-assets.tar.gz
           tar -xzf /tmp/harness-ux-assets.tar.gz -C /tmp
           cp /tmp/HARNESS_UX_UI_IMPLEMENTATION_PLAN.md docs/harness-ux-ui-implementation-plan.md
           cp /tmp/harness-overview.webp docs/assets/ux-ui/harness-overview.webp
@@ -48,6 +48,6 @@ jobs:
           rm -f .github/workflows/materialize-harness-ux-assets.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/harness-ux-ui-implementation-plan.md docs/assets/ux-ui .ux-upload .github/workflows/materialize-harness-ux-assets.yml
+          git add -A docs .ux-upload .github/workflows/materialize-harness-ux-assets.yml
           git commit -m "Add Harness UX/UI implementation plan and mockups"
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
