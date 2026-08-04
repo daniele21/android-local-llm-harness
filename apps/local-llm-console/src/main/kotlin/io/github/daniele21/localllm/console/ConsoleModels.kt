@@ -84,6 +84,7 @@ data class ConsoleSnapshot(
     val resources: List<ResourceSnapshot>,
     val benchmarkBaselines: List<BenchmarkBaseline>,
     val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
+    val healthControl: ConsoleHealthControlState = DisconnectedHealthControl.snapshot(),
     val sourceError: String? = null,
 )
 
@@ -99,6 +100,7 @@ data class ConsoleScreen(
     val subtitle: String,
     val cards: List<ConsoleCard>,
     val charts: List<ConsoleChart> = emptyList(),
+    val actions: List<ConsoleAction> = emptyList(),
 )
 
 data class ConsoleCard(
@@ -121,6 +123,18 @@ data class ConsoleChart(
 data class ConsoleChartSeries(val label: String, val points: List<ConsoleChartPoint>)
 
 data class ConsoleChartPoint(val timestampEpochMs: Long, val value: Double?)
+
+enum class ConsoleActionType {
+    RUN_ALL_HEALTH_CHECKS,
+    RUN_HEALTH_CHECKS,
+}
+
+data class ConsoleAction(
+    val type: ConsoleActionType,
+    val label: String,
+    val healthCheckIds: List<String> = emptyList(),
+    val enabled: Boolean = true,
+)
 
 enum class ConsoleEmphasis {
     NEUTRAL,
