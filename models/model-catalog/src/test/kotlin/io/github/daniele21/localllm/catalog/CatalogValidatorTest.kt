@@ -29,7 +29,13 @@ class CatalogValidatorTest {
 
     @Test
     fun rejectsNonHttpsDownloadUri() {
-        val release = validCatalogRelease(downloadUri = URI("http://models.example.test/model.gguf"))
+        val release = validCatalogRelease { current ->
+            current.copy(
+                artifact = current.artifact.copy(
+                    downloadUri = URI("http://models.example.test/model.gguf"),
+                ),
+            )
+        }
 
         val result = validator.validate(validCatalogDocument(listOf(release)), nowEpochMs = 1_500)
 
@@ -39,7 +45,13 @@ class CatalogValidatorTest {
 
     @Test
     fun rejectsInvalidDigest() {
-        val release = validCatalogRelease(digest = "not-a-sha256")
+        val release = validCatalogRelease { current ->
+            current.copy(
+                artifact = current.artifact.copy(
+                    digest = io.github.daniele21.localllm.contracts.ModelDigest("not-a-sha256"),
+                ),
+            )
+        }
 
         val result = validator.validate(validCatalogDocument(listOf(release)), nowEpochMs = 1_500)
 
@@ -63,8 +75,15 @@ class CatalogValidatorTest {
 
     @Test
     fun rejectsConflictingMetadataForSameDigest() {
-        val first = validCatalogRelease(version = "1.0.0", sizeBytes = 10)
-        val second = validCatalogRelease(version = "1.1.0", sizeBytes = 11)
+        val first = validCatalogRelease { current ->
+            current.copy(artifact = current.artifact.copy(sizeBytes = 10))
+        }
+        val second = validCatalogRelease { current ->
+            current.copy(
+                id = current.id.copy(version = CatalogModelVersion("1.1.0")),
+                artifact = current.artifact.copy(sizeBytes = 11),
+            )
+        }
 
         val result =
             validator.validate(
