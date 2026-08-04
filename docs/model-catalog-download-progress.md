@@ -22,11 +22,12 @@
 | Workstream | Status | Current evidence |
 |---|---:|---|
 | Main audit and branch control | `[x]` | Fresh branch created from current `main`; historical branches excluded as dependencies |
-| Architecture decision | `[-]` | ADR 0005 added with Proposed status; CI and review pending |
-| Catalog domain contracts | `[-]` | `models/model-catalog` and public domain types added; CI pending |
-| Catalog validation | `[-]` | Fail-closed validation implemented and decomposed to satisfy complexity limits; CI pending |
-| Target filtering | `[-]` | Exact application/use-case filtering added; CI pending |
-| Compatibility evaluation | `[-]` | API, ABI, backend, profile, RAM and double-staging storage checks added; CI pending |
+| Architecture decision | `[-]` | ADR 0005 is implemented and CI-validated but remains Proposed pending review |
+| Catalog domain contracts | `[x]` | Public domain types passed repository validation run `30954976390` |
+| Catalog validation | `[x]` | Fail-closed validation and deterministic tests passed run `30954976390` |
+| Target filtering | `[x]` | Exact application/use-case filtering passed run `30954976390` |
+| Compatibility evaluation | `[x]` | API, ABI, backend, profile, RAM and storage policy passed run `30954976390` |
+| Public module documentation | `[-]` | `models/model-catalog/README.md` added; documentation validation pending |
 | Catalog parsing and codec | `[ ]` | No JSON or signed-manifest codec yet |
 | Catalog persistence and refresh | `[ ]` | Not started |
 | Secure model download | `[ ]` | Not started |
@@ -47,24 +48,24 @@
 - [x] identify PR #34 and PR #40 as unmerged overlap only
 - [x] create `agent/model-catalog-download-implementation`
 - [x] rewrite the implementation plan against `main`
-- [-] add ADR 0005 and obtain validation and review
+- [-] move ADR 0005 from Proposed to Accepted after review
 
 ## Phase 1 — Catalog domain and policy
 
-- [-] register `:models:model-catalog`
-- [-] define catalog, release, artifact, target, license and availability models
-- [-] define application-owned profile resolver boundary
-- [-] validate schema, IDs, time window, entry count and release uniqueness
-- [-] validate SHA-256, positive size, HTTPS URI and safe GGUF file name
-- [-] validate compatibility, targets and license links
-- [-] detect conflicting metadata for the same digest
-- [-] filter releases by exact application and use case
-- [-] evaluate availability, API, ABI, backend, Harness version and profile support
-- [-] evaluate minimum and recommended RAM
-- [-] calculate storage using download and import copies plus safety margin
-- [-] add deterministic validator and compatibility tests
-- [ ] validate with repository CI
-- [ ] document the public API after CI stabilizes
+- [x] register `:models:model-catalog`
+- [x] define catalog, release, artifact, target, license and availability models
+- [x] define application-owned profile resolver boundary
+- [x] validate schema, IDs, time window, entry count and release uniqueness
+- [x] validate SHA-256, positive size, HTTPS URI and safe GGUF file name
+- [x] validate compatibility, targets and license links
+- [x] detect conflicting metadata for the same digest
+- [x] filter releases by exact application and use case
+- [x] evaluate availability, API, ABI, backend, Harness version and profile support
+- [x] evaluate minimum and recommended RAM
+- [x] calculate storage using download and import copies plus safety margin
+- [x] add deterministic validator and compatibility tests
+- [x] validate with repository CI
+- [-] validate public module documentation
 
 ## Validation history
 
@@ -78,35 +79,34 @@
 | `30953791509` | failed | Kotlin passed; remaining failure limited to Markdown trailing whitespace |
 | `30954312737` | failed | Markdown and native checks passed; Detekt found one long test fixture and two compatibility-validation complexity findings |
 | `30954629742` | failed | Detekt refactor submitted; Spotless required one single-line fixture signature before analysis could continue |
-| current | running | Exact fixture format applied and tracker updated to trigger validation on the latest branch state |
+| `30954976390` | passed | Repository guards, Spotless, Detekt, catalog tests, Android Lint, downstream compilation, native tests and packaging all passed |
+| current | running | Public module README and validated progress state submitted |
 
 ## Key commits
 
 | Commit | Change | Validation |
 |---|---|---|
 | `639a9d4f99da` | Main-based implementation plan | Replaced by consolidated plan |
-| `a906b5b3dde4` | Add model-catalog module | CI pending |
-| `15b7121e6730` | Register module in settings | CI pending |
-| `0a69d294315f` | Add catalog domain contracts | CI pending |
-| `74173e1c275e` | Add fail-closed catalog validation | Refactored by later commits |
-| `9e8fe0b6fa26` | Add target filtering and compatibility evaluation | CI pending |
-| `4db85c723cfb` | Add test fixtures | Refactored by later commits |
-| `df61f7fba777` | Add validator tests | CI pending |
-| `ff00a710166d` | Add compatibility tests | CI pending |
-| `e336989d3eea` | Add ADR 0005 | CI pending |
-| `2fa827594cbc` | Index ADR 0005 | CI pending |
-| `0fce18d1cfec` | Map module in `AGENTS.md` | Navigation guard passed |
-| `6273639690b0` | Include catalog module in CI matrix | Scope confirmed by later runs |
-| `488f17c06fc3` | Restore final CI workflow after formatting diagnostics | Native tests passed; Markdown cleanup required |
-| `ddef21a1de1e` | Consolidate and normalize main-based plan | Markdown guard passed in later run |
-| `0388727346aa` | Decompose compatibility validation into bounded checks | Detekt pending |
-| `3267ecac0306` | Replace long-parameter fixture with transform-based fixture | Detekt pending |
-| `d0dfbc3ac58f` | Adapt compatibility tests to transformed fixtures | Spotless identified one fixture signature only |
-| `4aac5a2ff32a` | Apply exact Spotless fixture format | Validation trigger pending |
+| `a906b5b3dde4` | Add model-catalog module | Passed in run `30954976390` |
+| `15b7121e6730` | Register module in settings | Passed in run `30954976390` |
+| `0a69d294315f` | Add catalog domain contracts | Passed in run `30954976390` |
+| `74173e1c275e` | Add fail-closed catalog validation | Refactored and passed in run `30954976390` |
+| `9e8fe0b6fa26` | Add target filtering and compatibility evaluation | Passed in run `30954976390` |
+| `4db85c723cfb` | Add test fixtures | Refactored and passed in run `30954976390` |
+| `df61f7fba777` | Add validator tests | Passed in run `30954976390` |
+| `ff00a710166d` | Add compatibility tests | Passed in run `30954976390` |
+| `e336989d3eea` | Add ADR 0005 | Passed in run `30954976390`; review pending |
+| `2fa827594cbc` | Index ADR 0005 | Passed in run `30954976390` |
+| `0fce18d1cfec` | Map module in `AGENTS.md` | Passed in run `30954976390` |
+| `6273639690b0` | Include catalog module in CI matrix | Passed in run `30954976390` |
+| `0388727346aa` | Decompose compatibility validation into bounded checks | Passed Detekt in run `30954976390` |
+| `3267ecac0306` | Replace long-parameter fixture with transform-based fixture | Passed Detekt in run `30954976390` |
+| `4aac5a2ff32a` | Apply exact Spotless fixture format | Passed Spotless in run `30954976390` |
+| `cfcb4e0bc533` | Add public module README | Validation pending |
 
 ## Next implementation slice
 
-After the current module is green:
+After the README validation completes:
 
 1. add a bounded catalog codec contract and deterministic JSON implementation;
 2. add app-private atomic catalog persistence;
@@ -114,17 +114,17 @@ After the current module is green:
 4. add a fake catalog source and synchronization service;
 5. only then introduce the HTTPS download module.
 
-## Validation gate
-
-The current slice is not complete until all relevant checks pass:
+## Validation gate for the catalog foundation
 
 - [x] repository navigation and script guards
-- [-] Spotless and ktlint
-- [-] Detekt
-- [-] `:models:model-catalog:testDebugUnitTest`
-- [-] Android Lint for `model-catalog`
-- [-] downstream application compilation
+- [x] Spotless and ktlint
+- [x] Detekt
+- [x] `:models:model-catalog:testDebugUnitTest`
+- [x] Android Lint for `model-catalog`
+- [x] downstream application compilation
 - [x] native host tests
-- [ ] aggregate required `Repository validation` check
+- [x] Android native packaging
+- [x] aggregate required `Repository validation` check
+- [-] documentation-only follow-up validation
 
 No task marked `[-]` becomes `[x]` solely because code exists.
