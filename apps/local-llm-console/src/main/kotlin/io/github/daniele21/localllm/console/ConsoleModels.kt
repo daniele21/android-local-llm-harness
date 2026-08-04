@@ -94,7 +94,12 @@ data class ConsoleRequestDetail(
     val sourceError: String? = null,
 )
 
-data class ConsoleScreen(val title: String, val subtitle: String, val cards: List<ConsoleCard>)
+data class ConsoleScreen(
+    val title: String,
+    val subtitle: String,
+    val cards: List<ConsoleCard>,
+    val charts: List<ConsoleChart> = emptyList(),
+)
 
 data class ConsoleCard(
     val title: String,
@@ -102,6 +107,20 @@ data class ConsoleCard(
     val emphasis: ConsoleEmphasis = ConsoleEmphasis.NEUTRAL,
     val openRequestId: RequestId? = null,
 )
+
+data class ConsoleChart(
+    val title: String,
+    val subtitle: String,
+    val valueUnit: String,
+    val series: List<ConsoleChartSeries>,
+    val minimumValue: Double? = null,
+    val maximumValue: Double? = null,
+    val valueLabels: Map<Int, String> = emptyMap(),
+)
+
+data class ConsoleChartSeries(val label: String, val points: List<ConsoleChartPoint>)
+
+data class ConsoleChartPoint(val timestampEpochMs: Long, val value: Double?)
 
 enum class ConsoleEmphasis {
     NEUTRAL,
