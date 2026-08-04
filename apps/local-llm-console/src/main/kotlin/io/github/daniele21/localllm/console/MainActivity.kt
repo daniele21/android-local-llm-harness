@@ -158,28 +158,9 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
-        val currentSnapshot = snapshot ?: return
-        val displaySnapshot = currentSnapshot.copy(
-            healthControl = currentSnapshot.healthControl.copy(
-                executionInProgress = healthExecutionInProgress,
-                sourceError = healthExecutionError ?: currentSnapshot.healthControl.sourceError,
-            ),
-        )
-        val currentDetail = requestDetail
-        val baseScreen = when {
-            currentDetail != null -> presenter.presentRequestDetail(currentDetail)
-            selectedTab == ConsoleTab.HEALTH -> healthPresenter.present(displaySnapshot)
-            else -> presenter.present(selectedTab, displaySnapshot)
-        }
-        val screen = if (currentDetail == null && selectedTab == ConsoleTab.RESOURCES) {
-            baseScreen.copy(
-                subtitle = "Persisted memory and thermal trends from explicit resource captures",
-                charts = resourceChartPresenter.charts(displaySnapshot.resources),
-            )
-        } else {
-            baseScreen
-        }
-        backButton.visibility = if (currentDetail == null) View.GONE else View.VISIBLE
+        val displaySnapshot = displaySnapshot() ?: return
+        val screen = screenFor(displaySnapshot)
+        backButton.visibility = if (requestDetail == null) View.GONE else View.VISIBLE
         updatedAt.text = "Captured ${displaySnapshot.capturedAtEpochMs}"
         content.removeAllViews()
         content.addView(label(screen.title, 22f, bold = true).apply { setPadding(0, 20, 0, 10) })
@@ -195,6 +176,33 @@ class MainActivity : Activity() {
             )
         }
         screen.cards.forEach { card -> content.addView(card(card)) }
+    }
+
+    private fun displaySnapshot(): ConsoleSnapshot? {
+        val currentSnapshot = snapshot ?: return null
+        return currentSnapshot.copy(
+            healthControl = currentSnapshot.healthControl.copy(
+                executionInProgress = healthExecutionInProgress,
+                sourceError = healthExecutionError ?: currentSnapshot.healthControl.sourceError,
+            ),
+        )
+    }
+
+    private fun screenFor(displaySnapshot: ConsoleSnapshot): ConsoleScreen {
+        requestDetail?.let { detail -> return presenter.presentRequestDetail(detail) }
+        val baseScreen = if (selectedTab == ConsoleTab.HEALTH) {
+            healthPresenter.present(displaySnapshot)
+        } else {
+            presenter.present(selectedTab, displaySnapshot)
+        }
+        return if (selectedTab == ConsoleTab.RESOURCES) {
+            baseScreen.copy(
+                subtitle = "Persisted memory and thermal trends from explicit resource captures",
+                charts = resourceChartPresenter.charts(displaySnapshot.resources),
+            )
+        } else {
+            baseScreen
+        }
     }
 
     private fun actionButton(action: ConsoleAction): Button = Button(this).apply {
