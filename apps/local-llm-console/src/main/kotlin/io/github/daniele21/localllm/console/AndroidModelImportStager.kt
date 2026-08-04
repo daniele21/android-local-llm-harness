@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import java.io.File
 import java.security.MessageDigest
 
+@Suppress("TooGenericExceptionCaught")
 class AndroidModelImportStager(
     context: Context,
     private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES,
