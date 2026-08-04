@@ -376,11 +376,7 @@ class MainActivity :
         setPadding(0, dp(28), 0, dp(10))
     }
 
-    private fun input(
-        hint: String,
-        value: String,
-        inputType: Int = InputType.TYPE_CLASS_TEXT,
-    ): EditText = EditText(this).apply {
+    private fun input(hint: String, value: String, inputType: Int = InputType.TYPE_CLASS_TEXT): EditText = EditText(this).apply {
         this.hint = hint
         this.inputType = inputType
         setText(value)
