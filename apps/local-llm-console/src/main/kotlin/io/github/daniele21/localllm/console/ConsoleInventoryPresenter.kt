@@ -198,8 +198,7 @@ class ConsoleInventoryPresenter {
         else -> "Failed"
     }
 
-    private fun isActive(digest: ModelDigest, loadedModel: String): Boolean =
-        digest.sha256.equals(loadedModel, ignoreCase = true)
+    private fun isActive(digest: ModelDigest, loadedModel: String): Boolean = digest.sha256.equals(loadedModel, ignoreCase = true)
 
     private fun formatBytes(value: Long): String {
         val mib = value.toDouble() / BYTES_PER_MIB
