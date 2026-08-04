@@ -1,8 +1,10 @@
 # Model catalog
 
-`models/model-catalog` contains the UI-independent domain and policy layer for administrator-managed GGUF releases.
+`models/model-catalog` contains the UI-independent control-plane layer for administrator-managed GGUF releases.
 
-The module does not perform networking, write final model bytes or load a model into the inference runtime. It validates catalog data and decides whether a release can be offered to a specific application/use-case target on a specific device.
+The module represents and validates catalog entries, evaluates whether a release may be offered to an application/use-case target, decodes a bounded JSON wire format, persists the last validated snapshot atomically and coordinates explicit refreshes through an abstract source.
+
+It does not implement HTTP, download model bytes, publish artifacts into `ModelStore` or load models into the inference runtime.
 
 ## Responsibilities
 
@@ -11,12 +13,19 @@ The module does not perform networking, write final model bytes or load a model 
 - validate bounded catalog metadata;
 - filter releases by exact `applicationId + useCaseId`;
 - evaluate release, platform, backend, profile, RAM and storage compatibility;
-- expose stable reason and warning codes.
+- decode and encode the strict catalog JSON schema;
+- persist the last validated catalog in app-private storage;
+- reject revision rollback, same-revision conflicts and catalog identity changes;
+- expose fresh, stale and expired cache states;
+- coordinate explicit refresh, conditional metadata and typed failures;
+- preserve the last good catalog when refresh fails.
 
 ## Non-responsibilities
 
-- HTTP catalog retrieval;
-- JSON decoding or signature verification;
+- choosing the catalog endpoint;
+- HTTP, authentication, redirects or certificate policy;
+- background refresh scheduling;
+- signed-manifest verification;
 - partial-file management;
 - model download;
 - GGUF inspection;
@@ -24,176 +33,145 @@ The module does not perform networking, write final model bytes or load a model 
 - model selection or runtime loading;
 - Android UI.
 
-Those concerns are implemented by later catalog persistence, download and application-integration layers. Final GGUF publication remains owned by `models/model-store`.
+Those concerns belong to later source, download and application-integration layers. Final GGUF publication remains owned by `models/model-store`.
 
-## Core types
+## Catalog domain
 
-### `CatalogModelDocument`
+`CatalogModelDocument` represents one immutable catalog revision. Every release connects a stable model/version identity to an exact SHA-256 digest, byte size, HTTPS distribution URI, compatibility policy, allowed targets, application-reviewed `ModelProfileKey` and license metadata.
 
-Represents one versioned catalog snapshot:
+The URL is a location, not model identity. Installation and deduplication continue to use the digest.
 
-```kotlin
-val document = CatalogModelDocument(
-    schemaVersion = 1,
-    catalogId = CatalogId("public-models"),
-    revision = 42,
-    generatedAtEpochMs = generatedAt,
-    expiresAtEpochMs = expiresAt,
-    entries = releases,
-)
-```
-
-A document contains no executable behavior. Its entries are untrusted until `CatalogValidator` accepts them.
-
-### `CatalogModelRelease`
-
-Connects:
-
-- stable model and release IDs;
-- exact `ModelDigest` and expected byte size;
-- HTTPS distribution URI;
-- architecture and quantization labels;
-- compatibility policy;
-- allowed application/use-case targets;
-- application-reviewed `ModelProfileKey`;
-- license and lifecycle metadata.
-
-The URI is a location, not identity. Installation and deduplication use the digest.
-
-### `CatalogTarget`
+Use `CatalogValidator` after decoding and before persistence or display:
 
 ```kotlin
-val target = CatalogTarget(
-    applicationId = ApplicationId("phone-test"),
-    useCaseId = UseCaseId("playground"),
-)
-```
-
-Target matching is exact. The module does not implement wildcards or implicit fallback.
-
-## Validation
-
-Use `CatalogValidator` before persisting or displaying a remotely supplied document:
-
-```kotlin
-val result = CatalogValidator().validate(
+val validation = CatalogValidator().validate(
     document = document,
     nowEpochMs = clock.nowEpochMs(),
 )
 
-if (!result.valid) {
-    result.violations.forEach { violation ->
+if (!validation.valid) {
+    validation.violations.forEach { violation ->
         logger.record(violation.code, violation.path)
     }
 }
 ```
 
-The validator checks:
+Violation paths are structural and privacy-safe. They do not contain remote values.
 
-- supported schema;
-- catalog ID, revision and validity window;
-- maximum entry count;
-- duplicate releases;
-- conflicting size metadata for one digest;
-- SHA-256 syntax and positive size;
-- HTTPS URI and safe GGUF file name;
-- architecture and quantization identifiers;
-- compatibility fields;
-- required targets;
-- license links;
-- replacement consistency.
+## JSON codec
 
-Violation paths are structural and privacy-safe. They do not include remote values.
-
-## Target filtering
+`CatalogJsonCodec` provides a deterministic schema-versioned representation without relying on Android JSON APIs or reflection.
 
 ```kotlin
-val visibleReleases = CatalogQueries.releasesForTarget(document, target)
-```
-
-Filtering alone does not mean a release is downloadable. Every visible release must also pass compatibility evaluation.
-
-## Compatibility evaluation
-
-`CatalogCompatibilityEvaluator` requires two application-owned collaborators:
-
-```kotlin
-interface CatalogVersionMatcher {
-    fun isInRange(
-        currentVersion: String,
-        minimumInclusive: String?,
-        maximumExclusive: String?,
-    ): Boolean
-}
-
-interface CatalogProfileResolver {
-    fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean
+val decoded = when (val result = CatalogJsonCodec().decode(responseBytes)) {
+    is CatalogDecodeResult.Success -> result.document
+    is CatalogDecodeResult.Failure -> return recordFailure(result.error.code)
 }
 ```
 
-The catalog cannot define arbitrary prompt or backend policy. `CatalogProfileResolver` only accepts keys reviewed and shipped by the application.
-
-Example:
-
-```kotlin
-val result = evaluator.evaluate(
-    release = release,
-    target = target,
-    device = CatalogDeviceProfile(
-        sdkInt = sdkInt,
-        supportedAbis = supportedAbis,
-        totalMemoryBytes = totalMemoryBytes,
-        availableStorageBytes = availableStorageBytes,
-        harnessVersion = harnessVersion,
-        backendId = "llama.cpp",
-    ),
-)
-
-if (result.compatible) {
-    showDownloadAction(result.requiredStorageBytes)
-} else {
-    showBlockedReasons(result.reasons)
-}
-```
-
-Hard blockers include target authorization, release state, Android API, ABI, backend, Harness version, profile support, minimum RAM and storage. Deprecation and recommended-RAM shortfalls are warnings.
-
-## Storage requirement
-
-The default evaluator accounts for the current installation pipeline:
+Default limits are:
 
 ```text
-2 × artifact size
-+ catalog minimum free storage
-+ 128 MiB safety margin
+maximum document bytes: 1 MiB
+maximum JSON depth: 16
+maximum JSON nodes: 20,000
+maximum string length: 8,192 UTF-16 code units
 ```
 
-The two copies represent the private download file and the current `ModelStore.import()` staging copy. This policy must be revisited if `ModelStore` later gains a separately reviewed verified-stream or adopt-file API.
+The decoder fails closed on malformed UTF-8, invalid Unicode, duplicate object keys, duplicate set values, unknown fields, missing fields, wrong types, non-integral numeric fields, invalid enum values and invalid URI syntax. Optional schema fields are represented explicitly as JSON `null`; omission is not treated as a default.
+
+Encoding is canonical for the current schema. Object fields have a stable order and set-backed values are sorted before serialization.
+
+## App-private persistence
+
+`FileModelCatalogRepository` stores one state envelope in a caller-supplied app-private directory:
+
+```text
+<catalog-root>/catalog-state.json
+```
+
+The envelope contains:
+
+- a storage schema version;
+- the canonical catalog JSON;
+- local fetch metadata such as ETag and Last-Modified;
+- the last typed refresh failure;
+- the local persistence timestamp.
+
+Replacement is written to a temporary file in the same directory, flushed and synchronized, then moved into place atomically when supported. An unsupported atomic move falls back to a same-filesystem replacement. Abandoned repository-owned temporary files are removed when the repository is first opened.
+
+Before replacement, the repository:
+
+1. validates the incoming document at the current time;
+2. validates bounded local metadata;
+3. rejects a different `catalogId` once a catalog is established;
+4. rejects a lower revision;
+5. rejects a different payload at the same revision;
+6. encodes the complete candidate state;
+7. publishes it only after the durable write succeeds.
+
+A failed refresh or rejected candidate does not delete or replace the last good catalog.
+
+## Freshness and authorization
+
+A cached document is exposed with one of four states:
+
+- `EMPTY`: no validated catalog is available;
+- `FRESH`: the document has not reached `expiresAtEpochMs`;
+- `STALE`: the document is expired but remains available for diagnostics during the configured grace period;
+- `EXPIRED`: the grace period has also elapsed.
+
+`CatalogSnapshot.canAuthorizeDownloads` is true only while the snapshot is `FRESH`. Stale or expired entries may be shown with their status but cannot authorize a new model download.
+
+The default stale grace period is seven days and can be replaced by application policy.
+
+## Explicit synchronization
+
+`ModelCatalogSynchronizer` connects three replaceable boundaries:
+
+```text
+ModelCatalogSource
+        ↓
+CatalogDocumentCodec + CatalogValidator
+        ↓
+ModelCatalogRepository
+```
+
+A source receives `CatalogFetchRequest` containing the current ETag, Last-Modified value and revision. It returns updated bytes, `NotModified`, or a typed failure. The source owns transport behavior; the synchronizer owns decoding, validation, revision enforcement, persistence and failure normalization.
+
+Fetch time is recorded from the local `CatalogClock`, not trusted from remote data. A `NotModified` response refreshes local response metadata but does not extend the document's own expiry window or re-authorize a stale catalog.
+
+Refresh is explicit. The module does not start jobs, register alarms or perform background work.
 
 ## Threading
 
-The current module is immutable and synchronous. It does not start threads, perform I/O or own lifecycle resources. Callers may execute validation and compatibility evaluation on any thread appropriate for their workload.
+Domain objects and codec operations are synchronous. `FileModelCatalogRepository` serializes its mutable state with an internal lock and performs file I/O synchronously. `ModelCatalogSynchronizer` invokes its source synchronously.
+
+Applications should call persistence and refresh operations from an appropriate worker dispatcher rather than the Android main thread. The module does not own executors or coroutine scopes.
 
 ## Errors and privacy
 
-The module returns fixed enums such as `CatalogViolationCode` and `CatalogCompatibilityReason`. Callers should persist these codes rather than arbitrary remote values or exception messages.
+The module exposes fixed error enums through `CatalogCodecErrorCode`, `CatalogFailureCode`, `CatalogReplaceRejectionCode`, validation violations and compatibility reasons.
 
-Do not log:
+Do not log or persist outside the private state envelope:
 
-- signed URLs;
-- authorization data;
-- private paths;
+- authorization headers or credentials;
+- signed download URLs;
+- private filesystem paths;
 - model bytes;
 - prompts or generated output.
 
 ## Tests
 
-Run:
+Run the targeted gate before pushing catalog changes:
 
 ```bash
-./gradlew :models:model-catalog:testDebugUnitTest
-./gradlew :models:model-catalog:lintDebug
-./gradlew detekt spotlessCheck
+./gradlew spotlessCheck
+./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+./gradlew :models:model-catalog:compileDebugKotlin \
+  :models:model-catalog:compileDebugUnitTestKotlin \
+  :models:model-catalog:testDebugUnitTest \
+  :models:model-catalog:lintDebug
 ```
 
-Repository CI includes this module in the mandatory validation matrix.
+Tests cover deterministic codec behavior, malformed and oversized input, duplicate data, atomic persistence, process-restart reload, rollback and conflict rejection, freshness transitions, conditional refresh, source failure and preservation of the last good catalog.
