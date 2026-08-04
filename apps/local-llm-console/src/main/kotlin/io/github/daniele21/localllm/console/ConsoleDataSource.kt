@@ -14,6 +14,7 @@ class TelemetryConsoleDataSource(
     private val telemetryRepository: TelemetryRepository,
     private val runtimeStateProvider: ConsoleRuntimeStateProvider = DisconnectedRuntimeStateProvider,
     private val modelInventoryProvider: ConsoleModelInventoryProvider = DisconnectedModelInventoryProvider,
+    private val healthControl: ConsoleHealthControl = DisconnectedHealthControl,
     private val clockEpochMs: () -> Long = System::currentTimeMillis,
     private val runLimit: Int = 100,
     private val logLimit: Int = 500,
@@ -29,6 +30,7 @@ class TelemetryConsoleDataSource(
         val capturedAt = clockEpochMs()
         val runtime = safelyLoadRuntime()
         val modelInventory = safelyLoadModelInventory()
+        val healthControlState = safelyLoadHealthControl()
 
         return try {
             ConsoleSnapshot(
@@ -40,6 +42,7 @@ class TelemetryConsoleDataSource(
                 resources = telemetryRepository.recentResourceSnapshots(resourceLimit),
                 benchmarkBaselines = telemetryRepository.benchmarkBaselines(),
                 modelInventory = modelInventory,
+                healthControl = healthControlState,
             )
         } catch (_: RuntimeException) {
             ConsoleSnapshot(
@@ -51,6 +54,7 @@ class TelemetryConsoleDataSource(
                 resources = emptyList(),
                 benchmarkBaselines = emptyList(),
                 modelInventory = modelInventory,
+                healthControl = healthControlState,
                 sourceError = TELEMETRY_SOURCE_ERROR,
             )
         }
@@ -85,6 +89,15 @@ class TelemetryConsoleDataSource(
         DisconnectedModelInventoryProvider.snapshot().copy(
             source = "Unavailable",
             sourceError = MODEL_INVENTORY_SOURCE_ERROR,
+        )
+    }
+
+    private fun safelyLoadHealthControl(): ConsoleHealthControlState = try {
+        healthControl.snapshot()
+    } catch (_: RuntimeException) {
+        DisconnectedHealthControl.snapshot().copy(
+            source = "Unavailable",
+            sourceError = HEALTH_EXECUTION_SOURCE_ERROR,
         )
     }
 
