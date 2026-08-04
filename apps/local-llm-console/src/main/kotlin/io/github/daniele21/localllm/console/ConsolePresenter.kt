@@ -1,6 +1,5 @@
 package io.github.daniele21.localllm.console
 
-import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -17,6 +16,7 @@ import java.util.Locale
 class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     private val inventoryPresenter = ConsoleInventoryPresenter()
     private val cachePresenter = ConsoleCachePresenter()
+    private val benchmarkPresenter = ConsoleBenchmarkPresenter(zoneId)
     private val timestampFormatter = DateTimeFormatter
         .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
         .withZone(zoneId)
@@ -30,7 +30,7 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         ConsoleTab.HEALTH -> health(snapshot)
         ConsoleTab.CACHES -> cachePresenter.present(snapshot)
         ConsoleTab.RESOURCES -> resources(snapshot)
-        ConsoleTab.BENCHMARKS -> benchmarks(snapshot)
+        ConsoleTab.BENCHMARKS -> benchmarkPresenter.present(snapshot)
     }
 
     fun presentRequestDetail(detail: ConsoleRequestDetail): ConsoleScreen {
@@ -117,7 +117,8 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
                 "Logs: ${snapshot.logs.size}",
                 "Health checks: ${snapshot.health.size}",
                 "Resource snapshots: ${snapshot.resources.size}",
-                "Benchmark baselines: ${snapshot.benchmarkBaselines.size}",
+                "Active benchmark baselines: ${snapshot.benchmarkBaselines.size}",
+                "Retained benchmark captures: ${snapshot.benchmarkHistory.size}",
                 "Captured: ${formatTimestamp(snapshot.capturedAtEpochMs)}",
             ),
         )
@@ -163,14 +164,6 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         subtitle = "Persisted resource snapshots",
         cards = snapshot.resources.map { resourceCard(it) }.ifEmpty {
             listOf(emptyCard("No resource snapshots recorded"))
-        },
-    )
-
-    private fun benchmarks(snapshot: ConsoleSnapshot): ConsoleScreen = ConsoleScreen(
-        title = "Benchmark baselines",
-        subtitle = "Current active baseline for each app, use case, model and load class",
-        cards = snapshot.benchmarkBaselines.map { benchmarkCard(it) }.ifEmpty {
-            listOf(emptyCard("No benchmark baselines recorded"))
         },
     )
 
@@ -261,21 +254,6 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
         },
     )
 
-    private fun benchmarkCard(baseline: BenchmarkBaseline): ConsoleCard = ConsoleCard(
-        title = "${baseline.key.applicationId.value} · ${baseline.key.useCaseId.value}",
-        lines = listOf(
-            "Model: ${shortDigest(baseline.key.modelDigest.sha256)}",
-            "Load class: ${baseline.key.modelLoadKind.name}",
-            "Captured: ${formatTimestamp(baseline.capturedAtEpochMs)}",
-            "Samples: ${baseline.sampleCount}",
-            "TTFT median / p95: ${formatMetric(baseline.medianTimeToFirstTokenMs, "ms")} / " +
-                formatMetric(baseline.p95TimeToFirstTokenMs, "ms"),
-            "Total median / p95: ${formatMetric(baseline.medianTotalMs, "ms")} / " +
-                formatMetric(baseline.p95TotalMs, "ms"),
-            "Decode median: ${formatMetric(baseline.medianDecodeTokensPerSecond, "tok/s")}",
-        ),
-    )
-
     private fun emptyCard(message: String, title: String = "Empty state"): ConsoleCard = ConsoleCard(
         title = title,
         lines = listOf(message),
@@ -294,10 +272,6 @@ class ConsolePresenter(zoneId: ZoneId = ZoneId.systemDefault()) {
     private fun formatOffset(value: Long): String = if (value >= 0) "+$value ms" else "$value ms"
 
     private fun formatRate(value: Double?): String = value?.let { String.format(Locale.US, "%.2f tok/s", it) }
-        ?: "Unavailable"
-
-    private fun formatMetric(value: Double?, unit: String): String = value
-        ?.let { String.format(Locale.US, "%.2f %s", it, unit) }
         ?: "Unavailable"
 
     private fun formatBytes(value: Long?): String {
