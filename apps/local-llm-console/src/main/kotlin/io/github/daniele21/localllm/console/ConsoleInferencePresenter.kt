@@ -156,7 +156,9 @@ class ConsoleInferencePresenter {
 
     private fun phaseEmphasis(phase: ConsoleInferencePhase): ConsoleEmphasis = when (phase) {
         ConsoleInferencePhase.COMPLETED -> ConsoleEmphasis.POSITIVE
+
         ConsoleInferencePhase.FAILED -> ConsoleEmphasis.NEGATIVE
+
         ConsoleInferencePhase.DISCONNECTED,
         ConsoleInferencePhase.PREPARING,
         ConsoleInferencePhase.QUEUED,
