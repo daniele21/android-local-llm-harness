@@ -16,11 +16,7 @@ class CatalogCompatibilityEvaluator(
         require(importCopyCount >= 1)
     }
 
-    fun evaluate(
-        release: CatalogModelRelease,
-        target: CatalogTarget,
-        device: CatalogDeviceProfile,
-    ): CatalogCompatibilityResult {
+    fun evaluate(release: CatalogModelRelease, target: CatalogTarget, device: CatalogDeviceProfile): CatalogCompatibilityResult {
         val reasons = linkedSetOf<CatalogCompatibilityReason>()
         val warnings = linkedSetOf<CatalogCompatibilityWarning>()
 
