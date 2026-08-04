@@ -15,6 +15,7 @@ enum class ConsoleTab(val label: String) {
     RUNS("Runs"),
     LOGS("Logs"),
     HEALTH("Health"),
+    CACHES("Caches"),
     RESOURCES("Resources"),
     BENCHMARKS("Benchmarks"),
 }
@@ -85,6 +86,7 @@ data class ConsoleSnapshot(
     val benchmarkBaselines: List<BenchmarkBaseline>,
     val modelInventory: ConsoleModelInventory = DisconnectedModelInventoryProvider.snapshot(),
     val healthControl: ConsoleHealthControlState = DisconnectedHealthControl.snapshot(),
+    val cacheControl: ConsoleCacheControlState = DisconnectedCacheControl.snapshot(),
     val sourceError: String? = null,
 )
 
@@ -127,12 +129,14 @@ data class ConsoleChartPoint(val timestampEpochMs: Long, val value: Double?)
 enum class ConsoleActionType {
     RUN_ALL_HEALTH_CHECKS,
     RUN_HEALTH_CHECKS,
+    REPAIR_CACHE,
 }
 
 data class ConsoleAction(
     val type: ConsoleActionType,
     val label: String,
     val healthCheckIds: List<String> = emptyList(),
+    val cacheId: String? = null,
     val enabled: Boolean = true,
 )
 
