@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: agent/recover-model-management
-          fetch-depth: 7
+          fetch-depth: 8
       - name: Apply focused recovery
         shell: bash
         run: |
@@ -32,6 +32,8 @@ jobs:
           lines[276] = ""
           lines[368] = "if old in text:\n    text = text.replace(old, new, 1)\nelse:\n    anchor = '                    HarnessPrimaryButton(\\n                        \"Use in Playground\",'\n    start = text.index(anchor)\n    end_marker = '                        onSelectInstalled(installed)\\n                    }\\n'\n    end = text.index(end_marker, start) + len(end_marker)\n    text = text[:start] + new + text[end:]"
           lines[369] = "ui.write_text(text)"
+          lines[496] = "if old in text:\n    text = text.replace(old, new, 1)\nelse:\n    anchor = '                        HarnessSecondaryButton(\"Remove model\"'\n    start = text.index(anchor)\n    end_marker = '                            afterPlaygroundRuntimeReleased { controller.removeModel() }\\n                        }\\n'\n    end = text.index(end_marker, start) + len(end_marker)\n    text = text[:start] + new + text[end:]"
+          lines[497] = "main.write_text(text)"
           Path('/tmp/recover_model_management.py').write_text('\n'.join(lines) + '\n')
           PY
           python3 /tmp/recover_model_management.py
