@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title description">
+  <title id="title">Harness symbol</title>
+  <desc id="description">Two opposing brackets connected by a four-node gradient bridge.</desc>
+  <g id="harness-symbol">
+    <path id="left-bracket" fill="#7C5CFC" d="M8,8 L33,20 L33,42 L16,50 L33,58 L33,80 L8,92 Z" />
+    <path id="right-bracket" fill="#25C2A0" d="M92,8 L67,20 L67,42 L84,50 L67,58 L67,80 L92,92 Z" />
+    <path id="bridge-primary" fill="#7C5CFC" d="M41.964,48.724 H44.643 V51.276 H41.964 Z" />
+    <path id="bridge-indigo" fill="#6467EB" d="M46.429,48.724 H49.107 V51.276 H46.429 Z" />
+    <path id="bridge-blue" fill="#3E97CD" d="M50.893,48.724 H53.571 V51.276 H50.893 Z" />
+    <path id="bridge-secondary" fill="#25C2A0" d="M55.357,48.724 H58.036 V51.276 H55.357 Z" />
+  </g>
+</svg>
