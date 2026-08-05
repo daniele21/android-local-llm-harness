@@ -47,6 +47,41 @@ sealed interface BenchmarkCaptureResult {
     data class InsufficientSamples(val available: Int, val required: Int) : BenchmarkCaptureResult
 }
 
+enum class BenchmarkMetric(val displayName: String, val unit: String, val thresholdDirection: BenchmarkThresholdDirection) {
+    MEDIAN_TIME_TO_FIRST_TOKEN("median TTFT", "ms", BenchmarkThresholdDirection.MAXIMUM_RATIO),
+    P95_TOTAL_LATENCY("p95 total latency", "ms", BenchmarkThresholdDirection.MAXIMUM_RATIO),
+    MEDIAN_DECODE_THROUGHPUT("median decode throughput", "tok/s", BenchmarkThresholdDirection.MINIMUM_RATIO),
+}
+
+enum class BenchmarkThresholdDirection {
+    MAXIMUM_RATIO,
+    MINIMUM_RATIO,
+}
+
+data class BenchmarkMetricComparison(
+    val metric: BenchmarkMetric,
+    val baselineValue: Double?,
+    val currentValue: Double?,
+    val ratio: Double?,
+    val thresholdRatio: Double,
+    val regressed: Boolean,
+) {
+    val comparable: Boolean
+        get() = baselineValue != null && currentValue != null
+}
+
+data class BenchmarkComparison(
+    val key: BenchmarkKey,
+    val baseline: BenchmarkBaseline?,
+    val current: BenchmarkBaseline?,
+    val availableSamples: Int,
+    val requiredSamples: Int,
+    val comparisonReady: Boolean,
+    val status: HealthStatus,
+    val detail: String,
+    val metrics: List<BenchmarkMetricComparison>,
+)
+
 class BenchmarkBaselineRecorder(
     private val repository: TelemetryRepository,
     private val policy: BenchmarkPolicy = BenchmarkPolicy(),
@@ -64,6 +99,79 @@ class BenchmarkBaselineRecorder(
     }
 }
 
+class BenchmarkComparisonEvaluator(private val policy: BenchmarkPolicy = BenchmarkPolicy()) {
+    fun compare(key: BenchmarkKey, baseline: BenchmarkBaseline?, runs: List<GenerationRunRecord>): BenchmarkComparison {
+        if (baseline == null) {
+            return BenchmarkComparison(
+                key = key,
+                baseline = null,
+                current = null,
+                availableSamples = 0,
+                requiredSamples = policy.minimumComparisonSamples,
+                comparisonReady = false,
+                status = HealthStatus.WARN,
+                detail = "Benchmark baseline is not available",
+                metrics = emptyList(),
+            )
+        }
+
+        val currentRuns = matchingRuns(runs, key)
+            .filter { (it.completedAtEpochMs ?: Long.MIN_VALUE) > baseline.capturedAtEpochMs }
+            .take(policy.comparisonWindowSize)
+        val current = currentRuns.takeIf { it.isNotEmpty() }
+            ?.toBaseline(key, capturedAtEpochMs = currentRuns.maxOfCompletedAt())
+        val metrics = metricComparisons(baseline, current, policy)
+
+        if (currentRuns.size < policy.minimumComparisonSamples) {
+            return BenchmarkComparison(
+                key = key,
+                baseline = baseline,
+                current = current,
+                availableSamples = currentRuns.size,
+                requiredSamples = policy.minimumComparisonSamples,
+                comparisonReady = false,
+                status = HealthStatus.WARN,
+                detail = "Benchmark comparison needs ${policy.minimumComparisonSamples} post-baseline sample(s)",
+                metrics = metrics,
+            )
+        }
+
+        val comparableMetricCount = metrics.count(BenchmarkMetricComparison::comparable)
+        if (comparableMetricCount == 0) {
+            return BenchmarkComparison(
+                key = key,
+                baseline = baseline,
+                current = current,
+                availableSamples = currentRuns.size,
+                requiredSamples = policy.minimumComparisonSamples,
+                comparisonReady = true,
+                status = HealthStatus.WARN,
+                detail = "Benchmark samples do not contain comparable metrics",
+                metrics = metrics,
+            )
+        }
+
+        val regressions = metrics.filter(BenchmarkMetricComparison::regressed)
+        val status = if (regressions.isEmpty()) HealthStatus.PASS else HealthStatus.FAIL
+        val detail = if (regressions.isEmpty()) {
+            "Benchmark is within baseline across $comparableMetricCount comparable metric(s)"
+        } else {
+            "Benchmark regression detected: ${regressions.joinToString { it.metric.displayName }}"
+        }
+        return BenchmarkComparison(
+            key = key,
+            baseline = baseline,
+            current = current,
+            availableSamples = currentRuns.size,
+            requiredSamples = policy.minimumComparisonSamples,
+            comparisonReady = true,
+            status = status,
+            detail = detail,
+            metrics = metrics,
+        )
+    }
+}
+
 class BenchmarkRegressionHealthCheck(
     private val repository: TelemetryRepository,
     private val key: BenchmarkKey,
@@ -77,60 +185,62 @@ class BenchmarkRegressionHealthCheck(
         key.modelLoadKind.name,
     ).joinToString(":")
 
-    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     override fun evaluate(): HealthAssessment {
         val baseline = repository.benchmarkBaselines().firstOrNull { it.key == key }
-            ?: return HealthAssessment(HealthStatus.WARN, "Benchmark baseline is not available")
-        val currentRuns = matchingRuns(
-            repository.recentRuns(policy.comparisonWindowSize * RUN_LOOKBACK_MULTIPLIER),
-            key,
-        ).filter { (it.completedAtEpochMs ?: Long.MIN_VALUE) > baseline.capturedAtEpochMs }
-            .take(policy.comparisonWindowSize)
-        if (currentRuns.size < policy.minimumComparisonSamples) {
-            return HealthAssessment(
-                HealthStatus.WARN,
-                "Benchmark comparison needs ${policy.minimumComparisonSamples} post-baseline sample(s)",
-            )
-        }
-
-        val current = currentRuns.toBaseline(key, capturedAtEpochMs = currentRuns.maxOfCompletedAt())
-        val regressions = buildList {
-            if (regressedHigher(
-                    baseline.medianTimeToFirstTokenMs,
-                    current.medianTimeToFirstTokenMs,
-                    policy.maxMedianTimeToFirstTokenRatio,
-                )
-            ) {
-                add("median TTFT")
-            }
-            if (regressedHigher(baseline.p95TotalMs, current.p95TotalMs, policy.maxP95TotalRatio)) {
-                add("p95 total latency")
-            }
-            if (regressedLower(
-                    baseline.medianDecodeTokensPerSecond,
-                    current.medianDecodeTokensPerSecond,
-                    policy.minMedianDecodeThroughputRatio,
-                )
-            ) {
-                add("median decode throughput")
-            }
-        }
-        val comparableMetricCount = comparableMetricCount(baseline, current)
-        if (comparableMetricCount == 0) {
-            return HealthAssessment(HealthStatus.WARN, "Benchmark samples do not contain comparable metrics")
-        }
-        return if (regressions.isEmpty()) {
-            HealthAssessment(
-                HealthStatus.PASS,
-                "Benchmark is within baseline across $comparableMetricCount comparable metric(s)",
-            )
-        } else {
-            HealthAssessment(
-                HealthStatus.FAIL,
-                "Benchmark regression detected: ${regressions.joinToString()}",
-            )
-        }
+        val runs = repository.recentRuns(policy.comparisonWindowSize * RUN_LOOKBACK_MULTIPLIER)
+        val comparison = BenchmarkComparisonEvaluator(policy).compare(key, baseline, runs)
+        return HealthAssessment(comparison.status, comparison.detail)
     }
+}
+
+private fun metricComparisons(
+    baseline: BenchmarkBaseline,
+    current: BenchmarkBaseline?,
+    policy: BenchmarkPolicy,
+): List<BenchmarkMetricComparison> = listOf(
+    metricComparison(
+        metric = BenchmarkMetric.MEDIAN_TIME_TO_FIRST_TOKEN,
+        baselineValue = baseline.medianTimeToFirstTokenMs,
+        currentValue = current?.medianTimeToFirstTokenMs,
+        thresholdRatio = policy.maxMedianTimeToFirstTokenRatio,
+    ),
+    metricComparison(
+        metric = BenchmarkMetric.P95_TOTAL_LATENCY,
+        baselineValue = baseline.p95TotalMs,
+        currentValue = current?.p95TotalMs,
+        thresholdRatio = policy.maxP95TotalRatio,
+    ),
+    metricComparison(
+        metric = BenchmarkMetric.MEDIAN_DECODE_THROUGHPUT,
+        baselineValue = baseline.medianDecodeTokensPerSecond,
+        currentValue = current?.medianDecodeTokensPerSecond,
+        thresholdRatio = policy.minMedianDecodeThroughputRatio,
+    ),
+)
+
+private fun metricComparison(
+    metric: BenchmarkMetric,
+    baselineValue: Double?,
+    currentValue: Double?,
+    thresholdRatio: Double,
+): BenchmarkMetricComparison {
+    val ratio = if (baselineValue != null && currentValue != null && baselineValue > 0.0) {
+        currentValue / baselineValue
+    } else {
+        null
+    }
+    val regressed = when (metric.thresholdDirection) {
+        BenchmarkThresholdDirection.MAXIMUM_RATIO -> ratio != null && ratio > thresholdRatio
+        BenchmarkThresholdDirection.MINIMUM_RATIO -> ratio != null && ratio < thresholdRatio
+    }
+    return BenchmarkMetricComparison(
+        metric = metric,
+        baselineValue = baselineValue,
+        currentValue = currentValue,
+        ratio = ratio,
+        thresholdRatio = thresholdRatio,
+        regressed = regressed,
+    )
 }
 
 private fun matchingRuns(runs: List<GenerationRunRecord>, key: BenchmarkKey): List<GenerationRunRecord> = runs.asSequence()
@@ -173,17 +283,5 @@ private fun List<Double>.percentile95(): Double? {
     val index = (ceil(sorted.size * 0.95).toInt() - 1).coerceIn(sorted.indices)
     return sorted[index]
 }
-
-private fun regressedHigher(baseline: Double?, current: Double?, maxRatio: Double): Boolean =
-    baseline != null && current != null && baseline > 0.0 && current / baseline > maxRatio
-
-private fun regressedLower(baseline: Double?, current: Double?, minRatio: Double): Boolean =
-    baseline != null && current != null && baseline > 0.0 && current / baseline < minRatio
-
-private fun comparableMetricCount(baseline: BenchmarkBaseline, current: BenchmarkBaseline): Int = listOf(
-    baseline.medianTimeToFirstTokenMs to current.medianTimeToFirstTokenMs,
-    baseline.p95TotalMs to current.p95TotalMs,
-    baseline.medianDecodeTokensPerSecond to current.medianDecodeTokensPerSecond,
-).count { (left, right) -> left != null && right != null }
 
 private const val RUN_LOOKBACK_MULTIPLIER = 10

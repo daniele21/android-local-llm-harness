@@ -121,6 +121,11 @@ internal object TelemetryEntityMapper {
     fun benchmarkEntity(baseline: BenchmarkBaseline): TelemetryEntities.BenchmarkBaselineEntity =
         TelemetryEntities.BenchmarkBaselineEntity().apply {
             baselineId = baseline.key.stableId
+            applyBenchmarkFields(baseline)
+        }
+
+    fun benchmarkHistoryEntity(baseline: BenchmarkBaseline): TelemetryEntities.BenchmarkBaselineHistoryEntity =
+        TelemetryEntities.BenchmarkBaselineHistoryEntity().apply {
             applicationId = baseline.key.applicationId.value
             useCaseId = baseline.key.useCaseId.value
             modelDigest = baseline.key.modelDigest.sha256
@@ -134,13 +139,25 @@ internal object TelemetryEntityMapper {
             medianDecodeTokensPerSecond = baseline.medianDecodeTokensPerSecond
         }
 
-    fun benchmarkBaseline(entity: TelemetryEntities.BenchmarkBaselineEntity): BenchmarkBaseline = BenchmarkBaseline(
-        key = BenchmarkKey(
-            applicationId = ApplicationId(entity.applicationId),
-            useCaseId = UseCaseId(entity.useCaseId),
-            modelDigest = ModelDigest(entity.modelDigest),
-            modelLoadKind = ModelLoadKind.valueOf(entity.modelLoadKind),
-        ),
+    fun benchmarkBaseline(entity: TelemetryEntities.BenchmarkBaselineEntity): BenchmarkBaseline = benchmarkBaseline(
+        applicationId = entity.applicationId,
+        useCaseId = entity.useCaseId,
+        modelDigest = entity.modelDigest,
+        modelLoadKind = entity.modelLoadKind,
+        capturedAtEpochMs = entity.capturedAtEpochMs,
+        sampleCount = entity.sampleCount,
+        medianTimeToFirstTokenMs = entity.medianTimeToFirstTokenMs,
+        p95TimeToFirstTokenMs = entity.p95TimeToFirstTokenMs,
+        medianTotalMs = entity.medianTotalMs,
+        p95TotalMs = entity.p95TotalMs,
+        medianDecodeTokensPerSecond = entity.medianDecodeTokensPerSecond,
+    )
+
+    fun benchmarkBaseline(entity: TelemetryEntities.BenchmarkBaselineHistoryEntity): BenchmarkBaseline = benchmarkBaseline(
+        applicationId = entity.applicationId,
+        useCaseId = entity.useCaseId,
+        modelDigest = entity.modelDigest,
+        modelLoadKind = entity.modelLoadKind,
         capturedAtEpochMs = entity.capturedAtEpochMs,
         sampleCount = entity.sampleCount,
         medianTimeToFirstTokenMs = entity.medianTimeToFirstTokenMs,
@@ -162,6 +179,49 @@ internal object TelemetryEntityMapper {
             decode(line.substring(0, separator)) to decode(line.substring(separator + 1))
         }
     }
+
+    private fun TelemetryEntities.BenchmarkBaselineEntity.applyBenchmarkFields(baseline: BenchmarkBaseline) {
+        applicationId = baseline.key.applicationId.value
+        useCaseId = baseline.key.useCaseId.value
+        modelDigest = baseline.key.modelDigest.sha256
+        modelLoadKind = baseline.key.modelLoadKind.name
+        capturedAtEpochMs = baseline.capturedAtEpochMs
+        sampleCount = baseline.sampleCount
+        medianTimeToFirstTokenMs = baseline.medianTimeToFirstTokenMs
+        p95TimeToFirstTokenMs = baseline.p95TimeToFirstTokenMs
+        medianTotalMs = baseline.medianTotalMs
+        p95TotalMs = baseline.p95TotalMs
+        medianDecodeTokensPerSecond = baseline.medianDecodeTokensPerSecond
+    }
+
+    @Suppress("LongParameterList")
+    private fun benchmarkBaseline(
+        applicationId: String,
+        useCaseId: String,
+        modelDigest: String,
+        modelLoadKind: String,
+        capturedAtEpochMs: Long,
+        sampleCount: Int,
+        medianTimeToFirstTokenMs: Double?,
+        p95TimeToFirstTokenMs: Double?,
+        medianTotalMs: Double?,
+        p95TotalMs: Double?,
+        medianDecodeTokensPerSecond: Double?,
+    ): BenchmarkBaseline = BenchmarkBaseline(
+        key = BenchmarkKey(
+            applicationId = ApplicationId(applicationId),
+            useCaseId = UseCaseId(useCaseId),
+            modelDigest = ModelDigest(modelDigest),
+            modelLoadKind = ModelLoadKind.valueOf(modelLoadKind),
+        ),
+        capturedAtEpochMs = capturedAtEpochMs,
+        sampleCount = sampleCount,
+        medianTimeToFirstTokenMs = medianTimeToFirstTokenMs,
+        p95TimeToFirstTokenMs = p95TimeToFirstTokenMs,
+        medianTotalMs = medianTotalMs,
+        p95TotalMs = p95TotalMs,
+        medianDecodeTokensPerSecond = medianDecodeTokensPerSecond,
+    )
 
     private fun encode(value: String): String = encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
 

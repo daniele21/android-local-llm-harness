@@ -5,10 +5,13 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,5 +76,36 @@ class HarnessBenchmarkSourceTest {
         decodeTokensPerSecond = 10.0 + index,
         errorCode = null,
         modelLoadKind = loadKind,
+    )
+
+    @Test
+    fun `exposes retained history separately from active baselines`() {
+        val repository = InMemoryTelemetryRepository(maxRuns = 100, maxLogs = 10)
+        val key = BenchmarkKey(
+            ApplicationId("play-internal-phone-test"),
+            UseCaseId("manual-inference-playground"),
+            digest,
+            ModelLoadKind.WARM,
+        )
+        repository.saveBenchmarkBaseline(baseline(key, 10L, 5))
+        repository.saveBenchmarkBaseline(baseline(key, 20L, 6))
+
+        val state = HarnessBenchmarkSource(repository) { model }.snapshot()
+
+        assertEquals(1, state.baselines.size)
+        assertEquals(2, state.history.size)
+        assertTrue(state.history.first().active)
+        assertFalse(state.history.last().active)
+    }
+
+    private fun baseline(key: BenchmarkKey, capturedAt: Long, samples: Int) = BenchmarkBaseline(
+        key = key,
+        capturedAtEpochMs = capturedAt,
+        sampleCount = samples,
+        medianTimeToFirstTokenMs = 20.0,
+        p95TimeToFirstTokenMs = 25.0,
+        medianTotalMs = 50.0,
+        p95TotalMs = 60.0,
+        medianDecodeTokensPerSecond = 12.0,
     )
 }

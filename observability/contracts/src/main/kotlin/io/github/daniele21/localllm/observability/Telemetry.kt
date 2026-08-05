@@ -139,11 +139,17 @@ data class DeveloperDashboardSnapshot(
     val modelCount: Int,
 )
 
-data class TelemetryRetentionPolicy(val maxRuns: Int = 500, val maxLogs: Int = 2_000, val maxResourceSnapshots: Int = 500) {
+data class TelemetryRetentionPolicy(
+    val maxRuns: Int = 500,
+    val maxLogs: Int = 2_000,
+    val maxResourceSnapshots: Int = 500,
+    val maxBenchmarkBaselines: Int = 200,
+) {
     init {
         require(maxRuns > 0) { "maxRuns must be positive" }
         require(maxLogs > 0) { "maxLogs must be positive" }
         require(maxResourceSnapshots > 0) { "maxResourceSnapshots must be positive" }
+        require(maxBenchmarkBaselines > 0) { "maxBenchmarkBaselines must be positive" }
     }
 }
 
@@ -171,6 +177,8 @@ interface TelemetryRepository {
 
     fun benchmarkBaselines(): List<BenchmarkBaseline>
 
+    fun benchmarkBaselineHistory(limit: Int = 100): List<BenchmarkBaseline>
+
     fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot
 }
 
@@ -197,6 +205,8 @@ object NoOpTelemetryRepository : TelemetryRepository {
     override fun recentResourceSnapshots(limit: Int): List<ResourceSnapshot> = emptyList()
 
     override fun benchmarkBaselines(): List<BenchmarkBaseline> = emptyList()
+
+    override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = emptyList()
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = DeveloperDashboardSnapshot(
         runtime = runtime,

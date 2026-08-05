@@ -27,7 +27,12 @@ class RoomTelemetryRepositoryTest {
         val dao = FakeTelemetryDao()
         val repository = RoomTelemetryRepository(
             dao = dao,
-            retention = TelemetryRetentionPolicy(maxRuns = 2, maxLogs = 3, maxResourceSnapshots = 2),
+            retention = TelemetryRetentionPolicy(
+                maxRuns = 2,
+                maxLogs = 3,
+                maxResourceSnapshots = 2,
+                maxBenchmarkBaselines = 2,
+            ),
             executor = Executors.newSingleThreadExecutor(),
         )
 
@@ -59,9 +64,18 @@ class RoomTelemetryRepositoryTest {
             repository.recordResourceSnapshot(resource(3L))
             assertEquals(listOf(3L, 2L), repository.recentResourceSnapshots().map { it.timestampEpochMs })
 
-            val baseline = benchmarkBaseline()
-            repository.saveBenchmarkBaseline(baseline)
-            assertEquals(listOf(baseline), repository.benchmarkBaselines())
+            val firstBaseline = benchmarkBaseline(capturedAtEpochMs = 10L, medianTtft = 20.0)
+            val secondBaseline = benchmarkBaseline(capturedAtEpochMs = 20L, medianTtft = 18.0)
+            val thirdBaseline = benchmarkBaseline(capturedAtEpochMs = 30L, medianTtft = 16.0)
+            repository.saveBenchmarkBaseline(firstBaseline)
+            repository.saveBenchmarkBaseline(secondBaseline)
+            repository.saveBenchmarkBaseline(thirdBaseline)
+
+            assertEquals(listOf(thirdBaseline), repository.benchmarkBaselines())
+            assertEquals(
+                listOf(thirdBaseline, secondBaseline),
+                repository.benchmarkBaselineHistory(),
+            )
         }
     }
 
@@ -118,16 +132,16 @@ class RoomTelemetryRepositoryTest {
         thermalStatus = ThermalStatus.LIGHT,
     )
 
-    private fun benchmarkBaseline(): BenchmarkBaseline = BenchmarkBaseline(
+    private fun benchmarkBaseline(capturedAtEpochMs: Long, medianTtft: Double): BenchmarkBaseline = BenchmarkBaseline(
         key = BenchmarkKey(
             ApplicationId("app"),
             UseCaseId("assistant"),
             ModelDigest("a".repeat(64)),
             ModelLoadKind.WARM,
         ),
-        capturedAtEpochMs = 10L,
+        capturedAtEpochMs = capturedAtEpochMs,
         sampleCount = 5,
-        medianTimeToFirstTokenMs = 20.0,
+        medianTimeToFirstTokenMs = medianTtft,
         p95TimeToFirstTokenMs = 30.0,
         medianTotalMs = 40.0,
         p95TotalMs = 50.0,
@@ -141,8 +155,10 @@ private class FakeTelemetryDao : TelemetryDao {
     private val health = linkedMapOf<String, TelemetryEntities.HealthCheckEntity>()
     private val resources = mutableListOf<TelemetryEntities.ResourceSnapshotEntity>()
     private val baselines = linkedMapOf<String, TelemetryEntities.BenchmarkBaselineEntity>()
+    private val baselineHistory = mutableListOf<TelemetryEntities.BenchmarkBaselineHistoryEntity>()
     private var nextLogId = 1L
     private var nextResourceId = 1L
+    private var nextBaselineHistoryId = 1L
 
     override fun upsertRun(run: TelemetryEntities.GenerationRunEntity) {
         runs[run.requestId] = run
@@ -202,7 +218,26 @@ private class FakeTelemetryDao : TelemetryDao {
 
     override fun benchmarkBaselines(): List<TelemetryEntities.BenchmarkBaselineEntity> = baselines.values.sortedBy { it.baselineId }
 
+    override fun insertBenchmarkBaselineHistory(baseline: TelemetryEntities.BenchmarkBaselineHistoryEntity): Long {
+        baseline.id = nextBaselineHistoryId++
+        baselineHistory += baseline
+        return baseline.id
+    }
+
+    override fun benchmarkBaselineHistory(limit: Int): List<TelemetryEntities.BenchmarkBaselineHistoryEntity> =
+        sortedBaselineHistory().take(limit)
+
+    override fun trimBenchmarkBaselineHistory(maxRows: Int) {
+        val retained = benchmarkBaselineHistory(maxRows).mapTo(mutableSetOf()) { it.id }
+        baselineHistory.removeAll { it.id !in retained }
+    }
+
     private fun sortedLogs(): List<TelemetryEntities.StructuredLogEntity> = logs.sortedWith(
         compareByDescending<TelemetryEntities.StructuredLogEntity> { it.timestampEpochMs }.thenByDescending { it.id },
+    )
+
+    private fun sortedBaselineHistory(): List<TelemetryEntities.BenchmarkBaselineHistoryEntity> = baselineHistory.sortedWith(
+        compareByDescending<TelemetryEntities.BenchmarkBaselineHistoryEntity> { it.capturedAtEpochMs }
+            .thenByDescending { it.id },
     )
 }
