@@ -55,20 +55,17 @@ jobs:
           lines[accepted_guard_index] = "        listener.onStateChanged(initialState)"
 
           install_start = lines.index("    fun install(stableId: String) {")
-          close_start = lines.index("    override fun close()", install_start)
-          handle_index = lines.index("        val handle = synchronized(lock) {", install_start, close_start)
+          handle_index = lines.index("        val handle = synchronized(lock) {", install_start)
           lines[handle_index] = "        val start = synchronized(lock) {"
           publish_index = lines.index(
               '            publishLocked("Installing ${release.displayName}")',
               handle_index,
-              close_start,
           )
           if lines[publish_index + 1] != "            pending":
               raise SystemExit("Unexpected installation synchronized-block result")
           lines[publish_index] = '            pending to publishLocked("Installing ${release.displayName}")'
           del lines[publish_index + 1]
-          close_start -= 1
-          executor_index = lines.index("        executor.execute {", publish_index, close_start)
+          executor_index = lines.index("        executor.execute {", publish_index)
           lines[executor_index:executor_index] = [
               "        val handle = start.first",
               "        listener.onStateChanged(start.second)",
