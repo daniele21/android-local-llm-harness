@@ -317,7 +317,7 @@ class VerifiedModelInstallerTest {
 
         override fun verify(digest: ModelDigest): VerificationResult {
             verifyCount += 1
-            if (verificationFailure) throw IllegalStateException("fixed")
+            if (verificationFailure) error("fixed")
             return VerificationResult(verificationValid, digest, "fixed")
         }
 
