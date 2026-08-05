@@ -3,31 +3,12 @@ plugins {
 }
 
 android {
-    namespace = "io.github.daniele21.localllm.llamacpp"
+    namespace = "io.github.daniele21.localllm.install"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
-    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
-
-        externalNativeBuild {
-            cmake {
-                arguments += "-DANDROID_STL=c++_shared"
-                cppFlags += listOf("-std=c++17", "-Wall", "-Wextra")
-            }
-        }
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 
     compileOptions {
@@ -46,6 +27,8 @@ android {
 dependencies {
     api(project(":core:contracts"))
     api(project(":models:model-profile"))
-    api(project(":models:model-install"))
+    api(project(":models:model-store"))
+    api(project(":models:model-catalog"))
+    api(project(":models:model-download"))
     testImplementation(libs.junit4)
 }

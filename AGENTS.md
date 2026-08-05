@@ -1,6 +1,6 @@
 # Android Local LLM Harness — Coding Agent Guide
 
-This file is the stable entry point for coding agents. Current implementation status belongs in [`docs/roadmap.md`](docs/roadmap.md); target behavior belongs in [`docs/implementation-plan.md`](docs/implementation-plan.md).
+This file is the stable entry point for coding agents. Current implementation status belongs in [`docs/current-state.md`](docs/current-state.md) and [`docs/roadmap.md`](docs/roadmap.md); target behavior belongs in [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## Start here
 
@@ -9,14 +9,15 @@ Read these sources before a non-trivial change:
 1. [`README.md`](README.md) — purpose, toolchain and top-level structure.
 2. [`BRANCHING.md`](BRANCHING.md) — canonical branch and pull-request discipline.
 3. [`docs/architecture.md`](docs/architecture.md) — data-plane and control-plane boundaries.
-4. [`docs/roadmap.md`](docs/roadmap.md) — current status and next priorities.
-5. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
-6. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge and production readiness.
-7. [`docs/api-usage.md`](docs/api-usage.md) — embedded API and lifecycle.
-8. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) — Android validation paths.
-9. [`docs/adr/README.md`](docs/adr/README.md) — accepted architectural decisions.
+4. [`docs/current-state.md`](docs/current-state.md) — active integration and recovery order.
+5. [`docs/roadmap.md`](docs/roadmap.md) — detailed implementation status and remaining evidence.
+6. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
+7. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge and production readiness.
+8. [`docs/api-usage.md`](docs/api-usage.md) — embedded API and lifecycle.
+9. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) — Android validation paths.
+10. [`docs/adr/README.md`](docs/adr/README.md) — accepted architectural decisions.
 
-When sources disagree, use this precedence: executable contracts and tests, accepted ADRs, architecture, implementation plan, roadmap, README and this guide. Do not silently reconcile contradictions.
+When sources disagree, use this precedence: executable contracts and tests, accepted ADRs, architecture, implementation plan, current-state ledger, roadmap, README and this guide. Do not silently reconcile contradictions.
 
 ## Non-negotiable architecture invariants
 
@@ -24,6 +25,8 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - Never expose native pointers, backend structures or backend-owned handles outside the backend module.
 - Keep runtime orchestration independent from transport and persistence implementations.
 - Resolve models explicitly through `applicationId + useCaseId`; never silently select or substitute a model.
+- Keep remote catalog selection, verified transfer, installation, binding and runtime loading as separate explicit operations.
+- Never expose a verified-download backing path; installation consumes only an opaque handle plus expected immutable identity.
 - Keep one loaded model and one active decode by default until measurements justify another policy.
 - Keep prompts and generated content out of normal telemetry and shared validation reports.
 - Store GGUF artifacts by immutable SHA-256 identity and never commit or bundle model binaries.
@@ -39,10 +42,11 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `core/contracts` | Stable request, response, session, metric and error contracts |
 | `core/runtime-core` | Runtime orchestration, scheduling, lifecycle and memory policy |
 | `models/model-profile` | GGUF artifacts, load profiles, use cases and app bindings |
-| `models/model-store` | Content-addressed model import, storage and integrity verification |
+| `models/model-store` | Content-addressed installed-model import, storage and integrity verification |
 | `models/model-catalog` | Admin-managed model release contracts, validation, target filtering and compatibility policy |
-| `models/model-download` | Secure remote transfer, redirect policy, verification and ModelStore handoff |
-| `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
+| `models/model-download` | Secure remote transfer and opaque access to the verified app-private holding area |
+| `models/model-install` | Catalog/profile reconciliation, GGUF inspection and explicit ModelStore publication |
+| `backends/llama-cpp` | Kotlin/JNI/C++ backend, native resource ownership and GGUF inspector adapter |
 | `observability/contracts` | Stable telemetry, health, resource and benchmark schemas |
 | `observability/in-memory-store` | Bounded ephemeral telemetry implementation |
 | `observability/room-store` | Persistent Android telemetry repository |
@@ -53,7 +57,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `ui/design-system` | Shared Compose theme, visual tokens and reusable Harness components |
 | `apps/local-llm-console` | Developer console and future cross-app control plane |
 | `apps/device-test-runner` | ADB/instrumentation GGUF lifecycle and memory validation |
-| `apps/local-llm-phone-test` | Play-installable physical-device validation without developer mode |
+| `apps/local-llm-phone-test` | Connected Compose console and Play-installable physical-device validation |
 | `third_party/llama.cpp` | Pinned upstream submodule |
 | `scripts` | Repository, packaging, device and evidence validation |
 | `docs` | Architecture, plans, operations and evidence |
@@ -64,10 +68,12 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 
 - Public API changes start in `core/contracts`; inspect all runtime, transport and observability consumers.
 - Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and cleanup after failure.
-- GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
+- Installed GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
 - Catalog release, target-filtering or device-compatibility changes start in `models/model-catalog`; keep remote distribution policy outside the runtime and final artifact store.
-- JNI or generation changes start in `backends/llama-cpp`; preserve opaque handles, idempotent release and cooperative cancellation.
-- The phone-test app may orchestrate existing contracts, import through Android's Storage Access Framework and format privacy-safe evidence, but must not own alternate inference policy.
+- Remote URI policy, transfer, retry, restart cleanup or verified-holding changes start in `models/model-download`; do not import into `ModelStore` or expose source paths there.
+- Verified-download installation changes start in `models/model-install`; preserve exact catalog/profile matching, metadata inspection before import, post-import verification and absence of binding/runtime side effects.
+- JNI or generation changes start in `backends/llama-cpp`; preserve opaque handles, idempotent release and cooperative cancellation. Backend-specific GGUF inspection is adapted into the neutral installation contract here.
+- The phone-test app may orchestrate existing contracts, import through Android's Storage Access Framework and format privacy-safe evidence, but must not own alternate inference or model-installation policy.
 - Console code must not open another application's private database directly; cross-app access requires the planned signature-protected diagnostics bridge.
 
 ## Change workflow
@@ -102,9 +108,9 @@ The exact command may be narrower than the full repository gate while iterating,
 ```bash
 ./gradlew spotlessCheck
 ./gradlew --no-configuration-cache detekt
-./gradlew :apps:local-llm-phone-test:compileDebugKotlin \
-  :apps:local-llm-phone-test:compileDebugUnitTestKotlin \
-  :apps:local-llm-phone-test:testDebugUnitTest
+./gradlew :models:model-download:testDebugUnitTest \
+  :models:model-install:testDebugUnitTest \
+  :backends:llama-cpp:testDebugUnitTest
 ```
 
 For changes spanning multiple modules or touching shared contracts, run `./gradlew check` before pushing unless there is a documented environment limitation. When the local environment cannot execute a required check, state that limitation before the push, perform the strongest available equivalent validation, and do not describe the change as validated.
@@ -163,10 +169,10 @@ Physical-device evidence is mandatory before production readiness, application-c
 ## Testing expectations
 
 - Keep domain logic behind interfaces and use fakes for deterministic orchestration tests.
-- Test cleanup after generation, failure and cancellation.
+- Test cleanup after generation, failure, cancellation and partial model installation.
 - Test idempotent close and release behavior.
 - Avoid timing assertions without a deterministic clock.
-- Keep prompts, generated output, document URIs and private paths out of persisted or shared reports.
+- Keep prompts, generated output, signed URLs, document URIs and private paths out of persisted or shared reports.
 - Verify the Play-installed app on representative `arm64-v8a` hardware with a real supported GGUF.
 
 ## Maintaining `AGENTS.md`
@@ -177,7 +183,7 @@ Use the exact uppercase filename. Keep this guide navigational and durable:
 - update the repository map whenever `settings.gradle.kts` changes;
 - update validation commands when CI changes;
 - document new ownership boundaries and link accepted ADRs;
-- keep current completion status in `docs/roadmap.md`;
+- keep active integration state in `docs/current-state.md` and detailed completion status in `docs/roadmap.md`;
 - run the navigation guard after every edit.
 
-Pause and surface the issue rather than improvising when a change conflicts with public contracts or an ADR, would commit a model, signing key or native dependency, exposes backend state, duplicates an active implementation line, or would claim production readiness without physical-device evidence.
+Pause and surface the issue rather than improvising when a change conflicts with public contracts or an ADR, would commit a model, signing key or native dependency, exposes backend or verified-download state, duplicates an active implementation line, or would claim production readiness without physical-device evidence.

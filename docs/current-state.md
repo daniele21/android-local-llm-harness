@@ -8,139 +8,114 @@ This document is the active integration and recovery ledger for the repository. 
 
 `main` is the only canonical integrated implementation line.
 
-Current integrated head at the time of this update:
+Integrated head before this installation slice:
 
 ```text
-c25b15e56389a84a5c474cbcff414d019267c534
-Harden secure model transfer boundary (#43)
+04045a1226d90ea7ee25ad7adc12dd1fc71e6307
+Update GitHub checkout action to v7 (#47)
 ```
-
-The cumulative `Validate` workflow and Android artifact packaging workflow passed for this head.
 
 Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
 
-## Integrated pull-request sequence
+## Completed repository cleanup and infrastructure
 
-The current implementation includes the following major merged lines:
+- PR #44 aligned README and established this state ledger.
+- PR #45 refreshed Android Gradle Plugin 9.3.1 from current `main` and passed complete Android validation.
+- PR #47 refreshed all workflows to `actions/checkout@v7`, split the model-distribution gate into attributable phases and passed cumulative validation.
+- PRs #20, #3 and #4 were closed with explicit superseded/obsolete disposition notes.
+- Issue #46 tracks branch protection and the required `Repository validation` repository setting.
 
-- PR #13 — Phase 1 functional embedded runtime;
-- PRs #21, #23–#28 — persistent telemetry, health, sanity, cache, resources, benchmarks and emulator preflight;
-- PRs #29, #32, #36 and #37 — Play-installable physical-device app, signing and connected manual inference;
-- PR #31 — console observability, controls and cache repair;
-- PR #35 — capability-driven manual console playground;
-- PRs #39 and #40 — canonical Harness UX/UI plan and connected Compose implementation;
-- PRs #41–#43 — administrator-managed catalog, persistence, secure download and verified-transfer hardening.
+## Legacy feature branches requiring selective recovery
 
-## Open pull-request disposition
+PR #33 and PR #34 must not be merged directly. Both are based on the pre-Compose console line and have diverged materially from current `main`.
 
-### Closed as obsolete
+### PR #33 — benchmark history
 
-- PR #20: superseded because current `main` already uses `gradle/actions/setup-gradle@v6` with the selected cache configuration.
-- PR #3: obsolete Dependabot Android Gradle Plugin branch based on an old `main`; recreate from current `main`.
-- PR #4: obsolete Dependabot `actions/checkout` branch based on an old `main`; recreate from current `main`.
-
-### Legacy feature branches requiring selective recovery
-
-PR #33 and PR #34 must not be merged directly.
-
-Both are based on the pre-Compose console line and have diverged materially from current `main`. Their unique responsibilities must be recovered through new focused branches from current `main`.
-
-#### PR #33 — benchmark history
-
-Potentially unique behavior to recover:
+Potentially unique behavior to recover on a fresh branch:
 
 - retained multi-capture benchmark history;
-- explicit active-baseline versus immutable-history semantics;
-- non-destructive Room schema migration for retained captures;
-- a shared comparison evaluator when not already present in the connected implementation;
-- historical metric presentation not already covered by `apps/local-llm-phone-test`.
+- active-baseline versus immutable-history semantics;
+- non-destructive Room migration for retained captures;
+- historical metric presentation not already covered by the connected Compose application.
 
-Recovery must not restore the old standalone-console composition or duplicate benchmark logic already present in the connected Compose application.
+Do not restore the old standalone-console composition or duplicate existing benchmark logic.
 
-#### PR #34 — model management
+### PR #34 — model management
 
-Potentially unique behavior to recover:
+Potentially unique behavior to recover on a fresh branch:
 
 - explicit model verification action;
-- confirmation before model removal;
-- blocking removal of the currently loaded model at both presentation and control boundaries;
-- reusable, privacy-safe model-management control contracts;
-- deterministic staged-file cleanup and operation-state tests not already present in the connected application.
+- confirmation before removal;
+- blocking removal of the currently loaded model;
+- reusable privacy-safe model-management controls;
+- staged-file cleanup and operation-state tests not already present in the connected app.
 
-Recovery must not create a parallel model store, duplicate current SAF import behavior or reconnect the old standalone-console sandbox as the product path.
+Do not create a parallel model store or reconnect the old standalone-console sandbox as the product path.
 
 ## Current functional boundary
 
-### Complete
+### Integrated before this slice
 
 - explicit application/use-case to GGUF profile resolution;
 - content-addressed installed-model store;
-- GGUF inspection and integrity verification;
 - local `llama.cpp` load, context, generation, streaming and cancellation;
-- embedded runtime lifecycle and single-decode scheduling;
 - telemetry, logs, health, resources, benchmarks and cache repair;
 - connected Compose Playground and Diagnostics surfaces;
 - administrator-managed catalog contracts, persistence and compatibility;
 - secure remote transfer to a verified app-private holding area.
 
-### Not complete
+### Implemented by the verified-installation slice
 
-The remote distribution path currently stops at:
+The remote distribution path is extended to:
 
 ```text
 CatalogGgufArtifact
-  -> secure transfer
-  -> VerifiedDownloadHandle
-```
-
-It must be extended explicitly to:
-
-```text
-VerifiedDownloadHandle
-  -> GGUF structural inspection
-  -> application-owned profile validation
+  -> secure verified transfer
+  -> opaque VerifiedDownloadHandle
+  -> exact catalog/profile/target validation
+  -> controlled staging copy with digest revalidation
+  -> metadata-only GGUF inspection
+  -> architecture and available quantization validation
   -> ModelStore import
   -> post-import integrity verification
-  -> installed-model metadata
-  -> optional explicit application/use-case binding
+  -> non-destructive failure when verification is invalid or unavailable
+  -> path-free InstalledModelDescriptor
 ```
 
-Installation must not activate a binding or load the runtime implicitly.
+The implementation adds:
+
+- `VerifiedDownloadAccess` in `models/model-download`, which never exposes the verified backing path;
+- `models/model-install`, a UI-independent installation coordinator;
+- `LlamaCppGgufArtifactInspector`, an adapter over the existing metadata-only JNI bridge;
+- deterministic tests for opaque access, tampering, profile mismatch, revoked releases, inspection mismatch, import/verification failure, non-destructive failure handling and cleanup;
+- dedicated and cumulative CI coverage for catalog, download, installation and the backend adapter;
+- ADR 0007 and the installation operations document.
+
+Installation still does not activate a binding, load the runtime or start inference.
 
 ## Ordered implementation plan
 
 ### Block 1 — repository state alignment
 
-- close obsolete PRs #20, #3 and #4 with clear disposition notes;
-- make README reflect the implementation merged through PR #43;
-- establish this active state ledger;
-- keep dependency replacement work separate from feature work.
+Status: **DONE through PR #44**.
 
 ### Block 2 — refreshed infrastructure updates
 
-Create separate focused pull requests from current `main` for:
-
-1. Android Gradle Plugin 9.3.0 to 9.3.1;
-2. `actions/checkout@v6` to `actions/checkout@v7`.
-
-Each change must pass the complete repository validation applicable to validation-infrastructure changes before merge.
+Status: **DONE through PRs #45 and #47**.
 
 ### Block 3 — verified-download installation boundary
 
-Introduce a UI-independent installation module or boundary that:
+Status: **IMPLEMENTED; awaiting pull-request CI and merge**.
 
-- accepts only an opaque `VerifiedDownloadHandle` plus catalog/profile context;
-- revalidates handle ownership, size and digest before use;
-- performs metadata-only GGUF inspection before import;
-- rejects incompatible architecture, quantization or profile mapping;
-- imports through the existing `ModelStore` contract;
-- performs post-import verification;
-- returns an installed-model result without binding or loading it;
-- consumes or safely retains the verified holding artifact according to an explicit policy;
-- emits privacy-safe progress and typed failures;
-- is deterministic and testable without Android UI.
+Remaining acceptance before completion:
+
+- pass Spotless, Detekt, module unit tests and Android Lint;
+- pass cumulative repository validation and native packaging checks;
+- merge only after all public contracts, tests and documentation are consistent.
 
 ### Block 4 — connected catalog and installation UI
+
+Status: **NEXT after Block 3 is merged**.
 
 Extend `apps/local-llm-phone-test` with explicit states for:
 
@@ -158,15 +133,19 @@ failed or cancelled
 
 The user must explicitly select, download and install. Runtime activation remains a separate action or existing prepare flow.
 
-### Block 5 — selective benchmark-history recovery
+### Block 5 — durable installed-model metadata
 
-Recover the unique retained-history behavior from PR #33 on a fresh branch from the then-current `main`. Prefer the connected Compose Diagnostics implementation and avoid old-console duplication.
+Persist the path-free relationship among installed digest, catalog release, application-reviewed profile and target. Persistence must not activate or alter bindings implicitly.
 
-### Block 6 — selective model-management recovery
+### Block 6 — selective benchmark-history recovery
+
+Recover only unique retained-history behavior from PR #33 on a fresh branch from the then-current `main`.
+
+### Block 7 — selective model-management recovery
 
 Recover unique verification, confirmation and loaded-model protection behavior from PR #34 on a fresh branch from the then-current `main`.
 
-### Block 7 — product and hardware completion
+### Block 8 — product and hardware completion
 
 - complete ViewModel/UDF and Navigation Compose detail routes;
 - add Compose UI, screenshot, accessibility and responsive tests;
@@ -174,9 +153,19 @@ Recover unique verification, confirmation and loaded-model protection behavior f
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
 
+## Deferred from the installation slice
+
+- transactional `ModelStore` creation provenance required for safe automatic rollback;
+- durable installed-model metadata persistence;
+- catalog/download/install Compose UI;
+- explicit application/use-case binding after installation;
+- cancellation during synchronous `ModelStore.import()`;
+- WorkManager or foreground-service execution;
+- physical-device remote-download and installation evidence.
+
 ## Merge discipline
 
-Each block must follow:
+Each block follows:
 
 ```text
 fresh branch from current main
@@ -192,12 +181,10 @@ Do not merge legacy stacked PRs merely because GitHub reports them as mergeable.
 
 ## Repository administration still required
 
-Repository settings currently require manual hardening outside the code tree:
+Issue #46 tracks operational hardening outside the code tree:
 
 - protect `main`;
-- require pull requests for changes;
+- require pull requests;
 - require the stable `Repository validation` check;
 - block force pushes and deletion of `main`;
 - enable automatic deletion of merged feature branches where appropriate.
-
-These settings are operational prerequisites but do not replace the repository Definition of Done.

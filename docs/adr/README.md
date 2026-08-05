@@ -10,6 +10,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0004-phone-test-upload-key-custody.md`](0004-phone-test-upload-key-custody.md) — external Play upload key, Keychain workflow and recovery policy
 - [`0005-admin-model-catalog-boundaries.md`](0005-admin-model-catalog-boundaries.md) — separation of remote model distribution, verified installation and local inference
 - [`0006-secure-model-download-core.md`](0006-secure-model-download-core.md) — allowlisted HTTPS transfer, partial-file recovery and pre-installation integrity verification
+- [`0007-explicit-verified-download-installation.md`](0007-explicit-verified-download-installation.md) — opaque verified-download access, GGUF inspection, ModelStore publication and post-import rollback
 
 ## Status values
 
