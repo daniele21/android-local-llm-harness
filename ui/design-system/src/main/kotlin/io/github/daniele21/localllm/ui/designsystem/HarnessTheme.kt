@@ -13,11 +13,11 @@ fun HarnessTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
     CompositionLocalProvider(
         LocalHarnessSpacing provides DefaultHarnessSpacing,
         LocalHarnessStatusColors provides
-        if (darkTheme) {
-            HarnessDarkStatusColors
-        } else {
-            HarnessLightStatusColors
-        },
+            if (darkTheme) {
+                HarnessDarkStatusColors
+            } else {
+                HarnessLightStatusColors
+            },
     ) {
         MaterialTheme(
             colorScheme = harnessColorScheme(darkTheme),
@@ -28,9 +28,8 @@ fun HarnessTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
     }
 }
 
-fun harnessColorScheme(darkTheme: Boolean): ColorScheme =
-    if (darkTheme) {
-        HarnessDarkColorScheme
-    } else {
-        HarnessLightColorScheme
-    }
+fun harnessColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) {
+    HarnessDarkColorScheme
+} else {
+    HarnessLightColorScheme
+}
