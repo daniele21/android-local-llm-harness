@@ -29,10 +29,11 @@ fun HarnessCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            width = HarnessBorderWidth,
-            color = MaterialTheme.colorScheme.outline,
-        ),
+        border =
+            BorderStroke(
+                width = HarnessBorderWidth,
+                color = MaterialTheme.colorScheme.outline,
+            ),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
@@ -68,11 +69,7 @@ fun HarnessMetric(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HarnessStatusBadge(
-    label: String,
-    tone: HarnessStatusTone,
-    modifier: Modifier = Modifier,
-) {
+fun HarnessStatusBadge(label: String, tone: HarnessStatusTone, modifier: Modifier = Modifier) {
     val colors = LocalHarnessStatusColors.current
     Surface(
         modifier = modifier,
@@ -82,10 +79,11 @@ fun HarnessStatusBadge(
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(
-                horizontal = LocalHarnessSpacing.current.medium,
-                vertical = LocalHarnessSpacing.current.small,
-            ),
+            modifier =
+                Modifier.padding(
+                    horizontal = LocalHarnessSpacing.current.medium,
+                    vertical = LocalHarnessSpacing.current.small,
+                ),
             style = MaterialTheme.typography.labelLarge,
         )
     }
