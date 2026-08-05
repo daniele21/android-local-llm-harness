@@ -41,6 +41,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `models/model-profile` | GGUF artifacts, load profiles, use cases and app bindings |
 | `models/model-store` | Content-addressed model import, storage and integrity verification |
 | `models/model-catalog` | Admin-managed model release contracts, validation, target filtering and compatibility policy |
+| `models/model-download` | Allowlisted HTTPS transfer, partial-file recovery, cancellation and verified-download holding area |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
 | `observability/contracts` | Stable telemetry, health, resource and benchmark schemas |
 | `observability/in-memory-store` | Bounded ephemeral telemetry implementation |
@@ -65,6 +66,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - Lifecycle, scheduling and memory changes start in `core/runtime-core`; preserve serialized state mutation and cleanup after failure.
 - GGUF storage or integrity changes start in `models/model-store` and `models/model-profile`; preserve streaming I/O, atomic staging and SHA-256 identity.
 - Catalog release, target-filtering or device-compatibility changes start in `models/model-catalog`; keep remote distribution policy outside the runtime and final artifact store.
+- Source, redirect, partial-file, retry or transfer-integrity changes start in `models/model-download`; never publish directly into `ModelStore` or activate bindings.
 - JNI or generation changes start in `backends/llama-cpp`; preserve opaque handles, idempotent release and cooperative cancellation.
 - The phone-test app may orchestrate existing contracts, import through Android's Storage Access Framework and format privacy-safe evidence, but must not own alternate inference policy.
 - Console code must not open another application's private database directly; cross-app access requires the planned signature-protected diagnostics bridge.
