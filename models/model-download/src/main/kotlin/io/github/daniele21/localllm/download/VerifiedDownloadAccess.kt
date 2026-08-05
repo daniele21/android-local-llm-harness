@@ -5,6 +5,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.security.MessageDigest
 
@@ -77,7 +79,7 @@ class FileSystemVerifiedDownloadAccess(rootDirectory: File, private val bufferSi
                     failure(VerifiedDownloadAccessFailureCode.DIGEST_MISMATCH)
                 }
 
-                else -> VerifiedDownloadCopyResult.Success(copied.digest, copied.sizeBytes)
+                else -> VerifiedDownloadCopyResult.Success(expectedDigest, copied.sizeBytes)
             }
         } catch (_: IOException) {
             destination.delete()
@@ -89,22 +91,14 @@ class FileSystemVerifiedDownloadAccess(rootDirectory: File, private val bufferSi
 
     private fun copyAndDigest(source: File, destination: File, maximumBytes: Long): CopyDigestResult {
         val digest = MessageDigest.getInstance(SHA_256_ALGORITHM)
-        val buffer = ByteArray(bufferSizeBytes)
-        var total = 0L
-        FileInputStream(source).use { input ->
-            FileOutputStream(destination, false).use { output ->
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count == -1) break
-                    if (count.toLong() > maximumBytes - total) {
-                        return CopyDigestResult(digest = null, sizeBytes = maximumBytes + 1L)
-                    }
-                    total += count.toLong()
-                    output.write(buffer, 0, count)
-                    digest.update(buffer, 0, count)
+        val total =
+            FileInputStream(source).use { input ->
+                FileOutputStream(destination, false).use { output ->
+                    copyStream(input, output, digest, maximumBytes).also { output.fd.sync() }
                 }
-                output.fd.sync()
             }
+        if (total > maximumBytes) {
+            return CopyDigestResult(digest = null, sizeBytes = total)
         }
         val actualDigest =
             ModelDigest(
@@ -113,6 +107,24 @@ class FileSystemVerifiedDownloadAccess(rootDirectory: File, private val bufferSi
                 },
             )
         return CopyDigestResult(actualDigest, total)
+    }
+
+    private fun copyStream(
+        input: InputStream,
+        output: OutputStream,
+        digest: MessageDigest,
+        maximumBytes: Long,
+    ): Long {
+        val buffer = ByteArray(bufferSizeBytes)
+        var total = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count == -1) return total
+            if (count.toLong() > maximumBytes - total) return maximumBytes + 1L
+            total += count.toLong()
+            output.write(buffer, 0, count)
+            digest.update(buffer, 0, count)
+        }
     }
 
     private fun validDestination(destination: File): Boolean {
