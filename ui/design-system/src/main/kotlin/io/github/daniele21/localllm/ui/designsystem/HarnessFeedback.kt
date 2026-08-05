@@ -32,9 +32,9 @@ fun HarnessTopAppBar(
     ) {
         Row(
             modifier =
-                Modifier.fillMaxWidth()
-                    .heightIn(min = HarnessAppBarMinimumHeight)
-                    .padding(horizontal = LocalHarnessSpacing.current.large),
+            Modifier.fillMaxWidth()
+                .heightIn(min = HarnessAppBarMinimumHeight)
+                .padding(horizontal = LocalHarnessSpacing.current.large),
             horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
