@@ -2,9 +2,9 @@
 
 **Canonical plan:** `docs/harness-ux-ui-implementation-plan.md`
 **Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
-**Implementation branch:** `agent/harness-ux-ui-implementation`
-**Pull request:** #40
-**Last updated:** 2026-08-04
+**Implementation branch:** `codex/harness-0.5-integration-plan`, ribasata su `origin/dev`
+**Pull request:** pending for the rebased UI/release-tooling candidate; historical foundation PR #40 is merged
+**Last updated:** 2026-08-06
 **Overall status:** In progress
 
 This document is the living progress tracker for the Harness Android UX/UI implementation plan.
@@ -21,26 +21,26 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 
 | Workstream | Status | Notes |
 | --- | --- | --- |
-| Compose platform foundation | PARTIAL | Compose stack is added; the planned ADR, full foundation evidence, and green CI are missing. |
-| Shared design system | PARTIAL | Theme and core card/button/metric components exist; full component inventory, states, charts, semantics, and accessibility hardening remain. |
-| Harness launcher identity | PARTIAL | Product label and in-app identity exist; final adaptive, monochrome, and themed assets remain. |
-| Responsive application shell | PARTIAL | Compact navigation, expanded rail, and saved destination state exist; Navigation Compose, detail routes, full back behavior, and responsive validation remain. |
+| Compose platform foundation | PARTIAL | Compose stack is integrated and validated; the explicit connected-app/UI architecture ADR remains. |
+| Shared design system | DONE | PR #61 provides split tokens, dark/light/system themes, shared components, previews, WCAG checks and 48 dp touch-target enforcement. |
+| Harness launcher identity | DONE | PR #60 provides repository-owned vector, adaptive, monochrome and fallback launcher assets with packaging verification. |
+| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist; detail routes, full back behavior, Activity slimming and responsive validation remain. |
 | Overview | PARTIAL | Connected model/runtime and latest Playground metrics exist; resource pressure, recent run, active-operation model, and state tests remain. |
 | Playground | PARTIAL | Real GGUF inference, streaming, cancellation, cleanup, and metrics are connected. ViewModel/UDF, settings sheet, smart scrolling, UI tests, and device evidence remain. |
-| Models | PARTIAL | Import, current-model display, and removal are connected; explicit verify/details/confirmation and durable multi-model catalog remain. |
+| Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected; unified multi-model state, detail routes and degraded-state recovery remain. |
 | Diagnostics container | VALIDATION | Runtime plus selectable Runs, Health, Resources, Benchmarks, Logs, and Validation sections are connected. Detail routes and complete state/navigation tests remain. |
-| Settings and developer tools | PARTIAL | Privacy/build disclosures and validation access exist; appearance, storage, metadata, separate routes, and administration controls remain. |
+| Settings and developer tools | PARTIAL | Session theme selection, privacy/build disclosures, storage summary and validation access exist; preference persistence, full metadata, cleanup and separate routes remain. |
 | Shared runtime ownership | DONE | One process-scoped lazy model store, registry, and runtime orchestrator are shared by Playground and physical validation. |
 | Telemetry repository injection | DONE | One bounded process-scoped in-memory repository is injected into the runtime. |
 | Diagnostics Health | PARTIAL | Explicit non-destructive checks and worst-status aggregation exist; targeted actions and complete capability states remain. |
 | Diagnostics Runs | PARTIAL | Real privacy-safe run cards and linked request timelines exist; dedicated detail route and complete state/navigation tests remain. |
 | Diagnostics Resources | VALIDATION | Explicit capture, bounded newest-first history, memory trend summary, low-memory count, thermal states, and snapshot cards are connected; charts and device/accessibility evidence remain. |
-| Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, bulk ready-key capture, sample progress, and regression cards are connected; retained multi-capture history remains. |
+| Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, regression cards and retained history are connected; richer charts, state tests and device evidence remain. |
 | Diagnostics Logs | VALIDATION | Privacy-safe filters, copy, request correlation, deterministic timelines, and automatic Logs-section opening from run cards are implemented and await final CI/device evidence. |
-| Durable multi-model catalog | PENDING | Current persisted metadata still represents one selected/imported model. |
+| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |
 | ViewModel and UDF migration | PENDING | Callback controllers and Activity-owned mutable state remain migration debt. |
-| Compose UI and screenshot tests | PENDING | Unit coverage includes runtime, privacy, health, resources, benchmarks, logs, and timeline mapping. |
-| CI and Android build validation | VALIDATION | Repository formatting is applied. A standard run is validating Spotless, Detekt, compilation, tests, Lint, assembly, and arm64 packaging on the connected UI. |
+| Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists; complete state/golden/accessibility matrix remains. |
+| CI and Android build validation | VALIDATION | Post-rebase local Spotless, Detekt, tests, Lint, APK/AAB assembly and packaging are green; remote PR and cumulative `dev` CI remain. |
 | Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
 
 ## Implemented connected capabilities
@@ -61,7 +61,9 @@ The audit corrected Playground prompt and generation-option state so recompositi
 
 The Diagnostics destination now exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.
 
-This remains Activity-owned state rather than a Navigation Compose graph. Dedicated detail routes, back-stack behavior, and complete navigation tests remain part of the later ViewModel/UDF migration.
+The app now uses Navigation Compose for top-level destinations, but Diagnostics section and
+timeline state remain Activity-owned and inline rather than dedicated detail routes. Back-stack
+behavior and complete navigation tests remain part of the ViewModel/UDF migration.
 
 ### Diagnostics Health
 
@@ -111,7 +113,7 @@ The implementation audit corrected previous completion claims:
 
 - Runs is `PARTIAL`, because the canonical plan also requires dedicated detail navigation and complete state tests.
 - Resources remains below `DONE`, because charts and physical/accessibility evidence remain despite connected bounded history.
-- Benchmarks remains below `DONE`, because retained multi-capture history and richer visualization remain despite connected readiness and selection.
+- Benchmarks remains below `DONE`, because richer visualization, complete state tests and device evidence remain despite connected readiness, selection and retained history.
 - Health is `PARTIAL`, because targeted checks and complete capability states remain.
 
 The audit also corrected:
@@ -123,36 +125,37 @@ The audit also corrected:
 
 ## Immediate next block
 
-### Validate connected Diagnostics UI
+### Integrate and validate the rebased UI/tooling candidate
 
-Status: `VALIDATION`
+Status: `LOCAL VALIDATION COMPLETE / REMOTE VALIDATION PENDING`
 
 Required work:
 
-1. pass repository Spotless on the formatter-produced source;
-2. pass Detekt and Kotlin/Compose compilation;
-3. pass JVM unit tests, including resource history and benchmark readiness;
-4. pass Android Lint;
-5. assemble the phone-test debug APK and scoped packaging targets;
-6. verify `arm64-v8a` packaging and the no-model-artifact guard;
-7. update this tracker and PR with exact passing evidence;
-8. keep physical-device GGUF validation as a separate required gate.
+1. [x] review the complete rebased diff against `origin/dev`;
+2. [x] pass Spotless, design-system accessibility tests, Detekt and Kotlin/Compose compilation;
+3. [x] pass phone-test JVM tests and Android Lint;
+4. [x] assemble debug APK and release AAB, then verify `arm64-v8a` packaging and model-artifact guard;
+5. [ ] rerun the compact emulator smoke tests; no emulator was connected during the post-rebase gate;
+6. [ ] publish the candidate branch and open a PR toward `dev`;
+7. [ ] obtain cumulative `Repository validation` on the exact current commit;
+8. [ ] keep physical-device GGUF validation as a separate required release gate.
 
 ## Planned sequence after CI validation
 
-1. implement the durable multi-model catalog;
-2. migrate Activity-owned state to ViewModel/UDF and Navigation Compose detail routes;
-3. complete Settings and developer tools;
-4. add Compose UI, screenshot, accessibility, responsive, performance, and physical-device evidence.
+1. extract detail navigation and reduce `MainActivity` to a composition root;
+2. migrate Activity-owned state to ViewModel/UDF, starting from Playground;
+3. complete unified multi-model state and degraded-state recovery;
+4. complete Overview, Diagnostics, Settings and developer tools;
+5. add Compose UI, screenshot, accessibility, responsive, performance, and physical-device evidence.
 
 ## Known technical debt
 
 - `MainActivity` still owns multiple screens and mutable state.
 - Controllers still use executors and callbacks rather than ViewModel-owned coroutine state.
-- Navigation remains destination-state based rather than a full Navigation Compose graph.
-- Resource charts and retained benchmark history remain incomplete.
+- Navigation Compose covers top-level destinations, but detail routes and complete back-stack tests remain.
+- Resource charts and richer benchmark-history visualization remain incomplete.
 - The telemetry implementation remains in-memory and is cleared by process death.
-- The design-system module does not yet contain the full planned component inventory.
+- The shared design system is integrated; feature screens still contain some one-off composition and spacing that should move to reusable components when repeated.
 - The implementation was accumulated in one draft PR rather than the canonical sequence of small UX PRs.
 
 ## Validation gates before marking the PR ready
