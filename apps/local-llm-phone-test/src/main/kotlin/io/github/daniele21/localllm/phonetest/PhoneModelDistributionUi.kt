@@ -18,17 +18,21 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
+internal data class PhoneModelDistributionActions(
+    val download: (String) -> Unit,
+    val cancelDownload: (String) -> Unit,
+    val install: (String) -> Unit,
+    val verifyInstalled: (String) -> Unit,
+    val requestRemove: (String) -> Unit,
+    val cancelRemove: (String) -> Unit,
+    val confirmRemove: (String) -> Unit,
+    val selectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+)
+
 @Composable
 internal fun PhoneModelDistributionCatalog(
     state: PhoneModelDistributionState,
-    onDownload: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onInstall: (String) -> Unit,
-    onVerifyInstalled: (String) -> Unit,
-    onRequestRemove: (String) -> Unit,
-    onCancelRemove: (String) -> Unit,
-    onConfirmRemove: (String) -> Unit,
-    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+    actions: PhoneModelDistributionActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HarnessCard {
@@ -53,14 +57,7 @@ internal fun PhoneModelDistributionCatalog(
             CatalogModelCard(
                 model = model,
                 operationActive = state.operationActive,
-                onDownload = onDownload,
-                onCancel = onCancel,
-                onInstall = onInstall,
-                onVerifyInstalled = onVerifyInstalled,
-                onRequestRemove = onRequestRemove,
-                onCancelRemove = onCancelRemove,
-                onConfirmRemove = onConfirmRemove,
-                onSelectInstalled = onSelectInstalled,
+                actions = actions,
             )
         }
     }
@@ -70,14 +67,7 @@ internal fun PhoneModelDistributionCatalog(
 private fun CatalogModelCard(
     model: PhoneCatalogModelUi,
     operationActive: Boolean,
-    onDownload: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onInstall: (String) -> Unit,
-    onVerifyInstalled: (String) -> Unit,
-    onRequestRemove: (String) -> Unit,
-    onCancelRemove: (String) -> Unit,
-    onConfirmRemove: (String) -> Unit,
-    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+    actions: PhoneModelDistributionActions,
 ) {
     HarnessCard {
         Text(model.displayName, style = MaterialTheme.typography.titleLarge)
@@ -113,11 +103,11 @@ private fun CatalogModelCard(
         }
 
         when (model.status) {
-            PhoneCatalogModelStatus.DOWNLOADING -> DownloadProgress(model, onCancel)
+            PhoneCatalogModelStatus.DOWNLOADING -> DownloadProgress(model, actions.cancelDownload)
 
             PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL ->
                 HarnessPrimaryButton("Install verified model") {
-                    onInstall(model.stableId)
+                    actions.install(model.stableId)
                 }
 
             PhoneCatalogModelStatus.INSTALLING -> {
@@ -125,50 +115,12 @@ private fun CatalogModelCard(
                 Text("Installation is running in the app-private model store.")
             }
 
-            PhoneCatalogModelStatus.INSTALLED -> {
-                val installed = model.installedModel
-                if (installed != null) {
-                    HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
-                    Text(
-                        "Installed. Runtime activation remains an explicit action.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HarnessPrimaryButton(
-                        "Use in Playground",
-                        enabled = !operationActive,
-                    ) {
-                        onSelectInstalled(installed)
-                    }
-                    HarnessSecondaryButton(
-                        "Verify integrity",
-                        enabled = !operationActive,
-                    ) {
-                        onVerifyInstalled(model.stableId)
-                    }
-                    if (model.removalConfirmationPending) {
-                        Text(
-                            "Removal permanently deletes the app-private model copy.",
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        HarnessPrimaryButton(
-                            "Confirm removal",
-                            enabled = !operationActive,
-                        ) {
-                            onConfirmRemove(model.stableId)
-                        }
-                        HarnessSecondaryButton("Cancel removal") {
-                            onCancelRemove(model.stableId)
-                        }
-                    } else {
-                        HarnessSecondaryButton(
-                            "Remove installed model",
-                            enabled = !operationActive,
-                        ) {
-                            onRequestRemove(model.stableId)
-                        }
-                    }
-                }
-            }
+            PhoneCatalogModelStatus.INSTALLED ->
+                InstalledModelActions(
+                    model = model,
+                    operationActive = operationActive,
+                    actions = actions,
+                )
 
             PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
             PhoneCatalogModelStatus.CANCELLED,
@@ -181,10 +133,58 @@ private fun CatalogModelCard(
                 },
                 enabled = model.compatible && !operationActive,
             ) {
-                onDownload(model.stableId)
+                actions.download(model.stableId)
             }
 
             PhoneCatalogModelStatus.INCOMPATIBLE -> Unit
+        }
+    }
+}
+
+@Composable
+private fun InstalledModelActions(
+    model: PhoneCatalogModelUi,
+    operationActive: Boolean,
+    actions: PhoneModelDistributionActions,
+) {
+    val installed = model.installedModel ?: return
+    HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
+    Text(
+        "Installed. Runtime activation remains an explicit action.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    HarnessPrimaryButton(
+        "Use in Playground",
+        enabled = !operationActive,
+    ) {
+        actions.selectInstalled(installed)
+    }
+    HarnessSecondaryButton(
+        "Verify integrity",
+        enabled = !operationActive,
+    ) {
+        actions.verifyInstalled(model.stableId)
+    }
+    if (model.removalConfirmationPending) {
+        Text(
+            "Removal permanently deletes the app-private model copy.",
+            color = MaterialTheme.colorScheme.error,
+        )
+        HarnessPrimaryButton(
+            "Confirm removal",
+            enabled = !operationActive,
+        ) {
+            actions.confirmRemove(model.stableId)
+        }
+        HarnessSecondaryButton("Cancel removal") {
+            actions.cancelRemove(model.stableId)
+        }
+    } else {
+        HarnessSecondaryButton(
+            "Remove installed model",
+            enabled = !operationActive,
+        ) {
+            actions.requestRemove(model.stableId)
         }
     }
 }
