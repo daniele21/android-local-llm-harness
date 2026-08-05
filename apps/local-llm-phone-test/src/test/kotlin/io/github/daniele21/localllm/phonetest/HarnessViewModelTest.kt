@@ -85,8 +85,8 @@ class HarnessViewModelTest {
     fun leavingLogsClosesTheSelectedRequestTimeline() {
         val timeline = DiagnosticsRequestTimelineUi(
             requestId = "request-1",
-            run = null,
-            entries = emptyList(),
+            requestIdPrefix = "request-1",
+            runStatus = "COMPLETED",
         )
         val viewModel = HarnessViewModel(
             HarnessUiState(
