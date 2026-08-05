@@ -1,0 +1,39 @@
+name: Register model download module
+
+on:
+  push:
+    branches:
+      - agent/model-catalog-persistence
+
+permissions:
+  contents: write
+
+jobs:
+  update-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/model-catalog-persistence
+      - name: Register module and remove helper workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("AGENTS.md")
+          text = path.read_text()
+          marker = "| `models/model-catalog` | Admin-managed model release contracts, validation, target filtering and compatibility policy |\n"
+          addition = marker + "| `models/model-download` | Secure remote transfer, redirect policy, verification and ModelStore handoff |\n"
+          if "| `models/model-download` |" not in text:
+              if marker not in text:
+                  raise SystemExit("repository map marker not found")
+              text = text.replace(marker, addition, 1)
+              path.write_text(text)
+          PY
+          git rm .github/workflows/register-model-download-module.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add AGENTS.md
+          git commit -m "docs: register model download module"
+          git push origin HEAD:agent/model-catalog-persistence
