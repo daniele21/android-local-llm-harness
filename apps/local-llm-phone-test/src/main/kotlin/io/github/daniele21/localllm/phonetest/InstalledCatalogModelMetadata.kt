@@ -82,13 +82,12 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
     override fun save(metadata: InstalledCatalogModelMetadata): Boolean {
         if (!valid(metadata)) return false
         val destination = fileFor(metadata.digest)
-        val temporary = runCatching {
-            File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, root)
-        }.getOrNull() ?: return false
+        val temporary =
+            runCatching { File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, root) }.getOrNull()
+                ?: return false
         return try {
-            val properties = encode(metadata)
             FileOutputStream(temporary).use { output ->
-                properties.store(output, null)
+                encode(metadata).store(output, null)
                 output.fd.sync()
             }
             moveIntoPlace(temporary, destination)
@@ -112,8 +111,11 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
             decode(properties).takeIf(::valid)
         }.getOrNull()
 
-    private fun decode(properties: Properties): InstalledCatalogModelMetadata =
-        InstalledCatalogModelMetadata(
+    private fun decode(properties: Properties): InstalledCatalogModelMetadata {
+        require(properties.required(KEY_SCHEMA_VERSION).toInt() == SCHEMA_VERSION) {
+            "Unsupported installed-model metadata schema"
+        }
+        return InstalledCatalogModelMetadata(
             digest = ModelDigest(properties.required(KEY_DIGEST)),
             modelId = properties.required(KEY_MODEL_ID),
             version = properties.required(KEY_VERSION),
@@ -127,6 +129,7 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
             quantization = properties.required(KEY_QUANTIZATION),
             installedAtEpochMs = properties.required(KEY_INSTALLED_AT).toLong(),
         )
+    }
 
     private fun encode(metadata: InstalledCatalogModelMetadata): Properties =
         Properties().apply {
@@ -147,17 +150,28 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
 
     private fun valid(metadata: InstalledCatalogModelMetadata): Boolean =
         SHA_256.matches(metadata.digest.sha256) &&
-            metadata.modelId.isNotBlank() &&
-            metadata.version.isNotBlank() &&
-            metadata.displayName.isNotBlank() &&
-            metadata.profileKey.isNotBlank() &&
-            metadata.applicationId.isNotBlank() &&
-            metadata.useCaseId.isNotBlank() &&
-            metadata.fileName.lowercase().endsWith(".gguf") &&
+            validText(metadata.modelId) &&
+            validText(metadata.version) &&
+            validText(metadata.displayName) &&
+            validText(metadata.profileKey) &&
+            validText(metadata.applicationId) &&
+            validText(metadata.useCaseId) &&
+            validFileName(metadata.fileName) &&
             metadata.sizeBytes > 0L &&
-            metadata.architecture.isNotBlank() &&
-            metadata.quantization.isNotBlank() &&
+            validText(metadata.architecture) &&
+            validText(metadata.quantization) &&
             metadata.installedAtEpochMs >= 0L
+
+    private fun validText(value: String): Boolean =
+        value.isNotBlank() && value.length <= MAX_TEXT_LENGTH && value.none(Char::isISOControl)
+
+    private fun validFileName(value: String): Boolean =
+        validText(value) &&
+            value.lowercase().endsWith(".gguf") &&
+            !value.contains('/') &&
+            !value.contains('\\') &&
+            value != "." &&
+            value != ".."
 
     private fun fileFor(digest: ModelDigest): File {
         require(SHA_256.matches(digest.sha256)) { "Invalid installed-model digest" }
@@ -182,6 +196,7 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
 
     private companion object {
         const val SCHEMA_VERSION = 1
+        const val MAX_TEXT_LENGTH = 2_000
         const val FILE_SUFFIX = ".properties"
         const val TEMP_PREFIX = "installed-catalog-model-"
         const val TEMP_SUFFIX = ".tmp"
