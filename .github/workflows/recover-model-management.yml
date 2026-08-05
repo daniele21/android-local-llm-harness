@@ -1,0 +1,706 @@
+name: Recover model management
+
+on:
+  push:
+    branches:
+      - agent/recover-model-management
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    if: github.event.head_commit.message == 'Bootstrap selective model management recovery'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/recover-model-management
+          fetch-depth: 0
+      - name: Apply focused recovery
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          pkg = root / 'apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest'
+          tests = root / 'apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest'
+
+          (pkg / 'PhoneModelManagementControl.kt').write_text('''package io.github.daniele21.localllm.phonetest
+
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.store.ModelStore
+
+internal enum class PhoneModelManagementOperation {
+    VERIFY,
+    REMOVE,
+}
+
+internal data class PhoneModelManagementOutcome(
+    val operation: PhoneModelManagementOperation,
+    val digest: ModelDigest,
+    val success: Boolean,
+    val detail: String,
+    val sourceError: String? = null,
+)
+
+internal interface PhoneModelManagementGateway {
+    fun verify(digest: ModelDigest): PhoneModelManagementOutcome
+
+    fun remove(digest: ModelDigest): PhoneModelManagementOutcome
+}
+
+@Suppress("TooGenericExceptionCaught")
+internal class ModelStorePhoneModelManagementControl(
+    private val modelStore: ModelStore,
+    private val protectedModelDigest: () -> ModelDigest?,
+    private val removeMetadata: (ModelDigest) -> Boolean,
+) : PhoneModelManagementGateway {
+    override fun verify(digest: ModelDigest): PhoneModelManagementOutcome = try {
+        val result = modelStore.verify(digest)
+        PhoneModelManagementOutcome(
+            operation = PhoneModelManagementOperation.VERIFY,
+            digest = digest,
+            success = result.valid,
+            detail = if (result.valid) {
+                "Model integrity verified"
+            } else {
+                "Model integrity check failed"
+            },
+        )
+    } catch (_: RuntimeException) {
+        unavailable(PhoneModelManagementOperation.VERIFY, digest)
+    }
+
+    override fun remove(digest: ModelDigest): PhoneModelManagementOutcome {
+        if (protectedModelDigest() == digest) {
+            return PhoneModelManagementOutcome(
+                operation = PhoneModelManagementOperation.REMOVE,
+                digest = digest,
+                success = false,
+                detail = "Selected or loaded model cannot be removed",
+            )
+        }
+        return try {
+            val removed = modelStore.remove(digest)
+            if (removed) removeMetadata(digest)
+            PhoneModelManagementOutcome(
+                operation = PhoneModelManagementOperation.REMOVE,
+                digest = digest,
+                success = removed,
+                detail = if (removed) "Model removed" else "Model not found",
+            )
+        } catch (_: RuntimeException) {
+            unavailable(PhoneModelManagementOperation.REMOVE, digest)
+        }
+    }
+
+    private fun unavailable(
+        operation: PhoneModelManagementOperation,
+        digest: ModelDigest,
+    ): PhoneModelManagementOutcome = PhoneModelManagementOutcome(
+        operation = operation,
+        digest = digest,
+        success = false,
+        detail = MODEL_MANAGEMENT_ERROR,
+        sourceError = MODEL_MANAGEMENT_ERROR,
+    )
+
+    private companion object {
+        const val MODEL_MANAGEMENT_ERROR = "Model management unavailable"
+    }
+}
+''')
+
+          graph = pkg / 'HarnessRuntimeGraph.kt'
+          text = graph.read_text()
+          needle = '''    fun runtimeSnapshot() = synchronized(lock) {
+        runtime?.runtimeSnapshot()
+    }
+'''
+          replacement = needle + '''
+    fun loadedModelDigest(): ModelDigest? = synchronized(lock) { runtimeModelDigest }
+'''
+          assert needle in text
+          graph.write_text(text.replace(needle, replacement, 1))
+
+          controller = pkg / 'PhoneModelDistributionController.kt'
+          text = controller.read_text()
+          text = text.replace(
+              '''    val detail: String? = null,
+    val installedModel: InstalledCatalogModelMetadata? = null,
+)''',
+              '''    val detail: String? = null,
+    val installedModel: InstalledCatalogModelMetadata? = null,
+    val removalConfirmationPending: Boolean = false,
+)''',
+              1,
+          )
+          text = text.replace(
+              '''    val metadataRepository: InstalledCatalogMetadataRepository,
+    val modelExists: (ModelDigest) -> Boolean,
+    val clock: () -> Long,
+)''',
+              '''    val metadataRepository: InstalledCatalogMetadataRepository,
+    val modelExists: (ModelDigest) -> Boolean,
+    val management: PhoneModelManagementGateway,
+    val clock: () -> Long,
+)''',
+              1,
+          )
+          text = text.replace(
+              '''    private val metadataRepository = services.metadataRepository
+    private val modelExists = services.modelExists
+    private val clock = services.clock
+''',
+              '''    private val metadataRepository = services.metadataRepository
+    private val modelExists = services.modelExists
+    private val management = services.management
+    private val clock = services.clock
+''',
+              1,
+          )
+          text = text.replace(
+              '''    private val pendingDownloads = mutableMapOf<String, VerifiedDownloadHandle>()
+    private val operationStates = mutableMapOf<String, RuntimeModelState>()
+
+    private var activeOperation: ActiveOperation? = null
+''',
+              '''    private val pendingDownloads = mutableMapOf<String, VerifiedDownloadHandle>()
+    private val operationStates = mutableMapOf<String, RuntimeModelState>()
+    private val managementDetails = mutableMapOf<String, String>()
+
+    private var activeOperation: ActiveOperation? = null
+    private var pendingRemovalStableId: String? = null
+''',
+              1,
+          )
+          marker = '''    fun download(stableId: String) {
+'''
+          methods = '''    fun verifyInstalled(stableId: String) {
+        val release = releases[stableId] ?: return
+        val initial = synchronized(lock) {
+            if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
+                return@synchronized null
+            }
+            activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
+            managementDetails[stableId] = "Verifying installed model integrity"
+            publishLocked("Verifying ${release.displayName}")
+        } ?: return
+        listener.onStateChanged(initial)
+        executor.execute {
+            val outcome = management.verify(release.artifact.digest)
+            val next = synchronized(lock) {
+                managementDetails[stableId] = outcome.detail
+                activeOperation = null
+                buildState(outcome.detail)
+            }
+            listener.onStateChanged(next)
+        }
+    }
+
+    fun requestRemove(stableId: String) {
+        val release = releases[stableId] ?: return
+        val next = synchronized(lock) {
+            if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
+                return@synchronized null
+            }
+            pendingRemovalStableId = stableId
+            managementDetails[stableId] = "Confirm removal of the app-private model copy"
+            publishLocked("Removal confirmation required")
+        }
+        next?.let(listener::onStateChanged)
+    }
+
+    fun cancelRemove(stableId: String) {
+        val next = synchronized(lock) {
+            if (pendingRemovalStableId != stableId) return@synchronized null
+            pendingRemovalStableId = null
+            managementDetails[stableId] = "Removal cancelled"
+            publishLocked("Removal cancelled")
+        }
+        next?.let(listener::onStateChanged)
+    }
+
+    fun confirmRemove(stableId: String) {
+        val release = releases[stableId] ?: return
+        val initial = synchronized(lock) {
+            if (
+                activeOperation != null ||
+                pendingRemovalStableId != stableId ||
+                !installed.containsKey(release.artifact.digest)
+            ) {
+                return@synchronized null
+            }
+            pendingRemovalStableId = null
+            activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
+            managementDetails[stableId] = "Removing installed model"
+            publishLocked("Removing ${release.displayName}")
+        } ?: return
+        listener.onStateChanged(initial)
+        executor.execute {
+            val outcome = management.remove(release.artifact.digest)
+            val next = synchronized(lock) {
+                if (outcome.success) {
+                    installed.remove(release.artifact.digest)
+                    operationStates.remove(stableId)
+                }
+                managementDetails[stableId] = outcome.detail
+                activeOperation = null
+                buildState(outcome.detail)
+            }
+            listener.onStateChanged(next)
+        }
+    }
+
+'''
+          assert marker in text
+          text = text.replace(marker, methods + marker, 1)
+          text = text.replace(
+              '''            detail = runtime?.detail,
+            installedModel = installedMetadata,
+        )''',
+              '''            detail = runtime?.detail ?: managementDetails[stableId],
+            installedModel = installedMetadata,
+            removalConfirmationPending = pendingRemovalStableId == stableId,
+        )''',
+              1,
+          )
+          text = text.replace(
+              '''        fun from(
+            context: Context,
+            runtimeGraph: HarnessRuntimeGraph,
+            listener: PhoneModelDistributionListener,
+        ): PhoneModelDistributionController {''',
+              '''        fun from(
+            context: Context,
+            runtimeGraph: HarnessRuntimeGraph,
+            listener: PhoneModelDistributionListener,
+            protectedModelDigest: () -> ModelDigest? = runtimeGraph::loadedModelDigest,
+        ): PhoneModelDistributionController {''',
+              1,
+          )
+          needle = '''            val metadataRepository = FileInstalledCatalogMetadataRepository(
+                File(appContext.noBackupFilesDir, METADATA_DIRECTORY),
+            )
+            return PhoneModelDistributionController(
+'''
+          replacement = '''            val metadataRepository = FileInstalledCatalogMetadataRepository(
+                File(appContext.noBackupFilesDir, METADATA_DIRECTORY),
+            )
+            val management = ModelStorePhoneModelManagementControl(
+                modelStore = runtimeGraph.modelStore,
+                protectedModelDigest = protectedModelDigest,
+                removeMetadata = metadataRepository::remove,
+            )
+            return PhoneModelDistributionController(
+'''
+          assert needle in text
+          text = text.replace(needle, replacement, 1)
+          text = text.replace(
+              '''                    metadataRepository = metadataRepository,
+                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
+                    clock = System::currentTimeMillis,
+''',
+              '''                    metadataRepository = metadataRepository,
+                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
+                    management = management,
+                    clock = System::currentTimeMillis,
+''',
+              1,
+          )
+          controller.write_text(text)
+
+          ui = pkg / 'PhoneModelDistributionUi.kt'
+          text = ui.read_text()
+          text = text.replace(
+              '''    onInstall: (String) -> Unit,
+    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+)''',
+              '''    onInstall: (String) -> Unit,
+    onVerifyInstalled: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
+    onCancelRemove: (String) -> Unit,
+    onConfirmRemove: (String) -> Unit,
+    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+)''',
+              1,
+          )
+          text = text.replace(
+              '''                onInstall = onInstall,
+                onSelectInstalled = onSelectInstalled,
+''',
+              '''                onInstall = onInstall,
+                onVerifyInstalled = onVerifyInstalled,
+                onRequestRemove = onRequestRemove,
+                onCancelRemove = onCancelRemove,
+                onConfirmRemove = onConfirmRemove,
+                onSelectInstalled = onSelectInstalled,
+''',
+              1,
+          )
+          text = text.replace(
+              '''    onInstall: (String) -> Unit,
+    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+)''',
+              '''    onInstall: (String) -> Unit,
+    onVerifyInstalled: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
+    onCancelRemove: (String) -> Unit,
+    onConfirmRemove: (String) -> Unit,
+    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
+)''',
+              1,
+          )
+          old = '''                    HarnessPrimaryButton(
+                        "Use in Playground",
+                        enabled = !operationActive,
+                    ) {
+                        onSelectInstalled(installed)
+                    }
+'''
+          new = old + '''                    HarnessSecondaryButton(
+                        "Verify integrity",
+                        enabled = !operationActive,
+                    ) {
+                        onVerifyInstalled(model.stableId)
+                    }
+                    if (model.removalConfirmationPending) {
+                        Text(
+                            "Removal permanently deletes the app-private model copy.",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        HarnessPrimaryButton(
+                            "Confirm removal",
+                            enabled = !operationActive,
+                        ) {
+                            onConfirmRemove(model.stableId)
+                        }
+                        HarnessSecondaryButton("Cancel removal") {
+                            onCancelRemove(model.stableId)
+                        }
+                    } else {
+                        HarnessSecondaryButton(
+                            "Remove installed model",
+                            enabled = !operationActive,
+                        ) {
+                            onRequestRemove(model.stableId)
+                        }
+                    }
+'''
+          assert old in text
+          ui.write_text(text.replace(old, new, 1))
+
+          main = pkg / 'MainActivity.kt'
+          text = main.read_text()
+          text = text.replace(
+              '''    private lateinit var modelDistributionController: PhoneModelDistributionController
+    private lateinit var playgroundController: PhonePlaygroundController
+''',
+              '''    private lateinit var modelDistributionController: PhoneModelDistributionController
+    private lateinit var selectedModelManagement: PhoneModelManagementGateway
+    private lateinit var playgroundController: PhonePlaygroundController
+''',
+              1,
+          )
+          text = text.replace(
+              '''    private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
+''',
+              '''    private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
+    private var selectedRemovalConfirmationPending by mutableStateOf(false)
+''',
+              1,
+          )
+          needle = '''        controller = PhoneTestController(this, this)
+        modelDistributionController = PhoneModelDistributionController.from(
+'''
+          replacement = '''        controller = PhoneTestController(this, this)
+        selectedModelManagement = ModelStorePhoneModelManagementControl(
+            modelStore = runtimeGraph.modelStore,
+            protectedModelDigest = runtimeGraph::loadedModelDigest,
+            removeMetadata = { true },
+        )
+        modelDistributionController = PhoneModelDistributionController.from(
+'''
+          assert needle in text
+          text = text.replace(needle, replacement, 1)
+          text = text.replace(
+              '''            listener = PhoneModelDistributionListener { state ->
+                runOnUiThread {
+                    modelDistributionState = state
+                    operationStatus = state.message
+                    updateKeepScreenOn()
+                }
+            },
+        )''',
+              '''            listener = PhoneModelDistributionListener { state ->
+                runOnUiThread {
+                    modelDistributionState = state
+                    operationStatus = state.message
+                    updateKeepScreenOn()
+                }
+            },
+            protectedModelDigest = {
+                selectedModelForDiagnostics?.digest ?: runtimeGraph.loadedModelDigest()
+            },
+        )''',
+              1,
+          )
+          method_marker = '''    private fun refreshDiagnostics() {
+'''
+          methods = '''    private fun verifySelectedModel() {
+        val model = importedModel ?: return
+        if (isBusy()) return
+        operationStatus = "Verifying selected model integrity…"
+        diagnosticsExecutor.execute {
+            val outcome = selectedModelManagement.verify(model.digest)
+            runOnUiThread {
+                operationStatus = outcome.detail
+                modelDistributionController.refresh()
+                refreshDiagnostics()
+            }
+        }
+    }
+
+'''
+          assert method_marker in text
+          text = text.replace(method_marker, methods + method_marker, 1)
+          text = text.replace(
+              '''                    onInstall = modelDistributionController::install,
+                    onSelectInstalled = { metadata ->''',
+              '''                    onInstall = modelDistributionController::install,
+                    onVerifyInstalled = modelDistributionController::verifyInstalled,
+                    onRequestRemove = modelDistributionController::requestRemove,
+                    onCancelRemove = modelDistributionController::cancelRemove,
+                    onConfirmRemove = modelDistributionController::confirmRemove,
+                    onSelectInstalled = { metadata ->''',
+              1,
+          )
+          old = '''                        HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
+                            afterPlaygroundRuntimeReleased { controller.removeModel() }
+                        }
+'''
+          new = '''                        HarnessSecondaryButton(
+                            "Verify integrity",
+                            enabled = !isBusy(),
+                            onClick = ::verifySelectedModel,
+                        )
+                        if (selectedRemovalConfirmationPending) {
+                            Text(
+                                "Removal permanently deletes the selected app-private model copy.",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            HarnessPrimaryButton("Confirm removal", enabled = !isBusy()) {
+                                selectedRemovalConfirmationPending = false
+                                afterPlaygroundRuntimeReleased { controller.removeModel() }
+                            }
+                            HarnessSecondaryButton("Cancel removal") {
+                                selectedRemovalConfirmationPending = false
+                            }
+                        } else {
+                            HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
+                                selectedRemovalConfirmationPending = true
+                            }
+                        }
+'''
+          assert old in text
+          main.write_text(text.replace(old, new, 1))
+
+          test_file = tests / 'PhoneModelManagementControlTest.kt'
+          test_file.write_text('''package io.github.daniele21.localllm.phonetest
+
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.models.GgufArtifact
+import io.github.daniele21.localllm.store.ModelStore
+import io.github.daniele21.localllm.store.ModelStoreSnapshot
+import io.github.daniele21.localllm.store.StoredModel
+import io.github.daniele21.localllm.store.VerificationResult
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+class PhoneModelManagementControlTest {
+    @Test
+    fun verifiesWithoutExposingStoragePaths() {
+        val store = FakeModelStore(mutableSetOf(DIGEST))
+        val control = ModelStorePhoneModelManagementControl(store, { null }, { true })
+
+        val outcome = control.verify(DIGEST)
+
+        assertTrue(outcome.success)
+        assertEquals("Model integrity verified", outcome.detail)
+        assertFalse(outcome.detail.contains(File.separator))
+    }
+
+    @Test
+    fun blocksRemovalOfSelectedOrLoadedModel() {
+        val store = FakeModelStore(mutableSetOf(DIGEST))
+        val control = ModelStorePhoneModelManagementControl(store, { DIGEST }, { true })
+
+        val outcome = control.remove(DIGEST)
+
+        assertFalse(outcome.success)
+        assertEquals("Selected or loaded model cannot be removed", outcome.detail)
+        assertTrue(store.contains(DIGEST))
+    }
+
+    @Test
+    fun removesUnprotectedModelAndItsMetadata() {
+        val store = FakeModelStore(mutableSetOf(DIGEST))
+        val cleaned = mutableListOf<ModelDigest>()
+        val control = ModelStorePhoneModelManagementControl(
+            modelStore = store,
+            protectedModelDigest = { null },
+            removeMetadata = { digest -> cleaned += digest; true },
+        )
+
+        val outcome = control.remove(DIGEST)
+
+        assertTrue(outcome.success)
+        assertFalse(store.contains(DIGEST))
+        assertEquals(listOf(DIGEST), cleaned)
+    }
+
+    private class FakeModelStore(private val digests: MutableSet<ModelDigest>) : ModelStore {
+        fun contains(digest: ModelDigest): Boolean = digest in digests
+
+        override fun find(digest: ModelDigest): StoredModel? = null
+
+        override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
+
+        override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(
+            valid = digest in digests,
+            actualDigest = digest.takeIf(digests::contains),
+            detail = "internal-path-must-not-surface",
+        )
+
+        override fun remove(digest: ModelDigest): Boolean = digests.remove(digest)
+
+        override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(0, 0L, emptyList())
+    }
+
+    private companion object {
+        val DIGEST = ModelDigest("b".repeat(64))
+    }
+}
+''')
+
+          dist_test = tests / 'PhoneModelDistributionControllerTest.kt'
+          text = dist_test.read_text()
+          insert_before = '''    private fun controller(
+'''
+          extra_tests = '''    @Test
+    fun verificationAndConfirmedRemovalPublishExplicitManagementStates() {
+        val metadataRepository = InMemoryInstalledMetadataRepository().apply {
+            save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))
+        }
+        val installedDigests = mutableSetOf(DIGEST)
+        var latest = PhoneModelDistributionState()
+        val controller = controller(
+            executor = ImmediateExecutorService(),
+            metadataRepository = metadataRepository,
+            installedDigests = installedDigests,
+            downloadGateway = successfulDownloadGateway(),
+            installGateway = PhoneModelInstallGateway { _, _ -> error("Install must not run") },
+            discard = { false },
+            listener = { latest = it },
+        )
+        val stableId = latest.models.single().stableId
+
+        controller.verifyInstalled(stableId)
+        assertEquals("Model integrity verified", latest.models.single().detail)
+
+        controller.requestRemove(stableId)
+        assertTrue(latest.models.single().removalConfirmationPending)
+        assertTrue(installedDigests.contains(DIGEST))
+
+        controller.confirmRemove(stableId)
+        assertFalse(latest.models.single().removalConfirmationPending)
+        assertEquals(PhoneCatalogModelStatus.READY_TO_DOWNLOAD, latest.models.single().status)
+        assertFalse(installedDigests.contains(DIGEST))
+        assertTrue(metadataRepository.loadAll().isEmpty())
+        controller.close()
+    }
+
+'''
+          assert insert_before in text
+          text = text.replace(insert_before, extra_tests + insert_before, 1)
+          text = text.replace(
+              '''            modelExists = installedDigests::contains,
+            clock = { NOW },
+''',
+              '''            modelExists = installedDigests::contains,
+            management = object : PhoneModelManagementGateway {
+                override fun verify(digest: ModelDigest): PhoneModelManagementOutcome =
+                    PhoneModelManagementOutcome(
+                        PhoneModelManagementOperation.VERIFY,
+                        digest,
+                        digest in installedDigests,
+                        if (digest in installedDigests) "Model integrity verified" else "Model integrity check failed",
+                    )
+
+                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome {
+                    val removed = installedDigests.remove(digest)
+                    if (removed) metadataRepository.remove(digest)
+                    return PhoneModelManagementOutcome(
+                        PhoneModelManagementOperation.REMOVE,
+                        digest,
+                        removed,
+                        if (removed) "Model removed" else "Model not found",
+                    )
+                }
+            },
+            clock = { NOW },
+''',
+              1,
+          )
+          dist_test.write_text(text)
+
+          docs = root / 'docs/model-management-phone.md'
+          docs.write_text('''# Phone model management
+
+The phone Models surface manages installed GGUF artifacts through the shared `ModelStore`; it does not create a second inventory or expose filesystem paths.
+
+## Operations
+
+- **Verify integrity** recomputes the stored artifact verification through `ModelStore.verify` and reports only a privacy-safe result.
+- **Remove installed model** always requires an explicit second confirmation.
+- A model selected for inference or currently owned by the runtime is protected from catalog-card removal. The selected-model card can remove it only after the playground runtime has been released.
+- Successful catalog removal also deletes the path-free installed catalog metadata. A later refresh reconciles any stale metadata if storage changed externally.
+
+Verification and removal run off the UI thread. Only one catalog distribution or management operation runs at a time.
+
+## Boundaries
+
+Removal deletes the app-private installed copy. It does not delete the user's original SAF document. Download URLs, signed URLs and storage paths are never displayed or persisted by the management state.
+''')
+
+          state = root / 'docs/current-state.md'
+          text = state.read_text()
+          text = text.replace(
+              '''### Block 7 — selective model-management recovery
+
+Recover unique verification, confirmation and loaded-model protection behavior from PR #34 on a fresh branch from the then-current `main`.
+''',
+              '''### Block 7 — selective model-management recovery
+
+Status: **IMPLEMENTED; awaiting pull-request CI and merge**.
+
+Recovered on the connected phone Models surface: explicit integrity verification, two-step removal confirmation, protection for selected or runtime-owned models, privacy-safe operation outcomes and catalog metadata cleanup. The old standalone console, parallel inventory and SAF staging implementation were not restored.
+''',
+              1,
+          )
+          state.write_text(text)
+
+          workflow = root / '.github/workflows/recover-model-management.yml'
+          workflow.unlink()
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Recover safe phone model management"
+          git push origin HEAD:agent/recover-model-management
