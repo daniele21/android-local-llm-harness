@@ -46,65 +46,42 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          codec_path = Path("models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogCodec.kt")
+          def replace_between(text: str, start: str, end: str, replacement: str) -> str:
+              start_index = text.index(start)
+              end_index = text.index(end, start_index)
+              return text[:start_index] + replacement.rstrip() + "\n\n" + text[end_index:]
+
+          codec_path = Path(
+              "models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogCodec.kt"
+          )
           codec = codec_path.read_text()
-          old_codec = '''private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
-              val raw = (requiredValue(name, path) as? CatalogJsonNumber)?.raw
-                  ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
-              if (raw.any { it == '.' || it == 'e' || it == 'E' }) {
-                  throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
-              }
-              return raw.toLongOrNull() ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
-          }
-          '''
-          new_codec = '''private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
+          codec = replace_between(
+              codec,
+              "private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {",
+              "private fun CatalogJsonObject.optionalLong",
+              '''private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
               val fieldPath = "$path.$name"
-              val raw = (requiredValue(name, path) as? CatalogJsonNumber)?.raw
-                  ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, fieldPath)
+              val raw =
+                  (requiredValue(name, path) as? CatalogJsonNumber)?.raw
+                      ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, fieldPath)
               if (raw.any { it == '.' || it == 'e' || it == 'E' }) invalidCatalogNumber(fieldPath)
               return raw.toLongOrNull() ?: invalidCatalogNumber(fieldPath)
           }
 
           private fun invalidCatalogNumber(path: String): Nothing =
-              throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, path)
-          '''
-          if old_codec not in codec:
-              raise SystemExit("CatalogCodec requiredLong block not found")
-          codec_path.write_text(codec.replace(old_codec, new_codec))
+              throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, path)''',
+          )
+          codec_path.write_text(codec)
 
-          persistence_path = Path("models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogPersistence.kt")
+          persistence_path = Path(
+              "models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogPersistence.kt"
+          )
           persistence = persistence_path.read_text()
-          old_read_state = '''    private fun readState(): RepositoryState? {
-              val file = stateFile()
-              if (!file.exists()) return null
-              if (!file.isFile || file.length() > maxStateBytes) throw CatalogStateException()
-              val bytes = readBoundedState(file)
-              val root = STATE_PARSER.parse(bytes) as? CatalogJsonObject ?: throw CatalogStateException()
-              requireFields(root, STATE_FIELDS)
-              val schemaVersion = requiredLong(root, "storageSchemaVersion")
-              if (schemaVersion != STORAGE_SCHEMA_VERSION.toLong()) throw CatalogStateException()
-              val persistedAt = requiredLong(root, "persistedAtEpochMs")
-              if (persistedAt < 0) throw CatalogStateException()
-              val catalogString = optionalString(root, "catalogJson")
-              val document = catalogString?.let { encoded ->
-                  when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
-                      is CatalogDecodeResult.Success -> decoded.document
-                      is CatalogDecodeResult.Failure -> throw CatalogStateException()
-                  }
-              }
-              val metadata = optionalObject(root, "syncMetadata")?.let(::decodeMetadata)
-              val failure = optionalObject(root, "lastFailure")?.let(::decodeFailure)
-              if ((document == null) != (metadata == null)) throw CatalogStateException()
-              return RepositoryState(
-                  document = document,
-                  encodedDocument = catalogString?.toByteArray(Charsets.UTF_8),
-                  syncMetadata = metadata,
-                  lastFailure = failure,
-                  persistedAtEpochMs = persistedAt,
-              )
-          }
-          '''
-          new_read_state = '''    private fun readState(): RepositoryState? {
+          persistence = replace_between(
+              persistence,
+              "    private fun readState(): RepositoryState? {",
+              "    private fun decodeMetadata",
+              '''    private fun readState(): RepositoryState? {
               val file = stateFile()
               if (!file.exists()) return null
               ensureValidState(file.isFile && file.length() <= maxStateBytes)
@@ -116,12 +93,13 @@ jobs:
               val persistedAt = requiredLong(root, "persistedAtEpochMs")
               ensureValidState(persistedAt >= 0)
               val catalogString = optionalString(root, "catalogJson")
-              val document = catalogString?.let { encoded ->
-                  when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
-                      is CatalogDecodeResult.Success -> decoded.document
-                      is CatalogDecodeResult.Failure -> invalidState()
+              val document =
+                  catalogString?.let { encoded ->
+                      when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
+                          is CatalogDecodeResult.Success -> decoded.document
+                          is CatalogDecodeResult.Failure -> invalidState()
+                      }
                   }
-              }
               val metadata = optionalObject(root, "syncMetadata")?.let(::decodeMetadata)
               val failure = optionalObject(root, "lastFailure")?.let(::decodeFailure)
               ensureValidState((document == null) == (metadata == null))
@@ -138,42 +116,31 @@ jobs:
               if (!valid) invalidState()
           }
 
-          private fun invalidState(): Nothing = throw CatalogStateException()
-          '''
-          if old_read_state not in persistence:
-              raise SystemExit("CatalogPersistence readState block not found")
-          persistence = persistence.replace(old_read_state, new_read_state)
-
-          old_require_fields = '''private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
-              if (value.fields.keys != expected) throw IllegalArgumentException("Unexpected catalog state fields")
-          }
-          '''
-          new_require_fields = '''private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
+          private fun invalidState(): Nothing = throw CatalogStateException()''',
+          )
+          persistence = replace_between(
+              persistence,
+              "private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {",
+              "private fun requiredValue",
+              '''private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
               require(value.fields.keys == expected) { "Unexpected catalog state fields" }
-          }
-          '''
-          if old_require_fields not in persistence:
-              raise SystemExit("CatalogPersistence requireFields block not found")
-          persistence = persistence.replace(old_require_fields, new_require_fields)
-
-          old_required_long = '''private fun requiredLong(value: CatalogJsonObject, name: String): Long {
-              val raw = (requiredValue(value, name) as? CatalogJsonNumber)?.raw
-                  ?: throw IllegalArgumentException("Invalid catalog state number")
-              if (raw.any { it == '.' || it == 'e' || it == 'E' }) throw IllegalArgumentException("Invalid catalog state integer")
-              return raw.toLongOrNull() ?: throw IllegalArgumentException("Catalog state integer out of range")
-          }
-          '''
-          new_required_long = '''private fun requiredLong(value: CatalogJsonObject, name: String): Long {
+          }''',
+          )
+          persistence = replace_between(
+              persistence,
+              "private fun requiredLong(value: CatalogJsonObject, name: String): Long {",
+              "private fun optionalObject",
+              '''private fun requiredLong(value: CatalogJsonObject, name: String): Long {
               val number = requiredValue(value, name) as? CatalogJsonNumber
               requireNotNull(number) { "Invalid catalog state number" }
               val raw = number.raw
-              require(raw.none { it == '.' || it == 'e' || it == 'E' }) { "Invalid catalog state integer" }
+              require(raw.none { it == '.' || it == 'e' || it == 'E' }) {
+                  "Invalid catalog state integer"
+              }
               return requireNotNull(raw.toLongOrNull()) { "Catalog state integer out of range" }
-          }
-          '''
-          if old_required_long not in persistence:
-              raise SystemExit("CatalogPersistence requiredLong block not found")
-          persistence_path.write_text(persistence.replace(old_required_long, new_required_long))
+          }''',
+          )
+          persistence_path.write_text(persistence)
           PY
 
       - name: Format and validate curated catalog
