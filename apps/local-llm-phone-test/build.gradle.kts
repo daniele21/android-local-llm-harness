@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -37,6 +40,15 @@ gradle.taskGraph.whenReady {
     }
 }
 
+val versionPropertiesFile = file("version.properties")
+val versionProperties = Properties().apply {
+    if (versionPropertiesFile.exists()) {
+        FileInputStream(versionPropertiesFile).use { load(it) }
+    }
+}
+val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
+val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -47,8 +59,8 @@ android {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = currentVersionCode
+        versionName = currentVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
