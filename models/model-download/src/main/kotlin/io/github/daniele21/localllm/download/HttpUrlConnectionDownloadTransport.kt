@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.download
 
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 
@@ -21,7 +22,11 @@ class HttpUrlConnectionDownloadTransport : DownloadTransport {
         override val contentLength: Long? = connection.contentLengthLong.takeIf { it >= 0 }
         override val redirectLocation: String? = connection.getHeaderField("Location")
         override val body: InputStream by lazy {
-            if (statusCode in 200..299) connection.inputStream else connection.errorStream ?: InputStream.nullInputStream()
+            if (statusCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream ?: ByteArrayInputStream(ByteArray(0))
+            }
         }
 
         override fun close() {
