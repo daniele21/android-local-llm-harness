@@ -21,6 +21,7 @@ import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.io.File
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -480,7 +481,7 @@ internal class PhoneTestController(
         return String(result)
     }
 
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
+    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
 
     private data class DocumentMetadata(val fileName: String, val sizeBytes: Long?)
 

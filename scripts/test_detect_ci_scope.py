@@ -60,20 +60,38 @@ class DetectCiScopeTest(unittest.TestCase):
         scope = classify_paths(
             [
                 "observability/health-engine/src/main/kotlin/Health.kt",
-                "core/contracts/src/main/kotlin/Request.kt",
+                "core/runtime-core/src/main/kotlin/Runtime.kt",
             ]
         )
         self.assertEqual(
             scope.modules,
-            ("core:contracts", "observability:health-engine"),
+            ("core:runtime-core", "observability:health-engine"),
         )
 
     def test_mixed_documentation_and_core_code_runs_android_only(self) -> None:
-        scope = classify_paths(["README.md", "core/contracts/src/main/kotlin/Request.kt"])
+        scope = classify_paths(
+            ["README.md", "core/runtime-core/src/main/kotlin/Runtime.kt"]
+        )
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
-        self.assertEqual(scope.modules, ("core:contracts",))
+        self.assertEqual(scope.modules, ("core:runtime-core",))
+
+    def test_core_contract_change_runs_all_android_modules(self) -> None:
+        scope = classify_paths(["core/contracts/src/main/kotlin/Request.kt"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("all",))
+
+    def test_observability_contract_change_runs_all_android_modules(self) -> None:
+        scope = classify_paths(
+            ["observability/contracts/src/main/kotlin/Telemetry.kt"]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("all",))
 
     def test_native_change_selects_backend_and_runs_all_validation(self) -> None:
         scope = classify_paths(["backends/llama-cpp/src/main/cpp/runtime.cpp"])

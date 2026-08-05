@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.observability.HealthStatus
 import io.github.daniele21.localllm.observability.RunStatus
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
+import java.util.Locale
 
 internal data class DiagnosticsRunUi(
     val requestId: String,
@@ -104,7 +105,7 @@ internal class HarnessDiagnosticsSource(
 
     private fun Long?.asDuration(): String = this?.let { "$it ms" } ?: "Unavailable"
 
-    private fun Double?.asThroughput(): String = this?.let { "%.2f tok/s".format(it) } ?: "Unavailable"
+    private fun Double?.asThroughput(): String = this?.let { "%.2f tok/s".format(Locale.ROOT, it) } ?: "Unavailable"
 
     private companion object {
         const val DEFAULT_RUN_LIMIT = 30

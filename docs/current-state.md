@@ -28,6 +28,14 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PRs #20, #3, #4 and #33 were closed with explicit superseded/obsolete disposition notes.
 - Issue #46 tracks branch protection and the required `Repository validation` repository setting.
 
+## Repository validation hardening
+
+The validation scope treats changes under `core/contracts` and `observability/contracts` as repository-wide Android changes. Public contract edits can break implementations and test doubles outside the changed-file set, so they fail safe to all Android modules until a tested reverse-dependency graph replaces this policy. The telemetry contract test doubles in `runtime-core` and `health-engine` implement the current benchmark-history contract.
+
+Brand asset generation is a read-only reproducibility check. It regenerates the committed assets and fails on a diff; it does not commit or push into a protected integration branch.
+
+Phone-test technical metrics use locale-independent decimal formatting so repository tests and privacy-safe reports remain stable across developer and CI locales.
+
 ## Legacy feature branch requiring selective recovery
 
 PR #34 must not be merged directly. It is based on the pre-Compose console line and has diverged materially from current `main`.

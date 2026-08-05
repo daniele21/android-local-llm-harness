@@ -29,6 +29,7 @@ Historical branches are read-only audit references. They must not receive new im
 The cumulative validation gate covers:
 
 - [x] coding-agent navigation and llama.cpp pin guards
+- [x] repository-wide Android fan-out for public runtime and telemetry contract changes
 - [x] shell and Python runner validation
 - [x] native host configuration, compilation and tests
 - [x] Spotless and ktlint formatting checks
