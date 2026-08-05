@@ -181,7 +181,6 @@ class VerifiedModelInstaller(
             val verification = try {
                 modelStore.verify(stored.digest)
             } catch (_: RuntimeException) {
-                runCatching { modelStore.remove(stored.digest) }
                 return fail(
                     observer,
                     installationId,
@@ -190,7 +189,6 @@ class VerifiedModelInstaller(
                 )
             }
             if (!verification.valid) {
-                runCatching { modelStore.remove(stored.digest) }
                 return fail(
                     observer,
                     installationId,
