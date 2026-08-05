@@ -1,0 +1,38 @@
+name: Apply dev integration documentation
+
+on:
+  push:
+    branches:
+      - codex/dev-ci-governance
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ github.event.head_commit.message == 'Apply dev integration documentation' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/dev-ci-governance
+          fetch-depth: 1
+      - name: Apply canonical documentation migration
+        run: python3 scripts/apply_dev_integration_docs_v2.py
+      - name: Validate navigation and Python sources
+        run: |
+          python3 scripts/verify-agent-navigation.py
+          python3 -m py_compile scripts/*.py
+      - name: Remove temporary migration automation
+        run: |
+          rm scripts/apply_dev_integration_docs.py
+          rm scripts/apply_dev_integration_docs_v2.py
+          rm .github/workflows/apply-dev-integration-docs.yml
+          rm .github/dev-doc-migration.trigger
+      - name: Commit canonical documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Document dev integration and promotion workflow"
+          git push origin HEAD:codex/dev-ci-governance
