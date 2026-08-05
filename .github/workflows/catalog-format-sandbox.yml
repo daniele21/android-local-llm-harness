@@ -165,7 +165,8 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add models/model-catalog docs/curated-model-catalog.md
+          git add -f models/model-catalog
+          git add docs/curated-model-catalog.md
           git diff --cached --quiet && exit 0
           git commit -m "style: validate and format curated catalog"
           git push origin HEAD:agent/model-catalog-curated-staging
