@@ -17,4 +17,4 @@ Removal deletes the app-private installed copy. It does not delete the user's or
 
 ## Recovery validation
 
-The recovered implementation is accepted only after the source-level controller, UI wiring and stateful test doubles compile and pass without retaining self-modifying repair workflows.
+The recovered implementation is accepted only after the source-level controller, UI wiring and stateful test doubles compile and pass without retaining self-modifying repair workflows. Verification detail and pending-removal confirmation are part of the published UI state and therefore covered by controller tests.
