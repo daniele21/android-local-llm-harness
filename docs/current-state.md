@@ -4,18 +4,18 @@ Last updated: 2026-08-05
 
 This document is the active integration and recovery ledger for the repository. It complements the historical detail in `docs/roadmap.md` and must be updated whenever a merged pull request changes the next operational block.
 
-## Canonical line
+## Canonical lines
 
-`main` is the only canonical integrated implementation line.
+`dev` is the canonical integration base and target for ordinary repository work. `main` is the protected stable and release-oriented line.
 
-Integrated head before the next recovery block:
+Current integration baseline before the governance pull request:
 
 ```text
-34fb5f37f626d229dbef80e2cfffa738ff403b38
-Recover retained benchmark history (#51)
+d9404084ee79c542ca24c4c790c0e0d20d118f01
+Split curated model catalog by family (#58)
 ```
 
-Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
+The normal path is a focused pull request into `dev`, cumulative validation on the merged `dev` commit, then a complete `dev -> main` promotion. Historical implementation, staging and sandbox branches are audit references only. New work starts from the latest green `dev` unless it is an explicit hotfix based on `main`.
 
 ## Completed repository cleanup and infrastructure
 
@@ -25,8 +25,19 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
 - PR #49 connected the phone Models UI to catalog, secure download and verified installation, and added durable path-free installed metadata.
 - PR #51 recovered retained benchmark history on the current connected phone-test architecture without restoring the obsolete standalone console.
+- PR #55 completed the telemetry test doubles, made public-contract validation repository-wide, made technical metric formatting locale-independent and converted brand generation into a read-only reproducibility check.
 - PRs #20, #3, #4 and #33 were closed with explicit superseded/obsolete disposition notes.
-- Issue #46 tracks branch protection and the required `Repository validation` repository setting.
+- Issue #46 is implemented: `main` requires an up-to-date pull request, one approval, resolved conversations and the `Repository validation` check; administrators follow the same rules, and force-push and deletion are disabled.
+
+## Repository validation hardening
+
+The validation scope treats changes under `core/contracts` and `observability/contracts` as repository-wide Android changes. Public contract edits can break implementations and test doubles outside the changed-file set, so they fail safe to all Android modules until a tested reverse-dependency graph replaces this policy. The telemetry contract test doubles in `runtime-core` and `health-engine` implement the current benchmark-history contract.
+
+Brand asset generation is a read-only reproducibility check. It regenerates the committed assets and fails on a diff; it does not commit or push into a protected integration branch.
+
+Phone-test technical metrics use locale-independent decimal formatting so repository tests and privacy-safe reports remain stable across developer and CI locales.
+
+The repository baseline was restored on `main` through PR #55. `dev` now contains the curated-catalog expansion and the modular Detekt fix from PR #58. The active governance pull request adds cumulative `dev` validation, promotion gates, branch-target enforcement and the canonical documentation required for Harness 0.5.0. Repository-level protection for `dev` remains an administrative gate that cannot be applied from the code tree.
 
 ## Legacy feature branch requiring selective recovery
 
@@ -162,9 +173,9 @@ Recovered on the current phone-test architecture: immutable retained captures, a
 
 ### Block 7 — selective model-management recovery
 
-Status: **NEXT**.
+Status: **IN PROGRESS through PR #53**.
 
-Recover unique verification, confirmation, loaded-model protection, cleanup and operation-state behavior from PR #34 on a fresh branch from current `main`. Do not restore its parallel store or old console composition.
+PR #53 is retargeted to `dev`, contains only the focused connected-phone implementation and no longer includes temporary self-modifying workflows. Its source-level recovery compiles and its targeted controller tests pass. It remains draft until it is aligned with the final governance baseline and complete repository validation is green.
 
 ### Block 8 — product and hardware completion
 
@@ -190,23 +201,18 @@ Recover unique verification, confirmation, loaded-model protection, cleanup and 
 Each block follows:
 
 ```text
-fresh branch from current main
+fresh branch from latest green dev
   -> focused implementation
   -> deterministic tests
   -> documentation and this ledger updated
-  -> complete CI
-  -> merge
-  -> next block starts from refreshed main
+  -> pull request and scoped CI
+  -> squash merge into dev
+  -> cumulative dev validation
+  -> later complete promotion into main
 ```
 
 Do not merge legacy stacked PRs merely because GitHub reports them as mergeable. Mergeability is not evidence of architectural currency or absence of duplication.
 
 ## Repository administration still required
 
-Issue #46 tracks operational hardening outside the code tree:
-
-- protect `main`;
-- require pull requests;
-- require the stable `Repository validation` check;
-- block force pushes and deletion of `main`;
-- enable automatic deletion of merged feature branches where appropriate.
+`main` protection is implemented through issue #46. The remaining repository-level action for Harness 0.5.0 is to apply equivalent push, force-push and deletion protection to `dev`, require an up-to-date pull request and `Repository validation`, and require resolved conversations. The default branch remains `main`; feature branches are removed after merge and audit rather than through an indiscriminate global deletion rule.

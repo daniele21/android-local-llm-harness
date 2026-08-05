@@ -13,6 +13,16 @@ The repository distinguishes two evidence levels:
 
 A merge-ready native feature may be integrated while physical-device evidence is explicitly deferred in the roadmap. It must not be described as production-ready, released to application consumers or used for device-performance claims until that evidence exists.
 
+## Branch and promotion completion
+
+- Ordinary feature, fix, dependency, documentation and UX/UI work is based on the latest green `dev` and targets `dev`.
+- The pull request is current with `dev`, conflict-free and green on `Repository validation`.
+- A merge into `dev` is not release evidence by itself; the resulting cumulative `dev` validation must also remain green.
+- A release candidate is an exact `dev` commit promoted to `main` through a pull request with complete non-scoped Android, native and packaging validation.
+- Promotion uses a merge commit so the validated `dev` identity remains auditable; tags and release artifacts originate only from validated `main` commits.
+- An emergency hotfix is based on `main`, validated there and forward-ported through a `main -> dev` pull request.
+- A red `dev` freezes unrelated integrations until a focused fix-forward or revert restores the branch.
+
 ## Functional completion
 
 - The intended behavior is implemented through the correct architectural boundary.
@@ -110,7 +120,7 @@ When a required check cannot be executed locally, document the limitation before
 
 After a CI-only failure, reproduce and verify the fix locally where possible before the next push.
 
-The relevant narrow checks pass during development, and the complete repository gate passes before merge:
+The relevant narrow checks pass during development, the pull-request gate passes before merge into `dev`, and the cumulative `dev` gate passes on the resulting integration commit:
 
 ```bash
 python3 scripts/verify-agent-navigation.py
@@ -199,7 +209,8 @@ safe native resource lifecycle
 exact Android native packaging verified
 privacy-safe observability
 documentation and deferred gates updated
-all required merge-readiness validation gates passing
+all required pull-request and cumulative dev validation gates passing
+release promotion tied to an exact validated dev commit
 ```
 
 When physical-device validation is deferred, the merge record must state that production readiness is still blocked.

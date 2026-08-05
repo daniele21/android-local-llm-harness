@@ -1,0 +1,41 @@
+name: Generate brand assets
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/generate_brand_assets.py
+      - .github/workflows/generate-brand-assets.yml
+      - docs/assets/brand/**
+  push:
+    branches: [main]
+    paths:
+      - scripts/generate_brand_assets.py
+      - .github/workflows/generate-brand-assets.yml
+      - docs/assets/brand/**
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check Pillow==11.3.0
+
+      - name: Generate dark and light assets
+        run: python scripts/generate_brand_assets.py
+
+      - name: Verify generated assets are committed
+        run: |
+          git add --intent-to-add docs/assets/brand
+          git diff --exit-code -- docs/assets/brand

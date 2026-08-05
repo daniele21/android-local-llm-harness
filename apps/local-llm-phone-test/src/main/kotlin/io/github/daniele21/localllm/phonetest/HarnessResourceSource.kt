@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.phonetest
 import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
+import java.util.Locale
 
 internal data class DiagnosticsResourceUi(
     val processPss: String,
@@ -84,9 +85,9 @@ internal class HarnessResourceSource(
 
     private fun Long?.asBytes(): String = this?.let { bytes ->
         when {
-            bytes >= GIBIBYTE -> "%.2f GiB".format(bytes / GIBIBYTE.toDouble())
-            bytes >= MEBIBYTE -> "%.1f MiB".format(bytes / MEBIBYTE.toDouble())
-            bytes >= KIBIBYTE -> "%.1f KiB".format(bytes / KIBIBYTE.toDouble())
+            bytes >= GIBIBYTE -> "%.2f GiB".format(Locale.ROOT, bytes / GIBIBYTE.toDouble())
+            bytes >= MEBIBYTE -> "%.1f MiB".format(Locale.ROOT, bytes / MEBIBYTE.toDouble())
+            bytes >= KIBIBYTE -> "%.1f KiB".format(Locale.ROOT, bytes / KIBIBYTE.toDouble())
             else -> "$bytes B"
         }
     } ?: "Unavailable"

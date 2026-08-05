@@ -106,6 +106,10 @@ GLOBAL_GRADLE_PATHS = {
     "settings.gradle.kts",
 }
 GLOBAL_GRADLE_PREFIXES = ("build-logic/", "gradle/")
+PUBLIC_CONTRACT_PREFIXES = (
+    "core/contracts/",
+    "observability/contracts/",
+)
 
 
 @dataclass(frozen=True)
@@ -154,6 +158,13 @@ def affected_gradle_modules(paths: Sequence[str]) -> tuple[str, ...]:
     implementation_paths = tuple(path for path in paths if not is_docs_only(path))
     if not implementation_paths:
         return ()
+
+    # Public contract changes can break implementers and test doubles in modules
+    # that do not otherwise appear in the changed-file set. Validate every Android
+    # module until an explicit, tested reverse-dependency graph replaces this
+    # fail-safe fan-out.
+    if any(path.startswith(PUBLIC_CONTRACT_PREFIXES) for path in implementation_paths):
+        return ("all",)
 
     if any(
         path in FORCE_ALL_PATHS

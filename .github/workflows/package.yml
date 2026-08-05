@@ -2,6 +2,23 @@ name: Package Android Artifacts
 
 on:
   push:
+    branches: [main, dev]
+    paths:
+      - "apps/**"
+      - "backends/**"
+      - "core/**"
+      - "models/**"
+      - "observability/**"
+      - "transports/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".gitmodules"
+      - "third_party/llama.cpp"
+      - "scripts/verify-android-packaging.py"
+      - ".github/workflows/package.yml"
+  pull_request:
     branches: [main]
     paths:
       - "apps/**"
@@ -20,6 +37,10 @@ on:
       - ".github/workflows/package.yml"
   workflow_dispatch:
     inputs:
+      candidate_ref:
+        description: Branch, tag, or commit to package
+        type: string
+        default: dev
       profile:
         description: Generate a Gradle performance report
         type: boolean
@@ -29,7 +50,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: package-${{ github.ref }}
+  group: package-${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +64,7 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.sha }}
 
       - name: Verify llama.cpp pin
         run: ./scripts/verify-llama-cpp-pin.sh
