@@ -172,44 +172,44 @@ internal class PhoneModelDistributionController(
     fun verifyInstalled(stableId: String) {
         val release = releases[stableId] ?: return
         val initial = synchronized(lock) {
-  if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
-      return@synchronized null
-  }
-  activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
-  managementDetails[stableId] = "Verifying installed model integrity"
-  publishLocked("Verifying ${release.displayName}")
+            if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
+                return@synchronized null
+            }
+            activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
+            managementDetails[stableId] = "Verifying installed model integrity"
+            publishLocked("Verifying ${release.displayName}")
         } ?: return
         listener.onStateChanged(initial)
         executor.execute {
-  val outcome = management.verify(release.artifact.digest)
-  val next = synchronized(lock) {
-      managementDetails[stableId] = outcome.detail
-      activeOperation = null
-      buildState(outcome.detail)
-  }
-  listener.onStateChanged(next)
+            val outcome = management.verify(release.artifact.digest)
+            val next = synchronized(lock) {
+                managementDetails[stableId] = outcome.detail
+                activeOperation = null
+                buildState(outcome.detail)
+            }
+            listener.onStateChanged(next)
         }
     }
 
     fun requestRemove(stableId: String) {
         val release = releases[stableId] ?: return
         val next = synchronized(lock) {
-  if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
-      return@synchronized null
-  }
-  pendingRemovalStableId = stableId
-  managementDetails[stableId] = "Confirm removal of the app-private model copy"
-  publishLocked("Removal confirmation required")
+            if (activeOperation != null || !installed.containsKey(release.artifact.digest)) {
+                return@synchronized null
+            }
+            pendingRemovalStableId = stableId
+            managementDetails[stableId] = "Confirm removal of the app-private model copy"
+            publishLocked("Removal confirmation required")
         }
         next?.let(listener::onStateChanged)
     }
 
     fun cancelRemove(stableId: String) {
         val next = synchronized(lock) {
-  if (pendingRemovalStableId != stableId) return@synchronized null
-  pendingRemovalStableId = null
-  managementDetails[stableId] = "Removal cancelled"
-  publishLocked("Removal cancelled")
+            if (pendingRemovalStableId != stableId) return@synchronized null
+            pendingRemovalStableId = null
+            managementDetails[stableId] = "Removal cancelled"
+            publishLocked("Removal cancelled")
         }
         next?.let(listener::onStateChanged)
     }
@@ -217,31 +217,31 @@ internal class PhoneModelDistributionController(
     fun confirmRemove(stableId: String) {
         val release = releases[stableId] ?: return
         val initial = synchronized(lock) {
-  if (
-      activeOperation != null ||
-      pendingRemovalStableId != stableId ||
-      !installed.containsKey(release.artifact.digest)
-  ) {
-      return@synchronized null
-  }
-  pendingRemovalStableId = null
-  activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
-  managementDetails[stableId] = "Removing installed model"
-  publishLocked("Removing ${release.displayName}")
+            if (
+                activeOperation != null ||
+                pendingRemovalStableId != stableId ||
+                !installed.containsKey(release.artifact.digest)
+            ) {
+                return@synchronized null
+            }
+            pendingRemovalStableId = null
+            activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
+            managementDetails[stableId] = "Removing installed model"
+            publishLocked("Removing ${release.displayName}")
         } ?: return
         listener.onStateChanged(initial)
         executor.execute {
-  val outcome = management.remove(release.artifact.digest)
-  val next = synchronized(lock) {
-      if (outcome.success) {
-          installed.remove(release.artifact.digest)
-          operationStates.remove(stableId)
-      }
-      managementDetails[stableId] = outcome.detail
-      activeOperation = null
-      buildState(outcome.detail)
-  }
-  listener.onStateChanged(next)
+            val outcome = management.remove(release.artifact.digest)
+            val next = synchronized(lock) {
+                if (outcome.success) {
+                    installed.remove(release.artifact.digest)
+                    operationStates.remove(stableId)
+                }
+                managementDetails[stableId] = outcome.detail
+                activeOperation = null
+                buildState(outcome.detail)
+            }
+            listener.onStateChanged(next)
         }
     }
 
@@ -492,8 +492,10 @@ internal class PhoneModelDistributionController(
             compatibilityWarnings = result.warnings.map { it.name },
             bytesDownloaded = runtime?.bytesDownloaded ?: 0L,
             expectedBytes = runtime?.expectedBytes ?: release.artifact.sizeBytes,
-            detail = runtime?.detail,
+            detail =
+            managementDetails[stableId] ?: runtime?.detail,
             installedModel = installedMetadata,
+            removalConfirmationPending = pendingRemovalStableId == stableId,
         )
     }
 
@@ -562,12 +564,12 @@ internal class PhoneModelDistributionController(
             val metadataRepository = FileInstalledCatalogMetadataRepository(
                 File(appContext.noBackupFilesDir, METADATA_DIRECTORY),
             )
-  val management = ModelStorePhoneModelManagementControl(
-      modelStore = runtimeGraph.modelStore,
-      protectedModelDigest = protectedModelDigest,
-      removeMetadata = metadataRepository::remove,
-  )
-  return PhoneModelDistributionController(
+            val management = ModelStorePhoneModelManagementControl(
+                modelStore = runtimeGraph.modelStore,
+                protectedModelDigest = runtimeGraph::loadedModelDigest,
+                removeMetadata = metadataRepository::remove,
+            )
+            return PhoneModelDistributionController(
                 environment =
                 PhoneModelDistributionEnvironment(
                     catalog = catalog,
@@ -597,6 +599,7 @@ internal class PhoneModelDistributionController(
                     discardVerifiedDownload = verifiedAccess::discard,
                     metadataRepository = metadataRepository,
                     modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
+                    management = management,
                     clock = System::currentTimeMillis,
                 ),
                 listener = listener,

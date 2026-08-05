@@ -154,18 +154,18 @@ class PhoneModelDistributionControllerTest {
     @Test
     fun verificationAndConfirmedRemovalPublishExplicitManagementStates() {
         val metadataRepository = InMemoryInstalledMetadataRepository().apply {
-  save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))
+            save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))
         }
         val installedDigests = mutableSetOf(DIGEST)
         var latest = PhoneModelDistributionState()
         val controller = controller(
-  executor = ImmediateExecutorService(),
-  metadataRepository = metadataRepository,
-  installedDigests = installedDigests,
-  downloadGateway = successfulDownloadGateway(),
-  installGateway = PhoneModelInstallGateway { _, _ -> error("Install must not run") },
-  discard = { false },
-  listener = { latest = it },
+            executor = ImmediateExecutorService(),
+            metadataRepository = metadataRepository,
+            installedDigests = installedDigests,
+            downloadGateway = successfulDownloadGateway(),
+            installGateway = PhoneModelInstallGateway { _, _ -> error("Install must not run") },
+            discard = { false },
+            listener = { latest = it },
         )
         val stableId = latest.models.single().stableId
 
@@ -224,6 +224,24 @@ class PhoneModelDistributionControllerTest {
             discardVerifiedDownload = discard,
             metadataRepository = metadataRepository,
             modelExists = installedDigests::contains,
+            management = object : PhoneModelManagementGateway {
+                override fun verify(digest: ModelDigest): PhoneModelManagementOutcome = PhoneModelManagementOutcome(
+                    operation = PhoneModelManagementOperation.VERIFY,
+                    digest = digest,
+                    success = true,
+                    detail = "Model integrity verified",
+                )
+                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome {
+                    installedDigests.remove(digest)
+                    metadataRepository.remove(digest)
+                    return PhoneModelManagementOutcome(
+                        operation = PhoneModelManagementOperation.REMOVE,
+                        digest = digest,
+                        success = true,
+                        detail = "Model removed",
+                    )
+                }
+            },
             clock = { NOW },
         ),
         listener = PhoneModelDistributionListener(listener),

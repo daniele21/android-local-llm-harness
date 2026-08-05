@@ -122,9 +122,9 @@ class MainActivity :
         logSource = HarnessLogSource(runtimeGraph.telemetryRepository)
         controller = PhoneTestController(this, this)
         selectedModelManagement = ModelStorePhoneModelManagementControl(
-  modelStore = runtimeGraph.modelStore,
-  protectedModelDigest = runtimeGraph::loadedModelDigest,
-  removeMetadata = { true },
+            modelStore = runtimeGraph.modelStore,
+            protectedModelDigest = runtimeGraph::loadedModelDigest,
+            removeMetadata = { true },
         )
         modelDistributionController = PhoneModelDistributionController.from(
             context = this,
@@ -207,12 +207,12 @@ class MainActivity :
         if (isBusy()) return
         operationStatus = "Verifying selected model integrity…"
         diagnosticsExecutor.execute {
-  val outcome = selectedModelManagement.verify(model.digest)
-  runOnUiThread {
-      operationStatus = outcome.detail
-      modelDistributionController.refresh()
-      refreshDiagnostics()
-  }
+            val outcome = selectedModelManagement.verify(model.digest)
+            runOnUiThread {
+                operationStatus = outcome.detail
+                modelDistributionController.refresh()
+                refreshDiagnostics()
+            }
         }
     }
 
@@ -559,6 +559,10 @@ class MainActivity :
                     onDownload = modelDistributionController::download,
                     onCancel = modelDistributionController::cancelDownload,
                     onInstall = modelDistributionController::install,
+                    onVerifyInstalled = modelDistributionController::verifyInstalled,
+                    onRequestRemove = modelDistributionController::requestRemove,
+                    onCancelRemove = modelDistributionController::cancelRemove,
+                    onConfirmRemove = modelDistributionController::confirmRemove,
                     onSelectInstalled = { metadata ->
                         afterPlaygroundRuntimeReleased {
                             controller.selectInstalledModel(metadata.asImportedPhoneModel())

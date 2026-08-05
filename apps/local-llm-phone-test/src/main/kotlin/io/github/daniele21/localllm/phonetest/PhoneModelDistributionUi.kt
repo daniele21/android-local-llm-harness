@@ -56,6 +56,10 @@ internal fun PhoneModelDistributionCatalog(
                 onDownload = onDownload,
                 onCancel = onCancel,
                 onInstall = onInstall,
+                onVerifyInstalled = onVerifyInstalled,
+                onRequestRemove = onRequestRemove,
+                onCancelRemove = onCancelRemove,
+                onConfirmRemove = onConfirmRemove,
                 onSelectInstalled = onSelectInstalled,
             )
         }
@@ -130,39 +134,39 @@ private fun CatalogModelCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HarnessPrimaryButton(
-              "Use in Playground",
-              enabled = !operationActive,
-          ) {
-              onSelectInstalled(installed)
-          }
+                        "Use in Playground",
+                        enabled = !operationActive,
+                    ) {
+                        onSelectInstalled(installed)
+                    }
                     HarnessSecondaryButton(
-              "Verify integrity",
-              enabled = !operationActive,
-          ) {
-              onVerifyInstalled(model.stableId)
-          }
-          if (model.removalConfirmationPending) {
-              Text(
-                  "Removal permanently deletes the app-private model copy.",
-                  color = MaterialTheme.colorScheme.error,
-              )
-              HarnessPrimaryButton(
-                  "Confirm removal",
-                  enabled = !operationActive,
-              ) {
-                  onConfirmRemove(model.stableId)
-              }
-              HarnessSecondaryButton("Cancel removal") {
-                  onCancelRemove(model.stableId)
-              }
-          } else {
-              HarnessSecondaryButton(
-                  "Remove installed model",
-                  enabled = !operationActive,
-              ) {
-                  onRequestRemove(model.stableId)
-              }
-          }
+                        "Verify integrity",
+                        enabled = !operationActive,
+                    ) {
+                        onVerifyInstalled(model.stableId)
+                    }
+                    if (model.removalConfirmationPending) {
+                        Text(
+                            "Removal permanently deletes the app-private model copy.",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        HarnessPrimaryButton(
+                            "Confirm removal",
+                            enabled = !operationActive,
+                        ) {
+                            onConfirmRemove(model.stableId)
+                        }
+                        HarnessSecondaryButton("Cancel removal") {
+                            onCancelRemove(model.stableId)
+                        }
+                    } else {
+                        HarnessSecondaryButton(
+                            "Remove installed model",
+                            enabled = !operationActive,
+                        ) {
+                            onRequestRemove(model.stableId)
+                        }
+                    }
                 }
             }
 
