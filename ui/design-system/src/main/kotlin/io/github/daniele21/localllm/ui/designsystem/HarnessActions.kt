@@ -21,10 +21,10 @@ fun HarnessPrimaryButton(text: String, enabled: Boolean = true, modifier: Modifi
         enabled = enabled,
         modifier = modifier.fillMaxWidth().heightIn(min = HarnessMinimumTouchTarget),
         colors =
-            ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
     ) {
         Text(text)
     }
