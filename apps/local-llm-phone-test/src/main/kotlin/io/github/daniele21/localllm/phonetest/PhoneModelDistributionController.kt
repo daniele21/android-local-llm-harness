@@ -93,7 +93,7 @@ internal fun interface PhoneModelDistributionListener {
     fun onStateChanged(state: PhoneModelDistributionState)
 }
 
-internal interface PhoneModelDownloadGateway {
+internal fun interface PhoneModelDownloadGateway {
     fun download(
         release: CatalogModelRelease,
         observer: DownloadProgressObserver,
@@ -101,11 +101,8 @@ internal interface PhoneModelDownloadGateway {
     ): ModelDownloadResult
 }
 
-internal interface PhoneModelInstallGateway {
-    fun install(
-        request: ModelInstallationRequest,
-        observer: ModelInstallationObserver,
-    ): ModelInstallationResult
+internal fun interface PhoneModelInstallGateway {
+    fun install(request: ModelInstallationRequest, observer: ModelInstallationObserver): ModelInstallationResult
 }
 
 internal class PhoneModelDistributionController(
@@ -403,15 +400,14 @@ internal class PhoneModelDistributionController(
     private fun RuntimeModelState?.orEmpty(): RuntimeModelState =
         this ?: RuntimeModelState(status = PhoneCatalogModelStatus.READY_TO_DOWNLOAD)
 
-    private fun CatalogModelRelease.toProfileArtifact(): GgufArtifact =
-        GgufArtifact(
-            digest = artifact.digest,
-            fileName = artifact.fileName,
-            sizeBytes = artifact.sizeBytes,
-            architecture = artifact.architecture,
-            quantization = artifact.quantization,
-            source = ArtifactSource.Download("administrator-curated-catalog"),
-        )
+    private fun CatalogModelRelease.toProfileArtifact(): GgufArtifact = GgufArtifact(
+        digest = artifact.digest,
+        fileName = artifact.fileName,
+        sizeBytes = artifact.sizeBytes,
+        architecture = artifact.architecture,
+        quantization = artifact.quantization,
+        source = ArtifactSource.Download("administrator-curated-catalog"),
+    )
 
     private data class RuntimeModelState(
         val status: PhoneCatalogModelStatus,
@@ -420,10 +416,7 @@ internal class PhoneModelDistributionController(
         val detail: String? = null,
     )
 
-    private data class ActiveOperation(
-        val stableId: String,
-        val cancellation: AtomicBoolean,
-    )
+    private data class ActiveOperation(val stableId: String, val cancellation: AtomicBoolean)
 
     companion object {
         private const val CATALOG_VALIDITY_MS = 365L * 24L * 60L * 60L * 1000L
@@ -479,18 +472,15 @@ internal class PhoneModelDistributionController(
                         release: CatalogModelRelease,
                         observer: DownloadProgressObserver,
                         cancellationToken: DownloadCancellationToken,
-                    ): ModelDownloadResult =
-                        secureDownloader.download(
-                            ModelDownloadRequest(release.artifact),
-                            observer,
-                            cancellationToken,
-                        )
+                    ): ModelDownloadResult = secureDownloader.download(
+                        ModelDownloadRequest(release.artifact),
+                        observer,
+                        cancellationToken,
+                    )
                 },
                 installer = object : PhoneModelInstallGateway {
-                    override fun install(
-                        request: ModelInstallationRequest,
-                        observer: ModelInstallationObserver,
-                    ): ModelInstallationResult = installer.install(request, observer)
+                    override fun install(request: ModelInstallationRequest, observer: ModelInstallationObserver): ModelInstallationResult =
+                        installer.install(request, observer)
                 },
                 discardVerifiedDownload = verifiedAccess::discard,
                 metadataRepository = metadataRepository,
@@ -500,8 +490,7 @@ internal class PhoneModelDistributionController(
             )
         }
 
-        private fun stableId(release: CatalogModelRelease): String =
-            "${release.id.modelId.value}@${release.id.version.value}"
+        private fun stableId(release: CatalogModelRelease): String = "${release.id.modelId.value}@${release.id.version.value}"
 
         private fun safeCatalogExpiry(now: Long): Long =
             runCatching { Math.addExact(now, CATALOG_VALIDITY_MS) }.getOrDefault(Long.MAX_VALUE)
@@ -509,11 +498,7 @@ internal class PhoneModelDistributionController(
 }
 
 private object PhoneCatalogVersionMatcher : CatalogVersionMatcher {
-    override fun isInRange(
-        currentVersion: String,
-        minimumInclusive: String?,
-        maximumExclusive: String?,
-    ): Boolean {
+    override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean {
         val current = SemanticVersion.parse(currentVersion)
             ?: return minimumInclusive == null && maximumExclusive == null
         val minimum = minimumInclusive?.let(SemanticVersion::parse) ?: SemanticVersion.ZERO
@@ -530,11 +515,7 @@ private class PhoneCatalogProfileResolver(
         target == supportedTarget && profileKey in supportedProfileKeys
 }
 
-private data class SemanticVersion(
-    val major: Int,
-    val minor: Int,
-    val patch: Int,
-) : Comparable<SemanticVersion> {
+private data class SemanticVersion(val major: Int, val minor: Int, val patch: Int) : Comparable<SemanticVersion> {
     override fun compareTo(other: SemanticVersion): Int =
         compareValuesBy(this, other, SemanticVersion::major, SemanticVersion::minor, SemanticVersion::patch)
 

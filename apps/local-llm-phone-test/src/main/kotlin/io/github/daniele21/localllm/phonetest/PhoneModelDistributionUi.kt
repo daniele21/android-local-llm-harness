@@ -150,10 +150,7 @@ private fun CatalogModelCard(
 }
 
 @Composable
-private fun DownloadProgress(
-    model: PhoneCatalogModelUi,
-    onCancel: (String) -> Unit,
-) {
+private fun DownloadProgress(model: PhoneCatalogModelUi, onCancel: (String) -> Unit) {
     val expected = model.expectedBytes.coerceAtLeast(1L)
     val progress = (model.bytesDownloaded.toDouble() / expected.toDouble()).coerceIn(0.0, 1.0)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

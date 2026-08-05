@@ -34,14 +34,14 @@ import io.github.daniele21.localllm.install.ModelInstallationId
 import io.github.daniele21.localllm.install.ModelInstallationObserver
 import io.github.daniele21.localllm.install.ModelInstallationRequest
 import io.github.daniele21.localllm.install.ModelInstallationResult
-import java.net.URI
-import java.util.concurrent.AbstractExecutorService
-import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.URI
+import java.util.concurrent.AbstractExecutorService
+import java.util.concurrent.TimeUnit
 
 class PhoneModelDistributionControllerTest {
     @Test
@@ -60,7 +60,10 @@ class PhoneModelDistributionControllerTest {
                     installedDigests += request.release.artifact.digest
                     successfulInstallation(request)
                 },
-                discard = { handle -> discarded += handle; true },
+                discard = { handle ->
+                    discarded += handle
+                    true
+                },
                 listener = { latest = it },
             )
 
@@ -156,83 +159,75 @@ class PhoneModelDistributionControllerTest {
         installGateway: PhoneModelInstallGateway,
         discard: (VerifiedDownloadHandle) -> Boolean,
         listener: (PhoneModelDistributionState) -> Unit,
-    ): PhoneModelDistributionController =
-        PhoneModelDistributionController(
-            catalog = DOCUMENT,
-            target = TARGET,
-            compatibilityEvaluator =
-                CatalogCompatibilityEvaluator(
-                    versionMatcher = object : CatalogVersionMatcher {
-                        override fun isInRange(
-                            currentVersion: String,
-                            minimumInclusive: String?,
-                            maximumExclusive: String?,
-                        ): Boolean = true
-                    },
-                    profileResolver = object : CatalogProfileResolver {
-                        override fun supports(
-                            profileKey: ModelProfileKey,
-                            target: CatalogTarget,
-                        ): Boolean = profileKey == PROFILE_KEY && target == TARGET
-                    },
-                ),
-            deviceProfile =
-                CatalogDeviceProfile(
-                    sdkInt = 36,
-                    supportedAbis = setOf("arm64-v8a"),
-                    totalMemoryBytes = 8_000_000_000L,
-                    availableStorageBytes = 4_000_000_000L,
-                    harnessVersion = "1.0.0",
-                    backendId = "llama.cpp",
-                ),
-            downloader = downloadGateway,
-            installer = installGateway,
-            discardVerifiedDownload = discard,
-            metadataRepository = metadataRepository,
-            modelExists = installedDigests::contains,
-            clock = { NOW },
-            listener = PhoneModelDistributionListener(listener),
-            executor = executor,
-        )
+    ): PhoneModelDistributionController = PhoneModelDistributionController(
+        catalog = DOCUMENT,
+        target = TARGET,
+        compatibilityEvaluator =
+        CatalogCompatibilityEvaluator(
+            versionMatcher = object : CatalogVersionMatcher {
+                override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean = true
+            },
+            profileResolver = object : CatalogProfileResolver {
+                override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
+                    profileKey == PROFILE_KEY && target == TARGET
+            },
+        ),
+        deviceProfile =
+        CatalogDeviceProfile(
+            sdkInt = 36,
+            supportedAbis = setOf("arm64-v8a"),
+            totalMemoryBytes = 8_000_000_000L,
+            availableStorageBytes = 4_000_000_000L,
+            harnessVersion = "1.0.0",
+            backendId = "llama.cpp",
+        ),
+        downloader = downloadGateway,
+        installer = installGateway,
+        discardVerifiedDownload = discard,
+        metadataRepository = metadataRepository,
+        modelExists = installedDigests::contains,
+        clock = { NOW },
+        listener = PhoneModelDistributionListener(listener),
+        executor = executor,
+    )
 
-    private fun successfulDownloadGateway(): PhoneModelDownloadGateway =
-        PhoneModelDownloadGateway { release, observer, cancellationToken ->
-            assertFalse(cancellationToken.isCancelled())
-            observer.onProgress(
-                DownloadProgress(
-                    operationId = DownloadOperationId("download"),
-                    digestPrefix = release.artifact.digest.sha256.take(12),
-                    sourceHost = "models.example",
-                    stage = DownloadStage.DOWNLOADING,
-                    bytesDownloaded = release.artifact.sizeBytes / 2,
-                    expectedBytes = release.artifact.sizeBytes,
-                    attempt = 1,
-                ),
-            )
-            ModelDownloadResult.Success(
+    private fun successfulDownloadGateway(): PhoneModelDownloadGateway = PhoneModelDownloadGateway { release, observer, cancellationToken ->
+        assertFalse(cancellationToken.isCancelled())
+        observer.onProgress(
+            DownloadProgress(
                 operationId = DownloadOperationId("download"),
-                handle = VerifiedDownloadHandle(release.artifact.digest.sha256),
-                digest = release.artifact.digest,
-                sizeBytes = release.artifact.sizeBytes,
+                digestPrefix = release.artifact.digest.sha256.take(12),
                 sourceHost = "models.example",
-                deduplicated = false,
-            )
-        }
+                stage = DownloadStage.DOWNLOADING,
+                bytesDownloaded = release.artifact.sizeBytes / 2,
+                expectedBytes = release.artifact.sizeBytes,
+                attempt = 1,
+            ),
+        )
+        ModelDownloadResult.Success(
+            operationId = DownloadOperationId("download"),
+            handle = VerifiedDownloadHandle(release.artifact.digest.sha256),
+            digest = release.artifact.digest,
+            sizeBytes = release.artifact.sizeBytes,
+            sourceHost = "models.example",
+            deduplicated = false,
+        )
+    }
 
     private fun successfulInstallation(request: ModelInstallationRequest): ModelInstallationResult.Success =
         ModelInstallationResult.Success(
             installationId = ModelInstallationId("install"),
             installed =
-                InstalledModelDescriptor(
-                    digest = request.release.artifact.digest,
-                    sizeBytes = request.release.artifact.sizeBytes,
-                    releaseId = request.release.id,
-                    target = request.target,
-                    profileKey = request.release.profileKey,
-                    architecture = request.release.artifact.architecture,
-                    quantization = request.release.artifact.quantization,
-                    metadata = GgufArtifactMetadata(3u, "qwen35", "test", 15L),
-                ),
+            InstalledModelDescriptor(
+                digest = request.release.artifact.digest,
+                sizeBytes = request.release.artifact.sizeBytes,
+                releaseId = request.release.id,
+                target = request.target,
+                profileKey = request.release.profileKey,
+                architecture = request.release.artifact.architecture,
+                quantization = request.release.artifact.quantization,
+                metadata = GgufArtifactMetadata(3u, "qwen35", "test", 15L),
+            ),
             verifiedDownloadDiscarded = false,
         )
 
@@ -317,20 +312,20 @@ class PhoneModelDistributionControllerTest {
                 displayName = "Test model",
                 description = "Deterministic catalog model",
                 artifact =
-                    CatalogGgufArtifact(
-                        digest = DIGEST,
-                        sizeBytes = 1_024L,
-                        downloadUri = URI("https://models.example/test-model.gguf"),
-                        architecture = "qwen35",
-                        quantization = "Q4_K_M",
-                        fileName = "test-model.gguf",
-                    ),
+                CatalogGgufArtifact(
+                    digest = DIGEST,
+                    sizeBytes = 1_024L,
+                    downloadUri = URI("https://models.example/test-model.gguf"),
+                    architecture = "qwen35",
+                    quantization = "Q4_K_M",
+                    fileName = "test-model.gguf",
+                ),
                 compatibility =
-                    CatalogCompatibility(
-                        minSdk = 26,
-                        supportedAbis = setOf("arm64-v8a"),
-                        supportedBackendIds = setOf("llama.cpp"),
-                    ),
+                CatalogCompatibility(
+                    minSdk = 26,
+                    supportedAbis = setOf("arm64-v8a"),
+                    supportedBackendIds = setOf("llama.cpp"),
+                ),
                 availability = CatalogAvailability.ACTIVE,
                 allowedTargets = setOf(TARGET),
                 profileKey = PROFILE_KEY,

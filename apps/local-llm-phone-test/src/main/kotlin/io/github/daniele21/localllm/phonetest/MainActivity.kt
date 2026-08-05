@@ -969,8 +969,7 @@ class MainActivity :
 
     private fun diagnosticActionRunning(): Boolean = healthRunning || resourceCaptureRunning || benchmarkCaptureRunning
 
-    private fun isBusy(): Boolean =
-        controllerBusy || modelDistributionState.operationActive || playgroundController.active
+    private fun isBusy(): Boolean = controllerBusy || modelDistributionState.operationActive || playgroundController.active
 
     private fun copyLog(log: DiagnosticsLogUi) {
         copyToClipboard("Harness log entry", log.copyText())
