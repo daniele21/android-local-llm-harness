@@ -2,10 +2,10 @@ package io.github.daniele21.localllm.llamacpp
 
 import io.github.daniele21.localllm.install.GgufArtifactInspectionFailureCode
 import io.github.daniele21.localllm.install.GgufArtifactInspectionResult
-import java.io.File
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class LlamaCppGgufArtifactInspectorTest {
     @Test
@@ -72,12 +72,8 @@ class LlamaCppGgufArtifactInspectorTest {
 
         override fun shutdown(): Array<String> = arrayOf("ok")
 
-        override fun loadModel(
-            path: String,
-            nGpuLayers: Int,
-            useMmap: Boolean,
-            useMlock: Boolean,
-        ): Array<String> = arrayOf("error", "INTERNAL", "unused")
+        override fun loadModel(path: String, nGpuLayers: Int, useMmap: Boolean, useMlock: Boolean): Array<String> =
+            arrayOf("error", "INTERNAL", "unused")
 
         override fun unloadModel(modelHandle: Long): Array<String> = arrayOf("ok")
 

@@ -1,13 +1,13 @@
 package io.github.daniele21.localllm.download
 
 import io.github.daniele21.localllm.contracts.ModelDigest
-import java.io.File
-import java.nio.file.Files
-import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
+import java.security.MessageDigest
 
 class FileSystemVerifiedDownloadAccessTest {
     @Test
@@ -101,8 +101,7 @@ class FileSystemVerifiedDownloadAccessTest {
         return store.publish(partial, digest, bytes.size.toLong()).file
     }
 
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+        .digest(bytes)
+        .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
 }

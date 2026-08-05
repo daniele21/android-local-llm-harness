@@ -26,13 +26,13 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import java.io.File
-import java.net.URI
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.net.URI
+import java.nio.file.Files
 
 class VerifiedModelInstallerTest {
     @Test
@@ -217,62 +217,55 @@ class VerifiedModelInstallerTest {
         assertEquals(0, access.copyCount)
     }
 
-    private fun installer(
-        root: File,
-        access: VerifiedDownloadAccess,
-        store: ModelStore,
-    ): VerifiedModelInstaller =
-        VerifiedModelInstaller(
-            File(root, "staging"),
-            access,
-            GgufArtifactInspector {
-                GgufArtifactInspectionResult.Success(
-                    GgufArtifactMetadata(3u, ARCHITECTURE, "test", 15L),
-                )
-            },
-            store,
-        )
+    private fun installer(root: File, access: VerifiedDownloadAccess, store: ModelStore): VerifiedModelInstaller = VerifiedModelInstaller(
+        File(root, "staging"),
+        access,
+        GgufArtifactInspector {
+            GgufArtifactInspectionResult.Success(
+                GgufArtifactMetadata(3u, ARCHITECTURE, "test", 15L),
+            )
+        },
+        store,
+    )
 
-    private fun request(): ModelInstallationRequest =
-        ModelInstallationRequest(
-            handle = VerifiedDownloadHandle(DIGEST.sha256),
-            release = release(),
-            target = TARGET,
-            profile =
-                ResolvedInstallationProfile(
-                    key = PROFILE_KEY,
-                    artifact =
-                        GgufArtifact(
-                            digest = DIGEST,
-                            fileName = FILE_NAME,
-                            sizeBytes = MODEL_BYTES.size.toLong(),
-                            architecture = ARCHITECTURE,
-                            quantization = QUANTIZATION,
-                            source = ArtifactSource.Download("catalog"),
-                        ),
-                ),
-        )
-
-    private fun release(): CatalogModelRelease =
-        CatalogModelRelease(
-            id = CatalogReleaseId(CatalogModelId("test-model"), CatalogModelVersion("1.0.0")),
-            displayName = "Test model",
-            description = "Test release",
+    private fun request(): ModelInstallationRequest = ModelInstallationRequest(
+        handle = VerifiedDownloadHandle(DIGEST.sha256),
+        release = release(),
+        target = TARGET,
+        profile =
+        ResolvedInstallationProfile(
+            key = PROFILE_KEY,
             artifact =
-                CatalogGgufArtifact(
-                    digest = DIGEST,
-                    sizeBytes = MODEL_BYTES.size.toLong(),
-                    downloadUri = URI("https://models.example/model.gguf"),
-                    architecture = ARCHITECTURE,
-                    quantization = QUANTIZATION,
-                    fileName = FILE_NAME,
-                ),
-            compatibility = CatalogCompatibility(minSdk = 26, supportedAbis = setOf("arm64-v8a")),
-            availability = CatalogAvailability.CANDIDATE,
-            allowedTargets = setOf(TARGET),
-            profileKey = PROFILE_KEY,
-            license = CatalogLicense("Apache-2.0", "Apache-2.0"),
-        )
+            GgufArtifact(
+                digest = DIGEST,
+                fileName = FILE_NAME,
+                sizeBytes = MODEL_BYTES.size.toLong(),
+                architecture = ARCHITECTURE,
+                quantization = QUANTIZATION,
+                source = ArtifactSource.Download("catalog"),
+            ),
+        ),
+    )
+
+    private fun release(): CatalogModelRelease = CatalogModelRelease(
+        id = CatalogReleaseId(CatalogModelId("test-model"), CatalogModelVersion("1.0.0")),
+        displayName = "Test model",
+        description = "Test release",
+        artifact =
+        CatalogGgufArtifact(
+            digest = DIGEST,
+            sizeBytes = MODEL_BYTES.size.toLong(),
+            downloadUri = URI("https://models.example/model.gguf"),
+            architecture = ARCHITECTURE,
+            quantization = QUANTIZATION,
+            fileName = FILE_NAME,
+        ),
+        compatibility = CatalogCompatibility(minSdk = 26, supportedAbis = setOf("arm64-v8a")),
+        availability = CatalogAvailability.CANDIDATE,
+        allowedTargets = setOf(TARGET),
+        profileKey = PROFILE_KEY,
+        license = CatalogLicense("Apache-2.0", "Apache-2.0"),
+    )
 
     private class FakeVerifiedDownloadAccess(
         private val bytes: ByteArray,
@@ -281,10 +274,7 @@ class VerifiedModelInstallerTest {
         var copyCount = 0
         var discarded = false
 
-        override fun copyTo(
-            request: VerifiedDownloadCopyRequest,
-            destination: File,
-        ): VerifiedDownloadCopyResult {
+        override fun copyTo(request: VerifiedDownloadCopyRequest, destination: File): VerifiedDownloadCopyResult {
             copyCount += 1
             failure?.let { return VerifiedDownloadCopyResult.Failure(it) }
             destination.writeBytes(bytes)

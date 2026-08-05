@@ -21,10 +21,7 @@ import java.util.UUID
 @JvmInline
 value class ModelInstallationId(val value: String)
 
-data class ResolvedInstallationProfile(
-    val key: ModelProfileKey,
-    val artifact: GgufArtifact,
-)
+data class ResolvedInstallationProfile(val key: ModelProfileKey, val artifact: GgufArtifact)
 
 data class ModelInstallationRequest(
     val handle: VerifiedDownloadHandle,
@@ -49,10 +46,7 @@ enum class ModelInstallationStage {
     FAILED,
 }
 
-data class ModelInstallationProgress(
-    val installationId: ModelInstallationId,
-    val stage: ModelInstallationStage,
-)
+data class ModelInstallationProgress(val installationId: ModelInstallationId, val stage: ModelInstallationStage)
 
 fun interface ModelInstallationObserver {
     fun onProgress(progress: ModelInstallationProgress)
@@ -102,11 +96,8 @@ sealed interface ModelInstallationResult {
         val verifiedDownloadDiscarded: Boolean,
     ) : ModelInstallationResult
 
-    data class Failure(
-        override val installationId: ModelInstallationId,
-        val code: ModelInstallationFailureCode,
-        val detail: String,
-    ) : ModelInstallationResult
+    data class Failure(override val installationId: ModelInstallationId, val code: ModelInstallationFailureCode, val detail: String) :
+        ModelInstallationResult
 }
 
 enum class ModelInstallationFailureCode {
@@ -238,10 +229,7 @@ class VerifiedModelInstaller(
         }
     }
 
-    private fun copyVerifiedDownload(
-        request: ModelInstallationRequest,
-        staged: File,
-    ): InstallationFailure? {
+    private fun copyVerifiedDownload(request: ModelInstallationRequest, staged: File): InstallationFailure? {
         val copied =
             verifiedDownloads.copyTo(
                 VerifiedDownloadCopyRequest(
@@ -253,6 +241,7 @@ class VerifiedModelInstaller(
             )
         return when (copied) {
             is VerifiedDownloadCopyResult.Success -> null
+
             is VerifiedDownloadCopyResult.Failure ->
                 when (copied.code) {
                     VerifiedDownloadAccessFailureCode.VERIFIED_DOWNLOAD_MISSING ->
@@ -316,10 +305,7 @@ class VerifiedModelInstaller(
         return null
     }
 
-    private fun validateInspectedMetadata(
-        request: ModelInstallationRequest,
-        metadata: GgufArtifactMetadata,
-    ): InstallationFailure? {
+    private fun validateInspectedMetadata(request: ModelInstallationRequest, metadata: GgufArtifactMetadata): InstallationFailure? {
         val expectedArchitecture = normalize(request.release.artifact.architecture)
         val actualArchitecture = metadata.architecture?.let(::normalize)
         if (actualArchitecture == null || actualArchitecture != expectedArchitecture) {
@@ -341,18 +327,17 @@ class VerifiedModelInstaller(
         return null
     }
 
-    private fun createStagingFile(): File? =
-        try {
-            File.createTempFile("model-install-", ".gguf", stagingRoot).also { file ->
-                check(file.canonicalFile.parentFile == stagingRoot) {
-                    "Installation staging file escaped its root"
-                }
+    private fun createStagingFile(): File? = try {
+        File.createTempFile("model-install-", ".gguf", stagingRoot).also { file ->
+            check(file.canonicalFile.parentFile == stagingRoot) {
+                "Installation staging file escaped its root"
             }
-        } catch (_: IOException) {
-            null
-        } catch (_: SecurityException) {
-            null
         }
+    } catch (_: IOException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    }
 
     private fun fail(
         observer: ModelInstallationObserver,
@@ -364,11 +349,7 @@ class VerifiedModelInstaller(
         return ModelInstallationResult.Failure(installationId, code, detail)
     }
 
-    private fun emit(
-        observer: ModelInstallationObserver,
-        installationId: ModelInstallationId,
-        stage: ModelInstallationStage,
-    ) {
+    private fun emit(observer: ModelInstallationObserver, installationId: ModelInstallationId, stage: ModelInstallationStage) {
         runCatching { observer.onProgress(ModelInstallationProgress(installationId, stage)) }
     }
 

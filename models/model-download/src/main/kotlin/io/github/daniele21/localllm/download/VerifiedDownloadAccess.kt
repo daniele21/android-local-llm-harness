@@ -8,11 +8,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.security.MessageDigest
 
-data class VerifiedDownloadCopyRequest(
-    val handle: VerifiedDownloadHandle,
-    val expectedDigest: ModelDigest,
-    val expectedSizeBytes: Long,
-)
+data class VerifiedDownloadCopyRequest(val handle: VerifiedDownloadHandle, val expectedDigest: ModelDigest, val expectedSizeBytes: Long)
 
 sealed interface VerifiedDownloadCopyResult {
     data class Success(val digest: ModelDigest, val sizeBytes: Long) : VerifiedDownloadCopyResult
@@ -37,10 +33,8 @@ interface VerifiedDownloadAccess {
 }
 
 @Suppress("ReturnCount")
-class FileSystemVerifiedDownloadAccess(
-    rootDirectory: File,
-    private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES,
-) : VerifiedDownloadAccess {
+class FileSystemVerifiedDownloadAccess(rootDirectory: File, private val bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES) :
+    VerifiedDownloadAccess {
     private val fileStore = DownloadFileStore(rootDirectory)
 
     init {
@@ -49,10 +43,7 @@ class FileSystemVerifiedDownloadAccess(
         }
     }
 
-    override fun copyTo(
-        request: VerifiedDownloadCopyRequest,
-        destination: File,
-    ): VerifiedDownloadCopyResult {
+    override fun copyTo(request: VerifiedDownloadCopyRequest, destination: File): VerifiedDownloadCopyResult {
         val expectedDigest =
             canonicalDigest(request.expectedDigest)
                 ?: return failure(VerifiedDownloadAccessFailureCode.INVALID_DESCRIPTOR)
