@@ -22,10 +22,20 @@ The following identities are versioned separately from the SDK release:
 
 Changing an SDK version must never implicitly change an application's configured model identity.
 
+## Integration and release lines
+
+- `dev` carries snapshot development and is the only normal base and target for feature work.
+- `main` carries stable promotable history and receives ordinary changes only through a complete `dev -> main` promotion.
+- Feature pull requests normally squash into `dev`; promotions use a merge commit to preserve the exact validated candidate.
+- Tags, changelog release entries and distributed Android artifacts are created only from validated `main` commits.
+- Emergency hotfixes are applied to `main` and then forward-ported to `dev`.
+
 ## Release gate
 
 A release requires:
 
+- an exact `dev` candidate promoted to `main` through a protected pull request;
+- complete non-scoped Android, native and packaging validation on the candidate;
 - passing CI from a clean checkout;
 - changelog entry;
 - public API review;
@@ -37,4 +47,4 @@ A release requires:
 
 ## Development versions
 
-The repository starts at `0.1.0-SNAPSHOT`. The first tagged `0.1.0` release is reserved for a functional embedded GGUF inference path and does not occur during repository hardening alone.
+Development builds on `dev` use snapshot semantics and are not releases. Harness `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. It must not be described as production-ready until representative physical-device GGUF lifecycle, cancellation, memory, JNI-loading and thermal evidence is complete.

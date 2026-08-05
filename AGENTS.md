@@ -8,14 +8,15 @@ Read these sources before a non-trivial change:
 
 1. [`README.md`](README.md) — purpose, toolchain and top-level structure.
 2. [`BRANCHING.md`](BRANCHING.md) — canonical branch and pull-request discipline.
-3. [`docs/architecture.md`](docs/architecture.md) — data-plane and control-plane boundaries.
-4. [`docs/current-state.md`](docs/current-state.md) — active integration and recovery order.
-5. [`docs/roadmap.md`](docs/roadmap.md) — detailed implementation status and remaining evidence.
-6. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
-7. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge and production readiness.
-8. [`docs/api-usage.md`](docs/api-usage.md) — embedded API and lifecycle.
-9. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) — Android validation paths.
-10. [`docs/adr/README.md`](docs/adr/README.md) — accepted architectural decisions.
+3. [`docs/dev-integration-and-harness-0.5-plan.md`](docs/dev-integration-and-harness-0.5-plan.md) — active Harness 0.5.0 integration sequence.
+4. [`docs/architecture.md`](docs/architecture.md) — data-plane and control-plane boundaries.
+5. [`docs/current-state.md`](docs/current-state.md) — active integration and recovery order.
+6. [`docs/roadmap.md`](docs/roadmap.md) — detailed implementation status and remaining evidence.
+7. [`docs/implementation-plan.md`](docs/implementation-plan.md) — target behavior and acceptance criteria.
+8. [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge and production readiness.
+9. [`docs/api-usage.md`](docs/api-usage.md) — embedded API and lifecycle.
+10. [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) — Android validation paths.
+11. [`docs/adr/README.md`](docs/adr/README.md) — accepted architectural decisions.
 
 When sources disagree, use this precedence: executable contracts and tests, accepted ADRs, architecture, implementation plan, current-state ledger, roadmap, README and this guide. Do not silently reconcile contradictions.
 
@@ -76,9 +77,18 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 - The phone-test app may orchestrate existing contracts, import through Android's Storage Access Framework and format privacy-safe evidence, but must not own alternate inference or model-installation policy.
 - Console code must not open another application's private database directly; cross-app access requires the planned signature-protected diagnostics bridge.
 
+## Branch discipline
+
+- Ordinary work starts from the latest green `dev` and opens a pull request back to `dev`.
+- Do not open a feature, dependency or documentation pull request directly to `main`; the validation gate rejects it.
+- `main` is reserved for a complete `dev -> main` promotion or an explicit emergency hotfix.
+- A red cumulative `dev` freezes new integrations until a focused fix-forward or revert restores the branch.
+- Feature pull requests normally squash into `dev`; promotions preserve the validated `dev` identity with a merge commit.
+- Never reuse a merged or superseded branch for new implementation work.
+
 ## Change workflow
 
-1. Confirm the canonical base and active pull requests.
+1. Confirm the latest green `dev`, the intended target and active pull requests; use `main` only for an explicit hotfix.
 2. Read relevant contracts, implementation, tests and documentation.
 3. Implement the smallest coherent vertical slice in the owning module.
 4. Add deterministic tests for success, failure and lifecycle paths.

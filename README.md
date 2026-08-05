@@ -78,7 +78,7 @@ The repository uses Android Gradle Plugin 9.3.1 and its built-in Kotlin support.
 
 ## Current state
 
-`main` is the canonical integrated implementation line. Repository-state alignment, Android Gradle Plugin 9.3.1 and `actions/checkout@v7` were integrated through PRs #44, #45 and #47.
+`dev` is the canonical integration line for ordinary work. `main` remains the protected stable and release-oriented line and receives normal changes only through a validated `dev -> main` promotion. Harness 0.5.0 integration is tracked in [`docs/dev-integration-and-harness-0.5-plan.md`](docs/dev-integration-and-harness-0.5-plan.md).
 
 ### Functional embedded runtime
 
@@ -140,13 +140,13 @@ See [`docs/model-installation.md`](docs/model-installation.md) and ADR 0007 for 
 
 ## Current priorities
 
-1. Integrate catalog selection, download progress, explicit installation and installed-model state into the connected phone application.
-2. Add durable installed-model catalog/profile metadata without making installation activate a binding.
-3. Recover only the still-unique benchmark-history and model-management behavior from legacy draft PRs #33 and #34 on fresh branches from current `main`.
-4. Complete the physical-device production-readiness evidence on representative Android `arm64-v8a` hardware.
-5. Complete the remaining Compose architecture, accessibility, responsive and UI-test work.
-6. Add native Android and Capacitor integration surfaces as thin adapters.
-7. Add a signature-protected diagnostics bridge and Binder transport before promoting the console into a shared runtime host.
+1. Complete and protect the `dev` integration line, cumulative CI and promotion gates for Harness 0.5.0.
+2. Merge the focused model-management recovery from PR #53 into `dev`, then close the legacy PR #34 as superseded.
+3. Integrate the Android brand kit into launcher assets, theme tokens and reusable Compose components.
+4. Complete Navigation Compose, ViewModel/UDF migration and the Overview, Playground, Models, Diagnostics and Settings surfaces.
+5. Add Compose UI, screenshot, accessibility and responsive-layout validation.
+6. Produce a signed AAB for Google Play Internal Testing and capture representative privacy-safe physical-device GGUF evidence.
+7. Add native Android and Capacitor adapters, followed by the signature-protected diagnostics bridge and Binder transport.
 
 See [`docs/current-state.md`](docs/current-state.md) for the active integration and recovery ledger and [`docs/roadmap.md`](docs/roadmap.md) for the detailed historical roadmap.
 
@@ -162,7 +162,7 @@ python3 scripts/verify-agent-navigation.py
 
 ## Validation
 
-The complete repository gate includes repository guards, scoped Android validation, native host tests and packaging verification. The stable aggregate required-check name is:
+Pull requests into `dev` use repository guards and the relevant Android, native and packaging scopes. Every merge push on `dev` runs cumulative validation; a `dev -> main` promotion runs complete non-scoped Android, native and packaging gates. The complete repository gate includes repository guards, Android validation, native host tests and packaging verification. The stable aggregate required-check name is:
 
 ```text
 Repository validation

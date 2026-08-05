@@ -2,18 +2,18 @@
 
 This repository uses one canonical implementation line per active phase. Historical branches may remain temporarily for traceability, but they must not receive new implementation commits after their work is superseded or merged.
 
-## Current canonical line
+## Current canonical lines
 
 As of August 2026:
 
-- `main` is the canonical integrated baseline;
-- pull request #13 merged the consolidated Phase 1 implementation into `main`;
-- pull requests #21, #23, #24, #25, #26 and #27 merged the current Phase 2 telemetry, health, resource and benchmark slices into `main`;
-- pull request #28 merged the useful sanity-assertion recovery and ARM64 emulator preflight;
-- pull request #29 merged the Google Play-installable physical-device validation app;
-- the physical-device GGUF gate remains open and blocks production readiness, releases to application consumers and device-performance claims.
+- `main` is the stable, protected and release-oriented line;
+- `dev` is the canonical integration base and target for ordinary feature, fix, documentation, dependency and UX/UI work;
+- changes reach both long-lived branches through pull requests;
+- `dev -> main` is the normal promotion path and is validated as one release candidate;
+- direct pull requests to `main` are reserved for the `dev` promotion or an explicit emergency hotfix;
+- the physical-device GGUF gate remains open and blocks production readiness, application-consumer releases and device-performance claims.
 
-New work must start from the latest `main` unless an explicit, documented stacked dependency requires otherwise.
+New work must start from the latest green `dev` unless it is an explicitly documented hotfix based on `main` or a short-lived stacked dependency.
 
 ## Archived historical branches
 
@@ -55,10 +55,10 @@ Delete historical remote branches only after their replacement is safely integra
 
 Dependabot and infrastructure branches are not product implementation lines. Keep them isolated from runtime and feature changes.
 
-After a major integration into `main`:
+After a major integration into `dev` or a promotion into `main`:
 
 - close or refresh dependency pull requests whose base predates the integration;
-- require the dependency branch to be based on the current `main` before review;
+- require the dependency branch to be based on the current `dev` before review;
 - review major GitHub Actions upgrades individually, especially changes with runner, caching, security or licensing implications;
 - do not mix dependency-only updates with runtime, documentation or observability work.
 
@@ -66,7 +66,7 @@ PR #20 remains the isolated review line for the `gradle/actions` v6 licensing an
 
 ## Rules for new work
 
-1. Start from the latest intended target branch, normally `main`.
+1. Start from the latest intended target branch, normally the latest green `dev`; use `main` only for an explicit hotfix.
 2. Use one branch for one coherent deliverable and one pull request.
 3. Avoid stacked branches unless the dependency is explicit, short-lived and documented in both pull requests.
 4. Rebase or retarget a stacked child branch immediately after its parent merges.
@@ -77,18 +77,28 @@ PR #20 remains the isolated review line for the `gradle/actions` v6 licensing an
 9. Close superseded pull requests with a note identifying the canonical replacement and any selectively recovered behavior.
 10. Delete merged or superseded remote branches after the replacement is safely integrated and audited.
 
-## Required protection for `main`
+## Required protection for long-lived branches
 
-Repository settings for `main` should require:
+Repository settings for both `main` and `dev` must require:
 
 - changes through pull requests;
 - the stable aggregate status check `Repository validation`;
-- the branch to be current with `main` before merge;
+- the pull-request branch to be current with its target before merge;
 - resolved review conversations;
 - force pushes and branch deletion to be disabled;
 - repository administrators to follow the same protection rules, except for documented emergency recovery.
 
+`main` additionally requires at least one approval and normally accepts only `dev` promotions. `dev` remains the daily integration target and is frozen when its cumulative post-merge validation is red.
+
 Physical-device evidence is not required for every repository pull request. It is required before a production-ready release, before distributing the runtime to application consumers and before making device compatibility or performance claims. A pull request that itself introduces such a claim must include or reference the relevant evidence.
+
+## Merge and promotion strategy
+
+- Feature, fix, documentation, dependency and UX/UI pull requests target `dev` and normally use squash merge.
+- Promotion pull requests use `dev` as head and `main` as base, run complete non-scoped Android, native and packaging gates, and use a merge commit.
+- After promotion, synchronize the resulting `main` merge commit back into `dev` before the next promotion cycle.
+- Emergency hotfixes start from `main`, use squash merge into `main`, then return through a `main -> dev` forward-port pull request.
+- Tags and release artifacts are created only from validated `main` commits.
 
 ## Merge discipline
 
