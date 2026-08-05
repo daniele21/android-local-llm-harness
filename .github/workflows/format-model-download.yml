@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  format-and-register:
+  format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -27,21 +27,10 @@ jobs:
           sdkmanager \
             "platforms;android-36" \
             "build-tools;36.0.0"
-      - name: Format and register validation scope
+      - name: Format downloader sources
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('.github/workflows/validate.yml')
-          text = path.read_text()
-          marker = '            models:model-catalog\n'
-          addition = marker + '            models:model-download\n'
-          if '            models:model-download\n' not in text:
-              if marker not in text:
-                  raise SystemExit('validation module marker not found')
-              path.write_text(text.replace(marker, addition, 1))
-          PY
           chmod +x gradlew
           ./gradlew --no-configuration-cache spotlessApply
           git rm .github/workflows/format-model-download.yml
