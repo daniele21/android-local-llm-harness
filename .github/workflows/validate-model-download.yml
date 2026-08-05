@@ -48,8 +48,19 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Validate formatting
-        run: ./gradlew --no-configuration-cache --stacktrace spotlessCheck
+      - name: Capture canonical formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-configuration-cache --stacktrace spotlessApply
+          mapfile -t changed_files < <(git diff --name-only)
+          printf 'Spotless changed %s files.\n' "${#changed_files[@]}"
+          for file in "${changed_files[@]}"; do
+            printf 'FORMATTED_FILE_BEGIN:%s\n' "$file"
+            base64 -w 0 "$file"
+            printf '\nFORMATTED_FILE_END:%s\n' "$file"
+          done
+          exit 1
       - name: Run static analysis
         run: ./gradlew --no-configuration-cache --stacktrace detekt
       - name: Verify repository contains no model artifacts
