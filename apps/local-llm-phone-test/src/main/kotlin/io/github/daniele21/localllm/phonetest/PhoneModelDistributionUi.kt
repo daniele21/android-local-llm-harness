@@ -18,17 +18,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
-internal data class PhoneModelDistributionActions(
-    val download: (String) -> Unit,
-    val cancelDownload: (String) -> Unit,
-    val install: (String) -> Unit,
-    val verifyInstalled: (String) -> Unit,
-    val requestRemove: (String) -> Unit,
-    val cancelRemove: (String) -> Unit,
-    val confirmRemove: (String) -> Unit,
-    val selectInstalled: (InstalledCatalogModelMetadata) -> Unit,
-)
-
 @Composable
 internal fun PhoneModelDistributionCatalog(
     state: PhoneModelDistributionState,
