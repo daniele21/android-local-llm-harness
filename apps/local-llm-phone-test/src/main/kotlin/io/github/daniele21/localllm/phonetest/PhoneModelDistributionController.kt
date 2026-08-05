@@ -167,11 +167,11 @@ internal class PhoneModelDistributionController(
     fun download(stableId: String) {
         val release = releases[stableId] ?: return
         val cancellation = AtomicBoolean(false)
-        val accepted = synchronized(lock) {
-            if (activeOperation != null) return@synchronized false
+        val initialState = synchronized(lock) {
+            if (activeOperation != null) return@synchronized null
             val compatibilityResult = compatibility.getValue(stableId)
             if (!compatibilityResult.compatible || installed.containsKey(release.artifact.digest)) {
-                return@synchronized false
+                return@synchronized null
             }
             activeOperation = ActiveOperation(stableId, cancellation)
             operationStates[stableId] = RuntimeModelState(
@@ -179,9 +179,8 @@ internal class PhoneModelDistributionController(
                 detail = "Preparing secure download",
             )
             publishLocked("Downloading ${release.displayName}")
-            true
-        }
-        if (!accepted) return
+        } ?: return
+        listener.onStateChanged(initialState)
 
         executor.execute {
             val result = downloader.download(
@@ -254,7 +253,7 @@ internal class PhoneModelDistributionController(
 
     fun install(stableId: String) {
         val release = releases[stableId] ?: return
-        val handle = synchronized(lock) {
+        val start = synchronized(lock) {
             if (activeOperation != null) return@synchronized null
             val pending = pendingDownloads[stableId] ?: return@synchronized null
             activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
@@ -262,9 +261,11 @@ internal class PhoneModelDistributionController(
                 status = PhoneCatalogModelStatus.INSTALLING,
                 detail = "Validating GGUF metadata",
             )
-            publishLocked("Installing ${release.displayName}")
-            pending
+            pending to publishLocked("Installing ${release.displayName}")
         } ?: return
+
+        val handle = start.first
+        listener.onStateChanged(start.second)
 
         executor.execute {
             val request = ModelInstallationRequest(
