@@ -12,7 +12,6 @@
 *.jks
 *.keystore
 keystore.properties
-models/
 *.gguf
 *.ggml
 
