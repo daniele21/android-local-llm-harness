@@ -31,10 +31,10 @@ fun HarnessTopAppBar(
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = HarnessAppBarMinimumHeight)
-                .padding(horizontal = LocalHarnessSpacing.current.large),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(min = HarnessAppBarMinimumHeight)
+                    .padding(horizontal = LocalHarnessSpacing.current.large),
             horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -54,11 +54,7 @@ fun HarnessTopAppBar(
 }
 
 @Composable
-fun HarnessLoadingState(
-    title: String,
-    detail: String? = null,
-    modifier: Modifier = Modifier,
-) {
+fun HarnessLoadingState(title: String, detail: String? = null, modifier: Modifier = Modifier) {
     HarnessFeedbackState(
         title = title,
         detail = detail,
@@ -68,20 +64,12 @@ fun HarnessLoadingState(
 }
 
 @Composable
-fun HarnessEmptyState(
-    title: String,
-    detail: String,
-    modifier: Modifier = Modifier,
-) {
+fun HarnessEmptyState(title: String, detail: String, modifier: Modifier = Modifier) {
     HarnessFeedbackState(title = title, detail = detail, modifier = modifier)
 }
 
 @Composable
-fun HarnessErrorState(
-    title: String,
-    detail: String,
-    modifier: Modifier = Modifier,
-) {
+fun HarnessErrorState(title: String, detail: String, modifier: Modifier = Modifier) {
     HarnessFeedbackState(
         title = title,
         detail = detail,
@@ -99,9 +87,7 @@ private fun HarnessFeedbackState(
     indicator: (@Composable () -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(LocalHarnessSpacing.current.xLarge),
+        modifier = modifier.fillMaxWidth().padding(LocalHarnessSpacing.current.xLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
     ) {
