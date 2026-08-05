@@ -28,6 +28,7 @@ class SecureModelDownloader(
     private val journal = DownloadJournal(fileStore.operationsDirectory, fileStore.partialsDirectory)
     private val activeOperations = ConcurrentHashMap<String, DownloadOperationId>()
 
+    @Suppress("ReturnCount", "SwallowedException")
     fun download(
         request: ModelDownloadRequest,
         observer: DownloadProgressObserver = DownloadProgressObserver {},
@@ -79,7 +80,14 @@ class SecureModelDownloader(
 
     fun discardVerifiedDownload(handle: VerifiedDownloadHandle): Boolean = fileStore.discard(handle)
 
-    @Suppress("LoopWithTooManyJumpStatements", "LongMethod", "TooGenericExceptionCaught")
+    @Suppress(
+        "CyclomaticComplexMethod",
+        "LongMethod",
+        "LoopWithTooManyJumpStatements",
+        "ReturnCount",
+        "SwallowedException",
+        "TooGenericExceptionCaught",
+    )
     private fun executeDownload(
         operationId: DownloadOperationId,
         artifact: CatalogGgufArtifact,
@@ -229,6 +237,7 @@ class SecureModelDownloader(
             val redirected = parseRedirect(source.uri, location)
             source = when (val result = sourcePolicy.validate(redirected)) {
                 is SourcePolicyResult.Allowed -> result
+
                 is SourcePolicyResult.Rejected -> throw downloadError(
                     DownloadFailureCode.DOWNLOAD_REDIRECT_INVALID,
                     false,
@@ -242,6 +251,7 @@ class SecureModelDownloader(
     private fun validateNetworkAddress(host: String) {
         when (val result = networkPolicy.validate(host)) {
             NetworkAddressPolicyResult.Allowed -> Unit
+
             is NetworkAddressPolicyResult.Rejected -> throw downloadError(
                 DownloadFailureCode.SOURCE_ADDRESS_REJECTED,
                 retryable = false,
@@ -261,6 +271,7 @@ class SecureModelDownloader(
         }
     }
 
+    @Suppress("ThrowsCount")
     private fun validateResponse(response: DownloadTransportResponse, artifact: CatalogGgufArtifact) {
         if (response.statusCode != HTTP_OK) {
             val retryable = response.statusCode in RETRYABLE_HTTP_CODES
@@ -284,6 +295,7 @@ class SecureModelDownloader(
         }
     }
 
+    @Suppress("LoopWithTooManyJumpStatements", "NestedBlockDepth", "SwallowedException", "ThrowsCount")
     private fun transfer(
         response: DownloadTransportResponse,
         partial: File,
@@ -381,12 +393,14 @@ class SecureModelDownloader(
         }
     }
 
+    @Suppress("SwallowedException")
     private fun createPartial(): File = try {
         fileStore.createPartial()
     } catch (error: IOException) {
         throw downloadError(DownloadFailureCode.TEMP_STORAGE_FAILURE, false, error.javaClass.simpleName)
     }
 
+    @Suppress("SwallowedException")
     private fun writeJournal(record: DownloadJournalRecord) {
         try {
             journal.write(record)
@@ -419,11 +433,10 @@ class SecureModelDownloader(
     private fun invalidDescriptor(operationId: DownloadOperationId): ModelDownloadResult.Failure =
         failure(operationId, DownloadFailureCode.INVALID_DESCRIPTOR, false, "invalid-artifact")
 
-    private fun cancelled(operationId: DownloadOperationId): ModelDownloadResult.Cancelled =
-        ModelDownloadResult.Cancelled(
-            operationId,
-            DownloadFailure(DownloadFailureCode.DOWNLOAD_CANCELLED, retryable = false, detail = "cancelled"),
-        )
+    private fun cancelled(operationId: DownloadOperationId): ModelDownloadResult.Cancelled = ModelDownloadResult.Cancelled(
+        operationId,
+        DownloadFailure(DownloadFailureCode.DOWNLOAD_CANCELLED, retryable = false, detail = "cancelled"),
+    )
 
     private fun failure(
         operationId: DownloadOperationId,
@@ -468,6 +481,7 @@ class SecureModelDownloader(
         private var lastEmissionAt = Long.MIN_VALUE
         private var lastStage: DownloadStage? = null
 
+        @Suppress("ComplexCondition")
         fun emit(stage: DownloadStage, bytes: Long, attempt: Int, force: Boolean = false) {
             lastBytes = bytes
             val now = clock.nowEpochMs()
@@ -493,10 +507,7 @@ class SecureModelDownloader(
         }
     }
 
-    private data class OpenedResponse(
-        val source: SourcePolicyResult.Allowed,
-        val response: DownloadTransportResponse,
-    )
+    private data class OpenedResponse(val source: SourcePolicyResult.Allowed, val response: DownloadTransportResponse)
 
     private data class TransferResult(val bytes: Long, val sha256: String)
 
@@ -511,19 +522,13 @@ class SecureModelDownloader(
         val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
         val RETRYABLE_HTTP_CODES = setOf(408, 425, 429, 500, 502, 503, 504)
 
-        fun downloadError(
-            code: DownloadFailureCode,
-            retryable: Boolean,
-            detail: String,
-        ): DownloadException = DownloadException(DownloadFailure(code, retryable, detail))
+        fun downloadError(code: DownloadFailureCode, retryable: Boolean, detail: String): DownloadException =
+            DownloadException(DownloadFailure(code, retryable, detail))
 
-        fun ByteArray.toHex(): String =
-            joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
-        fun safeAdd(left: Long, right: Long): Long? =
-            if (right > Long.MAX_VALUE - left) null else left + right
+        fun safeAdd(left: Long, right: Long): Long? = if (right > Long.MAX_VALUE - left) null else left + right
 
-        fun safeSubtract(left: Long, right: Long): Long =
-            if (right > left) Long.MIN_VALUE else left - right
+        fun safeSubtract(left: Long, right: Long): Long = if (right > left) Long.MIN_VALUE else left - right
     }
 }

@@ -2,6 +2,12 @@ package io.github.daniele21.localllm.download
 
 import io.github.daniele21.localllm.catalog.CatalogGgufArtifact
 import io.github.daniele21.localllm.contracts.ModelDigest
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
@@ -15,12 +21,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
 @Suppress("TooManyFunctions")
 class SecureModelDownloaderTest {
@@ -242,11 +242,7 @@ class SecureModelDownloaderTest {
         assertTrue(operations.listFiles().orEmpty().isEmpty())
     }
 
-    private fun assertDownloadFailure(
-        expected: ByteArray,
-        received: ByteArray,
-        code: DownloadFailureCode,
-    ) {
+    private fun assertDownloadFailure(expected: ByteArray, received: ByteArray, code: DownloadFailureCode) {
         val result = downloader(
             temporaryDirectory(),
             QueueTransport(FakeResponse(200, received, contentLengthBytes = null)),
@@ -304,8 +300,7 @@ class SecureModelDownloaderTest {
         assertEquals(code, (result as ModelDownloadResult.Failure).failure.code)
     }
 
-    private fun temporaryDirectory(): File =
-        Files.createTempDirectory("secure-downloader-test-").toFile()
+    private fun temporaryDirectory(): File = Files.createTempDirectory("secure-downloader-test-").toFile()
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes)
@@ -336,10 +331,7 @@ class SecureModelDownloaderTest {
         override fun close() = Unit
     }
 
-    private class CancellingResponse(
-        private val body: ByteArray,
-        private val afterFirstRead: () -> Unit,
-    ) : DownloadTransportResponse {
+    private class CancellingResponse(private val body: ByteArray, private val afterFirstRead: () -> Unit) : DownloadTransportResponse {
         override val statusCode: Int = 200
         override val contentLengthBytes: Long = body.size.toLong()
         override val contentEncoding: String? = null

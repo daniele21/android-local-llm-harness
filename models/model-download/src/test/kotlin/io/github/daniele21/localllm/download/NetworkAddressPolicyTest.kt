@@ -1,9 +1,9 @@
 package io.github.daniele21.localllm.download
 
-import java.net.InetAddress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
 
 class NetworkAddressPolicyTest {
     @Test
@@ -57,10 +57,9 @@ class NetworkAddressPolicyTest {
         )
     }
 
-    private fun policy(vararg addresses: String): PublicNetworkAddressPolicy =
-        PublicNetworkAddressPolicy(
-            HostAddressResolver {
-                addresses.map(InetAddress::getByName)
-            },
-        )
+    private fun policy(vararg addresses: String): PublicNetworkAddressPolicy = PublicNetworkAddressPolicy(
+        HostAddressResolver {
+            addresses.map(InetAddress::getByName)
+        },
+    )
 }

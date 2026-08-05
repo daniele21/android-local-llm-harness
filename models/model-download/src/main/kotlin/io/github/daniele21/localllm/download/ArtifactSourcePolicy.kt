@@ -28,10 +28,8 @@ fun interface ArtifactSourcePolicy {
     fun validate(uri: URI): SourcePolicyResult
 }
 
-class AllowlistedHttpsSourcePolicy(
-    allowedHosts: Set<AllowedSourceHost>,
-    private val allowedPorts: Set<Int> = setOf(443),
-) : ArtifactSourcePolicy {
+class AllowlistedHttpsSourcePolicy(allowedHosts: Set<AllowedSourceHost>, private val allowedPorts: Set<Int> = setOf(443)) :
+    ArtifactSourcePolicy {
     private val normalizedAllowedHosts = allowedHosts.map(::normalizeAllowedHost)
 
     init {

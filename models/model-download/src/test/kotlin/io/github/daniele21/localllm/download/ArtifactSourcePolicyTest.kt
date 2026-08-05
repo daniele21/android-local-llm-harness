@@ -1,9 +1,9 @@
 package io.github.daniele21.localllm.download
 
-import java.net.URI
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.URI
 
 class ArtifactSourcePolicyTest {
     private val policy = AllowlistedHttpsSourcePolicy(

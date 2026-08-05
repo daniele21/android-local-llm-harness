@@ -56,6 +56,7 @@ class PublicNetworkAddressPolicy(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun isPublicIpv4(octets: List<Int>): Boolean {
         val first = octets[0]
         val second = octets[1]

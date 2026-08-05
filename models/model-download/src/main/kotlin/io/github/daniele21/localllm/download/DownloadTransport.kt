@@ -6,11 +6,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 
-data class DownloadTransportRequest(
-    val uri: URI,
-    val connectTimeoutMs: Int,
-    val readTimeoutMs: Int,
-)
+data class DownloadTransportRequest(val uri: URI, val connectTimeoutMs: Int, val readTimeoutMs: Int)
 
 interface DownloadTransportResponse : Closeable {
     val statusCode: Int

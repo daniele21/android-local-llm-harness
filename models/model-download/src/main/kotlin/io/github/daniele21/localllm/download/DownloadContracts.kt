@@ -95,27 +95,14 @@ sealed interface ModelDownloadResult {
         val deduplicated: Boolean,
     ) : ModelDownloadResult
 
-    data class AlreadyRunning(
-        override val operationId: DownloadOperationId,
-        val digest: ModelDigest,
-    ) : ModelDownloadResult
+    data class AlreadyRunning(override val operationId: DownloadOperationId, val digest: ModelDigest) : ModelDownloadResult
 
-    data class Cancelled(
-        override val operationId: DownloadOperationId,
-        val failure: DownloadFailure,
-    ) : ModelDownloadResult
+    data class Cancelled(override val operationId: DownloadOperationId, val failure: DownloadFailure) : ModelDownloadResult
 
-    data class Failure(
-        override val operationId: DownloadOperationId,
-        val failure: DownloadFailure,
-    ) : ModelDownloadResult
+    data class Failure(override val operationId: DownloadOperationId, val failure: DownloadFailure) : ModelDownloadResult
 }
 
-data class DownloadFailure(
-    val code: DownloadFailureCode,
-    val retryable: Boolean,
-    val detail: String,
-)
+data class DownloadFailure(val code: DownloadFailureCode, val retryable: Boolean, val detail: String)
 
 enum class DownloadFailureCode {
     INVALID_DESCRIPTOR,
@@ -144,11 +131,7 @@ data class InterruptedDownload(
     val startedAtEpochMs: Long,
 )
 
-data class DownloadCleanupReport(
-    val interrupted: List<InterruptedDownload>,
-    val orphanFilesDeleted: Int,
-    val cleanupFailures: Int,
-)
+data class DownloadCleanupReport(val interrupted: List<InterruptedDownload>, val orphanFilesDeleted: Int, val cleanupFailures: Int)
 
 fun interface DownloadClock {
     fun nowEpochMs(): Long
