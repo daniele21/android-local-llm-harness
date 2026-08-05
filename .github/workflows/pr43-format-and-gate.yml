@@ -83,6 +83,16 @@ jobs:
           )
           replace_once(
               downloader,
+              "    private fun createPartial(): File = try {",
+              "    @Suppress(\"SwallowedException\")\n    private fun createPartial(): File = try {",
+          )
+          replace_once(
+              downloader,
+              "    private fun writeJournal(record: DownloadJournalRecord) {",
+              "    @Suppress(\"SwallowedException\")\n    private fun writeJournal(record: DownloadJournalRecord) {",
+          )
+          replace_once(
+              downloader,
               "        fun emit(stage: DownloadStage, bytes: Long, attempt: Int, force: Boolean = false) {",
               "        @Suppress(\"ComplexCondition\")\n        fun emit(stage: DownloadStage, bytes: Long, attempt: Int, force: Boolean = false) {",
           )
