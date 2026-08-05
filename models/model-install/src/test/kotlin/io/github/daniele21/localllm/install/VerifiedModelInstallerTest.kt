@@ -176,7 +176,7 @@ class VerifiedModelInstallerTest {
     }
 
     @Test
-    fun removesImportedModelWhenPostImportVerificationFails() {
+    fun postImportVerificationFailureDoesNotRemoveAnUnclassifiedStoreEntry() {
         val root = Files.createTempDirectory("model-install-test").toFile()
         val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
         val store = FakeModelStore(root, verificationValid = false)
@@ -185,12 +185,12 @@ class VerifiedModelInstallerTest {
 
         result as ModelInstallationResult.Failure
         assertEquals(ModelInstallationFailureCode.POST_IMPORT_VERIFICATION_FAILED, result.code)
-        assertEquals(1, store.removeCount)
+        assertEquals(0, store.removeCount)
         assertFalse(access.discarded)
     }
 
     @Test
-    fun removesImportedModelWhenPostImportVerificationThrows() {
+    fun postImportVerificationExceptionDoesNotRemoveAnUnclassifiedStoreEntry() {
         val root = Files.createTempDirectory("model-install-test").toFile()
         val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
         val store = FakeModelStore(root, verificationFailure = true)
@@ -199,7 +199,7 @@ class VerifiedModelInstallerTest {
 
         result as ModelInstallationResult.Failure
         assertEquals(ModelInstallationFailureCode.POST_IMPORT_VERIFICATION_FAILED, result.code)
-        assertEquals(1, store.removeCount)
+        assertEquals(0, store.removeCount)
         assertFalse(access.discarded)
     }
 
