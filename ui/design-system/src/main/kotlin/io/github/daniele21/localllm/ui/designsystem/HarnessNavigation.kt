@@ -11,10 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun HarnessNavigationBar(
-    modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
-) {
+fun HarnessNavigationBar(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     NavigationBar(modifier = modifier, content = content)
 }
 
