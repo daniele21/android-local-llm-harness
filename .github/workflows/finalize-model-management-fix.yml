@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   finalize:
-    if: github.event.head_commit.message == 'Add final model management test fixer'
-    runs-on: ubuntu-24.04
+    if: ${{ github.event.head_commit.message == 'Add final model management test fixer' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -20,92 +20,25 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - name: Install SDK
+      - name: Install Android SDK components
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
-      - name: Apply final source fixes and validate
-        shell: bash
+      - name: Apply recovery source fixes
+        run: python3 scripts/finalize_model_management_recovery.py
+      - name: Validate recovered model management
         run: |
-          python3 - <<'PY'
-          import base64
-          import re
-          from pathlib import Path
-
-          base_workflow = Path('.github/workflows/fix-model-management-compile.yml').read_text()
-          payload = re.search(r"echo '([^']+)' \| base64 -d > /tmp/fix.py", base_workflow)
-          if payload is None:
-              raise SystemExit('Base compile fixer payload not found')
-          Path('/tmp/base-fix.py').write_bytes(base64.b64decode(payload.group(1)))
-          PY
-          python3 /tmp/base-fix.py
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          controller = Path(
-              'apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/'
-              'localllm/phonetest/PhoneModelDistributionController.kt'
-          )
-          text = controller.read_text()
-          old = '''            detail = runtime?.detail,
-              installedModel = installedMetadata,
-          )'''
-          if old not in text:
-              old = '''            detail = runtime?.detail,
-            installedModel = installedMetadata,
-        )'''
-          new = '''            detail = managementDetails[stableId] ?: runtime?.detail,
-            installedModel = installedMetadata,
-            removalConfirmationPending = pendingRemovalStableId == stableId,
-        )'''
-          if old not in text:
-              raise SystemExit('Controller management-state anchor not found')
-          controller.write_text(text.replace(old, new, 1))
-
-          test = Path(
-              'apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/'
-              'localllm/phonetest/PhoneModelDistributionControllerTest.kt'
-          )
-          text = test.read_text()
-          text = text.replace(
-              'detail = "verified",',
-              'detail = "Model integrity verified",',
-              1,
-          )
-          old_remove = '''                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome =
-                    PhoneModelManagementOutcome(
-                        operation = PhoneModelManagementOperation.REMOVE,
-                        digest = digest,
-                        success = true,
-                        detail = "removed",
-                    )'''
-          new_remove = '''                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome {
-                    installedDigests.remove(digest)
-                    metadataRepository.remove(digest)
-                    return PhoneModelManagementOutcome(
-                        operation = PhoneModelManagementOperation.REMOVE,
-                        digest = digest,
-                        success = true,
-                        detail = "Model removed",
-                    )
-                }'''
-          if old_remove not in text:
-              raise SystemExit('Stateful management test-double anchor not found')
-          test.write_text(text.replace(old_remove, new_remove, 1))
-          PY
-
           chmod +x gradlew
-          ./gradlew --no-configuration-cache \
-            spotlessApply \
-            :apps:local-llm-phone-test:compileDebugKotlin \
-            :apps:local-llm-phone-test:testDebugUnitTest
-
+          ./gradlew --no-configuration-cache spotlessApply :apps:local-llm-phone-test:compileDebugKotlin :apps:local-llm-phone-test:testDebugUnitTest
+      - name: Remove temporary recovery automation
+        run: |
+          rm scripts/finalize_model_management_recovery.py
           rm .github/workflows/fix-model-management-compile.yml
           rm .github/workflows/finalize-model-management-fix.yml
-
+      - name: Commit recovered implementation
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
