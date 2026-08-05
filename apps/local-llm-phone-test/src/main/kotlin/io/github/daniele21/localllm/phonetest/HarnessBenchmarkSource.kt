@@ -63,15 +63,16 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
     fun snapshot(captureDetail: String? = null): BenchmarkUiState = runCatching {
         val model = selectedModel()
         val keys = model?.let(::knownKeys).orEmpty()
+        val activeBaselines = repository.benchmarkBaselines()
         BenchmarkUiState(
-            baselines = repository.benchmarkBaselines()
+            baselines = activeBaselines
                 .filter { model == null || it.key.modelDigest == model.digest }
                 .sortedWith(compareBy({ it.key.useCaseId.value }, { it.key.modelLoadKind.name }))
                 .map(::toUi),
             readiness = keys.map(::toReadinessUi),
             history = repository.benchmarkBaselineHistory(HISTORY_LIMIT)
                 .filter { model == null || it.key.modelDigest == model.digest }
-                .map { baseline -> toHistoryUi(baseline, repository.benchmarkBaselines()) },
+                .map { baseline -> baseline.toHistoryUi(activeBaselines) },
             eligibleKeys = keys.size,
             captureDetail = captureDetail,
         )
@@ -207,24 +208,6 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
         modelDigest == key.modelDigest &&
         modelLoadKind == key.modelLoadKind
 
-    private fun BenchmarkKey.safeStableId(): String = listOf(
-        applicationId.value,
-        useCaseId.value,
-        modelLoadKind.name,
-    ).joinToString(separator = ":")
-
-    private fun toHistoryUi(baseline: BenchmarkBaseline, activeBaselines: List<BenchmarkBaseline>): BenchmarkHistoryUi = BenchmarkHistoryUi(
-        stableId = "${baseline.key.safeStableId()}:${baseline.capturedAtEpochMs}",
-        useCase = baseline.key.useCaseId.value,
-        loadKind = baseline.key.modelLoadKind.name,
-        capturedAt = java.time.Instant.ofEpochMilli(baseline.capturedAtEpochMs).toString(),
-        samples = baseline.sampleCount.toString(),
-        medianTtft = baseline.medianTimeToFirstTokenMs.asMilliseconds(),
-        p95Total = baseline.p95TotalMs.asMilliseconds(),
-        medianDecode = baseline.medianDecodeTokensPerSecond.asThroughput(),
-        active = activeBaselines.any { it == baseline },
-    )
-
     private fun toUi(baseline: BenchmarkBaseline): BenchmarkUi {
         val assessment = BenchmarkRegressionHealthCheck(repository, baseline.key).evaluate()
         return BenchmarkUi(
@@ -250,6 +233,24 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
         const val SOURCE_ERROR = "Benchmark diagnostics are temporarily unavailable."
     }
 }
+
+private fun BenchmarkBaseline.toHistoryUi(activeBaselines: List<BenchmarkBaseline>): BenchmarkHistoryUi = BenchmarkHistoryUi(
+    stableId = "${key.safeStableId()}:$capturedAtEpochMs",
+    useCase = key.useCaseId.value,
+    loadKind = key.modelLoadKind.name,
+    capturedAt = java.time.Instant.ofEpochMilli(capturedAtEpochMs).toString(),
+    samples = sampleCount.toString(),
+    medianTtft = medianTimeToFirstTokenMs.asMilliseconds(),
+    p95Total = p95TotalMs.asMilliseconds(),
+    medianDecode = medianDecodeTokensPerSecond.asThroughput(),
+    active = activeBaselines.any { it == this },
+)
+
+private fun BenchmarkKey.safeStableId(): String = listOf(
+    applicationId.value,
+    useCaseId.value,
+    modelLoadKind.name,
+).joinToString(separator = ":")
 
 private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(it) } ?: "Unavailable"
 
