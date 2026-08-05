@@ -78,7 +78,7 @@ CatalogGgufArtifact
   -> architecture and available quantization validation
   -> ModelStore import
   -> post-import integrity verification
-  -> rollback after failed or incomplete verification
+  -> non-destructive failure when verification is invalid or unavailable
   -> path-free InstalledModelDescriptor
 ```
 
@@ -87,7 +87,7 @@ The implementation adds:
 - `VerifiedDownloadAccess` in `models/model-download`, which never exposes the verified backing path;
 - `models/model-install`, a UI-independent installation coordinator;
 - `LlamaCppGgufArtifactInspector`, an adapter over the existing metadata-only JNI bridge;
-- deterministic tests for opaque access, tampering, profile mismatch, revoked releases, inspection mismatch, import/verification failure, rollback and cleanup;
+- deterministic tests for opaque access, tampering, profile mismatch, revoked releases, inspection mismatch, import/verification failure, non-destructive failure handling and cleanup;
 - dedicated and cumulative CI coverage for catalog, download, installation and the backend adapter;
 - ADR 0007 and the installation operations document.
 
@@ -155,6 +155,7 @@ Recover unique verification, confirmation and loaded-model protection behavior f
 
 ## Deferred from the installation slice
 
+- transactional `ModelStore` creation provenance required for safe automatic rollback;
 - durable installed-model metadata persistence;
 - catalog/download/install Compose UI;
 - explicit application/use-case binding after installation;
