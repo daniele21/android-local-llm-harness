@@ -6,7 +6,6 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import io.github.daniele21.localllm.catalog.CatalogCompatibilityEvaluator
-import io.github.daniele21.localllm.catalog.CatalogCompatibilityResult
 import io.github.daniele21.localllm.catalog.CatalogDeviceProfile
 import io.github.daniele21.localllm.catalog.CatalogModelDocument
 import io.github.daniele21.localllm.catalog.CatalogModelRelease
@@ -133,9 +132,10 @@ internal class PhoneModelDistributionController(
 
     private var activeOperation: ActiveOperation? = null
     private var installed = reconcileInstalledMetadata()
-    private var state = loadInitialState()
+    private var state = PhoneModelDistributionState()
 
     init {
+        state = loadInitialState()
         listener.onStateChanged(state)
     }
 
@@ -239,19 +239,17 @@ internal class PhoneModelDistributionController(
 
     fun install(stableId: String) {
         val release = releases[stableId] ?: return
-        val handle: VerifiedDownloadHandle
-        val accepted = synchronized(lock) {
-            if (activeOperation != null) return@synchronized false
-            handle = pendingDownloads[stableId] ?: return@synchronized false
+        val handle = synchronized(lock) {
+            if (activeOperation != null) return@synchronized null
+            val pending = pendingDownloads[stableId] ?: return@synchronized null
             activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
             operationStates[stableId] = RuntimeModelState(
                 status = PhoneCatalogModelStatus.INSTALLING,
                 detail = "Validating GGUF metadata",
             )
             publishLocked("Installing ${release.displayName}")
-            true
-        }
-        if (!accepted) return
+            pending
+        } ?: return
 
         executor.execute {
             val request = ModelInstallationRequest(
@@ -393,8 +391,8 @@ internal class PhoneModelDistributionController(
             licenseName = release.license.displayName,
             status = status,
             compatible = result.compatible,
-            compatibilityReasons = result.reasons.map(Enum<*>::name),
-            compatibilityWarnings = result.warnings.map(Enum<*>::name),
+            compatibilityReasons = result.reasons.map { it.name },
+            compatibilityWarnings = result.warnings.map { it.name },
             bytesDownloaded = runtime?.bytesDownloaded ?: 0L,
             expectedBytes = runtime?.expectedBytes ?: release.artifact.sizeBytes,
             detail = runtime?.detail,
@@ -402,9 +400,8 @@ internal class PhoneModelDistributionController(
         )
     }
 
-    private fun RuntimeModelState?.orEmpty(): RuntimeModelState = this ?: RuntimeModelState(
-        status = PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
-    )
+    private fun RuntimeModelState?.orEmpty(): RuntimeModelState =
+        this ?: RuntimeModelState(status = PhoneCatalogModelStatus.READY_TO_DOWNLOAD)
 
     private fun CatalogModelRelease.toProfileArtifact(): GgufArtifact =
         GgufArtifact(
@@ -449,7 +446,7 @@ internal class PhoneModelDistributionController(
             val profileKeys = CuratedModelCatalog.releases.mapTo(mutableSetOf()) { it.profileKey }
             val evaluator = CatalogCompatibilityEvaluator(
                 versionMatcher = PhoneCatalogVersionMatcher,
-                profileResolver = PhoneCatalogProfileResolver(profileKeys),
+                profileResolver = PhoneCatalogProfileResolver(TARGET, profileKeys),
             )
             val downloadRoot = File(appContext.noBackupFilesDir, DOWNLOAD_DIRECTORY)
             val verifiedAccess = FileSystemVerifiedDownloadAccess(downloadRoot)
@@ -482,11 +479,12 @@ internal class PhoneModelDistributionController(
                         release: CatalogModelRelease,
                         observer: DownloadProgressObserver,
                         cancellationToken: DownloadCancellationToken,
-                    ): ModelDownloadResult = secureDownloader.download(
-                        ModelDownloadRequest(release.artifact),
-                        observer,
-                        cancellationToken,
-                    )
+                    ): ModelDownloadResult =
+                        secureDownloader.download(
+                            ModelDownloadRequest(release.artifact),
+                            observer,
+                            cancellationToken,
+                        )
                 },
                 installer = object : PhoneModelInstallGateway {
                     override fun install(
@@ -516,7 +514,8 @@ private object PhoneCatalogVersionMatcher : CatalogVersionMatcher {
         minimumInclusive: String?,
         maximumExclusive: String?,
     ): Boolean {
-        val current = SemanticVersion.parse(currentVersion) ?: return minimumInclusive == null && maximumExclusive == null
+        val current = SemanticVersion.parse(currentVersion)
+            ?: return minimumInclusive == null && maximumExclusive == null
         val minimum = minimumInclusive?.let(SemanticVersion::parse) ?: SemanticVersion.ZERO
         val maximum = maximumExclusive?.let(SemanticVersion::parse)
         return current >= minimum && (maximum == null || current < maximum)
@@ -524,15 +523,11 @@ private object PhoneCatalogVersionMatcher : CatalogVersionMatcher {
 }
 
 private class PhoneCatalogProfileResolver(
+    private val supportedTarget: CatalogTarget,
     private val supportedProfileKeys: Set<ModelProfileKey>,
 ) : CatalogProfileResolver {
     override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
-        target == PhoneModelDistributionController.Companion.run {
-            CatalogTarget(
-                ApplicationId("play-internal-phone-test"),
-                UseCaseId("manual-inference-playground"),
-            )
-        } && profileKey in supportedProfileKeys
+        target == supportedTarget && profileKey in supportedProfileKeys
 }
 
 private data class SemanticVersion(
