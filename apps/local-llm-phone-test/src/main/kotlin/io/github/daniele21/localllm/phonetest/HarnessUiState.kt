@@ -154,8 +154,6 @@ internal object HarnessUiReducer {
         is HarnessUiEvent.ThemeChanged -> state.copy(themePreference = event.preference)
     }
 
-    private fun Set<HarnessDiagnosticAction>.withAction(
-        action: HarnessDiagnosticAction,
-        running: Boolean,
-    ): Set<HarnessDiagnosticAction> = if (running) this + action else this - action
+    private fun Set<HarnessDiagnosticAction>.withAction(action: HarnessDiagnosticAction, running: Boolean): Set<HarnessDiagnosticAction> =
+        if (running) this + action else this - action
 }
