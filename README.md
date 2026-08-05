@@ -76,6 +76,28 @@ A verified download is not yet an installed or active model. Installation does n
 
 The repository uses Android Gradle Plugin 9.3.1 and its built-in Kotlin support. Android API 36 is the stable reproducible build target; API 37 remains a preview platform and will be adopted only when the required SDK package is consistently available in CI.
 
+## Build and run the Android app
+
+The two common application workflows are documented together in
+[`docs/android-build-and-run.md`](docs/android-build-and-run.md):
+
+- build the signed `.aab` that can be uploaded to Google Play Console;
+- build, install and launch the debug app on an already-running Android emulator.
+
+Quick commands, after completing the prerequisites in that guide:
+
+```bash
+# Signed release bundle for Google Play Console
+bash scripts/build-phone-test-release.sh build
+
+# Debug build of the same phone app on a running emulator
+bash scripts/run-emulator-debug.sh --app phone-test
+```
+
+The emulator runner installs and launches the application, but it does not create or boot an
+Android Virtual Device. Start the AVD first from Android Studio Device Manager or with the
+Android SDK `emulator` command as described in the guide.
+
 ## Current state
 
 `dev` is the canonical integration line for ordinary work. `main` remains the protected stable and release-oriented line and receives normal changes only through a validated `dev -> main` promotion. Harness 0.5.0 integration is tracked in [`docs/dev-integration-and-harness-0.5-plan.md`](docs/dev-integration-and-harness-0.5-plan.md).

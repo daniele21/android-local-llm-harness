@@ -30,11 +30,20 @@ Historical branches are read-only audit references. They must not receive new im
 - [x] establish the `dev` branch and correct its curated-model-catalog Detekt regression through PR #58
 - [x] implement repository-owned `dev` validation, promotion gates, target-branch policy, PR template and integration ADR
 - [ ] apply the equivalent repository ruleset to `dev`
-- [ ] align, validate and squash-merge the focused model-management recovery in PR #53
-- [ ] close PR #34 as superseded after auditing its unique behavior
-- [ ] integrate real Android launcher, themed-icon and Compose brand assets
+- [x] align, validate and squash-merge the focused model-management recovery in PR #53
+- [x] close PR #34 as superseded after auditing its unique behavior
+- [x] integrate real Android launcher, themed-icon and Compose brand assets
 - [ ] complete Navigation Compose, ViewModel/UDF and the five primary product surfaces
+  - Navigation Compose top-level routing and the five surface hierarchies are implemented on
+    the current local integration candidate. Shared visual tokens, compact chrome,
+    list-oriented panels, mockup-matched navigation and all five primary compositions are also
+    implemented; PR/remote CI, ViewModel/UDF ownership and detail routes remain.
 - [ ] add Compose UI, screenshot, accessibility and responsive-layout evidence
+  - shell-height and primary-destination reachability tests plus compact-emulator visual QA are
+    implemented on the current local candidate, including screenshot-by-screenshot manual
+    comparison with the approved mockups; the full state, font-scale, TalkBack, screenshot-golden
+    and expanded-layout matrix remains.
+- [ ] integrate the rebased local UI/release-tooling candidate through a reviewed PR and obtain cumulative green `dev` CI
 - [ ] build and upload the signed AAB to Google Play Internal Testing
 - [ ] capture privacy-safe representative physical-device GGUF evidence
 - [ ] promote the validated `dev` candidate to `main` with a merge commit and tag Harness 0.5.0 only after the applicable release gates pass

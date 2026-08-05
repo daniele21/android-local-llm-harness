@@ -1,10 +1,39 @@
 # Harness Android UX/UI implementation plan
 
-**Status:** Proposed implementation plan
+**Status:** Implementation in progress
 **Target repository:** `daniele21/android-local-llm-harness`
 **Primary target application:** `apps/local-llm-phone-test`, branded in-product as **Harness — Local AI Console**
 **Supporting source application:** `apps/local-llm-console`
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-06
+
+Implementation note (2026-08-05): the connected phone app now has compact branded chrome,
+top-level Navigation Compose routing, adaptive bottom/rail navigation and all five primary
+surfaces. The current visual-matching pass implements the mockups' dense type scale, restrained
+surface radii, compact actions, underline diagnostic tabs, unboxed bottom navigation, runtime
+hexagon and list-oriented runtime, model, health and settings treatments. Illustrative populated
+mockup values are never substituted for real empty, unavailable or not-run application state.
+Initial instrumented shell/navigation checks are present. This does not complete the plan:
+ViewModel/UDF migration, detail routes, the complete accessibility and automated screenshot
+matrix, expanded-layout validation and representative physical-device evidence remain open.
+The implementation is currently a local candidate rebased on the shared design-system and plan
+updates from `origin/dev`; review and cumulative remote CI are still required before the
+candidate counts as integrated.
+
+### Current implementation checkpoint
+
+| Workstream | Status | Remaining evidence or implementation |
+| --- | --- | --- |
+| Shared visual system | Implemented | Automated screenshot regression coverage |
+| Compact phone shell and top-level navigation | Implemented | Expanded-width visual validation and detail routes |
+| Overview, Playground, Models, Diagnostics and Settings compositions | Implemented | ViewModel/UDF ownership and complete state matrix |
+| Mockup visual matching | Implemented for compact dark-theme emulator | Light theme, font-scale, TalkBack and golden-image matrix |
+| Instrumented UI smoke coverage | Initial coverage implemented | Loading, success, warning, failure and restoration scenarios |
+| Remote integration | Local candidate rebased on current `origin/dev` | Feature PR, review and cumulative `dev` CI |
+| Release and device evidence | Not complete | Signed Play installation and representative physical-device GGUF run |
+
+The next UX block is ViewModel/UDF migration followed by deterministic state fixtures and
+automated screenshot/accessibility coverage. Physical-device validation remains a separate
+release gate and must not be inferred from the compact-emulator visual match.
 
 ## 1. Purpose
 
@@ -66,9 +95,15 @@ The following images are directional product mockups. They define information hi
 - physical-device validation;
 - privacy-safe validation reports.
 
-Its UI is built programmatically in one `Activity` with `ScrollView`, `LinearLayout`, `TextView`, `EditText`, and `Button`. The controllers use callback listeners and single-thread executors. This is appropriate for an evidence app but not for the target product structure.
+Its UI now uses Compose, Material 3 and Navigation Compose for the five primary destinations,
+with compact bottom navigation and an expanded navigation rail. `MainActivity` still owns most
+screen state and several controllers still use callback listeners and single-thread executors;
+ViewModel/UDF migration and detail routes therefore remain the primary architecture debt.
 
-The current model metadata persistence is effectively a **single selected/imported model**. The content-addressed store can contain artifacts, but the app does not yet maintain a durable multi-model catalog with display name, architecture, quantization, last-used time, and selection state.
+Installed catalog metadata is persisted per digest and the content-addressed store can contain
+multiple artifacts. The app still lacks a single product-level multi-model state that reconciles
+catalog releases, installed artifacts, active selection, loaded ownership, `lastUsedAt` and
+degraded/orphaned states.
 
 ### 3.2 Standalone console
 
@@ -92,9 +127,10 @@ Its UI is also built using programmatic Android Views in one `Activity`.
 
 ### 3.3 Build and UI stack
 
-The repository currently does not declare Jetpack Compose, Material 3, Navigation Compose, lifecycle-compose, coroutines, or a shared UI module in the version catalog.
-
-The implementation therefore requires an explicit UI-platform foundation before screen migration.
+The repository declares the Compose/Material/Navigation stack and includes the shared
+`ui:design-system` module. PR #61 split palette, typography, shapes, spacing and reusable
+components, and added dark/light previews plus deterministic contrast/touch-target tests.
+Coroutines/ViewModel ownership and a dedicated connected-app architecture ADR remain open.
 
 ## 4. Product and architecture decision
 
@@ -143,13 +179,13 @@ Instead:
 
 ### 4.3 Runtime ownership
 
-The final connected app should have one application-scoped composition root, provisionally named:
+The connected app has one application-scoped composition root named:
 
 ```text
 HarnessRuntimeGraph
 ```
 
-It will own or provide:
+It owns or provides:
 
 - the app-private `FileSystemModelStore`;
 - the installed-model metadata catalog;
@@ -163,9 +199,12 @@ It will own or provide:
 - runtime-owned cache probes and maintenance controls;
 - physical-device validation coordinator.
 
-This removes the current duplication where playground and validation independently construct runtime objects while still preserving explicit session and request lifecycles.
-
-Critical unification requirement: both `PhoneTestController` and `PhonePlaygroundController` currently create their own independent `FileSystemModelStore` instance against the same `local-llm-phone-test` directory. `HarnessRuntimeGraph` must provide a single shared `FileSystemModelStore` and a single `RuntimeOrchestrator` instance to all consumers. The current `RuntimeOrchestrator` construction in both controllers does not inject a `TelemetryRepository`; `HarnessRuntimeGraph` must construct the orchestrator with a real `TelemetryRepository` (Room-backed or in-memory) so that generation runs, structured logs, and health results are observable through the Diagnostics screens.
+The graph removes the earlier duplication where playground and validation constructed independent
+store/runtime objects while preserving explicit session and request lifecycles. It provides a
+single shared `FileSystemModelStore`, current `RuntimeOrchestrator` and bounded
+`InMemoryTelemetryRepository` to the connected consumers. The remaining decision is whether
+Harness 0.5 keeps process-only telemetry explicitly or adopts the existing Room store with
+tested migrations and retention.
 
 The graph must remain lazy. Importing a model or opening a screen must not load the model. Model loading occurs only when an operation explicitly requires it.
 
@@ -1552,6 +1591,9 @@ The Harness UX/UI initiative is complete when:
 
 ## 21. Immediate next action
 
-Start with **PR UX-01 — Decision record and Compose foundation**.
-
-Do not start by implementing every mockup screen in one branch. The first PR should establish the pinned Compose stack, shared design tokens, core components, and the explicit connected-app architecture decision. This keeps runtime risk low and makes every later screen a reviewable vertical slice.
+Integrate the rebased UI/release-tooling candidate through a reviewed PR toward `dev` and rerun
+the cumulative gate after its design-system reconciliation. Then continue with a focused
+navigation/state PR: extract `HarnessNavHost`, add detail routes and back-stack tests, and reduce
+`MainActivity` before migrating Playground to ViewModel/UDF. Track the executable checklist,
+release gates and evidence in
+[`dev-integration-and-harness-0.5-plan.md`](dev-integration-and-harness-0.5-plan.md).

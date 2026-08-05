@@ -15,36 +15,42 @@ private val MaterialTypography = Typography()
 val HarnessTypography = Typography(
     headlineLarge = MaterialTypography.headlineLarge.copy(
         fontFamily = HarnessFontFamilies.Interface,
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
-        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        fontWeight = FontWeight.SemiBold,
+    ),
+    headlineMedium = MaterialTypography.headlineMedium.copy(
+        fontFamily = HarnessFontFamilies.Interface,
+        fontSize = 18.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.SemiBold,
     ),
     titleLarge = MaterialTypography.titleLarge.copy(
         fontFamily = HarnessFontFamilies.Interface,
-        fontSize = 20.sp,
-        lineHeight = 28.sp,
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
         fontWeight = FontWeight.SemiBold,
     ),
     titleMedium = MaterialTypography.titleMedium.copy(
         fontFamily = HarnessFontFamilies.Interface,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
         fontWeight = FontWeight.SemiBold,
     ),
     bodyLarge = MaterialTypography.bodyLarge.copy(
         fontFamily = HarnessFontFamilies.Interface,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-    ),
-    bodyMedium = MaterialTypography.bodyMedium.copy(
-        fontFamily = HarnessFontFamilies.Interface,
         fontSize = 14.sp,
         lineHeight = 20.sp,
     ),
+    bodyMedium = MaterialTypography.bodyMedium.copy(
+        fontFamily = HarnessFontFamilies.Interface,
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+    ),
     labelLarge = MaterialTypography.labelLarge.copy(
         fontFamily = HarnessFontFamilies.Interface,
-        fontSize = 13.sp,
-        lineHeight = 18.sp,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
         fontWeight = FontWeight.Medium,
     ),
 )
