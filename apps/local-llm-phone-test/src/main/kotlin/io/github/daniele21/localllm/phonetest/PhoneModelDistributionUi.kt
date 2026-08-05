@@ -53,7 +53,7 @@ private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolea
                 style = MaterialTheme.typography.titleMedium,
             )
             HarnessStatusBadge(
-                text = model.status.name.displayLabel(),
+                label = model.status.name.displayLabel(),
                 tone = model.status.statusTone(),
             )
         }

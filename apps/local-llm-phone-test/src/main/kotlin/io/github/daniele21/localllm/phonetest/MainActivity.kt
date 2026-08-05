@@ -1032,7 +1032,7 @@ class MainActivity :
                         )
                     }
                     HarnessStatusBadge(
-                        text = modelDistributionState.catalogStatus.name.replace('_', ' '),
+                        label = modelDistributionState.catalogStatus.name.replace('_', ' '),
                         tone = if (modelDistributionState.catalogStatus == PhoneCatalogLoadStatus.READY) {
                             HarnessStatusTone.SUCCESS
                         } else {
