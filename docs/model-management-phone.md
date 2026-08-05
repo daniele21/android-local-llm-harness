@@ -14,3 +14,7 @@ Verification and removal run off the UI thread. Only one catalog distribution or
 ## Boundaries
 
 Removal deletes the app-private installed copy. It does not delete the user's original SAF document. Download URLs, signed URLs and storage paths are never displayed or persisted by the management state.
+
+## Recovery validation
+
+The recovered implementation is accepted only after the source-level controller, UI wiring and stateful test doubles compile and pass without retaining self-modifying repair workflows.
