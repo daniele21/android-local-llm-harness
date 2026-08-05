@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   fix:
-    if: github.event.head_commit.message == 'Add temporary model management compile fixer'
+    if: github.event.head_commit.message == 'Repair temporary model management compile fixer'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -29,61 +29,8 @@ jobs:
       - name: Apply compile fixes and validate
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          root = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest')
-
-          ui = root / 'PhoneModelDistributionUi.kt'
-          text = ui.read_text()
-          old = '''                onInstall = onInstall,
-                onSelectInstalled = onSelectInstalled,
-'''
-          new = '''                onInstall = onInstall,
-                onVerifyInstalled = onVerifyInstalled,
-                onRequestRemove = onRequestRemove,
-                onCancelRemove = onCancelRemove,
-                onConfirmRemove = onConfirmRemove,
-                onSelectInstalled = onSelectInstalled,
-'''
-          if old not in text:
-              raise SystemExit('PhoneModelDistributionUi callback anchor not found')
-          ui.write_text(text.replace(old, new, 1))
-
-          main = root / 'MainActivity.kt'
-          text = main.read_text()
-          old = '''                    onInstall = modelDistributionController::install,
-                    onSelectInstalled = ::selectInstalledCatalogModel,
-'''
-          new = '''                    onInstall = modelDistributionController::install,
-                    onVerifyInstalled = modelDistributionController::verifyInstalled,
-                    onRequestRemove = modelDistributionController::requestRemove,
-                    onCancelRemove = modelDistributionController::cancelRemove,
-                    onConfirmRemove = modelDistributionController::confirmRemove,
-                    onSelectInstalled = ::selectInstalledCatalogModel,
-'''
-          if old not in text:
-              raise SystemExit('MainActivity catalog callback anchor not found')
-          main.write_text(text.replace(old, new, 1))
-
-          controller = root / 'PhoneModelDistributionController.kt'
-          text = controller.read_text()
-          text = text.replace(
-              'protectedModelDigest = protectedModelDigest,',
-              'protectedModelDigest = runtimeGraph::loadedModelDigest,',
-              1,
-          )
-          old = '''                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
-                    clock = System::currentTimeMillis,
-'''
-          new = '''                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
-                    management = management,
-                    clock = System::currentTimeMillis,
-'''
-          if old not in text:
-              raise SystemExit('Controller services anchor not found')
-          controller.write_text(text.replace(old, new, 1))
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnJvb3QgPSBQYXRoKCJhcHBzL2xvY2FsLWxsbS1waG9uZS10ZXN0L3NyYy9tYWluL2tvdGxpbi9pby9naXRodWIvZGFuaWVsZTIxL2xvY2FsbGxtL3Bob25ldGVzdCIpCgp1aSA9IHJvb3QgLyAiUGhvbmVNb2RlbERpc3RyaWJ1dGlvblVpLmt0Igp0ZXh0ID0gdWkucmVhZF90ZXh0KCkKb2xkID0gIiAgICAgICAgICAgICAgICBvbkluc3RhbGwgPSBvbkluc3RhbGwsXG4gICAgICAgICAgICAgICAgb25TZWxlY3RJbnN0YWxsZWQgPSBvblNlbGVjdEluc3RhbGxlZCxcbiIKbmV3ID0gIiAgICAgICAgICAgICAgICBvbkluc3RhbGwgPSBvbkluc3RhbGwsXG4gICAgICAgICAgICAgICAgb25WZXJpZnlJbnN0YWxsZWQgPSBvblZlcmlmeUluc3RhbGxlZCxcbiAgICAgICAgICAgICAgICBvblJlcXVlc3RSZW1vdmUgPSBvblJlcXVlc3RSZW1vdmUsXG4gICAgICAgICAgICAgICAgb25DYW5jZWxSZW1vdmUgPSBvbkNhbmNlbFJlbW92ZSxcbiAgICAgICAgICAgICAgICBvbkNvbmZpcm1SZW1vdmUgPSBvbkNvbmZpcm1SZW1vdmUsXG4gICAgICAgICAgICAgICAgb25TZWxlY3RJbnN0YWxsZWQgPSBvblNlbGVjdEluc3RhbGxlZCxcbiIKaWYgb2xkIG5vdCBpbiB0ZXh0OgogICAgcmFpc2UgU3lzdGVtRXhpdCgiUGhvbmVNb2RlbERpc3RyaWJ1dGlvblVpIGNhbGxiYWNrIGFuY2hvciBub3QgZm91bmQiKQp1aS53cml0ZV90ZXh0KHRleHQucmVwbGFjZShvbGQsIG5ldywgMSkpCgptYWluID0gcm9vdCAvICJNYWluQWN0aXZpdHkua3QiCnRleHQgPSBtYWluLnJlYWRfdGV4dCgpCm9sZCA9ICIgICAgICAgICAgICAgICAgICAgIG9uSW5zdGFsbCA9IG1vZGVsRGlzdHJpYnV0aW9uQ29udHJvbGxlcjo6aW5zdGFsbCxcbiAgICAgICAgICAgICAgICAgICAgb25TZWxlY3RJbnN0YWxsZWQgPSB7IG1ldGFkYXRhIC0+XG4iCm5ldyA9ICIgICAgICAgICAgICAgICAgICAgIG9uSW5zdGFsbCA9IG1vZGVsRGlzdHJpYnV0aW9uQ29udHJvbGxlcjo6aW5zdGFsbCxcbiAgICAgICAgICAgICAgICAgICAgb25WZXJpZnlJbnN0YWxsZWQgPSBtb2RlbERpc3RyaWJ1dGlvbkNvbnRyb2xsZXI6OnZlcmlmeUluc3RhbGxlZCxcbiAgICAgICAgICAgICAgICAgICAgb25SZXF1ZXN0UmVtb3ZlID0gbW9kZWxEaXN0cmlidXRpb25Db250cm9sbGVyOjpyZXF1ZXN0UmVtb3ZlLFxuICAgICAgICAgICAgICAgICAgICBvbkNhbmNlbFJlbW92ZSA9IG1vZGVsRGlzdHJpYnV0aW9uQ29udHJvbGxlcjo6Y2FuY2VsUmVtb3ZlLFxuICAgICAgICAgICAgICAgICAgICBvbkNvbmZpcm1SZW1vdmUgPSBtb2RlbERpc3RyaWJ1dGlvbkNvbnRyb2xsZXI6OmNvbmZpcm1SZW1vdmUsXG4gICAgICAgICAgICAgICAgICAgIG9uU2VsZWN0SW5zdGFsbGVkID0geyBtZXRhZGF0YSAtPlxuIgppZiBvbGQgbm90IGluIHRleHQ6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJNYWluQWN0aXZpdHkgY2F0YWxvZyBjYWxsYmFjayBhbmNob3Igbm90IGZvdW5kIikKbWFpbi53cml0ZV90ZXh0KHRleHQucmVwbGFjZShvbGQsIG5ldywgMSkpCgpjb250cm9sbGVyID0gcm9vdCAvICJQaG9uZU1vZGVsRGlzdHJpYnV0aW9uQ29udHJvbGxlci5rdCIKdGV4dCA9IGNvbnRyb2xsZXIucmVhZF90ZXh0KCkKb2xkID0gInByb3RlY3RlZE1vZGVsRGlnZXN0ID0gcHJvdGVjdGVkTW9kZWxEaWdlc3QsIgppZiBvbGQgbm90IGluIHRleHQ6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJwcm90ZWN0ZWRNb2RlbERpZ2VzdCBhbmNob3Igbm90IGZvdW5kIikKdGV4dCA9IHRleHQucmVwbGFjZShvbGQsICJwcm90ZWN0ZWRNb2RlbERpZ2VzdCA9IHJ1bnRpbWVHcmFwaDo6bG9hZGVkTW9kZWxEaWdlc3QsIiwgMSkKb2xkID0gIiAgICAgICAgICAgICAgICAgICAgbW9kZWxFeGlzdHMgPSB7IGRpZ2VzdCAtPiBydW50aW1lR3JhcGgubW9kZWxTdG9yZS5maW5kKGRpZ2VzdCk/LnZlcmlmaWVkID09IHRydWUgfSxcbiAgICAgICAgICAgICAgICAgICAgY2xvY2sgPSBTeXN0ZW06OmN1cnJlbnRUaW1lTWlsbGlzLFxuIgpuZXcgPSAiICAgICAgICAgICAgICAgICAgICBtb2RlbEV4aXN0cyA9IHsgZGlnZXN0IC0+IHJ1bnRpbWVHcmFwaC5tb2RlbFN0b3JlLmZpbmQoZGlnZXN0KT8udmVyaWZpZWQgPT0gdHJ1ZSB9LFxuICAgICAgICAgICAgICAgICAgICBtYW5hZ2VtZW50ID0gbWFuYWdlbWVudCxcbiAgICAgICAgICAgICAgICAgICAgY2xvY2sgPSBTeXN0ZW06OmN1cnJlbnRUaW1lTWlsbGlzLFxuIgppZiBvbGQgbm90IGluIHRleHQ6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJDb250cm9sbGVyIHNlcnZpY2VzIGFuY2hvciBub3QgZm91bmQiKQpjb250cm9sbGVyLndyaXRlX3RleHQodGV4dC5yZXBsYWNlKG9sZCwgbmV3LCAxKSkK' | base64 -d > /tmp/fix.py
+          python3 /tmp/fix.py
           chmod +x gradlew
           ./gradlew --no-configuration-cache spotlessApply :apps:local-llm-phone-test:compileDebugKotlin :apps:local-llm-phone-test:testDebugUnitTest
           rm .github/workflows/fix-model-management-compile.yml
