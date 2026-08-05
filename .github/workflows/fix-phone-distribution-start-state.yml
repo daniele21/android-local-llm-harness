@@ -39,81 +39,58 @@ jobs:
           path = Path("apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionController.kt")
           text = path.read_text(encoding="utf-8")
 
-          old_download = '''        val accepted = synchronized(lock) {
-              if (activeOperation != null) return@synchronized false
-              val compatibilityResult = compatibility.getValue(stableId)
-              if (!compatibilityResult.compatible || installed.containsKey(release.artifact.digest)) {
-                  return@synchronized false
-              }
-              activeOperation = ActiveOperation(stableId, cancellation)
-              operationStates[stableId] = RuntimeModelState(
-                  status = PhoneCatalogModelStatus.DOWNLOADING,
-                  detail = "Preparing secure download",
-              )
-              publishLocked("Downloading ${release.displayName}")
+          download_start = text.index("    fun download(stableId: String) {")
+          download_end = text.index("    fun cancelDownload(stableId: String) {", download_start)
+          download = text[download_start:download_end]
+          download = download.replace(
+              "        val accepted = synchronized(lock) {",
+              "        val initialState = synchronized(lock) {",
+              1,
+          )
+          download = download.replace("return@synchronized false", "return@synchronized null")
+          old_download_tail = '''            publishLocked("Downloading ${release.displayName}")
               true
           }
           if (!accepted) return
 
           executor.execute {
           '''
-          new_download = '''        val initialState = synchronized(lock) {
-              if (activeOperation != null) return@synchronized null
-              val compatibilityResult = compatibility.getValue(stableId)
-              if (!compatibilityResult.compatible || installed.containsKey(release.artifact.digest)) {
-                  return@synchronized null
-              }
-              activeOperation = ActiveOperation(stableId, cancellation)
-              operationStates[stableId] = RuntimeModelState(
-                  status = PhoneCatalogModelStatus.DOWNLOADING,
-                  detail = "Preparing secure download",
-              )
-              publishLocked("Downloading ${release.displayName}")
+          new_download_tail = '''            publishLocked("Downloading ${release.displayName}")
           } ?: return
           listener.onStateChanged(initialState)
 
           executor.execute {
           '''
+          if download.count(old_download_tail) != 1:
+              raise SystemExit("Unable to locate the formatted download start-state tail")
+          download = download.replace(old_download_tail, new_download_tail, 1)
+          text = text[:download_start] + download + text[download_end:]
 
-          old_install = '''        val handle = synchronized(lock) {
-              if (activeOperation != null) return@synchronized null
-              val pending = pendingDownloads[stableId] ?: return@synchronized null
-              activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
-              operationStates[stableId] = RuntimeModelState(
-                  status = PhoneCatalogModelStatus.INSTALLING,
-                  detail = "Validating GGUF metadata",
-              )
-              publishLocked("Installing ${release.displayName}")
+          install_start = text.index("    fun install(stableId: String) {")
+          install_end = text.index("    override fun close()", install_start)
+          install = text[install_start:install_end]
+          install = install.replace(
+              "        val handle = synchronized(lock) {",
+              "        val start = synchronized(lock) {",
+              1,
+          )
+          old_install_tail = '''            publishLocked("Installing ${release.displayName}")
               pending
           } ?: return
 
           executor.execute {
           '''
-          new_install = '''        val start = synchronized(lock) {
-              if (activeOperation != null) return@synchronized null
-              val pending = pendingDownloads[stableId] ?: return@synchronized null
-              activeOperation = ActiveOperation(stableId, AtomicBoolean(false))
-              operationStates[stableId] = RuntimeModelState(
-                  status = PhoneCatalogModelStatus.INSTALLING,
-                  detail = "Validating GGUF metadata",
-              )
-              pending to publishLocked("Installing ${release.displayName}")
+          new_install_tail = '''            pending to publishLocked("Installing ${release.displayName}")
           } ?: return
           val handle = start.first
           listener.onStateChanged(start.second)
 
           executor.execute {
           '''
-
-          replacements = [
-              (old_download, new_download, "download start state"),
-              (old_install, new_install, "installation start state"),
-          ]
-          for old, new, label in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"Expected exactly one {label} block, found {count}")
-              text = text.replace(old, new, 1)
+          if install.count(old_install_tail) != 1:
+              raise SystemExit("Unable to locate the formatted installation start-state tail")
+          install = install.replace(old_install_tail, new_install_tail, 1)
+          text = text[:install_start] + install + text[install_end:]
 
           path.write_text(text, encoding="utf-8")
           PY
