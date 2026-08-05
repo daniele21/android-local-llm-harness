@@ -37,62 +37,45 @@ jobs:
           from pathlib import Path
 
           path = Path("apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionController.kt")
-          text = path.read_text(encoding="utf-8")
+          lines = path.read_text(encoding="utf-8").splitlines()
 
-          download_start = text.index("    fun download(stableId: String) {")
-          download_end = text.index("    fun cancelDownload(stableId: String) {", download_start)
-          download = text[download_start:download_end]
-          download = download.replace(
-              "        val accepted = synchronized(lock) {",
-              "        val initialState = synchronized(lock) {",
-              1,
+          download_start = lines.index("    fun download(stableId: String) {")
+          cancel_start = lines.index("    fun cancelDownload(stableId: String) {")
+          accepted_index = lines.index("        val accepted = synchronized(lock) {", download_start, cancel_start)
+          lines[accepted_index] = "        val initialState = synchronized(lock) {"
+          for index in range(accepted_index, cancel_start):
+              lines[index] = lines[index].replace("return@synchronized false", "return@synchronized null")
+          true_index = lines.index("            true", accepted_index, cancel_start)
+          del lines[true_index]
+          cancel_start -= 1
+          accepted_guard_index = lines.index("        if (!accepted) return", accepted_index, cancel_start)
+          if lines[accepted_guard_index - 1] != "        }":
+              raise SystemExit("Unexpected download synchronized-block boundary")
+          lines[accepted_guard_index - 1] = "        } ?: return"
+          lines[accepted_guard_index] = "        listener.onStateChanged(initialState)"
+
+          install_start = lines.index("    fun install(stableId: String) {")
+          close_start = lines.index("    override fun close()", install_start)
+          handle_index = lines.index("        val handle = synchronized(lock) {", install_start, close_start)
+          lines[handle_index] = "        val start = synchronized(lock) {"
+          publish_index = lines.index(
+              '            publishLocked("Installing ${release.displayName}")',
+              handle_index,
+              close_start,
           )
-          download = download.replace("return@synchronized false", "return@synchronized null")
-          old_download_tail = '''            publishLocked("Downloading ${release.displayName}")
-              true
-          }
-          if (!accepted) return
+          if lines[publish_index + 1] != "            pending":
+              raise SystemExit("Unexpected installation synchronized-block result")
+          lines[publish_index] = '            pending to publishLocked("Installing ${release.displayName}")'
+          del lines[publish_index + 1]
+          close_start -= 1
+          executor_index = lines.index("        executor.execute {", publish_index, close_start)
+          lines[executor_index:executor_index] = [
+              "        val handle = start.first",
+              "        listener.onStateChanged(start.second)",
+              "",
+          ]
 
-          executor.execute {
-          '''
-          new_download_tail = '''            publishLocked("Downloading ${release.displayName}")
-          } ?: return
-          listener.onStateChanged(initialState)
-
-          executor.execute {
-          '''
-          if download.count(old_download_tail) != 1:
-              raise SystemExit("Unable to locate the formatted download start-state tail")
-          download = download.replace(old_download_tail, new_download_tail, 1)
-          text = text[:download_start] + download + text[download_end:]
-
-          install_start = text.index("    fun install(stableId: String) {")
-          install_end = text.index("    override fun close()", install_start)
-          install = text[install_start:install_end]
-          install = install.replace(
-              "        val handle = synchronized(lock) {",
-              "        val start = synchronized(lock) {",
-              1,
-          )
-          old_install_tail = '''            publishLocked("Installing ${release.displayName}")
-              pending
-          } ?: return
-
-          executor.execute {
-          '''
-          new_install_tail = '''            pending to publishLocked("Installing ${release.displayName}")
-          } ?: return
-          val handle = start.first
-          listener.onStateChanged(start.second)
-
-          executor.execute {
-          '''
-          if install.count(old_install_tail) != 1:
-              raise SystemExit("Unable to locate the formatted installation start-state tail")
-          install = install.replace(old_install_tail, new_install_tail, 1)
-          text = text[:install_start] + install + text[install_end:]
-
-          path.write_text(text, encoding="utf-8")
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
       - name: Format and run phone app unit tests
         run: |
