@@ -62,6 +62,7 @@ class CatalogCompatibilityEvaluator(
     ) {
         when (availability) {
             CatalogAvailability.ACTIVE -> Unit
+            CatalogAvailability.CANDIDATE -> warnings += CatalogCompatibilityWarning.RELEASE_CANDIDATE
             CatalogAvailability.DEPRECATED -> warnings += CatalogCompatibilityWarning.RELEASE_DEPRECATED
             CatalogAvailability.REVOKED -> reasons += CatalogCompatibilityReason.RELEASE_REVOKED
             CatalogAvailability.UNAVAILABLE -> reasons += CatalogCompatibilityReason.RELEASE_UNAVAILABLE

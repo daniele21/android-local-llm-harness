@@ -1,10 +1,10 @@
 package io.github.daniele21.localllm.catalog
 
-import java.io.File
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class ModelCatalogSynchronizerTest {
     private val codec = CatalogJsonCodec()
@@ -85,22 +85,12 @@ class ModelCatalogSynchronizerTest {
         assertEquals(CatalogFailureCode.INTERNAL_FAILURE, result.failure.code)
     }
 
-    private fun synchronizer(
-        source: ModelCatalogSource,
-        repository: ModelCatalogRepository,
-        nowEpochMs: Long,
-    ): ModelCatalogSynchronizer {
-        return ModelCatalogSynchronizer(source, repository, codec, validator, CatalogClock { nowEpochMs })
-    }
+    private fun synchronizer(source: ModelCatalogSource, repository: ModelCatalogRepository, nowEpochMs: Long): ModelCatalogSynchronizer =
+        ModelCatalogSynchronizer(source, repository, codec, validator, CatalogClock { nowEpochMs })
 
-    private fun encode(document: CatalogModelDocument): ByteArray {
-        return (codec.encode(document) as CatalogEncodeResult.Success).bytes
-    }
+    private fun encode(document: CatalogModelDocument): ByteArray = (codec.encode(document) as CatalogEncodeResult.Success).bytes
 
-    private fun withFixture(
-        staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L,
-        block: (FileModelCatalogRepository, File) -> Unit,
-    ) {
+    private fun withFixture(staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L, block: (FileModelCatalogRepository, File) -> Unit) {
         val directory = Files.createTempDirectory("model-catalog-sync-test").toFile()
         try {
             block(FileModelCatalogRepository(directory, codec, validator, staleGracePeriodMs), directory)
