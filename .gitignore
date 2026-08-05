@@ -32,3 +32,5 @@ env/
 .env
 .env.*
 !.env.example
+.kotlin/errors/errors-1785944408134.log
+.kotlin/errors/errors-1785944408252.log
