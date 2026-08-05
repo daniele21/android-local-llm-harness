@@ -1,0 +1,55 @@
+name: Recover benchmark history
+
+on:
+  push:
+    branches: [agent/recover-benchmark-history]
+    paths:
+      - ".github/workflows/recover-benchmark-history.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-benchmark-history
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/recover-benchmark-history
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - name: Recover retained benchmark history
+        run: python3 scripts/recover_benchmark_history.py
+      - name: Format and validate recovered slice
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache --stacktrace \
+            spotlessApply \
+            :observability:benchmark-engine:test \
+            :observability:in-memory-store:test \
+            :observability:room-store:testDebugUnitTest \
+            :apps:local-llm-phone-test:testDebugUnitTest \
+            :apps:local-llm-phone-test:lintDebug
+      - name: Commit verified recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git reset .github/workflows/recover-benchmark-history.yml scripts/recover_benchmark_history.py
+          git commit -m "Recover retained benchmark history"
+          git push origin HEAD:agent/recover-benchmark-history
