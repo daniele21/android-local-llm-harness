@@ -28,11 +28,13 @@ The installer:
 5. validates inspected architecture and any quantization metadata available from the backend;
 6. imports through the existing `ModelStore` contract;
 7. verifies the installed content-addressed artifact after import;
-8. removes the imported artifact when post-import verification fails or cannot be completed;
+8. reports post-import verification failure without automatically deleting the digest;
 9. discards the verified holding artifact only after successful installation and only according to an explicit retention policy;
 10. returns a path-free installed-model descriptor.
 
 The first backend adapter is `LlamaCppGgufArtifactInspector`, which maps the existing `LlamaCppBridge.inspectGguf()` result into the neutral installation contract without forwarding backend messages or paths.
+
+Post-import failure is deliberately non-destructive because `ModelStore.import()` does not currently reveal whether it created a new object or deduplicated an existing one. Automatic deletion could remove a model that existed before this installation or was installed concurrently. Transactional creation provenance is required before safe automatic rollback can be introduced.
 
 Installation does not:
 
@@ -52,7 +54,7 @@ Model identity remains the SHA-256 digest.
 - download, installation, binding and runtime activation stay individually observable and testable;
 - catalog metadata cannot bypass application-owned profile review;
 - GGUF structure is inspected before final publication;
-- failed post-import verification triggers deterministic rollback;
+- post-import verification cannot accidentally delete a deduplicated or concurrently installed model;
 - UI integrations can expose explicit `verified`, `installing` and `installed` states without hidden side effects;
 - alternative backends may provide their own metadata inspector without changing installation orchestration.
 
@@ -61,12 +63,14 @@ Model identity remains the SHA-256 digest.
 - installation temporarily holds a staging copy in addition to the verified download and final store artifact;
 - metadata inspection support is limited by what each backend exposes;
 - the current installer is synchronous and must execute off the Android main thread;
-- cancellation inside the existing synchronous `ModelStore.import()` operation is not introduced by this decision.
+- cancellation inside the existing synchronous `ModelStore.import()` operation is not introduced by this decision;
+- an artifact associated with failed post-import verification requires explicit diagnosis, repair or removal.
 
 ## Deferred decisions
 
 This ADR does not define:
 
+- transactional creation provenance or safe automatic rollback in `ModelStore`;
 - durable persistence of the returned installed-model catalog/profile metadata;
 - automatic application/use-case binding after installation;
 - WorkManager or foreground-service orchestration;
@@ -89,6 +93,10 @@ Rejected because callers could retain, move, disclose or import bytes outside th
 ### Let the runtime prepare operation install missing models
 
 Rejected because inference preparation must not perform network or storage mutation implicitly.
+
+### Delete the digest after any post-import verification failure
+
+Rejected because the current store contract does not distinguish a newly created artifact from a deduplicated existing artifact. Deletion would not be transactionally safe.
 
 ### Validate only SHA-256 and size
 
