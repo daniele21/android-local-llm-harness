@@ -32,7 +32,27 @@ jobs:
         with:
           cache-provider: basic
       - name: Recover retained benchmark history
-        run: python3 scripts/recover_benchmark_history.py
+        run: |
+          python3 scripts/recover_benchmark_history.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("observability/in-memory-store/build.gradle.kts")
+          text = path.read_text(encoding="utf-8")
+          old = '''dependencies {
+              api(project(":observability:contracts"))
+          }
+          '''
+          new = '''dependencies {
+              api(project(":observability:contracts"))
+
+              testImplementation(libs.junit4)
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("Unexpected in-memory store dependency block")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
       - name: Format and validate recovered slice
         run: |
           chmod +x gradlew
