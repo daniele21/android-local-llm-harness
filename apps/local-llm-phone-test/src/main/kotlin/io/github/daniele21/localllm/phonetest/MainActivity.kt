@@ -65,10 +65,12 @@ class MainActivity :
     private lateinit var benchmarkSource: HarnessBenchmarkSource
     private lateinit var logSource: HarnessLogSource
     private lateinit var controller: PhoneTestController
+    private lateinit var modelDistributionController: PhoneModelDistributionController
     private lateinit var playgroundController: PhonePlaygroundController
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
 
     private var importedModel by mutableStateOf<ImportedPhoneModel?>(null)
+    private var modelDistributionState by mutableStateOf(PhoneModelDistributionState())
     private var latestReport by mutableStateOf("")
     private var controllerBusy by mutableStateOf(false)
     private var healthRunning by mutableStateOf(false)
@@ -117,6 +119,17 @@ class MainActivity :
         }
         logSource = HarnessLogSource(runtimeGraph.telemetryRepository)
         controller = PhoneTestController(this, this)
+        modelDistributionController = PhoneModelDistributionController.from(
+            context = this,
+            runtimeGraph = runtimeGraph,
+            listener = PhoneModelDistributionListener { state ->
+                runOnUiThread {
+                    modelDistributionState = state
+                    operationStatus = state.message
+                    updateKeepScreenOn()
+                }
+            },
+        )
         playgroundController = PhonePlaygroundController(this, ::onPlaygroundStateChanged)
         playgroundState = playgroundController.snapshot()
         refreshDiagnostics()
@@ -133,6 +146,7 @@ class MainActivity :
 
     override fun onDestroy() {
         diagnosticsExecutor.shutdownNow()
+        modelDistributionController.close()
         playgroundController.close()
         controller.close()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -158,6 +172,9 @@ class MainActivity :
         selectedModelForDiagnostics = model
         runOnUiThread {
             importedModel = model
+            if (::modelDistributionController.isInitialized) {
+                modelDistributionController.refresh()
+            }
             refreshDiagnostics()
         }
     }
@@ -515,19 +532,42 @@ class MainActivity :
     @Composable
     private fun ModelsScreen(onImport: () -> Unit) {
         ScreenList("Models") {
-            item { HarnessPrimaryButton("Import GGUF", enabled = !isBusy(), onClick = onImport) }
+            item {
+                PhoneModelDistributionCatalog(
+                    state = modelDistributionState,
+                    onDownload = modelDistributionController::download,
+                    onCancel = modelDistributionController::cancelDownload,
+                    onInstall = modelDistributionController::install,
+                    onSelectInstalled = { metadata ->
+                        afterPlaygroundRuntimeReleased {
+                            controller.selectInstalledModel(metadata.asImportedPhoneModel())
+                        }
+                    },
+                )
+            }
+            item {
+                HarnessCard {
+                    Text("Manual GGUF import", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Use Android's document picker for a local GGUF that is not present in the curated catalog.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HarnessPrimaryButton("Import GGUF", enabled = !isBusy(), onClick = onImport)
+                }
+            }
             item {
                 val model = importedModel
                 if (model == null) {
                     HarnessCard {
-                        Text("No imported models", style = MaterialTheme.typography.titleLarge)
+                        Text("No model selected", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Harness currently exposes the selected model while the durable " +
-                                "multi-model catalog is introduced.",
+                            "Downloading and installing does not activate a model. Choose Use in Playground " +
+                                "on an installed catalog model, or import a GGUF manually.",
                         )
                     }
                 } else {
                     HarnessCard {
+                        Text("Selected for local inference", style = MaterialTheme.typography.titleMedium)
                         Text(model.fileName, style = MaterialTheme.typography.titleLarge)
                         HarnessMetricRow {
                             HarnessMetric("Architecture", model.architecture, Modifier.weight(1f))
@@ -877,7 +917,7 @@ class MainActivity :
             item {
                 HarnessCard {
                     Text("Build", style = MaterialTheme.typography.titleLarge)
-                    HarnessMetric("Application", "Harness 0.3.0")
+                    HarnessMetric("Application", "Harness 0.4.0")
                     HarnessMetric("Format", "GGUF only")
                     HarnessMetric("Transport", "In-process")
                     HarnessMetric("Telemetry", "In-memory")
@@ -920,7 +960,7 @@ class MainActivity :
     }
 
     private fun updateKeepScreenOn() {
-        if (controllerBusy || playgroundState.active) {
+        if (controllerBusy || modelDistributionState.operationActive || playgroundState.active) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -929,7 +969,7 @@ class MainActivity :
 
     private fun diagnosticActionRunning(): Boolean = healthRunning || resourceCaptureRunning || benchmarkCaptureRunning
 
-    private fun isBusy(): Boolean = controllerBusy || playgroundController.active
+    private fun isBusy(): Boolean = controllerBusy || modelDistributionState.operationActive || playgroundController.active
 
     private fun copyLog(log: DiagnosticsLogUi) {
         copyToClipboard("Harness log entry", log.copyText())

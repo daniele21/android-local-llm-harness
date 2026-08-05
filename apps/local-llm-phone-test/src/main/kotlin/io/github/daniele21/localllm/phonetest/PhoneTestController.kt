@@ -89,6 +89,22 @@ internal class PhoneTestController(
         }
     }
 
+    fun selectInstalledModel(model: ImportedPhoneModel) {
+        runExclusive {
+            progress("Verifying installed model before selection")
+            val stored = requireNotNull(modelStore.find(model.digest)) {
+                "Installed model is no longer available"
+            }
+            check(stored.verified) { "Installed model is not marked as verified" }
+            val verification = modelStore.verify(model.digest)
+            check(verification.valid) { verification.detail }
+            persist(model)
+            currentModel = model
+            post { listener.onModelChanged(model) }
+            progress("${model.fileName} selected for local inference")
+        }
+    }
+
     fun removeModel() {
         runExclusive {
             val model = currentModel ?: return@runExclusive
