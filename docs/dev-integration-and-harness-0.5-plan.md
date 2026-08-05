@@ -1,7 +1,8 @@
 # Piano di integrazione `dev` e rilascio Harness 0.5.0
 
-**Stato:** in esecuzione — Fase 0 completata
+**Stato:** in esecuzione — Fasi 0, 2 e 3 completate; Fase 1 operativa con protezione amministrativa di `dev` ancora aperta (#59); prossimo blocco UX-03
 **Data:** 2026-08-05
+**Ultimo avanzamento registrato:** `dev` a `22c4d9c` dopo il merge di UX-02 (PR #61)
 **Ambito:** governance Git, ripristino CI, recovery model management, brand Android, UX/UI, validazione e rilascio interno
 
 ## 1. Obiettivo
@@ -183,24 +184,24 @@ Evidenza della Fase 0: la PR #55 è stata unita con merge commit `2935743`; `Rep
 
 Solo dopo OPS-01:
 
-- [ ] creare `dev` dall'esatto commit verde di `main`;
-- [ ] pubblicare `dev` senza commit aggiuntivi;
-- [ ] applicare protezioni equivalenti a quelle di `main` per push, force-push ed eliminazione;
-- [ ] richiedere `Repository validation` sulle PR verso `dev`;
-- [ ] mantenere `main` come default branch del repository;
-- [ ] aggiornare il template PR affinché una feature ordinaria selezioni `dev` come base;
-- [ ] aggiungere un controllo che segnali una feature PR aperta per errore verso `main`.
+- [x] creare `dev` dall'esatto commit verde di `main`;
+- [x] pubblicare `dev` senza commit aggiuntivi;
+- [ ] applicare protezioni equivalenti a quelle di `main` per push, force-push ed eliminazione (issue amministrativa #59);
+- [ ] richiedere `Repository validation` come regola GitHub bloccante sulle PR verso `dev` (issue amministrativa #59);
+- [x] mantenere `main` come default branch del repository;
+- [x] aggiornare il template PR affinché una feature ordinaria selezioni `dev` come base;
+- [x] aggiungere un controllo che segnali una feature PR aperta per errore verso `main`.
 
 ### OPS-04 — Adattare la CI a `dev`
 
-- [ ] eseguire `Validate` anche sui push a `dev`;
-- [ ] mantenere il percorso rapido per PR esclusivamente documentali;
-- [ ] eseguire tutti i moduli Android per modifiche a contratti pubblici;
-- [ ] eseguire native host tests quando cambiano JNI, C++, CMake o il pin `llama.cpp`;
-- [ ] eseguire packaging quando cambiano app, manifest, ABI, risorse launcher o configurazione Gradle;
-- [ ] eseguire una validazione cumulativa dopo ogni merge su `dev`;
-- [ ] aggiungere un workflow di promotion/release candidate per PR con base `main`;
-- [ ] mantenere `Package Android Artifacts` su `main` e renderlo eseguibile esplicitamente sul candidato `dev` prima della promotion.
+- [x] eseguire `Validate` anche sui push a `dev`;
+- [x] mantenere il percorso rapido per PR esclusivamente documentali;
+- [x] eseguire tutti i moduli Android per modifiche a contratti pubblici;
+- [x] eseguire native host tests quando cambiano JNI, C++, CMake o il pin `llama.cpp`;
+- [x] eseguire packaging quando cambiano app, manifest, ABI, risorse launcher o configurazione Gradle;
+- [x] eseguire una validazione cumulativa dopo ogni merge su `dev`;
+- [x] aggiungere un workflow di promotion/release candidate per PR con base `main`;
+- [x] mantenere `Package Android Artifacts` su `main` e renderlo eseguibile esplicitamente sul candidato `dev` prima della promotion.
 
 Matrice prevista:
 
@@ -216,15 +217,15 @@ Matrice prevista:
 
 Nella PR che introduce `dev`, aggiornare insieme:
 
-- [ ] `BRANCHING.md`;
-- [ ] `AGENTS.md`;
-- [ ] `README.md`;
-- [ ] `docs/current-state.md`;
-- [ ] `docs/roadmap.md`;
-- [ ] `docs/definition-of-done.md`;
-- [ ] `docs/versioning.md`;
-- [ ] un nuovo ADR sulla linea di integrazione `dev` e sulla promozione protetta verso `main`;
-- [ ] eventuali template PR e regole CODEOWNERS.
+- [x] `BRANCHING.md`;
+- [x] `AGENTS.md`;
+- [x] `README.md`;
+- [x] `docs/current-state.md`;
+- [x] `docs/roadmap.md`;
+- [x] `docs/definition-of-done.md`;
+- [x] `docs/versioning.md`;
+- [x] un nuovo ADR sulla linea di integrazione `dev` e sulla promozione protetta verso `main`;
+- [x] eventuali template PR e regole CODEOWNERS.
 
 Il nuovo ADR deve definire almeno:
 
@@ -242,26 +243,28 @@ Criterio di uscita della Fase 1:
 - i documenti non indicano più `main` come base ordinaria delle feature;
 - nessuna automazione esegue push diretto su entrambi.
 
+Evidenza della Fase 1: la PR #57 è stata unita in `dev` con commit `77ab158`; CI, policy di base delle PR, packaging del candidato, ADR 0008 e documentazione canonica sono integrati. La fase è operativa nel repository, ma il criterio amministrativo di protezione del branch non è ancora chiuso: l'issue #59 resta aperta per applicare e verificare il ruleset GitHub su `dev`.
+
 ## Fase 2 — Recovery model management
 
 ### REC-01 — Ripulire e retargettare la PR #53
 
 Dopo la creazione di `dev`:
 
-- [ ] cambiare la base della PR #53 da `main` a `dev`;
-- [ ] aggiornare il branch della PR sull'ultimo `dev`;
-- [ ] eliminare `.github/workflows/fix-model-management-compile.yml`;
-- [ ] eliminare `.github/workflows/finalize-model-management-fix.yml`;
-- [ ] applicare nel sorgente, non in un runner temporaneo, il fake stateful di `PhoneModelDistributionControllerTest`;
-- [ ] garantire che la rimozione aggiorni store simulato e metadata;
-- [ ] ereditare da `dev` il fix `benchmarkBaselineHistory()`;
-- [ ] applicare Spotless e verificare il diff completo;
-- [ ] verificare che il modello selezionato o caricato non possa essere rimosso;
-- [ ] verificare conferma, annullamento, successo, modello assente, errore store e cleanup metadata;
-- [ ] verificare che nessun path o URI venga mostrato, persistito o loggato;
-- [ ] aggiornare `docs/current-state.md`, `docs/roadmap.md` e la documentazione model management;
-- [ ] ottenere CI verde e review prima di rimuovere il draft;
-- [ ] eseguire squash merge verso `dev`.
+- [x] cambiare la base della PR #53 da `main` a `dev`;
+- [x] aggiornare il branch della PR sull'ultimo `dev`;
+- [x] eliminare `.github/workflows/fix-model-management-compile.yml`;
+- [x] eliminare `.github/workflows/finalize-model-management-fix.yml`;
+- [x] applicare nel sorgente, non in un runner temporaneo, il fake stateful di `PhoneModelDistributionControllerTest`;
+- [x] garantire che la rimozione aggiorni store simulato e metadata;
+- [x] ereditare da `dev` il fix `benchmarkBaselineHistory()`;
+- [x] applicare Spotless e verificare il diff completo;
+- [x] verificare che il modello selezionato o caricato non possa essere rimosso;
+- [x] verificare conferma, annullamento, successo, modello assente, errore store e cleanup metadata;
+- [x] verificare che nessun path o URI venga mostrato, persistito o loggato;
+- [x] aggiornare `docs/current-state.md`, `docs/roadmap.md` e la documentazione model management;
+- [x] ottenere CI verde e review prima di rimuovere il draft;
+- [x] eseguire squash merge verso `dev`.
 
 Comandi minimi prima del push finale:
 
@@ -280,11 +283,11 @@ python3 scripts/verify-android-packaging.py
 
 Solo dopo il merge di REC-01:
 
-- [ ] chiudere la PR #34 come superseded dalla PR #53;
-- [ ] aggiungere una nota con il mapping delle funzionalità recuperate;
-- [ ] confermare che non restino commit unici necessari;
+- [x] chiudere la PR #34 come superseded dalla PR #53;
+- [x] aggiungere una nota con il mapping delle funzionalità recuperate;
+- [x] confermare che non restino commit unici necessari;
 - [ ] eliminare il branch remoto legacy quando l'audit è completo;
-- [ ] non riaprire o rebasare la vecchia console come percorso prodotto.
+- [x] non riaprire o rebasare la vecchia console come percorso prodotto.
 
 Criterio di uscita della Fase 2:
 
@@ -292,33 +295,35 @@ Criterio di uscita della Fase 2:
 - nessuna implementazione concorrente aperta;
 - `docs/current-state.md` indica il blocco come completato su `dev`, non ancora rilasciato su `main`.
 
+Evidenza della Fase 2: la PR #53 è stata unita in `dev` con commit `9451314`; verifica, rimozione protetta, conferma, cleanup metadata e risultati privacy-safe sono integrati. La PR legacy #34 è stata chiusa come superseded. Resta soltanto la cancellazione del branch remoto legacy dopo l'audit amministrativo.
+
 ## Fase 3 — Brand Android reale
 
 ### UX-01 — Asset e identità Android
 
 Branch fresco da `dev`, senza modifiche al runtime.
 
-- [ ] definire master vector repository-owned per simbolo, wordmark e lockup;
-- [ ] convertire il simbolo in Android VectorDrawable;
-- [ ] creare adaptive launcher icon foreground/background;
-- [ ] creare monochrome/themed icon per Android 13+;
-- [ ] aggiungere le risorse `mipmap-anydpi-v26` e fallback necessari;
-- [ ] collegare `android:icon` e `android:roundIcon` nel manifest;
-- [ ] validare safe zone e leggibilità alle dimensioni previste;
-- [ ] mantenere i PNG documentali come reference, non come unica sorgente runtime;
-- [ ] rendere la generazione riproducibile e verificata dalla CI;
-- [ ] verificare che l'AAB contenga gli asset corretti.
+- [x] definire master vector repository-owned per simbolo, wordmark e lockup;
+- [x] convertire il simbolo in Android VectorDrawable;
+- [x] creare adaptive launcher icon foreground/background;
+- [x] creare monochrome/themed icon per Android 13+;
+- [x] aggiungere le risorse `mipmap-anydpi-v26` e fallback necessari;
+- [x] collegare `android:icon` e `android:roundIcon` nel manifest;
+- [x] validare safe zone e leggibilità alle dimensioni previste;
+- [x] mantenere i PNG documentali come reference, non come unica sorgente runtime;
+- [x] rendere la generazione riproducibile e verificata dalla CI;
+- [x] verificare che l'AAB contenga gli asset corretti.
 
 ### UX-02 — Design system e tema
 
-- [ ] separare colori, tipografia, shape, spacing e componenti nei file previsti dal piano;
-- [ ] rimuovere colori e stili locali duplicati dalle schermate;
-- [ ] completare dark, light e system theme;
-- [ ] decidere e documentare la policy font offline per Inter e JetBrains Mono;
-- [ ] introdurre componenti condivisi per app bar, navigation, card, status, metriche, empty/error/loading state e dialoghi;
-- [ ] aggiungere preview e test dei componenti;
-- [ ] verificare WCAG AA e touch target di almeno 48 dp;
-- [ ] aggiornare le brand guidelines se l'implementazione richiede una variazione approvata.
+- [x] separare colori, tipografia, shape, spacing e componenti nei file previsti dal piano;
+- [x] rimuovere colori e stili locali duplicati dalle schermate;
+- [x] completare dark, light e system theme;
+- [x] decidere e documentare la policy font offline per Inter e JetBrains Mono;
+- [x] introdurre componenti condivisi per app bar, navigation, card, status, metriche, empty/error/loading state e dialoghi;
+- [x] aggiungere preview e test dei componenti;
+- [x] verificare WCAG AA e touch target di almeno 48 dp;
+- [x] aggiornare le brand guidelines se l'implementazione richiede una variazione approvata.
 
 Criterio di uscita della Fase 3:
 
@@ -326,6 +331,8 @@ Criterio di uscita della Fase 3:
 - i token sono centralizzati;
 - nessun valore illustrativo viene presentato come dato reale;
 - packaging, screenshot preliminari e accessibilità di base sono verdi.
+
+Evidenza della Fase 3: UX-01 è stata unita con PR #60 e commit `c9d7a2c`, includendo master SVG, launcher adaptive/monochrome, manifest e verifica riproducibile degli asset nel packaging. UX-02 è stata unita con PR #61 e commit `22c4d9c`, includendo tema light/dark/system, token centralizzati, componenti Compose condivisi, policy font offline, preview e test WCAG/touch target. La validazione cumulativa post-merge su `dev` è verde.
 
 ## Fase 4 — Nuova architettura UX/UI
 
@@ -562,12 +569,12 @@ Questi elementi restano nel piano generale e devono partire da `dev` dopo la sta
 Il piano è completato quando:
 
 - [ ] `main` e `dev` sono protetti e verdi;
-- [ ] le feature PR puntano a `dev`;
-- [ ] le promotion PR sono l'unico percorso ordinario verso `main`;
+- [x] le feature PR puntano a `dev`;
+- [x] le promotion PR sono l'unico percorso ordinario verso `main`;
 - [ ] gli hotfix vengono forward-portati;
-- [ ] PR #53 è integrata e PR #34 è chiusa come superseded;
-- [ ] nessun workflow auto-modificante o push diretto resta attivo;
-- [ ] brand launcher e design system sono integrati nell'app;
+- [x] PR #53 è integrata e PR #34 è chiusa come superseded;
+- [x] nessun workflow auto-modificante o push diretto resta attivo;
+- [x] brand launcher e design system sono integrati nell'app;
 - [ ] Navigation Compose e ViewModel/UDF sostituiscono lo stato di dominio in `MainActivity`;
 - [ ] le principali funzionalità del piano UX/UI sono collegate a dati reali;
 - [ ] UI test, screenshot, accessibilità e responsive gate passano;
@@ -579,4 +586,4 @@ Il piano è completato quando:
 
 ## 11. Prima azione
 
-Eseguire OPS-01 sul branch locale `dev`, creato dall'esatto commit dell'attuale `main`, e usarlo esclusivamente come bootstrap. Aprire la promotion PR verso `main`, ottenere il gate completo verde e sincronizzare il merge commit di `main` in `dev`; soltanto allora applicare OPS-03 e iniziare a usarlo come linea di integrazione per le feature.
+Avviare UX-03 su un branch fresco dall'ultimo `dev` verde (`22c4d9c`): introdurre `HarnessApp`, `HarnessNavHost`, route top-level/detail, comportamento back e shell responsive, riducendo `MainActivity` a composition root senza alterare il comportamento runtime reale. In parallelo, completare l'issue amministrativa #59 applicando il ruleset di protezione a `dev`; questo residuo non blocca l'avvio della PR UX-03, ma deve essere chiuso prima della promotion Harness 0.5.0 verso `main`.
