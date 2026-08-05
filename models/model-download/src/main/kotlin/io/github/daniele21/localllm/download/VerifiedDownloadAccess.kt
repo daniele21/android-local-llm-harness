@@ -109,12 +109,7 @@ class FileSystemVerifiedDownloadAccess(rootDirectory: File, private val bufferSi
         return CopyDigestResult(actualDigest, total)
     }
 
-    private fun copyStream(
-        input: InputStream,
-        output: OutputStream,
-        digest: MessageDigest,
-        maximumBytes: Long,
-    ): Long {
+    private fun copyStream(input: InputStream, output: OutputStream, digest: MessageDigest, maximumBytes: Long): Long {
         val buffer = ByteArray(bufferSizeBytes)
         var total = 0L
         while (true) {
