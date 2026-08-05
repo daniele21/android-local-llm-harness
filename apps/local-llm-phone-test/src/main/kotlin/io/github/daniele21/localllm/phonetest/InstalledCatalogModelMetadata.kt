@@ -25,21 +25,16 @@ data class InstalledCatalogModelMetadata(
     val quantization: String,
     val installedAtEpochMs: Long,
 ) {
-    fun asImportedPhoneModel(): ImportedPhoneModel =
-        ImportedPhoneModel(
-            digest = digest,
-            fileName = fileName,
-            sizeBytes = sizeBytes,
-            architecture = architecture,
-            quantization = quantization,
-        )
+    fun asImportedPhoneModel(): ImportedPhoneModel = ImportedPhoneModel(
+        digest = digest,
+        fileName = fileName,
+        sizeBytes = sizeBytes,
+        architecture = architecture,
+        quantization = quantization,
+    )
 
     companion object {
-        fun from(
-            release: CatalogModelRelease,
-            target: CatalogTarget,
-            installedAtEpochMs: Long,
-        ): InstalledCatalogModelMetadata =
+        fun from(release: CatalogModelRelease, target: CatalogTarget, installedAtEpochMs: Long): InstalledCatalogModelMetadata =
             InstalledCatalogModelMetadata(
                 digest = release.artifact.digest,
                 modelId = release.id.modelId.value,
@@ -73,11 +68,10 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
         require(root.isDirectory) { "Installed-model metadata path must be a directory" }
     }
 
-    override fun loadAll(): List<InstalledCatalogModelMetadata> =
-        root.listFiles { file -> file.isFile && file.name.endsWith(FILE_SUFFIX) }
-            .orEmpty()
-            .mapNotNull(::read)
-            .sortedByDescending(InstalledCatalogModelMetadata::installedAtEpochMs)
+    override fun loadAll(): List<InstalledCatalogModelMetadata> = root.listFiles { file -> file.isFile && file.name.endsWith(FILE_SUFFIX) }
+        .orEmpty()
+        .mapNotNull(::read)
+        .sortedByDescending(InstalledCatalogModelMetadata::installedAtEpochMs)
 
     override fun save(metadata: InstalledCatalogModelMetadata): Boolean {
         if (!InstalledCatalogMetadataCodec.valid(metadata)) return false
@@ -104,13 +98,12 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
         return !file.exists() || file.delete()
     }
 
-    private fun read(file: File): InstalledCatalogModelMetadata? =
-        runCatching {
-            val properties = Properties()
-            file.inputStream().use(properties::load)
-            InstalledCatalogMetadataCodec.decode(properties)
-                .takeIf(InstalledCatalogMetadataCodec::valid)
-        }.getOrNull()
+    private fun read(file: File): InstalledCatalogModelMetadata? = runCatching {
+        val properties = Properties()
+        file.inputStream().use(properties::load)
+        InstalledCatalogMetadataCodec.decode(properties)
+            .takeIf(InstalledCatalogMetadataCodec::valid)
+    }.getOrNull()
 
     private fun fileFor(digest: ModelDigest): File {
         require(InstalledCatalogMetadataCodec.validDigest(digest)) {
@@ -161,22 +154,21 @@ private object InstalledCatalogMetadataCodec {
     private const val KEY_INSTALLED_AT = "installedAtEpochMs"
     private val SHA_256 = Regex("^[0-9a-f]{64}$")
 
-    fun encode(metadata: InstalledCatalogModelMetadata): Properties =
-        Properties().apply {
-            setProperty(KEY_SCHEMA_VERSION, SCHEMA_VERSION.toString())
-            setProperty(KEY_DIGEST, metadata.digest.sha256)
-            setProperty(KEY_MODEL_ID, metadata.modelId)
-            setProperty(KEY_VERSION, metadata.version)
-            setProperty(KEY_DISPLAY_NAME, metadata.displayName)
-            setProperty(KEY_PROFILE_KEY, metadata.profileKey)
-            setProperty(KEY_APPLICATION_ID, metadata.applicationId)
-            setProperty(KEY_USE_CASE_ID, metadata.useCaseId)
-            setProperty(KEY_FILE_NAME, metadata.fileName)
-            setProperty(KEY_SIZE_BYTES, metadata.sizeBytes.toString())
-            setProperty(KEY_ARCHITECTURE, metadata.architecture)
-            setProperty(KEY_QUANTIZATION, metadata.quantization)
-            setProperty(KEY_INSTALLED_AT, metadata.installedAtEpochMs.toString())
-        }
+    fun encode(metadata: InstalledCatalogModelMetadata): Properties = Properties().apply {
+        setProperty(KEY_SCHEMA_VERSION, SCHEMA_VERSION.toString())
+        setProperty(KEY_DIGEST, metadata.digest.sha256)
+        setProperty(KEY_MODEL_ID, metadata.modelId)
+        setProperty(KEY_VERSION, metadata.version)
+        setProperty(KEY_DISPLAY_NAME, metadata.displayName)
+        setProperty(KEY_PROFILE_KEY, metadata.profileKey)
+        setProperty(KEY_APPLICATION_ID, metadata.applicationId)
+        setProperty(KEY_USE_CASE_ID, metadata.useCaseId)
+        setProperty(KEY_FILE_NAME, metadata.fileName)
+        setProperty(KEY_SIZE_BYTES, metadata.sizeBytes.toString())
+        setProperty(KEY_ARCHITECTURE, metadata.architecture)
+        setProperty(KEY_QUANTIZATION, metadata.quantization)
+        setProperty(KEY_INSTALLED_AT, metadata.installedAtEpochMs.toString())
+    }
 
     fun decode(properties: Properties): InstalledCatalogModelMetadata {
         require(properties.required(KEY_SCHEMA_VERSION).toInt() == SCHEMA_VERSION) {
@@ -198,35 +190,31 @@ private object InstalledCatalogMetadataCodec {
         )
     }
 
-    fun valid(metadata: InstalledCatalogModelMetadata): Boolean =
-        validDigest(metadata.digest) &&
-            validText(metadata.modelId) &&
-            validText(metadata.version) &&
-            validText(metadata.displayName) &&
-            validText(metadata.profileKey) &&
-            validText(metadata.applicationId) &&
-            validText(metadata.useCaseId) &&
-            validFileName(metadata.fileName) &&
-            metadata.sizeBytes > 0L &&
-            validText(metadata.architecture) &&
-            validText(metadata.quantization) &&
-            metadata.installedAtEpochMs >= 0L
+    fun valid(metadata: InstalledCatalogModelMetadata): Boolean = validDigest(metadata.digest) &&
+        validText(metadata.modelId) &&
+        validText(metadata.version) &&
+        validText(metadata.displayName) &&
+        validText(metadata.profileKey) &&
+        validText(metadata.applicationId) &&
+        validText(metadata.useCaseId) &&
+        validFileName(metadata.fileName) &&
+        metadata.sizeBytes > 0L &&
+        validText(metadata.architecture) &&
+        validText(metadata.quantization) &&
+        metadata.installedAtEpochMs >= 0L
 
     fun validDigest(digest: ModelDigest): Boolean = SHA_256.matches(digest.sha256)
 
-    private fun validText(value: String): Boolean =
-        value.isNotBlank() &&
-            value.length <= MAX_TEXT_LENGTH &&
-            value.none(Char::isISOControl)
+    private fun validText(value: String): Boolean = value.isNotBlank() &&
+        value.length <= MAX_TEXT_LENGTH &&
+        value.none(Char::isISOControl)
 
-    private fun validFileName(value: String): Boolean =
-        validText(value) &&
-            value.lowercase().endsWith(".gguf") &&
-            !value.contains('/') &&
-            !value.contains('\\') &&
-            value != "." &&
-            value != ".."
+    private fun validFileName(value: String): Boolean = validText(value) &&
+        value.lowercase().endsWith(".gguf") &&
+        !value.contains('/') &&
+        !value.contains('\\') &&
+        value != "." &&
+        value != ".."
 
-    private fun Properties.required(key: String): String =
-        requireNotNull(getProperty(key)).also { value -> require(value.isNotBlank()) }
+    private fun Properties.required(key: String): String = requireNotNull(getProperty(key)).also { value -> require(value.isNotBlank()) }
 }
