@@ -132,7 +132,7 @@ The catalog, downloader and installation boundaries provide:
 - exact catalog/profile/target reconciliation before installation;
 - metadata-only GGUF inspection before final publication;
 - import and post-import verification through the existing `ModelStore`;
-- rollback after failed or incomplete post-import verification;
+- non-destructive failure when post-import verification is invalid or unavailable;
 - explicit retention or discard of verified bytes only after success;
 - no implicit binding, runtime load or inference.
 
