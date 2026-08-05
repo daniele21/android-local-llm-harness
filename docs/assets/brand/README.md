@@ -1,36 +1,21 @@
 # Harness brand assets
 
-The graphical assets in this directory are generated from the approved Harness brand direction.
+Generated PNG assets for the Harness visual identity.
 
-The source generator creates both dark-mode and light-mode PNG assets:
+## Dark mode
 
-- logo lockup;
-- standalone symbol;
-- Android-style app icon;
-- favicon;
-- UI component sheet.
+- `dark/logo-lockup.png`
+- `dark/symbol.png`
+- `dark/app-icon.png`
+- `dark/favicon.png`
+- `dark/component-sheet.png`
 
-Regenerate locally with:
+## Light mode
 
-```bash
-python -m pip install Pillow==11.3.0
-python scripts/generate_brand_assets.py
-```
+- `light/logo-lockup.png`
+- `light/symbol.png`
+- `light/app-icon.png`
+- `light/favicon.png`
+- `light/component-sheet.png`
 
-Generated output:
-
-```text
-docs/assets/brand/
-├── dark/
-│   ├── app-icon.png
-│   ├── component-sheet.png
-│   ├── favicon.png
-│   ├── logo-lockup.png
-│   └── symbol.png
-└── light/
-    ├── app-icon.png
-    ├── component-sheet.png
-    ├── favicon.png
-    ├── logo-lockup.png
-    └── symbol.png
-```
+Run `python scripts/generate_brand_assets.py` to regenerate the complete set.
