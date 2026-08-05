@@ -11,8 +11,8 @@ This document is the active integration and recovery ledger for the repository. 
 Integrated head before the next recovery block:
 
 ```text
-34fb5f37f626d229dbef80e2cfffa738ff403b38
-Recover retained benchmark history (#51)
+29357430a2d161c8e8c0686d1e5f5429f168a816
+Restore repository validation baseline (#55)
 ```
 
 Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
@@ -25,8 +25,9 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
 - PR #49 connected the phone Models UI to catalog, secure download and verified installation, and added durable path-free installed metadata.
 - PR #51 recovered retained benchmark history on the current connected phone-test architecture without restoring the obsolete standalone console.
+- PR #55 completed the telemetry test doubles, made public-contract validation repository-wide, made technical metric formatting locale-independent and converted brand generation into a read-only reproducibility check.
 - PRs #20, #3, #4 and #33 were closed with explicit superseded/obsolete disposition notes.
-- Issue #46 tracks branch protection and the required `Repository validation` repository setting.
+- Issue #46 is implemented: `main` requires an up-to-date pull request, one approval, resolved conversations and the `Repository validation` check; administrators follow the same rules, and force-push and deletion are disabled.
 
 ## Repository validation hardening
 
@@ -35,6 +36,8 @@ The validation scope treats changes under `core/contracts` and `observability/co
 Brand asset generation is a read-only reproducibility check. It regenerates the committed assets and fails on a diff; it does not commit or push into a protected integration branch.
 
 Phone-test technical metrics use locale-independent decimal formatting so repository tests and privacy-safe reports remain stable across developer and CI locales.
+
+The post-merge validation, native host tests, brand reproducibility check and Android artifact packaging passed on `main` at `2935743`. The local and remote `dev` refs point to that same merge commit; `dev` remains a bootstrap ref rather than the canonical feature-integration line until the Phase 1 governance and CI changes are merged.
 
 ## Legacy feature branch requiring selective recovery
 

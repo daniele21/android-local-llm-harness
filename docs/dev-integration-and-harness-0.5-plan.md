@@ -1,6 +1,6 @@
 # Piano di integrazione `dev` e rilascio Harness 0.5.0
 
-**Stato:** proposto
+**Stato:** in esecuzione — Fase 0 completata
 **Data:** 2026-08-05
 **Ambito:** governance Git, ripristino CI, recovery model management, brand Android, UX/UI, validazione e rilascio interno
 
@@ -135,7 +135,7 @@ Modifiche richieste:
 - [x] aggiornare il workflow del brand da `actions/checkout@v4` a `actions/checkout@v7`;
 - [x] rimuovere dal workflow del brand il push diretto su `main`;
 - [x] trasformare la generazione del brand in un controllo riproducibile con `git diff --exit-code`, oppure in un'automazione che apra una PR separata;
-- [ ] eseguire il gate completo locale e CI;
+- [x] eseguire il gate completo locale e CI;
 - [x] aggiornare il ledger dello stato senza dichiarare completato il model management.
 
 Validazione minima:
@@ -160,20 +160,22 @@ Criterio di uscita:
 
 Applicare l'issue #46 tramite branch protection o repository ruleset.
 
-- [ ] richiedere pull request;
-- [ ] richiedere `Repository validation`;
-- [ ] richiedere branch aggiornata;
-- [ ] richiedere almeno una approvazione;
-- [ ] richiedere conversazioni risolte;
-- [ ] vietare force-push ed eliminazione;
-- [ ] applicare le regole anche agli amministratori, salvo procedura break-glass documentata;
-- [ ] impedire bypass ai workflow con `contents: write`;
-- [ ] abilitare eliminazione automatica dei branch integrati quando non serve conservarli per audit.
+- [x] richiedere pull request;
+- [x] richiedere `Repository validation`;
+- [x] richiedere branch aggiornata;
+- [x] richiedere almeno una approvazione;
+- [x] richiedere conversazioni risolte;
+- [x] vietare force-push ed eliminazione;
+- [x] applicare le regole anche agli amministratori, salvo procedura break-glass documentata;
+- [x] impedire bypass ai workflow con `contents: write`;
+- [x] conservare `dev` tra le promotion e rimuovere gli altri branch integrati dopo l'audit, senza attivare la cancellazione automatica globale.
 
 Criterio di uscita:
 
 - un push diretto di prova viene rifiutato;
 - una PR con check rosso non può essere unita.
+
+Evidenza della Fase 0: la PR #55 è stata unita con merge commit `2935743`; `Repository validation`, native host tests, brand reproducibility e packaging Android sono verdi sul commit di `main`. La configurazione riletta tramite API applica le regole anche agli amministratori e non consente force-push o eliminazione. Non è stato eseguito un push distruttivo di prova su `main`.
 
 ## Fase 1 — Creazione della linea `dev`
 
