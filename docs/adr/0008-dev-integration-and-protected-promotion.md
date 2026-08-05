@@ -86,3 +86,7 @@ Costs:
 - hotfixes require an explicit forward-port;
 - branch protection must be maintained consistently for both long-lived branches;
 - promotion introduces an additional review and validation step.
+
+## Operational status
+
+The code-owned policy, validation workflows, packaging candidate selection, pull-request template and canonical documentation are delivered together by the governance pull request. Repository-level protection for `dev` remains an administrative action: require an up-to-date pull request, resolved conversations and `Repository validation`, and disable force-push and deletion before treating Phase 1 as fully complete.
