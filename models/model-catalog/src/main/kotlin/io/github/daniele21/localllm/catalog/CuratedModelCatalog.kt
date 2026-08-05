@@ -6,6 +6,8 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import java.net.URI
 
 /** Administrator-curated bootstrap releases for the phone-test catalog. */
+// One builder per immutable release keeps catalog changes isolated and reviewable.
+@Suppress("TooManyFunctions")
 object CuratedModelCatalog {
     val catalogId = CatalogId("android-local-llm-curated")
     const val REVISION: Long = 2
