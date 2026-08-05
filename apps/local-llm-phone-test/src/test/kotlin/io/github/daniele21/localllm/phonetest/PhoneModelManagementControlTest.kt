@@ -6,20 +6,11 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import org.junit.Assert.assertEquals
-if old in text:
-    text = text.replace(old, new, 1)
-else:
-    anchor = '                        HarnessSecondaryButton("Remove model"'
-    start = text.index(anchor)
-    end_marker = '                            afterPlaygroundRuntimeReleased { controller.removeModel() }
-                        }
-'
-    end = text.index(end_marker, start) + len(end_marker)
-    text = text[:start] + new + text[end:]
-
-main.write_text(text)
 import java.io.File
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class PhoneModelManagementControlTest {
     @Test
@@ -51,9 +42,12 @@ class PhoneModelManagementControlTest {
         val store = FakeModelStore(mutableSetOf(DIGEST))
         val cleaned = mutableListOf<ModelDigest>()
         val control = ModelStorePhoneModelManagementControl(
-  modelStore = store,
-  protectedModelDigest = { null },
-  removeMetadata = { digest -> cleaned += digest; true },
+            modelStore = store,
+            protectedModelDigest = { null },
+            removeMetadata = { digest ->
+                cleaned += digest
+                true
+            },
         )
 
         val outcome = control.remove(DIGEST)
@@ -71,9 +65,9 @@ class PhoneModelManagementControlTest {
         override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
 
         override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(
-  valid = digest in digests,
-  actualDigest = digest.takeIf(digests::contains),
-  detail = "internal-path-must-not-surface",
+            valid = digest in digests,
+            actualDigest = digest.takeIf(digests::contains),
+            detail = "internal-path-must-not-surface",
         )
 
         override fun remove(digest: ModelDigest): Boolean = digests.remove(digest)
