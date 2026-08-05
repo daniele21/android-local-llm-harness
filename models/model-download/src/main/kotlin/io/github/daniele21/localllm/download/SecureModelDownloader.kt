@@ -21,10 +21,7 @@ class SecureModelDownloader(
         return installed?.let(DownloadResult::AlreadyInstalled) ?: downloadMissing(artifact, request)
     }
 
-    private fun downloadMissing(
-        artifact: CatalogGgufArtifact,
-        request: DownloadRequest,
-    ): DownloadResult {
+    private fun downloadMissing(artifact: CatalogGgufArtifact, request: DownloadRequest): DownloadResult {
         val partFile = preparePartFile(artifact) ?: return directoryFailure()
         return try {
             when (val transfer = transferEngine.transfer(artifact, partFile, request)) {
@@ -45,35 +42,27 @@ class SecureModelDownloader(
         }
     }
 
-    private fun importVerified(
-        partFile: File,
-        artifact: CatalogGgufArtifact,
-        downloadedBytes: Long,
-    ): DownloadResult =
-        try {
-            val stored = modelStore.import(partFile, artifact.toStoreArtifact())
-            DownloadResult.Installed(stored, downloadedBytes)
-        } catch (error: ModelImportException) {
-            storeFailure(error.message ?: error.code.name)
-        } catch (error: IllegalStateException) {
-            storeFailure(error.message ?: "Model store failure")
-        }
+    private fun importVerified(partFile: File, artifact: CatalogGgufArtifact, downloadedBytes: Long): DownloadResult = try {
+        val stored = modelStore.import(partFile, artifact.toStoreArtifact())
+        DownloadResult.Installed(stored, downloadedBytes)
+    } catch (error: ModelImportException) {
+        storeFailure(error.message ?: error.code.name)
+    } catch (error: IllegalStateException) {
+        storeFailure(error.message ?: "Model store failure")
+    }
 
-    private fun CatalogGgufArtifact.toStoreArtifact() =
-        GgufArtifact(
-            digest = digest,
-            fileName = fileName,
-            sizeBytes = sizeBytes,
-            architecture = architecture,
-            quantization = quantization,
-            source = ArtifactSource.Download(downloadUri.toString()),
-        )
+    private fun CatalogGgufArtifact.toStoreArtifact() = GgufArtifact(
+        digest = digest,
+        fileName = fileName,
+        sizeBytes = sizeBytes,
+        architecture = architecture,
+        quantization = quantization,
+        source = ArtifactSource.Download(downloadUri.toString()),
+    )
 
-    private fun directoryFailure() =
-        DownloadResult.Failed(
-            DownloadError(DownloadErrorCode.IO_FAILURE, "Unable to create download directory"),
-        )
+    private fun directoryFailure() = DownloadResult.Failed(
+        DownloadError(DownloadErrorCode.IO_FAILURE, "Unable to create download directory"),
+    )
 
-    private fun storeFailure(detail: String) =
-        DownloadResult.Failed(DownloadError(DownloadErrorCode.STORE_FAILURE, detail))
+    private fun storeFailure(detail: String) = DownloadResult.Failed(DownloadError(DownloadErrorCode.STORE_FAILURE, detail))
 }

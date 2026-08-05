@@ -7,15 +7,8 @@ import java.io.IOException
 import java.net.URI
 import java.security.MessageDigest
 
-internal class SecureArtifactTransfer(
-    private val transport: DownloadTransport,
-    private val policy: SecureDownloadPolicy,
-) {
-    fun transfer(
-        artifact: CatalogGgufArtifact,
-        partFile: File,
-        request: DownloadRequest,
-    ): ArtifactTransferResult =
+internal class SecureArtifactTransfer(private val transport: DownloadTransport, private val policy: SecureDownloadPolicy) {
+    fun transfer(artifact: CatalogGgufArtifact, partFile: File, request: DownloadRequest): ArtifactTransferResult =
         when (val initial = validateInitialUri(artifact.downloadUri)) {
             is UriValidation.Failure -> ArtifactTransferResult.Failure(initial.error)
             is UriValidation.Success -> followResponses(initial.uri, artifact, partFile, request)
@@ -36,10 +29,12 @@ internal class SecureArtifactTransfer(
             } else {
                 when (val response = open(currentUri)) {
                     is OpenResponse.Failure -> result = ArtifactTransferResult.Failure(response.error)
+
                     is OpenResponse.Success ->
                         response.response.use { opened ->
                             when (val decision = inspect(currentUri, redirectCount, opened, artifact, partFile, request)) {
                                 is ResponseDecision.Complete -> result = decision.result
+
                                 is ResponseDecision.Redirect -> {
                                     currentUri = decision.uri
                                     redirectCount += 1
@@ -52,22 +47,21 @@ internal class SecureArtifactTransfer(
         return result
     }
 
-    private fun open(uri: URI): OpenResponse =
-        try {
-            OpenResponse.Success(
-                transport.open(
-                    TransportRequest(
-                        uri = uri,
-                        connectTimeoutMs = policy.connectTimeoutMs,
-                        readTimeoutMs = policy.readTimeoutMs,
-                    ),
+    private fun open(uri: URI): OpenResponse = try {
+        OpenResponse.Success(
+            transport.open(
+                TransportRequest(
+                    uri = uri,
+                    connectTimeoutMs = policy.connectTimeoutMs,
+                    readTimeoutMs = policy.readTimeoutMs,
                 ),
-            )
-        } catch (error: IOException) {
-            OpenResponse.Failure(
-                DownloadError(DownloadErrorCode.IO_FAILURE, error.message ?: "Transport failure"),
-            )
-        }
+            ),
+        )
+    } catch (error: IOException) {
+        OpenResponse.Failure(
+            DownloadError(DownloadErrorCode.IO_FAILURE, error.message ?: "Transport failure"),
+        )
+    }
 
     private fun inspect(
         currentUri: URI,
@@ -76,28 +70,26 @@ internal class SecureArtifactTransfer(
         artifact: CatalogGgufArtifact,
         partFile: File,
         request: DownloadRequest,
-    ): ResponseDecision =
-        when {
-            response.statusCode in REDIRECT_STATUS_CODES ->
-                redirectDecision(currentUri, redirectCount, response.redirectLocation)
-            response.statusCode !in 200..299 ->
-                completeFailure(
-                    DownloadErrorCode.HTTP_FAILURE,
-                    "Unexpected HTTP status ${response.statusCode}",
-                )
-            response.contentLength?.let { it != artifact.sizeBytes } == true ->
-                completeFailure(
-                    DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
-                    "Declared content length does not match catalog size",
-                )
-            else -> ResponseDecision.Complete(copyAndVerify(response, artifact, partFile, request))
-        }
+    ): ResponseDecision = when {
+        response.statusCode in REDIRECT_STATUS_CODES ->
+            redirectDecision(currentUri, redirectCount, response.redirectLocation)
 
-    private fun redirectDecision(
-        currentUri: URI,
-        redirectCount: Int,
-        location: String?,
-    ): ResponseDecision {
+        response.statusCode !in 200..299 ->
+            completeFailure(
+                DownloadErrorCode.HTTP_FAILURE,
+                "Unexpected HTTP status ${response.statusCode}",
+            )
+
+        response.contentLength?.let { it != artifact.sizeBytes } == true ->
+            completeFailure(
+                DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
+                "Declared content length does not match catalog size",
+            )
+
+        else -> ResponseDecision.Complete(copyAndVerify(response, artifact, partFile, request))
+    }
+
+    private fun redirectDecision(currentUri: URI, redirectCount: Int, location: String?): ResponseDecision {
         val limitExceeded = redirectCount >= policy.maxRedirects
         val target = if (limitExceeded) null else resolveRedirect(currentUri, location)
         return when {
@@ -106,11 +98,13 @@ internal class SecureArtifactTransfer(
                     DownloadErrorCode.REDIRECT_LIMIT_EXCEEDED,
                     "Redirect limit exceeded",
                 )
+
             target == null ->
                 completeFailure(
                     DownloadErrorCode.INVALID_REDIRECT,
                     "Redirect target is missing or not allowed",
                 )
+
             else -> ResponseDecision.Redirect(target)
         }
     }
@@ -120,18 +114,12 @@ internal class SecureArtifactTransfer(
         artifact: CatalogGgufArtifact,
         partFile: File,
         request: DownloadRequest,
-    ): ArtifactTransferResult =
-        when (val copied = copy(response, artifact, partFile, request)) {
-            is CopyResult.Failure -> ArtifactTransferResult.Failure(copied.error)
-            is CopyResult.Success -> verifyCopy(copied, artifact)
-        }
+    ): ArtifactTransferResult = when (val copied = copy(response, artifact, partFile, request)) {
+        is CopyResult.Failure -> ArtifactTransferResult.Failure(copied.error)
+        is CopyResult.Success -> verifyCopy(copied, artifact)
+    }
 
-    private fun copy(
-        response: TransportResponse,
-        artifact: CatalogGgufArtifact,
-        partFile: File,
-        request: DownloadRequest,
-    ): CopyResult {
+    private fun copy(response: TransportResponse, artifact: CatalogGgufArtifact, partFile: File, request: DownloadRequest): CopyResult {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(policy.bufferSizeBytes)
         var total = 0L
@@ -163,69 +151,60 @@ internal class SecureArtifactTransfer(
             ?: CopyResult.Success(total, digest.digest().toHex())
     }
 
-    private fun verifyCopy(
-        copied: CopyResult.Success,
-        artifact: CatalogGgufArtifact,
-    ): ArtifactTransferResult =
-        when {
-            copied.bytes != artifact.sizeBytes ->
-                transferFailure(
-                    DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
-                    "Downloaded byte count does not match catalog size",
-                )
-            !copied.sha256.equals(artifact.digest.sha256, ignoreCase = true) ->
-                transferFailure(DownloadErrorCode.DIGEST_MISMATCH, "SHA-256 mismatch")
-            else -> ArtifactTransferResult.Success(copied.bytes)
-        }
+    private fun verifyCopy(copied: CopyResult.Success, artifact: CatalogGgufArtifact): ArtifactTransferResult = when {
+        copied.bytes != artifact.sizeBytes ->
+            transferFailure(
+                DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
+                "Downloaded byte count does not match catalog size",
+            )
 
-    private fun validateInitialUri(uri: URI): UriValidation =
-        validateUri(uri)?.let { validated ->
-            if (policy.hostPolicy.isAllowed(validated.host)) {
-                UriValidation.Success(validated)
-            } else {
-                UriValidation.Failure(
-                    DownloadError(DownloadErrorCode.HOST_NOT_ALLOWED, "Download host is not allowlisted"),
-                )
-            }
-        } ?: UriValidation.Failure(
-            DownloadError(DownloadErrorCode.INVALID_URI, "Only canonical HTTPS URIs are allowed"),
-        )
+        !copied.sha256.equals(artifact.digest.sha256, ignoreCase = true) ->
+            transferFailure(DownloadErrorCode.DIGEST_MISMATCH, "SHA-256 mismatch")
 
-    private fun resolveRedirect(base: URI, location: String?): URI? =
-        location
-            ?.takeIf(String::isNotBlank)
-            ?.let { runCatching { base.resolve(it) }.getOrNull() }
-            ?.let(::validateUri)
-            ?.takeIf { policy.hostPolicy.isAllowed(it.host) }
+        else -> ArtifactTransferResult.Success(copied.bytes)
+    }
 
-    private fun validateUri(uri: URI): URI? =
-        uri.normalize().takeIf { normalized ->
-            normalized.scheme.equals("https", ignoreCase = true) &&
-                !normalized.host.isNullOrBlank() &&
-                normalized.userInfo == null &&
-                normalized.fragment == null &&
-                normalized.port in setOf(-1, 443)
-        }
-
-    private fun cancellationError(request: DownloadRequest): DownloadError? =
-        if (request.cancellation.isCancelled()) {
-            DownloadError(DownloadErrorCode.CANCELLED, "Download cancelled")
+    private fun validateInitialUri(uri: URI): UriValidation = validateUri(uri)?.let { validated ->
+        if (policy.hostPolicy.isAllowed(validated.host)) {
+            UriValidation.Success(validated)
         } else {
-            null
+            UriValidation.Failure(
+                DownloadError(DownloadErrorCode.HOST_NOT_ALLOWED, "Download host is not allowlisted"),
+            )
         }
+    } ?: UriValidation.Failure(
+        DownloadError(DownloadErrorCode.INVALID_URI, "Only canonical HTTPS URIs are allowed"),
+    )
 
-    private fun sizeError(downloadedBytes: Long, expectedBytes: Long): DownloadError? =
-        if (downloadedBytes > expectedBytes) {
-            DownloadError(DownloadErrorCode.SIZE_LIMIT_EXCEEDED, "Downloaded bytes exceed catalog size")
-        } else {
-            null
-        }
+    private fun resolveRedirect(base: URI, location: String?): URI? = location
+        ?.takeIf(String::isNotBlank)
+        ?.let { runCatching { base.resolve(it) }.getOrNull() }
+        ?.let(::validateUri)
+        ?.takeIf { policy.hostPolicy.isAllowed(it.host) }
 
-    private fun completeFailure(code: DownloadErrorCode, detail: String) =
-        ResponseDecision.Complete(transferFailure(code, detail))
+    private fun validateUri(uri: URI): URI? = uri.normalize().takeIf { normalized ->
+        normalized.scheme.equals("https", ignoreCase = true) &&
+            !normalized.host.isNullOrBlank() &&
+            normalized.userInfo == null &&
+            normalized.fragment == null &&
+            normalized.port in setOf(-1, 443)
+    }
 
-    private fun transferFailure(code: DownloadErrorCode, detail: String) =
-        ArtifactTransferResult.Failure(DownloadError(code, detail))
+    private fun cancellationError(request: DownloadRequest): DownloadError? = if (request.cancellation.isCancelled()) {
+        DownloadError(DownloadErrorCode.CANCELLED, "Download cancelled")
+    } else {
+        null
+    }
+
+    private fun sizeError(downloadedBytes: Long, expectedBytes: Long): DownloadError? = if (downloadedBytes > expectedBytes) {
+        DownloadError(DownloadErrorCode.SIZE_LIMIT_EXCEEDED, "Downloaded bytes exceed catalog size")
+    } else {
+        null
+    }
+
+    private fun completeFailure(code: DownloadErrorCode, detail: String) = ResponseDecision.Complete(transferFailure(code, detail))
+
+    private fun transferFailure(code: DownloadErrorCode, detail: String) = ArtifactTransferResult.Failure(DownloadError(code, detail))
 
     private fun cancelled() = transferFailure(DownloadErrorCode.CANCELLED, "Download cancelled")
 
