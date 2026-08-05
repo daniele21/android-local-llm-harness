@@ -69,3 +69,5 @@ jobs:
           git add models/model-catalog docs/curated-model-catalog.md
           git commit -m "style: apply repository formatter to curated catalog"
           git push origin HEAD:agent/model-catalog-curated-staging
+
+# Retry after aligning the curated catalog constant naming with ktlint.
