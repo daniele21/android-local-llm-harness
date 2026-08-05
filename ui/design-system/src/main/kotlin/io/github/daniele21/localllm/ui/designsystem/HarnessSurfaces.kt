@@ -30,10 +30,10 @@ fun HarnessCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border =
-            BorderStroke(
-                width = HarnessBorderWidth,
-                color = MaterialTheme.colorScheme.outline,
-            ),
+        BorderStroke(
+            width = HarnessBorderWidth,
+            color = MaterialTheme.colorScheme.outline,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
@@ -80,10 +80,10 @@ fun HarnessStatusBadge(label: String, tone: HarnessStatusTone, modifier: Modifie
         Text(
             text = label,
             modifier =
-                Modifier.padding(
-                    horizontal = LocalHarnessSpacing.current.medium,
-                    vertical = LocalHarnessSpacing.current.small,
-                ),
+            Modifier.padding(
+                horizontal = LocalHarnessSpacing.current.medium,
+                vertical = LocalHarnessSpacing.current.small,
+            ),
             style = MaterialTheme.typography.labelLarge,
         )
     }
