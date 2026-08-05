@@ -5,14 +5,14 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-const val WcagAaNormalTextContrast = 4.5
-const val WcagAaLargeTextContrast = 3.0
+const val WCAG_AA_NORMAL_TEXT_CONTRAST = 4.5
+const val WCAG_AA_LARGE_TEXT_CONTRAST = 3.0
 
 fun contrastRatio(foreground: Color, background: Color): Double {
     val foregroundLuminance = relativeLuminance(foreground)
     val backgroundLuminance = relativeLuminance(background)
-    return (max(foregroundLuminance, backgroundLuminance) + LuminanceOffset) /
-        (min(foregroundLuminance, backgroundLuminance) + LuminanceOffset)
+    return (max(foregroundLuminance, backgroundLuminance) + LUMINANCE_OFFSET) /
+        (min(foregroundLuminance, backgroundLuminance) + LUMINANCE_OFFSET)
 }
 
 fun meetsWcagAa(
@@ -20,30 +20,30 @@ fun meetsWcagAa(
     background: Color,
     largeText: Boolean = false,
 ): Boolean = contrastRatio(foreground, background) >= if (largeText) {
-    WcagAaLargeTextContrast
+    WCAG_AA_LARGE_TEXT_CONTRAST
 } else {
-    WcagAaNormalTextContrast
+    WCAG_AA_NORMAL_TEXT_CONTRAST
 }
 
-private fun relativeLuminance(color: Color): Double = RedWeight * linearized(color.red) +
-    GreenWeight * linearized(color.green) +
-    BlueWeight * linearized(color.blue)
+private fun relativeLuminance(color: Color): Double = RED_WEIGHT * linearized(color.red) +
+    GREEN_WEIGHT * linearized(color.green) +
+    BLUE_WEIGHT * linearized(color.blue)
 
 private fun linearized(channel: Float): Double {
     val value = channel.toDouble()
-    return if (value <= SrgbThreshold) {
-        value / SrgbLinearDivisor
+    return if (value <= SRGB_THRESHOLD) {
+        value / SRGB_LINEAR_DIVISOR
     } else {
-        ((value + SrgbOffset) / SrgbScale).pow(SrgbExponent)
+        ((value + SRGB_OFFSET) / SRGB_SCALE).pow(SRGB_EXPONENT)
     }
 }
 
-private const val LuminanceOffset = 0.05
-private const val SrgbThreshold = 0.04045
-private const val SrgbLinearDivisor = 12.92
-private const val SrgbOffset = 0.055
-private const val SrgbScale = 1.055
-private const val SrgbExponent = 2.4
-private const val RedWeight = 0.2126
-private const val GreenWeight = 0.7152
-private const val BlueWeight = 0.0722
+private const val LUMINANCE_OFFSET = 0.05
+private const val SRGB_THRESHOLD = 0.04045
+private const val SRGB_LINEAR_DIVISOR = 12.92
+private const val SRGB_OFFSET = 0.055
+private const val SRGB_SCALE = 1.055
+private const val SRGB_EXPONENT = 2.4
+private const val RED_WEIGHT = 0.2126
+private const val GREEN_WEIGHT = 0.7152
+private const val BLUE_WEIGHT = 0.0722
