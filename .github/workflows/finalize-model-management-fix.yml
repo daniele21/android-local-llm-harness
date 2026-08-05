@@ -26,7 +26,7 @@ jobs:
           packages: platform-tools
       - name: Install SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
-      - name: Apply final fixes and validate
+      - name: Apply final source fixes and validate
         shell: bash
         run: |
           python3 - <<'PY'
@@ -34,19 +34,78 @@ jobs:
           import re
           from pathlib import Path
 
-          workflow = Path('.github/workflows/fix-model-management-compile.yml').read_text()
-          match = re.search(r"echo '([^']+)' \| base64 -d > /tmp/fix.py", workflow)
-          if match is None:
+          base_workflow = Path('.github/workflows/fix-model-management-compile.yml').read_text()
+          payload = re.search(r"echo '([^']+)' \| base64 -d > /tmp/fix.py", base_workflow)
+          if payload is None:
               raise SystemExit('Base compile fixer payload not found')
-          Path('/tmp/fix.py').write_bytes(base64.b64decode(match.group(1)))
+          Path('/tmp/base-fix.py').write_bytes(base64.b64decode(payload.group(1)))
           PY
-          python3 /tmp/fix.py
-          echo 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAoKdGVzdCA9IFBhdGgoImFwcHMvbG9jYWwtbGxtLXBob25lLXRlc3Qvc3JjL3Rlc3Qva290bGluL2lvL2dpdGh1Yi9kYW5pZWxlMjEvbG9jYWxsbG0vcGhvbmV0ZXN0L1Bob25lTW9kZWxEaXN0cmlidXRpb25Db250cm9sbGVyVGVzdC5rdCIpCnRleHQgPSB0ZXN0LnJlYWRfdGV4dCgpCnRleHQgPSB0ZXh0LnJlcGxhY2UoJ2RldGFpbCA9ICJ2ZXJpZmllZCIsJywgJ2RldGFpbCA9ICJNb2RlbCBpbnRlZ3JpdHkgdmVyaWZpZWQiLCcsIDEpCm9sZCA9ICcnJyAgICAgICAgICAgICAgICBvdmVycmlkZSBmdW4gcmVtb3ZlKGRpZ2VzdDogTW9kZWxEaWdlc3QpOiBQaG9uZU1vZGVsTWFuYWdlbWVudE91dGNvbWUgPQogICAgICAgICAgICAgICAgICAgIFBob25lTW9kZWxNYW5hZ2VtZW50T3V0Y29tZSgKICAgICAgICAgICAgICAgICAgICAgICAgb3BlcmF0aW9uID0gUGhvbmVNb2RlbE1hbmFnZW1lbnRPcGVyYXRpb24uUkVNT1ZFLAogICAgICAgICAgICAgICAgICAgICAgICBkaWdlc3QgPSBkaWdlc3QsCiAgICAgICAgICAgICAgICAgICAgICAgIHN1Y2Nlc3MgPSB0cnVlLAogICAgICAgICAgICAgICAgICAgICAgICBkZXRhaWwgPSAicmVtb3ZlZCIsCiAgICAgICAgICAgICAgICAgICAgKQonJycKbmV3ID0gJycnICAgICAgICAgICAgICAgIG92ZXJyaWRlIGZ1biByZW1vdmUoZGlnZXN0OiBNb2RlbERpZ2VzdCk6IFBob25lTW9kZWxNYW5hZ2VtZW50T3V0Y29tZSB7CiAgICAgICAgICAgICAgICAgICAgaW5zdGFsbGVkRGlnZXN0cy5yZW1vdmUoZGlnZXN0KQogICAgICAgICAgICAgICAgICAgIG1ldGFkYXRhUmVwb3NpdG9yeS5yZW1vdmUoZGlnZXN0KQogICAgICAgICAgICAgICAgICAgIHJldHVybiBQaG9uZU1vZGVsTWFuYWdlbWVudE91dGNvbWUoCiAgICAgICAgICAgICAgICAgICAgICAgIG9wZXJhdGlvbiA9IFBob25lTW9kZWxNYW5hZ2VtZW50T3BlcmF0aW9uLlJFTU9WRSwKICAgICAgICAgICAgICAgICAgICAgICAgZGlnZXN0ID0gZGlnZXN0LAogICAgICAgICAgICAgICAgICAgICAgICBzdWNjZXNzID0gdHJ1ZSwKICAgICAgICAgICAgICAgICAgICAgICAgZGV0YWlsID0gIk1vZGVsIHJlbW92ZWQiLAogICAgICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgICAgIH0KJycnCmlmIG9sZCBub3QgaW4gdGV4dDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIk1hbmFnZW1lbnQgdGVzdCBnYXRld2F5IGFuY2hvciBub3QgZm91bmQiKQp0ZXN0LndyaXRlX3RleHQodGV4dC5yZXBsYWNlKG9sZCwgbmV3LCAxKSkK' | base64 -d > /tmp/fix-test.py
-          python3 /tmp/fix-test.py
+          python3 /tmp/base-fix.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          controller = Path(
+              'apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/'
+              'localllm/phonetest/PhoneModelDistributionController.kt'
+          )
+          text = controller.read_text()
+          old = '''            detail = runtime?.detail,
+              installedModel = installedMetadata,
+          )'''
+          if old not in text:
+              old = '''            detail = runtime?.detail,
+            installedModel = installedMetadata,
+        )'''
+          new = '''            detail = managementDetails[stableId] ?: runtime?.detail,
+            installedModel = installedMetadata,
+            removalConfirmationPending = pendingRemovalStableId == stableId,
+        )'''
+          if old not in text:
+              raise SystemExit('Controller management-state anchor not found')
+          controller.write_text(text.replace(old, new, 1))
+
+          test = Path(
+              'apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/'
+              'localllm/phonetest/PhoneModelDistributionControllerTest.kt'
+          )
+          text = test.read_text()
+          text = text.replace(
+              'detail = "verified",',
+              'detail = "Model integrity verified",',
+              1,
+          )
+          old_remove = '''                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome =
+                    PhoneModelManagementOutcome(
+                        operation = PhoneModelManagementOperation.REMOVE,
+                        digest = digest,
+                        success = true,
+                        detail = "removed",
+                    )'''
+          new_remove = '''                override fun remove(digest: ModelDigest): PhoneModelManagementOutcome {
+                    installedDigests.remove(digest)
+                    metadataRepository.remove(digest)
+                    return PhoneModelManagementOutcome(
+                        operation = PhoneModelManagementOperation.REMOVE,
+                        digest = digest,
+                        success = true,
+                        detail = "Model removed",
+                    )
+                }'''
+          if old_remove not in text:
+              raise SystemExit('Stateful management test-double anchor not found')
+          test.write_text(text.replace(old_remove, new_remove, 1))
+          PY
+
           chmod +x gradlew
-          ./gradlew --no-configuration-cache spotlessApply :apps:local-llm-phone-test:compileDebugKotlin :apps:local-llm-phone-test:testDebugUnitTest
+          ./gradlew --no-configuration-cache \
+            spotlessApply \
+            :apps:local-llm-phone-test:compileDebugKotlin \
+            :apps:local-llm-phone-test:testDebugUnitTest
+
           rm .github/workflows/fix-model-management-compile.yml
           rm .github/workflows/finalize-model-management-fix.yml
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
