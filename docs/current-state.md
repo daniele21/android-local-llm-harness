@@ -185,6 +185,18 @@ PR #53 is retargeted to `dev`, contains only the focused connected-phone impleme
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
 
+The active UX-alignment branch now provides the connected phone app with compact branded
+chrome, Navigation Compose top-level routing, bottom navigation or navigation rail according
+to width and all five primary surfaces. A subsequent visual-matching pass replaces generic
+Material sizing and large hero cards with the mockups' dense typography, restrained radii,
+thin panels, list-oriented runtime and health states, compact action tiles, underline tabs,
+unboxed bottom-navigation selection and the runtime hexagon visual. Real empty, unavailable
+and not-run states remain explicit instead of displaying the populated illustrative values from
+the mockups. Instrumented checks cover shell height and destination reachability. This is
+partial completion of the block: controller state still needs migration to ViewModel/UDF, the
+full screenshot and accessibility matrix is not yet automated, and emulator evidence does not
+replace the required physical-device gate.
+
 ## Deferred after connected distribution
 
 - remote administrator catalog synchronization and trust-policy wiring in the phone app;

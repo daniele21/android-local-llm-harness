@@ -1,10 +1,35 @@
 # Harness Android UX/UI implementation plan
 
-**Status:** Proposed implementation plan
+**Status:** Implementation in progress
 **Target repository:** `daniele21/android-local-llm-harness`
 **Primary target application:** `apps/local-llm-phone-test`, branded in-product as **Harness — Local AI Console**
 **Supporting source application:** `apps/local-llm-console`
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-05
+
+Implementation note (2026-08-05): the connected phone app now has compact branded chrome,
+top-level Navigation Compose routing, adaptive bottom/rail navigation and all five primary
+surfaces. The current visual-matching pass implements the mockups' dense type scale, restrained
+surface radii, compact actions, underline diagnostic tabs, unboxed bottom navigation, runtime
+hexagon and list-oriented runtime, model, health and settings treatments. Illustrative populated
+mockup values are never substituted for real empty, unavailable or not-run application state.
+Initial instrumented shell/navigation checks are present. This does not complete the plan:
+ViewModel/UDF migration, detail routes, the complete accessibility and automated screenshot
+matrix, expanded-layout validation and representative physical-device evidence remain open.
+
+### Current implementation checkpoint
+
+| Workstream | Status | Remaining evidence or implementation |
+| --- | --- | --- |
+| Shared visual system | Implemented | Automated screenshot regression coverage |
+| Compact phone shell and top-level navigation | Implemented | Expanded-width visual validation and detail routes |
+| Overview, Playground, Models, Diagnostics and Settings compositions | Implemented | ViewModel/UDF ownership and complete state matrix |
+| Mockup visual matching | Implemented for compact dark-theme emulator | Light theme, font-scale, TalkBack and golden-image matrix |
+| Instrumented UI smoke coverage | Initial coverage implemented | Loading, success, warning, failure and restoration scenarios |
+| Release and device evidence | Not complete | Signed Play installation and representative physical-device GGUF run |
+
+The next UX block is ViewModel/UDF migration followed by deterministic state fixtures and
+automated screenshot/accessibility coverage. Physical-device validation remains a separate
+release gate and must not be inferred from the compact-emulator visual match.
 
 ## 1. Purpose
 

@@ -17,28 +17,13 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
+import java.util.Locale
 
 @Composable
 internal fun PhoneModelDistributionCatalog(state: PhoneModelDistributionState, actions: PhoneModelDistributionActions) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HarnessCard {
-            Text("Model catalog", style = MaterialTheme.typography.titleLarge)
-            Text(state.sourceLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            HarnessMetricRow {
-                HarnessMetric(
-                    "Status",
-                    state.catalogStatus.name.replace('_', ' ').lowercase(),
-                    Modifier.weight(1f),
-                )
-                HarnessMetric(
-                    "Revision",
-                    state.catalogRevision?.toString() ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
-            }
-            Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         state.models.forEach { model ->
             CatalogModelCard(
                 model = model,
@@ -46,37 +31,48 @@ internal fun PhoneModelDistributionCatalog(state: PhoneModelDistributionState, a
                 actions = actions,
             )
         }
+        Text(
+            "${state.sourceLabel} · revision ${state.catalogRevision ?: "unavailable"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(state.message, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
     HarnessCard {
-        Text(model.displayName, style = MaterialTheme.typography.titleLarge)
-        Text(model.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                model.displayName,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            HarnessStatusBadge(
+                text = model.status.name.displayLabel(),
+                tone = model.status.statusTone(),
+            )
+        }
         HarnessMetricRow {
             HarnessMetric("Architecture", model.architecture, Modifier.weight(1f))
             HarnessMetric("Quantization", model.quantization, Modifier.weight(1f))
-        }
-        HarnessMetricRow {
             HarnessMetric("Size", formatDistributionBytes(model.sizeBytes), Modifier.weight(1f))
             HarnessMetric("License", model.licenseName, Modifier.weight(1f))
         }
-        HarnessMetric("Profile", model.profileKey)
-        HarnessMetric(
-            "State",
-            model.status.name.replace('_', ' ').lowercase(),
-        )
 
         if (model.compatibilityWarnings.isNotEmpty()) {
             Text(
-                "Warnings: ${model.compatibilityWarnings.joinToString()}",
-                color = MaterialTheme.colorScheme.tertiary,
+                model.compatibilityWarnings.joinToString(prefix = "Check before download: ") { it.displayLabel() },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (model.compatibilityReasons.isNotEmpty()) {
             Text(
-                "Unavailable: ${model.compatibilityReasons.joinToString()}",
+                model.compatibilityReasons.joinToString(prefix = "Unavailable: ") { it.displayLabel() },
                 color = MaterialTheme.colorScheme.error,
             )
         }
@@ -107,20 +103,43 @@ private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolea
             PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
             PhoneCatalogModelStatus.CANCELLED,
             PhoneCatalogModelStatus.FAILED,
-            -> HarnessPrimaryButton(
-                if (model.status == PhoneCatalogModelStatus.READY_TO_DOWNLOAD) {
-                    "Download"
-                } else {
-                    "Retry download"
-                },
-                enabled = model.compatible && !operationActive,
+            -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
             ) {
-                actions.download(model.stableId)
+                HarnessPrimaryButton(
+                    if (model.status == PhoneCatalogModelStatus.READY_TO_DOWNLOAD) {
+                        "Download"
+                    } else {
+                        "Retry download"
+                    },
+                    enabled = model.compatible && !operationActive,
+                    modifier = Modifier,
+                ) {
+                    actions.download(model.stableId)
+                }
             }
 
             PhoneCatalogModelStatus.INCOMPATIBLE -> Unit
         }
     }
+}
+
+private fun PhoneCatalogModelStatus.statusTone(): HarnessStatusTone = when (this) {
+    PhoneCatalogModelStatus.INSTALLED -> HarnessStatusTone.SUCCESS
+
+    PhoneCatalogModelStatus.DOWNLOADING,
+    PhoneCatalogModelStatus.INSTALLING,
+    PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL,
+    -> HarnessStatusTone.INFO
+
+    PhoneCatalogModelStatus.INCOMPATIBLE,
+    PhoneCatalogModelStatus.FAILED,
+    -> HarnessStatusTone.WARNING
+
+    PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
+    PhoneCatalogModelStatus.CANCELLED,
+    -> HarnessStatusTone.NEUTRAL
 }
 
 @Composable
@@ -198,3 +217,7 @@ private fun formatDistributionBytes(bytes: Long): String {
     if (mib < 1_024.0) return "%.1f MiB".format(mib)
     return "%.2f GiB".format(mib / 1_024.0)
 }
+
+private fun String.displayLabel(): String = lowercase(Locale.ROOT)
+    .replace('_', ' ')
+    .replaceFirstChar { character -> character.titlecase(Locale.ROOT) }

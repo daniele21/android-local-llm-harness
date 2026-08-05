@@ -23,21 +23,28 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun HarnessCard(
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(LocalHarnessSpacing.current.large),
+    emphasized: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(LocalHarnessSpacing.current.medium),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (emphasized) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        ),
         border =
         BorderStroke(
             width = HarnessBorderWidth,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = if (emphasized) 0.45f else 0.72f),
         ),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
+            verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small),
             content = content,
         )
     }
