@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<incidents format="6" by="lint 9.3.0" type="configured_issues">
-    <config id="InlinedApi" severity="warning"/>
-    <config id="NewApi" severity="error"/>
-    <config id="ObsoleteSdkInt" severity="warning"/>
-    <config id="TypographyQuotes" severity="informational"/>
-    <config id="UnusedResources" severity="warning"/>
-
-</incidents>
