@@ -39,7 +39,7 @@ class HarnessAccessibilityTest {
 
     @Test
     fun `minimum touch target is at least 48 dp`() {
-        assertTrue(HarnessMinimumTouchTarget.value >= MinimumTouchTargetDp)
+        assertTrue(HarnessMinimumTouchTarget.value >= MINIMUM_TOUCH_TARGET_DP)
     }
 
     @Test
@@ -48,6 +48,6 @@ class HarnessAccessibilityTest {
     }
 
     private companion object {
-        const val MinimumTouchTargetDp = 48f
+        const val MINIMUM_TOUCH_TARGET_DP = 48f
     }
 }
