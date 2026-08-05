@@ -15,7 +15,7 @@ import androidx.compose.ui.tooling.preview.Preview
 
 @Preview(name = "Harness components dark", showBackground = true)
 @Composable
-private fun HarnessComponentsDarkPreview() {
+fun HarnessComponentsDarkPreview() {
     HarnessTheme(darkTheme = true) {
         HarnessComponentSheet()
     }
@@ -23,7 +23,7 @@ private fun HarnessComponentsDarkPreview() {
 
 @Preview(name = "Harness components light", showBackground = true)
 @Composable
-private fun HarnessComponentsLightPreview() {
+fun HarnessComponentsLightPreview() {
     HarnessTheme(darkTheme = false) {
         HarnessComponentSheet()
     }
