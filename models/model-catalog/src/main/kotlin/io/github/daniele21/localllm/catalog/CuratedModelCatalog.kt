@@ -8,7 +8,7 @@ import java.net.URI
 /** Administrator-curated bootstrap releases for the phone-test catalog. */
 object CuratedModelCatalog {
     val catalogId = CatalogId("android-local-llm-curated")
-    const val revision: Long = 1
+    const val REVISION: Long = 1
 
     private val phoneTestApplicationId = ApplicationId("play-internal-phone-test")
     private val phoneTestUseCases =
@@ -29,7 +29,7 @@ object CuratedModelCatalog {
         CatalogModelDocument(
             schemaVersion = 1,
             catalogId = catalogId,
-            revision = revision,
+            revision = REVISION,
             generatedAtEpochMs = generatedAtEpochMs,
             expiresAtEpochMs = expiresAtEpochMs,
             entries = releases,
