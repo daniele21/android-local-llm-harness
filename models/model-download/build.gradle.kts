@@ -26,7 +26,5 @@ android {
 
 dependencies {
     api(project(":models:model-catalog"))
-    implementation(project(":models:model-profile"))
-    implementation(project(":models:model-store"))
     testImplementation(libs.junit4)
 }

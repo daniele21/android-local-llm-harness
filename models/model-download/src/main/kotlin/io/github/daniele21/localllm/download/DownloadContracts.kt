@@ -1,79 +1,167 @@
 package io.github.daniele21.localllm.download
 
-import io.github.daniele21.localllm.catalog.CatalogModelRelease
-import io.github.daniele21.localllm.store.StoredModel
-import java.io.Closeable
-import java.io.InputStream
-import java.net.URI
+import io.github.daniele21.localllm.catalog.CatalogGgufArtifact
+import io.github.daniele21.localllm.contracts.ModelDigest
 
-fun interface DownloadCancellation {
-    fun isCancelled(): Boolean
+@JvmInline
+value class DownloadOperationId(val value: String)
+
+@JvmInline
+value class VerifiedDownloadHandle(val value: String)
+
+data class ModelDownloadRequest(val artifact: CatalogGgufArtifact)
+
+data class DownloadConfiguration(
+    val maxArtifactBytes: Long = 8_000_000_000L,
+    val storageHeadroomBytes: Long = 268_435_456L,
+    val maxRedirects: Int = 5,
+    val connectTimeoutMs: Int = 30_000,
+    val readTimeoutMs: Int = 30_000,
+    val bufferSizeBytes: Int = 65_536,
+    val progressMinBytesDelta: Long = 1_048_576L,
+    val progressMinIntervalMs: Long = 500L,
+    val orphanRetentionMs: Long = 86_400_000L,
+    val retryPolicy: DownloadRetryPolicy = DownloadRetryPolicy(),
+) {
+    init {
+        require(maxArtifactBytes > 0)
+        require(storageHeadroomBytes >= 0)
+        require(maxRedirects >= 0)
+        require(connectTimeoutMs > 0)
+        require(readTimeoutMs > 0)
+        require(bufferSizeBytes in 4_096..1_048_576)
+        require(progressMinBytesDelta > 0)
+        require(progressMinIntervalMs >= 0)
+        require(orphanRetentionMs >= 0)
+    }
 }
 
-fun interface DownloadProgressListener {
+data class DownloadRetryPolicy(
+    val maxAttempts: Int = 3,
+    val initialDelayMs: Long = 1_000L,
+    val maxDelayMs: Long = 30_000L,
+    val jitterRatio: Double = 0.20,
+) {
+    init {
+        require(maxAttempts > 0)
+        require(initialDelayMs >= 0)
+        require(maxDelayMs >= initialDelayMs)
+        require(jitterRatio in 0.0..1.0)
+    }
+}
+
+enum class DownloadStage {
+    PREPARING,
+    CONNECTING,
+    DOWNLOADING,
+    RETRY_WAIT,
+    VERIFYING,
+    COMPLETED,
+    CANCELLED,
+    FAILED,
+}
+
+data class DownloadProgress(
+    val operationId: DownloadOperationId,
+    val digestPrefix: String,
+    val sourceHost: String,
+    val stage: DownloadStage,
+    val bytesDownloaded: Long,
+    val expectedBytes: Long,
+    val attempt: Int,
+)
+
+fun interface DownloadProgressObserver {
     fun onProgress(progress: DownloadProgress)
 }
 
-data class DownloadProgress(val downloadedBytes: Long, val expectedBytes: Long)
+fun interface DownloadCancellationToken {
+    fun isCancelled(): Boolean
+}
 
-data class DownloadRequest(
-    val release: CatalogModelRelease,
-    val cancellation: DownloadCancellation = DownloadCancellation { false },
-    val progressListener: DownloadProgressListener = DownloadProgressListener {},
+object NeverCancelled : DownloadCancellationToken {
+    override fun isCancelled(): Boolean = false
+}
+
+sealed interface ModelDownloadResult {
+    val operationId: DownloadOperationId
+
+    data class Success(
+        override val operationId: DownloadOperationId,
+        val handle: VerifiedDownloadHandle,
+        val digest: ModelDigest,
+        val sizeBytes: Long,
+        val sourceHost: String,
+        val deduplicated: Boolean,
+    ) : ModelDownloadResult
+
+    data class AlreadyRunning(
+        override val operationId: DownloadOperationId,
+        val digest: ModelDigest,
+    ) : ModelDownloadResult
+
+    data class Cancelled(
+        override val operationId: DownloadOperationId,
+        val failure: DownloadFailure,
+    ) : ModelDownloadResult
+
+    data class Failure(
+        override val operationId: DownloadOperationId,
+        val failure: DownloadFailure,
+    ) : ModelDownloadResult
+}
+
+data class DownloadFailure(
+    val code: DownloadFailureCode,
+    val retryable: Boolean,
+    val detail: String,
 )
 
-sealed interface DownloadResult {
-    data class Installed(val model: StoredModel, val downloadedBytes: Long) : DownloadResult
-
-    data class AlreadyInstalled(val model: StoredModel) : DownloadResult
-
-    data class Failed(val error: DownloadError) : DownloadResult
+enum class DownloadFailureCode {
+    INVALID_DESCRIPTOR,
+    SOURCE_URL_REJECTED,
+    SOURCE_ADDRESS_REJECTED,
+    INSUFFICIENT_STORAGE,
+    DOWNLOAD_HTTP_ERROR,
+    DOWNLOAD_REDIRECT_LIMIT,
+    DOWNLOAD_REDIRECT_INVALID,
+    DOWNLOAD_SIZE_EXCEEDED,
+    DOWNLOAD_SIZE_MISMATCH,
+    DOWNLOAD_CANCELLED,
+    NETWORK_FAILURE,
+    CONTENT_ENCODING_UNSUPPORTED,
+    SHA256_MISMATCH,
+    TEMP_STORAGE_FAILURE,
+    VERIFIED_STORAGE_FAILURE,
+    INTERNAL_FAILURE,
 }
 
-data class DownloadError(val code: DownloadErrorCode, val detail: String)
+data class InterruptedDownload(
+    val operationId: DownloadOperationId,
+    val digest: ModelDigest,
+    val expectedBytes: Long,
+    val sourceHost: String,
+    val startedAtEpochMs: Long,
+)
 
-enum class DownloadErrorCode {
-    INVALID_URI,
-    HOST_NOT_ALLOWED,
-    REDIRECT_LIMIT_EXCEEDED,
-    INVALID_REDIRECT,
-    HTTP_FAILURE,
-    CONTENT_LENGTH_MISMATCH,
-    SIZE_LIMIT_EXCEEDED,
-    DIGEST_MISMATCH,
-    CANCELLED,
-    IO_FAILURE,
-    STORE_FAILURE,
+data class DownloadCleanupReport(
+    val interrupted: List<InterruptedDownload>,
+    val orphanFilesDeleted: Int,
+    val cleanupFailures: Int,
+)
+
+fun interface DownloadClock {
+    fun nowEpochMs(): Long
 }
 
-data class TransportRequest(val uri: URI, val connectTimeoutMs: Int, val readTimeoutMs: Int)
-
-interface DownloadTransport {
-    fun open(request: TransportRequest): TransportResponse
+fun interface DownloadSleeper {
+    fun sleep(delayMs: Long)
 }
 
-interface TransportResponse : Closeable {
-    val statusCode: Int
-    val contentLength: Long?
-    val redirectLocation: String?
-    val body: InputStream
+fun interface DownloadJitterSource {
+    fun nextDouble(): Double
 }
 
-fun interface DownloadHostPolicy {
-    fun isAllowed(host: String): Boolean
-}
-
-data class SecureDownloadPolicy(
-    val hostPolicy: DownloadHostPolicy,
-    val maxRedirects: Int = 5,
-    val connectTimeoutMs: Int = 15_000,
-    val readTimeoutMs: Int = 30_000,
-    val bufferSizeBytes: Int = 64 * 1024,
-) {
-    init {
-        require(maxRedirects in 0..10)
-        require(connectTimeoutMs > 0)
-        require(readTimeoutMs > 0)
-        require(bufferSizeBytes in 4 * 1024..1024 * 1024)
-    }
+fun interface DownloadStorageProbe {
+    fun usableBytes(directory: java.io.File): Long
 }
