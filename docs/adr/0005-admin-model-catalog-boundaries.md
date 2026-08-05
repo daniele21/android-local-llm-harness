@@ -1,6 +1,6 @@
 # ADR 0005: Separate remote model distribution from local inference
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-04
 
 ## Context
@@ -13,7 +13,7 @@ The product now needs an administrator-managed list of approved GGUF releases th
 
 Remote distribution is a control-plane concern separated from the local inference data plane.
 
-- `models/model-catalog` owns catalog domain models, validation, target filtering and compatibility policy.
+- `models/model-catalog` owns catalog domain models, strict bounded decoding, validation, app-private snapshot persistence, target filtering, compatibility policy and explicit synchronization;
 - a later `models/model-download` module owns HTTPS transfer, partial files, cancellation, byte counting, hashing and installation orchestration;
 - `models/model-store` remains the only owner of final GGUF artifact publication;
 - model identity remains the canonical SHA-256 digest rather than a URL, display name or remote release identifier;
@@ -22,6 +22,7 @@ Remote distribution is a control-plane concern separated from the local inferenc
 - downloading, installing, selecting and loading are separate explicit operations;
 - installed inference remains available without network access;
 - catalog refresh or download failure cannot invalidate an otherwise healthy installed artifact;
+- stale or expired catalog data cannot authorize a new download;
 - normal telemetry excludes credentials, signed URLs, private paths, model bytes, prompts and generated output.
 
 The first connected surface is `apps/local-llm-phone-test`, while the catalog and download contracts remain UI independent and reusable by future embedded or shared-runtime integrations.
@@ -30,7 +31,8 @@ The first connected surface is `apps/local-llm-phone-test`, while the catalog an
 
 - the existing content-addressed store and integrity checks are reused rather than duplicated;
 - installation temporarily requires enough storage for download and `ModelStore` staging copies unless a separately reviewed adopt/stream API is added;
-- catalog release metadata requires storage separate from raw model bytes;
+- catalog release metadata is persisted separately from raw model bytes through an atomic app-private state envelope;
+- conditional refresh metadata does not extend the expiry declared by a catalog document;
 - administrator changes can publish or deprecate releases without shipping a new application, while application-owned profile policy remains under code review;
 - adding model download requires explicit Android network permission, host policy and privacy review;
 - production third-party catalog distribution requires signed-manifest verification, key rotation and rollback protection;

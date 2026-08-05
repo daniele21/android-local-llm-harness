@@ -63,6 +63,7 @@ data class CatalogLicense(val id: String, val displayName: String, val sourceUri
 
 enum class CatalogAvailability {
     ACTIVE,
+    CANDIDATE,
     DEPRECATED,
     REVOKED,
     UNAVAILABLE,
@@ -99,6 +100,7 @@ enum class CatalogCompatibilityReason {
 }
 
 enum class CatalogCompatibilityWarning {
+    RELEASE_CANDIDATE,
     RELEASE_DEPRECATED,
     RAM_BELOW_RECOMMENDED,
 }

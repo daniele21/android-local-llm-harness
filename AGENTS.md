@@ -41,6 +41,7 @@ When sources disagree, use this precedence: executable contracts and tests, acce
 | `models/model-profile` | GGUF artifacts, load profiles, use cases and app bindings |
 | `models/model-store` | Content-addressed model import, storage and integrity verification |
 | `models/model-catalog` | Admin-managed model release contracts, validation, target filtering and compatibility policy |
+| `models/model-download` | Secure remote transfer, redirect policy, verification and ModelStore handoff |
 | `backends/llama-cpp` | Kotlin/JNI/C++ backend and native resource ownership |
 | `observability/contracts` | Stable telemetry, health, resource and benchmark schemas |
 | `observability/in-memory-store` | Bounded ephemeral telemetry implementation |

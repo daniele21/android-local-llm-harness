@@ -22,6 +22,7 @@ include(
     ":models:model-profile",
     ":models:model-store",
     ":models:model-catalog",
+    ":models:model-download",
     ":backends:llama-cpp",
     ":observability:contracts",
     ":observability:in-memory-store",
