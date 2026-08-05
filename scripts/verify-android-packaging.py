@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate native Android packaging produced by the repository build."""
+"""Validate native libraries and runtime brand resources in Android packages."""
 
 from __future__ import annotations
 
@@ -25,6 +25,13 @@ EXPECTED_RUNTIME_LIBRARIES = {
 PHONE_TEST_NATIVE_LIBRARIES = EXPECTED_RUNTIME_LIBRARIES | {
     "libandroidx.graphics.path.so",
 }
+EXPECTED_BRAND_RESOURCES = {
+    "harness_launcher_background",
+    "harness_launcher_foreground",
+    "harness_launcher_monochrome",
+    "ic_launcher",
+    "ic_launcher_round",
+}
 EXPECTED_ABI = "arm64-v8a"
 EM_AARCH64 = 183
 ELF_HEADER_BYTES = 20
@@ -40,6 +47,14 @@ def find_single(root: Path, pattern: str, label: str) -> Path:
         rendered = ", ".join(str(path) for path in matches) or "none"
         raise PackagingError(f"Expected one {label}; found {len(matches)}: {rendered}")
     return matches[0]
+
+
+def find_optional_single(root: Path, pattern: str, label: str) -> Path | None:
+    matches = sorted(root.glob(pattern))
+    if len(matches) > 1:
+        rendered = ", ".join(str(path) for path in matches)
+        raise PackagingError(f"Expected at most one {label}; found {len(matches)}: {rendered}")
+    return matches[0] if matches else None
 
 
 def native_entries(archive: ZipFile, prefix: str) -> list[str]:
@@ -105,6 +120,31 @@ def verify_native_archive(
     print(f"  native libraries: {len(expected_libraries)}")
 
 
+def resource_name_present(resource_table: bytes, name: str) -> bool:
+    return name.encode("utf-8") in resource_table or name.encode("utf-16le") in resource_table
+
+
+def verify_phone_brand_resources(path: Path, table_entry: str, label: str) -> None:
+    try:
+        with ZipFile(path) as archive:
+            if table_entry not in archive.namelist():
+                raise PackagingError(f"{label} does not contain {table_entry}")
+            resource_table = archive.read(table_entry)
+    except BadZipFile as error:
+        raise PackagingError(f"{label} is not a valid ZIP archive: {path}") from error
+
+    missing = sorted(
+        name
+        for name in EXPECTED_BRAND_RESOURCES
+        if not resource_name_present(resource_table, name)
+    )
+    if missing:
+        raise PackagingError(
+            f"{label} is missing Harness launcher resources in {table_entry}: {missing}"
+        )
+    print(f"Verified Harness launcher resources in {label}: {path}")
+
+
 def verify_instrumentation_apk(path: Path) -> None:
     try:
         with ZipFile(path) as archive:
@@ -131,6 +171,11 @@ def main() -> int:
         "apps/local-llm-phone-test/build/outputs/apk/debug/*-debug.apk",
         "phone-test application APK",
     )
+    phone_application_aab = find_optional_single(
+        repository,
+        "apps/local-llm-phone-test/build/outputs/bundle/**/*.aab",
+        "phone-test application AAB",
+    )
     instrumentation_apk = find_single(
         repository,
         "apps/device-test-runner/build/outputs/apk/androidTest/debug/*-androidTest.apk",
@@ -149,9 +194,23 @@ def main() -> int:
         "phone-test application APK",
         PHONE_TEST_NATIVE_LIBRARIES,
     )
+    verify_phone_brand_resources(
+        phone_application_apk,
+        "resources.arsc",
+        "phone-test application APK",
+    )
+    if phone_application_aab is not None:
+        verify_phone_brand_resources(
+            phone_application_aab,
+            "base/resources.pb",
+            "phone-test application AAB",
+        )
+    else:
+        print("Phone-test AAB not present in this scoped build; APK brand check completed.")
+
     verify_instrumentation_apk(instrumentation_apk)
     verify_native_archive(backend_aar, "jni/", "llama.cpp debug AAR")
-    print("Android native packaging verification completed successfully")
+    print("Android packaging verification completed successfully")
     return 0
 
 
