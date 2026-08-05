@@ -63,19 +63,13 @@ internal sealed interface HarnessUiEvent {
 
     data class PlaygroundChanged(val state: PlaygroundState) : HarnessUiEvent
 
-    data class DiagnosticActionChanged(
-        val action: HarnessDiagnosticAction,
-        val running: Boolean,
-    ) : HarnessUiEvent
+    data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : HarnessUiEvent
 
     data class DiagnosticsChanged(val state: DiagnosticsUiState) : HarnessUiEvent
 
     data class BenchmarkChanged(val state: BenchmarkUiState) : HarnessUiEvent
 
-    data class LogFilterChanged(
-        val filter: DiagnosticsLogFilter,
-        val state: DiagnosticsLogUiState,
-    ) : HarnessUiEvent
+    data class LogFilterChanged(val filter: DiagnosticsLogFilter, val state: DiagnosticsLogUiState) : HarnessUiEvent
 
     data class LogsChanged(val state: DiagnosticsLogUiState) : HarnessUiEvent
 
@@ -99,46 +93,64 @@ internal sealed interface HarnessUiEvent {
 internal object HarnessUiReducer {
     fun reduce(state: HarnessUiState, event: HarnessUiEvent): HarnessUiState = when (event) {
         is HarnessUiEvent.ControllerBusyChanged -> state.copy(controllerBusy = event.busy)
+
         is HarnessUiEvent.ModelDistributionChanged -> state.copy(
             modelDistribution = event.state,
             operationStatus = event.state.message,
         )
+
         is HarnessUiEvent.ModelChanged -> state.copy(
             importedModel = event.model,
             removalConfirmationPending = false,
         )
+
         is HarnessUiEvent.ReportChanged -> state.copy(
             latestReport = event.report,
             operationStatus = "Validation completed",
         )
+
         is HarnessUiEvent.OperationStatusChanged -> state.copy(operationStatus = event.status)
+
         is HarnessUiEvent.PlaygroundChanged -> state.copy(playground = event.state)
+
         is HarnessUiEvent.DiagnosticActionChanged -> state.copy(
             activeDiagnosticActions = state.activeDiagnosticActions.withAction(event.action, event.running),
         )
+
         is HarnessUiEvent.DiagnosticsChanged -> state.copy(diagnostics = event.state)
+
         is HarnessUiEvent.BenchmarkChanged -> state.copy(benchmark = event.state)
+
         is HarnessUiEvent.LogFilterChanged -> state.copy(
             logFilter = event.filter,
             logs = event.state,
         )
+
         is HarnessUiEvent.LogsChanged -> state.copy(logs = event.state)
+
         is HarnessUiEvent.RequestTimelineChanged -> state.copy(selectedRequestTimeline = event.timeline)
+
         is HarnessUiEvent.DiagnosticsSectionChanged -> state.copy(
             diagnosticsSection = event.section,
             selectedRequestTimeline = state.selectedRequestTimeline.takeIf {
                 event.section == DiagnosticsSection.LOGS
             },
         )
+
         is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
+
         is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens)
+
         is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
             playgroundTemperature = event.temperature,
         )
+
         is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed)
+
         is HarnessUiEvent.RemovalConfirmationChanged -> state.copy(
             removalConfirmationPending = event.pending,
         )
+
         is HarnessUiEvent.ThemeChanged -> state.copy(themePreference = event.preference)
     }
 
