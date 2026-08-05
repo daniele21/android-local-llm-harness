@@ -66,6 +66,7 @@ class MainActivity :
     private lateinit var logSource: HarnessLogSource
     private lateinit var controller: PhoneTestController
     private lateinit var modelDistributionController: PhoneModelDistributionController
+    private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
 
@@ -88,6 +89,7 @@ class MainActivity :
     private var playgroundMaxTokens by mutableStateOf(DEFAULT_MAX_OUTPUT_TOKENS)
     private var playgroundTemperature by mutableStateOf(DEFAULT_TEMPERATURE)
     private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
+    private var selectedRemovalConfirmationPending by mutableStateOf(false)
 
     @Volatile
     private var selectedModelForDiagnostics: ImportedPhoneModel? = null
@@ -119,6 +121,11 @@ class MainActivity :
         }
         logSource = HarnessLogSource(runtimeGraph.telemetryRepository)
         controller = PhoneTestController(this, this)
+        selectedModelManagement = ModelStorePhoneModelManagementControl(
+  modelStore = runtimeGraph.modelStore,
+  protectedModelDigest = runtimeGraph::loadedModelDigest,
+  removeMetadata = { true },
+        )
         modelDistributionController = PhoneModelDistributionController.from(
             context = this,
             runtimeGraph = runtimeGraph,
@@ -192,6 +199,20 @@ class MainActivity :
             playgroundState = state
             updateKeepScreenOn()
             refreshDiagnostics()
+        }
+    }
+
+    private fun verifySelectedModel() {
+        val model = importedModel ?: return
+        if (isBusy()) return
+        operationStatus = "Verifying selected model integrity…"
+        diagnosticsExecutor.execute {
+  val outcome = selectedModelManagement.verify(model.digest)
+  runOnUiThread {
+      operationStatus = outcome.detail
+      modelDistributionController.refresh()
+      refreshDiagnostics()
+  }
         }
     }
 

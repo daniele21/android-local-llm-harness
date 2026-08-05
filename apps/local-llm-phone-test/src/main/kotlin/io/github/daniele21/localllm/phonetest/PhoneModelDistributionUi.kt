@@ -24,6 +24,10 @@ internal fun PhoneModelDistributionCatalog(
     onDownload: (String) -> Unit,
     onCancel: (String) -> Unit,
     onInstall: (String) -> Unit,
+    onVerifyInstalled: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
+    onCancelRemove: (String) -> Unit,
+    onConfirmRemove: (String) -> Unit,
     onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -65,6 +69,10 @@ private fun CatalogModelCard(
     onDownload: (String) -> Unit,
     onCancel: (String) -> Unit,
     onInstall: (String) -> Unit,
+    onVerifyInstalled: (String) -> Unit,
+    onRequestRemove: (String) -> Unit,
+    onCancelRemove: (String) -> Unit,
+    onConfirmRemove: (String) -> Unit,
     onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
 ) {
     HarnessCard {
@@ -122,11 +130,39 @@ private fun CatalogModelCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HarnessPrimaryButton(
-                        "Use in Playground",
-                        enabled = !operationActive,
-                    ) {
-                        onSelectInstalled(installed)
-                    }
+              "Use in Playground",
+              enabled = !operationActive,
+          ) {
+              onSelectInstalled(installed)
+          }
+                    HarnessSecondaryButton(
+              "Verify integrity",
+              enabled = !operationActive,
+          ) {
+              onVerifyInstalled(model.stableId)
+          }
+          if (model.removalConfirmationPending) {
+              Text(
+                  "Removal permanently deletes the app-private model copy.",
+                  color = MaterialTheme.colorScheme.error,
+              )
+              HarnessPrimaryButton(
+                  "Confirm removal",
+                  enabled = !operationActive,
+              ) {
+                  onConfirmRemove(model.stableId)
+              }
+              HarnessSecondaryButton("Cancel removal") {
+                  onCancelRemove(model.stableId)
+              }
+          } else {
+              HarnessSecondaryButton(
+                  "Remove installed model",
+                  enabled = !operationActive,
+              ) {
+                  onRequestRemove(model.stableId)
+              }
+          }
                 }
             }
 

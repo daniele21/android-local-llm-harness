@@ -78,6 +78,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         runtime?.runtimeSnapshot()
     }
 
+    fun loadedModelDigest(): ModelDigest? = synchronized(lock) { runtimeModelDigest }
+
     override fun close() {
         synchronized(lock) { closeRuntimeLocked() }
     }

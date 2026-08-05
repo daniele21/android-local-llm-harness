@@ -151,6 +151,39 @@ class PhoneModelDistributionControllerTest {
         controller.close()
     }
 
+    @Test
+    fun verificationAndConfirmedRemovalPublishExplicitManagementStates() {
+        val metadataRepository = InMemoryInstalledMetadataRepository().apply {
+  save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))
+        }
+        val installedDigests = mutableSetOf(DIGEST)
+        var latest = PhoneModelDistributionState()
+        val controller = controller(
+  executor = ImmediateExecutorService(),
+  metadataRepository = metadataRepository,
+  installedDigests = installedDigests,
+  downloadGateway = successfulDownloadGateway(),
+  installGateway = PhoneModelInstallGateway { _, _ -> error("Install must not run") },
+  discard = { false },
+  listener = { latest = it },
+        )
+        val stableId = latest.models.single().stableId
+
+        controller.verifyInstalled(stableId)
+        assertEquals("Model integrity verified", latest.models.single().detail)
+
+        controller.requestRemove(stableId)
+        assertTrue(latest.models.single().removalConfirmationPending)
+        assertTrue(installedDigests.contains(DIGEST))
+
+        controller.confirmRemove(stableId)
+        assertFalse(latest.models.single().removalConfirmationPending)
+        assertEquals(PhoneCatalogModelStatus.READY_TO_DOWNLOAD, latest.models.single().status)
+        assertFalse(installedDigests.contains(DIGEST))
+        assertTrue(metadataRepository.loadAll().isEmpty())
+        controller.close()
+    }
+
     private fun controller(
         executor: AbstractExecutorService,
         metadataRepository: InstalledCatalogMetadataRepository,
