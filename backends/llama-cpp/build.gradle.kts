@@ -46,5 +46,6 @@ android {
 dependencies {
     api(project(":core:contracts"))
     api(project(":models:model-profile"))
+    api(project(":models:model-install"))
     testImplementation(libs.junit4)
 }
