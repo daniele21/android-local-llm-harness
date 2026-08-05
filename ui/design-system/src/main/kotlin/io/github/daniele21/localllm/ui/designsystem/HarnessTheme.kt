@@ -9,17 +9,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
-fun HarnessTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun HarnessTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalHarnessSpacing provides DefaultHarnessSpacing,
-        LocalHarnessStatusColors provides if (darkTheme) {
-            HarnessDarkStatusColors
-        } else {
-            HarnessLightStatusColors
-        },
+        LocalHarnessStatusColors provides
+            if (darkTheme) {
+                HarnessDarkStatusColors
+            } else {
+                HarnessLightStatusColors
+            },
     ) {
         MaterialTheme(
             colorScheme = harnessColorScheme(darkTheme),
@@ -30,8 +28,9 @@ fun HarnessTheme(
     }
 }
 
-fun harnessColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) {
-    HarnessDarkColorScheme
-} else {
-    HarnessLightColorScheme
-}
+fun harnessColorScheme(darkTheme: Boolean): ColorScheme =
+    if (darkTheme) {
+        HarnessDarkColorScheme
+    } else {
+        HarnessLightColorScheme
+    }
