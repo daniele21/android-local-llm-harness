@@ -17,6 +17,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
+import java.util.Locale
 
 @Composable
 internal fun PhoneModelDistributionCatalog(
@@ -175,8 +176,8 @@ private fun DownloadProgress(model: PhoneCatalogModelUi, onCancel: (String) -> U
 private fun formatDistributionBytes(bytes: Long): String {
     if (bytes < 1_024L) return "$bytes B"
     val kib = bytes / 1_024.0
-    if (kib < 1_024.0) return "%.1f KiB".format(kib)
+    if (kib < 1_024.0) return "%.1f KiB".format(Locale.ROOT, kib)
     val mib = kib / 1_024.0
-    if (mib < 1_024.0) return "%.1f MiB".format(mib)
-    return "%.2f GiB".format(mib / 1_024.0)
+    if (mib < 1_024.0) return "%.1f MiB".format(Locale.ROOT, mib)
+    return "%.2f GiB".format(Locale.ROOT, mib / 1_024.0)
 }

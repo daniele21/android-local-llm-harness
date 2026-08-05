@@ -103,6 +103,8 @@ class HealthEngineTest {
 
         override fun benchmarkBaselines(): List<BenchmarkBaseline> = emptyList()
 
+        override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = emptyList()
+
         override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = error("Not needed")
     }
 }

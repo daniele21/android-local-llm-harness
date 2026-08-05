@@ -9,6 +9,7 @@ import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkBaselineRecorder
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkCaptureResult
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkRegressionHealthCheck
+import java.util.Locale
 
 internal data class BenchmarkUi(
     val stableId: String,
@@ -252,6 +253,6 @@ private fun BenchmarkKey.safeStableId(): String = listOf(
     modelLoadKind.name,
 ).joinToString(separator = ":")
 
-private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(it) } ?: "Unavailable"
+private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(Locale.ROOT, it) } ?: "Unavailable"
 
-private fun Double?.asThroughput(): String = this?.let { "%.2f tok/s".format(it) } ?: "Unavailable"
+private fun Double?.asThroughput(): String = this?.let { "%.2f tok/s".format(Locale.ROOT, it) } ?: "Unavailable"

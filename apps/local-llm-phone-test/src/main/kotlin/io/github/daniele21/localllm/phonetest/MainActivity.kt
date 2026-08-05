@@ -52,6 +52,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessTheme
+import java.util.Locale
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "LongMethod", "LargeClass")
@@ -438,7 +439,7 @@ class MainActivity :
                         )
                         HarnessMetric(
                             "Decode",
-                            metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(it) }
+                            metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(Locale.ROOT, it) }
                                 ?: "Unavailable",
                             Modifier.weight(1f),
                         )
@@ -1024,7 +1025,7 @@ class MainActivity :
         )
     }
 
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
+    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
 
     private enum class HarnessDestination(val label: String, val shortLabel: String) {
         OVERVIEW("Overview", "O"),

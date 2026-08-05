@@ -143,6 +143,8 @@ private object ThrowingTelemetryRepository : TelemetryRepository {
 
     override fun benchmarkBaselines(): List<BenchmarkBaseline> = fail()
 
+    override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = fail()
+
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = fail()
 
     private fun fail(): Nothing = error("telemetry unavailable")
