@@ -11,8 +11,8 @@ This document is the active integration and recovery ledger for the repository. 
 Integrated head before the next recovery block:
 
 ```text
-be8a2c61924ea955b6a844f6700754ab2fefb50e
-Connect model catalog download and installation UI (#49)
+34fb5f37f626d229dbef80e2cfffa738ff403b38
+Recover retained benchmark history (#51)
 ```
 
 Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
@@ -24,23 +24,13 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #47 refreshed all workflows to `actions/checkout@v7`, split the model-distribution gate into attributable phases and passed cumulative validation.
 - PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
 - PR #49 connected the phone Models UI to catalog, secure download and verified installation, and added durable path-free installed metadata.
-- PRs #20, #3 and #4 were closed with explicit superseded/obsolete disposition notes.
+- PR #51 recovered retained benchmark history on the current connected phone-test architecture without restoring the obsolete standalone console.
+- PRs #20, #3, #4 and #33 were closed with explicit superseded/obsolete disposition notes.
 - Issue #46 tracks branch protection and the required `Repository validation` repository setting.
 
-## Legacy feature branches requiring selective recovery
+## Legacy feature branch requiring selective recovery
 
-PR #33 and PR #34 must not be merged directly. Both are based on the pre-Compose console line and have diverged materially from current `main`.
-
-### PR #33 — benchmark history
-
-Potentially unique behavior to recover on a fresh branch:
-
-- retained multi-capture benchmark history;
-- active-baseline versus immutable-history semantics;
-- non-destructive Room migration for retained captures;
-- historical metric presentation not already covered by the connected Compose application.
-
-Do not restore the old standalone-console composition or duplicate existing benchmark logic.
+PR #34 must not be merged directly. It is based on the pre-Compose console line and has diverged materially from current `main`.
 
 ### PR #34 — model management
 
@@ -104,6 +94,32 @@ The integrated implementation includes:
 
 No download URL, signed URL or filesystem path is persisted in installed-model metadata.
 
+### Integrated retained benchmark history
+
+The current benchmark path now separates the regression anchor from historical evidence:
+
+```text
+completed generation runs
+  -> explicit baseline capture
+  -> active baseline per BenchmarkKey
+  -> immutable retained capture history
+  -> bounded in-memory or Room persistence
+  -> regression evaluation against active baseline only
+  -> historical presentation in the connected Benchmarks screen
+```
+
+The integrated implementation includes:
+
+- newest-first immutable capture history alongside the active baseline per application, use case, model digest and cold/warm load key;
+- independent `maxBenchmarkBaselines` retention;
+- in-memory and Room-store parity;
+- non-destructive Room schema migration 3→4 that seeds existing active baseline rows into history;
+- a shared comparison evaluator used by the regression health check;
+- current Compose presentation of retained captures without reviving the legacy console;
+- deterministic tests for active-versus-history semantics, retention, migration and UI mapping.
+
+Viewing retained history never activates or replaces a regression baseline.
+
 ## Ordered implementation plan
 
 ### Block 1 — repository state alignment
@@ -140,13 +156,15 @@ The persisted relationship is path-free and includes installed digest, catalog r
 
 ### Block 6 — selective benchmark-history recovery
 
-Status: **IMPLEMENTED; awaiting pull-request CI and merge**.
+Status: **DONE through PR #51**.
 
-Recovered on the current phone-test architecture: immutable retained captures, active-versus-history semantics, bounded in-memory and Room persistence, a non-destructive Room 3→4 migration and historical presentation. The obsolete standalone console was not restored.
+Recovered on the current phone-test architecture: immutable retained captures, active-versus-history semantics, bounded in-memory and Room persistence, a non-destructive Room 3→4 migration, shared comparison evaluation and historical presentation. The obsolete standalone console was not restored.
 
 ### Block 7 — selective model-management recovery
 
-Recover unique verification, confirmation and loaded-model protection behavior from PR #34 on a fresh branch from the then-current `main`.
+Status: **NEXT**.
+
+Recover unique verification, confirmation, loaded-model protection, cleanup and operation-state behavior from PR #34 on a fresh branch from current `main`. Do not restore its parallel store or old console composition.
 
 ### Block 8 — product and hardware completion
 
