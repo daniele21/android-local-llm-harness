@@ -8,11 +8,11 @@ This document is the active integration and recovery ledger for the repository. 
 
 `main` is the only canonical integrated implementation line.
 
-Integrated head before this connected-distribution slice:
+Integrated head before the next recovery block:
 
 ```text
-32aa1852c16a0735f069b8931ada28b0e03bb3e5
-Add explicit verified model installation boundary (#48)
+be8a2c61924ea955b6a844f6700754ab2fefb50e
+Connect model catalog download and installation UI (#49)
 ```
 
 Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
@@ -23,6 +23,7 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #45 refreshed Android Gradle Plugin 9.3.1 from current `main` and passed complete Android validation.
 - PR #47 refreshed all workflows to `actions/checkout@v7`, split the model-distribution gate into attributable phases and passed cumulative validation.
 - PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
+- PR #49 connected the phone Models UI to catalog, secure download and verified installation, and added durable path-free installed metadata.
 - PRs #20, #3 and #4 were closed with explicit superseded/obsolete disposition notes.
 - Issue #46 tracks branch protection and the required `Repository validation` repository setting.
 
@@ -55,7 +56,7 @@ Do not create a parallel model store or reconnect the old standalone-console san
 
 ## Current functional boundary
 
-### Integrated before this slice
+### Integrated before the connected-distribution slice
 
 - explicit application/use-case to GGUF profile resolution;
 - content-addressed installed-model store;
@@ -66,7 +67,7 @@ Do not create a parallel model store or reconnect the old standalone-console san
 - secure remote transfer to a verified app-private holding area;
 - explicit verified-download installation into `ModelStore` with post-import integrity verification.
 
-### Implemented by the connected-distribution slice
+### Integrated connected distribution
 
 The phone-test Models surface now connects the existing distribution boundaries:
 
@@ -86,7 +87,7 @@ administrator-curated catalog
   -> selected model for local inference
 ```
 
-The implementation adds:
+The integrated implementation includes:
 
 - application dependencies on `models:model-catalog`, `models:model-download` and `models:model-install`;
 - Android `INTERNET` permission for secure remote model transfer;
@@ -119,27 +120,29 @@ Status: **DONE through PR #48**.
 
 ### Block 4 — connected catalog and installation UI
 
-Status: **IMPLEMENTED in PR #49; awaiting complete CI and merge**.
+Status: **DONE through PR #49**.
 
-Acceptance requires:
+Validated behavior includes:
 
-- validated catalog loading for the phone-test target;
+- catalog loading for the phone-test target;
 - compatible and incompatible release presentation;
 - explicit download, progress and cancellation;
 - verified-ready-to-install state;
 - explicit installation and installed-state refresh;
 - no implicit binding, runtime load or inference activation;
-- Spotless, Detekt, unit tests, Android Lint, packaging and cumulative repository validation all green.
+- green Spotless, Detekt, unit tests, Android Lint, packaging and cumulative repository validation.
 
 ### Block 5 — durable installed-model metadata
 
-Status: **IMPLEMENTED in PR #49; awaiting complete CI and merge**.
+Status: **DONE through PR #49**.
 
 The persisted relationship is path-free and includes installed digest, catalog release, application-reviewed profile and target. Persistence does not activate or alter bindings implicitly.
 
 ### Block 6 — selective benchmark-history recovery
 
-Recover only unique retained-history behavior from PR #33 on a fresh branch from the then-current `main`.
+Status: **NEXT**.
+
+Recover only unique retained-history behavior from PR #33 on a fresh branch from current `main`.
 
 ### Block 7 — selective model-management recovery
 
@@ -153,7 +156,7 @@ Recover unique verification, confirmation and loaded-model protection behavior f
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
 
-## Deferred after the connected-distribution slice
+## Deferred after connected distribution
 
 - remote administrator catalog synchronization and trust-policy wiring in the phone app;
 - transactional `ModelStore` creation provenance required for safe automatic rollback;
