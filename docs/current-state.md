@@ -8,11 +8,11 @@ This document is the active integration and recovery ledger for the repository. 
 
 `main` is the only canonical integrated implementation line.
 
-Integrated head before this installation slice:
+Integrated head before this connected-distribution slice:
 
 ```text
-04045a1226d90ea7ee25ad7adc12dd1fc71e6307
-Update GitHub checkout action to v7 (#47)
+32aa1852c16a0735f069b8931ada28b0e03bb3e5
+Add explicit verified model installation boundary (#48)
 ```
 
 Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
@@ -22,6 +22,7 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #44 aligned README and established this state ledger.
 - PR #45 refreshed Android Gradle Plugin 9.3.1 from current `main` and passed complete Android validation.
 - PR #47 refreshed all workflows to `actions/checkout@v7`, split the model-distribution gate into attributable phases and passed cumulative validation.
+- PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
 - PRs #20, #3 and #4 were closed with explicit superseded/obsolete disposition notes.
 - Issue #46 tracks branch protection and the required `Repository validation` repository setting.
 
@@ -62,36 +63,45 @@ Do not create a parallel model store or reconnect the old standalone-console san
 - telemetry, logs, health, resources, benchmarks and cache repair;
 - connected Compose Playground and Diagnostics surfaces;
 - administrator-managed catalog contracts, persistence and compatibility;
-- secure remote transfer to a verified app-private holding area.
+- secure remote transfer to a verified app-private holding area;
+- explicit verified-download installation into `ModelStore` with post-import integrity verification.
 
-### Implemented by the verified-installation slice
+### Implemented by the connected-distribution slice
 
-The remote distribution path is extended to:
+The phone-test Models surface now connects the existing distribution boundaries:
 
 ```text
-CatalogGgufArtifact
-  -> secure verified transfer
-  -> opaque VerifiedDownloadHandle
-  -> exact catalog/profile/target validation
-  -> controlled staging copy with digest revalidation
-  -> metadata-only GGUF inspection
-  -> architecture and available quantization validation
-  -> ModelStore import
-  -> post-import integrity verification
-  -> non-destructive failure when verification is invalid or unavailable
-  -> path-free InstalledModelDescriptor
+administrator-curated catalog
+  -> catalog validation
+  -> target and device compatibility
+  -> explicit Download
+  -> progress or cooperative cancellation
+  -> opaque verified download
+  -> explicit Install
+  -> verified ModelStore import
+  -> durable path-free catalog/profile metadata
+  -> installed state
+  -> explicit Use in Playground
+  -> integrity verification
+  -> selected model for local inference
 ```
 
 The implementation adds:
 
-- `VerifiedDownloadAccess` in `models/model-download`, which never exposes the verified backing path;
-- `models/model-install`, a UI-independent installation coordinator;
-- `LlamaCppGgufArtifactInspector`, an adapter over the existing metadata-only JNI bridge;
-- deterministic tests for opaque access, tampering, profile mismatch, revoked releases, inspection mismatch, import/verification failure, non-destructive failure handling and cleanup;
-- dedicated and cumulative CI coverage for catalog, download, installation and the backend adapter;
-- ADR 0007 and the installation operations document.
+- application dependencies on `models:model-catalog`, `models:model-download` and `models:model-install`;
+- Android `INTERNET` permission for secure remote model transfer;
+- device-aware catalog filtering for the phone-test application/use-case target;
+- Compose model cards for compatible, incompatible, downloading, verified, installing, installed, cancelled and failed states;
+- immediate publication of `DOWNLOADING` and `INSTALLING` before worker execution;
+- download byte progress, percentage and cooperative cancellation;
+- explicit installation through `VerifiedModelInstaller`, without implicit runtime activation;
+- schema-versioned, atomic persistence of catalog release, target and application-profile metadata by digest;
+- startup and refresh reconciliation between persisted metadata and the shared `ModelStore`;
+- explicit, integrity-checked selection of an installed catalog model for the existing Playground;
+- deterministic tests for metadata persistence, stale-record cleanup, progress, cancellation and installation;
+- an operational document covering the connected phone distribution flow.
 
-Installation still does not activate a binding, load the runtime or start inference.
+No download URL, signed URL or filesystem path is persisted in installed-model metadata.
 
 ## Ordered implementation plan
 
@@ -105,37 +115,27 @@ Status: **DONE through PRs #45 and #47**.
 
 ### Block 3 — verified-download installation boundary
 
-Status: **IMPLEMENTED; awaiting pull-request CI and merge**.
-
-Remaining acceptance before completion:
-
-- pass Spotless, Detekt, module unit tests and Android Lint;
-- pass cumulative repository validation and native packaging checks;
-- merge only after all public contracts, tests and documentation are consistent.
+Status: **DONE through PR #48**.
 
 ### Block 4 — connected catalog and installation UI
 
-Status: **NEXT after Block 3 is merged**.
+Status: **IMPLEMENTED in PR #49; awaiting complete CI and merge**.
 
-Extend `apps/local-llm-phone-test` with explicit states for:
+Acceptance requires:
 
-```text
-catalog unavailable
-catalog stale or expired
-release incompatible
-ready to download
-downloading
-verified, awaiting installation
-installing
-installed
-failed or cancelled
-```
-
-The user must explicitly select, download and install. Runtime activation remains a separate action or existing prepare flow.
+- validated catalog loading for the phone-test target;
+- compatible and incompatible release presentation;
+- explicit download, progress and cancellation;
+- verified-ready-to-install state;
+- explicit installation and installed-state refresh;
+- no implicit binding, runtime load or inference activation;
+- Spotless, Detekt, unit tests, Android Lint, packaging and cumulative repository validation all green.
 
 ### Block 5 — durable installed-model metadata
 
-Persist the path-free relationship among installed digest, catalog release, application-reviewed profile and target. Persistence must not activate or alter bindings implicitly.
+Status: **IMPLEMENTED in PR #49; awaiting complete CI and merge**.
+
+The persisted relationship is path-free and includes installed digest, catalog release, application-reviewed profile and target. Persistence does not activate or alter bindings implicitly.
 
 ### Block 6 — selective benchmark-history recovery
 
@@ -153,15 +153,16 @@ Recover unique verification, confirmation and loaded-model protection behavior f
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
 
-## Deferred from the installation slice
+## Deferred after the connected-distribution slice
 
+- remote administrator catalog synchronization and trust-policy wiring in the phone app;
 - transactional `ModelStore` creation provenance required for safe automatic rollback;
-- durable installed-model metadata persistence;
-- catalog/download/install Compose UI;
+- durable restoration of a verified-ready-to-install UI state without an explicit deduplicated Download action;
 - explicit application/use-case binding after installation;
 - cancellation during synchronous `ModelStore.import()`;
-- WorkManager or foreground-service execution;
-- physical-device remote-download and installation evidence.
+- WorkManager or foreground-service execution for long-running distribution operations;
+- parallel model downloads or installations;
+- physical-device remote-download, installation and inference evidence.
 
 ## Merge discipline
 
