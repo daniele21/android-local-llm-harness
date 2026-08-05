@@ -105,20 +105,38 @@ internal fun interface PhoneModelInstallGateway {
     fun install(request: ModelInstallationRequest, observer: ModelInstallationObserver): ModelInstallationResult
 }
 
+internal data class PhoneModelDistributionEnvironment(
+    val catalog: CatalogModelDocument,
+    val target: CatalogTarget,
+    val compatibilityEvaluator: CatalogCompatibilityEvaluator,
+    val deviceProfile: CatalogDeviceProfile,
+)
+
+internal data class PhoneModelDistributionServices(
+    val downloader: PhoneModelDownloadGateway,
+    val installer: PhoneModelInstallGateway,
+    val discardVerifiedDownload: (VerifiedDownloadHandle) -> Boolean,
+    val metadataRepository: InstalledCatalogMetadataRepository,
+    val modelExists: (ModelDigest) -> Boolean,
+    val clock: () -> Long,
+)
+
 internal class PhoneModelDistributionController(
-    private val catalog: CatalogModelDocument,
-    private val target: CatalogTarget,
-    private val compatibilityEvaluator: CatalogCompatibilityEvaluator,
-    private val deviceProfile: CatalogDeviceProfile,
-    private val downloader: PhoneModelDownloadGateway,
-    private val installer: PhoneModelInstallGateway,
-    private val discardVerifiedDownload: (VerifiedDownloadHandle) -> Boolean,
-    private val metadataRepository: InstalledCatalogMetadataRepository,
-    private val modelExists: (ModelDigest) -> Boolean,
-    private val clock: () -> Long,
+    environment: PhoneModelDistributionEnvironment,
+    services: PhoneModelDistributionServices,
     private val listener: PhoneModelDistributionListener,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : AutoCloseable {
+    private val catalog = environment.catalog
+    private val target = environment.target
+    private val compatibilityEvaluator = environment.compatibilityEvaluator
+    private val deviceProfile = environment.deviceProfile
+    private val downloader = services.downloader
+    private val installer = services.installer
+    private val discardVerifiedDownload = services.discardVerifiedDownload
+    private val metadataRepository = services.metadataRepository
+    private val modelExists = services.modelExists
+    private val clock = services.clock
     private val lock = Any()
     private val releases = CatalogQueries.releasesForTarget(catalog, target).associateBy(::stableId)
     private val compatibility = releases.mapValues { (_, release) ->
@@ -463,29 +481,37 @@ internal class PhoneModelDistributionController(
                 File(appContext.noBackupFilesDir, METADATA_DIRECTORY),
             )
             return PhoneModelDistributionController(
-                catalog = catalog,
-                target = TARGET,
-                compatibilityEvaluator = evaluator,
-                deviceProfile = appContext.catalogDeviceProfile(),
-                downloader = object : PhoneModelDownloadGateway {
-                    override fun download(
-                        release: CatalogModelRelease,
-                        observer: DownloadProgressObserver,
-                        cancellationToken: DownloadCancellationToken,
-                    ): ModelDownloadResult = secureDownloader.download(
-                        ModelDownloadRequest(release.artifact),
-                        observer,
-                        cancellationToken,
-                    )
-                },
-                installer = object : PhoneModelInstallGateway {
-                    override fun install(request: ModelInstallationRequest, observer: ModelInstallationObserver): ModelInstallationResult =
-                        installer.install(request, observer)
-                },
-                discardVerifiedDownload = verifiedAccess::discard,
-                metadataRepository = metadataRepository,
-                modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
-                clock = System::currentTimeMillis,
+                environment =
+                PhoneModelDistributionEnvironment(
+                    catalog = catalog,
+                    target = TARGET,
+                    compatibilityEvaluator = evaluator,
+                    deviceProfile = appContext.catalogDeviceProfile(),
+                ),
+                services =
+                PhoneModelDistributionServices(
+                    downloader = object : PhoneModelDownloadGateway {
+                        override fun download(
+                            release: CatalogModelRelease,
+                            observer: DownloadProgressObserver,
+                            cancellationToken: DownloadCancellationToken,
+                        ): ModelDownloadResult = secureDownloader.download(
+                            ModelDownloadRequest(release.artifact),
+                            observer,
+                            cancellationToken,
+                        )
+                    },
+                    installer = object : PhoneModelInstallGateway {
+                        override fun install(
+                            request: ModelInstallationRequest,
+                            observer: ModelInstallationObserver,
+                        ): ModelInstallationResult = installer.install(request, observer)
+                    },
+                    discardVerifiedDownload = verifiedAccess::discard,
+                    metadataRepository = metadataRepository,
+                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
+                    clock = System::currentTimeMillis,
+                ),
                 listener = listener,
             )
         }

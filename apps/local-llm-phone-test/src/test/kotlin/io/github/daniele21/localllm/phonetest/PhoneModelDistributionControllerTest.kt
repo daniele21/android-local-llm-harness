@@ -160,33 +160,39 @@ class PhoneModelDistributionControllerTest {
         discard: (VerifiedDownloadHandle) -> Boolean,
         listener: (PhoneModelDistributionState) -> Unit,
     ): PhoneModelDistributionController = PhoneModelDistributionController(
-        catalog = DOCUMENT,
-        target = TARGET,
-        compatibilityEvaluator =
-        CatalogCompatibilityEvaluator(
-            versionMatcher = object : CatalogVersionMatcher {
-                override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean = true
-            },
-            profileResolver = object : CatalogProfileResolver {
-                override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
-                    profileKey == PROFILE_KEY && target == TARGET
-            },
+        environment =
+        PhoneModelDistributionEnvironment(
+            catalog = DOCUMENT,
+            target = TARGET,
+            compatibilityEvaluator =
+            CatalogCompatibilityEvaluator(
+                versionMatcher = object : CatalogVersionMatcher {
+                    override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean = true
+                },
+                profileResolver = object : CatalogProfileResolver {
+                    override fun supports(profileKey: ModelProfileKey, target: CatalogTarget): Boolean =
+                        profileKey == PROFILE_KEY && target == TARGET
+                },
+            ),
+            deviceProfile =
+            CatalogDeviceProfile(
+                sdkInt = 36,
+                supportedAbis = setOf("arm64-v8a"),
+                totalMemoryBytes = 8_000_000_000L,
+                availableStorageBytes = 4_000_000_000L,
+                harnessVersion = "1.0.0",
+                backendId = "llama.cpp",
+            ),
         ),
-        deviceProfile =
-        CatalogDeviceProfile(
-            sdkInt = 36,
-            supportedAbis = setOf("arm64-v8a"),
-            totalMemoryBytes = 8_000_000_000L,
-            availableStorageBytes = 4_000_000_000L,
-            harnessVersion = "1.0.0",
-            backendId = "llama.cpp",
+        services =
+        PhoneModelDistributionServices(
+            downloader = downloadGateway,
+            installer = installGateway,
+            discardVerifiedDownload = discard,
+            metadataRepository = metadataRepository,
+            modelExists = installedDigests::contains,
+            clock = { NOW },
         ),
-        downloader = downloadGateway,
-        installer = installGateway,
-        discardVerifiedDownload = discard,
-        metadataRepository = metadataRepository,
-        modelExists = installedDigests::contains,
-        clock = { NOW },
         listener = PhoneModelDistributionListener(listener),
         executor = executor,
     )

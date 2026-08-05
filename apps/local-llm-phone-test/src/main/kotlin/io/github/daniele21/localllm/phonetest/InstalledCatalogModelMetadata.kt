@@ -84,7 +84,20 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
                 encode(metadata).store(output, null)
                 output.fd.sync()
             }
-            moveIntoPlace(temporary, destination)
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    destination.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(
+                    temporary.toPath(),
+                    destination.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
             true
         } catch (_: IOException) {
             false
@@ -165,19 +178,6 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
     private fun fileFor(digest: ModelDigest): File {
         require(SHA_256.matches(digest.sha256)) { "Invalid installed-model digest" }
         return File(root, digest.sha256 + FILE_SUFFIX)
-    }
-
-    private fun moveIntoPlace(source: File, destination: File) {
-        try {
-            Files.move(
-                source.toPath(),
-                destination.toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
     }
 
     private fun Properties.required(key: String): String = requireNotNull(getProperty(key)).also { value -> require(value.isNotBlank()) }
