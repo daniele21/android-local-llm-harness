@@ -93,4 +93,29 @@ public interface TelemetryDao {
 
     @Query("SELECT * FROM benchmark_baselines ORDER BY baseline_id ASC")
     List<TelemetryEntities.BenchmarkBaselineEntity> benchmarkBaselines();
+
+    @Insert
+    long insertBenchmarkBaselineHistory(
+            TelemetryEntities.BenchmarkBaselineHistoryEntity baseline);
+
+    @Query(
+            "SELECT * FROM benchmark_baseline_history "
+                    + "ORDER BY captured_at_epoch_ms DESC, id DESC LIMIT :limit")
+    List<TelemetryEntities.BenchmarkBaselineHistoryEntity> benchmarkBaselineHistory(int limit);
+
+    @Query(
+            "DELETE FROM benchmark_baseline_history WHERE id NOT IN ("
+                    + "SELECT id FROM benchmark_baseline_history "
+                    + "ORDER BY captured_at_epoch_ms DESC, id DESC LIMIT :maxRows)")
+    void trimBenchmarkBaselineHistory(int maxRows);
+
+    @Transaction
+    default void saveBenchmarkBaselineWithHistory(
+            TelemetryEntities.BenchmarkBaselineEntity activeBaseline,
+            TelemetryEntities.BenchmarkBaselineHistoryEntity historicalBaseline,
+            int maxRows) {
+        upsertBenchmarkBaseline(activeBaseline);
+        insertBenchmarkBaselineHistory(historicalBaseline);
+        trimBenchmarkBaselineHistory(maxRows);
+    }
 }

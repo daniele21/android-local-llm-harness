@@ -140,9 +140,9 @@ The persisted relationship is path-free and includes installed digest, catalog r
 
 ### Block 6 — selective benchmark-history recovery
 
-Status: **NEXT**.
+Status: **IMPLEMENTED; awaiting pull-request CI and merge**.
 
-Recover only unique retained-history behavior from PR #33 on a fresh branch from current `main`.
+Recovered on the current phone-test architecture: immutable retained captures, active-versus-history semantics, bounded in-memory and Room persistence, a non-destructive Room 3→4 migration and historical presentation. The obsolete standalone console was not restored.
 
 ### Block 7 — selective model-management recovery
 

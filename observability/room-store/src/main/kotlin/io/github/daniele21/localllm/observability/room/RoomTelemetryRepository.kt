@@ -65,7 +65,11 @@ class RoomTelemetryRepository internal constructor(
 
     override fun saveBenchmarkBaseline(baseline: BenchmarkBaseline) {
         executeAsync {
-            dao.upsertBenchmarkBaseline(TelemetryEntityMapper.benchmarkEntity(baseline))
+            dao.saveBenchmarkBaselineWithHistory(
+                TelemetryEntityMapper.benchmarkEntity(baseline),
+                TelemetryEntityMapper.benchmarkHistoryEntity(baseline),
+                retention.maxBenchmarkBaselines,
+            )
         }
     }
 
@@ -96,7 +100,11 @@ class RoomTelemetryRepository internal constructor(
     }
 
     override fun benchmarkBaselines(): List<BenchmarkBaseline> = executeBlocking {
-        dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline)
+        dao.benchmarkBaselines().map { TelemetryEntityMapper.benchmarkBaseline(it) }
+    }
+
+    override fun benchmarkBaselineHistory(limit: Int): List<BenchmarkBaseline> = executeBlocking {
+        dao.benchmarkBaselineHistory(requirePositiveLimit(limit)).map { TelemetryEntityMapper.benchmarkBaseline(it) }
     }
 
     override fun dashboard(runtime: RuntimeSnapshot): DeveloperDashboardSnapshot = executeBlocking {
@@ -107,7 +115,7 @@ class RoomTelemetryRepository internal constructor(
             health = dao.healthResults().map(TelemetryEntityMapper::healthResult),
             resources = dao.recentResourceSnapshots(retention.maxResourceSnapshots)
                 .map(TelemetryEntityMapper::resourceSnapshot),
-            benchmarkBaselines = dao.benchmarkBaselines().map(TelemetryEntityMapper::benchmarkBaseline),
+            benchmarkBaselines = dao.benchmarkBaselines().map { TelemetryEntityMapper.benchmarkBaseline(it) },
             modelStoreBytes = 0L,
             modelCount = 0,
         )
@@ -208,6 +216,47 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS benchmark_baseline_history (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "application_id TEXT NOT NULL, " +
+                        "use_case_id TEXT NOT NULL, " +
+                        "model_digest TEXT NOT NULL, " +
+                        "model_load_kind TEXT NOT NULL, " +
+                        "captured_at_epoch_ms INTEGER NOT NULL, " +
+                        "sample_count INTEGER NOT NULL, " +
+                        "median_time_to_first_token_ms REAL, " +
+                        "p95_time_to_first_token_ms REAL, " +
+                        "median_total_ms REAL, " +
+                        "p95_total_ms REAL, " +
+                        "median_decode_tokens_per_second REAL)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_benchmark_baseline_history_captured_at_epoch_ms " +
+                        "ON benchmark_baseline_history(captured_at_epoch_ms)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "index_benchmark_baseline_history_application_id_use_case_id_model_digest_model_load_kind " +
+                        "ON benchmark_baseline_history(" +
+                        "application_id, use_case_id, model_digest, model_load_kind)",
+                )
+                database.execSQL(
+                    "INSERT INTO benchmark_baseline_history (" +
+                        "application_id, use_case_id, model_digest, model_load_kind, " +
+                        "captured_at_epoch_ms, sample_count, median_time_to_first_token_ms, " +
+                        "p95_time_to_first_token_ms, median_total_ms, p95_total_ms, " +
+                        "median_decode_tokens_per_second) " +
+                        "SELECT application_id, use_case_id, model_digest, model_load_kind, " +
+                        "captured_at_epoch_ms, sample_count, median_time_to_first_token_ms, " +
+                        "p95_time_to_first_token_ms, median_total_ms, p95_total_ms, " +
+                        "median_decode_tokens_per_second FROM benchmark_baselines",
+                )
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -218,7 +267,7 @@ class RoomTelemetryRepository internal constructor(
                 context.applicationContext,
                 TelemetryDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
             }

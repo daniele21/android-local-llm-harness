@@ -26,4 +26,6 @@ android {
 
 dependencies {
     api(project(":observability:contracts"))
+
+    testImplementation(libs.junit4)
 }

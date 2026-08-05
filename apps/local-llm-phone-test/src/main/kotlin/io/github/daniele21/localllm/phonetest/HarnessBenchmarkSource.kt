@@ -22,6 +22,18 @@ internal data class BenchmarkUi(
     val regressionDetail: String,
 )
 
+internal data class BenchmarkHistoryUi(
+    val stableId: String,
+    val useCase: String,
+    val loadKind: String,
+    val capturedAt: String,
+    val samples: String,
+    val medianTtft: String,
+    val p95Total: String,
+    val medianDecode: String,
+    val active: Boolean,
+)
+
 internal data class BenchmarkReadinessUi(
     val stableId: String,
     val useCase: String,
@@ -39,6 +51,7 @@ internal data class BenchmarkReadinessUi(
 internal data class BenchmarkUiState(
     val baselines: List<BenchmarkUi> = emptyList(),
     val readiness: List<BenchmarkReadinessUi> = emptyList(),
+    val history: List<BenchmarkHistoryUi> = emptyList(),
     val eligibleKeys: Int = 0,
     val captureDetail: String? = null,
     val sourceError: String? = null,
@@ -50,12 +63,16 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
     fun snapshot(captureDetail: String? = null): BenchmarkUiState = runCatching {
         val model = selectedModel()
         val keys = model?.let(::knownKeys).orEmpty()
+        val activeBaselines = repository.benchmarkBaselines()
         BenchmarkUiState(
-            baselines = repository.benchmarkBaselines()
+            baselines = activeBaselines
                 .filter { model == null || it.key.modelDigest == model.digest }
                 .sortedWith(compareBy({ it.key.useCaseId.value }, { it.key.modelLoadKind.name }))
                 .map(::toUi),
             readiness = keys.map(::toReadinessUi),
+            history = repository.benchmarkBaselineHistory(HISTORY_LIMIT)
+                .filter { model == null || it.key.modelDigest == model.digest }
+                .map { baseline -> baseline.toHistoryUi(activeBaselines) },
             eligibleKeys = keys.size,
             captureDetail = captureDetail,
         )
@@ -191,12 +208,6 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
         modelDigest == key.modelDigest &&
         modelLoadKind == key.modelLoadKind
 
-    private fun BenchmarkKey.safeStableId(): String = listOf(
-        applicationId.value,
-        useCaseId.value,
-        modelLoadKind.name,
-    ).joinToString(separator = ":")
-
     private fun toUi(baseline: BenchmarkBaseline): BenchmarkUi {
         val assessment = BenchmarkRegressionHealthCheck(repository, baseline.key).evaluate()
         return BenchmarkUi(
@@ -214,6 +225,7 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
 
     private companion object {
         const val RUN_LOOKBACK = 500
+        const val HISTORY_LIMIT = 100
         const val BASELINE_WINDOW_SIZE = 20
         const val COMPARISON_WINDOW_SIZE = 10
         const val BASELINE_REQUIRED_SAMPLES = 5
@@ -221,6 +233,24 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
         const val SOURCE_ERROR = "Benchmark diagnostics are temporarily unavailable."
     }
 }
+
+private fun BenchmarkBaseline.toHistoryUi(activeBaselines: List<BenchmarkBaseline>): BenchmarkHistoryUi = BenchmarkHistoryUi(
+    stableId = "${key.safeStableId()}:$capturedAtEpochMs",
+    useCase = key.useCaseId.value,
+    loadKind = key.modelLoadKind.name,
+    capturedAt = java.time.Instant.ofEpochMilli(capturedAtEpochMs).toString(),
+    samples = sampleCount.toString(),
+    medianTtft = medianTimeToFirstTokenMs.asMilliseconds(),
+    p95Total = p95TotalMs.asMilliseconds(),
+    medianDecode = medianDecodeTokensPerSecond.asThroughput(),
+    active = activeBaselines.any { it == this },
+)
+
+private fun BenchmarkKey.safeStableId(): String = listOf(
+    applicationId.value,
+    useCaseId.value,
+    modelLoadKind.name,
+).joinToString(separator = ":")
 
 private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(it) } ?: "Unavailable"
 

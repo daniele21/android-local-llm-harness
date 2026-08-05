@@ -746,6 +746,7 @@ class MainActivity :
                 HarnessMetricRow {
                     HarnessMetric("Baselines", benchmarkState.baselines.size.toString(), Modifier.weight(1f))
                     HarnessMetric("Known keys", benchmarkState.readiness.size.toString(), Modifier.weight(1f))
+                    HarnessMetric("History", benchmarkState.history.size.toString(), Modifier.weight(1f))
                 }
                 Text(
                     benchmarkState.sourceError
@@ -803,6 +804,30 @@ class MainActivity :
                 }
             }
         }
+        if (benchmarkState.history.isNotEmpty()) {
+            item {
+                Text("Retained baseline history", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+        items(benchmarkState.history, key = { "history:${it.stableId}" }) { history ->
+            HarnessCard {
+                Text(
+                    "${history.useCase} · ${history.loadKind}",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(history.capturedAt)
+                HarnessMetricRow {
+                    HarnessMetric("State", if (history.active) "Active" else "Historical", Modifier.weight(1f))
+                    HarnessMetric("Samples", history.samples, Modifier.weight(1f))
+                }
+                HarnessMetricRow {
+                    HarnessMetric("Median TTFT", history.medianTtft, Modifier.weight(1f))
+                    HarnessMetric("p95 total", history.p95Total, Modifier.weight(1f))
+                }
+                HarnessMetric("Median decode", history.medianDecode)
+            }
+        }
+
         items(benchmarkState.baselines, key = { "baseline:${it.stableId}" }) { benchmark ->
             HarnessCard {
                 Text(
