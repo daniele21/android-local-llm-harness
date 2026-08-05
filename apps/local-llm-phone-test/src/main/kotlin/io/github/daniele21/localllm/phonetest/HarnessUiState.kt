@@ -133,8 +133,11 @@ internal object HarnessUiReducer {
 
     private fun reducePlayground(state: HarnessUiState, event: HarnessUiEvent.Playground): HarnessUiState = when (event) {
         is HarnessUiEvent.PlaygroundChanged -> state.copy(playground = event.state)
+
         is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
+
         is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens)
+
         is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
             playgroundTemperature = event.temperature,
         )
