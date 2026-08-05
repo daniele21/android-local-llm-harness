@@ -42,12 +42,19 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-      - name: Validate secure downloader
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+      - name: Validate formatting, static analysis and repository guard
         run: |
-          chmod +x gradlew
           ./gradlew --no-configuration-cache --stacktrace \
             spotlessCheck \
             detekt \
-            verifyNoModelArtifacts \
-            :models:model-download:testDebugUnitTest \
+            verifyNoModelArtifacts
+      - name: Test secure downloader
+        run: |
+          ./gradlew --no-configuration-cache --stacktrace \
+            :models:model-download:testDebugUnitTest
+      - name: Lint secure downloader
+        run: |
+          ./gradlew --no-configuration-cache --stacktrace \
             :models:model-download:lintDebug
