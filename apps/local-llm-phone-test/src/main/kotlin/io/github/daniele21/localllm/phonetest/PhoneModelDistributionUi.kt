@@ -19,10 +19,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
 @Composable
-internal fun PhoneModelDistributionCatalog(
-    state: PhoneModelDistributionState,
-    actions: PhoneModelDistributionActions,
-) {
+internal fun PhoneModelDistributionCatalog(state: PhoneModelDistributionState, actions: PhoneModelDistributionActions) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HarnessCard {
             Text("Model catalog", style = MaterialTheme.typography.titleLarge)
@@ -53,11 +50,7 @@ internal fun PhoneModelDistributionCatalog(
 }
 
 @Composable
-private fun CatalogModelCard(
-    model: PhoneCatalogModelUi,
-    operationActive: Boolean,
-    actions: PhoneModelDistributionActions,
-) {
+private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
     HarnessCard {
         Text(model.displayName, style = MaterialTheme.typography.titleLarge)
         Text(model.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -131,11 +124,7 @@ private fun CatalogModelCard(
 }
 
 @Composable
-private fun InstalledModelActions(
-    model: PhoneCatalogModelUi,
-    operationActive: Boolean,
-    actions: PhoneModelDistributionActions,
-) {
+private fun InstalledModelActions(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
     val installed = model.installedModel ?: return
     HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
     Text(

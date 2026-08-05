@@ -123,7 +123,7 @@ class MainActivity :
         controller = PhoneTestController(this, this)
         selectedModelManagement = ModelStorePhoneModelManagementControl(
             modelStore = runtimeGraph.modelStore,
-            protectedModelDigest = runtimeGraph::loadedModelDigest,
+            protectedModelDigest = { runtimeGraph.loadedModelDigest },
             removeMetadata = { true },
         )
         modelDistributionController = PhoneModelDistributionController.from(
@@ -179,6 +179,7 @@ class MainActivity :
         selectedModelForDiagnostics = model
         runOnUiThread {
             importedModel = model
+            selectedRemovalConfirmationPending = false
             if (::modelDistributionController.isInitialized) {
                 modelDistributionController.refresh()
             }
@@ -556,18 +557,21 @@ class MainActivity :
             item {
                 PhoneModelDistributionCatalog(
                     state = modelDistributionState,
-                    onDownload = modelDistributionController::download,
-                    onCancel = modelDistributionController::cancelDownload,
-                    onInstall = modelDistributionController::install,
-                    onVerifyInstalled = modelDistributionController::verifyInstalled,
-                    onRequestRemove = modelDistributionController::requestRemove,
-                    onCancelRemove = modelDistributionController::cancelRemove,
-                    onConfirmRemove = modelDistributionController::confirmRemove,
-                    onSelectInstalled = { metadata ->
-                        afterPlaygroundRuntimeReleased {
-                            controller.selectInstalledModel(metadata.asImportedPhoneModel())
-                        }
-                    },
+                    actions =
+                    PhoneModelDistributionActions(
+                        download = modelDistributionController::download,
+                        cancelDownload = modelDistributionController::cancelDownload,
+                        install = modelDistributionController::install,
+                        verifyInstalled = modelDistributionController::verifyInstalled,
+                        requestRemove = modelDistributionController::requestRemove,
+                        cancelRemove = modelDistributionController::cancelRemove,
+                        confirmRemove = modelDistributionController::confirmRemove,
+                        selectInstalled = { metadata ->
+                            afterPlaygroundRuntimeReleased {
+                                controller.selectInstalledModel(metadata.asImportedPhoneModel())
+                            }
+                        },
+                    ),
                 )
             }
             item {
@@ -600,8 +604,32 @@ class MainActivity :
                         }
                         HarnessMetric("SHA-256", model.digest.sha256.take(24) + "…")
                         HarnessMetric("Size", formatBytes(model.sizeBytes))
-                        HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
-                            afterPlaygroundRuntimeReleased { controller.removeModel() }
+                        HarnessSecondaryButton(
+                            "Verify integrity",
+                            enabled = !isBusy(),
+                            onClick = ::verifySelectedModel,
+                        )
+                        if (selectedRemovalConfirmationPending) {
+                            Text(
+                                "Removal permanently deletes the app-private model copy.",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            HarnessPrimaryButton(
+                                "Confirm removal",
+                                enabled = !isBusy(),
+                            ) {
+                                afterPlaygroundRuntimeReleased {
+                                    selectedRemovalConfirmationPending = false
+                                    controller.removeModel()
+                                }
+                            }
+                            HarnessSecondaryButton("Cancel removal") {
+                                selectedRemovalConfirmationPending = false
+                            }
+                        } else {
+                            HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
+                                selectedRemovalConfirmationPending = true
+                            }
                         }
                     }
                 }

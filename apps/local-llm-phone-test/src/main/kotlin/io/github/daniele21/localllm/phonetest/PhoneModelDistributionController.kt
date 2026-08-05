@@ -492,8 +492,7 @@ internal class PhoneModelDistributionController(
             compatibilityWarnings = result.warnings.map { it.name },
             bytesDownloaded = runtime?.bytesDownloaded ?: 0L,
             expectedBytes = runtime?.expectedBytes ?: release.artifact.sizeBytes,
-            detail =
-            managementDetails[stableId] ?: runtime?.detail,
+            detail = managementDetails[stableId] ?: runtime?.detail,
             installedModel = installedMetadata,
             removalConfirmationPending = pendingRemovalStableId == stableId,
         )
@@ -566,7 +565,7 @@ internal class PhoneModelDistributionController(
             )
             val management = ModelStorePhoneModelManagementControl(
                 modelStore = runtimeGraph.modelStore,
-                protectedModelDigest = runtimeGraph::loadedModelDigest,
+                protectedModelDigest = { runtimeGraph.loadedModelDigest },
                 removeMetadata = metadataRepository::remove,
             )
             return PhoneModelDistributionController(
