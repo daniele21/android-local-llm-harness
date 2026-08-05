@@ -40,6 +40,142 @@ jobs:
         with:
           cache-provider: basic
 
+      - name: Apply deterministic Detekt refactor
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          codec_path = Path("models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogCodec.kt")
+          codec = codec_path.read_text()
+          old_codec = '''private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
+              val raw = (requiredValue(name, path) as? CatalogJsonNumber)?.raw
+                  ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, "$path.$name")
+              if (raw.any { it == '.' || it == 'e' || it == 'E' }) {
+                  throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
+              }
+              return raw.toLongOrNull() ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, "$path.$name")
+          }
+          '''
+          new_codec = '''private fun CatalogJsonObject.requiredLong(name: String, path: String): Long {
+              val fieldPath = "$path.$name"
+              val raw = (requiredValue(name, path) as? CatalogJsonNumber)?.raw
+                  ?: throw CatalogMappingException(CatalogCodecErrorCode.INVALID_FIELD_TYPE, fieldPath)
+              if (raw.any { it == '.' || it == 'e' || it == 'E' }) invalidCatalogNumber(fieldPath)
+              return raw.toLongOrNull() ?: invalidCatalogNumber(fieldPath)
+          }
+
+          private fun invalidCatalogNumber(path: String): Nothing =
+              throw CatalogMappingException(CatalogCodecErrorCode.INVALID_NUMBER, path)
+          '''
+          if old_codec not in codec:
+              raise SystemExit("CatalogCodec requiredLong block not found")
+          codec_path.write_text(codec.replace(old_codec, new_codec))
+
+          persistence_path = Path("models/model-catalog/src/main/kotlin/io/github/daniele21/localllm/catalog/CatalogPersistence.kt")
+          persistence = persistence_path.read_text()
+          old_read_state = '''    private fun readState(): RepositoryState? {
+              val file = stateFile()
+              if (!file.exists()) return null
+              if (!file.isFile || file.length() > maxStateBytes) throw CatalogStateException()
+              val bytes = readBoundedState(file)
+              val root = STATE_PARSER.parse(bytes) as? CatalogJsonObject ?: throw CatalogStateException()
+              requireFields(root, STATE_FIELDS)
+              val schemaVersion = requiredLong(root, "storageSchemaVersion")
+              if (schemaVersion != STORAGE_SCHEMA_VERSION.toLong()) throw CatalogStateException()
+              val persistedAt = requiredLong(root, "persistedAtEpochMs")
+              if (persistedAt < 0) throw CatalogStateException()
+              val catalogString = optionalString(root, "catalogJson")
+              val document = catalogString?.let { encoded ->
+                  when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
+                      is CatalogDecodeResult.Success -> decoded.document
+                      is CatalogDecodeResult.Failure -> throw CatalogStateException()
+                  }
+              }
+              val metadata = optionalObject(root, "syncMetadata")?.let(::decodeMetadata)
+              val failure = optionalObject(root, "lastFailure")?.let(::decodeFailure)
+              if ((document == null) != (metadata == null)) throw CatalogStateException()
+              return RepositoryState(
+                  document = document,
+                  encodedDocument = catalogString?.toByteArray(Charsets.UTF_8),
+                  syncMetadata = metadata,
+                  lastFailure = failure,
+                  persistedAtEpochMs = persistedAt,
+              )
+          }
+          '''
+          new_read_state = '''    private fun readState(): RepositoryState? {
+              val file = stateFile()
+              if (!file.exists()) return null
+              ensureValidState(file.isFile && file.length() <= maxStateBytes)
+              val bytes = readBoundedState(file)
+              val root = STATE_PARSER.parse(bytes) as? CatalogJsonObject ?: invalidState()
+              requireFields(root, STATE_FIELDS)
+              val schemaVersion = requiredLong(root, "storageSchemaVersion")
+              ensureValidState(schemaVersion == STORAGE_SCHEMA_VERSION.toLong())
+              val persistedAt = requiredLong(root, "persistedAtEpochMs")
+              ensureValidState(persistedAt >= 0)
+              val catalogString = optionalString(root, "catalogJson")
+              val document = catalogString?.let { encoded ->
+                  when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
+                      is CatalogDecodeResult.Success -> decoded.document
+                      is CatalogDecodeResult.Failure -> invalidState()
+                  }
+              }
+              val metadata = optionalObject(root, "syncMetadata")?.let(::decodeMetadata)
+              val failure = optionalObject(root, "lastFailure")?.let(::decodeFailure)
+              ensureValidState((document == null) == (metadata == null))
+              return RepositoryState(
+                  document = document,
+                  encodedDocument = catalogString?.toByteArray(Charsets.UTF_8),
+                  syncMetadata = metadata,
+                  lastFailure = failure,
+                  persistedAtEpochMs = persistedAt,
+              )
+          }
+
+          private fun ensureValidState(valid: Boolean) {
+              if (!valid) invalidState()
+          }
+
+          private fun invalidState(): Nothing = throw CatalogStateException()
+          '''
+          if old_read_state not in persistence:
+              raise SystemExit("CatalogPersistence readState block not found")
+          persistence = persistence.replace(old_read_state, new_read_state)
+
+          old_require_fields = '''private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
+              if (value.fields.keys != expected) throw IllegalArgumentException("Unexpected catalog state fields")
+          }
+          '''
+          new_require_fields = '''private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
+              require(value.fields.keys == expected) { "Unexpected catalog state fields" }
+          }
+          '''
+          if old_require_fields not in persistence:
+              raise SystemExit("CatalogPersistence requireFields block not found")
+          persistence = persistence.replace(old_require_fields, new_require_fields)
+
+          old_required_long = '''private fun requiredLong(value: CatalogJsonObject, name: String): Long {
+              val raw = (requiredValue(value, name) as? CatalogJsonNumber)?.raw
+                  ?: throw IllegalArgumentException("Invalid catalog state number")
+              if (raw.any { it == '.' || it == 'e' || it == 'E' }) throw IllegalArgumentException("Invalid catalog state integer")
+              return raw.toLongOrNull() ?: throw IllegalArgumentException("Catalog state integer out of range")
+          }
+          '''
+          new_required_long = '''private fun requiredLong(value: CatalogJsonObject, name: String): Long {
+              val number = requiredValue(value, name) as? CatalogJsonNumber
+              requireNotNull(number) { "Invalid catalog state number" }
+              val raw = number.raw
+              require(raw.none { it == '.' || it == 'e' || it == 'E' }) { "Invalid catalog state integer" }
+              return requireNotNull(raw.toLongOrNull()) { "Catalog state integer out of range" }
+          }
+          '''
+          if old_required_long not in persistence:
+              raise SystemExit("CatalogPersistence requiredLong block not found")
+          persistence_path.write_text(persistence.replace(old_required_long, new_required_long))
+          PY
+
       - name: Format and validate curated catalog
         shell: bash
         run: |
@@ -56,18 +192,13 @@ jobs:
             :models:model-catalog:lintDebug
           git diff --check
 
-      - name: Publish formatted staging tree
+      - name: Publish validated staging tree
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet; then
-            echo "Formatter produced no changes"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add models/model-catalog docs/curated-model-catalog.md
-          git commit -m "style: apply repository formatter to curated catalog"
+          git diff --cached --quiet && exit 0
+          git commit -m "style: validate and format curated catalog"
           git push origin HEAD:agent/model-catalog-curated-staging
-
-# Retry after aligning the curated catalog constant naming with ktlint.
