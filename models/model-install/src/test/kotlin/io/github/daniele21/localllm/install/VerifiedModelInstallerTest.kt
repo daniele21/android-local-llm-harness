@@ -101,6 +101,25 @@ class VerifiedModelInstallerTest {
     }
 
     @Test
+    fun rejectsTargetNotAllowedBeforeReadingVerifiedBytes() {
+        val root = Files.createTempDirectory("model-install-test").toFile()
+        val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
+        val store = FakeModelStore(root)
+        val disallowed =
+            CatalogTarget(
+                applicationId = ApplicationId("other-app"),
+                useCaseId = UseCaseId("manual"),
+            )
+
+        val result = installer(root, access, store).install(request().copy(target = disallowed))
+
+        result as ModelInstallationResult.Failure
+        assertEquals(ModelInstallationFailureCode.TARGET_NOT_ALLOWED, result.code)
+        assertEquals(0, access.copyCount)
+        assertEquals(0, store.importCount)
+    }
+
+    @Test
     fun rejectsUnavailableVerifiedDownloadWithoutImporting() {
         val root = Files.createTempDirectory("model-install-test").toFile()
         val access =
@@ -143,10 +162,38 @@ class VerifiedModelInstallerTest {
     }
 
     @Test
+    fun mapsModelStoreImportFailureAndRetainsVerifiedDownload() {
+        val root = Files.createTempDirectory("model-install-test").toFile()
+        val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
+        val store = FakeModelStore(root, importFailure = true)
+
+        val result = installer(root, access, store).install(request())
+
+        result as ModelInstallationResult.Failure
+        assertEquals(ModelInstallationFailureCode.MODEL_STORE_IMPORT_FAILED, result.code)
+        assertFalse(access.discarded)
+        assertEquals(0, store.verifyCount)
+    }
+
+    @Test
     fun removesImportedModelWhenPostImportVerificationFails() {
         val root = Files.createTempDirectory("model-install-test").toFile()
         val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
         val store = FakeModelStore(root, verificationValid = false)
+
+        val result = installer(root, access, store).install(request())
+
+        result as ModelInstallationResult.Failure
+        assertEquals(ModelInstallationFailureCode.POST_IMPORT_VERIFICATION_FAILED, result.code)
+        assertEquals(1, store.removeCount)
+        assertFalse(access.discarded)
+    }
+
+    @Test
+    fun removesImportedModelWhenPostImportVerificationThrows() {
+        val root = Files.createTempDirectory("model-install-test").toFile()
+        val access = FakeVerifiedDownloadAccess(MODEL_BYTES)
+        val store = FakeModelStore(root, verificationFailure = true)
 
         val result = installer(root, access, store).install(request())
 
@@ -253,6 +300,8 @@ class VerifiedModelInstallerTest {
     private class FakeModelStore(
         private val root: File,
         private val verificationValid: Boolean = true,
+        private val verificationFailure: Boolean = false,
+        private val importFailure: Boolean = false,
     ) : ModelStore {
         var importCount = 0
         var verifyCount = 0
@@ -262,6 +311,9 @@ class VerifiedModelInstallerTest {
 
         override fun import(source: File, artifact: GgufArtifact): StoredModel {
             importCount += 1
+            if (importFailure) {
+                throw ModelImportException(ModelImportErrorCode.IO_FAILURE, "fixed")
+            }
             if (!source.isFile) {
                 throw ModelImportException(ModelImportErrorCode.INVALID_SOURCE, "missing")
             }
@@ -275,6 +327,7 @@ class VerifiedModelInstallerTest {
 
         override fun verify(digest: ModelDigest): VerificationResult {
             verifyCount += 1
+            if (verificationFailure) throw IllegalStateException("fixed")
             return VerificationResult(verificationValid, digest, "fixed")
         }
 
