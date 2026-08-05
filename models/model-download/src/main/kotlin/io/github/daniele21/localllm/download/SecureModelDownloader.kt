@@ -40,12 +40,7 @@ class SecureModelDownloader(
         }
     }
 
-    private fun transfer(
-        initialUri: URI,
-        artifact: CatalogGgufArtifact,
-        partFile: File,
-        request: DownloadRequest,
-    ): TransferResult {
+    private fun transfer(initialUri: URI, artifact: CatalogGgufArtifact, partFile: File, request: DownloadRequest): TransferResult {
         var current = initialUri
         var redirects = 0
         while (true) {
@@ -136,29 +131,23 @@ class SecureModelDownloader(
         }
     }
 
-    private fun importVerified(
-        partFile: File,
-        artifact: CatalogGgufArtifact,
-        downloadedBytes: Long,
-    ): DownloadResult =
-        try {
-            val stored = modelStore.import(partFile, artifact.toStoreArtifact())
-            DownloadResult.Installed(stored, downloadedBytes)
-        } catch (error: ModelImportException) {
-            failure(DownloadErrorCode.STORE_FAILURE, error.message ?: error.code.name)
-        } catch (error: IllegalStateException) {
-            failure(DownloadErrorCode.STORE_FAILURE, error.message ?: "Model store failure")
-        }
+    private fun importVerified(partFile: File, artifact: CatalogGgufArtifact, downloadedBytes: Long): DownloadResult = try {
+        val stored = modelStore.import(partFile, artifact.toStoreArtifact())
+        DownloadResult.Installed(stored, downloadedBytes)
+    } catch (error: ModelImportException) {
+        failure(DownloadErrorCode.STORE_FAILURE, error.message ?: error.code.name)
+    } catch (error: IllegalStateException) {
+        failure(DownloadErrorCode.STORE_FAILURE, error.message ?: "Model store failure")
+    }
 
-    private fun CatalogGgufArtifact.toStoreArtifact() =
-        GgufArtifact(
-            digest = digest,
-            fileName = fileName,
-            sizeBytes = sizeBytes,
-            architecture = architecture,
-            quantization = quantization,
-            source = ArtifactSource.Download(downloadUri.toString()),
-        )
+    private fun CatalogGgufArtifact.toStoreArtifact() = GgufArtifact(
+        digest = digest,
+        fileName = fileName,
+        sizeBytes = sizeBytes,
+        architecture = architecture,
+        quantization = quantization,
+        source = ArtifactSource.Download(downloadUri.toString()),
+    )
 
     private fun resolveRedirect(base: URI, location: String?): URI? {
         if (location.isNullOrBlank()) return null
@@ -177,15 +166,13 @@ class SecureModelDownloader(
 
     private fun invalidUri() = failure(DownloadErrorCode.INVALID_URI, "Only canonical HTTPS URIs are allowed")
 
-    private fun invalidRedirect() =
-        transferFailure(DownloadErrorCode.INVALID_REDIRECT, "Redirect target is missing or not allowed")
+    private fun invalidRedirect() = transferFailure(DownloadErrorCode.INVALID_REDIRECT, "Redirect target is missing or not allowed")
 
     private fun cancelled() = transferFailure(DownloadErrorCode.CANCELLED, "Download cancelled")
 
     private fun failure(code: DownloadErrorCode, detail: String) = DownloadResult.Failed(DownloadError(code, detail))
 
-    private fun transferFailure(code: DownloadErrorCode, detail: String) =
-        TransferResult.Failure(DownloadError(code, detail))
+    private fun transferFailure(code: DownloadErrorCode, detail: String) = TransferResult.Failure(DownloadError(code, detail))
 
     private sealed interface TransferResult {
         data class Success(val bytes: Long) : TransferResult

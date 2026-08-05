@@ -46,11 +46,7 @@ enum class DownloadErrorCode {
     STORE_FAILURE,
 }
 
-data class TransportRequest(
-    val uri: URI,
-    val connectTimeoutMs: Int,
-    val readTimeoutMs: Int,
-)
+data class TransportRequest(val uri: URI, val connectTimeoutMs: Int, val readTimeoutMs: Int)
 
 interface DownloadTransport {
     fun open(request: TransportRequest): TransportResponse

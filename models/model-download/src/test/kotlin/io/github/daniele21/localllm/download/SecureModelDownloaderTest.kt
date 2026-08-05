@@ -15,16 +15,16 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import java.io.ByteArrayInputStream
-import java.io.File
-import java.net.URI
-import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.net.URI
+import java.security.MessageDigest
 
 class SecureModelDownloaderTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
@@ -102,53 +102,42 @@ class SecureModelDownloaderTest {
         assertFalse(temporaryFolder.root.walkTopDown().any { it.extension == "part" })
     }
 
-    private fun downloader(
-        store: ModelStore,
-        transport: DownloadTransport,
-        hosts: Set<String>,
-        bufferSize: Int = 4 * 1024,
-    ) =
+    private fun downloader(store: ModelStore, transport: DownloadTransport, hosts: Set<String>, bufferSize: Int = 4 * 1024) =
         SecureModelDownloader(
             workingDirectory = temporaryFolder.newFolder(),
             transport = transport,
             modelStore = store,
             policy =
-                SecureDownloadPolicy(
-                    hostPolicy = AllowlistedDownloadHosts(hosts),
-                    bufferSizeBytes = bufferSize,
-                ),
+            SecureDownloadPolicy(
+                hostPolicy = AllowlistedDownloadHosts(hosts),
+                bufferSizeBytes = bufferSize,
+            ),
         )
 
-    private fun release(bytes: ByteArray): CatalogModelRelease =
-        CatalogModelRelease(
-            id = CatalogReleaseId(CatalogModelId("test"), CatalogModelVersion("1.0.0")),
-            displayName = "Test",
-            description = "Test release",
-            artifact =
-                CatalogGgufArtifact(
-                    digest = ModelDigest(sha256(bytes)),
-                    sizeBytes = bytes.size.toLong(),
-                    downloadUri = URI("https://models.example/model.gguf"),
-                    architecture = "llama",
-                    quantization = "Q4_K_M",
-                    fileName = "model.gguf",
-                ),
-            compatibility = CatalogCompatibility(minSdk = 26, supportedAbis = setOf("arm64-v8a")),
-            availability = CatalogAvailability.CANDIDATE,
-            allowedTargets = emptySet(),
-            profileKey = ModelProfileKey("test-profile"),
-            license = CatalogLicense("Apache-2.0", "Apache-2.0"),
-        )
+    private fun release(bytes: ByteArray): CatalogModelRelease = CatalogModelRelease(
+        id = CatalogReleaseId(CatalogModelId("test"), CatalogModelVersion("1.0.0")),
+        displayName = "Test",
+        description = "Test release",
+        artifact =
+        CatalogGgufArtifact(
+            digest = ModelDigest(sha256(bytes)),
+            sizeBytes = bytes.size.toLong(),
+            downloadUri = URI("https://models.example/model.gguf"),
+            architecture = "llama",
+            quantization = "Q4_K_M",
+            fileName = "model.gguf",
+        ),
+        compatibility = CatalogCompatibility(minSdk = 26, supportedAbis = setOf("arm64-v8a")),
+        availability = CatalogAvailability.CANDIDATE,
+        allowedTargets = emptySet(),
+        profileKey = ModelProfileKey("test-profile"),
+        license = CatalogLicense("Apache-2.0", "Apache-2.0"),
+    )
 
-    private fun response(
-        status: Int,
-        bytes: ByteArray,
-        length: Long? = bytes.size.toLong(),
-        redirect: String? = null,
-    ) = FakeResponse(status, length, redirect, bytes)
+    private fun response(status: Int, bytes: ByteArray, length: Long? = bytes.size.toLong(), redirect: String? = null) =
+        FakeResponse(status, length, redirect, bytes)
 
-    private fun sha256(bytes: ByteArray) =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private class QueueTransport(private vararg val responses: TransportResponse) : DownloadTransport {
         private var index = 0
