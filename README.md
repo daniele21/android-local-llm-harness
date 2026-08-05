@@ -21,8 +21,9 @@ core/runtime-core                      Runtime orchestration, scheduling, lifecy
 models/model-profile                   GGUF artifacts, load profiles and app bindings
 models/model-store                     Content-addressed installed-model storage and integrity
 models/model-catalog                   Administrator-managed catalog contracts, persistence and compatibility
-models/model-download                  Verified remote transfer boundary and app-private holding area
-backends/llama-cpp                     Kotlin/JNI/C++ llama.cpp backend
+models/model-download                  Verified remote transfer and opaque holding-area access
+models/model-install                   GGUF inspection and explicit ModelStore installation
+backends/llama-cpp                     Kotlin/JNI/C++ backend and installation inspector adapter
 observability/contracts                Metrics, logs, health, retention and dashboard contracts
 observability/in-memory-store          Bounded ephemeral telemetry and deterministic test implementation
 observability/room-store               Persistent Android Room telemetry repository
@@ -55,14 +56,15 @@ catalog release selection
           -> compatibility evaluation
           -> secure verified download
           -> VerifiedDownloadHandle
+          -> explicit verified installation
           -> GGUF inspection
-          -> ModelStore installation
+          -> ModelStore publication and verification
           -> installed-model metadata
           -> explicit app/use-case binding
           -> runtime prepare and inference
 ```
 
-A verified download is not yet an installed or active model. Downloading must not activate a binding, load the runtime or start inference as a side effect.
+A verified download is not yet an installed or active model. Installation does not activate a binding, load the runtime or start inference as a side effect.
 
 ## Build prerequisites
 
@@ -72,11 +74,11 @@ A verified download is not yet an installed or active model. Downloading must no
 - Android NDK 28.2.13676358
 - Gradle 9.5.0 through the committed wrapper
 
-The repository uses Android Gradle Plugin 9.3.0 and its built-in Kotlin support. Android API 36 is the stable reproducible build target; API 37 remains a preview platform and will be adopted only when the required SDK package is consistently available in CI.
+The repository uses Android Gradle Plugin 9.3.1 and its built-in Kotlin support. Android API 36 is the stable reproducible build target; API 37 remains a preview platform and will be adopted only when the required SDK package is consistently available in CI.
 
 ## Current state
 
-`main` is the canonical integrated implementation line. The current state includes the work merged through PR #43.
+`main` is the canonical integrated implementation line. Repository-state alignment, Android Gradle Plugin 9.3.1 and `actions/checkout@v7` were integrated through PRs #44, #45 and #47.
 
 ### Functional embedded runtime
 
@@ -114,27 +116,32 @@ The repository uses Android Gradle Plugin 9.3.0 and its built-in Kotlin support.
 
 The canonical UX/UI plan is not complete. ViewModel/UDF migration, full Navigation Compose detail routes, durable multi-model presentation, UI/screenshot/accessibility testing and representative physical-device evidence remain open.
 
-### Administrator-managed catalog and secure transfer
+### Administrator-managed model distribution
 
-The merged catalog and downloader foundation provides:
+The catalog, downloader and installation boundaries provide:
 
 - strict catalog contracts and fail-closed validation;
 - exact application/use-case filtering and device compatibility evaluation;
 - atomic app-private catalog persistence with revision, rollback and expiry handling;
-- a curated bootstrap catalog of candidate mobile GGUF releases;
 - HTTPS-only, allowlisted and redirect-bounded transfer;
 - DNS and address-class preflight;
 - size, storage-headroom and SHA-256 verification while streaming;
 - cancellation, bounded retry, restart cleanup and digest-based deduplication;
 - durable publication into an app-private verified holding area;
-- an opaque `VerifiedDownloadHandle` rather than an unrestricted filesystem path.
+- opaque access that never exposes the verified backing path;
+- exact catalog/profile/target reconciliation before installation;
+- metadata-only GGUF inspection before final publication;
+- import and post-import verification through the existing `ModelStore`;
+- rollback after failed or incomplete post-import verification;
+- explicit retention or discard of verified bytes only after success;
+- no implicit binding, runtime load or inference.
 
-Verified transfer is complete, but the connected installation slice remains open: GGUF inspection, final `ModelStore` import, installed-model metadata and UI integration must still be added explicitly.
+See [`docs/model-installation.md`](docs/model-installation.md) and ADR 0007 for the installation lifecycle.
 
 ## Current priorities
 
-1. Implement the verified-download installation boundary from `VerifiedDownloadHandle` through GGUF inspection and `ModelStore` publication.
-2. Integrate catalog selection, download progress, explicit installation and installed-model state into the connected phone application.
+1. Integrate catalog selection, download progress, explicit installation and installed-model state into the connected phone application.
+2. Add durable installed-model catalog/profile metadata without making installation activate a binding.
 3. Recover only the still-unique benchmark-history and model-management behavior from legacy draft PRs #33 and #34 on fresh branches from current `main`.
 4. Complete the physical-device production-readiness evidence on representative Android `arm64-v8a` hardware.
 5. Complete the remaining Compose architecture, accessibility, responsive and UI-test work.
@@ -161,7 +168,7 @@ The complete repository gate includes repository guards, scoped Android validati
 Repository validation
 ```
 
-The dedicated model-download workflow additionally validates formatting, Detekt, the model-artifact guard, downloader unit tests and Android Lint.
+The dedicated model-distribution workflow additionally validates formatting, Detekt, the model-artifact guard, downloader/installer/backend tests and Android Lint.
 
 ## Physical-device GGUF validation
 
@@ -189,4 +196,4 @@ Configure the external PKCS12 upload keystore and macOS Keychain by following [`
 
 The runtime remains not production-ready until representative physical-device evidence covers JNI loading, real GGUF inference, cancellation during prefill and decode, repeated lifecycle stability, memory, latency, throughput and thermal behavior.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/current-state.md`](docs/current-state.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) and [`docs/roadmap.md`](docs/roadmap.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/current-state.md`](docs/current-state.md), [`docs/model-installation.md`](docs/model-installation.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) and [`docs/roadmap.md`](docs/roadmap.md).
