@@ -17,6 +17,8 @@ jobs:
         with:
           ref: codex/dev-ci-governance
           fetch-depth: 1
+      - name: Disambiguate legacy roadmap checklist
+        run: python3 scripts/patch_dev_doc_migration.py
       - name: Apply canonical documentation migration
         run: python3 scripts/apply_dev_integration_docs_v2.py
       - name: Validate navigation and Python sources
@@ -27,6 +29,7 @@ jobs:
         run: |
           rm scripts/apply_dev_integration_docs.py
           rm scripts/apply_dev_integration_docs_v2.py
+          rm scripts/patch_dev_doc_migration.py
           rm .github/workflows/apply-dev-integration-docs.yml
           rm .github/dev-doc-migration.trigger
       - name: Commit canonical documentation
