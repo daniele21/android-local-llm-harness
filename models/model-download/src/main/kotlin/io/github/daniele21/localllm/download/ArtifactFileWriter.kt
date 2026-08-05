@@ -13,18 +13,12 @@ internal class ArtifactFileWriter(private val policy: SecureDownloadPolicy) {
         artifact: CatalogGgufArtifact,
         partFile: File,
         request: DownloadRequest,
-    ): ArtifactTransferResult =
-        when (val copied = copy(response, artifact, partFile, request)) {
-            is CopyResult.Failure -> ArtifactTransferResult.Failure(copied.error)
-            is CopyResult.Success -> verify(copied, artifact)
-        }
+    ): ArtifactTransferResult = when (val copied = copy(response, artifact, partFile, request)) {
+        is CopyResult.Failure -> ArtifactTransferResult.Failure(copied.error)
+        is CopyResult.Success -> verify(copied, artifact)
+    }
 
-    private fun copy(
-        response: TransportResponse,
-        artifact: CatalogGgufArtifact,
-        partFile: File,
-        request: DownloadRequest,
-    ): CopyResult =
+    private fun copy(response: TransportResponse, artifact: CatalogGgufArtifact, partFile: File, request: DownloadRequest): CopyResult =
         try {
             FileOutputStream(partFile).use { output ->
                 val result = stream(response, output, artifact, request)
@@ -72,41 +66,32 @@ internal class ArtifactFileWriter(private val policy: SecureDownloadPolicy) {
         }
     }
 
-    private fun verify(
-        copied: CopyResult.Success,
-        artifact: CatalogGgufArtifact,
-    ): ArtifactTransferResult =
-        when {
-            copied.bytes != artifact.sizeBytes ->
-                ArtifactTransferResult.Failure(
-                    DownloadError(
-                        DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
-                        "Downloaded byte count does not match catalog size",
-                    ),
-                )
-            !copied.sha256.equals(artifact.digest.sha256, ignoreCase = true) ->
-                ArtifactTransferResult.Failure(
-                    DownloadError(
-                        DownloadErrorCode.DIGEST_MISMATCH,
-                        "SHA-256 mismatch",
-                    ),
-                )
-            else -> ArtifactTransferResult.Success(copied.bytes)
-        }
+    private fun verify(copied: CopyResult.Success, artifact: CatalogGgufArtifact): ArtifactTransferResult = when {
+        copied.bytes != artifact.sizeBytes ->
+            ArtifactTransferResult.Failure(
+                DownloadError(
+                    DownloadErrorCode.CONTENT_LENGTH_MISMATCH,
+                    "Downloaded byte count does not match catalog size",
+                ),
+            )
 
-    private fun failure(
-        code: DownloadErrorCode,
-        detail: String,
-    ): CopyResult.Failure = CopyResult.Failure(DownloadError(code, detail))
+        !copied.sha256.equals(artifact.digest.sha256, ignoreCase = true) ->
+            ArtifactTransferResult.Failure(
+                DownloadError(
+                    DownloadErrorCode.DIGEST_MISMATCH,
+                    "SHA-256 mismatch",
+                ),
+            )
 
-    private fun ByteArray.toHex(): String =
-        joinToString("") { byte -> "%02x".format(byte) }
+        else -> ArtifactTransferResult.Success(copied.bytes)
+    }
+
+    private fun failure(code: DownloadErrorCode, detail: String): CopyResult.Failure = CopyResult.Failure(DownloadError(code, detail))
+
+    private fun ByteArray.toHex(): String = joinToString("") { byte -> "%02x".format(byte) }
 
     private sealed interface CopyResult {
-        data class Success(
-            val bytes: Long,
-            val sha256: String,
-        ) : CopyResult
+        data class Success(val bytes: Long, val sha256: String) : CopyResult
 
         data class Failure(val error: DownloadError) : CopyResult
     }
