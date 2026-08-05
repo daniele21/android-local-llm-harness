@@ -1,52 +1,68 @@
-name: Apply model installation formatting
+name: Validate model distribution
 
 on:
   pull_request:
     paths:
+      - "models/model-download/**"
       - "models/model-install/**"
+      - "models/model-catalog/**"
+      - "models/model-profile/**"
+      - "models/model-store/**"
+      - "backends/llama-cpp/build.gradle.kts"
+      - "backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppGgufArtifactInspector.kt"
+      - "backends/llama-cpp/src/test/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppGgufArtifactInspectorTest.kt"
+      - "settings.gradle.kts"
       - ".github/workflows/validate-model-download.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: apply-model-installation-formatting-${{ github.ref }}
+  group: validate-model-distribution-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  format:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 1
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK components
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
-      - name: Apply canonical formatting
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+      - name: Validate formatting
+        run: ./gradlew --no-configuration-cache --stacktrace spotlessCheck
+      - name: Run static analysis
+        run: ./gradlew --no-configuration-cache --stacktrace detekt
+      - name: Verify repository contains no model artifacts
+        run: ./gradlew --no-configuration-cache --stacktrace verifyNoModelArtifacts
+      - name: Test model distribution boundaries
         run: |
-          chmod +x gradlew
-          ./gradlew --no-configuration-cache --stacktrace spotlessApply
-      - name: Commit formatter output
-        shell: bash
+          ./gradlew --no-configuration-cache --stacktrace \
+            :models:model-download:testDebugUnitTest \
+            :models:model-install:testDebugUnitTest \
+            :backends:llama-cpp:testDebugUnitTest
+      - name: Lint model distribution boundaries
         run: |
-          set -euo pipefail
-          if git diff --quiet; then
-            echo "No formatting changes remain."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f \
-            models/model-install/src/main/kotlin/io/github/daniele21/localllm/install/ModelInstallation.kt \
-            models/model-install/src/test/kotlin/io/github/daniele21/localllm/install/VerifiedModelInstallerTest.kt
-          git commit -m "Apply canonical Kotlin formatting"
-          git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          ./gradlew --no-configuration-cache --stacktrace \
+            :models:model-download:lintDebug \
+            :models:model-install:lintDebug \
+            :backends:llama-cpp:lintDebug
