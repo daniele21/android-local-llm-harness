@@ -47,8 +47,8 @@ android {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -119,6 +119,9 @@ dependencies {
     implementation(project(":core:runtime-core"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
+    implementation(project(":models:model-catalog"))
+    implementation(project(":models:model-download"))
+    implementation(project(":models:model-install"))
     implementation(project(":backends:llama-cpp"))
     implementation(project(":observability:contracts"))
     implementation(project(":observability:in-memory-store"))
