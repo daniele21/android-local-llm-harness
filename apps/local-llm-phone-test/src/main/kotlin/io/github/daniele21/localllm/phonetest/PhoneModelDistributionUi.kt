@@ -17,16 +17,9 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
-import java.util.Locale
 
 @Composable
-internal fun PhoneModelDistributionCatalog(
-    state: PhoneModelDistributionState,
-    onDownload: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onInstall: (String) -> Unit,
-    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
-) {
+internal fun PhoneModelDistributionCatalog(state: PhoneModelDistributionState, actions: PhoneModelDistributionActions) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HarnessCard {
             Text("Model catalog", style = MaterialTheme.typography.titleLarge)
@@ -50,24 +43,14 @@ internal fun PhoneModelDistributionCatalog(
             CatalogModelCard(
                 model = model,
                 operationActive = state.operationActive,
-                onDownload = onDownload,
-                onCancel = onCancel,
-                onInstall = onInstall,
-                onSelectInstalled = onSelectInstalled,
+                actions = actions,
             )
         }
     }
 }
 
 @Composable
-private fun CatalogModelCard(
-    model: PhoneCatalogModelUi,
-    operationActive: Boolean,
-    onDownload: (String) -> Unit,
-    onCancel: (String) -> Unit,
-    onInstall: (String) -> Unit,
-    onSelectInstalled: (InstalledCatalogModelMetadata) -> Unit,
-) {
+private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
     HarnessCard {
         Text(model.displayName, style = MaterialTheme.typography.titleLarge)
         Text(model.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -102,11 +85,11 @@ private fun CatalogModelCard(
         }
 
         when (model.status) {
-            PhoneCatalogModelStatus.DOWNLOADING -> DownloadProgress(model, onCancel)
+            PhoneCatalogModelStatus.DOWNLOADING -> DownloadProgress(model, actions.cancelDownload)
 
             PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL ->
                 HarnessPrimaryButton("Install verified model") {
-                    onInstall(model.stableId)
+                    actions.install(model.stableId)
                 }
 
             PhoneCatalogModelStatus.INSTALLING -> {
@@ -114,22 +97,12 @@ private fun CatalogModelCard(
                 Text("Installation is running in the app-private model store.")
             }
 
-            PhoneCatalogModelStatus.INSTALLED -> {
-                val installed = model.installedModel
-                if (installed != null) {
-                    HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
-                    Text(
-                        "Installed. Runtime activation remains an explicit action.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HarnessPrimaryButton(
-                        "Use in Playground",
-                        enabled = !operationActive,
-                    ) {
-                        onSelectInstalled(installed)
-                    }
-                }
-            }
+            PhoneCatalogModelStatus.INSTALLED ->
+                InstalledModelActions(
+                    model = model,
+                    operationActive = operationActive,
+                    actions = actions,
+                )
 
             PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
             PhoneCatalogModelStatus.CANCELLED,
@@ -142,10 +115,54 @@ private fun CatalogModelCard(
                 },
                 enabled = model.compatible && !operationActive,
             ) {
-                onDownload(model.stableId)
+                actions.download(model.stableId)
             }
 
             PhoneCatalogModelStatus.INCOMPATIBLE -> Unit
+        }
+    }
+}
+
+@Composable
+private fun InstalledModelActions(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
+    val installed = model.installedModel ?: return
+    HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
+    Text(
+        "Installed. Runtime activation remains an explicit action.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    HarnessPrimaryButton(
+        "Use in Playground",
+        enabled = !operationActive,
+    ) {
+        actions.selectInstalled(installed)
+    }
+    HarnessSecondaryButton(
+        "Verify integrity",
+        enabled = !operationActive,
+    ) {
+        actions.verifyInstalled(model.stableId)
+    }
+    if (model.removalConfirmationPending) {
+        Text(
+            "Removal permanently deletes the app-private model copy.",
+            color = MaterialTheme.colorScheme.error,
+        )
+        HarnessPrimaryButton(
+            "Confirm removal",
+            enabled = !operationActive,
+        ) {
+            actions.confirmRemove(model.stableId)
+        }
+        HarnessSecondaryButton("Cancel removal") {
+            actions.cancelRemove(model.stableId)
+        }
+    } else {
+        HarnessSecondaryButton(
+            "Remove installed model",
+            enabled = !operationActive,
+        ) {
+            actions.requestRemove(model.stableId)
         }
     }
 }
@@ -176,8 +193,8 @@ private fun DownloadProgress(model: PhoneCatalogModelUi, onCancel: (String) -> U
 private fun formatDistributionBytes(bytes: Long): String {
     if (bytes < 1_024L) return "$bytes B"
     val kib = bytes / 1_024.0
-    if (kib < 1_024.0) return "%.1f KiB".format(Locale.ROOT, kib)
+    if (kib < 1_024.0) return "%.1f KiB".format(kib)
     val mib = kib / 1_024.0
-    if (mib < 1_024.0) return "%.1f MiB".format(Locale.ROOT, mib)
-    return "%.2f GiB".format(Locale.ROOT, mib / 1_024.0)
+    if (mib < 1_024.0) return "%.1f MiB".format(mib)
+    return "%.2f GiB".format(mib / 1_024.0)
 }

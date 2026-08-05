@@ -52,7 +52,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessTheme
-import java.util.Locale
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "LongMethod", "LargeClass")
@@ -67,6 +66,7 @@ class MainActivity :
     private lateinit var logSource: HarnessLogSource
     private lateinit var controller: PhoneTestController
     private lateinit var modelDistributionController: PhoneModelDistributionController
+    private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
 
@@ -89,6 +89,7 @@ class MainActivity :
     private var playgroundMaxTokens by mutableStateOf(DEFAULT_MAX_OUTPUT_TOKENS)
     private var playgroundTemperature by mutableStateOf(DEFAULT_TEMPERATURE)
     private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
+    private var selectedRemovalConfirmationPending by mutableStateOf(false)
 
     @Volatile
     private var selectedModelForDiagnostics: ImportedPhoneModel? = null
@@ -120,6 +121,11 @@ class MainActivity :
         }
         logSource = HarnessLogSource(runtimeGraph.telemetryRepository)
         controller = PhoneTestController(this, this)
+        selectedModelManagement = ModelStorePhoneModelManagementControl(
+            modelStore = runtimeGraph.modelStore,
+            protectedModelDigest = { runtimeGraph.loadedModelDigest },
+            removeMetadata = { true },
+        )
         modelDistributionController = PhoneModelDistributionController.from(
             context = this,
             runtimeGraph = runtimeGraph,
@@ -173,6 +179,7 @@ class MainActivity :
         selectedModelForDiagnostics = model
         runOnUiThread {
             importedModel = model
+            selectedRemovalConfirmationPending = false
             if (::modelDistributionController.isInitialized) {
                 modelDistributionController.refresh()
             }
@@ -193,6 +200,20 @@ class MainActivity :
             playgroundState = state
             updateKeepScreenOn()
             refreshDiagnostics()
+        }
+    }
+
+    private fun verifySelectedModel() {
+        val model = importedModel ?: return
+        if (isBusy()) return
+        operationStatus = "Verifying selected model integrity…"
+        diagnosticsExecutor.execute {
+            val outcome = selectedModelManagement.verify(model.digest)
+            runOnUiThread {
+                operationStatus = outcome.detail
+                modelDistributionController.refresh()
+                refreshDiagnostics()
+            }
         }
     }
 
@@ -439,7 +460,7 @@ class MainActivity :
                         )
                         HarnessMetric(
                             "Decode",
-                            metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(Locale.ROOT, it) }
+                            metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(it) }
                                 ?: "Unavailable",
                             Modifier.weight(1f),
                         )
@@ -536,14 +557,21 @@ class MainActivity :
             item {
                 PhoneModelDistributionCatalog(
                     state = modelDistributionState,
-                    onDownload = modelDistributionController::download,
-                    onCancel = modelDistributionController::cancelDownload,
-                    onInstall = modelDistributionController::install,
-                    onSelectInstalled = { metadata ->
-                        afterPlaygroundRuntimeReleased {
-                            controller.selectInstalledModel(metadata.asImportedPhoneModel())
-                        }
-                    },
+                    actions =
+                    PhoneModelDistributionActions(
+                        download = modelDistributionController::download,
+                        cancelDownload = modelDistributionController::cancelDownload,
+                        install = modelDistributionController::install,
+                        verifyInstalled = modelDistributionController::verifyInstalled,
+                        requestRemove = modelDistributionController::requestRemove,
+                        cancelRemove = modelDistributionController::cancelRemove,
+                        confirmRemove = modelDistributionController::confirmRemove,
+                        selectInstalled = { metadata ->
+                            afterPlaygroundRuntimeReleased {
+                                controller.selectInstalledModel(metadata.asImportedPhoneModel())
+                            }
+                        },
+                    ),
                 )
             }
             item {
@@ -576,8 +604,32 @@ class MainActivity :
                         }
                         HarnessMetric("SHA-256", model.digest.sha256.take(24) + "…")
                         HarnessMetric("Size", formatBytes(model.sizeBytes))
-                        HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
-                            afterPlaygroundRuntimeReleased { controller.removeModel() }
+                        HarnessSecondaryButton(
+                            "Verify integrity",
+                            enabled = !isBusy(),
+                            onClick = ::verifySelectedModel,
+                        )
+                        if (selectedRemovalConfirmationPending) {
+                            Text(
+                                "Removal permanently deletes the app-private model copy.",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            HarnessPrimaryButton(
+                                "Confirm removal",
+                                enabled = !isBusy(),
+                            ) {
+                                afterPlaygroundRuntimeReleased {
+                                    selectedRemovalConfirmationPending = false
+                                    controller.removeModel()
+                                }
+                            }
+                            HarnessSecondaryButton("Cancel removal") {
+                                selectedRemovalConfirmationPending = false
+                            }
+                        } else {
+                            HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
+                                selectedRemovalConfirmationPending = true
+                            }
                         }
                     }
                 }
@@ -1025,7 +1077,7 @@ class MainActivity :
         )
     }
 
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
+    private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
 
     private enum class HarnessDestination(val label: String, val shortLabel: String) {
         OVERVIEW("Overview", "O"),
