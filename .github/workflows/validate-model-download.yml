@@ -48,12 +48,12 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Validate formatting, static analysis and repository guard
-        run: |
-          ./gradlew --no-configuration-cache --stacktrace \
-            spotlessCheck \
-            detekt \
-            verifyNoModelArtifacts
+      - name: Validate formatting
+        run: ./gradlew --no-configuration-cache --stacktrace spotlessCheck
+      - name: Run static analysis
+        run: ./gradlew --no-configuration-cache --stacktrace detekt
+      - name: Verify repository contains no model artifacts
+        run: ./gradlew --no-configuration-cache --stacktrace verifyNoModelArtifacts
       - name: Test model distribution boundaries
         run: |
           ./gradlew --no-configuration-cache --stacktrace \
