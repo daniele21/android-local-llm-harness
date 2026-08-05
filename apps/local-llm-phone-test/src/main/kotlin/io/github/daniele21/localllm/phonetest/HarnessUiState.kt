@@ -51,47 +51,62 @@ internal data class HarnessUiState(
 }
 
 internal sealed interface HarnessUiEvent {
-    data class ControllerBusyChanged(val busy: Boolean) : HarnessUiEvent
+    sealed interface Runtime : HarnessUiEvent
 
-    data class ModelDistributionChanged(val state: PhoneModelDistributionState) : HarnessUiEvent
+    sealed interface Playground : HarnessUiEvent
 
-    data class ModelChanged(val model: ImportedPhoneModel?) : HarnessUiEvent
+    sealed interface Diagnostics : HarnessUiEvent
 
-    data class ReportChanged(val report: String) : HarnessUiEvent
+    sealed interface Preferences : HarnessUiEvent
 
-    data class OperationStatusChanged(val status: String) : HarnessUiEvent
+    data class ControllerBusyChanged(val busy: Boolean) : Runtime
 
-    data class PlaygroundChanged(val state: PlaygroundState) : HarnessUiEvent
+    data class ModelDistributionChanged(val state: PhoneModelDistributionState) : Runtime
 
-    data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : HarnessUiEvent
+    data class ModelChanged(val model: ImportedPhoneModel?) : Runtime
 
-    data class DiagnosticsChanged(val state: DiagnosticsUiState) : HarnessUiEvent
+    data class ReportChanged(val report: String) : Runtime
 
-    data class BenchmarkChanged(val state: BenchmarkUiState) : HarnessUiEvent
+    data class OperationStatusChanged(val status: String) : Runtime
 
-    data class LogFilterChanged(val filter: DiagnosticsLogFilter, val state: DiagnosticsLogUiState) : HarnessUiEvent
+    data class RemovalConfirmationChanged(val pending: Boolean) : Runtime
 
-    data class LogsChanged(val state: DiagnosticsLogUiState) : HarnessUiEvent
+    data class PlaygroundChanged(val state: PlaygroundState) : Playground
 
-    data class RequestTimelineChanged(val timeline: DiagnosticsRequestTimelineUi?) : HarnessUiEvent
+    data class PlaygroundPromptChanged(val prompt: String) : Playground
 
-    data class DiagnosticsSectionChanged(val section: DiagnosticsSection) : HarnessUiEvent
+    data class PlaygroundMaxTokensChanged(val maxTokens: String) : Playground
 
-    data class PlaygroundPromptChanged(val prompt: String) : HarnessUiEvent
+    data class PlaygroundTemperatureChanged(val temperature: String) : Playground
 
-    data class PlaygroundMaxTokensChanged(val maxTokens: String) : HarnessUiEvent
+    data class PlaygroundSeedChanged(val seed: String) : Playground
 
-    data class PlaygroundTemperatureChanged(val temperature: String) : HarnessUiEvent
+    data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : Diagnostics
 
-    data class PlaygroundSeedChanged(val seed: String) : HarnessUiEvent
+    data class DiagnosticsChanged(val state: DiagnosticsUiState) : Diagnostics
 
-    data class RemovalConfirmationChanged(val pending: Boolean) : HarnessUiEvent
+    data class BenchmarkChanged(val state: BenchmarkUiState) : Diagnostics
 
-    data class ThemeChanged(val preference: HarnessThemePreference) : HarnessUiEvent
+    data class LogFilterChanged(val filter: DiagnosticsLogFilter, val state: DiagnosticsLogUiState) : Diagnostics
+
+    data class LogsChanged(val state: DiagnosticsLogUiState) : Diagnostics
+
+    data class RequestTimelineChanged(val timeline: DiagnosticsRequestTimelineUi?) : Diagnostics
+
+    data class DiagnosticsSectionChanged(val section: DiagnosticsSection) : Diagnostics
+
+    data class ThemeChanged(val preference: HarnessThemePreference) : Preferences
 }
 
 internal object HarnessUiReducer {
     fun reduce(state: HarnessUiState, event: HarnessUiEvent): HarnessUiState = when (event) {
+        is HarnessUiEvent.Runtime -> reduceRuntime(state, event)
+        is HarnessUiEvent.Playground -> reducePlayground(state, event)
+        is HarnessUiEvent.Diagnostics -> reduceDiagnostics(state, event)
+        is HarnessUiEvent.Preferences -> reducePreferences(state, event)
+    }
+
+    private fun reduceRuntime(state: HarnessUiState, event: HarnessUiEvent.Runtime): HarnessUiState = when (event) {
         is HarnessUiEvent.ControllerBusyChanged -> state.copy(controllerBusy = event.busy)
 
         is HarnessUiEvent.ModelDistributionChanged -> state.copy(
@@ -111,8 +126,23 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.OperationStatusChanged -> state.copy(operationStatus = event.status)
 
-        is HarnessUiEvent.PlaygroundChanged -> state.copy(playground = event.state)
+        is HarnessUiEvent.RemovalConfirmationChanged -> state.copy(
+            removalConfirmationPending = event.pending,
+        )
+    }
 
+    private fun reducePlayground(state: HarnessUiState, event: HarnessUiEvent.Playground): HarnessUiState = when (event) {
+        is HarnessUiEvent.PlaygroundChanged -> state.copy(playground = event.state)
+        is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
+        is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens)
+        is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
+            playgroundTemperature = event.temperature,
+        )
+
+        is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed)
+    }
+
+    private fun reduceDiagnostics(state: HarnessUiState, event: HarnessUiEvent.Diagnostics): HarnessUiState = when (event) {
         is HarnessUiEvent.DiagnosticActionChanged -> state.copy(
             activeDiagnosticActions = state.activeDiagnosticActions.withAction(event.action, event.running),
         )
@@ -136,21 +166,9 @@ internal object HarnessUiReducer {
                 event.section == DiagnosticsSection.LOGS
             },
         )
+    }
 
-        is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
-
-        is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens)
-
-        is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
-            playgroundTemperature = event.temperature,
-        )
-
-        is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed)
-
-        is HarnessUiEvent.RemovalConfirmationChanged -> state.copy(
-            removalConfirmationPending = event.pending,
-        )
-
+    private fun reducePreferences(state: HarnessUiState, event: HarnessUiEvent.Preferences): HarnessUiState = when (event) {
         is HarnessUiEvent.ThemeChanged -> state.copy(themePreference = event.preference)
     }
 
