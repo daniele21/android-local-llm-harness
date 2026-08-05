@@ -15,15 +15,12 @@ fun contrastRatio(foreground: Color, background: Color): Double {
         (min(foregroundLuminance, backgroundLuminance) + LUMINANCE_OFFSET)
 }
 
-fun meetsWcagAa(
-    foreground: Color,
-    background: Color,
-    largeText: Boolean = false,
-): Boolean = contrastRatio(foreground, background) >= if (largeText) {
-    WCAG_AA_LARGE_TEXT_CONTRAST
-} else {
-    WCAG_AA_NORMAL_TEXT_CONTRAST
-}
+fun meetsWcagAa(foreground: Color, background: Color, largeText: Boolean = false): Boolean =
+    contrastRatio(foreground, background) >= if (largeText) {
+        WCAG_AA_LARGE_TEXT_CONTRAST
+    } else {
+        WCAG_AA_NORMAL_TEXT_CONTRAST
+    }
 
 private fun relativeLuminance(color: Color): Double = RED_WEIGHT * linearized(color.red) +
     GREEN_WEIGHT * linearized(color.green) +
