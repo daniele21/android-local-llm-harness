@@ -29,6 +29,15 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("core:runtime-core",))
 
+    def test_model_download_change_selects_only_downloader_module(self) -> None:
+        scope = classify_paths(
+            ["models/model-download/src/main/kotlin/SecureModelDownloader.kt"]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("models:model-download",))
+
     def test_app_change_selects_app_and_runs_packaging(self) -> None:
         scope = classify_paths(["apps/local-llm-phone-test/src/main/kotlin/MainActivity.kt"])
         self.assertTrue(scope.android)
