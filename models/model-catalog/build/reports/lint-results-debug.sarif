@@ -1,0 +1,118 @@
+{
+    "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    "version" : "2.1.0",
+    "runs" : [
+        {
+            "tool": {
+                "driver": {
+                    "name": "Android Lint",
+                    "fullName": "Android Lint (in gradle)",
+                    "version": "9.3.0",
+                    "semanticVersion": "9.3.0",
+                    "organization": "Google",
+                    "informationUri": "https://developer.android.com/studio/write/lint",
+                    "fullDescription": {
+                        "text": "Static analysis originally for Android source code but now performing general analysis"
+                    },
+                    "language": "en-US",
+                    "rules": [
+                        {
+                            "id": "GradleDependency",
+                            "shortDescription": {
+                                "text": "Obsolete Gradle Dependency"
+                            },
+                            "fullDescription": {
+                                "text": "This detector looks for usages of libraries where the version you are using is not the current stable release. Using older versions is fine, and there are cases where you deliberately want to stick with an older version. However, you may simply not be aware that a more recent version is available, and that is what this lint check helps find."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 70
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Correctness"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "originalUriBaseIds": {
+                "%SRCROOT%": {
+                    "uri": "file:///home/runner/work/android-local-llm-harness/android-local-llm-harness/"
+                }
+            },
+            "results": [
+                {
+                    "ruleId": "GradleDependency",
+                    "ruleIndex": 0,
+                    "message": {
+                        "text": "A newer version of compileSdk than 36 is available: 37",
+                        "markdown": "A newer version of `compileSdk` than 36 is available: 37"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "models/model-catalog/build.gradle.kts"
+                                },
+                                "region": {
+                                    "startLine": 7,
+                                    "startColumn": 5,
+                                    "endLine": 7,
+                                    "endColumn": 56,
+                                    "charOffset": 122,
+                                    "charLength": 51,
+                                    "snippet": {
+                                        "text": "compileSdk = libs.versions.compileSdk.get().toInt()"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 5,
+                                    "endLine": 10,
+                                    "snippet": {
+                                        "text": "android {\n    namespace = \"io.github.daniele21.localllm.catalog\"\n    compileSdk = libs.versions.compileSdk.get().toInt()\n    buildToolsVersion = libs.versions.buildTools.get()\n\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Set compileSdk to 37"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "gradle/libs.versions.toml"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 3,
+                                                "startColumn": 15,
+                                                "charOffset": 39,
+                                                "endLine": 3,
+                                                "endColumn": 17,
+                                                "charLength": 2
+                                            },
+                                            "insertedContent": {
+                                                "text": "37\n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "f0b14052c6d11407"
+                    }
+                }
+            ]
+        }
+    ]
+}

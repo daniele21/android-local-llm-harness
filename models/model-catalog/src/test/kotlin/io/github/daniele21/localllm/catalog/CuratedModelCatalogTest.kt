@@ -2,11 +2,11 @@ package io.github.daniele21.localllm.catalog
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.UseCaseId
-import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.MessageDigest
 
 class CuratedModelCatalogTest {
     @Test
@@ -58,14 +58,14 @@ class CuratedModelCatalogTest {
                 release = CuratedModelCatalog.releases.first(),
                 target = target,
                 device =
-                    CatalogDeviceProfile(
-                        sdkInt = 36,
-                        supportedAbis = setOf("arm64-v8a"),
-                        totalMemoryBytes = 8_000_000_000,
-                        availableStorageBytes = 4_000_000_000,
-                        harnessVersion = "0.3.0",
-                        backendId = "llama.cpp",
-                    ),
+                CatalogDeviceProfile(
+                    sdkInt = 36,
+                    supportedAbis = setOf("arm64-v8a"),
+                    totalMemoryBytes = 8_000_000_000,
+                    availableStorageBytes = 4_000_000_000,
+                    harnessVersion = "0.3.0",
+                    backendId = "llama.cpp",
+                ),
             )
 
         assertTrue(result.reasons.toString(), result.compatible)

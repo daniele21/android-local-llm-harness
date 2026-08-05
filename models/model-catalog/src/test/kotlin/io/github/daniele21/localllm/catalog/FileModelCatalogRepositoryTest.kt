@@ -1,11 +1,11 @@
 package io.github.daniele21.localllm.catalog
 
-import java.io.File
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class FileModelCatalogRepositoryTest {
     private val codec = CatalogJsonCodec()
@@ -117,12 +117,8 @@ class FileModelCatalogRepositoryTest {
         assertFalse(snapshot.canAuthorizeDownloads)
     }
 
-    private fun repository(
-        directory: File,
-        staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L,
-    ): FileModelCatalogRepository {
-        return FileModelCatalogRepository(directory, codec, validator, staleGracePeriodMs)
-    }
+    private fun repository(directory: File, staleGracePeriodMs: Long = 7L * 24L * 60L * 60L * 1_000L): FileModelCatalogRepository =
+        FileModelCatalogRepository(directory, codec, validator, staleGracePeriodMs)
 
     private fun withTemporaryDirectory(block: (File) -> Unit) {
         val directory = Files.createTempDirectory("model-catalog-test").toFile()

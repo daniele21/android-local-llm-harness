@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.daniele21.localllm.catalog.CatalogValidatorTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-08-05T04:41:59.231Z" hostname="runnervmvrwv9" time="0.028">
+  <properties/>
+  <testcase name="rejectsInvalidDigest" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.013"/>
+  <testcase name="rejectsReleaseReplacingItself" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.005"/>
+  <testcase name="rejectsDuplicateReleaseIdentity" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.001"/>
+  <testcase name="acceptsValidCatalog" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.001"/>
+  <testcase name="rejectsExpiredCatalog" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.0"/>
+  <testcase name="rejectsNonHttpsDownloadUri" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.005"/>
+  <testcase name="rejectsConflictingMetadataForSameDigest" classname="io.github.daniele21.localllm.catalog.CatalogValidatorTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

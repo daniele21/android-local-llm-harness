@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-08-05T04:41:59.081Z" hostname="runnervmvrwv9" time="0.138">
+  <properties/>
+  <testcase name="roundTripsCanonicalCatalog" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.073"/>
+  <testcase name="rejectsDocumentAboveConfiguredLimit" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.005"/>
+  <testcase name="rejectsMissingFields" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.009"/>
+  <testcase name="encodesSetsInDeterministicOrder" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.004"/>
+  <testcase name="rejectsDuplicateJsonObjectFields" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.01"/>
+  <testcase name="rejectsUnpairedUnicodeDuringEncoding" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.001"/>
+  <testcase name="rejectsFractionalIntegerFields" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.009"/>
+  <testcase name="rejectsDuplicateSetValues" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.007"/>
+  <testcase name="rejectsInvalidUris" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.005"/>
+  <testcase name="rejectsUnknownFields" classname="io.github.daniele21.localllm.catalog.CatalogJsonCodecTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

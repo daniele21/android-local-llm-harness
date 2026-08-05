@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.daniele21.localllm.catalog.CuratedModelCatalogTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-05T04:41:59.268Z" hostname="runnervmvrwv9" time="0.028">
+  <properties/>
+  <testcase name="candidateReleaseRemainsSelectableWithExplicitWarning" classname="io.github.daniele21.localllm.catalog.CuratedModelCatalogTest" time="0.003"/>
+  <testcase name="exposesFourCandidateReleasesForThePhonePlayground" classname="io.github.daniele21.localllm.catalog.CuratedModelCatalogTest" time="0.001"/>
+  <testcase name="curatedDocumentValidatesAndHasStableCanonicalPayload" classname="io.github.daniele21.localllm.catalog.CuratedModelCatalogTest" time="0.022"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

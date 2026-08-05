@@ -1,0 +1,24 @@
+<libraries>
+  <library
+      name=":@@:core:contracts::debug"
+      jars="/home/runner/.gradle/caches/9.5.0/transforms/33a72662662ddc83de9300223caf53df/transformed/out/jars/classes.jar:/home/runner/.gradle/caches/9.5.0/transforms/33a72662662ddc83de9300223caf53df/transformed/out/jars/libs/R.jar"
+      resolved="android-local-llm-harness.core:contracts:unspecified"
+      partialResultsDir="/home/runner/work/android-local-llm-harness/android-local-llm-harness/core/contracts/build/intermediates/lint_partial_results/debug/lintAnalyzeDebug/out"
+      folder="/home/runner/.gradle/caches/9.5.0/transforms/33a72662662ddc83de9300223caf53df/transformed/out"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
+      name="org.jetbrains.kotlin:kotlin-stdlib:2.2.10@jar"
+      jars="/home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.2.10/30de6faa127a4a012db8e71bf1b9c0a99b1402b2/kotlin-stdlib-2.2.10.jar"
+      resolved="org.jetbrains.kotlin:kotlin-stdlib:2.2.10"/>
+  <library
+      name="org.jetbrains:annotations:13.0@jar"
+      jars="/home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar"
+      resolved="org.jetbrains:annotations:13.0"/>
+</libraries>

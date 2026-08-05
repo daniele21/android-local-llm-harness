@@ -1,0 +1,21 @@
+<lint-module
+    format="1"
+    dir="/home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-catalog"
+    name=":models:model-catalog"
+    type="LIBRARY"
+    maven="android-local-llm-harness.models:model-catalog:unspecified"
+    agpVersion="9.3.0"
+    buildFolder="build"
+    bootClassPath="/usr/local/lib/android/sdk/platforms/android-36/android.jar:/usr/local/lib/android/sdk/build-tools/36.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-36"
+    neverShrinking="true"
+    highlightGradualR8Api="false">
+  <lintOptions
+      lintConfig="/home/runner/work/android-local-llm-harness/android-local-llm-harness/lint.xml"
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="debug"/>
+</lint-module>

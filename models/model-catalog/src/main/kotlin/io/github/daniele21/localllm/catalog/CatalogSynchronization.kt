@@ -1,25 +1,13 @@
 package io.github.daniele21.localllm.catalog
 
-data class CatalogFetchRequest(
-    val etag: String?,
-    val lastModified: String?,
-    val currentRevision: Long?,
-)
+data class CatalogFetchRequest(val etag: String?, val lastModified: String?, val currentRevision: Long?)
 
-data class CatalogResponseMetadata(
-    val etag: String? = null,
-    val lastModified: String? = null,
-)
+data class CatalogResponseMetadata(val etag: String? = null, val lastModified: String? = null)
 
 sealed interface CatalogFetchResult {
-    data class Updated(
-        val bytes: ByteArray,
-        val metadata: CatalogResponseMetadata = CatalogResponseMetadata(),
-    ) : CatalogFetchResult
+    data class Updated(val bytes: ByteArray, val metadata: CatalogResponseMetadata = CatalogResponseMetadata()) : CatalogFetchResult
 
-    data class NotModified(
-        val metadata: CatalogResponseMetadata = CatalogResponseMetadata(),
-    ) : CatalogFetchResult
+    data class NotModified(val metadata: CatalogResponseMetadata = CatalogResponseMetadata()) : CatalogFetchResult
 
     data class Failed(val failure: CatalogFailure) : CatalogFetchResult
 }
@@ -66,6 +54,7 @@ class ModelCatalogSynchronizer(
     private fun applyUpdated(fetched: CatalogFetchResult.Updated, nowEpochMs: Long): CatalogRefreshResult {
         val decoded = when (val result = codec.decode(fetched.bytes)) {
             is CatalogDecodeResult.Success -> result.document
+
             is CatalogDecodeResult.Failure -> {
                 val failure = CatalogFailure(mapCodecFailure(result.error.code), nowEpochMs)
                 return reject(failure, nowEpochMs)
@@ -79,7 +68,9 @@ class ModelCatalogSynchronizer(
         val metadata = fetched.metadata.toSyncMetadata(nowEpochMs)
         return when (val replace = repository.replace(decoded, metadata, nowEpochMs)) {
             is CatalogReplaceResult.Stored -> CatalogRefreshResult.Updated(replace.snapshot)
+
             is CatalogReplaceResult.Unchanged -> CatalogRefreshResult.NotModified(replace.snapshot)
+
             is CatalogReplaceResult.Rejected -> reject(
                 CatalogFailure(mapReplaceRejection(replace.code), nowEpochMs),
                 nowEpochMs,
@@ -98,7 +89,9 @@ class ModelCatalogSynchronizer(
         val metadata = fetched.metadata.toSyncMetadata(nowEpochMs)
         return when (val replace = repository.recordNotModified(metadata, nowEpochMs)) {
             is CatalogReplaceResult.Stored -> CatalogRefreshResult.NotModified(replace.snapshot)
+
             is CatalogReplaceResult.Unchanged -> CatalogRefreshResult.NotModified(replace.snapshot)
+
             is CatalogReplaceResult.Rejected -> reject(
                 CatalogFailure(mapReplaceRejection(replace.code), nowEpochMs),
                 nowEpochMs,
@@ -117,49 +110,45 @@ class ModelCatalogSynchronizer(
         return CatalogRefreshResult.Rejected(failure, repository.current(nowEpochMs))
     }
 
-    private fun mapCodecFailure(code: CatalogCodecErrorCode): CatalogFailureCode {
-        return when (code) {
-            CatalogCodecErrorCode.DOCUMENT_TOO_LARGE,
-            CatalogCodecErrorCode.ENCODED_DOCUMENT_TOO_LARGE,
-            CatalogCodecErrorCode.JSON_LIMIT_EXCEEDED,
-            -> CatalogFailureCode.RESPONSE_TOO_LARGE
+    private fun mapCodecFailure(code: CatalogCodecErrorCode): CatalogFailureCode = when (code) {
+        CatalogCodecErrorCode.DOCUMENT_TOO_LARGE,
+        CatalogCodecErrorCode.ENCODED_DOCUMENT_TOO_LARGE,
+        CatalogCodecErrorCode.JSON_LIMIT_EXCEEDED,
+        -> CatalogFailureCode.RESPONSE_TOO_LARGE
 
-            else -> CatalogFailureCode.MALFORMED_DOCUMENT
-        }
+        else -> CatalogFailureCode.MALFORMED_DOCUMENT
     }
 
-    private fun mapValidationFailure(result: CatalogValidationResult): CatalogFailureCode {
-        return when {
-            result.violations.any { it.code == CatalogViolationCode.UNSUPPORTED_SCHEMA } ->
-                CatalogFailureCode.UNSUPPORTED_SCHEMA
+    private fun mapValidationFailure(result: CatalogValidationResult): CatalogFailureCode = when {
+        result.violations.any { it.code == CatalogViolationCode.UNSUPPORTED_SCHEMA } ->
+            CatalogFailureCode.UNSUPPORTED_SCHEMA
 
-            result.violations.any { it.code == CatalogViolationCode.DOCUMENT_EXPIRED } ->
-                CatalogFailureCode.EXPIRED_DOCUMENT
+        result.violations.any { it.code == CatalogViolationCode.DOCUMENT_EXPIRED } ->
+            CatalogFailureCode.EXPIRED_DOCUMENT
 
-            else -> CatalogFailureCode.VALIDATION_FAILURE
-        }
+        else -> CatalogFailureCode.VALIDATION_FAILURE
     }
 
-    private fun mapReplaceRejection(code: CatalogReplaceRejectionCode): CatalogFailureCode {
-        return when (code) {
-            CatalogReplaceRejectionCode.INVALID_DOCUMENT -> CatalogFailureCode.VALIDATION_FAILURE
-            CatalogReplaceRejectionCode.INVALID_METADATA,
-            CatalogReplaceRejectionCode.ENCODING_FAILURE,
-            CatalogReplaceRejectionCode.PERSISTENCE_FAILURE,
-            -> CatalogFailureCode.PERSISTENCE_FAILURE
+    private fun mapReplaceRejection(code: CatalogReplaceRejectionCode): CatalogFailureCode = when (code) {
+        CatalogReplaceRejectionCode.INVALID_DOCUMENT -> CatalogFailureCode.VALIDATION_FAILURE
 
-            CatalogReplaceRejectionCode.ROLLBACK_REJECTED -> CatalogFailureCode.ROLLBACK_REJECTED
-            CatalogReplaceRejectionCode.REVISION_CONFLICT -> CatalogFailureCode.REVISION_CONFLICT
-            CatalogReplaceRejectionCode.CATALOG_ID_MISMATCH -> CatalogFailureCode.CATALOG_ID_MISMATCH
-            CatalogReplaceRejectionCode.NO_CACHED_DOCUMENT -> CatalogFailureCode.NOT_MODIFIED_WITHOUT_CACHE
-        }
+        CatalogReplaceRejectionCode.INVALID_METADATA,
+        CatalogReplaceRejectionCode.ENCODING_FAILURE,
+        CatalogReplaceRejectionCode.PERSISTENCE_FAILURE,
+        -> CatalogFailureCode.PERSISTENCE_FAILURE
+
+        CatalogReplaceRejectionCode.ROLLBACK_REJECTED -> CatalogFailureCode.ROLLBACK_REJECTED
+
+        CatalogReplaceRejectionCode.REVISION_CONFLICT -> CatalogFailureCode.REVISION_CONFLICT
+
+        CatalogReplaceRejectionCode.CATALOG_ID_MISMATCH -> CatalogFailureCode.CATALOG_ID_MISMATCH
+
+        CatalogReplaceRejectionCode.NO_CACHED_DOCUMENT -> CatalogFailureCode.NOT_MODIFIED_WITHOUT_CACHE
     }
 
-    private fun CatalogResponseMetadata.toSyncMetadata(nowEpochMs: Long): CatalogSyncMetadata {
-        return CatalogSyncMetadata(
-            fetchedAtEpochMs = nowEpochMs,
-            etag = etag,
-            lastModified = lastModified,
-        )
-    }
+    private fun CatalogResponseMetadata.toSyncMetadata(nowEpochMs: Long): CatalogSyncMetadata = CatalogSyncMetadata(
+        fetchedAtEpochMs = nowEpochMs,
+        etag = etag,
+        lastModified = lastModified,
+    )
 }

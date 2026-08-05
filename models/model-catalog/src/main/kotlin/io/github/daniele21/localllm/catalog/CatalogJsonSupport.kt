@@ -12,16 +12,10 @@ internal data class CatalogJsonNumber(val raw: String) : CatalogJsonValue
 internal data class CatalogJsonBoolean(val value: Boolean) : CatalogJsonValue
 internal data object CatalogJsonNull : CatalogJsonValue
 
-internal class CatalogJsonSyntaxException(
-    val code: CatalogCodecErrorCode,
-    val position: Int,
-) : IllegalArgumentException("Invalid JSON at position $position: $code")
+internal class CatalogJsonSyntaxException(val code: CatalogCodecErrorCode, val position: Int) :
+    IllegalArgumentException("Invalid JSON at position $position: $code")
 
-internal class BoundedCatalogJsonParser(
-    private val maxDepth: Int,
-    private val maxNodes: Int,
-    private val maxStringChars: Int,
-) {
+internal class BoundedCatalogJsonParser(private val maxDepth: Int, private val maxNodes: Int, private val maxStringChars: Int) {
     init {
         require(maxDepth > 0)
         require(maxNodes > 0)
@@ -37,16 +31,14 @@ internal class BoundedCatalogJsonParser(
         return value
     }
 
-    private fun decodeUtf8(bytes: ByteArray): String {
-        return try {
-            StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(bytes))
-                .toString()
-        } catch (_: java.nio.charset.CharacterCodingException) {
-            throw CatalogJsonSyntaxException(CatalogCodecErrorCode.INVALID_UTF8, 0)
-        }
+    private fun decodeUtf8(bytes: ByteArray): String = try {
+        StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(bytes))
+            .toString()
+    } catch (_: java.nio.charset.CharacterCodingException) {
+        throw CatalogJsonSyntaxException(CatalogCodecErrorCode.INVALID_UTF8, 0)
     }
 
     @Suppress("TooManyFunctions")
@@ -236,9 +228,7 @@ internal class BoundedCatalogJsonParser(
 internal class CatalogJsonWriteException(val code: CatalogCodecErrorCode) : IllegalArgumentException()
 
 internal object CatalogJsonWriter {
-    fun encode(value: CatalogJsonValue): ByteArray {
-        return buildString { appendValue(value) }.toByteArray(StandardCharsets.UTF_8)
-    }
+    fun encode(value: CatalogJsonValue): ByteArray = buildString { appendValue(value) }.toByteArray(StandardCharsets.UTF_8)
 
     private fun StringBuilder.appendValue(value: CatalogJsonValue) {
         when (value) {
@@ -285,7 +275,9 @@ internal object CatalogJsonWriter {
                     append(value[index + 1])
                     index += 2
                 }
+
                 char.isLowSurrogate() -> throw CatalogJsonWriteException(CatalogCodecErrorCode.INVALID_UNICODE)
+
                 else -> {
                     appendEscaped(char)
                     index += 1
@@ -298,12 +290,19 @@ internal object CatalogJsonWriter {
     private fun StringBuilder.appendEscaped(char: Char) {
         when (char) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             '\b' -> append("\\b")
+
             '\u000c' -> append("\\f")
+
             '\n' -> append("\\n")
+
             '\r' -> append("\\r")
+
             '\t' -> append("\\t")
+
             else -> if (char.code < CONTROL_LIMIT) {
                 append("\\u")
                 append(char.code.toString(HEX_RADIX).padStart(UNICODE_HEX_LENGTH, '0'))

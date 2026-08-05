@@ -14,11 +14,7 @@ fun interface CatalogClock {
     fun nowEpochMs(): Long
 }
 
-data class CatalogSyncMetadata(
-    val fetchedAtEpochMs: Long,
-    val etag: String? = null,
-    val lastModified: String? = null,
-)
+data class CatalogSyncMetadata(val fetchedAtEpochMs: Long, val etag: String? = null, val lastModified: String? = null)
 
 enum class CatalogFreshness {
     EMPTY,
@@ -44,10 +40,7 @@ enum class CatalogFailureCode {
     INTERNAL_FAILURE,
 }
 
-data class CatalogFailure(
-    val code: CatalogFailureCode,
-    val occurredAtEpochMs: Long,
-)
+data class CatalogFailure(val code: CatalogFailureCode, val occurredAtEpochMs: Long)
 
 data class CatalogSnapshot(
     val document: CatalogModelDocument?,
@@ -77,16 +70,9 @@ sealed interface CatalogReplaceResult {
 interface ModelCatalogRepository {
     fun current(nowEpochMs: Long): CatalogSnapshot
 
-    fun replace(
-        document: CatalogModelDocument,
-        metadata: CatalogSyncMetadata,
-        nowEpochMs: Long,
-    ): CatalogReplaceResult
+    fun replace(document: CatalogModelDocument, metadata: CatalogSyncMetadata, nowEpochMs: Long): CatalogReplaceResult
 
-    fun recordNotModified(
-        metadata: CatalogSyncMetadata,
-        nowEpochMs: Long,
-    ): CatalogReplaceResult
+    fun recordNotModified(metadata: CatalogSyncMetadata, nowEpochMs: Long): CatalogReplaceResult
 
     fun markRefreshFailure(failure: CatalogFailure)
 }
@@ -118,53 +104,48 @@ class FileModelCatalogRepository(
     }
 
     @Suppress("ReturnCount")
-    override fun replace(
-        document: CatalogModelDocument,
-        metadata: CatalogSyncMetadata,
-        nowEpochMs: Long,
-    ): CatalogReplaceResult = synchronized(lock) {
-        ensureLoaded(nowEpochMs)
-        val validation = validator.validate(document, nowEpochMs)
-        if (!validation.valid) {
-            return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_DOCUMENT)
-        }
-        if (!validMetadata(metadata)) {
-            return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_METADATA)
-        }
-
-        val incomingBytes = when (val encoded = codec.encode(document)) {
-            is CatalogEncodeResult.Success -> encoded.bytes
-            is CatalogEncodeResult.Failure -> return@synchronized CatalogReplaceResult.Rejected(
-                CatalogReplaceRejectionCode.ENCODING_FAILURE,
-            )
-        }
-        val currentDocument = state.document
-        if (currentDocument != null) {
-            compareRevision(currentDocument, document)?.let { rejection ->
-                return@synchronized CatalogReplaceResult.Rejected(rejection)
+    override fun replace(document: CatalogModelDocument, metadata: CatalogSyncMetadata, nowEpochMs: Long): CatalogReplaceResult =
+        synchronized(lock) {
+            ensureLoaded(nowEpochMs)
+            val validation = validator.validate(document, nowEpochMs)
+            if (!validation.valid) {
+                return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_DOCUMENT)
             }
+            if (!validMetadata(metadata)) {
+                return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.INVALID_METADATA)
+            }
+
+            val incomingBytes = when (val encoded = codec.encode(document)) {
+                is CatalogEncodeResult.Success -> encoded.bytes
+
+                is CatalogEncodeResult.Failure -> return@synchronized CatalogReplaceResult.Rejected(
+                    CatalogReplaceRejectionCode.ENCODING_FAILURE,
+                )
+            }
+            val currentDocument = state.document
+            if (currentDocument != null) {
+                compareRevision(currentDocument, document)?.let { rejection ->
+                    return@synchronized CatalogReplaceResult.Rejected(rejection)
+                }
+            }
+
+            val unchanged = currentDocument != null && currentDocument.revision == document.revision
+            val candidate = RepositoryState(
+                document = document,
+                encodedDocument = incomingBytes,
+                syncMetadata = metadata,
+                lastFailure = null,
+                persistedAtEpochMs = nowEpochMs,
+            )
+            if (!persist(candidate)) {
+                return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.PERSISTENCE_FAILURE)
+            }
+            state = candidate
+            val snapshot = state.toSnapshot(nowEpochMs)
+            if (unchanged) CatalogReplaceResult.Unchanged(snapshot) else CatalogReplaceResult.Stored(snapshot)
         }
 
-        val unchanged = currentDocument != null && currentDocument.revision == document.revision
-        val candidate = RepositoryState(
-            document = document,
-            encodedDocument = incomingBytes,
-            syncMetadata = metadata,
-            lastFailure = null,
-            persistedAtEpochMs = nowEpochMs,
-        )
-        if (!persist(candidate)) {
-            return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.PERSISTENCE_FAILURE)
-        }
-        state = candidate
-        val snapshot = state.toSnapshot(nowEpochMs)
-        if (unchanged) CatalogReplaceResult.Unchanged(snapshot) else CatalogReplaceResult.Stored(snapshot)
-    }
-
-    override fun recordNotModified(
-        metadata: CatalogSyncMetadata,
-        nowEpochMs: Long,
-    ): CatalogReplaceResult = synchronized(lock) {
+    override fun recordNotModified(metadata: CatalogSyncMetadata, nowEpochMs: Long): CatalogReplaceResult = synchronized(lock) {
         ensureLoaded(nowEpochMs)
         if (state.document == null) {
             return@synchronized CatalogReplaceResult.Rejected(CatalogReplaceRejectionCode.NO_CACHED_DOCUMENT)
@@ -201,10 +182,7 @@ class FileModelCatalogRepository(
         }
     }
 
-    private fun compareRevision(
-        current: CatalogModelDocument,
-        incoming: CatalogModelDocument,
-    ): CatalogReplaceRejectionCode? {
+    private fun compareRevision(current: CatalogModelDocument, incoming: CatalogModelDocument): CatalogReplaceRejectionCode? {
         if (current.catalogId != incoming.catalogId) return CatalogReplaceRejectionCode.CATALOG_ID_MISMATCH
         if (incoming.revision < current.revision) return CatalogReplaceRejectionCode.ROLLBACK_REJECTED
         if (incoming.revision > current.revision) return null
@@ -227,24 +205,25 @@ class FileModelCatalogRepository(
     private fun readState(): RepositoryState? {
         val file = stateFile()
         if (!file.exists()) return null
-        if (!file.isFile || file.length() > maxStateBytes) throw CatalogStateException()
+        ensureValidState(file.isFile && file.length() <= maxStateBytes)
         val bytes = readBoundedState(file)
-        val root = STATE_PARSER.parse(bytes) as? CatalogJsonObject ?: throw CatalogStateException()
+        val root = STATE_PARSER.parse(bytes) as? CatalogJsonObject ?: invalidState()
         requireFields(root, STATE_FIELDS)
         val schemaVersion = requiredLong(root, "storageSchemaVersion")
-        if (schemaVersion != STORAGE_SCHEMA_VERSION.toLong()) throw CatalogStateException()
+        ensureValidState(schemaVersion == STORAGE_SCHEMA_VERSION.toLong())
         val persistedAt = requiredLong(root, "persistedAtEpochMs")
-        if (persistedAt < 0) throw CatalogStateException()
+        ensureValidState(persistedAt >= 0)
         val catalogString = optionalString(root, "catalogJson")
-        val document = catalogString?.let { encoded ->
-            when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
-                is CatalogDecodeResult.Success -> decoded.document
-                is CatalogDecodeResult.Failure -> throw CatalogStateException()
+        val document =
+            catalogString?.let { encoded ->
+                when (val decoded = codec.decode(encoded.toByteArray(Charsets.UTF_8))) {
+                    is CatalogDecodeResult.Success -> decoded.document
+                    is CatalogDecodeResult.Failure -> invalidState()
+                }
             }
-        }
         val metadata = optionalObject(root, "syncMetadata")?.let(::decodeMetadata)
         val failure = optionalObject(root, "lastFailure")?.let(::decodeFailure)
-        if ((document == null) != (metadata == null)) throw CatalogStateException()
+        ensureValidState((document == null) == (metadata == null))
         return RepositoryState(
             document = document,
             encodedDocument = catalogString?.toByteArray(Charsets.UTF_8),
@@ -253,6 +232,12 @@ class FileModelCatalogRepository(
             persistedAtEpochMs = persistedAt,
         )
     }
+
+    private fun ensureValidState(valid: Boolean) {
+        if (!valid) invalidState()
+    }
+
+    private fun invalidState(): Nothing = throw CatalogStateException()
 
     private fun decodeMetadata(value: CatalogJsonObject): CatalogSyncMetadata {
         requireFields(value, METADATA_FIELDS)
@@ -339,7 +324,9 @@ class FileModelCatalogRepository(
                     if (index + 1 >= length || !this[index + 1].isLowSurrogate()) return false
                     index += 2
                 }
+
                 char.isLowSurrogate() -> return false
+
                 else -> index += 1
             }
         }
@@ -462,37 +449,33 @@ private fun jsonNumber(value: Number): CatalogJsonNumber = CatalogJsonNumber(val
 private fun CatalogJsonValue?.orNull(): CatalogJsonValue = this ?: CatalogJsonNull
 
 private fun requireFields(value: CatalogJsonObject, expected: Set<String>) {
-    if (value.fields.keys != expected) throw IllegalArgumentException("Unexpected catalog state fields")
+    require(value.fields.keys == expected) { "Unexpected catalog state fields" }
 }
 
-private fun requiredValue(value: CatalogJsonObject, name: String): CatalogJsonValue {
-    return value.fields[name] ?: throw IllegalArgumentException("Missing catalog state field")
-}
+private fun requiredValue(value: CatalogJsonObject, name: String): CatalogJsonValue =
+    value.fields[name] ?: throw IllegalArgumentException("Missing catalog state field")
 
-private fun requiredString(value: CatalogJsonObject, name: String): String {
-    return (requiredValue(value, name) as? CatalogJsonString)?.value
-        ?: throw IllegalArgumentException("Invalid catalog state string")
-}
+private fun requiredString(value: CatalogJsonObject, name: String): String = (requiredValue(value, name) as? CatalogJsonString)?.value
+    ?: throw IllegalArgumentException("Invalid catalog state string")
 
-private fun optionalString(value: CatalogJsonObject, name: String): String? {
-    return when (val field = requiredValue(value, name)) {
-        CatalogJsonNull -> null
-        is CatalogJsonString -> field.value
-        else -> throw IllegalArgumentException("Invalid optional catalog state string")
-    }
+private fun optionalString(value: CatalogJsonObject, name: String): String? = when (val field = requiredValue(value, name)) {
+    CatalogJsonNull -> null
+    is CatalogJsonString -> field.value
+    else -> throw IllegalArgumentException("Invalid optional catalog state string")
 }
 
 private fun requiredLong(value: CatalogJsonObject, name: String): Long {
-    val raw = (requiredValue(value, name) as? CatalogJsonNumber)?.raw
-        ?: throw IllegalArgumentException("Invalid catalog state number")
-    if (raw.any { it == '.' || it == 'e' || it == 'E' }) throw IllegalArgumentException("Invalid catalog state integer")
-    return raw.toLongOrNull() ?: throw IllegalArgumentException("Catalog state integer out of range")
+    val number = requiredValue(value, name) as? CatalogJsonNumber
+    requireNotNull(number) { "Invalid catalog state number" }
+    val raw = number.raw
+    require(raw.none { it == '.' || it == 'e' || it == 'E' }) {
+        "Invalid catalog state integer"
+    }
+    return requireNotNull(raw.toLongOrNull()) { "Catalog state integer out of range" }
 }
 
-private fun optionalObject(value: CatalogJsonObject, name: String): CatalogJsonObject? {
-    return when (val field = requiredValue(value, name)) {
-        CatalogJsonNull -> null
-        is CatalogJsonObject -> field
-        else -> throw IllegalArgumentException("Invalid optional catalog state object")
-    }
+private fun optionalObject(value: CatalogJsonObject, name: String): CatalogJsonObject? = when (val field = requiredValue(value, name)) {
+    CatalogJsonNull -> null
+    is CatalogJsonObject -> field
+    else -> throw IllegalArgumentException("Invalid optional catalog state object")
 }
