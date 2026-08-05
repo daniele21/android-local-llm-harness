@@ -6,9 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-internal class HarnessViewModel(
-    initialState: HarnessUiState = HarnessUiState(),
-) : ViewModel() {
+internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState()) : ViewModel() {
     private val mutableUiState = MutableStateFlow(initialState)
 
     val uiState: StateFlow<HarnessUiState> = mutableUiState.asStateFlow()
