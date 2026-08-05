@@ -5,21 +5,18 @@ on:
     branches:
       - agent/recover-model-management
 
-permissions:
-  contents: write
-
 jobs:
-  recover:
+  diagnose:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
           ref: agent/recover-model-management
-          fetch-depth: 2
-      - name: Apply focused recovery
+          fetch-depth: 3
+      - name: Locate bootstrap assertion
         shell: bash
         run: |
-          git show HEAD^:.github/workflows/recover-model-management.yml > /tmp/bootstrap.yml
+          git show e5f79d4ccd290e6d53bbba668856cd8320a8eb43:.github/workflows/recover-model-management.yml > /tmp/bootstrap.yml
           python3 - <<'PY'
           from pathlib import Path
           source = Path('/tmp/bootstrap.yml').read_text()
@@ -28,11 +25,6 @@ jobs:
           end = source.rindex("\n          PY")
           body = source[start:end]
           lines = [(line[10:] if line.startswith('          ') else line) for line in body.splitlines()]
-          Path('/tmp/recover_model_management.py').write_text('\n'.join(lines) + '\n')
+          for number in range(268, 283):
+              print(f"{number}: {lines[number - 1]}")
           PY
-          python3 /tmp/recover_model_management.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Recover safe phone model management"
-          git push origin HEAD:agent/recover-model-management
