@@ -4,25 +4,40 @@ This file is the authoritative source for current implementation status. Detaile
 
 ## Current execution status — August 2026
 
-Phase 1 is merged into `main` through pull request #13. Phase 2 has progressed through persistent telemetry, health checks, generation sanity, cache health, Android resource observability, benchmark regression checks and selective sanity-rule recovery.
+The functional runtime, observability, connected phone console, model distribution and retained benchmark history are implemented. Harness 0.5.0 is now following the protected `dev` integration plan: `dev` is the ordinary development line, while `main` remains stable and release-oriented.
 
-The current `main` head contains the work merged through pull request #29, including the ARM64 emulator preflight and the Google Play-installable physical-device validation app that does not require developer mode or ADB.
+The active sequence is governance and cumulative CI, focused model-management recovery, real Android branding, Compose architecture and surface completion, UI/accessibility validation, then signed internal distribution and physical-device evidence.
 
-The repository is merge-ready for continued development but is **not production-ready** until the physical-device GGUF evidence gate is completed.
+The repository remains **not production-ready** until the representative physical-device GGUF evidence gate is completed.
 
 ## Repository and branch control
 
-- [x] use `main` as the canonical integrated implementation line
-- [x] consolidate the complete Phase 1 runtime through PR #13
-- [x] close superseded Phase 1 implementation PRs #8 and #12
-- [x] keep dependency-only changes separate from functional runtime work
-- [x] document branch and pull-request discipline in [`BRANCHING.md`](../BRANCHING.md)
-- [x] supersede the alternative Phase 2 health-control-plane line in PR #22
-- [x] recover only compatible sanity-assertion behavior on a fresh branch from current `main`
-- [x] merge the recovery and emulator-preflight line through PR #28
+- [x] keep `main` as the protected stable and release-oriented line
+- [x] create `dev` from the restored green repository baseline
+- [x] make `dev` the documented base and target for ordinary work
+- [x] add automated rejection of ordinary pull requests opened directly to `main`
+- [x] add cumulative Android and native validation after merges to `dev`
+- [x] add complete non-scoped validation and packaging for `dev -> main` promotions
+- [x] document hotfix, forward-port, merge and rollback behavior in ADR 0008
+- [ ] apply repository-level protection to `dev` and verify direct pushes are rejected
 - [ ] delete historical remote branches after their unique commits and recovery notes are audited
 
 Historical branches are read-only audit references. They must not receive new implementation commits and must never be used as the base for new feature work.
+
+## Harness 0.5.0 integration sequence
+
+- [x] restore the green repository baseline and protect `main` through PR #55
+- [x] establish the `dev` branch and correct its curated-model-catalog Detekt regression through PR #58
+- [x] implement repository-owned `dev` validation, promotion gates, target-branch policy, PR template and integration ADR
+- [ ] apply the equivalent repository ruleset to `dev`
+- [ ] align, validate and squash-merge the focused model-management recovery in PR #53
+- [ ] close PR #34 as superseded after auditing its unique behavior
+- [ ] integrate real Android launcher, themed-icon and Compose brand assets
+- [ ] complete Navigation Compose, ViewModel/UDF and the five primary product surfaces
+- [ ] add Compose UI, screenshot, accessibility and responsive-layout evidence
+- [ ] build and upload the signed AAB to Google Play Internal Testing
+- [ ] capture privacy-safe representative physical-device GGUF evidence
+- [ ] promote the validated `dev` candidate to `main` with a merge commit and tag Harness 0.5.0 only after the applicable release gates pass
 
 ## Verified repository gate
 
@@ -280,7 +295,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
 - [ ] connect the standalone console to a real cross-application diagnostics source
 
-### Benchmark regression and baseline history console — PR #33
+### Benchmark regression and baseline history console — selectively recovered through PR #51
 
 - [x] stacked branch and draft PR based on PR #31
 - [x] `BenchmarkComparisonEvaluator` shared by health checks and console presentation
@@ -296,9 +311,9 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] in-memory and Room active/history persistence tests
 - [x] evaluator, data-source and presenter tests
 - [x] Spotless, Detekt, Android Lint, compilation and packaging validation
-- [ ] rebase or retarget onto `main` after PR #31 is merged
+- [x] recover the current retained-history behavior through PR #51 without reviving the legacy standalone console
 
-### Explicit model management console — PR #34
+### Legacy explicit model management console — PR #34
 
 - [x] stacked branch and draft PR based on PR #31
 - [x] `ConsoleModelControl` boundary over existing `ModelStore` import, verify and remove operations
@@ -314,7 +329,7 @@ The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-i
 - [x] staged-file cleanup after success and failure
 - [x] control, presenter and data-source tests
 - [x] Spotless, Detekt, Android Lint, compilation and packaging validation
-- [ ] rebase or retarget onto `main` after PR #31 is merged
+- [ ] close PR #34 as superseded after the focused PR #53 recovery is merged into `dev`
 
 ### Manual inference playground — PR #35
 
