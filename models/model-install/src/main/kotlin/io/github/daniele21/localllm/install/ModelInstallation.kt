@@ -187,7 +187,17 @@ class VerifiedModelInstaller(
             }
 
             emit(observer, installationId, ModelInstallationStage.VERIFYING)
-            val verification = modelStore.verify(stored.digest)
+            val verification = try {
+                modelStore.verify(stored.digest)
+            } catch (_: RuntimeException) {
+                runCatching { modelStore.remove(stored.digest) }
+                return fail(
+                    observer,
+                    installationId,
+                    ModelInstallationFailureCode.POST_IMPORT_VERIFICATION_FAILED,
+                    "Installed model verification could not be completed",
+                )
+            }
             if (!verification.valid) {
                 runCatching { modelStore.remove(stored.digest) }
                 return fail(
