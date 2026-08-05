@@ -107,13 +107,13 @@ verified holding artifact
 
 Compatibility and UI storage calculations must account for this temporary overlap.
 
-## Post-import verification and rollback
+## Post-import verification
 
 After `ModelStore.import()`, the installer calls `ModelStore.verify()` on the installed digest.
 
-If verification reports invalid content or throws before it can complete, the installer performs best-effort removal of the imported digest and returns `POST_IMPORT_VERIFICATION_FAILED`.
+If verification reports invalid content or cannot complete, the installer returns `POST_IMPORT_VERIFICATION_FAILED` and retains the verified holding artifact for diagnosis or retry.
 
-The verified holding artifact is retained after every failed installation so the operation may be diagnosed or retried without another network transfer.
+The failure path is deliberately non-destructive. The current `ModelStore.import()` contract does not expose whether it created a new artifact or deduplicated an existing one. Automatically deleting the digest could therefore remove a valid model that existed before this installation or was installed concurrently. Explicit repair or removal remains behind model-store maintenance controls until the store exposes transactional creation provenance.
 
 On success, the default policy discards the verified holding artifact. `RETAIN` keeps it explicitly. Cleanup failure does not invalidate an already verified installed model; the success result exposes whether discard completed.
 
@@ -167,7 +167,7 @@ Deterministic tests cover:
 - missing or invalid verified download;
 - GGUF architecture mismatch;
 - import failure;
-- post-import verification failure and rollback;
+- non-destructive post-import verification failures;
 - retention of verified bytes after failure;
 - cleanup of installation staging files;
 - mapping from `llama.cpp` inspection results to stable installation outcomes.
@@ -176,6 +176,7 @@ Deterministic tests cover:
 
 The following remain separate implementation blocks:
 
+- transactional import provenance if automatic rollback is required;
 - durable installed-model metadata persistence;
 - catalog/download/install Compose UI;
 - explicit application/use-case binding after installation;
