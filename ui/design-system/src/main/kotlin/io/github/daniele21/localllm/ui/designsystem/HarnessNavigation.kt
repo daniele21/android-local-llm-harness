@@ -16,12 +16,7 @@ fun HarnessNavigationBar(modifier: Modifier = Modifier, content: @Composable Row
 }
 
 @Composable
-fun RowScope.HarnessNavigationItem(
-    selected: Boolean,
-    label: String,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-) {
+fun RowScope.HarnessNavigationItem(selected: Boolean, label: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
     NavigationBarItem(
         selected = selected,
         onClick = onClick,
