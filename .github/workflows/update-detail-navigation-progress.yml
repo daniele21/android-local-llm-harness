@@ -1,0 +1,99 @@
+name: Update detail navigation progress
+
+on:
+  push:
+    branches: [agent/detail-navigation]
+    paths:
+      - .github/workflows/update-detail-navigation-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/detail-navigation
+          fetch-depth: 1
+
+      - name: Update canonical UX progress tracker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/harness-ux-ui-implementation-progress.md")
+          text = path.read_text()
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "**Integrated baseline:** `dev` after merged PR #67",
+              "**Integrated baseline:** `dev` after merged PR #68",
+              "integrated baseline",
+          )
+          replace_once(
+              "**Active implementation branch:** `agent/playground-presentation-tests`",
+              "**Active implementation branch:** `agent/detail-navigation`",
+              "active branch",
+          )
+          replace_once(
+              "**Active pull request:** PR #68 toward `dev`",
+              "**Active pull request:** PR #70 toward `dev`",
+              "active pull request",
+          )
+          replace_once(
+              "| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist; detail routes, full back behavior, Activity slimming and responsive validation remain. |",
+              "| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist. PR #70 adds typed Settings details, a dedicated request timeline route and detail-aware Back behavior; model details, Activity slimming and responsive validation remain. |",
+              "responsive shell row",
+          )
+          replace_once(
+              "| Diagnostics Runs | PARTIAL | Real privacy-safe run cards and linked request timelines exist; dedicated detail route and complete state/navigation tests remain. |",
+              "| Diagnostics Runs | PARTIAL | Real privacy-safe run cards exist and PR #70 moves correlated evidence to a dedicated request timeline route; complete navigation, restoration and emulator evidence remain. |",
+              "diagnostics runs row",
+          )
+          replace_once(
+              "| Settings and developer tools | PARTIAL | Session theme selection, privacy/build disclosures, storage summary and validation access exist; preference persistence, full metadata, cleanup and separate routes remain. |",
+              "| Settings and developer tools | PARTIAL | PR #70 adds separate Privacy, Storage, Build, Developer tools and Physical validation routes with real app/model state; theme persistence, cleanup controls and complete metadata remain. |",
+              "settings row",
+          )
+          replace_once(
+              "The app uses Navigation Compose for top-level destinations, but Diagnostics section and timeline state remain Activity-owned and inline rather than dedicated detail routes. Back-stack behavior and complete navigation tests remain part of the ViewModel/UDF migration.",
+              "The app uses Navigation Compose for top-level destinations. PR #70 adds a dedicated opaque request-timeline route and moves Settings disclosures into explicit detail destinations. Diagnostics section and loaded timeline data remain Activity-owned, while complete restoration and emulator back-stack evidence remain part of the ViewModel/UDF migration.",
+              "diagnostics navigation paragraph",
+          )
+
+          marker = "### Diagnostics section navigation\n"
+          detail_section = """### Typed detail navigation\n\nPR #70 introduces the first detail-route slice without changing runtime ownership:\n\n- a pure route and shell-state contract for top-level and detail destinations;\n- separate Privacy, Storage, Build, Developer tools and Physical validation screens;\n- a dedicated `runs/{requestId}` destination with URL-safe opaque request identifiers;\n- detail-aware top bars and bottom-navigation visibility;\n- Settings navigation that preserves the previously selected top-level destination;\n- request timeline loading and cleanup tied to destination lifecycle;\n- JVM coverage for top-level, detail, fallback and request-ID round-trip behavior.\n\nModel details, complete state restoration, responsive emulator evidence and further Activity slimming remain open.\n\n"""
+          if text.count(marker) != 1:
+              raise RuntimeError("detail navigation insertion marker missing")
+          text = text.replace(marker, detail_section + marker, 1)
+
+          old_block_start = text.index("## Immediate next block")
+          old_block_end = text.index("## Planned sequence after the Playground slice")
+          new_block = """## Immediate next block\n\n### Complete typed detail navigation\n\nStatus: `IMPLEMENTED / PR VALIDATION`\n\nCompleted in PR #70:\n\n1. [x] introduce a pure typed route and shell-state contract;\n2. [x] add Privacy, Storage, Build, Developer tools and Physical validation destinations;\n3. [x] move request timelines to a dedicated opaque-argument route;\n4. [x] preserve the previous top-level destination when Settings is opened;\n5. [x] hide top-level navigation chrome on detail destinations;\n6. [x] keep active generation independent from navigation;\n7. [x] add deterministic JVM route and argument coverage;\n8. [x] pass focused formatting, unit-test and Kotlin-compilation validation;\n9. [ ] pass cumulative PR validation and merge into `dev`;\n10. [ ] capture compact and expanded emulator Back/restoration evidence.\n\n## Planned sequence after the detail-navigation slice\n\n1. migrate Models to ViewModel/UDF and introduce one unified multi-model state;\n2. add `models/{digest}` with compatibility, integrity, loaded ownership and recovery actions;\n3. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;\n4. complete remaining back-stack restoration and remove inline Activity-owned detail state;\n5. add Compose UI, screenshot, accessibility, responsive, performance and physical-device evidence.\n\n"""
+          text = text[:old_block_start] + new_block + text[old_block_end + len("## Planned sequence after the Playground slice\n\n1. extract detail navigation and continue reducing `MainActivity` to a composition root;\n2. migrate Models and unified multi-model state, including degraded-state recovery;\n3. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;\n4. complete detail routes and back-stack behavior;\n5. add Compose UI, screenshot, accessibility, responsive, performance, and physical-device evidence.\n\n"):]
+
+          replace_once(
+              "- Navigation Compose covers top-level destinations, but detail routes and complete back-stack tests remain.",
+              "- Navigation Compose covers top-level destinations plus the first Settings and request-timeline details; model detail, restoration and complete back-stack evidence remain.",
+              "navigation debt",
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflow and commit tracker
+        run: |
+          rm .github/workflows/update-detail-navigation-progress.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: record typed detail navigation progress"
+          git push origin HEAD:agent/detail-navigation
