@@ -1,0 +1,99 @@
+name: Update model inventory progress
+
+on:
+  push:
+    branches: [agent/models-udf-foundation]
+    paths:
+      - .github/workflows/update-model-inventory-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/models-udf-foundation
+          fetch-depth: 1
+
+      - name: Update canonical progress tracker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/harness-ux-ui-implementation-progress.md")
+          text = path.read_text()
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "**Integrated baseline:** `dev` after merged PR #68",
+              "**Integrated baseline:** `dev` after merged PR #70",
+              "integrated baseline",
+          )
+          replace_once(
+              "**Active implementation branch:** `agent/detail-navigation`",
+              "**Active implementation branch:** `agent/models-udf-foundation`",
+              "active branch",
+          )
+          replace_once(
+              "**Active pull request:** PR #70 toward `dev`",
+              "**Active pull request:** PR #71 toward `dev`",
+              "active pull request",
+          )
+          replace_once(
+              "| Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected; unified multi-model state, detail routes and degraded-state recovery remain. |",
+              "| Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected. PR #71 adds the unified catalog/import/selection/runtime inventory foundation; controller effects, connected rendering, model details and recovery actions remain. |",
+              "models row",
+          )
+          replace_once(
+              "| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |",
+              "| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest. PR #71 derives one immutable inventory across catalog releases, external imports, selection and runtime ownership with explicit degraded states; `lastUsedAt`, connected recovery and restart UI tests remain. |",
+              "catalog row",
+          )
+          replace_once(
+              "| ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation. PR #67 migrates the Playground vertical slice to lifecycle-aware `StateFlow` rendering and a testable effect boundary; Models, Diagnostics, Overview, and Settings remain Activity-owned. |",
+              "| ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation; PR #67 connects Playground. PR #71 integrates the unified model inventory into reducer events, while Models effects/rendering plus Diagnostics, Overview and Settings remain Activity-owned. |",
+              "udf row",
+          )
+          replace_once(
+              "| CI and Android build validation | VALIDATION | PR #68 is merged into `dev`. PR #70 passed focused formatting, JVM tests and Kotlin compilation in run `31076390922`; cumulative repository validation remains pending. |",
+              "| CI and Android build validation | VALIDATION | PR #70 is merged into `dev`; cumulative validation `31078225131` and packaging `31078225481` are green. PR #71 passed focused Spotless, Detekt, JVM, Lint and Kotlin compilation in run `31079690251`. |",
+              "ci row",
+          )
+
+          marker = "### Typed detail navigation\n"
+          section = """### Unified model inventory foundation\n\nPR #71 introduces a pure product-level projection without changing model operations:\n\n- catalog releases retain stable catalog identity and gain a digest only when installed metadata supplies one;\n- externally imported GGUF models remain valid installed selections outside the administrator catalog;\n- selected and runtime-loaded ownership are represented independently;\n- runtime ownership missing from the inventory and loaded-versus-selected mismatches become explicit degraded states;\n- catalog, selection and loaded-ownership events rebuild one immutable `HarnessModelInventoryState`;\n- catalog refreshes preserve the last known runtime ownership;\n- deterministic tests cover lifecycle mapping, imports, mismatches and reducer convergence.\n\nThe controller effect boundary, connected Models rendering, `models/{digest}` and recovery actions remain the next vertical slice.\n\n"""
+          if text.count(marker) != 1:
+              raise RuntimeError("inventory section insertion marker missing")
+          text = text.replace(marker, section + marker, 1)
+
+          start = text.index("## Immediate next block")
+          end = text.index("## Known technical debt")
+          replacement = """## Immediate next block\n\n### Establish unified Models UDF state\n\nStatus: `IMPLEMENTED / PR VALIDATION`\n\nCompleted in PR #71:\n\n1. [x] define catalog, imported and runtime model origins;\n2. [x] map catalog download and installation states into one lifecycle;\n3. [x] keep catalog stable IDs separate from optional installed digests;\n4. [x] represent selection and loaded runtime ownership independently;\n5. [x] expose deterministic degraded states for missing or mismatched runtime ownership;\n6. [x] rebuild the inventory through typed reducer events;\n7. [x] preserve loaded ownership across catalog refreshes;\n8. [x] add pure reconciliation and reducer tests;\n9. [x] pass focused Spotless, Detekt, JVM, Lint and Kotlin compilation validation;\n10. [ ] pass cumulative PR validation and merge into `dev`.\n\n## Planned sequence after the inventory foundation\n\n1. introduce `ModelEffects` around import, refresh, download, cancel, install, select, verify and remove;\n2. render Models from `HarnessUiState.modelInventory` and remove duplicate Activity-owned model state;\n3. add `models/{digest}` with compatibility, integrity, loaded ownership and deterministic recovery actions;\n4. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;\n5. complete restoration, Compose UI, accessibility, responsive and physical-device evidence.\n\n"""
+          text = text[:start] + replacement + text[end:]
+
+          replace_once(
+              "- The ViewModel/reducer foundation is wired only for Playground; Models, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.",
+              "- Playground is fully wired to ViewModel/UDF and PR #71 adds the Models inventory reducer foundation; Models effects/rendering, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.",
+              "udf debt",
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflow and commit tracker
+        run: |
+          rm .github/workflows/update-model-inventory-progress.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: record unified model inventory progress"
+          git push origin HEAD:agent/models-udf-foundation
