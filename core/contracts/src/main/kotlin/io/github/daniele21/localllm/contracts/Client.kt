@@ -4,6 +4,12 @@ interface LocalLlmClient {
     fun runtimeSnapshot(): RuntimeSnapshot
     fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult
     fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId
+
+    fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId {
+        require(options == SessionOptions()) { "This client does not support explicit session options" }
+        return createSession(applicationId, useCaseId)
+    }
+
     fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle
     fun closeSession(sessionId: SessionId)
 }

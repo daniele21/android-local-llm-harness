@@ -80,6 +80,11 @@ For `observability/contracts` changes, use the repository-wide Android gate beca
 ./gradlew :observability:room-store:assembleDebugAndroidTest
 ```
 
+Keep exported Room schemas under `room-store/src/androidTest/assets` and cover each supported
+migration with `MigrationTestHelper`, including a historical row whose newly added fields remain
+nullable. Run `connectedDebugAndroidTest` only when an emulator or device is available; successful
+assembly proves compilation and packaging, not migration execution.
+
 Compile and test `apps/local-llm-phone-test` when presentation or app adapters change. Physical-device evidence is required before memory, thermal or performance claims.
 
 ## Maintaining this guide

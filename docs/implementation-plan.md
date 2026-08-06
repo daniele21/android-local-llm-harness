@@ -477,6 +477,9 @@ Provide stable, cancellable and observable local generation inside an Android ap
 
 #### Generation
 
+- Follow the focused [`generation configuration and prompting plan`](generation-configuration-and-prompting-plan.md)
+  for the staged contracts, prompt/template trust boundary, exact token planning, dynamic
+  context lifecycle, preset rollout, telemetry migration and validation sequence.
 - Build the prompt using the configured chat template policy.
 - Apply system prompt and use-case template versions.
 - Tokenize and validate context limits before decode.

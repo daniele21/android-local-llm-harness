@@ -40,7 +40,10 @@ add_library(
     local_llm_jni
     SHARED
     gguf_metadata.cpp
+    common_string_utils.cpp
+    generation_output_buffer.cpp
     llama_jni_entry.cpp
+    "${LLAMA_CPP_DIR}/common/json-schema-to-grammar.cpp"
 )
 
 target_compile_definitions(
@@ -55,6 +58,8 @@ target_include_directories(
     PRIVATE
     "${LLAMA_CPP_DIR}/include"
     "${LLAMA_CPP_DIR}/ggml/include"
+    "${LLAMA_CPP_DIR}/common"
+    "${LLAMA_CPP_DIR}/vendor"
 )
 
 find_library(android_lib android REQUIRED)

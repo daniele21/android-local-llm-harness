@@ -1,9 +1,13 @@
 package io.github.daniele21.localllm.observability.room
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ChatTemplateSource
+import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkKey
@@ -42,6 +46,22 @@ internal object TelemetryEntityMapper {
         errorCode = run.errorCode
         prefillMs = run.prefillMs
         decodeMs = run.decodeMs
+        presetId = run.presetId?.value
+        presetVersion = run.presetVersion
+        temperature = run.temperature
+        topP = run.topP
+        topK = run.topK
+        seedPolicy = run.seedPolicy?.name
+        effectiveSeed = run.effectiveSeed
+        maxOutputTokens = run.maxOutputTokens
+        contextSize = run.contextSize
+        promptTokenCount = run.promptTokenCount
+        chatTemplateId = run.chatTemplateId
+        chatTemplateSource = run.chatTemplateSource?.name
+        systemPromptVersion = run.systemPromptVersion
+        stopReason = run.stopReason?.name
+        promptPlanningMs = run.promptPlanningMs
+        contextCreationMs = run.contextCreationMs
     }
 
     fun runRecord(entity: TelemetryEntities.GenerationRunEntity): GenerationRunRecord = GenerationRunRecord(
@@ -63,6 +83,22 @@ internal object TelemetryEntityMapper {
         prefillMs = entity.prefillMs,
         decodeMs = entity.decodeMs,
         modelLoadKind = ModelLoadKind.valueOf(entity.modelLoadKind),
+        presetId = entity.presetId?.let(::InferencePresetId),
+        presetVersion = entity.presetVersion,
+        temperature = entity.temperature,
+        topP = entity.topP,
+        topK = entity.topK,
+        seedPolicy = entity.seedPolicy?.let(SeedPolicyType::valueOf),
+        effectiveSeed = entity.effectiveSeed,
+        maxOutputTokens = entity.maxOutputTokens,
+        contextSize = entity.contextSize,
+        promptTokenCount = entity.promptTokenCount,
+        chatTemplateId = entity.chatTemplateId,
+        chatTemplateSource = entity.chatTemplateSource?.let(ChatTemplateSource::valueOf),
+        systemPromptVersion = entity.systemPromptVersion,
+        stopReason = entity.stopReason?.let(StopReason::valueOf),
+        promptPlanningMs = entity.promptPlanningMs,
+        contextCreationMs = entity.contextCreationMs,
     )
 
     fun logEntity(log: StructuredLog): TelemetryEntities.StructuredLogEntity = TelemetryEntities.StructuredLogEntity().apply {

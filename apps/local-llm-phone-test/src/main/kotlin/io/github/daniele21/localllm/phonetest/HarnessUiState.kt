@@ -12,6 +12,48 @@ internal enum class HarnessDiagnosticAction {
     BENCHMARK_CAPTURE,
 }
 
+internal data class PlaygroundPresetOption(
+    val id: String,
+    val label: String,
+    val description: String,
+    val maxOutputTokens: String,
+    val temperature: String,
+    val topP: String,
+    val topK: String,
+    val seed: String,
+    val preferredContextTokens: Int,
+    val recommendedMaximumContextTokens: Int,
+    val systemPrompt: String,
+)
+
+internal val playgroundPresetOptions = listOf(
+    PlaygroundPresetOption(
+        "precise-structured", "Preciso e strutturato", "Estrazione, JSON e benchmark riproducibili",
+        "256", "0", "1", "40", "42", 2_048, 4_096,
+        "Return only the requested structured result. Do not add commentary outside the required format.",
+    ),
+    PlaygroundPresetOption(
+        "short-form", "Titoli e sintesi brevi", "Risposte concise senza preamboli",
+        "384", "0.25", "0.85", "30", "42", 4_096, 4_096,
+        "Return only the requested result. Avoid introductions and conclusions. Be concise and informative.",
+    ),
+    PlaygroundPresetOption(
+        "accurate-summary", "Riassunto accurato", "Aderenza al testo e nessuna aggiunta",
+        "768", "0.2", "0.9", "30", "42", 4_096, 8_192,
+        "Summarize accurately using only information supported by the input. Do not invent details.",
+    ),
+    PlaygroundPresetOption(
+        "balanced-conversation", "Conversazione bilanciata", "Impostazione generale naturale e controllata",
+        "768", "0.6", "0.9", "40", "", 4_096, 8_192,
+        "Be natural, accurate, and concise.",
+    ),
+    PlaygroundPresetOption(
+        "creative-conversation", "Conversazione creativa", "Brainstorming e variazioni meno deterministiche",
+        "1024", "0.85", "0.95", "50", "", 8_192, 8_192,
+        "Be imaginative and offer useful variations while respecting the user's constraints.",
+    ),
+)
+
 internal data class HarnessUiState(
     val importedModel: ImportedPhoneModel? = null,
     val modelDistribution: PhoneModelDistributionState = PhoneModelDistributionState(),
@@ -30,7 +72,12 @@ internal data class HarnessUiState(
     val playgroundPrompt: String = DEFAULT_PROMPT,
     val playgroundMaxTokens: String = DEFAULT_MAX_OUTPUT_TOKENS,
     val playgroundTemperature: String = DEFAULT_TEMPERATURE,
+    val playgroundPreset: String = DEFAULT_PRESET,
+    val playgroundBasePreset: String? = DEFAULT_PRESET,
+    val playgroundTopP: String = DEFAULT_TOP_P,
+    val playgroundTopK: String = DEFAULT_TOP_K,
     val playgroundSeed: String = DEFAULT_SEED,
+    val playgroundContext: String = "",
     val removalConfirmationPending: Boolean = false,
     val themePreference: HarnessThemePreference = HarnessThemePreference.DARK,
 ) {
@@ -44,9 +91,12 @@ internal data class HarnessUiState(
         get() = busy
 
     private companion object {
-        const val DEFAULT_MAX_OUTPUT_TOKENS = "128"
-        const val DEFAULT_TEMPERATURE = "0.2"
-        const val DEFAULT_SEED = "42"
+        const val DEFAULT_MAX_OUTPUT_TOKENS = "768"
+        const val DEFAULT_TEMPERATURE = "0.6"
+        const val DEFAULT_PRESET = "balanced-conversation"
+        const val DEFAULT_TOP_P = "0.9"
+        const val DEFAULT_TOP_K = "40"
+        const val DEFAULT_SEED = ""
         const val DEFAULT_PROMPT = "Explain in two sentences why local inference improves privacy."
     }
 }
@@ -82,7 +132,15 @@ internal sealed interface HarnessUiEvent {
 
     data class PlaygroundTemperatureChanged(val temperature: String) : Playground
 
+    data class PlaygroundPresetChanged(val preset: String) : Playground
+
+    data class PlaygroundTopPChanged(val topP: String) : Playground
+
+    data class PlaygroundTopKChanged(val topK: String) : Playground
+
     data class PlaygroundSeedChanged(val seed: String) : Playground
+
+    data class PlaygroundContextChanged(val context: String) : Playground
 
     data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : Diagnostics
 
@@ -157,13 +215,36 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
 
-        is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens)
+        is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens, playgroundPreset = "")
 
         is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
             playgroundTemperature = event.temperature,
+            playgroundPreset = "",
         )
 
-        is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed)
+        is HarnessUiEvent.PlaygroundPresetChanged -> state.applyPreset(event.preset)
+
+        is HarnessUiEvent.PlaygroundTopPChanged -> state.copy(playgroundTopP = event.topP, playgroundPreset = "")
+
+        is HarnessUiEvent.PlaygroundTopKChanged -> state.copy(playgroundTopK = event.topK, playgroundPreset = "")
+
+        is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed, playgroundPreset = "")
+
+        is HarnessUiEvent.PlaygroundContextChanged -> state.copy(playgroundContext = event.context, playgroundPreset = "")
+    }
+
+    private fun HarnessUiState.applyPreset(id: String): HarnessUiState {
+        val preset = playgroundPresetOptions.firstOrNull { it.id == id } ?: return copy(playgroundPreset = id)
+        return copy(
+            playgroundPreset = id,
+            playgroundBasePreset = id,
+            playgroundMaxTokens = preset.maxOutputTokens,
+            playgroundTemperature = preset.temperature,
+            playgroundTopP = preset.topP,
+            playgroundTopK = preset.topK,
+            playgroundSeed = preset.seed,
+            playgroundContext = "",
+        )
     }
 
     private fun reduceDiagnostics(state: HarnessUiState, event: HarnessUiEvent.Diagnostics): HarnessUiState = when (event) {

@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.SeedPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -150,7 +151,7 @@ class HarnessViewModelTest {
         assertEquals("Explain local inference", effects.startedPrompt)
         assertEquals(64, effects.startedOptions?.maxOutputTokens)
         assertEquals(0.4f, effects.startedOptions?.temperature)
-        assertEquals(7L, effects.startedOptions?.seed)
+        assertEquals(SeedPolicy.Fixed(7), effects.startedOptions?.seedPolicy)
     }
 
     @Test
@@ -199,6 +200,18 @@ class HarnessViewModelTest {
         assertTrue(effects.cancelCalled)
         assertTrue(effects.releaseCalled)
         assertTrue(releaseCompleted)
+    }
+
+    @Test
+    fun manualSamplingChangeKeepsPresetAsCustomizationBase() {
+        val viewModel = HarnessViewModel()
+
+        viewModel.updatePlaygroundPreset("short-form")
+        viewModel.updatePlaygroundTemperature("0.3")
+
+        assertEquals("", viewModel.uiState.value.playgroundPreset)
+        assertEquals("short-form", viewModel.uiState.value.playgroundBasePreset)
+        assertEquals("0.3", viewModel.uiState.value.playgroundTemperature)
     }
 
     private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(

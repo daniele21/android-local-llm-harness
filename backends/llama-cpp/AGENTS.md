@@ -13,7 +13,7 @@ Read these sources according to the change:
 | Concern | Start here | Supporting source |
 | --- | --- | --- |
 | Kotlin/backend contract adaptation | `src/main/kotlin` | [`api-usage.md`](../../docs/api-usage.md), [`architecture.md`](../../docs/architecture.md) |
-| JNI entry points and conversion | `src/main/cpp/llama_jni_entry.cpp`, `llama_jni.cpp` | [`definition-of-done.md`](../../docs/definition-of-done.md) |
+| JNI entry points, UTF conversion and output buffering | `src/main/cpp/llama_jni_entry.cpp`, `llama_jni.cpp`, `generation_output_buffer.*` | [`definition-of-done.md`](../../docs/definition-of-done.md), native tests under `src/test-native` |
 | Native model/context/cancellation ownership | Registry headers and generation implementation | [`architecture.md`](../../docs/architecture.md), native tests under `src/test-native` |
 | GGUF metadata inspection | `gguf_metadata.*` and Kotlin inspector adapter | [`model-installation.md`](../../docs/model-installation.md), [ADR 0007](../../docs/adr/0007-explicit-verified-download-installation.md) |
 | CMake, ABI or packaged libraries | `src/main/cpp/CMakeLists.txt`, module Gradle file | [`device-e2e-testing.md`](../../docs/device-e2e-testing.md), packaging verification script |
@@ -31,8 +31,9 @@ rg --files backends/llama-cpp/src/main backends/llama-cpp/src/test backends/llam
 - Native pointers and backend-owned structures never cross the backend boundary; expose opaque IDs or neutral results.
 - Model, context and cancellation registries own their resources explicitly, reject invalid handles and release idempotently.
 - Partial initialization, generation failure, cancellation and shutdown release every resource already acquired and leave the runtime recoverable.
-- Synchronous and streaming generation share prompt preparation, tokenization, sampling, prefill, decode, stop handling, metrics and cleanup.
-- Keep JNI coarse-grained; aggregate streaming output before crossing into Kotlin.
+- Keep one native streaming decode path for prompt preparation, tokenization, sampling, prefill,
+  decode, stop handling, metrics and cleanup. Aggregate above the native boundary when needed.
+- Keep JNI coarse-grained and keep UTF-8 chunk buffering and stop matching in testable native helpers.
 - Backend errors map to typed, privacy-safe contracts. Do not make product behavior depend on free-form native messages.
 - GGUF inspection used by installation remains metadata-only and adapts to the neutral `model-install` contract.
 - Native implementation files are compiled and linked normally; do not include one `.cpp` file from another.

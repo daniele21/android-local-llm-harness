@@ -5,11 +5,9 @@ import io.github.daniele21.localllm.models.ArtifactSource
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
-import java.util.Base64
 
 class LlamaCppGenerationTest {
     @Test
@@ -42,101 +40,6 @@ class LlamaCppGenerationTest {
         assertEquals(
             GenerationNativeErrorCode.NATIVE_PROTOCOL,
             (result as ContextCreationResult.Failure).error.code,
-        )
-    }
-
-    @Test
-    fun `generation decodes utf8 output and metrics`() {
-        val output = "Risposta locale 🌍"
-        val nativeApi = FakeNativeGenerationApi(
-            generation = arrayOf(
-                "ok",
-                Base64.getEncoder().encodeToString(output.toByteArray(Charsets.UTF_8)),
-                "12",
-                "4",
-                "20",
-                "40",
-            ),
-        )
-        val context = testContext()
-        val config = testConfig()
-
-        val result = LlamaCppGenerationBridge(nativeApi).generate(context, "Prompt", config)
-
-        assertEquals(
-            NativeGenerationResult.Success(
-                output = output,
-                metrics = NativeGenerationMetrics(
-                    inputTokens = 12,
-                    outputTokens = 4,
-                    promptDurationMs = 20,
-                    generationDurationMs = 40,
-                ),
-            ),
-            result,
-        )
-        assertEquals(
-            listOf(11L, "Prompt", 32, 0.2f, 0.9f, 20, 123L),
-            nativeApi.lastGeneration,
-        )
-    }
-
-    @Test
-    fun `malformed generation payload fails closed`() {
-        val nativeApi = FakeNativeGenerationApi(
-            generation = arrayOf("ok", "not-base64", "1", "1", "1", "1"),
-        )
-
-        val result = LlamaCppGenerationBridge(nativeApi).generate(
-            testContext(),
-            "Prompt",
-            testConfig(),
-        )
-
-        assertTrue(result is NativeGenerationResult.Failure)
-        assertEquals(
-            GenerationNativeErrorCode.NATIVE_PROTOCOL,
-            (result as NativeGenerationResult.Failure).error.code,
-        )
-    }
-
-    @Test
-    fun `invalid config is rejected before JNI`() {
-        val nativeApi = FakeNativeGenerationApi()
-        val result = LlamaCppGenerationBridge(nativeApi).generate(
-            testContext(),
-            " ",
-            testConfig(),
-        )
-
-        assertTrue(result is NativeGenerationResult.Failure)
-        assertEquals(
-            GenerationNativeErrorCode.INVALID_ARGUMENT,
-            (result as NativeGenerationResult.Failure).error.code,
-        )
-        assertFalse(nativeApi.generateCalled)
-    }
-
-    @Test
-    fun `native generation error retains structured code`() {
-        val nativeApi = FakeNativeGenerationApi(
-            generation = arrayOf("error", "CONTEXT_OVERFLOW", "Requested context is too large"),
-        )
-
-        val result = LlamaCppGenerationBridge(nativeApi).generate(
-            testContext(),
-            "Prompt",
-            testConfig(),
-        )
-
-        assertEquals(
-            NativeGenerationResult.Failure(
-                GenerationNativeError(
-                    GenerationNativeErrorCode.CONTEXT_OVERFLOW,
-                    "Requested context is too large",
-                ),
-            ),
-            result,
         )
     }
 
@@ -180,25 +83,14 @@ class LlamaCppGenerationTest {
         gpuLayers = 0,
         flashAttention = true,
     )
-
-    private fun testConfig(): NativeGenerationConfig = NativeGenerationConfig(
-        maxOutputTokens = 32,
-        temperature = 0.2f,
-        topP = 0.9f,
-        topK = 20,
-        seed = 123,
-    )
 }
 
 private class FakeNativeGenerationApi(
     private val contextCreation: Array<String> = arrayOf("ok", "1"),
     private val contextRelease: Array<String> = arrayOf("ok"),
-    private val generation: Array<String> = arrayOf("ok", "", "0", "0", "0", "0"),
 ) : NativeLlamaGenerationApi {
     var lastContextCreation: List<Any>? = null
     var releasedContextHandle: Long? = null
-    var lastGeneration: List<Any>? = null
-    var generateCalled: Boolean = false
 
     override fun createContext(
         modelHandle: Long,
@@ -224,27 +116,5 @@ private class FakeNativeGenerationApi(
     override fun releaseContext(contextHandle: Long): Array<String> {
         releasedContextHandle = contextHandle
         return contextRelease
-    }
-
-    override fun generate(
-        contextHandle: Long,
-        prompt: String,
-        maxOutputTokens: Int,
-        temperature: Float,
-        topP: Float,
-        topK: Int,
-        seed: Long,
-    ): Array<String> {
-        generateCalled = true
-        lastGeneration = listOf(
-            contextHandle,
-            prompt,
-            maxOutputTokens,
-            temperature,
-            topP,
-            topK,
-            seed,
-        )
-        return generation
     }
 }

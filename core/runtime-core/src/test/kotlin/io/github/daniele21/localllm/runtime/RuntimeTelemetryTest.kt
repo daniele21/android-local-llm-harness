@@ -63,7 +63,7 @@ class RuntimeTelemetryTest {
             .flatMap { it.fields.entries }
             .flatMap { listOf(it.key, it.value) }
             .joinToString(" ")
-        assertFalse(persistedText.contains(request.input))
+        assertFalse(persistedText.contains("secret prompt text"))
         assertFalse(persistedText.contains("generated output"))
         assertEquals(
             listOf(
