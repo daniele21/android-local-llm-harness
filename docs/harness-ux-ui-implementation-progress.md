@@ -2,8 +2,9 @@
 
 **Canonical plan:** `docs/harness-ux-ui-implementation-plan.md`
 **Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
-**Implementation branch:** `codex/harness-0.5-integration-plan`, ribasata su `origin/dev`
-**Pull request:** pending for the rebased UI/release-tooling candidate; historical foundation PR #40 is merged
+**Integrated baseline:** `dev` after merged PR #65
+**Active implementation branch:** `agent/harness-ui-state-viewmodel`
+**Active pull request:** draft PR #66 toward `dev`
 **Last updated:** 2026-08-06
 **Overall status:** In progress
 
@@ -26,7 +27,7 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Harness launcher identity | DONE | PR #60 provides repository-owned vector, adaptive, monochrome and fallback launcher assets with packaging verification. |
 | Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist; detail routes, full back behavior, Activity slimming and responsive validation remain. |
 | Overview | PARTIAL | Connected model/runtime and latest Playground metrics exist; resource pressure, recent run, active-operation model, and state tests remain. |
-| Playground | PARTIAL | Real GGUF inference, streaming, cancellation, cleanup, and metrics are connected. ViewModel/UDF, settings sheet, smart scrolling, UI tests, and device evidence remain. |
+| Playground | PARTIAL | Real GGUF inference, streaming, cancellation, cleanup, and metrics are connected. The typed ViewModel/UDF foundation now exists; effect ownership, settings sheet, smart scrolling, UI tests, and device evidence remain. |
 | Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected; unified multi-model state, detail routes and degraded-state recovery remain. |
 | Diagnostics container | VALIDATION | Runtime plus selectable Runs, Health, Resources, Benchmarks, Logs, and Validation sections are connected. Detail routes and complete state/navigation tests remain. |
 | Settings and developer tools | PARTIAL | Session theme selection, privacy/build disclosures, storage summary and validation access exist; preference persistence, full metadata, cleanup and separate routes remain. |
@@ -38,16 +39,16 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, regression cards and retained history are connected; richer charts, state tests and device evidence remain. |
 | Diagnostics Logs | VALIDATION | Privacy-safe filters, copy, request correlation, deterministic timelines, and automatic Logs-section opening from run cards are implemented and await final CI/device evidence. |
 | Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |
-| ViewModel and UDF migration | PENDING | Callback controllers and Activity-owned mutable state remain migration debt. |
+| ViewModel and UDF migration | PARTIAL | PR #66 adds one immutable `HarnessUiState`, typed events, a pure reducer, `StateFlow` ownership and reducer tests. Playground effect ownership and removal of the corresponding Activity state are the next vertical slice. |
 | Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists; complete state/golden/accessibility matrix remains. |
-| CI and Android build validation | VALIDATION | Post-rebase local Spotless, Detekt, tests, Lint, APK/AAB assembly and packaging are green; remote PR and cumulative `dev` CI remain. |
+| CI and Android build validation | VALIDATION | PR #65 is merged into `dev`. PR #66 is running scoped repository validation for the first ViewModel/UDF block. |
 | Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
 
 ## Implemented connected capabilities
 
 ### UX foundation and shared runtime
 
-The branch adds the Compose stack, shared design-system module, Harness identity, responsive shell, and connected Overview, Playground, Models, Diagnostics, and Settings destinations.
+The `dev` branch contains the Compose stack, shared design-system module, Harness identity, responsive shell, and connected Overview, Playground, Models, Diagnostics, and Settings destinations.
 
 `HarnessRuntimeGraph` owns one app-private `FileSystemModelStore`, selected-model registry, current `RuntimeOrchestrator`, and bounded `InMemoryTelemetryRepository`. Constructing the graph does not load a model. Playground and physical validation resolve the same graph.
 
@@ -57,13 +58,27 @@ Real model import, SHA-256 verification, streaming local inference, cooperative 
 
 The audit corrected Playground prompt and generation-option state so recomposition no longer resets values. The values remain process-memory-only and are not written to saved instance state or telemetry.
 
+### ViewModel and UDF foundation
+
+PR #66 introduces the first isolated Activity-slimming block:
+
+- one immutable `HarnessUiState` for model, Playground, diagnostics, benchmark, logs, navigation, theme and operation state;
+- typed `HarnessUiEvent` transitions;
+- a pure `HarnessUiReducer` with no Android or runtime effects;
+- `HarnessViewModel` exposing `StateFlow<HarnessUiState>`;
+- derived busy and keep-screen-on policies;
+- deterministic cleanup of stale removal confirmation and selected request timelines;
+- independent tracking of concurrent diagnostics actions;
+- JVM tests for the highest-risk transitions;
+- an explicit Playground-first migration sequence in `docs/harness-viewmodel-udf-foundation.md`.
+
+This foundation does not yet remove Activity-owned state or move runtime lifecycle effects. The migration is intentionally vertical: connect one feature, validate it, then delete its old Activity state before moving to the next feature.
+
 ### Diagnostics section navigation
 
-The Diagnostics destination now exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.
+The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.
 
-The app now uses Navigation Compose for top-level destinations, but Diagnostics section and
-timeline state remain Activity-owned and inline rather than dedicated detail routes. Back-stack
-behavior and complete navigation tests remain part of the ViewModel/UDF migration.
+The app uses Navigation Compose for top-level destinations, but Diagnostics section and timeline state remain Activity-owned and inline rather than dedicated detail routes. Back-stack behavior and complete navigation tests remain part of the ViewModel/UDF migration.
 
 ### Diagnostics Health
 
@@ -73,7 +88,7 @@ behavior and complete navigation tests remain part of the ViewModel/UDF migratio
 
 `HarnessResourceSource` composes `AndroidResourceSnapshotProvider` and `ResourceSnapshotRecorder`. Manual capture records process PSS, native heap, Java heap, available memory, low-memory, and thermal status. Unsupported values remain `Unavailable`.
 
-The connected UI now presents a bounded newest-first history, current/minimum/maximum PSS, a trend only when enough samples exist, low-memory sample count, observed thermal states, and up to ten detailed snapshot cards. Graphical charts and physical-device/accessibility evidence remain open.
+The connected UI presents a bounded newest-first history, current/minimum/maximum PSS, a trend only when enough samples exist, low-memory sample count, observed thermal states, and up to ten detailed snapshot cards. Graphical charts and physical-device/accessibility evidence remain open.
 
 ### Diagnostics Benchmarks
 
@@ -123,42 +138,49 @@ The audit also corrected:
 - arbitrary exception-message Toast fallbacks in Playground startup;
 - repeated capture of already-recorded benchmark baselines.
 
+The tracker previously still described the rebased UI/tooling candidate as unpublished. That integration was completed by PR #65 and is now the `dev` baseline.
+
 ## Immediate next block
 
-### Integrate and validate the rebased UI/tooling candidate
+### Complete the Playground ViewModel/UDF vertical slice
 
-Status: `LOCAL VALIDATION COMPLETE / REMOTE VALIDATION PENDING`
+Status: `FOUNDATION IMPLEMENTED / EFFECT INTEGRATION NEXT`
 
 Required work:
 
-1. [x] review the complete rebased diff against `origin/dev`;
-2. [x] pass Spotless, design-system accessibility tests, Detekt and Kotlin/Compose compilation;
-3. [x] pass phone-test JVM tests and Android Lint;
-4. [x] assemble debug APK and release AAB, then verify `arm64-v8a` packaging and model-artifact guard;
-5. [ ] rerun the compact emulator smoke tests; no emulator was connected during the post-rebase gate;
-6. [ ] publish the candidate branch and open a PR toward `dev`;
-7. [ ] obtain cumulative `Repository validation` on the exact current commit;
-8. [ ] keep physical-device GGUF validation as a separate required release gate.
+1. [x] define one immutable `HarnessUiState` and typed events;
+2. [x] add a pure reducer and `StateFlow`-backed `HarnessViewModel`;
+3. [x] cover model selection, busy state, diagnostics concurrency, Playground activity, timeline cleanup and validation completion with JVM tests;
+4. [x] document the effect boundary and incremental migration order;
+5. [ ] collect `HarnessViewModel.uiState` from the Activity with lifecycle awareness;
+6. [ ] route existing `PhonePlaygroundController` callbacks through typed ViewModel events;
+7. [ ] introduce a testable Playground controller/effect interface for start, cancel, runtime release and cleanup;
+8. [ ] render Playground exclusively from `HarnessUiState` and emit user intents;
+9. [ ] add fake-controller tests for idle, preparing, queued, generating, completed, failed and cancelled states;
+10. [ ] remove the migrated Playground `mutableStateOf` fields and direct callback mutations from `MainActivity`;
+11. [ ] pass Spotless, Detekt, JVM tests, Lint, APK assembly and compact/expanded emulator smoke tests;
+12. [ ] preserve physical-device GGUF validation as a separate required release gate.
 
-## Planned sequence after CI validation
+## Planned sequence after the Playground slice
 
-1. extract detail navigation and reduce `MainActivity` to a composition root;
-2. migrate Activity-owned state to ViewModel/UDF, starting from Playground;
-3. complete unified multi-model state and degraded-state recovery;
-4. complete Overview, Diagnostics, Settings and developer tools;
+1. extract detail navigation and continue reducing `MainActivity` to a composition root;
+2. migrate Models and unified multi-model state, including degraded-state recovery;
+3. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;
+4. complete detail routes and back-stack behavior;
 5. add Compose UI, screenshot, accessibility, responsive, performance, and physical-device evidence.
 
 ## Known technical debt
 
 - `MainActivity` still owns multiple screens and mutable state.
+- The new ViewModel/reducer foundation is not yet wired to runtime effects.
 - Controllers still use executors and callbacks rather than ViewModel-owned coroutine state.
 - Navigation Compose covers top-level destinations, but detail routes and complete back-stack tests remain.
 - Resource charts and richer benchmark-history visualization remain incomplete.
 - The telemetry implementation remains in-memory and is cleared by process death.
 - The shared design system is integrated; feature screens still contain some one-off composition and spacing that should move to reusable components when repeated.
-- The implementation was accumulated in one draft PR rather than the canonical sequence of small UX PRs.
+- The integrated UX work was accumulated in a larger candidate before PR #65; subsequent migration work should remain split into reviewable vertical slices.
 
-## Validation gates before marking the PR ready
+## Validation gates before marking the migration ready
 
 - dependency locks reproducible;
 - Spotless, Detekt, tests, and Android Lint pass;
