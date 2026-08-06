@@ -46,21 +46,9 @@ jobs:
                   raise RuntimeError(f"{label}: expected one match, found {count}")
               text = text.replace(old, new, 1)
 
-          replace_once(
-              "**Integrated baseline:** `dev` after merged PR #65",
-              "**Integrated baseline:** `dev` after merged PR #66",
-              "integrated baseline",
-          )
-          replace_once(
-              "**Active implementation branch:** `agent/harness-ui-state-viewmodel`",
-              "**Active implementation branch:** `agent/playground-viewmodel-udf`",
-              "active branch",
-          )
-          replace_once(
-              "**Active pull request:** draft PR #66 toward `dev`",
-              "**Active pull request:** draft PR #67 toward `dev`",
-              "active pull request",
-          )
+          replace_once("**Integrated baseline:** `dev` after merged PR #65", "**Integrated baseline:** `dev` after merged PR #66", "integrated baseline")
+          replace_once("**Active implementation branch:** `agent/harness-ui-state-viewmodel`", "**Active implementation branch:** `agent/playground-viewmodel-udf`", "active branch")
+          replace_once("**Active pull request:** draft PR #66 toward `dev`", "**Active pull request:** draft PR #67 toward `dev`", "active pull request")
           replace_once(
               "| Playground | PARTIAL | Real GGUF inference, streaming, cancellation, cleanup, and metrics are connected. The typed ViewModel/UDF foundation now exists; effect ownership, settings sheet, smart scrolling, UI tests, and device evidence remain. |",
               "| Playground | VALIDATION | Real GGUF inference, streaming, cancellation, cleanup, metrics, typed ViewModel state, and effect orchestration are connected. Compose state tests, settings-sheet polish, smart scrolling, responsive smoke checks, and physical-device evidence remain. |",
@@ -82,30 +70,32 @@ jobs:
               "foundation status paragraph",
           )
 
+          immediate_lines = [
+              "## Immediate next block",
+              "",
+              "### Add Playground Compose state tests and responsive smoke validation",
+              "",
+              "Status: `IMPLEMENTATION CONNECTED / UI EVIDENCE NEXT`",
+              "",
+              "Completed in the Playground UDF slice:",
+              "",
+              "1. [x] collect `HarnessViewModel.uiState` with lifecycle awareness;",
+              "2. [x] route `PhonePlaygroundController` callbacks through typed events;",
+              "3. [x] introduce `PlaygroundEffects` for snapshot, start, cancel, runtime release and cleanup;",
+              "4. [x] render Playground inputs, response, phase and metrics from `HarnessUiState`;",
+              "5. [x] route prompt, settings, run and stop intents through `HarnessViewModel`;",
+              "6. [x] remove Playground-owned `mutableStateOf` fields from `MainActivity`;",
+              "7. [x] add fake-effects JVM tests for attachment, option parsing, busy rejection, start, cancel and release;",
+              "8. [ ] add Compose rendering tests for idle, preparing, queued, generating, completed, failed and cancelled states;",
+              "9. [ ] validate compact and expanded layouts plus navigation and back behavior on emulators;",
+              "10. [ ] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification;",
+              "11. [ ] preserve real-GGUF physical arm64 validation as a separate release gate.",
+              "",
+              "",
+          ]
           start = text.index("## Immediate next block")
           end = text.index("## Planned sequence after the Playground slice", start)
-          immediate = '''## Immediate next block
-
-### Add Playground Compose state tests and responsive smoke validation
-
-Status: `IMPLEMENTATION CONNECTED / UI EVIDENCE NEXT`
-
-Completed in the Playground UDF slice:
-
-1. [x] collect `HarnessViewModel.uiState` with lifecycle awareness;
-2. [x] route `PhonePlaygroundController` callbacks through typed events;
-3. [x] introduce `PlaygroundEffects` for snapshot, start, cancel, runtime release and cleanup;
-4. [x] render Playground inputs, response, phase and metrics from `HarnessUiState`;
-5. [x] route prompt, settings, run and stop intents through `HarnessViewModel`;
-6. [x] remove Playground-owned `mutableStateOf` fields from `MainActivity`;
-7. [x] add fake-effects JVM tests for attachment, option parsing, busy rejection, start, cancel and release;
-8. [ ] add Compose rendering tests for idle, preparing, queued, generating, completed, failed and cancelled states;
-9. [ ] validate compact and expanded layouts plus navigation and back behavior on emulators;
-10. [ ] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification;
-11. [ ] preserve real-GGUF physical arm64 validation as a separate release gate.
-
-'''
-          text = text[:start] + immediate + text[end:]
+          text = text[:start] + "\n".join(immediate_lines) + text[end:]
 
           replace_once(
               "- The new ViewModel/reducer foundation is not yet wired to runtime effects.",
@@ -132,5 +122,3 @@ Completed in the Playground UDF slice:
           git diff --cached --check
           git commit -m "chore(phone-test): format and document Playground UDF slice"
           git push origin HEAD:agent/playground-viewmodel-udf
-
-# Triggered after workflow registration.
