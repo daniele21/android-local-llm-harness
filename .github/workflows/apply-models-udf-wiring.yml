@@ -1,0 +1,83 @@
+name: Apply Models UDF wiring
+
+on:
+  push:
+    branches: [agent/models-udf-wiring]
+    paths:
+      - .github/workflows/apply-models-udf-wiring.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/models-udf-wiring
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Apply deterministic Models wiring
+        run: python3 .github/scripts/apply-models-udf-wiring.py
+
+      - name: Format implementation
+        run: |
+          chmod +x gradlew
+          ./gradlew spotlessApply --no-configuration-cache --stacktrace
+
+      - name: Validate static contracts
+        run: |
+          ./gradlew spotlessCheck detekt --no-configuration-cache --stacktrace
+
+      - name: Validate phone application
+        run: |
+          ./gradlew \
+            :apps:local-llm-phone-test:testDebugUnitTest \
+            :apps:local-llm-phone-test:lintDebug \
+            :apps:local-llm-phone-test:compileDebugKotlin \
+            --no-configuration-cache \
+            --stacktrace
+
+      - name: Verify Activity model-state removal
+        run: |
+          activity=apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt
+          ! grep -q "private var importedModel" "$activity"
+          ! grep -q "modelDistributionState" "$activity"
+          ! grep -q "selectedRemovalConfirmationPending" "$activity"
+          ! grep -q "selectedModelForDiagnostics" "$activity"
+
+      - name: Remove temporary patch infrastructure
+        run: |
+          rm .github/scripts/apply-models-udf-wiring.py
+          rm .github/workflows/apply-models-udf-wiring.yml
+
+      - name: Commit validated Models wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(phone-test): wire Models through ViewModel effects"
+          git push origin HEAD:agent/models-udf-wiring
