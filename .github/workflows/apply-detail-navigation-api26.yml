@@ -1,0 +1,69 @@
+name: Apply detail navigation API 26 fix
+
+on:
+  push:
+    branches: [agent/detail-navigation]
+    paths:
+      - .github/workflows/apply-detail-navigation-api26.yml
+      - scripts/patch_detail_navigation_api26.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/detail-navigation
+          fetch-depth: 1
+
+      - name: Apply API compatibility patch
+        run: python3 scripts/patch_detail_navigation_api26.py
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Format and validate API 26 compatibility
+        run: |
+          chmod +x gradlew
+          ./gradlew \
+            spotlessApply \
+            :apps:local-llm-phone-test:testDebugUnitTest \
+            :apps:local-llm-phone-test:lintDebug \
+            :apps:local-llm-phone-test:compileDebugKotlin \
+            --no-configuration-cache \
+            --stacktrace
+
+      - name: Remove temporary patch tooling
+        run: |
+          rm scripts/patch_detail_navigation_api26.py
+          rm .github/workflows/apply-detail-navigation-api26.yml
+
+      - name: Commit API compatibility fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(phone-test): support build metadata on API 26"
+          git push origin HEAD:agent/detail-navigation
