@@ -6,6 +6,12 @@ internal data class ModelEffectsSnapshot(
     val loadedDigest: String?,
 )
 
+internal sealed interface ModelRecoveryCommand {
+    data class AdoptLoadedSelection(val metadata: InstalledCatalogModelMetadata) : ModelRecoveryCommand
+
+    data object ReleaseRuntime : ModelRecoveryCommand
+}
+
 internal sealed interface ModelCatalogCommand {
     data object Refresh : ModelCatalogCommand
 
@@ -42,4 +48,6 @@ internal interface ModelEffects {
     fun verifySelected(): Boolean
 
     fun removeSelected(): Boolean
+
+    fun executeRecovery(command: ModelRecoveryCommand): Boolean
 }

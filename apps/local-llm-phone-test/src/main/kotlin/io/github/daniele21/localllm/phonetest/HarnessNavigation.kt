@@ -46,26 +46,21 @@ internal data class HarnessShellState(
 internal object HarnessRoutes {
     const val REQUEST_ID_ARGUMENT = "requestId"
     const val REQUEST_TIMELINE_PATTERN = "runs/{$REQUEST_ID_ARGUMENT}"
+    const val MODEL_IDENTITY_ARGUMENT = "modelIdentity"
+    const val MODEL_DETAIL_PATTERN = "models/{$MODEL_IDENTITY_ARGUMENT}"
 
     private const val REQUEST_TIMELINE_PREFIX = "runs/"
+    private const val MODEL_DETAIL_PREFIX = "models/"
 
-    fun requestTimeline(requestId: String): String {
-        require(requestId.isNotBlank()) { "requestId must not be blank" }
-        val encoded = Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(requestId.toByteArray(StandardCharsets.UTF_8))
-        return REQUEST_TIMELINE_PREFIX + encoded
-    }
+    fun requestTimeline(requestId: String): String = REQUEST_TIMELINE_PREFIX + encode(requestId, "requestId")
 
-    fun decodeRequestId(encodedRequestId: String?): String? {
-        if (encodedRequestId.isNullOrBlank()) return null
-        return runCatching {
-            String(
-                Base64.getUrlDecoder().decode(encodedRequestId),
-                StandardCharsets.UTF_8,
-            )
-        }.getOrNull()?.takeIf(String::isNotBlank)
-    }
+    fun decodeRequestId(encodedRequestId: String?): String? = decode(encodedRequestId)
+
+    fun modelDetail(item: HarnessModelInventoryItem): String = modelDetail(HarnessModelDetails.identity(item))
+
+    internal fun modelDetail(identity: String): String = MODEL_DETAIL_PREFIX + encode(identity, "model identity")
+
+    fun decodeModelIdentity(encodedIdentity: String?): String? = decode(encodedIdentity)
 
     fun shellState(route: String?): HarnessShellState {
         val settingsDetail = HarnessSettingsDetail.entries.firstOrNull { it.route == route }
@@ -83,6 +78,30 @@ internal object HarnessRoutes {
                 detailSubtitle = "Privacy-safe correlated events",
             )
         }
+        if (route == MODEL_DETAIL_PATTERN || route?.startsWith(MODEL_DETAIL_PREFIX) == true) {
+            return HarnessShellState(
+                destination = HarnessDestination.MODELS,
+                detailTitle = "Model details",
+                detailSubtitle = "Compatibility, integrity and runtime ownership",
+            )
+        }
         return HarnessShellState(destination = HarnessDestination.fromRoute(route))
+    }
+
+    private fun encode(value: String, label: String): String {
+        require(value.isNotBlank()) { "$label must not be blank" }
+        return Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun decode(encoded: String?): String? {
+        if (encoded.isNullOrBlank()) return null
+        return runCatching {
+            String(
+                Base64.getUrlDecoder().decode(encoded),
+                StandardCharsets.UTF_8,
+            )
+        }.getOrNull()?.takeIf(String::isNotBlank)
     }
 }

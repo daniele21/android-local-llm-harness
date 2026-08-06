@@ -481,7 +481,34 @@ class MainActivity :
                         )
                     }
                     composable(HarnessDestination.MODELS.route) {
-                        ModelsScreen(state = uiState)
+                        ModelsScreen(
+                            state = uiState,
+                            onOpenModelDetails = { item ->
+                                navController.navigate(HarnessRoutes.modelDetail(item))
+                            },
+                        )
+                    }
+                    composable(
+                        route = HarnessRoutes.MODEL_DETAIL_PATTERN,
+                        arguments = listOf(
+                            navArgument(HarnessRoutes.MODEL_IDENTITY_ARGUMENT) {
+                                type = NavType.StringType
+                            },
+                        ),
+                    ) { entry ->
+                        val identity = HarnessRoutes.decodeModelIdentity(
+                            entry.arguments?.getString(HarnessRoutes.MODEL_IDENTITY_ARGUMENT),
+                        )
+                        HarnessModelDetailScreen(
+                            presentation = HarnessModelDetails.present(uiState.modelInventory, identity),
+                            pendingRecovery = uiState.modelRecoveryConfirmation,
+                            busy = uiState.busy,
+                            onRequestRecovery = { identity, action ->
+                                harnessViewModel.models.recovery.request(identity, action)
+                            },
+                            onConfirmRecovery = { harnessViewModel.models.recovery.confirm() },
+                            onCancelRecovery = harnessViewModel.models.recovery::cancel,
+                        )
                     }
                     composable(HarnessDestination.DIAGNOSTICS.route) {
                         DiagnosticsScreen(
@@ -1099,15 +1126,16 @@ class MainActivity :
     }
 
     @Composable
-    private fun ModelsScreen(state: HarnessUiState) {
+    private fun ModelsScreen(state: HarnessUiState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
         val inventory = state.modelInventory
         ScreenList(title = null) {
             item { ModelsHeader(state.busy) }
             item { ModelsSummaryCard(inventory) }
             if (inventory.degradedCount > 0) {
-                item { ModelsRecoveryCard(inventory) }
+                item { ModelsRecoveryCard(inventory, onOpenModelDetails) }
             }
-            item { SelectedModelCard(state, inventory.selectedItem) }
+            item { SelectedModelCard(state, inventory.selectedItem, onOpenModelDetails) }
+            item { ModelInventoryDetailCards(inventory, onOpenModelDetails) }
             item { ModelCatalogHeader(state.modelDistribution) }
             item { ModelCatalogContent(state.modelDistribution) }
         }
@@ -1156,7 +1184,7 @@ class MainActivity :
     }
 
     @Composable
-    private fun ModelsRecoveryCard(inventory: HarnessModelInventoryState) {
+    private fun ModelsRecoveryCard(inventory: HarnessModelInventoryState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
         HarnessCard {
             HarnessStatusBadge("RECOVERY REQUIRED", HarnessStatusTone.WARNING)
             Text("Runtime and model selection are not aligned.")
@@ -1167,6 +1195,9 @@ class MainActivity :
                         item.detail ?: item.degradation?.name.orEmpty().replace('_', ' '),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    HarnessSecondaryButton("Review ${item.displayName}") {
+                        onOpenModelDetails(item)
+                    }
                 }
             HarnessSecondaryButton("Refresh model state") {
                 harnessViewModel.models.executeCatalog(ModelCatalogCommand.Refresh)
@@ -1175,11 +1206,15 @@ class MainActivity :
     }
 
     @Composable
-    private fun SelectedModelCard(state: HarnessUiState, selected: HarnessModelInventoryItem?) {
+    private fun SelectedModelCard(
+        state: HarnessUiState,
+        selected: HarnessModelInventoryItem?,
+        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
+    ) {
         if (selected == null) {
             EmptySelectedModelCard()
         } else {
-            ActiveSelectedModelCard(state, selected)
+            ActiveSelectedModelCard(state, selected, onOpenModelDetails)
         }
     }
 
@@ -1214,7 +1249,11 @@ class MainActivity :
     }
 
     @Composable
-    private fun ActiveSelectedModelCard(state: HarnessUiState, selected: HarnessModelInventoryItem) {
+    private fun ActiveSelectedModelCard(
+        state: HarnessUiState,
+        selected: HarnessModelInventoryItem,
+        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
+    ) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1246,6 +1285,9 @@ class MainActivity :
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            HarnessSecondaryButton("View model details") {
+                onOpenModelDetails(selected)
+            }
             SelectedModelActions(state)
             SelectedModelRemoval(state)
         }
@@ -1346,6 +1388,43 @@ class MainActivity :
                 selectInstalled = { harnessViewModel.models.selectInstalled(it) },
             ),
         )
+    }
+
+    @Composable
+    private fun ModelInventoryDetailCards(inventory: HarnessModelInventoryState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Inventory", style = MaterialTheme.typography.titleLarge)
+            if (inventory.items.isEmpty()) {
+                Text(
+                    "No catalog, imported or runtime-owned models are available.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            inventory.items.forEach { item ->
+                HarnessCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.displayName, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "${item.origin.name.lowercase()} · ${item.lifecycle.name.lowercase().replace('_', ' ')}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        HarnessStatusBadge(
+                            item.lifecycle.name.replace('_', ' '),
+                            item.lifecycle.statusTone(),
+                        )
+                    }
+                    HarnessSecondaryButton("View details") {
+                        onOpenModelDetails(item)
+                    }
+                }
+            }
+        }
     }
 
     private fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
@@ -2012,6 +2091,20 @@ class MainActivity :
         override fun verifySelected(): Boolean = verifySelectedModel()
 
         override fun removeSelected(): Boolean = afterPlaygroundRuntimeReleased(controller::removeModel)
+
+        override fun executeRecovery(command: ModelRecoveryCommand): Boolean = when (command) {
+            is ModelRecoveryCommand.AdoptLoadedSelection -> {
+                if (runtimeGraph.loadedModelDigest?.sha256 != command.metadata.digest.sha256) {
+                    false
+                } else {
+                    modelEffect {
+                        controller.selectInstalledModel(command.metadata.asImportedPhoneModel())
+                    }
+                }
+            }
+
+            ModelRecoveryCommand.ReleaseRuntime -> afterPlaygroundRuntimeReleased(::syncLoadedModelOwnership)
+        }
     }
 
     private fun importModelDocument(uri: Uri) {

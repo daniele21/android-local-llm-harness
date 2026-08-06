@@ -47,12 +47,31 @@ class HarnessNavigationTest {
     }
 
     @Test
-    fun `request timeline rejects blank identifiers and malformed arguments`() {
-        val failure = runCatching { HarnessRoutes.requestTimeline("   ") }
+    fun `model detail route round trips digest and stable identities`() {
+        listOf(
+            "digest:${"a".repeat(64)}",
+            "stable:qwen/release with spaces+è",
+        ).forEach { identity ->
+            val route = HarnessRoutes.modelDetail(identity)
+            val encoded = route.substringAfter("models/")
 
-        assertTrue(failure.isFailure)
+            assertFalse(encoded.contains('/'))
+            assertEquals(identity, HarnessRoutes.decodeModelIdentity(encoded))
+            val shell = HarnessRoutes.shellState(route)
+            assertEquals(HarnessDestination.MODELS, shell.destination)
+            assertTrue(shell.isDetail)
+            assertFalse(shell.showBottomNavigation)
+        }
+    }
+
+    @Test
+    fun `detail routes reject blank identifiers and malformed arguments`() {
+        assertTrue(runCatching { HarnessRoutes.requestTimeline("   ") }.isFailure)
+        assertTrue(runCatching { HarnessRoutes.modelDetail("   ") }.isFailure)
         assertNull(HarnessRoutes.decodeRequestId(null))
         assertNull(HarnessRoutes.decodeRequestId("%%%"))
+        assertNull(HarnessRoutes.decodeModelIdentity(null))
+        assertNull(HarnessRoutes.decodeModelIdentity("%%%"))
     }
 
     @Test
