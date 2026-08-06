@@ -58,13 +58,16 @@ private fun PlaygroundPhase.statusLabel(): String = when (this) {
 
 private fun PlaygroundPhase.statusTone(): PlaygroundPresentationTone = when (this) {
     PlaygroundPhase.IDLE -> PlaygroundPresentationTone.NEUTRAL
+
     PlaygroundPhase.PREPARING,
     PlaygroundPhase.QUEUED,
     PlaygroundPhase.GENERATING,
     -> PlaygroundPresentationTone.ACTIVE
 
     PlaygroundPhase.COMPLETED -> PlaygroundPresentationTone.SUCCESS
+
     PlaygroundPhase.FAILED -> PlaygroundPresentationTone.ERROR
+
     PlaygroundPhase.CANCELLED -> PlaygroundPresentationTone.WARNING
 }
 
