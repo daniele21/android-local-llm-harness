@@ -26,17 +26,17 @@ internal data class PlaygroundPresentation(
 )
 
 internal fun HarnessUiState.toPlaygroundPresentation(): PlaygroundPresentation {
-    val playground = playground
-    val metrics = playground.metrics
+    val playgroundState = playground
+    val metrics = playgroundState.metrics
     return PlaygroundPresentation(
-        statusLabel = playground.phase.statusLabel(),
-        statusTone = playground.phase.statusTone(),
-        detail = playground.detail,
-        responseText = playground.output.ifBlank { EMPTY_RESPONSE },
-        runLabel = if (playground.active) "Generating…" else "Run locally",
+        statusLabel = playgroundState.phase.statusLabel(),
+        statusTone = playgroundState.phase.statusTone(),
+        detail = playgroundState.detail,
+        responseText = playgroundState.output.ifBlank { EMPTY_RESPONSE },
+        runLabel = if (playgroundState.active) "Generating…" else "Run locally",
         runEnabled = importedModel != null && !busy,
-        stopVisible = playground.active || playground.cancellationAvailable,
-        stopEnabled = playground.cancellationAvailable,
+        stopVisible = playgroundState.active || playgroundState.cancellationAvailable,
+        stopEnabled = playgroundState.cancellationAvailable,
         inputsEnabled = !busy,
         ttft = metrics?.timeToFirstTokenMs?.let { "$it ms" } ?: UNAVAILABLE,
         total = metrics?.totalMs?.let { "$it ms" } ?: UNAVAILABLE,
