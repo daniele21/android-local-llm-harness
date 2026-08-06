@@ -47,7 +47,7 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
         return when {
             model == null -> PlaygroundStartResult.MODEL_REQUIRED
             state.busy -> PlaygroundStartResult.BUSY
-            else -> startPlayground(state, model)
+            else -> executePlaygroundStart(state, model, playgroundEffects)
         }
     }
 
@@ -58,19 +58,23 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
     fun releasePlaygroundRuntime(onComplete: () -> Unit): Boolean = runCatching {
         playgroundEffects?.releaseRuntime(onComplete) ?: false
     }.getOrDefault(false)
+}
 
-    private fun startPlayground(state: HarnessUiState, model: ImportedPhoneModel): PlaygroundStartResult {
-        val options = runCatching {
-            PlaygroundRequestOptions.parse(
-                state.playgroundMaxTokens,
-                state.playgroundTemperature,
-                state.playgroundSeed,
-            )
-        }.getOrElse { return PlaygroundStartResult.INVALID_SETTINGS }
-        val effects = playgroundEffects ?: return PlaygroundStartResult.CONTROLLER_UNAVAILABLE
-        val started = runCatching {
-            effects.start(model, state.playgroundPrompt, options)
-        }.getOrDefault(false)
-        return if (started) PlaygroundStartResult.STARTED else PlaygroundStartResult.REJECTED
-    }
+private fun executePlaygroundStart(
+    state: HarnessUiState,
+    model: ImportedPhoneModel,
+    effects: PlaygroundEffects?,
+): PlaygroundStartResult {
+    val options = runCatching {
+        PlaygroundRequestOptions.parse(
+            state.playgroundMaxTokens,
+            state.playgroundTemperature,
+            state.playgroundSeed,
+        )
+    }.getOrElse { return PlaygroundStartResult.INVALID_SETTINGS }
+    val attachedEffects = effects ?: return PlaygroundStartResult.CONTROLLER_UNAVAILABLE
+    val started = runCatching {
+        attachedEffects.start(model, state.playgroundPrompt, options)
+    }.getOrDefault(false)
+    return if (started) PlaygroundStartResult.STARTED else PlaygroundStartResult.REJECTED
 }
