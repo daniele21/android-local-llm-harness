@@ -1,0 +1,39 @@
+name: Apply Playground presentation wiring
+
+on:
+  push:
+    branches:
+      - agent/playground-presentation-tests
+    paths:
+      - scripts/apply-playground-presentation.py
+      - .github/workflows/apply-playground-presentation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/playground-presentation-tests
+          fetch-depth: 0
+
+      - name: Apply deterministic wiring
+        run: python3 scripts/apply-playground-presentation.py
+
+      - name: Remove one-off migration assets
+        run: |
+          rm scripts/apply-playground-presentation.py
+          rm .github/workflows/apply-playground-presentation.yml
+
+      - name: Commit generated wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(phone-test): wire Playground presentation model"
+          git push origin HEAD:agent/playground-presentation-tests
