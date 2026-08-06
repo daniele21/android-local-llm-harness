@@ -764,11 +764,7 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundPromptCard(
-        state: HarnessUiState,
-        advancedVisible: Boolean,
-        onToggleAdvanced: () -> Unit,
-    ) {
+    private fun PlaygroundPromptCard(state: HarnessUiState, advancedVisible: Boolean, onToggleAdvanced: () -> Unit) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1674,15 +1670,19 @@ class MainActivity :
     private fun startPlayground() {
         when (harnessViewModel.startPlayground()) {
             PlaygroundStartResult.STARTED -> Unit
+
             PlaygroundStartResult.MODEL_REQUIRED -> {
                 Toast.makeText(this, "Select a local model first", Toast.LENGTH_SHORT).show()
             }
+
             PlaygroundStartResult.BUSY -> {
                 Toast.makeText(this, "Wait for the active operation to finish", Toast.LENGTH_SHORT).show()
             }
+
             PlaygroundStartResult.INVALID_SETTINGS -> {
                 Toast.makeText(this, "Invalid generation settings", Toast.LENGTH_LONG).show()
             }
+
             PlaygroundStartResult.CONTROLLER_UNAVAILABLE,
             PlaygroundStartResult.REJECTED,
             -> Toast.makeText(this, "Unable to start local inference", Toast.LENGTH_LONG).show()

@@ -209,9 +209,7 @@ class HarnessViewModelTest {
         quantization = "Q4_K_M",
     )
 
-    private class FakePlaygroundEffects(
-        private val current: PlaygroundState = PlaygroundState(),
-    ) : PlaygroundEffects {
+    private class FakePlaygroundEffects(private val current: PlaygroundState = PlaygroundState()) : PlaygroundEffects {
         var startedModel: ImportedPhoneModel? = null
         var startedPrompt: String? = null
         var startedOptions: PlaygroundRequestOptions? = null
@@ -220,11 +218,7 @@ class HarnessViewModelTest {
 
         override fun snapshot(): PlaygroundState = current
 
-        override fun start(
-            model: ImportedPhoneModel,
-            prompt: String,
-            options: PlaygroundRequestOptions,
-        ): Boolean {
+        override fun start(model: ImportedPhoneModel, prompt: String, options: PlaygroundRequestOptions): Boolean {
             startedModel = model
             startedPrompt = prompt
             startedOptions = options
