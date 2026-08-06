@@ -41,7 +41,9 @@ jobs:
           cache-provider: basic
 
       - name: Apply deterministic Models wiring
-        run: python3 .github/scripts/apply-models-udf-wiring.py
+        run: |
+          python3 .github/scripts/apply-models-udf-wiring.py
+          python3 .github/scripts/refactor-models-udf-wiring.py
 
       - name: Format implementation
         run: |
@@ -68,10 +70,12 @@ jobs:
           ! grep -q "modelDistributionState" "$activity"
           ! grep -q "selectedRemovalConfirmationPending" "$activity"
           ! grep -q "selectedModelForDiagnostics" "$activity"
+          ! grep -q "harnessViewModel.attachModelEffects" "$activity"
 
       - name: Remove temporary patch infrastructure
         run: |
           rm .github/scripts/apply-models-udf-wiring.py
+          rm .github/scripts/refactor-models-udf-wiring.py
           rm .github/workflows/apply-models-udf-wiring.yml
 
       - name: Commit validated Models wiring
