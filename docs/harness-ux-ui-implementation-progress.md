@@ -2,9 +2,9 @@
 
 **Canonical plan:** `docs/harness-ux-ui-implementation-plan.md`
 **Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
-**Integrated baseline:** `dev` after merged PR #67
-**Active implementation branch:** `agent/playground-presentation-tests`
-**Active pull request:** PR #68 toward `dev`
+**Integrated baseline:** `dev` after merged PR #68
+**Active implementation branch:** `agent/detail-navigation`
+**Active pull request:** PR #70 toward `dev`
 **Last updated:** 2026-08-06
 **Overall status:** In progress
 
@@ -25,16 +25,16 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Compose platform foundation | PARTIAL | Compose stack is integrated and validated; the explicit connected-app/UI architecture ADR remains. |
 | Shared design system | DONE | PR #61 provides split tokens, dark/light/system themes, shared components, previews, WCAG checks and 48 dp touch-target enforcement. |
 | Harness launcher identity | DONE | PR #60 provides repository-owned vector, adaptive, monochrome and fallback launcher assets with packaging verification. |
-| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist; detail routes, full back behavior, Activity slimming and responsive validation remain. |
+| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist. PR #70 adds typed Settings details, a dedicated request timeline route and detail-aware Back behavior; model details, Activity slimming and responsive validation remain. |
 | Overview | PARTIAL | Connected model/runtime and latest Playground metrics exist; resource pressure, recent run, active-operation model, and state tests remain. |
 | Playground | VALIDATION | Real GGUF inference, streaming, cancellation, cleanup, metrics and ViewModel UDF are connected. PR #68 adds a pure presentation contract and exhaustive JVM coverage for all seven phases; Compose semantics, settings-sheet polish, smart scrolling, responsive smoke checks and physical-device evidence remain. |
 | Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected; unified multi-model state, detail routes and degraded-state recovery remain. |
 | Diagnostics container | VALIDATION | Runtime plus selectable Runs, Health, Resources, Benchmarks, Logs, and Validation sections are connected. Detail routes and complete state/navigation tests remain. |
-| Settings and developer tools | PARTIAL | Session theme selection, privacy/build disclosures, storage summary and validation access exist; preference persistence, full metadata, cleanup and separate routes remain. |
+| Settings and developer tools | PARTIAL | PR #70 adds separate Privacy, Storage, Build, Developer tools and Physical validation routes with real app/model state; theme persistence, cleanup controls and complete metadata remain. |
 | Shared runtime ownership | DONE | One process-scoped lazy model store, registry, and runtime orchestrator are shared by Playground and physical validation. |
 | Telemetry repository injection | DONE | One bounded process-scoped in-memory repository is injected into the runtime. |
 | Diagnostics Health | PARTIAL | Explicit non-destructive checks and worst-status aggregation exist; targeted actions and complete capability states remain. |
-| Diagnostics Runs | PARTIAL | Real privacy-safe run cards and linked request timelines exist; dedicated detail route and complete state/navigation tests remain. |
+| Diagnostics Runs | PARTIAL | Real privacy-safe run cards exist and PR #70 moves correlated evidence to a dedicated request timeline route; complete navigation, restoration and emulator evidence remain. |
 | Diagnostics Resources | VALIDATION | Explicit capture, bounded newest-first history, memory trend summary, low-memory count, thermal states, and snapshot cards are connected; charts and device/accessibility evidence remain. |
 | Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, regression cards and retained history are connected; richer charts, state tests and device evidence remain. |
 | Diagnostics Logs | VALIDATION | Privacy-safe filters, copy, request correlation, deterministic timelines, and automatic Logs-section opening from run cards are implemented and await final CI/device evidence. |
@@ -76,11 +76,25 @@ PR #67 applies that vertical migration to Playground: Compose collects `StateFlo
 
 PR #68 extracts a pure `PlaygroundPresentation` contract from `HarnessUiState`. Phase labels and semantic tone, run and stop availability, input enablement, response fallback and metric formatting are no longer recalculated inside the private composables. JVM tests cover `IDLE`, `PREPARING`, `QUEUED`, `GENERATING`, `COMPLETED`, `FAILED` and `CANCELLED`, together with busy state, missing-model behavior, cancellation availability and metric fallbacks. This does not replace Compose semantics, emulator or physical-device validation.
 
+### Typed detail navigation
+
+PR #70 introduces the first detail-route slice without changing runtime ownership:
+
+- a pure route and shell-state contract for top-level and detail destinations;
+- separate Privacy, Storage, Build, Developer tools and Physical validation screens;
+- a dedicated `runs/{requestId}` destination with URL-safe opaque request identifiers;
+- detail-aware top bars and bottom-navigation visibility;
+- Settings navigation that preserves the previously selected top-level destination;
+- request timeline loading and cleanup tied to destination lifecycle;
+- JVM coverage for top-level, detail, fallback and request-ID round-trip behavior.
+
+Model details, complete state restoration, responsive emulator evidence and further Activity slimming remain open.
+
 ### Diagnostics section navigation
 
 The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.
 
-The app uses Navigation Compose for top-level destinations, but Diagnostics section and timeline state remain Activity-owned and inline rather than dedicated detail routes. Back-stack behavior and complete navigation tests remain part of the ViewModel/UDF migration.
+The app uses Navigation Compose for top-level destinations. PR #70 adds a dedicated opaque request-timeline route and moves Settings disclosures into explicit detail destinations. Diagnostics section and loaded timeline data remain Activity-owned, while complete restoration and emulator back-stack evidence remain part of the ViewModel/UDF migration.
 
 ### Diagnostics Health
 
@@ -144,40 +158,37 @@ The tracker previously still described the rebased UI/tooling candidate as unpub
 
 ## Immediate next block
 
-### Complete Playground UI evidence
+### Complete typed detail navigation
 
-Status: `PRESENTATION CONTRACT VALIDATED / COMPOSE AND DEVICE EVIDENCE NEXT`
+Status: `IMPLEMENTED / PR VALIDATION`
 
-Completed across the Playground UDF and presentation slices:
+Completed in PR #70:
 
-1. [x] collect `HarnessViewModel.uiState` with lifecycle awareness;
-2. [x] route `PhonePlaygroundController` callbacks through typed events;
-3. [x] introduce `PlaygroundEffects` for snapshot, start, cancel, runtime release and cleanup;
-4. [x] render Playground inputs, response, phase and metrics from `HarnessUiState`;
-5. [x] route prompt, settings, run and stop intents through `HarnessViewModel`;
-6. [x] remove Playground-owned `mutableStateOf` fields from `MainActivity`;
-7. [x] add fake-effects JVM tests for attachment, option parsing, busy rejection, start, cancel and release;
-8. [x] derive one pure presentation model for labels, tone, controls, fallbacks and metrics;
-9. [x] cover idle, preparing, queued, generating, completed, failed and cancelled presentation states with JVM tests;
-10. [ ] add Compose semantics/render tests for the connected Playground screen;
-11. [ ] validate compact and expanded layouts plus navigation and back behavior on emulators;
-12. [x] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification for PR #68;
-13. [ ] preserve real-GGUF physical arm64 validation as a separate release gate.
+1. [x] introduce a pure typed route and shell-state contract;
+2. [x] add Privacy, Storage, Build, Developer tools and Physical validation destinations;
+3. [x] move request timelines to a dedicated opaque-argument route;
+4. [x] preserve the previous top-level destination when Settings is opened;
+5. [x] hide top-level navigation chrome on detail destinations;
+6. [x] keep active generation independent from navigation;
+7. [x] add deterministic JVM route and argument coverage;
+8. [x] pass focused formatting, unit-test and Kotlin-compilation validation;
+9. [ ] pass cumulative PR validation and merge into `dev`;
+10. [ ] capture compact and expanded emulator Back/restoration evidence.
 
-## Planned sequence after the Playground slice
+## Planned sequence after the detail-navigation slice
 
-1. extract detail navigation and continue reducing `MainActivity` to a composition root;
-2. migrate Models and unified multi-model state, including degraded-state recovery;
+1. migrate Models to ViewModel/UDF and introduce one unified multi-model state;
+2. add `models/{digest}` with compatibility, integrity, loaded ownership and recovery actions;
 3. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;
-4. complete detail routes and back-stack behavior;
-5. add Compose UI, screenshot, accessibility, responsive, performance, and physical-device evidence.
+4. complete remaining back-stack restoration and remove inline Activity-owned detail state;
+5. add Compose UI, screenshot, accessibility, responsive, performance and physical-device evidence.
 
 ## Known technical debt
 
 - `MainActivity` still owns multiple screens and mutable state.
 - The ViewModel/reducer foundation is wired only for Playground; Models, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.
 - Controllers still use executors and callbacks; Playground now crosses a typed effect boundary, while the remaining controllers have not yet migrated.
-- Navigation Compose covers top-level destinations, but detail routes and complete back-stack tests remain.
+- Navigation Compose covers top-level destinations plus the first Settings and request-timeline details; model detail, restoration and complete back-stack evidence remain.
 - Resource charts and richer benchmark-history visualization remain incomplete.
 - The telemetry implementation remains in-memory and is cleared by process death.
 - The shared design system is integrated; feature screens still contain some one-off composition and spacing that should move to reusable components when repeated.
