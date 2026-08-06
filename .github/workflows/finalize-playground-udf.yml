@@ -1,0 +1,134 @@
+name: Finalize Playground UDF slice
+
+on:
+  push:
+    branches:
+      - agent/playground-viewmodel-udf
+    paths:
+      - .github/workflows/finalize-playground-udf.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/playground-viewmodel-udf
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Apply repository formatting
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+
+      - name: Update canonical progress tracker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/harness-ux-ui-implementation-progress.md")
+          text = path.read_text(encoding="utf-8")
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "**Integrated baseline:** `dev` after merged PR #65",
+              "**Integrated baseline:** `dev` after merged PR #66",
+              "integrated baseline",
+          )
+          replace_once(
+              "**Active implementation branch:** `agent/harness-ui-state-viewmodel`",
+              "**Active implementation branch:** `agent/playground-viewmodel-udf`",
+              "active branch",
+          )
+          replace_once(
+              "**Active pull request:** draft PR #66 toward `dev`",
+              "**Active pull request:** draft PR #67 toward `dev`",
+              "active pull request",
+          )
+          replace_once(
+              "| Playground | PARTIAL | Real GGUF inference, streaming, cancellation, cleanup, and metrics are connected. The typed ViewModel/UDF foundation now exists; effect ownership, settings sheet, smart scrolling, UI tests, and device evidence remain. |",
+              "| Playground | VALIDATION | Real GGUF inference, streaming, cancellation, cleanup, metrics, typed ViewModel state, and effect orchestration are connected. Compose state tests, settings-sheet polish, smart scrolling, responsive smoke checks, and physical-device evidence remain. |",
+              "Playground summary row",
+          )
+          replace_once(
+              "| ViewModel and UDF migration | PARTIAL | PR #66 adds one immutable `HarnessUiState`, typed events, a pure reducer, `StateFlow` ownership and reducer tests. Playground effect ownership and removal of the corresponding Activity state are the next vertical slice. |",
+              "| ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation. PR #67 migrates the Playground vertical slice to lifecycle-aware `StateFlow` rendering and a testable effect boundary; Models, Diagnostics, Overview, and Settings remain Activity-owned. |",
+              "ViewModel summary row",
+          )
+          replace_once(
+              "| CI and Android build validation | VALIDATION | PR #65 is merged into `dev`. PR #66 is running scoped repository validation for the first ViewModel/UDF block. |",
+              "| CI and Android build validation | VALIDATION | PR #66 is merged into `dev`. PR #67 is running scoped repository validation for the connected Playground UDF slice. |",
+              "CI summary row",
+          )
+          replace_once(
+              "This foundation does not yet remove Activity-owned state or move runtime lifecycle effects. The migration is intentionally vertical: connect one feature, validate it, then delete its old Activity state before moving to the next feature.",
+              "PR #67 applies that vertical migration to Playground: Compose collects `StateFlow` lifecycle-aware, prompt, settings, progress, response, and metrics render from `HarnessUiState`, controller callbacks dispatch typed events, and start, cancel, and runtime-release actions cross a testable `PlaygroundEffects` boundary. Android controller resources remain Activity-scoped deliberately so native resources cannot outlive a recreated Activity.",
+              "foundation status paragraph",
+          )
+
+          start = text.index("## Immediate next block")
+          end = text.index("## Planned sequence after the Playground slice", start)
+          immediate = '''## Immediate next block
+
+### Add Playground Compose state tests and responsive smoke validation
+
+Status: `IMPLEMENTATION CONNECTED / UI EVIDENCE NEXT`
+
+Completed in the Playground UDF slice:
+
+1. [x] collect `HarnessViewModel.uiState` with lifecycle awareness;
+2. [x] route `PhonePlaygroundController` callbacks through typed events;
+3. [x] introduce `PlaygroundEffects` for snapshot, start, cancel, runtime release and cleanup;
+4. [x] render Playground inputs, response, phase and metrics from `HarnessUiState`;
+5. [x] route prompt, settings, run and stop intents through `HarnessViewModel`;
+6. [x] remove Playground-owned `mutableStateOf` fields from `MainActivity`;
+7. [x] add fake-effects JVM tests for attachment, option parsing, busy rejection, start, cancel and release;
+8. [ ] add Compose rendering tests for idle, preparing, queued, generating, completed, failed and cancelled states;
+9. [ ] validate compact and expanded layouts plus navigation and back behavior on emulators;
+10. [ ] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification;
+11. [ ] preserve real-GGUF physical arm64 validation as a separate release gate.
+
+'''
+          text = text[:start] + immediate + text[end:]
+
+          replace_once(
+              "- The new ViewModel/reducer foundation is not yet wired to runtime effects.",
+              "- The ViewModel/reducer foundation is wired only for Playground; Models, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.",
+              "runtime effects debt",
+          )
+          replace_once(
+              "- Controllers still use executors and callbacks rather than ViewModel-owned coroutine state.",
+              "- Controllers still use executors and callbacks; Playground now crosses a typed effect boundary, while the remaining controllers have not yet migrated.",
+              "controller debt",
+          )
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Remove one-off workflow
+        run: rm .github/workflows/finalize-playground-udf.yml
+
+      - name: Commit finalized slice
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(phone-test): format and document Playground UDF slice"
+          git push origin HEAD:agent/playground-viewmodel-udf
