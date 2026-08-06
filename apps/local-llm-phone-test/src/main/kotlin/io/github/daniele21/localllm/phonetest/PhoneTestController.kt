@@ -59,6 +59,8 @@ internal class PhoneTestController(
         post { listener.onModelChanged(currentModel) }
     }
 
+    fun snapshotModel(): ImportedPhoneModel? = currentModel
+
     fun importModel(uri: Uri, architecture: String, quantization: String) {
         runExclusive {
             require(architecture.isNotBlank()) { "Model architecture must not be blank" }

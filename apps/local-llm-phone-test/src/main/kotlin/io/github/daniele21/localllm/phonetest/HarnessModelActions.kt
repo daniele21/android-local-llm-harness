@@ -1,9 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-internal class HarnessModelActions(
-    private val state: () -> HarnessUiState,
-    private val dispatch: (HarnessUiEvent) -> Unit,
-) {
+internal class HarnessModelActions(private val state: () -> HarnessUiState, private val dispatch: (HarnessUiEvent) -> Unit) {
     private var effects: ModelEffects? = null
 
     fun attach(attachedEffects: ModelEffects) {
@@ -23,11 +20,9 @@ internal class HarnessModelActions(
         return execute(ModelEffects::requestImport)
     }
 
-    fun executeCatalog(command: ModelCatalogCommand): Boolean =
-        execute { it.executeCatalog(command) }
+    fun executeCatalog(command: ModelCatalogCommand): Boolean = execute { it.executeCatalog(command) }
 
-    fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean =
-        execute { it.selectInstalled(metadata) }
+    fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean = execute { it.selectInstalled(metadata) }
 
     fun verifySelected(): Boolean {
         val current = state()
