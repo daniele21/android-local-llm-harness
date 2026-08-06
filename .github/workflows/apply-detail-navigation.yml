@@ -1,7 +1,11 @@
 name: Apply detail navigation patch
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [agent/detail-navigation]
+    paths:
+      - .github/workflows/apply-detail-navigation.yml
+      - scripts/patch_detail_navigation.py
 
 permissions:
   contents: write
