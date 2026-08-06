@@ -9,9 +9,12 @@ import kotlinx.coroutines.flow.update
 internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState()) : ViewModel() {
     private val mutableUiState = MutableStateFlow(initialState)
     private var playgroundEffects: PlaygroundEffects? = null
-    private var modelEffects: ModelEffects? = null
 
     val uiState: StateFlow<HarnessUiState> = mutableUiState.asStateFlow()
+    val models = HarnessModelActions(
+        state = { uiState.value },
+        dispatch = ::dispatch,
+    )
 
     fun dispatch(event: HarnessUiEvent) {
         mutableUiState.update { current -> HarnessUiReducer.reduce(current, event) }
@@ -24,70 +27,6 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun detachPlaygroundEffects(effects: PlaygroundEffects) {
         if (playgroundEffects === effects) playgroundEffects = null
-    }
-
-    fun attachModelEffects(effects: ModelEffects) {
-        modelEffects = effects
-        val snapshot = effects.snapshot()
-        dispatch(HarnessUiEvent.ModelDistributionChanged(snapshot.distribution))
-        dispatch(HarnessUiEvent.ModelChanged(snapshot.selectedModel))
-        dispatch(HarnessUiEvent.LoadedModelChanged(snapshot.loadedDigest))
-    }
-
-    fun detachModelEffects(effects: ModelEffects) {
-        if (modelEffects === effects) modelEffects = null
-    }
-
-    fun requestModelImport(): Boolean {
-        if (uiState.value.busy) return false
-        return executeModelCommand(ModelEffects::requestImport)
-    }
-
-    fun refreshModels(): Boolean = executeModelCommand(ModelEffects::refresh)
-
-    fun downloadModel(stableId: String): Boolean = executeModelCommand { it.download(stableId) }
-
-    fun cancelModelDownload(stableId: String): Boolean = executeModelCommand { it.cancelDownload(stableId) }
-
-    fun installModel(stableId: String): Boolean = executeModelCommand { it.install(stableId) }
-
-    fun verifyInstalledModel(stableId: String): Boolean = executeModelCommand { it.verifyInstalled(stableId) }
-
-    fun requestCatalogModelRemoval(stableId: String): Boolean =
-        executeModelCommand { it.requestCatalogRemoval(stableId) }
-
-    fun cancelCatalogModelRemoval(stableId: String): Boolean =
-        executeModelCommand { it.cancelCatalogRemoval(stableId) }
-
-    fun confirmCatalogModelRemoval(stableId: String): Boolean =
-        executeModelCommand { it.confirmCatalogRemoval(stableId) }
-
-    fun selectInstalledModel(metadata: InstalledCatalogModelMetadata): Boolean =
-        executeModelCommand { it.selectInstalled(metadata) }
-
-    fun verifySelectedModel(): Boolean {
-        val state = uiState.value
-        if (state.importedModel == null || state.busy) return false
-        return executeModelCommand(ModelEffects::verifySelected)
-    }
-
-    fun requestSelectedModelRemoval(): Boolean {
-        val state = uiState.value
-        if (state.importedModel == null || state.busy) return false
-        dispatch(HarnessUiEvent.RemovalConfirmationChanged(true))
-        return true
-    }
-
-    fun cancelSelectedModelRemoval() {
-        dispatch(HarnessUiEvent.RemovalConfirmationChanged(false))
-    }
-
-    fun confirmSelectedModelRemoval(): Boolean {
-        val state = uiState.value
-        if (!state.removalConfirmationPending || state.importedModel == null || state.busy) return false
-        val accepted = executeModelCommand(ModelEffects::removeSelected)
-        if (accepted) dispatch(HarnessUiEvent.RemovalConfirmationChanged(false))
-        return accepted
     }
 
     fun updatePlaygroundPrompt(prompt: String) {
@@ -122,10 +61,6 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun releasePlaygroundRuntime(onComplete: () -> Unit): Boolean = runCatching {
         playgroundEffects?.releaseRuntime(onComplete) ?: false
-    }.getOrDefault(false)
-
-    private fun executeModelCommand(command: (ModelEffects) -> Boolean): Boolean = runCatching {
-        modelEffects?.let(command) ?: false
     }.getOrDefault(false)
 }
 
