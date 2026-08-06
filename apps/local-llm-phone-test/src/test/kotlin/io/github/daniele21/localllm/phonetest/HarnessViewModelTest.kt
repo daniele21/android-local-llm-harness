@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -113,6 +114,93 @@ class HarnessViewModelTest {
         assertEquals("Validation completed", viewModel.uiState.value.operationStatus)
     }
 
+    @Test
+    fun attachingPlaygroundEffectsPublishesItsSnapshot() {
+        val snapshot = PlaygroundState(
+            phase = PlaygroundPhase.COMPLETED,
+            output = "local result",
+        )
+        val effects = FakePlaygroundEffects(snapshot)
+        val viewModel = HarnessViewModel()
+
+        viewModel.attachPlaygroundEffects(effects)
+
+        assertEquals(snapshot, viewModel.uiState.value.playground)
+    }
+
+    @Test
+    fun startingPlaygroundUsesCurrentStateAndParsedOptions() {
+        val model = testModel()
+        val effects = FakePlaygroundEffects()
+        val viewModel = HarnessViewModel(
+            HarnessUiState(
+                importedModel = model,
+                playgroundPrompt = "Explain local inference",
+                playgroundMaxTokens = "64",
+                playgroundTemperature = "0.4",
+                playgroundSeed = "7",
+            ),
+        )
+        viewModel.attachPlaygroundEffects(effects)
+
+        val result = viewModel.startPlayground()
+
+        assertEquals(PlaygroundStartResult.STARTED, result)
+        assertSame(model, effects.startedModel)
+        assertEquals("Explain local inference", effects.startedPrompt)
+        assertEquals(64, effects.startedOptions?.maxOutputTokens)
+        assertEquals(0.4f, effects.startedOptions?.temperature)
+        assertEquals(7L, effects.startedOptions?.seed)
+    }
+
+    @Test
+    fun invalidPlaygroundSettingsAreRejectedBeforeControllerInvocation() {
+        val effects = FakePlaygroundEffects()
+        val viewModel = HarnessViewModel(
+            HarnessUiState(
+                importedModel = testModel(),
+                playgroundMaxTokens = "invalid",
+            ),
+        )
+        viewModel.attachPlaygroundEffects(effects)
+
+        val result = viewModel.startPlayground()
+
+        assertEquals(PlaygroundStartResult.INVALID_SETTINGS, result)
+        assertNull(effects.startedModel)
+    }
+
+    @Test
+    fun activeOperationsPreventPlaygroundStart() {
+        val effects = FakePlaygroundEffects()
+        val viewModel = HarnessViewModel(
+            HarnessUiState(
+                importedModel = testModel(),
+                controllerBusy = true,
+            ),
+        )
+        viewModel.attachPlaygroundEffects(effects)
+
+        val result = viewModel.startPlayground()
+
+        assertEquals(PlaygroundStartResult.BUSY, result)
+        assertNull(effects.startedModel)
+    }
+
+    @Test
+    fun cancelAndRuntimeReleaseAreDelegatedToAttachedEffects() {
+        val effects = FakePlaygroundEffects()
+        val viewModel = HarnessViewModel()
+        var releaseCompleted = false
+        viewModel.attachPlaygroundEffects(effects)
+
+        assertTrue(viewModel.cancelPlayground())
+        assertTrue(viewModel.releasePlaygroundRuntime { releaseCompleted = true })
+        assertTrue(effects.cancelCalled)
+        assertTrue(effects.releaseCalled)
+        assertTrue(releaseCompleted)
+    }
+
     private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(
         digest = ModelDigest("0".repeat(64)),
         fileName = "test.gguf",
@@ -120,4 +208,40 @@ class HarnessViewModelTest {
         architecture = "qwen3",
         quantization = "Q4_K_M",
     )
+
+    private class FakePlaygroundEffects(
+        private val current: PlaygroundState = PlaygroundState(),
+    ) : PlaygroundEffects {
+        var startedModel: ImportedPhoneModel? = null
+        var startedPrompt: String? = null
+        var startedOptions: PlaygroundRequestOptions? = null
+        var cancelCalled: Boolean = false
+        var releaseCalled: Boolean = false
+
+        override fun snapshot(): PlaygroundState = current
+
+        override fun start(
+            model: ImportedPhoneModel,
+            prompt: String,
+            options: PlaygroundRequestOptions,
+        ): Boolean {
+            startedModel = model
+            startedPrompt = prompt
+            startedOptions = options
+            return true
+        }
+
+        override fun cancel(): Boolean {
+            cancelCalled = true
+            return true
+        }
+
+        override fun releaseRuntime(onComplete: () -> Unit): Boolean {
+            releaseCalled = true
+            onComplete()
+            return true
+        }
+
+        override fun close() = Unit
+    }
 }
