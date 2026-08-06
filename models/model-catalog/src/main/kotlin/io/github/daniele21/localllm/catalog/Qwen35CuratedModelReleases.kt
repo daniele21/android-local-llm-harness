@@ -6,10 +6,13 @@ internal object Qwen35CuratedModelReleases {
             qwenThreePointFiveZeroPointEightBQFourKM(),
             qwenThreePointFiveZeroPointEightBQFiveKM(),
             qwenThreePointFiveZeroPointEightBQEightZero(),
+            qwenThreePointFiveZeroPointEightBUdIqTwoXxs(),
             qwenThreePointFiveTwoBQFourKM(),
             qwenThreePointFiveTwoBQFiveKM(),
+            qwenThreePointFiveTwoBUdIqTwoXxs(),
             qwenThreePointFiveFourBQFourKM(),
             qwenThreePointFiveFourBQFiveKM(),
+            qwenThreePointFiveFourBUdIqTwoXxs(),
         )
 
     private fun qwenThreePointFiveZeroPointEightBQFourKM(): CatalogModelRelease = CuratedModelReleaseFactory.release(
@@ -90,6 +93,34 @@ internal object Qwen35CuratedModelReleases {
         ),
     )
 
+    private fun qwenThreePointFiveZeroPointEightBUdIqTwoXxs(): CatalogModelRelease = CuratedModelReleaseFactory.release(
+        modelId = "qwen35-08b-ud-iq2-xxs",
+        displayName = "Qwen 3.5 0.8B UD-IQ2_XXS",
+        description =
+        "Quantizzazione minima di Qwen 3.5 0.8B, consigliata come modello ultra-leggero per sanity test, verifica del runtime, streaming, cancellazione e benchmark rapidi di inferenza locale.",
+        downloadUrl =
+        "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/5aea8824cba95d22990acc6ea66c2c1909530650/Qwen3.5-0.8B-UD-IQ2_XXS.gguf?download=true",
+        sha256 = "a369165c8ec45a92d55cbad98b5377e2c32ca8dfc824c899d9d05b33b6b53e54",
+        sizeBytes = 338_227_456,
+        fileName = "Qwen3.5-0.8B-UD-IQ2_XXS.gguf",
+        architecture = "qwen35",
+        quantization = "UD-IQ2_XXS",
+        minRamBytes = 3_000_000_000,
+        recommendedRamBytes = 4_000_000_000,
+        profileKey = "qwen35-08b-ud-iq2-xxs-ctx2048",
+        licenseId = "Apache-2.0",
+        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF",
+        useCases =
+        setOf(
+            "runtime-sanity",
+            "runtime-smoke-test",
+            "streaming-test",
+            "cancellation-test",
+            "lightweight-inference",
+            "quantization-benchmark",
+        ),
+    )
+
     private fun qwenThreePointFiveTwoBQFourKM(): CatalogModelRelease = CuratedModelReleaseFactory.release(
         modelId = "qwen35-2b-q4-k-m",
         displayName = "Qwen 3.5 2B Q4_K_M",
@@ -141,6 +172,34 @@ internal object Qwen35CuratedModelReleases {
             "summarization",
             "local-assistant",
             "local-rag",
+        ),
+    )
+
+    private fun qwenThreePointFiveTwoBUdIqTwoXxs(): CatalogModelRelease = CuratedModelReleaseFactory.release(
+        modelId = "qwen35-2b-ud-iq2-xxs",
+        displayName = "Qwen 3.5 2B UD-IQ2_XXS",
+        description =
+        "Quantizzazione minima di Qwen 3.5 2B, utile per verificare l'esecuzione di un modello intermedio mantenendo contenuti spazio, RAM e tempi di download.",
+        downloadUrl =
+        "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/a847ba37feb0735899f98cc9287bb84e432d7010/Qwen3.5-2B-UD-IQ2_XXS.gguf?download=true",
+        sha256 = "43aedbd2b03a3c2cc39f49ccf74fcd3c394ed0b2a1ede8a30ee652ee9cfc27ef",
+        sizeBytes = 768_270_592,
+        fileName = "Qwen3.5-2B-UD-IQ2_XXS.gguf",
+        architecture = "qwen35",
+        quantization = "UD-IQ2_XXS",
+        minRamBytes = 4_000_000_000,
+        recommendedRamBytes = 6_000_000_000,
+        profileKey = "qwen35-2b-ud-iq2-xxs-ctx2048",
+        licenseId = "Apache-2.0",
+        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF",
+        useCases =
+        setOf(
+            "runtime-regression-test",
+            "memory-pressure-test",
+            "lightweight-inference",
+            "structured-extraction-test",
+            "classification-test",
+            "quantization-benchmark",
         ),
     )
 
@@ -197,6 +256,34 @@ internal object Qwen35CuratedModelReleases {
             "local-assistant",
             "local-rag",
             "tool-calling",
+            "quantization-benchmark",
+        ),
+    )
+
+    private fun qwenThreePointFiveFourBUdIqTwoXxs(): CatalogModelRelease = CuratedModelReleaseFactory.release(
+        modelId = "qwen35-4b-ud-iq2-xxs",
+        displayName = "Qwen 3.5 4B UD-IQ2_XXS",
+        description =
+        "Quantizzazione minima di Qwen 3.5 4B, pensata per testare una capacità superiore senza utilizzare le più pesanti quantizzazioni Q4 o Q5.",
+        downloadUrl =
+        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/951946068e7924e25f038e1eab76cd0f976c2619/Qwen3.5-4B-UD-IQ2_XXS.gguf?download=true",
+        sha256 = "4c1ba794e8d6098f4fb6482b4db6e880c80b5ee0b4c64d8668afaf9541163677",
+        sizeBytes = 1_520_217_248,
+        fileName = "Qwen3.5-4B-UD-IQ2_XXS.gguf",
+        architecture = "qwen35",
+        quantization = "UD-IQ2_XXS",
+        minRamBytes = 6_000_000_000,
+        recommendedRamBytes = 8_000_000_000,
+        profileKey = "qwen35-4b-ud-iq2-xxs-ctx2048",
+        licenseId = "Apache-2.0",
+        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF",
+        useCases =
+        setOf(
+            "runtime-stress-test",
+            "memory-pressure-test",
+            "quality-scaling-test",
+            "structured-extraction-test",
+            "local-assistant-test",
             "quantization-benchmark",
         ),
     )

@@ -6,7 +6,7 @@ This file is the authoritative source for current implementation status. Detaile
 
 The functional runtime, observability, connected phone console, model distribution and retained benchmark history are implemented. Harness 0.5.0 is now following the protected `dev` integration plan: `dev` is the ordinary development line, while `main` remains stable and release-oriented.
 
-The active sequence is governance and cumulative CI, focused model-management recovery, real Android branding, Compose architecture and surface completion, UI/accessibility validation, then signed internal distribution and physical-device evidence.
+The active sequence is governance and cumulative CI, focused model-management recovery, real Android branding, Compose architecture and surface completion, explicit model RAM lifecycle with warm-idle eviction, UI/accessibility validation, then signed internal distribution and physical-device evidence.
 
 The repository remains **not production-ready** until the representative physical-device GGUF evidence gate is completed.
 
@@ -43,6 +43,7 @@ Historical branches are read-only audit references. They must not receive new im
     implemented on the current local candidate, including screenshot-by-screenshot manual
     comparison with the approved mockups; the full state, font-scale, TalkBack, screenshot-golden
     and expanded-layout matrix remains.
+- [ ] expose explicit non-destructive model load/unload controls and implement the configurable warm-idle TTL
 - [ ] integrate the rebased local UI/release-tooling candidate through a reviewed PR and obtain cumulative green `dev` CI
 - [ ] build and upload the signed AAB to Google Play Internal Testing
 - [ ] capture privacy-safe representative physical-device GGUF evidence
@@ -107,6 +108,8 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [x] reuse a compatible loaded model
 - [x] reject unsafe model switches while active work owns the model
 - [x] handle Android background and low-memory signals
+- [ ] expose explicit load/unload product controls that change RAM residency without deleting the installed model or changing its selection
+- [ ] add a configurable, monotonic warm-idle TTL with safe rearming, pinning and unload-reason telemetry
 - [x] recover after cancellation and request failure
 
 ### Validation and developer tooling

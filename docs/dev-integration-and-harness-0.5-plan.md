@@ -420,6 +420,7 @@ dei suoi stati degradati.
 - [ ] introdurre `ModelsUiState` e `ModelsViewModel` sopra i contratti esistenti;
 - [ ] unificare release di catalogo, metadata installati, snapshot del `ModelStore` e selezione attiva;
 - [ ] implementare lista e dettaglio con stati downloading, verified, installing, installed, selected e loaded;
+- [ ] esporre azioni esplicite `Load in memory` e `Unload from memory`, separate da selezione e rimozione dallo storage;
 - [ ] rendere visibili e recuperabili gli stati orphaned, unavailable, incompatible e failed verification;
 - [ ] definire selezione deterministica e `lastUsedAt` senza attivazione runtime implicita;
 - [ ] completare reconciliation al bootstrap senza cancellazioni automatiche distruttive;
@@ -429,6 +430,27 @@ dei suoi stati degradati.
 
 Criterio di uscita: più modelli sopravvivono al restart, una sola selezione è deterministica e
 ogni discrepanza catalogo/store è esplicita senza esporre backing path o applicare side effect.
+
+### RT-01 — Residenza RAM e warm idle TTL
+
+Stato: **DA IMPLEMENTARE**. Il runtime possiede già handle opachi di load/unload, riuso warm,
+unload manuale sicuro e reazione a background/low-memory. Manca la policy temporale automatica
+e l'azione prodotto dedicata che distingua chiaramente residenza RAM, selezione e installazione.
+
+- [ ] mantenere `prepare`/creazione sessione come load esplicito dell'identità risolta da `applicationId + useCaseId`;
+- [ ] rendere l'unload esplicito disponibile soltanto senza contesti, generazioni attive o richieste in coda;
+- [ ] garantire che unload manuale, TTL, memory pressure, switch e shutdown non rimuovano GGUF, metadata installati o selezione;
+- [ ] introdurre un warm idle TTL configurabile, guidato da clock monotono iniettato e scheduler cancellabile;
+- [ ] avviare il TTL dopo il rilascio dell'ultimo contesto, annullarlo o riarmarlo al riuso e ricontrollare l'ownership prima dell'eviction;
+- [ ] permettere pin/unpin esplicito per i casi latency-sensitive senza impedire il rilascio sotto pressione critica;
+- [ ] registrare reason e durata di unload/reload senza prompt, output, URI o backing path;
+- [ ] mostrare stato installed/selected/loaded e l'esito delle azioni senza presentare la page cache del sistema come memoria immediatamente liberata;
+- [ ] testare expiry, riuso vicino alla scadenza, sessione attiva, coda, generazione, pin, memory pressure, doppio unload e cold reload successivo;
+- [ ] misurare su hardware fisico PSS prima/dopo unload e latenza del reload per scegliere il default, senza fissarlo da evidenza desktop/emulator.
+
+Criterio di uscita: il modello può essere caricato e scaricato dalla RAM senza mutare lo storage;
+un modello realmente inattivo viene scaricato alla scadenza configurata, mentre lavoro attivo,
+riuso concorrente e pressione critica seguono una policy deterministica, osservabile e testata.
 
 ### UX-06 — Overview
 
@@ -498,6 +520,7 @@ Criterio di uscita della Fase 4:
 - nessuna schermata chiama direttamente `RuntimeOrchestrator`, `ModelStore`, repository o executor;
 - `MainActivity` non possiede stato di dominio delle schermate;
 - tutte le funzioni esistenti restano raggiungibili;
+- load/unload modifica soltanto la residenza runtime e il warm idle TTL non interrompe ownership attiva;
 - le schermate non introducono lavoro runtime implicito.
 
 ## Fase 5 — Hardening UX e release candidate
@@ -580,6 +603,8 @@ fisica. Il gate deve usare l'AAB installato da Google Play e un GGUF supportato 
 - [ ] eseguire generazione e streaming;
 - [ ] verificare cancellazione durante prefill e decode;
 - [ ] eseguire cicli ripetuti load/generate/unload;
+- [ ] verificare unload manuale e warm idle TTL senza perdita del GGUF installato, metadata o selezione;
+- [ ] verificare che riuso prima della scadenza, sessioni attive e richieste in coda impediscano l'eviction;
 - [ ] registrare PSS, TTFT, throughput e thermal state;
 - [ ] verificare Overview, Models, Playground, Diagnostics e Settings sul device;
 - [ ] completare TalkBack, font scaling, portrait e landscape;
@@ -607,12 +632,13 @@ release record del commit esatto.
 | 6 | INT-01 Integrate local UI/tooling candidate | `dev` | rebase, design-system reconciliation, CI | UX-03B |
 | 7 | UX-03B Navigation details and Activity slimming | `dev` | detail route, back stack, composition root | UX-04 |
 | 8 | UX-04 Playground UDF | `dev` | inferenza UI e lifecycle | UX-05 |
-| 9 | UX-05 Models UDF | `dev` | multi-model e management | UX-06 |
-| 10 | UX-06 Overview | `dev` | dashboard reale | UX-07 |
-| 11 | UX-07 Diagnostics | `dev` | health/runs/resources/benchmarks/logs | UX-08 |
-| 12 | UX-08 Settings | `dev` | amministrazione e developer tools | UX-09 |
-| 13 | UX-09 Hardening | `dev` | UI, screenshot, a11y, performance | REL-01 |
-| 14 | REL-01 Promotion Harness 0.5.0 | `main` da `dev` | versione e release candidate | REL-02 |
+| 9 | UX-05 Models UDF | `dev` | multi-model e management | RT-01 |
+| 10 | RT-01 Model RAM lifecycle | `dev` | load/unload esplicito, warm idle TTL e osservabilità | UX-06 |
+| 11 | UX-06 Overview | `dev` | dashboard reale | UX-07 |
+| 12 | UX-07 Diagnostics | `dev` | health/runs/resources/benchmarks/logs | UX-08 |
+| 13 | UX-08 Settings | `dev` | amministrazione e developer tools | UX-09 |
+| 14 | UX-09 Hardening | `dev` | UI, screenshot, a11y, performance | REL-01 |
+| 15 | REL-01 Promotion Harness 0.5.0 | `main` da `dev` | versione e release candidate | REL-02 |
 
 Le PR possono essere ulteriormente divise quando il diff supera un confine di responsabilità. Non devono essere accorpate per compensare ritardi di pianificazione.
 
@@ -683,6 +709,7 @@ Durante internal testing osservare e raccogliere in forma privacy-safe:
 - TTFT, durata totale e decode throughput;
 - PSS, heap nativo, heap Java e thermal state;
 - crescita memoria nei cicli ripetuti;
+- unload per azione manuale, idle TTL, memory pressure o switch e latenza del reload successivo;
 - errori di navigazione, contenuto tagliato e problemi TalkBack;
 - differenze tra cold, warm e loaded runtime;
 - commit SHA, app version, device, Android version, ABI e model digest.
@@ -718,6 +745,7 @@ Il piano è completato quando:
 - [x] brand launcher e design system sono integrati nell'app;
 - [ ] Navigation Compose e ViewModel/UDF sostituiscono lo stato di dominio in `MainActivity`;
 - [ ] le principali funzionalità del piano UX/UI sono collegate a dati reali;
+- [ ] load/unload RAM è distinto da selezione e rimozione storage, e il warm idle TTL è deterministico e configurabile;
 - [ ] UI test, screenshot, accessibilità e responsive gate passano;
 - [ ] CI e packaging completi passano da checkout pulito;
 - [ ] Harness 0.5.0 è promossa da `dev` a `main`;
