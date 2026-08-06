@@ -1,5 +1,12 @@
 # Harness brand assets
 
+Status: active
+Document type: asset-index
+Owner: ui/design-system
+Canonical scope: brand.assets
+Read when: locating source or rendered brand assets
+Last reviewed: 2026-08-06
+
 Generated PNG assets for the Harness visual identity.
 
 ## Dark mode

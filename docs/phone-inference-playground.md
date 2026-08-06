@@ -1,5 +1,12 @@
 # Phone inference playground
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.playground
+Read when: changing connected-app prompt entry, generation controls, streaming or cancellation
+Last reviewed: 2026-08-06
+
 ## Scope
 
 `apps/local-llm-phone-test` is the first installable Android application that exposes the embedded local runtime as a manual inference playground on a physical phone.

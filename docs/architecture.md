@@ -1,5 +1,12 @@
 # Architecture
 
+Status: active
+Document type: architecture
+Owner: repository
+Canonical scope: architecture.repository
+Read when: changing module boundaries, dependency direction, deployment shape or ownership
+Last reviewed: 2026-08-06
+
 ![Architecture Diagram](assets/architecture.png)
 
 ## Data plane

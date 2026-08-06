@@ -1,5 +1,12 @@
 # Device validation evidence bundle
 
+Status: active
+Document type: evidence-runbook
+Owner: apps/device-test-runner
+Canonical scope: validation.device-evidence-bundle
+Read when: capturing, packaging or reviewing physical-device lifecycle evidence
+Last reviewed: 2026-08-06
+
 Use `scripts/capture-device-e2e-evidence.sh` for physical-device acceptance runs. It wraps `scripts/run-device-e2e.sh`, preserves the original exit status and produces a timestamped evidence directory plus a compressed archive.
 
 ## Standard command

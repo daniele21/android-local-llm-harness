@@ -1,5 +1,12 @@
 # Versioning and release policy
 
+Status: active
+Document type: release-policy
+Owner: repository
+Canonical scope: release.versioning
+Read when: changing versions, compatibility promises, promotion or release artifacts
+Last reviewed: 2026-08-06
+
 ## SDK versions
 
 Published Android and Capacitor artifacts follow Semantic Versioning.

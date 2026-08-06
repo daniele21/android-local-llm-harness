@@ -8,8 +8,11 @@ on:
       - "AGENTS.md"
       - "**/AGENTS.md"
       - ".rgignore"
+      - ".github/CODEOWNERS"
       - "docs/**"
       - "scripts/verify-docs.py"
+      - "scripts/verify-agent-navigation.py"
+      - "scripts/test_verify_docs.py"
       - ".github/workflows/docs.yml"
   push:
     branches: [main, dev]
@@ -19,8 +22,11 @@ on:
       - "AGENTS.md"
       - "**/AGENTS.md"
       - ".rgignore"
+      - ".github/CODEOWNERS"
       - "docs/**"
       - "scripts/verify-docs.py"
+      - "scripts/verify-agent-navigation.py"
+      - "scripts/test_verify_docs.py"
       - ".github/workflows/docs.yml"
 
 permissions:
@@ -38,10 +44,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0
       - name: Verify documentation
+        env:
+          DOCS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          python3 -m py_compile scripts/verify-docs.py
-          python3 scripts/verify-docs.py
+          python3 -m py_compile scripts/verify-docs.py scripts/verify-agent-navigation.py scripts/test_verify_docs.py
+          python3 scripts/test_verify_docs.py
+          python3 scripts/verify-docs.py --base "$DOCS_BASE_SHA"
           python3 scripts/verify-agent-navigation.py
           git diff --check

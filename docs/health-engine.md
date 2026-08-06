@@ -1,5 +1,12 @@
 # Health engine
 
+Status: active
+Document type: feature-specification
+Owner: observability/health-engine
+Canonical scope: observability.health
+Read when: changing health checks, findings, sanity suites or integrity evaluation
+Last reviewed: 2026-08-06
+
 `observability/health-engine` is the Phase 2 control-plane boundary for independently testable health checks. It depends on stable runtime, observability and model-store contracts and does not depend on Android UI, transport implementations or `llama.cpp` internals.
 
 ## Responsibilities

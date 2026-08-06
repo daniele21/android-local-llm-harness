@@ -1,5 +1,12 @@
 # Harness connected telemetry composition
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.diagnostics.telemetry
+Read when: changing connected-app telemetry assembly, retention or timeline presentation
+Last reviewed: 2026-08-06
+
 **Status:** Implemented first iteration
 **Application:** `apps/local-llm-phone-test`
 **Last updated:** 2026-08-04

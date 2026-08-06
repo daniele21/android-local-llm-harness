@@ -3,6 +3,8 @@
 Status: active
 Document type: feature-specification
 Owner: core/runtime-core
+Canonical scope: runtime.generation-planning
+Read when: changing generation configuration, prompt planning, templates, token budgets or sampler behavior
 Last reviewed: 2026-08-06
 
 ## Purpose

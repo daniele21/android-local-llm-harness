@@ -1,5 +1,12 @@
 # Architecture Decision Records
 
+Status: active
+Document type: adr-index
+Owner: repository
+Canonical scope: architecture.decisions
+Read when: a change may alter a durable architectural constraint or supersede an accepted decision
+Last reviewed: 2026-08-06
+
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
 ## Records
@@ -13,6 +20,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0007-explicit-verified-download-installation.md`](0007-explicit-verified-download-installation.md) — opaque verified-download access, GGUF inspection, ModelStore publication and post-import rollback
 - [`0008-dev-integration-and-protected-promotion.md`](0008-dev-integration-and-protected-promotion.md) — protected `dev` integration and validated promotion to `main`
 - [`0009-model-aware-generation-planning.md`](0009-model-aware-generation-planning.md) — versioned generation planning, trusted prompt templates and lazy context materialization
+- [`0010-model-aware-embedded-first.md`](0010-model-aware-embedded-first.md) — explicit application/use-case model binding and embedded-first deployment
 
 ## Status values
 

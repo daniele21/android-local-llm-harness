@@ -1,5 +1,12 @@
 # Embedded API and lifecycle
 
+Status: active
+Document type: api-reference
+Owner: core/contracts
+Canonical scope: api.embedded-lifecycle
+Read when: assembling, invoking or closing the public embedded runtime API
+Last reviewed: 2026-08-06
+
 This document describes the implemented embedded runtime API. It is based on the current public contracts and production runtime classes; it does not describe the future Binder service or Capacitor plugin.
 
 The current integration is intentionally explicit. An application owns:

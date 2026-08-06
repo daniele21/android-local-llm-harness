@@ -1,5 +1,12 @@
 # Curated candidate model catalog
 
+Status: active
+Document type: feature-specification
+Owner: models/model-catalog
+Canonical scope: models.catalog
+Read when: changing curated releases, compatibility targeting or application-reviewed model profiles
+Last reviewed: 2026-08-06
+
 The repository includes a bootstrap catalog for administrator-curated GGUF releases through `CuratedModelCatalog` in `models/model-catalog`.
 
 This bootstrap is metadata only. It does not bundle or download model bytes, and it does not bypass the secure download and `ModelStore` installation flow.

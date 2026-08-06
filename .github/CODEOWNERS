@@ -4,3 +4,5 @@
 /third_party/llama.cpp/ @daniele21
 /.github/workflows/ @daniele21
 /docs/adr/ @daniele21
+/docs/documentation-policy.json @daniele21
+/scripts/verify-docs.py @daniele21

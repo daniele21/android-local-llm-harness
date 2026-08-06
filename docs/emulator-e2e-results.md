@@ -1,5 +1,12 @@
 # ARM64 emulator end-to-end results
 
+Status: active
+Document type: evidence
+Owner: apps/device-test-runner
+Canonical scope: evidence.emulator
+Read when: comparing emulator validation with physical-device evidence or reviewing packaging history
+Last reviewed: 2026-08-06
+
 This file records real-GGUF preflight runs on an Android ARM64 emulator. Emulator results validate the Android packaging, JNI and runtime path in an AVD, but they are not physical-device evidence and do not close the production-readiness gate in [`roadmap.md`](roadmap.md).
 
 ## 2026-08-03 — Qwen3 0.6B Q4_K_M

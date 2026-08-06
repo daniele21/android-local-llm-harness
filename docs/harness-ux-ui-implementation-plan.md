@@ -3,6 +3,8 @@
 Status: active
 Document type: target-specification
 Owner: apps/local-llm-phone-test
+Canonical scope: target.phone-ux
+Read when: changing connected-phone screen behavior, interaction patterns or UX acceptance criteria
 Last reviewed: 2026-08-06
 
 ## Purpose

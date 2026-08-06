@@ -1,5 +1,12 @@
 # Google Play internal phone test
 
+Status: active
+Document type: runbook
+Owner: apps/local-llm-phone-test
+Canonical scope: release.play-internal
+Read when: preparing, uploading or validating the phone application through Google Play Internal Testing
+Last reviewed: 2026-08-06
+
 `apps/local-llm-phone-test` is a standalone Android application for validating the real local-LLM runtime on a physical device when developer mode, USB debugging or ADB is unavailable.
 
 It is intentionally separate from the developer console and from the instrumentation-only device test runner.

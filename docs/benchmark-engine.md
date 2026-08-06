@@ -3,6 +3,8 @@
 Status: active
 Document type: feature-specification
 Owner: observability/benchmark-engine
+Canonical scope: observability.benchmarks
+Read when: changing benchmark baselines, retained history, regression evaluation or benchmark orchestration
 Last reviewed: 2026-08-06
 
 ## Purpose
