@@ -57,10 +57,10 @@ jobs:
             --stacktrace
 
       - name: Remove temporary patch tooling
-        run: rm \
-          scripts/patch_detail_navigation.py \
-          scripts/run_detail_navigation_patch.py \
-          .github/workflows/apply-detail-navigation.yml
+        run: |
+          rm scripts/patch_detail_navigation.py
+          rm scripts/run_detail_navigation_patch.py
+          rm .github/workflows/apply-detail-navigation.yml
 
       - name: Commit connected detail navigation
         run: |
