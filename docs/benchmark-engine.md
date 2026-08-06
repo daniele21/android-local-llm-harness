@@ -1,10 +1,15 @@
-# Benchmark baselines and regression checks
+# Benchmark baselines, retained history and regression checks
+
+Status: active
+Document type: feature-specification
+Owner: observability/benchmark-engine
+Last reviewed: 2026-08-06
 
 ## Purpose
 
-`observability/benchmark-engine` turns completed generation telemetry into repeatable performance baselines and privacy-safe health results.
+`observability/benchmark-engine` turns completed generation telemetry into repeatable performance baselines, retained capture history and privacy-safe regression health results.
 
-The module does not execute inference and does not select models. It consumes the metrics already recorded through `TelemetryRepository`, preserving the separation between the runtime data plane and the observability control plane.
+The engine does not execute inference or select models. It consumes metrics already recorded through `TelemetryRepository`, preserving the separation between runtime execution and observability control.
 
 ## Benchmark identity
 
@@ -15,112 +20,122 @@ Every baseline is scoped by a `BenchmarkKey` containing:
 - immutable model SHA-256 digest;
 - explicit `ModelLoadKind.COLD` or `ModelLoadKind.WARM`.
 
-`ModelLoadKind.UNKNOWN` is rejected when the key is created. This prevents mixed or ambiguous samples from becoming a baseline.
-
-Cold and warm measurements are intentionally independent. A warm generation is never compared with a cold-load baseline and vice versa.
+`ModelLoadKind.UNKNOWN` is rejected. Cold and warm measurements are intentionally independent.
 
 ## Capturing a baseline
 
-`BenchmarkBaselineRecorder` reads recent completed runs matching the key, limits them to the configured baseline window and persists a `BenchmarkBaseline` when the minimum sample count is available.
+`BenchmarkBaselineRecorder` reads recent completed runs matching one key, applies the configured window and persists a capture when the minimum sample count is available.
 
-```kotlin
-val key = BenchmarkKey(
-    applicationId = ApplicationId("com.example.app"),
-    useCaseId = UseCaseId("assistant"),
-    modelDigest = modelDigest,
-    modelLoadKind = ModelLoadKind.WARM,
-)
-
-val result = BenchmarkBaselineRecorder(
-    repository = telemetryRepository,
-    policy = BenchmarkPolicy(
-        baselineWindowSize = 20,
-        minimumBaselineSamples = 5,
-    ),
-).capture(key)
-```
-
-The recorder calculates:
+The capture records:
 
 - median time to first token;
 - nearest-rank p95 time to first token;
 - median total latency;
 - nearest-rank p95 total latency;
-- median decode throughput.
+- median decode throughput;
+- sample count and capture timestamp.
 
-Metrics that were not available in the source runs remain `null`; they are not fabricated or replaced with zero.
+Unavailable source metrics remain `null`; they are never converted to zero.
+
+## Active baseline and retained history
+
+The repository exposes two distinct views:
+
+- `benchmarkBaselines()` returns one active regression anchor for each benchmark key;
+- `benchmarkBaselineHistory(limit)` returns immutable captures in newest-first order.
+
+Capturing a new baseline:
+
+1. appends an immutable retained capture;
+2. replaces the active baseline for that exact key;
+3. leaves older retained captures unchanged;
+4. applies `TelemetryRetentionPolicy.maxBenchmarkBaselines` to retained history.
+
+Viewing or filtering history never changes the active regression anchor.
+
+The in-memory and Room implementations provide equivalent behavior. Room schema version 4 introduced `benchmark_baseline_history`; migration 3→4 copied each existing active baseline into retained history without deleting or changing the active row.
 
 ## Regression health check
 
-`BenchmarkRegressionHealthCheck` implements the common `HealthCheck` contract. It loads the baseline for one key and compares only completed runs whose completion timestamp is later than the baseline capture timestamp.
+`BenchmarkRegressionHealthCheck` implements the shared `HealthCheck` contract. It loads the active baseline for one key and compares only completed runs whose completion timestamp is later than the baseline capture timestamp.
 
 The default policy reports:
 
-- `WARN` when no baseline exists;
-- `WARN` when there are not enough post-baseline samples;
+- `WARN` when no active baseline exists;
+- `WARN` when there are not enough matching post-baseline samples;
 - `WARN` when no metric is comparable;
 - `PASS` when all comparable metrics remain within policy;
-- `FAIL` when one or more metrics regress beyond policy.
+- `FAIL` when one or more metrics exceed regression policy.
 
-The configurable comparisons are:
+Supported comparisons include:
 
 - current median TTFT divided by baseline median TTFT;
 - current p95 total latency divided by baseline p95 total latency;
 - current median decode throughput divided by baseline median decode throughput.
 
-The health detail names only metric classes such as `median TTFT` or `p95 total latency`. It does not include prompts, generated output, model paths or model digests.
+The health detail names metric classes only. It does not include prompts, generated output, model paths or full model digests.
 
 ## Stable health-check IDs
 
-The health-check ID contains the benchmark namespace and every key dimension:
+The check ID includes every key dimension:
 
 ```text
 benchmark-regression:<applicationId>:<useCaseId>:<modelDigest>:<COLD|WARM>
 ```
 
-This keeps IDs unique when the same use case is benchmarked with different models or load classifications. Consumers should treat the ID as opaque and should not display it as a user-facing model label.
+Consumers treat the ID as opaque and must not display it as a model label.
 
-## Persistence
+## Connected presentation
 
-The in-memory and Room telemetry implementations persist benchmark baselines behind the same `TelemetryRepository` contract.
+The connected Benchmarks surface separates:
 
-Room schema version 3 adds the benchmark baseline table and a non-destructive migration from schema version 2. Existing run, log, health and resource telemetry remains available after migration.
+- active baseline and current regression readiness;
+- post-baseline matching sample count;
+- regression result and comparable metrics;
+- retained historical captures.
 
-A new capture replaces the previous baseline with the same stable key. The current design stores the active baseline, not an unbounded history of prior baselines.
+Baseline capture is always explicit. Refresh, navigation and history browsing do not capture or replace a baseline.
+
+A capture action is enabled only when the selected key has enough matching completed runs. Bulk capture must skip keys that are not ready and must not overwrite unrelated active baselines.
 
 ## Threading and lifecycle
 
-The benchmark engine performs synchronous repository reads and writes. It is intended for explicit developer or administrative actions, not the generation hot path.
+The engine performs synchronous repository reads and writes and is intended for explicit developer or administrative actions outside the generation hot path.
 
-Repository implementations retain ownership of their own threading guarantees. The Room adapter continues to serialize database access according to its existing lifecycle and shutdown contract.
+The connected application runs capture and evaluation work through its diagnostics executor/effect boundary. UI composition, tab selection and ordinary refresh remain observational.
 
 ## Privacy
 
-The engine uses only structured telemetry already allowed by the observability contracts:
+The engine uses only privacy-safe telemetry:
 
-- identifiers required to scope the benchmark;
+- application and use-case identifiers;
+- model digest required for benchmark identity;
 - timestamps;
 - latency values;
 - token counts and throughput;
 - load classification.
 
-It does not read or persist prompt text, generated text, arbitrary backend exceptions or model file paths.
+It does not read or persist prompt text, generated output, arbitrary backend exceptions or model file paths. Connected UI may shorten digest presentation while retaining the exact digest inside the benchmark key.
 
 ## Testing
 
-The slice includes deterministic tests for:
+Deterministic coverage includes:
 
 - median and nearest-rank p95 calculations;
-- minimum baseline sample enforcement;
-- cold/warm isolation;
-- passing comparisons;
-- multi-metric regressions;
-- missing baseline and missing comparison windows;
+- minimum sample enforcement;
+- cold/warm and model-key isolation;
+- active baseline replacement;
+- immutable retained history ordering and retention;
+- migration 3→4 seeding existing active baselines into history;
+- comparison using only post-baseline samples;
+- passing, warning and multi-metric regression results;
+- missing metrics and no-comparable-metric behavior;
 - privacy-safe health details;
-- Room persistence and schema migration behavior.
+- in-memory and Room parity;
+- connected readiness and capture presentation.
 
-## Limitations
+## Evidence boundary
 
-Host-side and simulated tests validate the calculation, persistence and orchestration behavior. They do not establish representative Android device performance.
+Host and simulated tests validate calculation, persistence and orchestration. They do not establish representative Android performance.
 
-Production baselines still require repeated measurements on physical `arm64-v8a` devices with supported external GGUF models. Device architecture, memory pressure, thermal throttling and OEM scheduling can materially change the observed metrics.
+Production baselines require repeated measurements on representative physical `arm64-v8a` devices with the exact application/use-case/model/load key. Device architecture, memory pressure, thermal throttling and OEM scheduling must be recorded with the benchmark evidence.

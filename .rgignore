@@ -1,0 +1,19 @@
+# Pinned upstream source: search explicitly only for backend integration work.
+third_party/llama.cpp/**
+
+# Generated and local build output.
+.gradle/**
+build/**
+**/build/**
+**/.cxx/**
+**/.externalNativeBuild/**
+**/generated/**
+**/outputs/**
+.idea/**
+.kotlin/**
+
+# Local evidence, model and signing material.
+*.gguf
+*.ggml
+*.jks
+*.keystore
