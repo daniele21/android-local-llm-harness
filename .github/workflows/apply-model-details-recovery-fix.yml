@@ -18,6 +18,9 @@ jobs:
           ref: agent/model-details-recovery
           fetch-depth: 1
 
+      - name: Initialize native sources
+        run: git submodule update --init --recursive
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
