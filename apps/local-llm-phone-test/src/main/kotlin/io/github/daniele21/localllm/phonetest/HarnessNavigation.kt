@@ -3,11 +3,7 @@ package io.github.daniele21.localllm.phonetest
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
-internal enum class HarnessSettingsDetail(
-    val route: String,
-    val title: String,
-    val subtitle: String,
-) {
+internal enum class HarnessSettingsDetail(val route: String, val title: String, val subtitle: String) {
     PRIVACY(
         route = "settings/privacy",
         title = "Privacy",

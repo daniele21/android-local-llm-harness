@@ -33,11 +33,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun HarnessDetailTopBar(
-    title: String,
-    subtitle: String,
-    onNavigateBack: () -> Unit,
-) {
+internal fun HarnessDetailTopBar(title: String, subtitle: String, onNavigateBack: () -> Unit) {
     TopAppBar(
         modifier = Modifier.testTag("harnessDetailTopBar"),
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -83,34 +79,31 @@ internal fun PrivacyDetailScreen() {
             DetailCard(
                 title = "Telemetry boundary",
                 detail =
-                    "Normal telemetry stores technical lifecycle and performance data. " +
-                        "Prompt and generated-output content are excluded.",
+                "Normal telemetry stores technical lifecycle and performance data. " +
+                    "Prompt and generated-output content are excluded.",
             )
         }
         item {
             DetailCard(
                 title = "Model storage",
                 detail =
-                    "Imported GGUF artifacts are verified and stored in the application's " +
-                        "private content-addressed model store.",
+                "Imported GGUF artifacts are verified and stored in the application's " +
+                    "private content-addressed model store.",
             )
         }
         item {
             DetailCard(
                 title = "No cloud inference",
                 detail =
-                    "The connected Playground executes through the embedded llama.cpp runtime " +
-                        "without sending inference content to a cloud model.",
+                "The connected Playground executes through the embedded llama.cpp runtime " +
+                    "without sending inference content to a cloud model.",
             )
         }
     }
 }
 
 @Composable
-internal fun StorageDetailScreen(
-    importedModel: ImportedPhoneModel?,
-    onOpenModels: () -> Unit,
-) {
+internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModels: () -> Unit) {
     DetailList {
         item {
             HarnessCard(emphasized = true) {
@@ -144,19 +137,15 @@ internal fun StorageDetailScreen(
             DetailCard(
                 title = "Explicit removal",
                 detail =
-                    "Removing a model requires confirmation and is blocked while the runtime " +
-                        "still owns the loaded artifact.",
+                "Removing a model requires confirmation and is blocked while the runtime " +
+                    "still owns the loaded artifact.",
             )
         }
     }
 }
 
 @Composable
-internal fun BuildDetailScreen(
-    versionName: String,
-    versionCode: String,
-    applicationId: String,
-) {
+internal fun BuildDetailScreen(versionName: String, versionCode: String, applicationId: String) {
     DetailList {
         item {
             HarnessCard(emphasized = true) {
@@ -185,11 +174,7 @@ internal fun BuildDetailScreen(
 }
 
 @Composable
-internal fun DeveloperToolsDetailScreen(
-    onOpenHealth: () -> Unit,
-    onOpenLogs: () -> Unit,
-    onOpenPhysicalValidation: () -> Unit,
-) {
+internal fun DeveloperToolsDetailScreen(onOpenHealth: () -> Unit, onOpenLogs: () -> Unit, onOpenPhysicalValidation: () -> Unit) {
     DetailList {
         item {
             HarnessCard(emphasized = true) {
@@ -262,10 +247,7 @@ internal fun PhysicalValidationDetailScreen(
 }
 
 @Composable
-internal fun RequestTimelineDetailScreen(
-    timeline: DiagnosticsRequestTimelineUi?,
-    onCopyLog: (DiagnosticsLogUi) -> Unit,
-) {
+internal fun RequestTimelineDetailScreen(timeline: DiagnosticsRequestTimelineUi?, onCopyLog: (DiagnosticsLogUi) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("requestTimelineDetail"),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
@@ -276,7 +258,9 @@ internal fun RequestTimelineDetailScreen(
                 Text("Correlated request", style = MaterialTheme.typography.titleLarge)
                 when {
                     timeline == null -> Text("Loading privacy-safe request evidence…")
+
                     timeline.sourceError != null -> Text(timeline.sourceError)
+
                     else -> {
                         HarnessMetricRow {
                             HarnessMetric("Request", timeline.requestIdPrefix, Modifier.weight(1f))
@@ -321,11 +305,7 @@ internal fun RequestTimelineDetailScreen(
 }
 
 @Composable
-private fun DetailCard(
-    title: String,
-    detail: String,
-    monospace: Boolean = false,
-) {
+private fun DetailCard(title: String, detail: String, monospace: Boolean = false) {
     HarnessCard {
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(
@@ -346,5 +326,4 @@ private fun DetailList(content: androidx.compose.foundation.lazy.LazyListScope.(
     )
 }
 
-private fun formatDetailBytes(bytes: Long): String =
-    String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
+private fun formatDetailBytes(bytes: Long): String = String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)

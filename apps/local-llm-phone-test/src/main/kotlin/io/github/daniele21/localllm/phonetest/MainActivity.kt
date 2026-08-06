@@ -48,6 +48,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,10 +68,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -376,7 +380,8 @@ class MainActivity :
         val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
-        val destination = HarnessDestination.fromRoute(backStackEntry?.destination?.route)
+        val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
+        val destination = shellState.destination
         val expanded = LocalConfiguration.current.screenWidthDp >= 720
         val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
@@ -396,19 +401,32 @@ class MainActivity :
                 popUpTo(HarnessDestination.OVERVIEW.route) { saveState = true }
             }
         }
+        val navigateToSettings: () -> Unit = {
+            navController.navigate(HarnessDestination.SETTINGS.route) {
+                launchSingleTop = true
+            }
+        }
 
         Scaffold(
             topBar = {
-                HarnessTopBar(
-                    destination = destination,
-                    onOpenSettings = { navigate(HarnessDestination.SETTINGS) },
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) navigate(HarnessDestination.OVERVIEW)
-                    },
-                )
+                if (shellState.isDetail) {
+                    HarnessDetailTopBar(
+                        title = requireNotNull(shellState.detailTitle),
+                        subtitle = shellState.detailSubtitle.orEmpty(),
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                } else {
+                    HarnessTopBar(
+                        destination = destination,
+                        onOpenSettings = navigateToSettings,
+                        onNavigateBack = {
+                            if (!navController.popBackStack()) navigate(HarnessDestination.OVERVIEW)
+                        },
+                    )
+                }
             },
             bottomBar = {
-                if (!expanded && destination != HarnessDestination.SETTINGS) {
+                if (!expanded && shellState.showBottomNavigation) {
                     HarnessBottomBar(destination = destination, onNavigate = navigate)
                 }
             },
@@ -427,7 +445,7 @@ class MainActivity :
                         }
                         NavigationRailItem(
                             selected = destination == HarnessDestination.SETTINGS,
-                            onClick = { navigate(HarnessDestination.SETTINGS) },
+                            onClick = navigateToSettings,
                             icon = {
                                 HarnessDestinationIcon(
                                     HarnessDestination.SETTINGS,
@@ -465,10 +483,90 @@ class MainActivity :
                     composable(HarnessDestination.MODELS.route) {
                         ModelsScreen(onImport = { modelPicker.launch(MODEL_MIME_TYPES) })
                     }
-                    composable(HarnessDestination.DIAGNOSTICS.route) { DiagnosticsScreen() }
+                    composable(HarnessDestination.DIAGNOSTICS.route) {
+                        DiagnosticsScreen(
+                            onOpenRequestTimeline = { requestId ->
+                                navController.navigate(HarnessRoutes.requestTimeline(requestId))
+                            },
+                        )
+                    }
                     composable(HarnessDestination.SETTINGS.route) {
                         SettingsScreen(
-                            onOpenDiagnostics = { navigate(HarnessDestination.DIAGNOSTICS) },
+                            onOpenPrivacy = {
+                                navController.navigate(HarnessSettingsDetail.PRIVACY.route)
+                            },
+                            onOpenStorage = {
+                                navController.navigate(HarnessSettingsDetail.STORAGE.route)
+                            },
+                            onOpenBuild = {
+                                navController.navigate(HarnessSettingsDetail.BUILD.route)
+                            },
+                            onOpenDeveloperTools = {
+                                navController.navigate(HarnessSettingsDetail.DEVELOPER_TOOLS.route)
+                            },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.PRIVACY.route) {
+                        PrivacyDetailScreen()
+                    }
+                    composable(HarnessSettingsDetail.STORAGE.route) {
+                        StorageDetailScreen(
+                            importedModel = importedModel,
+                            onOpenModels = { navigate(HarnessDestination.MODELS) },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.BUILD.route) {
+                        BuildDetailScreen(
+                            versionName = appVersionName(),
+                            versionCode = appVersionCode(),
+                            applicationId = packageName,
+                        )
+                    }
+                    composable(HarnessSettingsDetail.DEVELOPER_TOOLS.route) {
+                        DeveloperToolsDetailScreen(
+                            onOpenHealth = {
+                                selectDiagnosticsSection(DiagnosticsSection.HEALTH)
+                                navigate(HarnessDestination.DIAGNOSTICS)
+                            },
+                            onOpenLogs = {
+                                selectDiagnosticsSection(DiagnosticsSection.LOGS)
+                                navigate(HarnessDestination.DIAGNOSTICS)
+                            },
+                            onOpenPhysicalValidation = {
+                                navController.navigate(HarnessSettingsDetail.PHYSICAL_VALIDATION.route)
+                            },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.PHYSICAL_VALIDATION.route) {
+                        PhysicalValidationDetailScreen(
+                            modelAvailable = importedModel != null,
+                            busy = isBusy() || diagnosticActionRunning(),
+                            latestReport = latestReport,
+                            onRunValidation = ::runPhysicalValidation,
+                            onCopyReport = ::copyReport,
+                            onShareReport = ::shareReport,
+                        )
+                    }
+                    composable(
+                        route = HarnessRoutes.REQUEST_TIMELINE_PATTERN,
+                        arguments = listOf(
+                            navArgument(HarnessRoutes.REQUEST_ID_ARGUMENT) {
+                                type = NavType.StringType
+                            },
+                        ),
+                    ) { entry ->
+                        val requestId = HarnessRoutes.decodeRequestId(
+                            entry.arguments?.getString(HarnessRoutes.REQUEST_ID_ARGUMENT),
+                        )
+                        LaunchedEffect(requestId) {
+                            if (requestId != null) openRequestTimeline(requestId)
+                        }
+                        DisposableEffect(requestId) {
+                            onDispose { closeRequestTimeline() }
+                        }
+                        RequestTimelineDetailScreen(
+                            timeline = selectedRequestTimeline,
+                            onCopyLog = ::copyLog,
                         )
                     }
                 }
@@ -1071,7 +1169,7 @@ class MainActivity :
     }
 
     @Composable
-    private fun DiagnosticsScreen() {
+    private fun DiagnosticsScreen(onOpenRequestTimeline: (String) -> Unit) {
         ScreenList(
             title = "Diagnostics",
             supportingText = "Health, performance and privacy-safe evidence",
@@ -1090,7 +1188,7 @@ class MainActivity :
 
                 DiagnosticsSection.RUNS -> {
                     runtimeDiagnostics()
-                    runDiagnostics()
+                    runDiagnostics(onOpenRequestTimeline)
                 }
 
                 DiagnosticsSection.RESOURCES -> {
@@ -1110,7 +1208,7 @@ class MainActivity :
                         filter = logFilter,
                         timeline = selectedRequestTimeline,
                         onFilterChange = ::updateLogFilter,
-                        onOpenTimeline = ::openRequestTimeline,
+                        onOpenTimeline = onOpenRequestTimeline,
                         onCloseTimeline = ::closeRequestTimeline,
                         onCopyLog = ::copyLog,
                     )
@@ -1398,7 +1496,7 @@ class MainActivity :
         }
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.runDiagnostics() {
+    private fun androidx.compose.foundation.lazy.LazyListScope.runDiagnostics(onOpenRequestTimeline: (String) -> Unit) {
         item {
             HarnessCard {
                 Text("Generation runs", style = MaterialTheme.typography.titleLarge)
@@ -1430,9 +1528,17 @@ class MainActivity :
                 HarnessMetric("Model", run.modelDigestPrefix + "…")
                 HarnessMetric("Request", run.requestId.take(12) + "…")
                 HarnessSecondaryButton("View request timeline") {
-                    openRequestTimeline(run.requestId)
+                    onOpenRequestTimeline(run.requestId)
                 }
             }
+        }
+    }
+
+    private fun runPhysicalValidation() {
+        afterPlaygroundRuntimeReleased {
+            latestReport = ""
+            operationStatus = "Starting validation…"
+            controller.runFullValidation()
         }
     }
 
@@ -1444,13 +1550,8 @@ class MainActivity :
                 HarnessPrimaryButton(
                     "Run full validation",
                     enabled = importedModel != null && !isBusy() && !diagnosticActionRunning(),
-                ) {
-                    afterPlaygroundRuntimeReleased {
-                        latestReport = ""
-                        operationStatus = "Starting validation…"
-                        controller.runFullValidation()
-                    }
-                }
+                    onClick = ::runPhysicalValidation,
+                )
             }
         }
         item {
@@ -1477,7 +1578,12 @@ class MainActivity :
     }
 
     @Composable
-    private fun SettingsScreen(onOpenDiagnostics: () -> Unit) {
+    private fun SettingsScreen(
+        onOpenPrivacy: () -> Unit,
+        onOpenStorage: () -> Unit,
+        onOpenBuild: () -> Unit,
+        onOpenDeveloperTools: () -> Unit,
+    ) {
         ScreenList(title = null) {
             item {
                 SettingsSectionLabel("Brand")
@@ -1551,6 +1657,7 @@ class MainActivity :
                     title = "Privacy",
                     detail = "Prompts are not persisted",
                     trailing = "On-device",
+                    onClick = onOpenPrivacy,
                 )
             }
             item {
@@ -1562,6 +1669,7 @@ class MainActivity :
                     title = "Storage",
                     detail = "Manage cache and local data",
                     trailing = importedModel?.let { "${formatBytes(it.sizeBytes)} used" } ?: "Empty",
+                    onClick = onOpenStorage,
                 )
             }
             item {
@@ -1573,6 +1681,7 @@ class MainActivity :
                     title = "Build info",
                     detail = "Version, build, and runtime details",
                     trailing = appVersionName(),
+                    onClick = onOpenBuild,
                 )
             }
             item {
@@ -1584,7 +1693,7 @@ class MainActivity :
                     title = "Developer tools",
                     detail = "Logs, diagnostics, and advanced options",
                     trailing = "›",
-                    onClick = onOpenDiagnostics,
+                    onClick = onOpenDeveloperTools,
                 )
             }
         }
@@ -1739,6 +1848,10 @@ class MainActivity :
     private fun appVersionName(): String = runCatching {
         packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
     }.getOrDefault("0.0.0")
+
+    private fun appVersionCode(): String = runCatching {
+        packageManager.getPackageInfo(packageName, 0).longVersionCode.toString()
+    }.getOrDefault("0")
 
     private enum class HarnessThemePreference(val label: String) {
         DARK("Dark"),
