@@ -60,11 +60,7 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
     }.getOrDefault(false)
 }
 
-private fun executePlaygroundStart(
-    state: HarnessUiState,
-    model: ImportedPhoneModel,
-    effects: PlaygroundEffects?,
-): PlaygroundStartResult {
+private fun executePlaygroundStart(state: HarnessUiState, model: ImportedPhoneModel, effects: PlaygroundEffects?): PlaygroundStartResult {
     val options = runCatching {
         PlaygroundRequestOptions.parse(
             state.playgroundMaxTokens,
