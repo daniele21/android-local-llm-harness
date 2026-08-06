@@ -5,11 +5,7 @@ package io.github.daniele21.localllm.phonetest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -20,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -34,6 +29,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +73,8 @@ internal fun PrivacyDetailScreen() {
             HarnessCard(emphasized = true) {
                 Text("Local by design", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Prompts, generated output, and GGUF model data remain on this device during normal Harness operation.",
+                    "Prompts, generated output, and GGUF model data remain on this device " +
+                        "during normal Harness operation.",
                 )
                 HarnessStatusBadge("On-device", HarnessStatusTone.SUCCESS)
             }
@@ -85,19 +82,25 @@ internal fun PrivacyDetailScreen() {
         item {
             DetailCard(
                 title = "Telemetry boundary",
-                detail = "Normal telemetry stores technical lifecycle and performance data. Prompt and generated-output content are excluded.",
+                detail =
+                    "Normal telemetry stores technical lifecycle and performance data. " +
+                        "Prompt and generated-output content are excluded.",
             )
         }
         item {
             DetailCard(
                 title = "Model storage",
-                detail = "Imported GGUF artifacts are verified and stored in the application's private content-addressed model store.",
+                detail =
+                    "Imported GGUF artifacts are verified and stored in the application's " +
+                        "private content-addressed model store.",
             )
         }
         item {
             DetailCard(
                 title = "No cloud inference",
-                detail = "The connected Playground executes through the embedded llama.cpp runtime without sending inference content to a cloud model.",
+                detail =
+                    "The connected Playground executes through the embedded llama.cpp runtime " +
+                        "without sending inference content to a cloud model.",
             )
         }
     }
@@ -140,7 +143,9 @@ internal fun StorageDetailScreen(
         item {
             DetailCard(
                 title = "Explicit removal",
-                detail = "Removing a model requires confirmation and is blocked while the runtime still owns the loaded artifact.",
+                detail =
+                    "Removing a model requires confirmation and is blocked while the runtime " +
+                        "still owns the loaded artifact.",
             )
         }
     }
@@ -172,7 +177,8 @@ internal fun BuildDetailScreen(
         item {
             DetailCard(
                 "Execution boundary",
-                "This release uses the in-process HarnessRuntimeGraph. Binder/AIDL sharing is not enabled in this phase.",
+                "This release uses the in-process HarnessRuntimeGraph. " +
+                    "Binder/AIDL sharing is not enabled in this phase.",
             )
         }
     }
@@ -197,7 +203,8 @@ internal fun DeveloperToolsDetailScreen(
             HarnessCard {
                 Text("Physical-device gate", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Run generation, cancellation, and repeated lifecycle checks with a real GGUF on representative arm64 hardware.",
+                    "Run generation, cancellation, and repeated lifecycle checks with a real GGUF " +
+                        "on representative arm64 hardware.",
                 )
                 HarnessSecondaryButton("Open physical validation", onClick = onOpenPhysicalValidation)
             }
@@ -339,4 +346,5 @@ private fun DetailList(content: androidx.compose.foundation.lazy.LazyListScope.(
     )
 }
 
-private fun formatDetailBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
+private fun formatDetailBytes(bytes: Long): String =
+    String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
