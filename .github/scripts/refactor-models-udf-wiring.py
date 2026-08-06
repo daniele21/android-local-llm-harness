@@ -368,6 +368,43 @@ main = replace_region(
     "grouped ModelEffects adapter",
 )
 
+main = replace_once(
+    main,
+    "                    healthDiagnostics()\n",
+    "                    healthDiagnostics(state)\n",
+    "Health state call",
+)
+main = replace_once(
+    main,
+    "                    benchmarkDiagnostics()\n",
+    "                    benchmarkDiagnostics(state)\n",
+    "Benchmark state call",
+)
+main = replace_once(
+    main,
+    "    private fun androidx.compose.foundation.lazy.LazyListScope.healthDiagnostics() {\n",
+    "    private fun androidx.compose.foundation.lazy.LazyListScope.healthDiagnostics(state: HarnessUiState) {\n",
+    "Health state signature",
+)
+main = replace_once(
+    main,
+    "\"Model integrity\" to if (importedModel == null) \"No model\" else \"Not run\",\n",
+    "\"Model integrity\" to if (state.importedModel == null) \"No model\" else \"Not run\",\n",
+    "Health selected model",
+)
+main = replace_once(
+    main,
+    "    private fun androidx.compose.foundation.lazy.LazyListScope.benchmarkDiagnostics() {\n",
+    "    private fun androidx.compose.foundation.lazy.LazyListScope.benchmarkDiagnostics(state: HarnessUiState) {\n",
+    "Benchmark state signature",
+)
+main = replace_once(
+    main,
+    "                    enabled = importedModel != null &&\n",
+    "                    enabled = state.importedModel != null &&\n",
+    "Benchmark selected model",
+)
+
 for stale in (
     "harnessViewModel.attachModelEffects",
     "harnessViewModel.detachModelEffects",
