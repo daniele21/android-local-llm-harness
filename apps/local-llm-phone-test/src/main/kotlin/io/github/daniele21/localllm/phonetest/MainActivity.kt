@@ -722,17 +722,19 @@ class MainActivity :
     @Composable
     private fun PlaygroundScreen(state: HarnessUiState, onOpenModels: () -> Unit) {
         var advancedVisible by rememberSaveable { mutableStateOf(true) }
+        val presentation = state.toPlaygroundPresentation()
         ScreenList(title = null) {
             item { DeviceOnlyStatus("Runs entirely on this device") }
             item { PlaygroundModelState(state.importedModel, onOpenModels) }
             item {
                 PlaygroundPromptCard(
                     state = state,
+                    presentation = presentation,
                     advancedVisible = advancedVisible,
                     onToggleAdvanced = { advancedVisible = !advancedVisible },
                 )
             }
-            item { PlaygroundResponseCard(state.playground) }
+            item { PlaygroundResponseCard(presentation) }
         }
     }
 
@@ -764,7 +766,12 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundPromptCard(state: HarnessUiState, advancedVisible: Boolean, onToggleAdvanced: () -> Unit) {
+    private fun PlaygroundPromptCard(
+        state: HarnessUiState,
+        presentation: PlaygroundPresentation,
+        advancedVisible: Boolean,
+        onToggleAdvanced: () -> Unit,
+    ) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -785,7 +792,7 @@ class MainActivity :
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Prompt") },
                 minLines = 4,
-                enabled = !state.busy,
+                enabled = presentation.inputsEnabled,
             )
             HarnessSecondaryButton(
                 text = if (advancedVisible) "Generation settings  ·  Hide" else "Generation settings  ·  Show",
@@ -793,56 +800,55 @@ class MainActivity :
                 onClick = onToggleAdvanced,
             )
             if (advancedVisible) {
-                PlaygroundGenerationSettings(state)
+                PlaygroundGenerationSettings(state, presentation)
             }
-            PlaygroundRunControls(state)
+            PlaygroundRunControls(presentation)
         }
     }
 
     @Composable
-    private fun PlaygroundGenerationSettings(state: HarnessUiState) {
+    private fun PlaygroundGenerationSettings(state: HarnessUiState, presentation: PlaygroundPresentation) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundMaxTokens,
                 onValueChange = harnessViewModel::updatePlaygroundMaxTokens,
                 modifier = Modifier.weight(1f),
                 label = { Text("Max tokens") },
-                enabled = !state.busy,
+                enabled = presentation.inputsEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundTemperature,
                 onValueChange = harnessViewModel::updatePlaygroundTemperature,
                 modifier = Modifier.weight(1f),
                 label = { Text("Temperature") },
-                enabled = !state.busy,
+                enabled = presentation.inputsEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundSeed,
                 onValueChange = harnessViewModel::updatePlaygroundSeed,
                 modifier = Modifier.weight(1f),
                 label = { Text("Seed") },
-                enabled = !state.busy,
+                enabled = presentation.inputsEnabled,
             )
         }
     }
 
     @Composable
-    private fun PlaygroundRunControls(state: HarnessUiState) {
-        val playground = state.playground
+    private fun PlaygroundRunControls(presentation: PlaygroundPresentation) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HarnessPrimaryButton(
-                text = if (playground.active) "Generating…" else "Run locally",
-                enabled = state.importedModel != null && !state.busy,
+                text = presentation.runLabel,
+                enabled = presentation.runEnabled,
                 modifier = Modifier.weight(1f),
                 onClick = ::startPlayground,
             )
-            if (playground.active || playground.cancellationAvailable) {
+            if (presentation.stopVisible) {
                 HarnessSecondaryButton(
                     text = "Stop",
-                    enabled = playground.cancellationAvailable,
+                    enabled = presentation.stopEnabled,
                     modifier = Modifier.weight(0.62f),
                     onClick = { harnessViewModel.cancelPlayground() },
                 )
@@ -851,7 +857,7 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundResponseCard(playground: PlaygroundState) {
+    private fun PlaygroundResponseCard(presentation: PlaygroundPresentation) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -860,39 +866,32 @@ class MainActivity :
             ) {
                 Text("Response", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    if (playground.active) {
-                        "●  Streaming"
-                    } else {
-                        playground.phase.name.lowercase().replaceFirstChar(Char::uppercase)
-                    },
+                    presentation.statusLabel,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (playground.active) HarnessColors.Secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = when (presentation.statusTone) {
+                        PlaygroundPresentationTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+
+                        PlaygroundPresentationTone.ACTIVE,
+                        PlaygroundPresentationTone.SUCCESS,
+                        -> HarnessColors.Secondary
+
+                        PlaygroundPresentationTone.ERROR -> MaterialTheme.colorScheme.error
+
+                        PlaygroundPresentationTone.WARNING -> HarnessColors.Warning
+                    },
                 )
             }
-            Text(playground.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(presentation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SelectionContainer {
                 Text(
-                    playground.output.ifBlank { "Generated output will appear here." },
+                    presentation.responseText,
                     fontFamily = FontFamily.Monospace,
                 )
             }
-            val metrics = playground.metrics
             HarnessMetricRow {
-                HarnessMetric(
-                    "TTFT",
-                    metrics?.timeToFirstTokenMs?.let { "$it ms" } ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
-                HarnessMetric(
-                    "Total",
-                    metrics?.totalMs?.let { "$it ms" } ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
-                HarnessMetric(
-                    "Decode",
-                    metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(it) } ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
+                HarnessMetric("TTFT", presentation.ttft, Modifier.weight(1f))
+                HarnessMetric("Total", presentation.total, Modifier.weight(1f))
+                HarnessMetric("Decode", presentation.decode, Modifier.weight(1f))
             }
         }
     }
