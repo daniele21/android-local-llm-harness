@@ -766,7 +766,12 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundPromptCard(state: HarnessUiState, presentation: PlaygroundPresentation, advancedVisible: Boolean, onToggleAdvanced: () -> Unit) {
+    private fun PlaygroundPromptCard(
+        state: HarnessUiState,
+        presentation: PlaygroundPresentation,
+        advancedVisible: Boolean,
+        onToggleAdvanced: () -> Unit,
+    ) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -865,10 +870,13 @@ class MainActivity :
                     style = MaterialTheme.typography.labelLarge,
                     color = when (presentation.statusTone) {
                         PlaygroundPresentationTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+
                         PlaygroundPresentationTone.ACTIVE,
                         PlaygroundPresentationTone.SUCCESS,
                         -> HarnessColors.Secondary
+
                         PlaygroundPresentationTone.ERROR -> MaterialTheme.colorScheme.error
+
                         PlaygroundPresentationTone.WARNING -> HarnessColors.Warning
                     },
                 )
