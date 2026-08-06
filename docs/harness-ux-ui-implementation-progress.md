@@ -41,7 +41,7 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |
 | ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation. PR #67 migrates the Playground vertical slice to lifecycle-aware `StateFlow` rendering and a testable effect boundary; Models, Diagnostics, Overview, and Settings remain Activity-owned. |
 | Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists. PR #68 adds state-derived Playground presentation tests, while Compose semantics, golden, accessibility and responsive matrices remain. |
-| CI and Android build validation | VALIDATION | PR #67 is merged into `dev`. PR #68 passed scoped repository, Spotless, Detekt, JVM test, Lint, APK and native-packaging validation in run `31071291383`. |
+| CI and Android build validation | VALIDATION | PR #68 is merged into `dev`. PR #70 passed focused formatting, JVM tests and Kotlin compilation in run `31076390922`; cumulative repository validation remains pending. |
 | Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
 
 ## Implemented connected capabilities
@@ -92,7 +92,7 @@ Model details, complete state restoration, responsive emulator evidence and furt
 
 ### Diagnostics section navigation
 
-The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.
+The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card or correlated log now navigates to a dedicated detail destination; leaving that destination clears the loaded timeline state.
 
 The app uses Navigation Compose for top-level destinations. PR #70 adds a dedicated opaque request-timeline route and moves Settings disclosures into explicit detail destinations. Diagnostics section and loaded timeline data remain Activity-owned, while complete restoration and emulator back-stack evidence remain part of the ViewModel/UDF migration.
 
@@ -131,7 +131,7 @@ Implemented:
 - severity, component, event, request, and safe-field search filters;
 - explicit empty, filtered-empty, populated, and source-error states;
 - request timeline access from run cards and correlated log entries;
-- automatic navigation to the Logs section when a run timeline is opened;
+- dedicated request-timeline navigation from run cards and correlated log entries;
 - deterministic chronological ordering and run-relative offsets;
 - copy of the mapped privacy-safe log representation;
 - allowlisted fields, shortened model digests, and omission of unknown fields;
@@ -142,7 +142,7 @@ Implemented:
 
 The implementation audit corrected previous completion claims:
 
-- Runs is `PARTIAL`, because the canonical plan also requires dedicated detail navigation and complete state tests.
+- Runs remains `PARTIAL`: PR #70 supplies dedicated detail navigation, while complete restoration, state and emulator navigation evidence remain.
 - Resources remains below `DONE`, because charts and physical/accessibility evidence remain despite connected bounded history.
 - Benchmarks remains below `DONE`, because richer visualization, complete state tests and device evidence remain despite connected readiness, selection and retained history.
 - Health is `PARTIAL`, because targeted checks and complete capability states remain.
