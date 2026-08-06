@@ -69,7 +69,24 @@ jobs:
           new_fixture = 'current = ModelEffectsSnapshot(distribution, testModel("8"), metadata.digest.sha256),'
           if effects_test.count(old_fixture) != 1:
               raise RuntimeError(f'Expected one recovery mismatch fixture, found {effects_test.count(old_fixture)}')
-          effects_test_path.write_text(effects_test.replace(old_fixture, new_fixture, 1))
+          effects_test = effects_test.replace(old_fixture, new_fixture, 1)
+          old_request = '''        val request =
+            viewModel.models.recovery.request(
+                identity = metadata.digest.sha256,
+                action = ModelRecoveryAction.ADOPT_LOADED,
+            )
+'''
+          new_request = '''        val loadedIdentity =
+            viewModel.state.value.modelInventory.items.single { it.loaded }.stableId
+          val request =
+            viewModel.models.recovery.request(
+                identity = loadedIdentity,
+                action = ModelRecoveryAction.ADOPT_LOADED,
+            )
+'''
+          if effects_test.count(old_request) != 1:
+              raise RuntimeError(f'Expected one recovery request fixture, found {effects_test.count(old_request)}')
+          effects_test_path.write_text(effects_test.replace(old_request, new_request, 1))
 
           activity_path = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt')
           activity = activity_path.read_text()
