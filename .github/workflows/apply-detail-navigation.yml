@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/apply-detail-navigation.yml
       - scripts/patch_detail_navigation.py
+      - scripts/run_detail_navigation_patch.py
 
 permissions:
   contents: write
@@ -21,7 +22,7 @@ jobs:
           fetch-depth: 1
 
       - name: Apply deterministic MainActivity patch
-        run: python3 scripts/patch_detail_navigation.py
+        run: python3 scripts/run_detail_navigation_patch.py
 
       - uses: actions/setup-java@v5
         with:
@@ -55,7 +56,10 @@ jobs:
             --stacktrace
 
       - name: Remove temporary patch tooling
-        run: rm scripts/patch_detail_navigation.py .github/workflows/apply-detail-navigation.yml
+        run: rm \
+          scripts/patch_detail_navigation.py \
+          scripts/run_detail_navigation_patch.py \
+          .github/workflows/apply-detail-navigation.yml
 
       - name: Commit connected detail navigation
         run: |
