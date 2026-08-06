@@ -71,6 +71,8 @@ jobs:
           ! grep -q "selectedRemovalConfirmationPending" "$activity"
           ! grep -q "selectedModelForDiagnostics" "$activity"
           ! grep -q "harnessViewModel.attachModelEffects" "$activity"
+          ! grep -q "if (importedModel == null)" "$activity"
+          ! grep -q "enabled = importedModel != null" "$activity"
 
       - name: Remove temporary patch infrastructure
         run: |
