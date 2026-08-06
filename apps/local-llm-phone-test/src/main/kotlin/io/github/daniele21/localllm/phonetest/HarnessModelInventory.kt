@@ -103,17 +103,6 @@ internal object HarnessModelInventoryReconciler {
         )
     }
 
-    private fun lifecycle(
-        mismatch: Boolean,
-        loaded: Boolean,
-        selected: Boolean,
-    ): HarnessModelLifecycle = when {
-        mismatch -> HarnessModelLifecycle.DEGRADED
-        loaded -> HarnessModelLifecycle.LOADED
-        selected -> HarnessModelLifecycle.SELECTED
-        else -> error("Catalog lifecycle must be supplied by the model status")
-    }
-
     private fun PhoneCatalogModelUi.lifecycle(
         mismatch: Boolean,
         loaded: Boolean,
