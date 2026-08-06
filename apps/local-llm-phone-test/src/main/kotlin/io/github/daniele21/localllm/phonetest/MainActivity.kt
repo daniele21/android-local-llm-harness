@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
@@ -1850,7 +1851,13 @@ class MainActivity :
     }.getOrDefault("0.0.0")
 
     private fun appVersionCode(): String = runCatching {
-        packageManager.getPackageInfo(packageName, 0).longVersionCode.toString()
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode.toString()
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toString()
+        }
     }.getOrDefault("0")
 
     private enum class HarnessThemePreference(val label: String) {
