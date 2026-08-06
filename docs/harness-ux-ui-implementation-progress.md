@@ -2,9 +2,9 @@
 
 **Canonical plan:** `docs/harness-ux-ui-implementation-plan.md`
 **Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
-**Integrated baseline:** `dev` after merged PR #68
-**Active implementation branch:** `agent/detail-navigation`
-**Active pull request:** PR #70 toward `dev`
+**Integrated baseline:** `dev` after merged PR #70
+**Active implementation branch:** `agent/models-udf-foundation`
+**Active pull request:** PR #71 toward `dev`
 **Last updated:** 2026-08-06
 **Overall status:** In progress
 
@@ -28,7 +28,7 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist. PR #70 adds typed Settings details, a dedicated request timeline route and detail-aware Back behavior; model details, Activity slimming and responsive validation remain. |
 | Overview | PARTIAL | Connected model/runtime and latest Playground metrics exist; resource pressure, recent run, active-operation model, and state tests remain. |
 | Playground | VALIDATION | Real GGUF inference, streaming, cancellation, cleanup, metrics and ViewModel UDF are connected. PR #68 adds a pure presentation contract and exhaustive JVM coverage for all seven phases; Compose semantics, settings-sheet polish, smart scrolling, responsive smoke checks and physical-device evidence remain. |
-| Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected; unified multi-model state, detail routes and degraded-state recovery remain. |
+| Models | PARTIAL | Import, download/install, explicit verify, confirmation and protected removal are connected. PR #71 adds the unified catalog/import/selection/runtime inventory foundation; controller effects, connected rendering, model details and recovery actions remain. |
 | Diagnostics container | VALIDATION | Runtime plus selectable Runs, Health, Resources, Benchmarks, Logs, and Validation sections are connected. Detail routes and complete state/navigation tests remain. |
 | Settings and developer tools | PARTIAL | PR #70 adds separate Privacy, Storage, Build, Developer tools and Physical validation routes with real app/model state; theme persistence, cleanup controls and complete metadata remain. |
 | Shared runtime ownership | DONE | One process-scoped lazy model store, registry, and runtime orchestrator are shared by Playground and physical validation. |
@@ -38,10 +38,10 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Diagnostics Resources | VALIDATION | Explicit capture, bounded newest-first history, memory trend summary, low-memory count, thermal states, and snapshot cards are connected; charts and device/accessibility evidence remain. |
 | Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, regression cards and retained history are connected; richer charts, state tests and device evidence remain. |
 | Diagnostics Logs | VALIDATION | Privacy-safe filters, copy, request correlation, deterministic timelines, and automatic Logs-section opening from run cards are implemented and await final CI/device evidence. |
-| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |
-| ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation. PR #67 migrates the Playground vertical slice to lifecycle-aware `StateFlow` rendering and a testable effect boundary; Models, Diagnostics, Overview, and Settings remain Activity-owned. |
+| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest. PR #71 derives one immutable inventory across catalog releases, external imports, selection and runtime ownership with explicit degraded states; `lastUsedAt`, connected recovery and restart UI tests remain. |
+| ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation; PR #67 connects Playground. PR #71 integrates the unified model inventory into reducer events, while Models effects/rendering plus Diagnostics, Overview and Settings remain Activity-owned. |
 | Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists. PR #68 adds state-derived Playground presentation tests, while Compose semantics, golden, accessibility and responsive matrices remain. |
-| CI and Android build validation | VALIDATION | PR #68 is merged into `dev`. PR #70 passed focused formatting, JVM tests and Kotlin compilation in run `31076390922`; cumulative repository validation remains pending. |
+| CI and Android build validation | VALIDATION | PR #70 is merged into `dev`; cumulative validation `31078225131` and packaging `31078225481` are green. PR #71 passed focused Spotless, Detekt, JVM, Lint and Kotlin compilation in run `31079690251`. |
 | Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
 
 ## Implemented connected capabilities
@@ -75,6 +75,20 @@ PR #66 introduces the first isolated Activity-slimming block:
 PR #67 applies that vertical migration to Playground: Compose collects `StateFlow` lifecycle-aware, prompt, settings, progress, response, and metrics render from `HarnessUiState`, controller callbacks dispatch typed events, and start, cancel, and runtime-release actions cross a testable `PlaygroundEffects` boundary. Android controller resources remain Activity-scoped deliberately so native resources cannot outlive a recreated Activity.
 
 PR #68 extracts a pure `PlaygroundPresentation` contract from `HarnessUiState`. Phase labels and semantic tone, run and stop availability, input enablement, response fallback and metric formatting are no longer recalculated inside the private composables. JVM tests cover `IDLE`, `PREPARING`, `QUEUED`, `GENERATING`, `COMPLETED`, `FAILED` and `CANCELLED`, together with busy state, missing-model behavior, cancellation availability and metric fallbacks. This does not replace Compose semantics, emulator or physical-device validation.
+
+### Unified model inventory foundation
+
+PR #71 introduces a pure product-level projection without changing model operations:
+
+- catalog releases retain stable catalog identity and gain a digest only when installed metadata supplies one;
+- externally imported GGUF models remain valid installed selections outside the administrator catalog;
+- selected and runtime-loaded ownership are represented independently;
+- runtime ownership missing from the inventory and loaded-versus-selected mismatches become explicit degraded states;
+- catalog, selection and loaded-ownership events rebuild one immutable `HarnessModelInventoryState`;
+- catalog refreshes preserve the last known runtime ownership;
+- deterministic tests cover lifecycle mapping, imports, mismatches and reducer convergence.
+
+The controller effect boundary, connected Models rendering, `models/{digest}` and recovery actions remain the next vertical slice.
 
 ### Typed detail navigation
 
@@ -158,35 +172,35 @@ The tracker previously still described the rebased UI/tooling candidate as unpub
 
 ## Immediate next block
 
-### Complete typed detail navigation
+### Establish unified Models UDF state
 
 Status: `IMPLEMENTED / PR VALIDATION`
 
-Completed in PR #70:
+Completed in PR #71:
 
-1. [x] introduce a pure typed route and shell-state contract;
-2. [x] add Privacy, Storage, Build, Developer tools and Physical validation destinations;
-3. [x] move request timelines to a dedicated opaque-argument route;
-4. [x] preserve the previous top-level destination when Settings is opened;
-5. [x] hide top-level navigation chrome on detail destinations;
-6. [x] keep active generation independent from navigation;
-7. [x] add deterministic JVM route and argument coverage;
-8. [x] pass focused formatting, unit-test and Kotlin-compilation validation;
-9. [ ] pass cumulative PR validation and merge into `dev`;
-10. [ ] capture compact and expanded emulator Back/restoration evidence.
+1. [x] define catalog, imported and runtime model origins;
+2. [x] map catalog download and installation states into one lifecycle;
+3. [x] keep catalog stable IDs separate from optional installed digests;
+4. [x] represent selection and loaded runtime ownership independently;
+5. [x] expose deterministic degraded states for missing or mismatched runtime ownership;
+6. [x] rebuild the inventory through typed reducer events;
+7. [x] preserve loaded ownership across catalog refreshes;
+8. [x] add pure reconciliation and reducer tests;
+9. [x] pass focused Spotless, Detekt, JVM, Lint and Kotlin compilation validation;
+10. [ ] pass cumulative PR validation and merge into `dev`.
 
-## Planned sequence after the detail-navigation slice
+## Planned sequence after the inventory foundation
 
-1. migrate Models to ViewModel/UDF and introduce one unified multi-model state;
-2. add `models/{digest}` with compatibility, integrity, loaded ownership and recovery actions;
-3. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;
-4. complete remaining back-stack restoration and remove inline Activity-owned detail state;
-5. add Compose UI, screenshot, accessibility, responsive, performance and physical-device evidence.
+1. introduce `ModelEffects` around import, refresh, download, cancel, install, select, verify and remove;
+2. render Models from `HarnessUiState.modelInventory` and remove duplicate Activity-owned model state;
+3. add `models/{digest}` with compatibility, integrity, loaded ownership and deterministic recovery actions;
+4. migrate Overview, Diagnostics, Settings and developer tools to the same state/effect pattern;
+5. complete restoration, Compose UI, accessibility, responsive and physical-device evidence.
 
 ## Known technical debt
 
 - `MainActivity` still owns multiple screens and mutable state.
-- The ViewModel/reducer foundation is wired only for Playground; Models, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.
+- Playground is fully wired to ViewModel/UDF and PR #71 adds the Models inventory reducer foundation; Models effects/rendering, Overview, Diagnostics, Settings and developer tools still use Activity-owned state.
 - Controllers still use executors and callbacks; Playground now crosses a typed effect boundary, while the remaining controllers have not yet migrated.
 - Navigation Compose covers top-level destinations plus the first Settings and request-timeline details; model detail, restoration and complete back-stack evidence remain.
 - Resource charts and richer benchmark-history visualization remain incomplete.
