@@ -1,8 +1,10 @@
 # Harness Android UX/UI progress
 
 Status: active
-Document type: current-state
+Document type: workstream-state
 Owner: apps/local-llm-phone-test
+Canonical scope: state.phone-ux
+Read when: determining the remaining connected-phone UX/UI migration and evidence work
 Last reviewed: 2026-08-06
 
 Canonical target specification: [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)

@@ -3,6 +3,8 @@
 Status: active
 Document type: roadmap
 Owner: repository
+Canonical scope: roadmap.repository
+Read when: selecting a capability milestone or understanding deferred product direction
 Last reviewed: 2026-08-06
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).

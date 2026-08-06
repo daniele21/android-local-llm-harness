@@ -3,6 +3,8 @@
 Status: active
 Document type: feature-specification
 Owner: apps/local-llm-phone-test
+Canonical scope: phone.architecture
+Read when: changing phone-app state ownership, effects, navigation, lifecycle or composition boundaries
 Last reviewed: 2026-08-06
 
 ## Purpose

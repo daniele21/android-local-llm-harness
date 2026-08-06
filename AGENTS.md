@@ -86,6 +86,8 @@ Use `settings.gradle.kts` as the authoritative module list. Prefer scoped search
 9. Record physical-device evidence as pending when it was not executed and do not claim production readiness.
 10. Inspect the complete diff before push.
 
+For documentation changes, search `Canonical scope` and [`docs/README.md`](docs/README.md) before creating a file. Prefer updating the existing owner. Every new active source needs supported metadata, a unique scope, a bounded `Read when` trigger and an index link. Completed plans and temporary ledgers move to the archive after durable behavior is transferred.
+
 Ordinary work starts from the latest green `dev` and opens a focused pull request back to `dev`. `main` is used only for validated promotions or explicit emergency hotfixes as defined in `BRANCHING.md`.
 
 ## Validation levels
@@ -95,8 +97,9 @@ Choose the narrowest gate that covers the changed module and its direct consumer
 ### Documentation and navigation
 
 ```bash
-python3 scripts/verify-docs.py
+python3 scripts/verify-docs.py --base <target-branch-commit>
 python3 scripts/verify-agent-navigation.py
+python3 scripts/test_verify_docs.py
 python3 -m py_compile scripts/*.py
 git diff --check
 ```
@@ -151,6 +154,8 @@ Physical-device evidence is required before production-readiness, device-perform
 ## Maintaining agent guides
 
 Agent guides contain only durable routing, local hazards, reading order and validation commands.
+
+Documentation reading budgets, lifecycle metadata, canonical-scope uniqueness, reachability and duplicate-content rules are machine-enforced from [`docs/documentation-policy.json`](docs/documentation-policy.json). Do not raise a budget to avoid splitting or consolidating a document; an exception must preserve or reduce the prior reading cost through the policy ratchet.
 
 Do not put these items in an agent guide:
 

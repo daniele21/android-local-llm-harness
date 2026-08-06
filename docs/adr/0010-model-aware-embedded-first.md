@@ -1,4 +1,4 @@
-# ADR 0001: Model-aware runtime with embedded-first deployment
+# ADR 0010: Model-aware runtime with embedded-first deployment
 
 - Status: Accepted
 - Date: 2026-08-01

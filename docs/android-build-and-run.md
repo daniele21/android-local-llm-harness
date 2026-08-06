@@ -1,5 +1,12 @@
 # Android application build and local run
 
+Status: active
+Document type: runbook
+Owner: repository
+Canonical scope: android.build-run
+Read when: building, installing or launching an Android application from this repository
+Last reviewed: 2026-08-06
+
 This guide covers the two common workflows for `apps/local-llm-phone-test`:
 
 1. creating a signed Android App Bundle (`.aab`) for Google Play Console;

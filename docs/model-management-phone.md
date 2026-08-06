@@ -1,5 +1,12 @@
 # Phone model management
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.models.management
+Read when: changing connected-app import, removal, selection or model action controls
+Last reviewed: 2026-08-06
+
 The phone Models surface manages installed GGUF artifacts through the shared `ModelStore`; it does not create a second inventory or expose filesystem paths.
 
 ## Operations

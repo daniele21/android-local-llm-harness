@@ -1,5 +1,12 @@
 # Android upload key runbook
 
+Status: active
+Document type: runbook
+Owner: apps/local-llm-phone-test
+Canonical scope: release.android-upload-key
+Read when: creating, storing, recovering or using the phone-test Google Play upload key
+Last reviewed: 2026-08-06
+
 This runbook covers creation, storage and use of the upload key for the Local LLM Phone Test application:
 
 ```text

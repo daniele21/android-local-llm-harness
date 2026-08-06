@@ -3,6 +3,8 @@
 Status: active
 Document type: current-state
 Owner: repository
+Canonical scope: state.repository
+Read when: determining the integrated baseline, open blockers or next repository work block
 Last reviewed: 2026-08-06
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).

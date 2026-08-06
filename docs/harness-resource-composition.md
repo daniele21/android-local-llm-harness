@@ -1,5 +1,12 @@
 # Harness resource diagnostics composition
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.diagnostics.resources
+Read when: changing connected-app memory, thermal or resource diagnostics
+Last reviewed: 2026-08-06
+
 ## Decision
 
 The connected phone-test application composes the existing `AndroidResourceSnapshotProvider` and `ResourceSnapshotRecorder` directly inside the application boundary.

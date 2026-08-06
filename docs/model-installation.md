@@ -1,5 +1,12 @@
 # Verified model installation
 
+Status: active
+Document type: feature-specification
+Owner: models/model-install
+Canonical scope: models.installation
+Read when: changing verified-handle consumption, GGUF inspection, publication or rollback
+Last reviewed: 2026-08-06
+
 ## Purpose
 
 `models/model-install` converts an already verified remote transfer into an installed content-addressed model without activating application bindings or loading the runtime.

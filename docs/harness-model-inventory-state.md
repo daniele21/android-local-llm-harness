@@ -3,6 +3,8 @@
 Status: active
 Document type: feature-specification
 Owner: apps/local-llm-phone-test
+Canonical scope: phone.models.inventory-state
+Read when: changing unified catalog, installed, selected or runtime model presentation state
 Last reviewed: 2026-08-06
 
 ## Purpose

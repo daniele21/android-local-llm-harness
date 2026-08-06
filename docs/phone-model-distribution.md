@@ -1,5 +1,12 @@
 # Phone model catalog, download and installation
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.models.distribution
+Read when: changing connected-app catalog, download, installation or recovery orchestration
+Last reviewed: 2026-08-06
+
 `apps/local-llm-phone-test` connects the administrator-curated bootstrap catalog to the existing secure download and explicit installation boundaries.
 
 ## User flow

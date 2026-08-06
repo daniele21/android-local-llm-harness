@@ -1,5 +1,12 @@
 # Android brand assets
 
+Status: active
+Document type: asset-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: brand.android-assets
+Read when: changing launcher identity, vector masters, generated Android resources or packaging checks
+Last reviewed: 2026-08-06
+
 The phone-test application uses repository-owned vector assets for its runtime identity.
 
 ## Source of truth
