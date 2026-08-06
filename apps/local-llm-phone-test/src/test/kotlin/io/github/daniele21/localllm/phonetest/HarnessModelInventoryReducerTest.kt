@@ -88,46 +88,43 @@ class HarnessModelInventoryReducerTest {
         assertFalse(reduced.removalConfirmationPending)
     }
 
-    private fun catalogModel(metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi =
-        PhoneCatalogModelUi(
-            stableId = "model@1.0.0",
-            displayName = "Model",
-            description = "Test model",
-            fileName = metadata.fileName,
-            sizeBytes = metadata.sizeBytes,
-            architecture = metadata.architecture,
-            quantization = metadata.quantization,
-            profileKey = metadata.profileKey,
-            licenseName = "Apache-2.0",
-            status = PhoneCatalogModelStatus.INSTALLED,
-            compatible = true,
-            compatibilityReasons = emptyList(),
-            compatibilityWarnings = emptyList(),
-            installedModel = metadata,
-        )
+    private fun catalogModel(metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi = PhoneCatalogModelUi(
+        stableId = "model@1.0.0",
+        displayName = "Model",
+        description = "Test model",
+        fileName = metadata.fileName,
+        sizeBytes = metadata.sizeBytes,
+        architecture = metadata.architecture,
+        quantization = metadata.quantization,
+        profileKey = metadata.profileKey,
+        licenseName = "Apache-2.0",
+        status = PhoneCatalogModelStatus.INSTALLED,
+        compatible = true,
+        compatibilityReasons = emptyList(),
+        compatibilityWarnings = emptyList(),
+        installedModel = metadata,
+    )
 
-    private fun metadata(digest: ModelDigest): InstalledCatalogModelMetadata =
-        InstalledCatalogModelMetadata(
-            digest = digest,
-            modelId = "model",
-            version = "1.0.0",
-            displayName = "Model",
-            profileKey = "profile",
-            applicationId = "play-internal-phone-test",
-            useCaseId = "manual-inference-playground",
-            fileName = "model.gguf",
-            sizeBytes = 1_024L,
-            architecture = "qwen2",
-            quantization = "Q4_K_M",
-            installedAtEpochMs = 1L,
-        )
+    private fun metadata(digest: ModelDigest): InstalledCatalogModelMetadata = InstalledCatalogModelMetadata(
+        digest = digest,
+        modelId = "model",
+        version = "1.0.0",
+        displayName = "Model",
+        profileKey = "profile",
+        applicationId = "play-internal-phone-test",
+        useCaseId = "manual-inference-playground",
+        fileName = "model.gguf",
+        sizeBytes = 1_024L,
+        architecture = "qwen2",
+        quantization = "Q4_K_M",
+        installedAtEpochMs = 1L,
+    )
 
-    private fun importedModel(digest: ModelDigest): ImportedPhoneModel =
-        ImportedPhoneModel(
-            digest = digest,
-            fileName = "external.gguf",
-            sizeBytes = 1_024L,
-            architecture = "qwen2",
-            quantization = "Q4_K_M",
-        )
+    private fun importedModel(digest: ModelDigest): ImportedPhoneModel = ImportedPhoneModel(
+        digest = digest,
+        fileName = "external.gguf",
+        sizeBytes = 1_024L,
+        architecture = "qwen2",
+        quantization = "Q4_K_M",
+    )
 }

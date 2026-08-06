@@ -78,10 +78,7 @@ internal object HarnessModelInventoryReconciler {
         )
     }
 
-    private fun PhoneCatalogModelUi.toInventoryItem(
-        selectedDigest: String?,
-        loadedDigest: String?,
-    ): HarnessModelInventoryItem {
+    private fun PhoneCatalogModelUi.toInventoryItem(selectedDigest: String?, loadedDigest: String?): HarnessModelInventoryItem {
         val installedDigest = installedModel?.digest?.sha256
         val selected = installedDigest != null && installedDigest == selectedDigest
         val loaded = installedDigest != null && installedDigest == loadedDigest
@@ -103,11 +100,7 @@ internal object HarnessModelInventoryReconciler {
         )
     }
 
-    private fun PhoneCatalogModelUi.lifecycle(
-        mismatch: Boolean,
-        loaded: Boolean,
-        selected: Boolean,
-    ): HarnessModelLifecycle = when {
+    private fun PhoneCatalogModelUi.lifecycle(mismatch: Boolean, loaded: Boolean, selected: Boolean): HarnessModelLifecycle = when {
         mismatch -> HarnessModelLifecycle.DEGRADED
         loaded -> HarnessModelLifecycle.LOADED
         selected -> HarnessModelLifecycle.SELECTED
@@ -135,10 +128,7 @@ internal object HarnessModelInventoryReconciler {
         )
     }
 
-    private fun appendUnknownRuntimeOwnership(
-        items: MutableList<HarnessModelInventoryItem>,
-        loadedDigest: String?,
-    ) {
+    private fun appendUnknownRuntimeOwnership(items: MutableList<HarnessModelInventoryItem>, loadedDigest: String?) {
         if (loadedDigest == null || items.represents(loadedDigest)) return
         items += HarnessModelInventoryItem(
             stableId = "runtime::$loadedDigest",
@@ -152,8 +142,7 @@ internal object HarnessModelInventoryReconciler {
         )
     }
 
-    private fun List<HarnessModelInventoryItem>.represents(digest: String?): Boolean =
-        digest != null && any { it.digest == digest }
+    private fun List<HarnessModelInventoryItem>.represents(digest: String?): Boolean = digest != null && any { it.digest == digest }
 
     private fun PhoneCatalogModelStatus.toLifecycle(): HarnessModelLifecycle = when (this) {
         PhoneCatalogModelStatus.INCOMPATIBLE -> HarnessModelLifecycle.INCOMPATIBLE

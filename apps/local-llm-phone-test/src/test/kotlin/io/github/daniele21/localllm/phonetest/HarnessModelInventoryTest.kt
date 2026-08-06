@@ -144,15 +144,14 @@ class HarnessModelInventoryTest {
         assertEquals(HarnessModelLifecycle.FAILED, state.items[2].lifecycle)
     }
 
-    private fun distribution(vararg models: PhoneCatalogModelUi): PhoneModelDistributionState =
-        PhoneModelDistributionState(
-            catalogStatus = PhoneCatalogLoadStatus.READY,
-            models = models.toList(),
-            operationActive = models.any {
-                it.status == PhoneCatalogModelStatus.DOWNLOADING ||
-                    it.status == PhoneCatalogModelStatus.INSTALLING
-            },
-        )
+    private fun distribution(vararg models: PhoneCatalogModelUi): PhoneModelDistributionState = PhoneModelDistributionState(
+        catalogStatus = PhoneCatalogLoadStatus.READY,
+        models = models.toList(),
+        operationActive = models.any {
+            it.status == PhoneCatalogModelStatus.DOWNLOADING ||
+                it.status == PhoneCatalogModelStatus.INSTALLING
+        },
+    )
 
     private fun catalogModel(
         stableId: String,
@@ -176,30 +175,28 @@ class HarnessModelInventoryTest {
         installedModel = installed,
     )
 
-    private fun installedMetadata(stableId: String, digest: ModelDigest): InstalledCatalogModelMetadata =
-        InstalledCatalogModelMetadata(
-            digest = digest,
-            modelId = stableId,
-            version = "1.0.0",
-            displayName = stableId,
-            profileKey = "profile-$stableId",
-            applicationId = "play-internal-phone-test",
-            useCaseId = "manual-inference-playground",
-            fileName = "$stableId.gguf",
-            sizeBytes = 1_024L,
-            architecture = "qwen2",
-            quantization = "Q4_K_M",
-            installedAtEpochMs = 1L,
-        )
+    private fun installedMetadata(stableId: String, digest: ModelDigest): InstalledCatalogModelMetadata = InstalledCatalogModelMetadata(
+        digest = digest,
+        modelId = stableId,
+        version = "1.0.0",
+        displayName = stableId,
+        profileKey = "profile-$stableId",
+        applicationId = "play-internal-phone-test",
+        useCaseId = "manual-inference-playground",
+        fileName = "$stableId.gguf",
+        sizeBytes = 1_024L,
+        architecture = "qwen2",
+        quantization = "Q4_K_M",
+        installedAtEpochMs = 1L,
+    )
 
-    private fun importedModel(digest: ModelDigest, fileName: String): ImportedPhoneModel =
-        ImportedPhoneModel(
-            digest = digest,
-            fileName = fileName,
-            sizeBytes = 1_024L,
-            architecture = "qwen2",
-            quantization = "Q4_K_M",
-        )
+    private fun importedModel(digest: ModelDigest, fileName: String): ImportedPhoneModel = ImportedPhoneModel(
+        digest = digest,
+        fileName = fileName,
+        sizeBytes = 1_024L,
+        architecture = "qwen2",
+        quantization = "Q4_K_M",
+    )
 
     private fun digest(character: Char): ModelDigest = ModelDigest(character.toString().repeat(64))
 }
