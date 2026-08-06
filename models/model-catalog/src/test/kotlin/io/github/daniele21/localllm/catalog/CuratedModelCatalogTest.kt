@@ -24,7 +24,7 @@ class CuratedModelCatalogTest {
     }
 
     @Test
-    fun exposesFifteenCandidateReleasesForThePhonePlayground() {
+    fun exposesEighteenCandidateReleasesForThePhonePlayground() {
         val target =
             CatalogTarget(
                 applicationId = ApplicationId("play-internal-phone-test"),
@@ -87,7 +87,7 @@ class CuratedModelCatalogTest {
     private companion object {
         const val GENERATED_AT = 1_800_000_000_000
         const val EXPIRES_AT = 1_800_086_400_000
-        const val EXPECTED_CANONICAL_SHA256 = "e67acbd5c5a25bfd253fde791e28d46096c5699b8152070fa04565eb8c27800a"
+        const val EXPECTED_CANONICAL_SHA256 = "34cc269ec1bf57555c675bfe98380469b86008bb0d4d6969ef3951af4c53a7b7"
         val EXPECTED_MODEL_IDS =
             setOf(
                 "lfm2.5-1.2b-instruct-q4-k-m",
@@ -101,10 +101,13 @@ class CuratedModelCatalogTest {
                 "qwen35-08b-q4-k-m",
                 "qwen35-08b-q5-k-m",
                 "qwen35-08b-q8-0",
+                "qwen35-08b-ud-iq2-xxs",
                 "qwen35-2b-q4-k-m",
                 "qwen35-2b-q5-k-m",
+                "qwen35-2b-ud-iq2-xxs",
                 "qwen35-4b-q4-k-m",
                 "qwen35-4b-q5-k-m",
+                "qwen35-4b-ud-iq2-xxs",
             )
     }
 }

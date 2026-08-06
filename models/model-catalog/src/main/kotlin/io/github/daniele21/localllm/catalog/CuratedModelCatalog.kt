@@ -3,7 +3,7 @@ package io.github.daniele21.localllm.catalog
 /** Administrator-curated bootstrap releases for the phone-test catalog. */
 object CuratedModelCatalog {
     val catalogId = CatalogId("android-local-llm-curated")
-    const val REVISION: Long = 2
+    const val REVISION: Long = 3
 
     val releases: List<CatalogModelRelease> =
         OtherCuratedModelReleases.releases +

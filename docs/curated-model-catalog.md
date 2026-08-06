@@ -19,10 +19,13 @@ This bootstrap is metadata only. It does not bundle or download model bytes, and
 | `qwen35-08b-q4-k-m` | `Qwen3.5-0.8B-Q4_K_M.gguf` | `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517` | 532,517,120 | `qwen35` | 3,000,000,000 | 4,000,000,000 | `qwen35-08b-q4-k-m-ctx4096` |
 | `qwen35-08b-q5-k-m` | `Qwen3.5-0.8B-Q5_K_M.gguf` | `c3ef5827b322c4be08a3a26ce424460d8b37daf593356c2cc1f4e40a7ab0581b` | 590,057,728 | `qwen35` | 3,000,000,000 | 4,000,000,000 | `qwen35-08b-q5-k-m-ctx4096` |
 | `qwen35-08b-q8-0` | `Qwen3.5-0.8B-Q8_0.gguf` | `0ad885ffd4bb022fc4f0d33a3308fa108ef8613159d3b3a67e23abca056b7a6c` | 811,843,840 | `qwen35` | 4,000,000,000 | 6,000,000,000 | `qwen35-08b-q8-0-ctx4096` |
+| `qwen35-08b-ud-iq2-xxs` | `Qwen3.5-0.8B-UD-IQ2_XXS.gguf` | `a369165c8ec45a92d55cbad98b5377e2c32ca8dfc824c899d9d05b33b6b53e54` | 338,227,456 | `qwen35` | 3,000,000,000 | 4,000,000,000 | `qwen35-08b-ud-iq2-xxs-ctx2048` |
 | `qwen35-2b-q4-k-m` | `Qwen3.5-2B-Q4_K_M.gguf` | `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223` | 1,280,835,840 | `qwen35` | 6,000,000,000 | 8,000,000,000 | `qwen35-2b-q4-k-m-ctx4096` |
 | `qwen35-2b-q5-k-m` | `Qwen3.5-2B-Q5_K_M.gguf` | `1885b3a9195f8cc09da9a7a7a75afdc1e8d5cbf9fc4a499c3961dddea37098ac` | 1,435,238,656 | `qwen35` | 6,000,000,000 | 8,000,000,000 | `qwen35-2b-q5-k-m-ctx4096` |
+| `qwen35-2b-ud-iq2-xxs` | `Qwen3.5-2B-UD-IQ2_XXS.gguf` | `43aedbd2b03a3c2cc39f49ccf74fcd3c394ed0b2a1ede8a30ee652ee9cfc27ef` | 768,270,592 | `qwen35` | 4,000,000,000 | 6,000,000,000 | `qwen35-2b-ud-iq2-xxs-ctx2048` |
 | `qwen35-4b-q4-k-m` | `Qwen3.5-4B-Q4_K_M.gguf` | `00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4` | 2,740,937,888 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-k-m-ctx4096` |
 | `qwen35-4b-q5-k-m` | `Qwen3.5-4B-Q5_K_M.gguf` | `8814232b85594dcd46c50e5b8b29324a7efe9e746edbe8a3d1df3d3fce7aad39` | 3,143,656,608 | `qwen35` | 12,000,000,000 | 16,000,000,000 | `qwen35-4b-q5-k-m-ctx4096` |
+| `qwen35-4b-ud-iq2-xxs` | `Qwen3.5-4B-UD-IQ2_XXS.gguf` | `4c1ba794e8d6098f4fb6482b4db6e880c80b5ee0b4c64d8668afaf9541163677` | 1,520,217,248 | `qwen35` | 6,000,000,000 | 8,000,000,000 | `qwen35-4b-ud-iq2-xxs-ctx2048` |
 
 All releases require Android API 26 or later, `arm64-v8a`, and the `llama.cpp` backend.
 

@@ -174,9 +174,9 @@ See [`docs/current-state.md`](docs/current-state.md) for the active integration 
 
 ## Coding-agent navigation
 
-Coding agents must start from [`AGENTS.md`](AGENTS.md). It maps modules to responsibilities, defines architectural invariants, routes common change types and lists required validation commands.
+Coding agents start from [`AGENTS.md`](AGENTS.md). It defines repository-wide invariants, routes common changes to their owning modules and indexes the scoped guides for model management, the native backend, observability and the connected phone app. A scoped guide supplements the root only when its subtree has distinct ownership, hazards or validation.
 
-The repository validates that configured Gradle modules remain discoverable from `AGENTS.md` and that local links in agent guides resolve correctly:
+Agent guides are maintained with the code boundaries they describe: global routing stays in the root, local commands and hazards stay in the closest scoped guide, and changing implementation status stays in `docs/current-state.md` and `docs/roadmap.md`. The repository validates that configured Gradle modules remain discoverable and that local links in all agent guides resolve correctly:
 
 ```bash
 python3 scripts/verify-agent-navigation.py
