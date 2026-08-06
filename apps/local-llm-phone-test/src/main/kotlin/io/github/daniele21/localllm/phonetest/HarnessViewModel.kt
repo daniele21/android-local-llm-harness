@@ -43,8 +43,23 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun startPlayground(): PlaygroundStartResult {
         val state = uiState.value
-        val model = state.importedModel ?: return PlaygroundStartResult.MODEL_REQUIRED
-        if (state.busy) return PlaygroundStartResult.BUSY
+        val model = state.importedModel
+        return when {
+            model == null -> PlaygroundStartResult.MODEL_REQUIRED
+            state.busy -> PlaygroundStartResult.BUSY
+            else -> startPlayground(state, model)
+        }
+    }
+
+    fun cancelPlayground(): Boolean = runCatching {
+        playgroundEffects?.cancel() ?: false
+    }.getOrDefault(false)
+
+    fun releasePlaygroundRuntime(onComplete: () -> Unit): Boolean = runCatching {
+        playgroundEffects?.releaseRuntime(onComplete) ?: false
+    }.getOrDefault(false)
+
+    private fun startPlayground(state: HarnessUiState, model: ImportedPhoneModel): PlaygroundStartResult {
         val options = runCatching {
             PlaygroundRequestOptions.parse(
                 state.playgroundMaxTokens,
@@ -58,12 +73,4 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
         }.getOrDefault(false)
         return if (started) PlaygroundStartResult.STARTED else PlaygroundStartResult.REJECTED
     }
-
-    fun cancelPlayground(): Boolean = runCatching {
-        playgroundEffects?.cancel() ?: false
-    }.getOrDefault(false)
-
-    fun releasePlaygroundRuntime(onComplete: () -> Unit): Boolean = runCatching {
-        playgroundEffects?.releaseRuntime(onComplete) ?: false
-    }.getOrDefault(false)
 }
