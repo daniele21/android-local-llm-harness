@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+// Activity-scoped Android effects consumed through ViewModel-owned Playground intents.
 internal interface PlaygroundEffects : AutoCloseable {
     fun snapshot(): PlaygroundState
 
