@@ -1,124 +1,168 @@
-# Harness unified model inventory state
+# Harness unified model inventory
 
-This document defines the connected Models ViewModel/UDF boundary for the phone application.
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Last reviewed: 2026-08-06
 
 ## Purpose
 
-The phone application exposes several valid but separate views of model state:
+The connected Models surface reconciles several valid but independent views of model state:
 
 ```text
-administrator catalog release state
+curated catalog releases
 installed catalog metadata
-external GGUF selection
-runtime-loaded model ownership
+external GGUF imports
+application selection
+runtime-loaded ownership
 ```
 
-Treating one of those views as the complete inventory would hide real product states. The unified inventory is therefore a derived, immutable projection rather than another persistence layer.
+The inventory is a derived immutable projection. It is not another persistence layer and it must not infer identity from filenames or display labels.
 
 ## Identity
 
-Catalog entries retain their stable catalog release identifier. A digest is attached only when the current state actually provides one, such as installed catalog metadata or an imported GGUF.
+Catalog items retain a stable release identity. A SHA-256 digest is attached only when a real installed or runtime state provides it.
 
-The projection does not infer a digest from a display name, filename, model ID, or version. It also does not persist download URLs, signed URLs, or filesystem paths.
+External imports use their verified digest as physical identity. The projection never infers a digest from:
+
+- display name;
+- filename;
+- logical model ID;
+- version string;
+- architecture or quantization.
+
+Download URLs, signed URLs, document URIs and filesystem paths never enter the inventory state.
 
 ## Origins
 
-Each item has one explicit origin:
+Each item has one origin:
 
-- `CATALOG`: an administrator-curated release;
-- `IMPORTED`: an external GGUF selected through the existing import flow;
-- `RUNTIME`: a model owned by the runtime but absent from the current catalog/import inventory.
+- `CATALOG`: administrator-curated release;
+- `IMPORTED`: external GGUF installed through the local import flow;
+- `RUNTIME`: loaded ownership that cannot be reconciled with current catalog or imported items.
 
-An external imported model is a valid installed and selected item. It is not marked degraded merely because it is absent from the administrator catalog.
+An imported GGUF is a valid installed and selectable item even when it is absent from the curated catalog.
 
-## Lifecycle precedence
+## Lifecycle
 
-Catalog download and installation states are mapped directly into the unified lifecycle. Runtime and selection ownership then apply this precedence:
+Catalog distribution state maps into product lifecycle first. Selection and runtime ownership then apply explicit precedence:
 
 ```text
-runtime mismatch -> DEGRADED
-loaded            -> LOADED
-selected          -> SELECTED
-catalog state     -> mapped lifecycle
+ownership mismatch -> DEGRADED
+loaded             -> LOADED
+selected           -> SELECTED
+catalog/import     -> mapped installation lifecycle
 ```
 
-This keeps a selected-but-not-loaded model distinct from the model currently owned by the runtime.
+The product must preserve these distinctions:
+
+- downloaded but not installed;
+- installed but not selected;
+- selected but not loaded;
+- loaded and selected;
+- loaded but inconsistent with selection;
+- installed but incompatible or unavailable;
+- failed integrity verification.
+
+Installation does not select or load a model. Selection does not imply RAM residency. Runtime release does not delete the installed artifact.
 
 ## Degraded states
 
-The inventory records two deterministic degradation reasons:
+The projection uses deterministic product reasons rather than arbitrary backend messages.
 
-- `LOADED_MODEL_NOT_IN_INVENTORY`: the runtime owns a digest that is absent from both catalog-installed and imported items;
+- `LOADED_MODEL_NOT_IN_INVENTORY`: the runtime owns a digest absent from catalog-installed and imported items.
 - `LOADED_MODEL_DIFFERS_FROM_SELECTION`: the runtime owns one known model while another known model is selected.
 
-These are product-state inconsistencies, not backend exception messages. No private path or prompt/output content is included.
+Additional unavailable, incompatible, orphaned or verification-failed states must remain explicit and recoverable. No automatic destructive cleanup occurs during projection or bootstrap reconciliation.
 
-## UDF state integration
+## State integration
 
-`HarnessUiState.modelInventory` is rebuilt by the reducer whenever one of these typed events arrives:
+`HarnessUiState.modelInventory` is rebuilt when catalog, installed metadata, selection or loaded ownership changes.
 
-- `ModelDistributionChanged`;
-- `ModelChanged`;
-- `LoadedModelChanged`.
+The reducer remains pure:
 
-Catalog refreshes preserve the last known loaded digest. Selection changes preserve runtime ownership and clear stale removal confirmation. The projection remains pure and has no Android, filesystem, network, or runtime side effects.
+- catalog refresh preserves the last known runtime ownership;
+- selection changes preserve loaded ownership;
+- stale removal confirmation is cleared when identity changes;
+- aggregate installed count, installed bytes and degraded count derive from the immutable projection;
+- no Android, filesystem, network or runtime side effect occurs during reconciliation.
 
-Inventory items also expose only the metadata needed by connected presentation: size, architecture and quantization. Aggregate installed count and bytes, active selection and degraded count are derived from the immutable inventory.
+## Effects boundary
 
-## Connected effects boundary
+`ModelEffects` is the Activity-scoped boundary for:
 
-`ModelEffects` is the Activity-scoped boundary around Android and controller operations. It exposes:
-
-- one initial snapshot containing catalog distribution, selected model and runtime-loaded digest;
-- import-document launch;
-- grouped typed catalog commands;
+- initial catalog/selection/runtime snapshot;
+- import document launch;
+- catalog refresh, download, cancellation and installation commands;
 - installed-model selection;
-- selected-model verification;
-- selected-model removal.
+- integrity verification;
+- confirmed removal;
+- runtime release or adoption recovery.
 
-Catalog mutations use `ModelCatalogCommand` rather than a wide effect interface. `HarnessModelActions` is owned by `HarnessViewModel` and applies busy guards, confirmation transitions and safe effect invocation before returning a synchronous acceptance result to the UI.
+`HarnessModelActions` is ViewModel-owned and applies busy guards, confirmation and deterministic state transitions before invoking effects.
 
-The Activity deliberately retains ownership of document launchers, controllers, executors and the process-scoped native runtime graph. Attaching the boundary does not transfer those Android resources into the ViewModel. Detaching it prevents a recreated Activity from leaving stale effects connected.
+Android launchers, executors, controllers and native runtime resources remain Activity-scoped. Attaching effects must not load a model. Detaching effects prevents a recreated Activity from retaining stale callbacks.
 
-## Connected rendering and ownership sync
+## Connected rendering
 
-The Models destination renders from `HarnessUiState.modelInventory` and `HarnessUiState.modelDistribution`. Import, refresh, download, cancellation, installation, selection, verification and removal enter through `HarnessViewModel.models`.
+Models, Overview, Health, Benchmarks, Validation, Settings and Storage consume the same selected-model and inventory state. The Activity must not maintain parallel copies for individual screens.
 
-The Activity no longer mirrors:
+The Models surface supports explicit:
 
-- selected/imported model;
-- catalog distribution state;
-- selected-model removal confirmation;
-- the selected model used by diagnostics.
+- import;
+- catalog refresh;
+- download and cancellation;
+- installation;
+- selection;
+- verification;
+- detail navigation;
+- runtime ownership recovery;
+- confirmed storage removal.
 
-Overview, Health, Benchmarks, Validation, Settings and Storage read the same selected-model state. Runtime ownership is republished after Playground state changes, validation reports and runtime release, preserving the distinction between selected and loaded models.
+Opening details is observational. It does not download, install, select, load, verify, release or remove a model.
 
-Selecting or removing a model still waits for Playground runtime release. This keeps existing native ownership and cleanup behavior unchanged while removing duplicate presentation state.
+## Recovery
 
-## Validation boundary
+Known loaded-versus-selected mismatch may be resolved by explicitly adopting the compatible loaded catalog model as the application selection.
 
-The inventory foundation is covered by pure reconciliation and reducer convergence tests. The connected effect slice adds fake-effects coverage for:
+Unknown or mismatched runtime ownership may be released only after confirmation and only when the runtime reports that unload is safe. Release:
 
-- initial snapshot publication;
-- grouped catalog command delegation;
-- busy-state rejection;
-- installed selection and selected verification;
-- selected-removal confirmation and completion;
-- effect detachment.
+- does not delete the GGUF;
+- does not remove installed metadata;
+- does not infer a new selection;
+- refreshes ownership from `RuntimeSnapshot.loadedModel` after completion.
 
-Focused Actions run `31082897050` passed Spotless, Detekt, phone-test JVM tests, Android Lint, Kotlin compilation and an explicit guard confirming that the four Activity-owned model-state mirrors were removed.
+A successful unload must converge the inventory by clearing loaded ownership rather than retaining a configured-but-not-loaded identity.
 
-This evidence validates the connected Kotlin/Compose contract. It does not constitute emulator, physical-device, download-server, real-GGUF or inference evidence.
+## Persistence and restart
 
-## Current boundary
+Installed catalog metadata and imported model metadata are durable and path-free. The product projection must be rebuilt after restart from:
 
-PR #74 implements the model-detail and deterministic-recovery slice:
+- current catalog releases;
+- persisted installed metadata;
+- `ModelStore` snapshot;
+- persisted application selection;
+- current runtime snapshot.
 
-1. URL-safe model-detail routes use the digest when available and stable catalog identity otherwise;
-2. one pure presentation contract reports compatibility, integrity, installation, selection and loaded ownership;
-3. loaded-versus-selected mismatch can adopt the compatible loaded catalog model explicitly;
-4. unknown or mismatched runtime ownership can be released only after confirmation and never deletes a model file;
-5. loaded ownership comes from `RuntimeSnapshot.loadedModel`, not the graph's configured model identity, so successful unload converges the inventory;
-6. route, presentation, reducer and effects behavior has deterministic JVM coverage.
+Reconciliation must preserve valid external imports, expose missing artifacts or stale metadata and avoid automatic destructive deletion.
 
-Connected UI/restoration execution and representative physical-device evidence remain validation gates. They are not inferred from JVM tests, Android assembly or emulator preflight.
+## Testing
+
+Deterministic coverage includes:
+
+- catalog and import mapping;
+- identity separation and digest attachment;
+- selection and loaded lifecycle precedence;
+- loaded-model absence and loaded-versus-selected mismatch;
+- catalog refresh preserving runtime ownership;
+- reducer convergence from events in different orders;
+- initial effects snapshot and effect detachment;
+- busy command rejection;
+- download/install/select/verify/remove delegation;
+- removal confirmation and active-model protection;
+- model-detail route identity and presentation;
+- explicit adoption and runtime-release recovery;
+- successful unload clearing runtime ownership;
+- restart reconciliation, missing artifact and corrupted metadata behavior.
+
+Connected download, installation, restart and recovery flows require representative physical-device evidence before release readiness.

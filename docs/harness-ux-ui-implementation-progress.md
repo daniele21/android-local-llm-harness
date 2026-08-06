@@ -1,232 +1,61 @@
-# Harness Android UX/UI implementation progress
+# Harness Android UX/UI progress
 
-**Canonical plan:** `docs/harness-ux-ui-implementation-plan.md`
-**Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
-**Integrated baseline:** `dev` after merged PR #71
-**Active implementation branch:** `agent/models-udf-wiring`
-**Active pull request:** PR #72 toward `dev`
-**Last updated:** 2026-08-06
-**Overall status:** In progress
+Status: active
+Document type: current-state
+Owner: apps/local-llm-phone-test
+Last reviewed: 2026-08-06
 
-This document is the living progress tracker for the Harness Android UX/UI implementation plan.
+Canonical target specification: [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
+
+This tracker records concise workstream status only. Detailed repository state and the immediate implementation block belong in [`current-state.md`](current-state.md).
 
 ## Status legend
 
-- `DONE`: implementation and block-level acceptance criteria are committed on the active branch.
-- `PARTIAL`: meaningful implementation exists, but canonical acceptance criteria are not fully satisfied.
-- `NEXT`: immediate implementation target.
-- `PENDING`: not started.
-- `VALIDATION`: implementation exists but awaits build, CI, emulator, or physical-device evidence.
+- `DONE`: implementation and automated acceptance criteria are integrated.
+- `PARTIAL`: meaningful connected behavior exists, but implementation or automated coverage remains.
+- `DEVICE`: implementation is integrated; representative physical-device evidence remains.
+- `PENDING`: implementation has not started.
 
-## Current summary
+## Workstreams
 
-| Workstream | Status | Notes |
-| --- | --- | --- |
-| Compose platform foundation | PARTIAL | Compose stack is integrated and validated; the explicit connected-app/UI architecture ADR remains. |
-| Shared design system | DONE | PR #61 provides split tokens, dark/light/system themes, shared components, previews, WCAG checks and 48 dp touch-target enforcement. |
-| Harness launcher identity | DONE | PR #60 provides repository-owned vector, adaptive, monochrome and fallback launcher assets with packaging verification. |
-| Responsive application shell | PARTIAL | Top-level Navigation Compose, compact bottom navigation and expanded rail exist. PR #70 adds typed Settings details and request timelines; PR #74 adds URL-safe model details. Activity slimming, restoration and responsive validation remain. |
-| Overview | PARTIAL | Connected model/runtime and latest Playground metrics exist; resource pressure, recent run, active-operation model, and state tests remain. |
-| Playground | VALIDATION | Real GGUF inference, streaming, cancellation, cleanup, metrics and ViewModel UDF are connected. PR #68 adds a pure presentation contract and exhaustive JVM coverage for all seven phases; Compose semantics, settings-sheet polish, smart scrolling, responsive smoke checks and physical-device evidence remain. |
-| Models | VALIDATION | Import, download/install, explicit verify, confirmation and protected removal are connected. PR #74 adds model details plus deterministic adopt-selection and confirmed runtime-release recovery; connected UI and physical-device evidence remain. |
-| Diagnostics container | VALIDATION | Runtime plus selectable Runs, Health, Resources, Benchmarks, Logs, and Validation sections are connected. Detail routes and complete state/navigation tests remain. |
-| Settings and developer tools | PARTIAL | PR #70 adds separate Privacy, Storage, Build, Developer tools and Physical validation routes with real app/model state; theme persistence, cleanup controls and complete metadata remain. |
-| Shared runtime ownership | DONE | One process-scoped lazy model store, registry, and runtime orchestrator are shared by Playground and physical validation. |
-| Telemetry repository injection | DONE | One bounded process-scoped in-memory repository is injected into the runtime. |
-| Diagnostics Health | PARTIAL | Explicit non-destructive checks and worst-status aggregation exist; targeted actions and complete capability states remain. |
-| Diagnostics Runs | PARTIAL | Real privacy-safe run cards exist and PR #70 moves correlated evidence to a dedicated request timeline route; complete navigation, restoration and emulator evidence remain. |
-| Diagnostics Resources | VALIDATION | Explicit capture, bounded newest-first history, memory trend summary, low-memory count, thermal states, and snapshot cards are connected; charts and device/accessibility evidence remain. |
-| Diagnostics Benchmarks | VALIDATION | Cold/warm baselines, per-key readiness, selective capture, regression cards and retained history are connected; richer charts, state tests and device evidence remain. |
-| Diagnostics Logs | VALIDATION | Privacy-safe filters, copy, request correlation, deterministic timelines, and automatic Logs-section opening from run cards are implemented and await final CI/device evidence. |
-| Durable multi-model catalog | PARTIAL | Metadata is persisted per digest and the unified inventory is connected to controller snapshots, model details and runtime recovery. `lastUsedAt`, restart UI tests and physical evidence remain. |
-| ViewModel and UDF migration | PARTIAL | Playground and Models now render from `HarnessUiState` and cross typed effect boundaries. Diagnostics, Overview and Settings still retain Activity-owned state and effects. |
-| Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists. PR #68 adds state-derived Playground presentation tests, while Compose semantics, golden, accessibility and responsive matrices remain. |
-| CI and Android build validation | VALIDATION | PRs #71–#73 are merged into `dev` after repository validation. PR #74 has passed focused Spotless, Detekt, JVM, Lint and debug assembly locally; cumulative PR validation remains. |
-| Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
+| Workstream | Status | Integrated boundary | Remaining gate |
+| --- | --- | --- | --- |
+| Launcher identity and shared design system | DONE | Reproducible launcher assets, light/dark/system tokens, shared components, contrast and touch-target checks | Screenshot regression expansion |
+| Responsive application shell | PARTIAL | Navigation Compose, compact bottom navigation, expanded rail and detail-aware top bars | Restoration, process recreation and responsive evidence |
+| Overview | PARTIAL | Real selected model, runtime and latest Playground state | Move remaining state/effects from Activity; resource/recent-run states |
+| Playground | DEVICE | Real inference, streaming, cancellation, cleanup, ViewModel/UDF and effective configuration | Compose semantics polish, responsive/accessibility and physical GGUF evidence |
+| Models | DEVICE | Unified inventory, typed effects, download/install/import/select/verify/remove, details and deterministic recovery | Restart/reconciliation UI coverage, RAM actions and physical evidence |
+| Diagnostics container | PARTIAL | Runs, Health, Resources, Benchmarks, Logs and Validation sections with real sources | Move state/actions behind ViewModel/effects and complete state matrix |
+| Settings and developer tools | PARTIAL | Privacy, Storage, Build, Developer tools and Physical validation details | ViewModel/effect migration, theme persistence and cleanup controls |
+| Request timeline and detail navigation | PARTIAL | Typed Settings, request-timeline and model-detail routes with opaque arguments | Back-stack restoration, process recreation and emulator matrix |
+| Durable multi-model state | PARTIAL | Catalog/import/selection/runtime projection and explicit degraded states | `lastUsedAt`, restart tests and physical reconciliation evidence |
+| RAM residency controls | PENDING | Runtime supports opaque load/unload and safe idle release | Product load/unload actions and monotonic warm-idle TTL |
+| Compose state and screenshot tests | PARTIAL | Initial shell/destination instrumentation and pure presentation coverage | Full semantics, golden, large-font, landscape and expanded matrix |
+| Accessibility | PARTIAL | Design-system contrast and 48 dp foundations | TalkBack, focus order and complete connected-state evidence |
+| Physical-device validation | DEVICE | Production contracts and Play/ADB validation paths exist | Representative download/install/inference/cancellation/memory evidence |
 
-## Implemented connected capabilities
+## Current architecture debt
 
-### UX foundation and shared runtime
+- `MainActivity` still owns Overview, Diagnostics and Settings renderable state or effects.
+- Diagnostics controllers still rely on callbacks and executors without a typed ViewModel/effect boundary.
+- Navigation restoration and process recreation are not fully demonstrated.
+- Resource and benchmark presentation can be richer, but only where source data supports it.
+- RAM residency remains implicit through prepare/release rather than explicit product controls.
+- Complete accessibility, screenshot and representative physical-device evidence remains open.
 
-The `dev` branch contains the Compose stack, shared design-system module, Harness identity, responsive shell, and connected Overview, Playground, Models, Diagnostics, and Settings destinations.
+## Next UX block
 
-`HarnessRuntimeGraph` owns one app-private `FileSystemModelStore`, selected-model registry, current `RuntimeOrchestrator`, and bounded `InMemoryTelemetryRepository`. Constructing the graph does not load a model. Playground and physical validation resolve the same graph.
+Migrate Diagnostics state and user intents behind immutable ViewModel state and an Activity-scoped effect implementation. Preserve explicit execution semantics: refresh and navigation remain observational, while health, resource, benchmark and validation work starts only from a user action.
 
-### Playground and model lifecycle
+Acceptance for that block:
 
-Real model import, SHA-256 verification, streaming local inference, cooperative cancellation, terminal cleanup, runtime release, model removal, and physical validation remain connected.
+- section, loading, result and error state is reducer-owned;
+- callbacks dispatch typed events rather than mutating Compose state;
+- executors and repository/native resources remain effect-owned and Activity-scoped;
+- leaving a detail route clears or restores bounded state deterministically;
+- JVM coverage includes concurrent actions, failure, stale callback and detach behavior;
+- focused phone-test Spotless, tests, Lint and Kotlin compilation pass.
 
-The audit corrected Playground prompt and generation-option state so recomposition no longer resets values. The values remain process-memory-only and are not written to saved instance state or telemetry.
+## Release boundary
 
-### ViewModel and UDF foundation
-
-PR #66 introduces the first isolated Activity-slimming block:
-
-- one immutable `HarnessUiState` for model, Playground, diagnostics, benchmark, logs, navigation, theme and operation state;
-- typed `HarnessUiEvent` transitions;
-- a pure `HarnessUiReducer` with no Android or runtime effects;
-- `HarnessViewModel` exposing `StateFlow<HarnessUiState>`;
-- derived busy and keep-screen-on policies;
-- deterministic cleanup of stale removal confirmation and selected request timelines;
-- independent tracking of concurrent diagnostics actions;
-- JVM tests for the highest-risk transitions;
-- an explicit Playground-first migration sequence in `docs/harness-viewmodel-udf-foundation.md`.
-
-PR #67 applies that vertical migration to Playground: Compose collects `StateFlow` lifecycle-aware, prompt, settings, progress, response, and metrics render from `HarnessUiState`, controller callbacks dispatch typed events, and start, cancel, and runtime-release actions cross a testable `PlaygroundEffects` boundary. Android controller resources remain Activity-scoped deliberately so native resources cannot outlive a recreated Activity.
-
-PR #68 extracts a pure `PlaygroundPresentation` contract from `HarnessUiState`. Phase labels and semantic tone, run and stop availability, input enablement, response fallback and metric formatting are no longer recalculated inside the private composables. JVM tests cover `IDLE`, `PREPARING`, `QUEUED`, `GENERATING`, `COMPLETED`, `FAILED` and `CANCELLED`, together with busy state, missing-model behavior, cancellation availability and metric fallbacks. This does not replace Compose semantics, emulator or physical-device validation.
-
-### Unified model inventory foundation
-
-PR #71 introduces a pure product-level projection without changing model operations:
-
-- catalog releases retain stable catalog identity and gain a digest only when installed metadata supplies one;
-- externally imported GGUF models remain valid installed selections outside the administrator catalog;
-- selected and runtime-loaded ownership are represented independently;
-- runtime ownership missing from the inventory and loaded-versus-selected mismatches become explicit degraded states;
-- catalog, selection and loaded-ownership events rebuild one immutable `HarnessModelInventoryState`;
-- catalog refreshes preserve the last known runtime ownership;
-- deterministic tests cover lifecycle mapping, imports, mismatches and reducer convergence.
-
-PR #72 connects this projection to the existing model controllers through an Activity-scoped `ModelEffects` boundary and a ViewModel-owned coordinator. Import, refresh, download, cancellation, installation, installed selection, verification and removal now enter through one typed command surface. The Models screen renders from `HarnessUiState.modelInventory`; Overview, Health, Benchmarks, Validation, Settings and Storage consume the same selected-model state. Activity mirrors for selected model, catalog distribution, removal confirmation and diagnostics selection are removed. Controller, launcher, executor and native runtime ownership remain Activity-scoped deliberately.
-
-PR #74 adds URL-safe `models/{identity}` detail navigation, a pure detail presentation for lifecycle, compatibility, integrity, selection and runtime ownership, and deterministic recovery for known mismatches. A compatible loaded catalog model can become the selected model without reloading it; releasing runtime ownership requires confirmation and never deletes the GGUF. Runtime ownership is read from `RuntimeSnapshot.loadedModel`, so a successful unload clears the degraded inventory state instead of retaining the graph's configured model identity.
-
-### Typed detail navigation
-
-PR #70 introduces the first detail-route slice without changing runtime ownership:
-
-- a pure route and shell-state contract for top-level and detail destinations;
-- separate Privacy, Storage, Build, Developer tools and Physical validation screens;
-- a dedicated `runs/{requestId}` destination with URL-safe opaque request identifiers;
-- detail-aware top bars and bottom-navigation visibility;
-- Settings navigation that preserves the previously selected top-level destination;
-- request timeline loading and cleanup tied to destination lifecycle;
-- JVM coverage for top-level, detail, fallback and request-ID round-trip behavior.
-
-Complete state restoration, responsive emulator evidence and further Activity slimming remain open.
-
-### Diagnostics section navigation
-
-The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card or correlated log now navigates to a dedicated detail destination; leaving that destination clears the loaded timeline state.
-
-The app uses Navigation Compose for top-level destinations. PR #70 adds a dedicated opaque request-timeline route and moves Settings disclosures into explicit detail destinations. Diagnostics section and loaded timeline data remain Activity-owned, while complete restoration and emulator back-stack evidence remain part of the ViewModel/UDF migration.
-
-### Diagnostics Health
-
-`HarnessHealthSource` uses the existing `HealthEngine` for selected-model, GGUF-integrity, runtime-state, and telemetry-readability checks. Execution is explicit, off-main-thread, and persisted through the same repository.
-
-### Diagnostics Resources
-
-`HarnessResourceSource` composes `AndroidResourceSnapshotProvider` and `ResourceSnapshotRecorder`. Manual capture records process PSS, native heap, Java heap, available memory, low-memory, and thermal status. Unsupported values remain `Unavailable`.
-
-The connected UI presents a bounded newest-first history, current/minimum/maximum PSS, a trend only when enough samples exist, low-memory sample count, observed thermal states, and up to ten detailed snapshot cards. Graphical charts and physical-device/accessibility evidence remain open.
-
-### Diagnostics Benchmarks
-
-Implemented and connected:
-
-- `HarnessBenchmarkSource` over the existing benchmark engine;
-- explicit baseline capture, never automatic during refresh or navigation;
-- benchmark keys isolated by application, use case, model digest, and `COLD`/`WARM` load kind;
-- discovery of keys from completed real runs and existing baselines;
-- per-key baseline and post-baseline sample readiness;
-- selective capture for one ready key;
-- bulk capture restricted to ready keys without overwriting captured baselines;
-- baseline metrics and post-baseline regression evaluation;
-- privacy-safe presentation that omits model file names and full digests;
-- execution on the shared diagnostics executor.
-
-Retained multi-capture history and richer trend visualization remain open.
-
-### Diagnostics Logs and request timeline
-
-Implemented:
-
-- `HarnessLogSource` with bounded repository reads;
-- severity, component, event, request, and safe-field search filters;
-- explicit empty, filtered-empty, populated, and source-error states;
-- request timeline access from run cards and correlated log entries;
-- dedicated request-timeline navigation from run cards and correlated log entries;
-- deterministic chronological ordering and run-relative offsets;
-- copy of the mapped privacy-safe log representation;
-- allowlisted fields, shortened model digests, and omission of unknown fields;
-- tests for filtering, timeline ordering, offsets, and prompt/output/path/message exclusion;
-- composition documentation in `docs/harness-logs-composition.md`.
-
-## Audit corrections
-
-The implementation audit corrected previous completion claims:
-
-- Runs remains `PARTIAL`: PR #70 supplies dedicated detail navigation, while complete restoration, state and emulator navigation evidence remain.
-- Resources remains below `DONE`, because charts and physical/accessibility evidence remain despite connected bounded history.
-- Benchmarks remains below `DONE`, because richer visualization, complete state tests and device evidence remain despite connected readiness, selection and retained history.
-- Health is `PARTIAL`, because targeted checks and complete capability states remain.
-
-The audit also corrected:
-
-- Playground state recreation during recomposition;
-- globally enabled keep-screen-on behavior;
-- arbitrary exception-message Toast fallbacks in Playground startup;
-- repeated capture of already-recorded benchmark baselines.
-
-The tracker previously still described the rebased UI/tooling candidate as unpublished. That integration was completed by PR #65 and is now part of the `dev` baseline.
-
-## Immediate next block
-
-### Validate model details and deterministic recovery
-
-Status: `VALIDATION`
-
-Completed in PR #72:
-
-1. [x] introduce an Activity-scoped `ModelEffects` boundary;
-2. [x] group catalog mutations into typed commands;
-3. [x] publish catalog, selection and runtime ownership snapshots to the reducer;
-4. [x] render Models from `HarnessUiState.modelInventory`;
-5. [x] route import, refresh, download, cancel, install, select, verify and remove through the ViewModel coordinator;
-6. [x] preserve Playground runtime release before model replacement or removal;
-7. [x] remove Activity-owned model, catalog, confirmation and diagnostics mirrors;
-8. [x] add fake-effects tests for commands, busy guards, selection and removal confirmation;
-9. [x] pass focused Spotless, Detekt, JVM, Lint, Kotlin compilation and state-removal guards;
-10. [x] pass cumulative PR validation and merge into `dev`.
-
-Completed in PR #74:
-
-1. [x] add a URL-safe model-detail route using digest when available and stable catalog identity otherwise;
-2. [x] derive one detail presentation for compatibility, integrity, installation, selection and loaded ownership;
-3. [x] expose deterministic recovery for runtime/selection mismatch and unknown runtime ownership;
-4. [x] keep destructive recovery behind explicit confirmation and runtime release;
-5. [x] source loaded ownership from the runtime snapshot after unload;
-6. [x] add route, presentation, reducer and effects tests;
-7. [ ] execute connected UI, restoration and representative physical-device evidence.
-
-## Known technical debt
-
-- `MainActivity` still owns multiple screens and mutable state.
-- Playground and Models are wired to ViewModel/UDF; Overview, Diagnostics, Settings and developer tools still retain Activity-owned state and effects.
-- Controllers still use executors and callbacks; Playground and Models cross typed effect boundaries, while diagnostics and settings controllers have not migrated.
-- Navigation Compose covers top-level destinations plus Settings, request-timeline and model details; restoration and complete back-stack evidence remain.
-- Resource charts and richer benchmark-history visualization remain incomplete.
-- The telemetry implementation remains in-memory and is cleared by process death.
-- The shared design system is integrated; feature screens still contain some one-off composition and spacing that should move to reusable components when repeated.
-- The integrated UX work was accumulated in a larger candidate before PR #65; subsequent migration work should remain split into reviewable vertical slices.
-
-## Validation gates before marking the migration ready
-
-- dependency locks reproducible;
-- Spotless, Detekt, tests, and Android Lint pass;
-- debug APK assembles;
-- release packaging guard behaves correctly;
-- no GGUF/GGML artifact is committed;
-- Compose compiler and AGP/Kotlin compatibility are confirmed;
-- import, generation, cancellation, cleanup, and removal pass on physical arm64 hardware;
-- Runs, Health, Resources, Benchmarks, Logs, and timelines render real values on-device;
-- cold/warm baselines remain isolated;
-- regression readiness uses only post-baseline matching samples;
-- telemetry privacy exclusions are verified;
-- compact, expanded, landscape, TalkBack, and dynamic-text behavior are validated.
-
-## Documentation maintenance rule
-
-A planned block is not complete unless implementation/tests, this progress tracker, the PR sequence, and relevant architecture documentation are updated in the same cycle. The next-action section must identify exactly one immediate implementation block.
+The workstream is not complete until the automated compact/expanded/accessibility matrix and representative physical-device GGUF evidence are recorded. Current Harness 0.5 release gates are maintained in [`releases/harness-0.5.md`](releases/harness-0.5.md).

@@ -1,0 +1,47 @@
+name: Documentation validation
+
+on:
+  pull_request:
+    paths:
+      - "README.md"
+      - "BRANCHING.md"
+      - "AGENTS.md"
+      - "**/AGENTS.md"
+      - ".rgignore"
+      - "docs/**"
+      - "scripts/verify-docs.py"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "README.md"
+      - "BRANCHING.md"
+      - "AGENTS.md"
+      - "**/AGENTS.md"
+      - ".rgignore"
+      - "docs/**"
+      - "scripts/verify-docs.py"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Documentation consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Verify documentation
+        run: |
+          python3 -m py_compile scripts/verify-docs.py
+          python3 scripts/verify-docs.py
+          python3 scripts/verify-agent-navigation.py
+          git diff --check

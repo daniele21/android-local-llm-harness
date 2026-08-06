@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate coding-agent navigation and repository module discoverability."""
+"""Validate coding-agent routing and repository module discoverability."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_GUIDE = ROOT / "AGENTS.md"
+README = ROOT / "README.md"
 SETTINGS = ROOT / "settings.gradle.kts"
 
 IGNORED_PARTS = {
@@ -21,19 +22,23 @@ IGNORED_PARTS = {
 }
 
 REQUIRED_HEADINGS = {
-    "## Start here",
-    "## Non-negotiable architecture invariants",
-    "## Repository map",
-    "## Validation commands",
-    "## Maintaining `AGENTS.md`",
+    "## Read only what the task requires",
+    "## Non-negotiable invariants",
+    "## Find the owning boundary",
+    "## Validation levels",
+    "## Maintaining agent guides",
 }
 
 REQUIRED_LINK_TARGETS = {
     "README.md",
+    "BRANCHING.md",
+    "docs/README.md",
+    "docs/current-state.md",
     "docs/architecture.md",
     "docs/roadmap.md",
     "docs/implementation-plan.md",
     "docs/definition-of-done.md",
+    "docs/releases/harness-0.5.md",
     "docs/adr/README.md",
 }
 
@@ -93,8 +98,13 @@ def validate_root_guide(errors: list[str]) -> None:
         if f"]({target})" not in text:
             errors.append(f"AGENTS.md: missing canonical document link: {target}")
 
+
+def validate_module_discoverability(guides: list[Path], errors: list[str]) -> None:
     if not SETTINGS.is_file():
         errors.append("missing settings.gradle.kts")
+        return
+    if not README.is_file():
+        errors.append("missing README.md")
         return
 
     settings_text = SETTINGS.read_text(encoding="utf-8")
@@ -103,11 +113,16 @@ def validate_root_guide(errors: list[str]) -> None:
         errors.append("settings.gradle.kts: no Gradle modules discovered")
         return
 
+    navigation_text = "\n".join(
+        [README.read_text(encoding="utf-8")]
+        + [guide.read_text(encoding="utf-8") for guide in guides]
+    )
+
     for module in modules:
         module_path = module.lstrip(":").replace(":", "/")
-        if f"`{module_path}`" not in text:
+        if f"`{module_path}`" not in navigation_text and module_path not in navigation_text:
             errors.append(
-                "AGENTS.md: Gradle module is not present in repository map: "
+                "configured Gradle module is not discoverable in README or an agent guide: "
                 f"{module} -> {module_path}"
             )
 
@@ -139,6 +154,8 @@ def main() -> int:
 
     for guide in guides:
         validate_links(guide, errors)
+
+    validate_module_discoverability(guides, errors)
 
     if errors:
         print("Agent navigation validation failed:", file=sys.stderr)

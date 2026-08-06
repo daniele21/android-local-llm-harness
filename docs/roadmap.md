@@ -1,396 +1,177 @@
 # Roadmap
 
-This file is the authoritative source for current implementation status. Detailed target behavior and acceptance criteria remain in [`implementation-plan.md`](implementation-plan.md).
+Status: active
+Document type: roadmap
+Owner: repository
+Last reviewed: 2026-08-06
 
-## Current execution status — August 2026
+This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
-The functional runtime, observability, connected phone console, model distribution and retained benchmark history are implemented. Harness 0.5.0 is now following the protected `dev` integration plan: `dev` is the ordinary development line, while `main` remains stable and release-oriented.
+The repository remains not production-ready until representative physical-device GGUF evidence is complete.
 
-The active sequence is governance and cumulative CI, focused model-management recovery, real Android branding, Compose architecture and surface completion, explicit model RAM lifecycle with warm-idle eviction, UI/accessibility validation, then signed internal distribution and physical-device evidence.
+## Milestone summary
 
-The repository remains **not production-ready** until the representative physical-device GGUF evidence gate is completed.
+| Milestone | Status | Remaining outcome |
+| --- | --- | --- |
+| Repository foundation and protected integration | Implemented | Confirm the repository-level `dev` ruleset before release |
+| Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
+| Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
+| Curated model distribution and installation | Implemented / device evidence pending | Real remote download/install validation on representative phones |
+| Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
+| Model RAM residency and warm-idle eviction | Planned | Product controls, TTL implementation and tests |
+| Native Android SDK integration | Planned | Stable consumer adapter over the embedded contracts |
+| Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
+| Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
+| Shared Binder/AIDL runtime | Future | Central model/runtime coordination after embedded evidence |
 
-## Repository and branch control
+## 1. Repository and release discipline
 
-- [x] keep `main` as the protected stable and release-oriented line
-- [x] create `dev` from the restored green repository baseline
-- [x] make `dev` the documented base and target for ordinary work
-- [x] add automated rejection of ordinary pull requests opened directly to `main`
-- [x] add cumulative Android and native validation after merges to `dev`
-- [x] add complete non-scoped validation and packaging for `dev -> main` promotions
-- [x] document hotfix, forward-port, merge and rollback behavior in ADR 0008
-- [ ] apply repository-level protection to `dev` and verify direct pushes are rejected
-- [ ] delete historical remote branches after their unique commits and recovery notes are audited
+Implemented:
 
-Historical branches are read-only audit references. They must not receive new implementation commits and must never be used as the base for new feature work.
+- reproducible Gradle and Android toolchain;
+- formatting, Detekt, Lint, dependency and model-artifact guards;
+- pinned `llama.cpp` and native host validation;
+- `dev` as ordinary integration line and `main` as stable promotion line;
+- scoped pull-request validation, cumulative `dev` validation and complete promotion validation;
+- protected promotion, hotfix and forward-port rules documented in ADR 0008;
+- reproducible Android packaging and launcher assets.
 
-## Harness 0.5.0 integration sequence
+Remaining:
 
-- [x] restore the green repository baseline and protect `main` through PR #55
-- [x] establish the `dev` branch and correct its curated-model-catalog Detekt regression through PR #58
-- [x] implement repository-owned `dev` validation, promotion gates, target-branch policy, PR template and integration ADR
-- [ ] apply the equivalent repository ruleset to `dev`
-- [x] align, validate and squash-merge the focused model-management recovery in PR #53
-- [x] close PR #34 as superseded after auditing its unique behavior
-- [x] integrate real Android launcher, themed-icon and Compose brand assets
-- [ ] complete Navigation Compose, ViewModel/UDF and the five primary product surfaces
-  - Navigation Compose top-level routing and the five surface hierarchies are implemented on
-    the current local integration candidate. Shared visual tokens, compact chrome,
-    list-oriented panels, mockup-matched navigation and all five primary compositions are also
-    implemented; PR/remote CI, ViewModel/UDF ownership and detail routes remain.
-- [ ] add Compose UI, screenshot, accessibility and responsive-layout evidence
-  - shell-height and primary-destination reachability tests plus compact-emulator visual QA are
-    implemented on the current local candidate, including screenshot-by-screenshot manual
-    comparison with the approved mockups; the full state, font-scale, TalkBack, screenshot-golden
-    and expanded-layout matrix remains.
-- [ ] expose explicit non-destructive model load/unload controls and implement the configurable warm-idle TTL
-- [ ] integrate the rebased local UI/release-tooling candidate through a reviewed PR and obtain cumulative green `dev` CI
-- [ ] build and upload the signed AAB to Google Play Internal Testing
-- [ ] capture privacy-safe representative physical-device GGUF evidence
-- [ ] promote the validated `dev` candidate to `main` with a merge commit and tag Harness 0.5.0 only after the applicable release gates pass
+- confirm `dev` branch protection through repository settings;
+- remove obsolete remote branches after audit;
+- retain concise documentation governance and consistency guards;
+- keep release tags and artifacts tied to an exact validated `main` commit.
 
-## Verified repository gate
+## 2. Embedded runtime
 
-The cumulative validation gate covers:
+Implemented:
 
-- [x] coding-agent navigation and llama.cpp pin guards
-- [x] repository-wide Android fan-out for public runtime and telemetry contract changes
-- [x] shell and Python runner validation
-- [x] native host configuration, compilation and tests
-- [x] Spotless and ktlint formatting checks
-- [x] Detekt static analysis and model-artifact repository guard
-- [x] JVM unit tests
-- [x] simulated Phase 1 acceptance lifecycle using the real content-addressed model store and runtime orchestrator
-- [x] Android Lint
-- [x] explicit APK, AAB and AAR assembly
-- [x] binary inspection of native packaging, ABI and ELF architecture
-- [x] Room schema and repository tests
-- [x] health-engine tests
-- [x] resource-observability tests
-- [x] benchmark-engine tests
+- GGUF inspection and immutable SHA-256 identity;
+- app-private content-addressed storage, verification and deduplication;
+- explicit application/use-case/model resolution;
+- opaque native model/context ownership;
+- load, generate, stream, cancel, release and shutdown lifecycle;
+- one-loaded-model and one-active-decode scheduling;
+- request priority, queue cancellation and recoverable failures;
+- compatible warm reuse, model-switch protection and Android memory-pressure handling;
+- model-aware templates, structured input, exact token planning and lazy context sizing;
+- output constraints, stop handling, seed policy and repetition protection.
 
-These checks provide host-side and simulated evidence. They do not prove Android linker behavior on representative physical devices, OEM memory management, real-device thermal throttling or device-specific native stability.
+Remaining:
 
-## Phase 0 — repository foundation
+- explicit product-facing RAM load/unload controls;
+- monotonic warm-idle TTL with cancellation, rearming, pinning and unload reasons;
+- representative physical-device validation of cancellation, memory stability, latency, throughput and thermal behavior;
+- performance policy selection based on device evidence rather than desktop assumptions.
 
-- [x] Gradle multi-module structure
-- [x] model-aware contracts
-- [x] explicit app/use-case binding
-- [x] GGUF profile contracts
-- [x] telemetry and dashboard contracts
-- [x] developer console shell
-- [x] centralized and pinned build versions
-- [x] Spotless and ktlint
-- [x] Detekt and Android Lint
-- [x] dependency locking
-- [x] CI artifact publication
-- [x] CODEOWNERS, security, versioning and ADR foundations
-- [x] model-binary repository guard
-- [x] committed and checksum-validated Gradle Wrapper
+## 3. Model management and distribution
 
-## Phase 1 — functional embedded runtime
+Implemented:
 
-### Runtime and model lifecycle
+- strict curated catalog validation and application/use-case targeting;
+- device compatibility filtering;
+- secure HTTPS transfer, bounded redirects, size/storage checks and SHA-256 verification;
+- opaque verified holding area;
+- explicit installation with metadata-only GGUF inspection;
+- non-destructive post-import verification behavior;
+- durable path-free installed metadata;
+- connected download, install, import, selection, verification and protected removal;
+- unified catalog/import/selection/runtime inventory;
+- model details and deterministic ownership recovery.
 
-- [x] pin and verify a specific `llama.cpp` commit
-- [x] compile the Android `arm64-v8a` CPU backend
-- [x] inspect GGUF metadata without full model load
-- [x] import models through streaming SHA-256 content-addressed storage
-- [x] deduplicate and verify model artifacts
-- [x] load and unload models through opaque native handles
-- [x] create and release contexts
-- [x] run deterministic generation
-- [x] stream aggregated text deltas
-- [x] cancel queued and active generation cooperatively
-- [x] serialize inference through a single-decode scheduler
-- [x] support request priority and queue cancellation
-- [x] orchestrate model, context, session and request lifecycle
-- [x] reuse a compatible loaded model
-- [x] reject unsafe model switches while active work owns the model
-- [x] handle Android background and low-memory signals
-- [ ] expose explicit load/unload product controls that change RAM residency without deleting the installed model or changing its selection
-- [ ] add a configurable, monotonic warm-idle TTL with safe rearming, pinning and unload-reason telemetry
-- [ ] implement the staged [generation configuration and prompting workstream](generation-configuration-and-prompting-plan.md):
-  versioned presets, explicit sampling and repeat-protection overrides, model-aware prompt compilation, exact-token
-  context planning, output constraints and privacy-safe effective-configuration telemetry
-- [x] recover after cancellation and request failure
+Remaining:
 
-### Validation and developer tooling
+- representative physical-device remote download and installation evidence;
+- `lastUsedAt` and final restart/reconciliation UI coverage;
+- product RAM-residency actions separate from selection and storage;
+- future administrator synchronization and trust-policy wiring only after the current embedded distribution path is stable.
 
-- [x] Kotlin and native tests
-- [x] simulated end-to-end acceptance lifecycle
-- [x] exact APK/AAR native packaging and AArch64 ELF verification
-- [x] physical-device test application using production store, runtime and backend
-- [x] ADB host runner for streaming an external GGUF into app-private storage
-- [x] device tests for lifecycle, cancellation and optional PSS regression cycles
-- [x] privacy-safe device-evidence capture tooling
-- [x] embedded API and lifecycle documentation
-- [x] ARM64 emulator preflight with a real Qwen3 GGUF on PR #28
-- [x] Play-installable launcher app for physical-device validation without developer mode on PR #29
-- [x] Storage Access Framework GGUF selection and private content-addressed import in the phone-test app
-- [x] copyable and shareable privacy-safe PASS/FAIL report in the phone-test app
-- [x] external PKCS12 upload-key and macOS Keychain signing workflow
-- [ ] signed Play internal-testing release installed on a physical phone
+## 4. Observability and developer controls
 
-The clean ARM64 emulator run is recorded in [`emulator-e2e-results.md`](emulator-e2e-results.md). It validates the AVD execution path but does not satisfy any item in the physical-device production-readiness gate below.
+Implemented:
 
-### Physical-device production-readiness gate
+- bounded in-memory and Room stores;
+- run lifecycle and request-correlated structured logs;
+- privacy-safe timelines and typed error codes;
+- queue, load, TTFT, prefill, decode, total, token and throughput metrics;
+- effective generation metadata;
+- health-suite orchestration, model integrity and generation sanity;
+- Android memory and thermal snapshots;
+- cache health and targeted repair;
+- cold/warm benchmark keys, active baselines, retained immutable history and regression checks;
+- connected phone Diagnostics surfaces.
 
-- [ ] install the signed phone-test AAB through Google Play internal testing on representative Android hardware
-- [ ] execute the complete lifecycle on representative physical Android `arm64-v8a` devices
-- [ ] inspect and run a supported external GGUF through the real JNI backend
-- [ ] verify cancellation during both prefill and decode
-- [ ] verify repeated load/generate/unload cycles do not show unbounded memory growth
-- [ ] confirm packaged JNI loading on representative devices
-- [ ] record latency, throughput, PSS and thermal baselines
-- [ ] preserve or reference the privacy-safe evidence archive in a release record
+Remaining:
 
-Required lifecycle:
+- complete Diagnostics UDF migration;
+- richer resource and benchmark-history visualization where source data supports it;
+- complete unavailable/loading/error state tests;
+- physical-device evidence for real values and lifecycle behavior;
+- later signature-protected diagnostics bridge for cross-application inspection.
 
-```text
-initialize
-inspect
-import
-verify
-load
-create context
-generate
-stream
-cancel
-release context
-unload
-shutdown
-```
+## 5. Connected Android application
 
-Use [`device-e2e-testing.md`](device-e2e-testing.md), [`device-e2e-evidence.md`](device-e2e-evidence.md) and [`play-internal-phone-test.md`](play-internal-phone-test.md) for execution and evidence requirements.
+Implemented:
 
-## Phase 2 — observability and health
+- Compose/Material 3 surface with Overview, Playground, Models, Diagnostics and Settings;
+- compact and expanded navigation shell;
+- reproducible Harness identity and shared design system;
+- shared process runtime graph;
+- real model management and Playground inference;
+- Playground and Models ViewModel/UDF boundaries;
+- typed Settings, request-timeline and model-detail routes;
+- privacy-safe model inventory, diagnostics and validation reports.
 
-### Persistent telemetry — PR #21
+Remaining:
 
-- [x] Room-backed telemetry store with bounded retention
-- [x] in-memory implementation for deterministic tests and ephemeral use
-- [x] persistent run states: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`
-- [x] request-correlated structured logs
-- [x] queue, model-load, TTFT, prefill, decode, token-count and throughput metrics
-- [x] serialized non-blocking Room writes
-- [x] telemetry failures isolated from inference
-- [x] prompt and generated-output exclusion from normal telemetry
-- [x] query APIs for runs, request timelines, logs and health results
+- migrate Overview, Diagnostics and Settings state/effects from `MainActivity`;
+- complete process recreation, state restoration and Back-stack evidence;
+- complete Compose state, screenshot, accessibility, large-font, landscape and expanded-layout matrices;
+- validate remote distribution, inference, cancellation and recovery on representative phones;
+- publish the signed candidate through Google Play Internal Testing.
 
-### Health control plane and model integrity — PR #23
+Focused acceptance criteria remain in [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md), and the durable application boundary is documented in [`features/phone-app-architecture.md`](features/phone-app-architecture.md).
 
-- [x] independently testable `observability/health-engine`
-- [x] stable and unique health-check IDs
-- [x] complete or targeted suite execution
-- [x] worst-status aggregation
-- [x] explicit `NOT_RUN` for unknown check IDs
-- [x] duration measurement through an injectable monotonic clock
-- [x] persisted privacy-safe results
-- [x] aggregate installed-model integrity check through `ModelStore.verify()`
-- [x] unexpected exception isolation
+## 6. Native and Capacitor integrations
 
-### Generation sanity — PR #24 and selective PR #22 recovery
+Planned sequence:
 
-- [x] bind each sanity check to an explicit application and use case
-- [x] execute `prepare`, session creation, generation and cleanup through `LocalLlmClient`
-- [x] deterministic temperature and seed defaults
-- [x] bounded timeout and cooperative cancellation
-- [x] typed runtime failures without backend-message persistence
-- [x] privacy-safe assertion failures without output disclosure
-- [x] exact output assertion
-- [x] required substring assertion
-- [x] non-empty output assertion
-- [x] forbidden substring assertion
-- [x] regular-expression assertion
-- [x] case-sensitive and case-insensitive matching
-- [x] invalid regex rejection before generation
-- [x] cleanup failure treated as a failed health check
-- [ ] physical-device execution with a real GGUF
+1. stabilize and document the embedded native Android adapter;
+2. expose lifecycle-safe client construction and application/use-case registration;
+3. add consumer samples and compatibility tests;
+4. implement a thin Capacitor plugin over the same native adapter;
+5. keep prompt/output and native handles out of JavaScript persistence and diagnostics;
+6. validate cancellation, Activity recreation and plugin shutdown on representative devices.
 
-The alternative `HealthControlPlane`, multi-fixture DTO set and granular model-integrity implementation from PR #22 are not merged. They overlap with the current HealthEngine architecture and remain historical reference material only.
+These integrations must not duplicate runtime policy or create a second model store.
 
-### Model-integrity cache health — PR #25
+## 7. Shared runtime and control plane
 
-- [x] neutral `CacheHealthProbe` and `CacheHealthSnapshot` contracts
-- [x] runtime-owned probe over the actual injected `ModelIntegrityCache`
-- [x] healthy, stale and orphaned cache classification
-- [x] observational and non-mutating snapshots
-- [x] privacy-safe aggregate health results
-- [x] re-hash a previously verified artifact after its file stamp changes
-- [ ] health contracts for future tokenizer caches
-- [ ] health contracts for future prompt/template caches
-- [ ] health contracts for future KV/context caches
-- [ ] health contracts for future downloaded-model caches
+Future work after the embedded path is release-ready:
 
-### Resource observability and load classification — PR #26
+- signature-protected diagnostics bridge;
+- stable serializable transport contracts;
+- Binder/AIDL runtime service;
+- centralized model-file deduplication and memory coordination;
+- explicit application authorization and lifecycle ownership;
+- migration path from in-process transport without changing model-binding semantics.
 
-- [x] explicit `COLD`, `WARM` and `UNKNOWN` model-load classification
-- [x] record model-load duration only for genuinely cold sessions
-- [x] process PSS snapshots
-- [x] native heap snapshots
-- [x] Java heap usage snapshots
-- [x] available-memory and Android low-memory state
-- [x] Android thermal-status mapping
-- [x] nullable unavailable measurements rather than invented zero values
-- [x] explicit caller-driven capture with no hidden timer
-- [x] bounded in-memory and Room retention
-- [x] non-destructive Room schema migration
-- [ ] physical-device memory and thermal evidence under a real GGUF workload
+The shared service is not part of Harness 0.5.0.
 
-### Benchmark baselines and regressions — PR #27 and PR #33
+## 8. Deferred capabilities
 
-- [x] benchmark key by application, use case, model digest and cold/warm classification
-- [x] reject `UNKNOWN` classification for baseline creation
-- [x] median TTFT
-- [x] nearest-rank p95 TTFT
-- [x] median total latency
-- [x] nearest-rank p95 total latency
-- [x] median decode throughput
-- [x] persisted active baseline storage in memory and Room
-- [x] non-destructive Room schema migration
-- [x] post-baseline regression comparison
-- [x] `WARN` for missing baseline or insufficient samples
-- [x] `FAIL` for policy regressions
-- [x] privacy-safe metric-class summaries
-- [x] bounded retained baseline history in memory and Room
-- [x] separate active baseline and immutable history semantics
-- [x] non-destructive Room schema 3→4 migration that seeds existing active baselines into history
-- [x] structured comparison results with values, ratios, thresholds and metric regression flags
-- [x] partial non-actionable comparison previews before minimum sample readiness
-- [ ] physical-device baseline collection on representative devices
+Deferred until the CPU embedded path and release evidence are stable:
 
-### Console observability, controls and cache repair — PR #31
+- production-default Vulkan/GPU offload;
+- simultaneous decodes;
+- speculative decoding;
+- multimodal models;
+- embeddings and rerankers;
+- LoRA hot swapping;
+- remote inference fallback;
+- automatic model selection based on quality scoring.
 
-- [x] tabbed console navigation for overview, installed models, active runtime, runs, logs, health, caches, resources and benchmarks
-- [x] `ConsoleDataSource` boundary over existing observability contracts
-- [x] runtime-state provider boundary independent from runtime, Room, Binder and backend types
-- [x] runtime adapter over the public `LocalLlmClient.runtimeSnapshot()` contract
-- [x] model-inventory provider boundary over the existing content-addressed `ModelStore.snapshot()` contract
-- [x] model-store adapter that removes private backing-file paths before presentation
-- [x] explicit disconnected, connected-empty and source-failure inventory states
-- [x] active installed-model correlation against the runtime snapshot
-- [x] standalone wiring limited to the console application's private `FileSystemModelStore`
-- [x] bounded run, log and resource queries
-- [x] privacy-safe disconnected and telemetry-failure states
-- [x] read-only generation metric cards
-- [x] read-only structured-log cards with deterministic field ordering
-- [x] read-only health, resource and benchmark cards
-- [x] selectable request detail from generation-run and correlated-log cards
-- [x] request-scoped run and structured-log queries
-- [x] chronological request timeline with event sequence and run-relative offsets
-- [x] privacy-safe missing-run, empty-timeline and source-error states
-- [x] process PSS, native heap and Java heap trend chart
-- [x] available-device-memory trend chart
-- [x] discrete Android thermal-pressure chart with low-memory signal count
-- [x] nullable measurements and unknown thermal states rendered as gaps rather than zero values
-- [x] chart rendering from persisted explicit captures without timers or hidden polling
-- [x] `ConsoleHealthControl` execution boundary over the existing `HealthEngine`
-- [x] explicit run-all and targeted per-check actions
-- [x] standalone `ModelIntegrityHealthCheck` execution against the console sandbox store
-- [x] automatic targeted controls for registered generation-sanity check IDs
-- [x] health execution outside the Android main thread through a single-thread executor
-- [x] action disabling while a health suite is in progress
-- [x] persisted-result refresh through the existing telemetry repository
-- [x] fixed privacy-safe health-control failure states
-- [x] neutral `CacheMaintenanceControl` contract separate from observational cache probes
-- [x] `ConsoleCacheControl` discovery and targeted-repair boundary
-- [x] independent cache-source loading and privacy-safe failure isolation
-- [x] disconnected, connected-empty, healthy, unhealthy and unavailable cache states
-- [x] repair actions exposed only for unhealthy caches with a registered maintenance capability
-- [x] runtime-owned model-integrity repair that revalidates stale entries and removes orphaned or invalid entries
-- [x] failed revalidation remains visible as an unresolved stale entry
-- [x] cache actions executed outside the Android main thread and disabled while running
-- [x] before/after, revalidated, removed and failed repair counts
-- [x] standalone cache control remains explicitly disconnected because the console does not own the runtime cache
-- [x] fixed privacy-safe cache-health and cache-repair error states
-- [x] refresh and back navigation without implicit runtime, model or cache mutation
-- [x] pure Kotlin presenter, data-source, adapter, health-control, cache-control and chart-model tests
-- [x] Android controls and custom-view compilation, lint and packaging validation
-- [x] explicit documentation of standalone sandbox, runtime-contract, health-capability, cache-ownership and resource-history limitations
-- [ ] connect the standalone console to a real cross-application diagnostics source
+## Release boundary
 
-### Benchmark regression and baseline history console — selectively recovered through PR #51
-
-- [x] stacked branch and draft PR based on PR #31
-- [x] `BenchmarkComparisonEvaluator` shared by health checks and console presentation
-- [x] comparison lookback independent from the visible Runs limit
-- [x] active-key and PASS/WARN/FAIL summary
-- [x] baseline/current metric values, ratios and policy thresholds
-- [x] explicit ready, preview, regression, within-policy and unavailable states
-- [x] retained baseline cards with active-capture identification
-- [x] chronological median TTFT history chart
-- [x] chronological p95 total-latency history chart
-- [x] chronological median decode-throughput history chart
-- [x] nullable history metrics rendered as gaps rather than zero values
-- [x] in-memory and Room active/history persistence tests
-- [x] evaluator, data-source and presenter tests
-- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
-- [x] recover the current retained-history behavior through PR #51 without reviving the legacy standalone console
-
-### Legacy explicit model management console — PR #34
-
-- [x] stacked branch and draft PR based on PR #31
-- [x] `ConsoleModelControl` boundary over existing `ModelStore` import, verify and remove operations
-- [x] observational inventory kept separate from mutating capabilities
-- [x] Storage Access Framework GGUF selection and private staging
-- [x] streaming SHA-256 and provider-size validation before import
-- [x] existing content-addressed store reused for digest, size, deduplication and conflict checks
-- [x] import, verification and removal outside the Android main thread
-- [x] model actions disabled while an operation is active
-- [x] explicit confirmation before removal
-- [x] loaded-model removal blocked in presenter and control layers when runtime identity is available
-- [x] fixed privacy-safe import, verification, removal and source failures
-- [x] staged-file cleanup after success and failure
-- [x] control, presenter and data-source tests
-- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
-- [ ] close PR #34 as superseded after the focused PR #53 recovery is merged into `dev`
-
-### Manual inference playground — PR #35
-
-- [x] stacked branch and draft PR based on PR #31
-- [x] `ConsoleInferenceControl` boundary over the public `LocalLlmClient` contract
-- [x] explicit application/use-case target registration supplied by the embedding application
-- [x] one-shot prepare, session creation and generation lifecycle
-- [x] target, prompt, maximum-output-token, temperature and seed request dialog
-- [x] queued, started, streaming, completed, failed and cancelled state mapping
-- [x] bounded 131,072-character in-memory output with explicit truncation state
-- [x] queue, load, TTFT, prefill, decode, total, token and throughput metric presentation
-- [x] cooperative cancellation through the runtime `GenerationHandle`
-- [x] race-safe synchronous terminal and cancellation callbacks
-- [x] session cleanup after completed, failed and cancelled terminal events
-- [x] cleanup failure overrides the terminal result with a privacy-safe failure state
-- [x] prompts excluded from console snapshots, telemetry and saved state
-- [x] generated output retained only in bounded in-memory playground state
-- [x] standalone console remains explicitly disconnected because it owns no configured runtime targets
-- [x] control, presenter and data-source tests
-- [x] Spotless, Detekt, Android Lint, compilation and packaging validation
-- [ ] rebase or retarget onto `main` after PR #31 is merged
-
-### Remaining Phase 2 work
-
-- [ ] privacy-redacted diagnostic bundle export
-- [ ] signature-protected diagnostics bridge for cross-application console access
-
-## Phase 3 — integrations
-
-- [ ] production-oriented native Android SDK adapter
-- [ ] native sample application
-- [ ] Capacitor plugin with aggregated token streaming
-- [ ] Capacitor cancellation and typed error mapping
-- [ ] Capacitor sample application
-- [ ] reusable production Android `content://` model import adapter
-- [ ] streamed HTTP/on-demand model source
-- [ ] signature-protected app diagnostics bridge
-
-## Phase 4 — shared runtime
-
-- [ ] versioned AIDL contracts
-- [ ] Binder transport
-- [ ] shared service lifecycle
-- [ ] caller authentication and signature permissions
-- [ ] central model store
-- [ ] cross-application artifact deduplication
-- [ ] global scheduler
-- [ ] global memory budget and application quotas
-- [ ] console application promoted to shared runtime host
+The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). Emulator, host-native and simulated acceptance evidence support merge readiness but do not satisfy physical-device production readiness.
