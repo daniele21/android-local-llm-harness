@@ -1,41 +1,42 @@
 # Android Local LLM Harness
 
-A local-first Android harness for running explicit GGUF models through `llama.cpp`, embedding the runtime inside native or Capacitor applications today and preserving a clean path toward a shared Android service later.
+A local-first Android harness for running explicit GGUF models through `llama.cpp`. The runtime is embedded in native Android applications today while public contracts preserve a path toward Capacitor adapters and a future shared Android service.
 
 ## Core decisions
 
-- **Model-aware, not model-selecting:** every application/use case binds to an explicit GGUF artifact and runtime profile.
+- **Explicit model binding:** every application/use case resolves a reviewed GGUF artifact and runtime profile.
 - **GGUF first:** `llama.cpp` is the initial native backend.
-- **Embedded first:** applications call the same runtime through an in-process transport.
-- **Shared later:** transport boundaries and serializable contracts are kept separate so Binder can replace the in-process transport.
-- **Observability first:** runs, timings, health, sanity checks, cache state and structured logs are first-class domains.
-- **Privacy by default:** telemetry stores metadata only; prompts and outputs are not persisted by default.
-- **Measured performance:** memory, cache and execution policies must be selected from device evidence rather than assumptions.
-- **Verified distribution:** remote catalog selection, verified transfer, installation, binding and runtime loading remain explicit separate operations.
+- **Embedded first, shared later:** in-process transport is current; backend-neutral contracts preserve future Binder deployment.
+- **Privacy by default:** prompts and generated output are excluded from normal telemetry and shared reports.
+- **Observability as a domain:** runs, logs, health, resources, cache state and benchmarks are first-class contracts.
+- **Verified distribution:** catalog selection, download, installation, selection and runtime loading are separate explicit operations.
+- **Measured performance:** residency, context, cache and device policies require representative evidence.
 
-## Modules
+## Repository map
 
 ```text
-core/contracts                         Stable request, session and runtime contracts
-core/runtime-core                      Runtime orchestration, scheduling, lifecycle and telemetry emission
-models/model-profile                   GGUF artifacts, load profiles and app bindings
+core/contracts                         Public request, session, generation and error contracts
+core/runtime-core                      Runtime orchestration, queueing, lifecycle and telemetry emission
+models/model-profile                   GGUF profiles, use cases and application bindings
 models/model-store                     Content-addressed installed-model storage and integrity
-models/model-catalog                   Administrator-managed catalog contracts, persistence and compatibility
+models/model-catalog                   Curated release contracts, targeting and compatibility
 models/model-download                  Verified remote transfer and opaque holding-area access
 models/model-install                   GGUF inspection and explicit ModelStore installation
-backends/llama-cpp                     Kotlin/JNI/C++ backend and installation inspector adapter
-observability/contracts                Metrics, logs, health, retention and dashboard contracts
-observability/in-memory-store          Bounded ephemeral telemetry and deterministic test implementation
-observability/room-store               Persistent Android Room telemetry repository
-observability/health-engine            Health orchestration, model integrity, sanity and cache checks
-observability/android-resource-probe   Android memory and thermal snapshot provider
-observability/benchmark-engine         Baseline capture and performance regression checks
-transports/in-process                  Embedded transport implementation
-ui/design-system                       Shared Compose theme and reusable Harness components
+backends/llama-cpp                     Kotlin/JNI/C++ backend and GGUF inspector adapter
+observability/contracts                Runs, logs, health, resources, retention and benchmark contracts
+observability/in-memory-store          Bounded ephemeral telemetry implementation
+observability/room-store               Persistent Android Room telemetry implementation
+observability/health-engine            Health, sanity and model-integrity execution
+observability/android-resource-probe   Android memory and thermal capture
+observability/benchmark-engine         Baselines, retained history and regression evaluation
+transports/in-process                  Embedded LocalLlmClient delegation
+ui/design-system                       Shared Compose theme and Harness components
 apps/local-llm-console                 Standalone developer-console application
-apps/device-test-runner                ADB/instrumentation GGUF lifecycle test application
+apps/device-test-runner                ADB/instrumentation lifecycle validation
 apps/local-llm-phone-test              Connected Compose console and Play-installable validation app
 ```
+
+`settings.gradle.kts` is the authoritative module list.
 
 ## Request resolution
 
@@ -47,24 +48,52 @@ applicationId + useCaseId
           -> exact GGUF digest and llama.cpp load configuration
 ```
 
-The harness never silently substitutes another model. Declared fallbacks, when added, must remain explicit and observable.
+The harness never silently substitutes a model. Fallbacks, when explicitly introduced, must be ordered and visible in diagnostics.
 
 ## Remote model lifecycle
 
 ```text
-catalog release selection
-          -> compatibility evaluation
-          -> secure verified download
-          -> VerifiedDownloadHandle
-          -> explicit verified installation
-          -> GGUF inspection
-          -> ModelStore publication and verification
-          -> installed-model metadata
-          -> explicit app/use-case binding
-          -> runtime prepare and inference
+catalog release
+  -> compatibility evaluation
+  -> secure verified download
+  -> opaque VerifiedDownloadHandle
+  -> explicit installation and GGUF inspection
+  -> ModelStore publication and verification
+  -> installed metadata
+  -> explicit selection/binding
+  -> runtime prepare and inference
 ```
 
-A verified download is not yet an installed or active model. Installation does not activate a binding, load the runtime or start inference as a side effect.
+A verified download is not installed. Installation does not select or load a model. Selection does not imply RAM residency.
+
+## Current integrated baseline
+
+The promoted baseline includes:
+
+- pinned `llama.cpp`, Android `arm64-v8a` packaging and host-native tests;
+- GGUF inspection, SHA-256 import, verification, deduplication and protected removal;
+- local load, context creation, generation, streaming and cooperative cancellation;
+- single-decode scheduling, warm reuse and Android memory-pressure handling;
+- curated catalog, secure verified download and explicit installation;
+- model-aware presets, prompt/template planning, exact token planning, output constraints, stop handling and repetition protection;
+- bounded in-memory and Room telemetry, request timelines, health, resources and benchmark history;
+- connected Compose phone surfaces for Overview, Playground, Models, Diagnostics and Settings;
+- ViewModel/UDF ownership for Playground and Models;
+- typed Settings, request-timeline and model-detail routes;
+- unified model inventory and deterministic runtime/selection recovery;
+- reproducible Android launcher identity and shared design-system foundations.
+
+The runtime is not production-ready until the required representative physical-device GGUF evidence is complete.
+
+## Current priorities
+
+1. Complete the remaining Overview, Diagnostics and Settings migration out of `MainActivity`.
+2. Implement explicit RAM load/unload controls and monotonic warm-idle TTL eviction.
+3. Complete navigation restoration, Compose screenshot, accessibility and responsive-layout evidence.
+4. Build the signed candidate, distribute it through Google Play Internal Testing and capture representative physical-device evidence.
+5. Continue native Android and Capacitor adapter work only after the embedded boundary and release gates are stable.
+
+Current state and the ordered next block are maintained in [`docs/current-state.md`](docs/current-state.md). Capability milestones are in [`docs/roadmap.md`](docs/roadmap.md). Harness 0.5 release gates are in [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md).
 
 ## Build prerequisites
 
@@ -73,149 +102,47 @@ A verified download is not yet an installed or active model. Installation does n
 - Android Build Tools 36.0.0
 - Android NDK 28.2.13676358
 - Gradle 9.5.0 through the committed wrapper
+- Android Gradle Plugin 9.3.1
 
-The repository uses Android Gradle Plugin 9.3.1 and its built-in Kotlin support. Android API 36 is the stable reproducible build target; API 37 remains a preview platform and will be adopted only when the required SDK package is consistently available in CI.
+## Common workflows
 
-## Build and run the Android app
-
-The two common application workflows are documented together in
-[`docs/android-build-and-run.md`](docs/android-build-and-run.md):
-
-- build the signed `.aab` that can be uploaded to Google Play Console;
-- build, install and launch the debug app on an already-running Android emulator.
-
-Quick commands, after completing the prerequisites in that guide:
+Build the signed release bundle or run the connected debug application by following [`docs/android-build-and-run.md`](docs/android-build-and-run.md).
 
 ```bash
 # Signed release bundle for Google Play Console
 bash scripts/build-phone-test-release.sh build
 
-# Debug build of the same phone app on a running emulator
+# Install and launch the debug phone application on a running emulator
 bash scripts/run-emulator-debug.sh --app phone-test
 ```
 
-The emulator runner installs and launches the application, but it does not create or boot an
-Android Virtual Device. Start the AVD first from Android Studio Device Manager or with the
-Android SDK `emulator` command as described in the guide.
-
-## Current state
-
-`dev` is the canonical integration line for ordinary work. `main` remains the protected stable and release-oriented line and receives normal changes only through a validated `dev -> main` promotion. Harness 0.5.0 integration is tracked in [`docs/dev-integration-and-harness-0.5-plan.md`](docs/dev-integration-and-harness-0.5-plan.md).
-
-### Functional embedded runtime
-
-- pinned `llama.cpp` submodule and Android `arm64-v8a` build;
-- GGUF metadata inspection;
-- SHA-256 content-addressed model import and verification;
-- opaque model and context lifecycle;
-- deterministic generation, aggregated streaming and cooperative cancellation;
-- single-decode scheduling with priorities and queue cancellation;
-- runtime orchestration, model reuse and model-switch protection;
-- Android background and memory-pressure handling;
-- Kotlin, native, simulated-acceptance, packaging and ARM64 emulator validation.
-
-### Observability and controls
-
-- bounded in-memory and Room-backed telemetry;
-- persistent generation states, request-correlated logs and request timelines;
-- queue, model-load, TTFT, prefill, decode, total, token and throughput metrics;
-- explicit `COLD`, `WARM` and `UNKNOWN` load classification;
-- Android memory and thermal snapshots;
-- model-integrity, generation-sanity and cache-health checks;
-- benchmark baselines and regression evaluation;
-- cache diagnosis and targeted repair;
-- privacy boundaries that exclude prompts and generated output from normal telemetry.
-
-### Connected Android console
-
-`apps/local-llm-phone-test` contains the connected Compose-based Harness surface with:
-
-- Overview, Playground, Models, Diagnostics and Settings destinations;
-- one process-scoped runtime graph shared by inference and physical validation;
-- real GGUF import, verification, streaming inference, cancellation and removal;
-- connected run, health, resource, benchmark, log and request-timeline views;
-- a Play-installable physical-device validation path without developer mode or ADB.
-
-The canonical UX/UI plan is not complete. ViewModel/UDF migration, full Navigation Compose detail routes, durable multi-model presentation, UI/screenshot/accessibility testing and representative physical-device evidence remain open.
-
-### Administrator-managed model distribution
-
-The catalog, downloader and installation boundaries provide:
-
-- strict catalog contracts and fail-closed validation;
-- exact application/use-case filtering and device compatibility evaluation;
-- atomic app-private catalog persistence with revision, rollback and expiry handling;
-- HTTPS-only, allowlisted and redirect-bounded transfer;
-- DNS and address-class preflight;
-- size, storage-headroom and SHA-256 verification while streaming;
-- cancellation, bounded retry, restart cleanup and digest-based deduplication;
-- durable publication into an app-private verified holding area;
-- opaque access that never exposes the verified backing path;
-- exact catalog/profile/target reconciliation before installation;
-- metadata-only GGUF inspection before final publication;
-- import and post-import verification through the existing `ModelStore`;
-- non-destructive failure when post-import verification is invalid or unavailable;
-- explicit retention or discard of verified bytes only after success;
-- no implicit binding, runtime load or inference.
-
-See [`docs/model-installation.md`](docs/model-installation.md) and ADR 0007 for the installation lifecycle.
-
-## Current priorities
-
-1. Complete and protect the `dev` integration line, cumulative CI and promotion gates for Harness 0.5.0.
-2. Merge the focused model-management recovery from PR #53 into `dev`, then close the legacy PR #34 as superseded.
-3. Integrate the Android brand kit into launcher assets, theme tokens and reusable Compose components.
-4. Complete Navigation Compose, ViewModel/UDF migration and the Overview, Playground, Models, Diagnostics and Settings surfaces.
-5. Add Compose UI, screenshot, accessibility and responsive-layout validation.
-6. Produce a signed AAB for Google Play Internal Testing and capture representative privacy-safe physical-device GGUF evidence.
-7. Add native Android and Capacitor adapters, followed by the signature-protected diagnostics bridge and Binder transport.
-
-See [`docs/current-state.md`](docs/current-state.md) for the active integration and recovery ledger and [`docs/roadmap.md`](docs/roadmap.md) for the detailed historical roadmap.
-
-## Coding-agent navigation
-
-Coding agents start from [`AGENTS.md`](AGENTS.md). It defines repository-wide invariants, routes common changes to their owning modules and indexes the scoped guides for model management, the native backend, observability and the connected phone app. A scoped guide supplements the root only when its subtree has distinct ownership, hazards or validation.
-
-Agent guides are maintained with the code boundaries they describe: global routing stays in the root, local commands and hazards stay in the closest scoped guide, and changing implementation status stays in `docs/current-state.md` and `docs/roadmap.md`. The repository validates that configured Gradle modules remain discoverable and that local links in all agent guides resolve correctly:
-
-```bash
-python3 scripts/verify-agent-navigation.py
-```
+The emulator runner does not create or boot an Android Virtual Device.
 
 ## Validation
 
-Pull requests into `dev` use repository guards and the relevant Android, native and packaging scopes. Every merge push on `dev` runs cumulative validation; a `dev -> main` promotion runs complete non-scoped Android, native and packaging gates. The complete repository gate includes repository guards, Android validation, native host tests and packaging verification. The stable aggregate required-check name is:
+Ordinary work starts from the latest green `dev` and targets `dev`. Pull requests use scoped validation; merge pushes on `dev` run cumulative validation; promotions to `main` use complete Android, native and packaging gates.
+
+The stable required-check name is:
 
 ```text
 Repository validation
 ```
 
-The dedicated model-distribution workflow additionally validates formatting, Detekt, the model-artifact guard, downloader/installer/backend tests and Android Lint.
-
-## Physical-device GGUF validation
-
-Two validation paths exercise the same production model-store, runtime and backend contracts.
-
-### ADB and instrumentation
-
-Connect a physical `arm64-v8a` device with USB debugging enabled, then run:
+Documentation changes additionally run:
 
 ```bash
-bash scripts/run-device-e2e.sh \
-  --model /absolute/path/to/model.gguf \
-  --architecture qwen3 \
-  --quantization Q4_K_M \
-  --memory-repeat 5
+python3 scripts/verify-docs.py
+python3 scripts/verify-agent-navigation.py
 ```
 
-The model is streamed into the debuggable test application's private storage and is never committed or packaged. See [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md).
+Coding agents start from [`AGENTS.md`](AGENTS.md), which routes work to the owning module without requiring every planning document to be loaded.
 
-### Google Play internal testing without developer mode
+## Device validation
 
-`apps/local-llm-phone-test` is a normal launcher application intended for phones where developer mode or ADB is unavailable. It imports a GGUF through Android's Storage Access Framework, runs generation, cancellation and repeated memory cycles, then produces a privacy-safe report that can be copied or shared.
+For ADB/instrumentation execution, use [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md). For Play-delivered validation without developer mode, configure the external upload key using [`docs/android-upload-key.md`](docs/android-upload-key.md) and follow [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md).
 
-Configure the external PKCS12 upload keystore and macOS Keychain by following [`docs/android-upload-key.md`](docs/android-upload-key.md), then build or sign its release AAB through `scripts/build-phone-test-release.sh`. Upload it to the Google Play internal-testing track, install it with the tester account and follow [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md). Signing keys, credentials and GGUF files must never be committed.
+Signing keys, credentials and GGUF files must never be committed.
 
-The runtime remains not production-ready until representative physical-device evidence covers JNI loading, real GGUF inference, cancellation during prefill and decode, repeated lifecycle stability, memory, latency, throughput and thermal behavior.
+## Documentation
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/implementation-plan.md`](docs/implementation-plan.md), [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/current-state.md`](docs/current-state.md), [`docs/model-installation.md`](docs/model-installation.md), [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md), [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) and [`docs/roadmap.md`](docs/roadmap.md).
+The documentation ownership map is [`docs/README.md`](docs/README.md). Durable architecture is in [`docs/architecture.md`](docs/architecture.md) and accepted ADRs. Target behavior is in [`docs/implementation-plan.md`](docs/implementation-plan.md) and focused feature specifications. Completion rules are in [`docs/definition-of-done.md`](docs/definition-of-done.md).

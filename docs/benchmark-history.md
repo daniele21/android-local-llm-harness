@@ -1,10 +1,10 @@
-# Retained benchmark history
+# Retained benchmark history — consolidated
 
-The telemetry repository exposes two separate views:
+Status: historical
+Document type: historical-plan
+Owner: observability/benchmark-engine
+Last reviewed: 2026-08-06
 
-- `benchmarkBaselines()` returns one active baseline for each application, use case, model digest and cold/warm load key. Regression checks use only this view.
-- `benchmarkBaselineHistory(limit)` returns immutable captures in newest-first order. Replacing the active baseline never rewrites older captures.
+Retained benchmark history is now documented together with active baselines and regression evaluation in [`benchmark-engine.md`](benchmark-engine.md).
 
-Both in-memory and Room stores enforce `TelemetryRetentionPolicy.maxBenchmarkBaselines`. Room schema version 4 adds `benchmark_baseline_history`; migration 3→4 copies every existing active baseline into history without deleting or changing the active row.
-
-The phone-test Benchmarks screen presents active regression results separately from retained captures. Browsing history never changes the active regression anchor.
+This compatibility file remains to avoid breaking existing links. It is not an independent specification and must not be updated separately.
