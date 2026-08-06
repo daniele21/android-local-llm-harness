@@ -63,6 +63,12 @@ These are product-state inconsistencies, not backend exception messages. No priv
 
 Catalog refreshes preserve the last known loaded digest. Selection changes preserve runtime ownership and clear stale removal confirmation. The projection remains pure and has no Android, filesystem, network, or runtime side effects.
 
+## Validation boundary
+
+The foundation is covered by pure reconciliation tests and reducer convergence tests. Focused validation in Actions run `31079690251` includes Spotless, Detekt, phone-test JVM tests, Android Lint, and Kotlin compilation.
+
+This evidence validates the state contract only. It does not constitute connected UI, emulator, physical-device, download/install, model-loading, or inference validation.
+
 ## Current boundary
 
 This slice establishes the state and reducer contract. It does not yet migrate the model controller actions into `HarnessViewModel`, and it does not change download, verification, installation, selection, removal, or runtime-loading behavior.
