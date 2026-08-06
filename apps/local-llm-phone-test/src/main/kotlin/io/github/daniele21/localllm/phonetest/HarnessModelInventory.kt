@@ -30,6 +30,9 @@ internal data class HarnessModelInventoryItem(
     val displayName: String,
     val origin: HarnessModelOrigin,
     val digest: String? = null,
+    val sizeBytes: Long? = null,
+    val architecture: String? = null,
+    val quantization: String? = null,
     val lifecycle: HarnessModelLifecycle,
     val compatible: Boolean = true,
     val installed: Boolean = false,
@@ -46,6 +49,12 @@ internal data class HarnessModelInventoryState(
 ) {
     val installedCount: Int
         get() = items.count(HarnessModelInventoryItem::installed)
+
+    val installedBytes: Long
+        get() = items.filter(HarnessModelInventoryItem::installed).sumOf { it.sizeBytes ?: 0L }
+
+    val selectedItem: HarnessModelInventoryItem?
+        get() = items.firstOrNull(HarnessModelInventoryItem::selected)
 
     val activeOperationCount: Int
         get() = items.count {
@@ -88,6 +97,9 @@ internal object HarnessModelInventoryReconciler {
             displayName = displayName,
             origin = HarnessModelOrigin.CATALOG,
             digest = installedDigest,
+            sizeBytes = sizeBytes,
+            architecture = architecture,
+            quantization = quantization,
             lifecycle = lifecycle(mismatch, loaded, selected),
             compatible = compatible,
             installed = installedModel != null,
@@ -120,6 +132,9 @@ internal object HarnessModelInventoryReconciler {
             displayName = selectedModel.fileName,
             origin = HarnessModelOrigin.IMPORTED,
             digest = selectedDigest,
+            sizeBytes = selectedModel.sizeBytes,
+            architecture = selectedModel.architecture,
+            quantization = selectedModel.quantization,
             lifecycle = if (loaded) HarnessModelLifecycle.LOADED else HarnessModelLifecycle.SELECTED,
             installed = true,
             selected = true,
