@@ -46,6 +46,8 @@ data class BackendGenerationRequest(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val seed: Long,
     val outputConstraint: OutputConstraint = OutputConstraint.Text,
     val stopTokenIds: Set<Int> = emptySet(),

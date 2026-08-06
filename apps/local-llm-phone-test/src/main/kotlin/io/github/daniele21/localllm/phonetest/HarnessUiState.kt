@@ -20,6 +20,8 @@ internal data class PlaygroundPresetOption(
     val temperature: String,
     val topP: String,
     val topK: String,
+    val repeatPenalty: String,
+    val repeatLastN: String,
     val seed: String,
     val preferredContextTokens: Int,
     val recommendedMaximumContextTokens: Int,
@@ -29,27 +31,27 @@ internal data class PlaygroundPresetOption(
 internal val playgroundPresetOptions = listOf(
     PlaygroundPresetOption(
         "precise-structured", "Preciso e strutturato", "Estrazione, JSON e benchmark riproducibili",
-        "256", "0", "1", "40", "42", 2_048, 4_096,
+        "256", "0", "1", "40", "1.05", "64", "42", 2_048, 4_096,
         "Return only the requested structured result. Do not add commentary outside the required format.",
     ),
     PlaygroundPresetOption(
         "short-form", "Titoli e sintesi brevi", "Risposte concise senza preamboli",
-        "384", "0.25", "0.85", "30", "42", 4_096, 4_096,
+        "384", "0.25", "0.85", "30", "1.05", "64", "42", 4_096, 4_096,
         "Return only the requested result. Avoid introductions and conclusions. Be concise and informative.",
     ),
     PlaygroundPresetOption(
         "accurate-summary", "Riassunto accurato", "Aderenza al testo e nessuna aggiunta",
-        "768", "0.2", "0.9", "30", "42", 4_096, 8_192,
+        "768", "0.2", "0.9", "30", "1.05", "64", "42", 4_096, 8_192,
         "Summarize accurately using only information supported by the input. Do not invent details.",
     ),
     PlaygroundPresetOption(
         "balanced-conversation", "Conversazione bilanciata", "Impostazione generale naturale e controllata",
-        "768", "0.6", "0.9", "40", "", 4_096, 8_192,
+        "768", "0.6", "0.9", "40", "1.05", "64", "", 4_096, 8_192,
         "Be natural, accurate, and concise.",
     ),
     PlaygroundPresetOption(
         "creative-conversation", "Conversazione creativa", "Brainstorming e variazioni meno deterministiche",
-        "1024", "0.85", "0.95", "50", "", 8_192, 8_192,
+        "1024", "0.85", "0.95", "50", "1.05", "64", "", 8_192, 8_192,
         "Be imaginative and offer useful variations while respecting the user's constraints.",
     ),
 )
@@ -76,6 +78,8 @@ internal data class HarnessUiState(
     val playgroundBasePreset: String? = DEFAULT_PRESET,
     val playgroundTopP: String = DEFAULT_TOP_P,
     val playgroundTopK: String = DEFAULT_TOP_K,
+    val playgroundRepeatPenalty: String = DEFAULT_REPEAT_PENALTY,
+    val playgroundRepeatLastN: String = DEFAULT_REPEAT_LAST_N,
     val playgroundSeed: String = DEFAULT_SEED,
     val playgroundContext: String = "",
     val removalConfirmationPending: Boolean = false,
@@ -97,6 +101,8 @@ internal data class HarnessUiState(
         const val DEFAULT_PRESET = "balanced-conversation"
         const val DEFAULT_TOP_P = "0.9"
         const val DEFAULT_TOP_K = "40"
+        const val DEFAULT_REPEAT_PENALTY = "1.05"
+        const val DEFAULT_REPEAT_LAST_N = "64"
         const val DEFAULT_SEED = ""
         const val DEFAULT_PROMPT = "Explain in two sentences why local inference improves privacy."
     }
@@ -140,6 +146,10 @@ internal sealed interface HarnessUiEvent {
     data class PlaygroundTopPChanged(val topP: String) : Playground
 
     data class PlaygroundTopKChanged(val topK: String) : Playground
+
+    data class PlaygroundRepeatPenaltyChanged(val repeatPenalty: String) : Playground
+
+    data class PlaygroundRepeatLastNChanged(val repeatLastN: String) : Playground
 
     data class PlaygroundSeedChanged(val seed: String) : Playground
 
@@ -238,6 +248,16 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.PlaygroundTopKChanged -> state.copy(playgroundTopK = event.topK, playgroundPreset = "")
 
+        is HarnessUiEvent.PlaygroundRepeatPenaltyChanged -> state.copy(
+            playgroundRepeatPenalty = event.repeatPenalty,
+            playgroundPreset = "",
+        )
+
+        is HarnessUiEvent.PlaygroundRepeatLastNChanged -> state.copy(
+            playgroundRepeatLastN = event.repeatLastN,
+            playgroundPreset = "",
+        )
+
         is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed, playgroundPreset = "")
 
         is HarnessUiEvent.PlaygroundContextChanged -> state.copy(playgroundContext = event.context, playgroundPreset = "")
@@ -252,6 +272,8 @@ internal object HarnessUiReducer {
             playgroundTemperature = preset.temperature,
             playgroundTopP = preset.topP,
             playgroundTopK = preset.topK,
+            playgroundRepeatPenalty = preset.repeatPenalty,
+            playgroundRepeatLastN = preset.repeatLastN,
             playgroundSeed = preset.seed,
             playgroundContext = "",
         )

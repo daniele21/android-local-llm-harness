@@ -109,6 +109,8 @@ class EmbeddedLocalLlm(
             topP = 0.95f,
             topK = 40,
             seed = 42,
+            repeatPenalty = 1.05f,
+            repeatLastN = 64,
         ),
         outputMode = OutputMode.TEXT,
         cachePolicy = UseCaseCachePolicy(
@@ -268,11 +270,11 @@ val handle = localLlm.client.generate(
 )
 ```
 
-Generation input can be plain text, structured user/assistant messages, or explicitly authorized raw completion. Request-level sampling overrides are resolved per field over a selected versioned preset and the use-case defaults. Use `SeedPolicy.Random` for a fresh unsigned 32-bit seed per execution or `SeedPolicy.Fixed(value)` for reproducibility; a missing seed is never coerced to zero.
+Generation input can be plain text, structured user/assistant messages, or explicitly authorized raw completion. Request-level sampling overrides, including `repeatPenalty` and its bounded `repeatLastN` window, are resolved per field over a selected versioned preset and the use-case defaults. A repeat penalty of `1.0` disables the penalty; an enabled penalty requires a positive window. Use `SeedPolicy.Random` for a fresh unsigned 32-bit seed per execution or `SeedPolicy.Fixed(value)` for reproducibility; a missing seed is never coerced to zero.
 
 The backend compiles structured messages with the model-aware template chain: supported GGUF template, application-reviewed override, reviewed family fallback, then raw completion only when explicitly requested and allowed. An application-owned template policy may also provide at most eight nonblank stop sequences, each at most 128 UTF-8 bytes and at most 512 bytes in total. The native backend uses one streaming decode path; callers that need a complete result aggregate those events above the native boundary. The first stop sequence by output position wins independently of policy order, and its bytes are not emitted. Invalid grammar or schema constraints map to the typed `INVALID_OUTPUT_CONSTRAINT` configuration error before decode.
 
-`GenerationEvent.Prepared` exposes only safe effective metadata: preset/version, sampling values, effective seed, context size, prompt token count, template ID/source and system-prompt version. Prompt, output, system-prompt text, template text, schemas and stop sequences are not persisted in normal telemetry.
+`GenerationEvent.Prepared` exposes only safe effective metadata: preset/version, sampling values including repeat penalty/window, effective seed, context size, prompt token count, template ID/source and system-prompt version. Prompt, output, system-prompt text, template text, schemas and stop sequences are not persisted in normal telemetry.
 
 Listener callbacks are not an Android main-thread API. Dispatch UI updates to the application's main-thread mechanism.
 

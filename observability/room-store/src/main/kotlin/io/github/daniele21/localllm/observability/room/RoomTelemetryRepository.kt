@@ -270,6 +270,13 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_penalty REAL")
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_last_n INTEGER")
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -280,7 +287,7 @@ class RoomTelemetryRepository internal constructor(
                 context.applicationContext,
                 TelemetryDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
             }

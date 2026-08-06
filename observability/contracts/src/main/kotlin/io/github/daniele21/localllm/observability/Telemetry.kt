@@ -35,6 +35,8 @@ data class GenerationRunRecord(
     val temperature: Float? = null,
     val topP: Float? = null,
     val topK: Int? = null,
+    val repeatPenalty: Float? = null,
+    val repeatLastN: Int? = null,
     val seedPolicy: SeedPolicyType? = null,
     val effectiveSeed: Long? = null,
     val maxOutputTokens: Int? = null,

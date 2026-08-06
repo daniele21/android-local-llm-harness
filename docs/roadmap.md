@@ -111,7 +111,7 @@ These checks provide host-side and simulated evidence. They do not prove Android
 - [ ] expose explicit load/unload product controls that change RAM residency without deleting the installed model or changing its selection
 - [ ] add a configurable, monotonic warm-idle TTL with safe rearming, pinning and unload-reason telemetry
 - [ ] implement the staged [generation configuration and prompting workstream](generation-configuration-and-prompting-plan.md):
-  versioned presets, explicit sampling overrides, model-aware prompt compilation, exact-token
+  versioned presets, explicit sampling and repeat-protection overrides, model-aware prompt compilation, exact-token
   context planning, output constraints and privacy-safe effective-configuration telemetry
 - [x] recover after cancellation and request failure
 

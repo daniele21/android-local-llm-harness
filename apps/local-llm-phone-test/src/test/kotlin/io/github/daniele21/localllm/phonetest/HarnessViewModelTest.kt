@@ -151,6 +151,8 @@ class HarnessViewModelTest {
         assertEquals("Explain local inference", effects.startedPrompt)
         assertEquals(64, effects.startedOptions?.maxOutputTokens)
         assertEquals(0.4f, effects.startedOptions?.temperature)
+        assertEquals(1.05f, effects.startedOptions?.repeatPenalty)
+        assertEquals(64, effects.startedOptions?.repeatLastN)
         assertEquals(SeedPolicy.Fixed(7), effects.startedOptions?.seedPolicy)
     }
 
@@ -212,6 +214,20 @@ class HarnessViewModelTest {
         assertEquals("", viewModel.uiState.value.playgroundPreset)
         assertEquals("short-form", viewModel.uiState.value.playgroundBasePreset)
         assertEquals("0.3", viewModel.uiState.value.playgroundTemperature)
+    }
+
+    @Test
+    fun repetitionOverridesKeepPresetAsCustomizationBase() {
+        val viewModel = HarnessViewModel()
+
+        viewModel.updatePlaygroundPreset("balanced-conversation")
+        viewModel.updatePlaygroundRepeatPenalty("1.1")
+        viewModel.updatePlaygroundRepeatLastN("96")
+
+        assertEquals("", viewModel.uiState.value.playgroundPreset)
+        assertEquals("balanced-conversation", viewModel.uiState.value.playgroundBasePreset)
+        assertEquals("1.1", viewModel.uiState.value.playgroundRepeatPenalty)
+        assertEquals("96", viewModel.uiState.value.playgroundRepeatLastN)
     }
 
     private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(

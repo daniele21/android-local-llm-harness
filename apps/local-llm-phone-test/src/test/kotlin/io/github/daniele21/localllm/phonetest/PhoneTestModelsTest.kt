@@ -35,6 +35,9 @@ class PhoneTestModelsTest {
         assertEquals(4_096, precise.contextPreference.recommendedMaximumTokens)
         assertEquals(null, precise.contextPreference.maximumTokens)
         val balanced = resolved.useCase.presets.first { it.ref.id.value == "balanced-conversation" }
+        assertEquals(PHONE_INFERENCE_PRESET_VERSION, balanced.ref.version)
+        assertEquals(1.05f, balanced.generation.repeatPenalty)
+        assertEquals(64, balanced.generation.repeatLastN)
         assertEquals(4_096, balanced.contextPreference.preferredTokens)
         assertEquals(8_192, balanced.contextPreference.recommendedMaximumTokens)
     }
@@ -42,17 +45,23 @@ class PhoneTestModelsTest {
     @Test
     fun playgroundOptionsParseSupportedOverrides() {
         val options = PlaygroundRequestOptions.parse(
-            presetId = "",
-            maxOutputTokens = "256",
-            temperature = "0.35",
-            topP = "0.9",
-            topK = "40",
-            seed = "123456789",
-            context = "4096",
+            PlaygroundRequestFields(
+                presetId = "",
+                maxOutputTokens = "256",
+                temperature = "0.35",
+                topP = "0.9",
+                topK = "40",
+                repeatPenalty = "1.1",
+                repeatLastN = "96",
+                seed = "123456789",
+                context = "4096",
+            ),
         )
 
         assertEquals(256, options.maxOutputTokens)
         assertEquals(0.35f, options.temperature)
+        assertEquals(1.1f, options.repeatPenalty)
+        assertEquals(96, options.repeatLastN)
         assertEquals(SeedPolicy.Fixed(123456789), options.seedPolicy)
         assertEquals(4096, options.contextTokens)
     }
@@ -61,13 +70,38 @@ class PhoneTestModelsTest {
     fun playgroundOptionsRejectUnsafeOutputBounds() {
         val error = runCatching {
             PlaygroundRequestOptions.parse(
-                presetId = "",
-                maxOutputTokens = "32769",
-                temperature = "0.2",
-                topP = "0.9",
-                topK = "40",
-                seed = "42",
-                context = "",
+                PlaygroundRequestFields(
+                    presetId = "",
+                    maxOutputTokens = "32769",
+                    temperature = "0.2",
+                    topP = "0.9",
+                    topK = "40",
+                    repeatPenalty = "1.05",
+                    repeatLastN = "64",
+                    seed = "42",
+                    context = "",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+    }
+
+    @Test
+    fun playgroundOptionsRejectEnabledPenaltyWithoutARepeatWindow() {
+        val error = runCatching {
+            PlaygroundRequestOptions.parse(
+                PlaygroundRequestFields(
+                    presetId = "",
+                    maxOutputTokens = "64",
+                    temperature = "0.7",
+                    topP = "0.8",
+                    topK = "20",
+                    repeatPenalty = "1.05",
+                    repeatLastN = "0",
+                    seed = "",
+                    context = "",
+                ),
             )
         }.exceptionOrNull()
 

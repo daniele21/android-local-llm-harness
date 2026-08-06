@@ -42,6 +42,7 @@ add_library(
     gguf_metadata.cpp
     common_string_utils.cpp
     generation_output_buffer.cpp
+    generation_sampler.cpp
     llama_jni_entry.cpp
     "${LLAMA_CPP_DIR}/common/json-schema-to-grammar.cpp"
 )

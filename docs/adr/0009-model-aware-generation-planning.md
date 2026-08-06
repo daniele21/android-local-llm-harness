@@ -20,7 +20,7 @@ runtime configuration.
 
 Generation is resolved into a model-aware execution plan before prefill.
 
-- `GenerationOverrides` owns request-scoped sampling, preset and output controls.
+- `GenerationOverrides` owns request-scoped sampling, including the bounded repeat penalty/window, preset and output controls.
 - `SessionOptions` owns `Auto` or `Manual` context policy.
 - `createSession` creates a logical session; a native context is materialized lazily after the
   prompt is rendered and tokenized with the loaded model.
@@ -42,7 +42,7 @@ Generation is resolved into a model-aware execution plan before prefill.
 - The native backend owns one streaming decode path for template rendering, tokenization,
   sampling, grammar, stop handling and terminal-reason semantics. Aggregation, when needed,
   derives from that stream above the native boundary rather than running a second decode loop.
-- Normal telemetry may persist bounded IDs, versions, numeric configuration, token counts,
+- Normal telemetry may persist bounded IDs, versions, numeric configuration including effective repeat protection, token counts,
   context size, template source and stop reason. It never persists prompt, output, messages,
   system-prompt text, template text, schema, grammar or stop sequences.
 

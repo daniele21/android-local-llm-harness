@@ -152,8 +152,12 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                     temperature = options.temperature,
                     topP = options.topP,
                     topK = options.topK,
+                    repeatPenalty = options.repeatPenalty,
+                    repeatLastN = options.repeatLastN,
                     seedPolicy = options.seedPolicy,
-                    preset = options.presetId?.let { InferencePresetRef(InferencePresetId(it), 1) },
+                    preset = options.presetId?.let {
+                        InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION)
+                    },
                 ),
             )
             val handle = currentHarness.runtime.generate(

@@ -1015,6 +1015,24 @@ class MainActivity :
                 enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
             )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundRepeatPenalty,
+                onValueChange = harnessViewModel::updatePlaygroundRepeatPenalty,
+                modifier = Modifier.weight(1f).testTag("playground-repeat-penalty"),
+                label = { Text("Repeat penalty") },
+                supportingText = { Text("1 = off") },
+                enabled = presentation.inputsEnabled,
+            )
+            OutlinedTextField(
+                value = state.playgroundRepeatLastN,
+                onValueChange = harnessViewModel::updatePlaygroundRepeatLastN,
+                modifier = Modifier.weight(1f).testTag("playground-repeat-last-n"),
+                label = { Text("Repeat last N") },
+                supportingText = { Text("0 = off") },
+                enabled = presentation.inputsEnabled,
+            )
+        }
         Text("Seed policy", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
@@ -1111,7 +1129,7 @@ class MainActivity :
             presentation.effectiveConfiguration?.let { configuration ->
                 Text(
                     "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
-                        "Seed ${configuration.effectiveSeed}",
+                        "Seed ${configuration.effectiveSeed} · Repeat ${configuration.repeatPenalty}/${configuration.repeatLastN}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

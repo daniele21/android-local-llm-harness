@@ -106,39 +106,46 @@ internal data class PlaygroundRequestOptions(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val seedPolicy: SeedPolicy,
     val contextTokens: Int?,
 ) {
     companion object {
-        fun parse(
-            presetId: String,
-            maxOutputTokens: String,
-            temperature: String,
-            topP: String,
-            topK: String,
-            seed: String,
-            context: String,
-        ): PlaygroundRequestOptions {
-            val parsedMaxOutputTokens = requireNotNull(maxOutputTokens.trim().toIntOrNull()) {
+        fun parse(fields: PlaygroundRequestFields): PlaygroundRequestOptions {
+            val parsedMaxOutputTokens = requireNotNull(fields.maxOutputTokens.trim().toIntOrNull()) {
                 "Maximum output tokens must be an integer"
             }
             require(parsedMaxOutputTokens in MIN_OUTPUT_TOKENS..MAX_OUTPUT_TOKENS) {
                 "Maximum output tokens must be between $MIN_OUTPUT_TOKENS and $MAX_OUTPUT_TOKENS"
             }
-            val parsedTemperature = requireNotNull(temperature.trim().toFloatOrNull()) {
+            val parsedTemperature = requireNotNull(fields.temperature.trim().toFloatOrNull()) {
                 "Temperature must be a number"
             }
             require(parsedTemperature in MIN_TEMPERATURE..MAX_TEMPERATURE) {
                 "Temperature must be between $MIN_TEMPERATURE and $MAX_TEMPERATURE"
             }
-            val parsedTopP = requireNotNull(topP.trim().toFloatOrNull()) { "Top-p must be a number" }
+            val parsedTopP = requireNotNull(fields.topP.trim().toFloatOrNull()) { "Top-p must be a number" }
             require(parsedTopP > 0f && parsedTopP <= 1f) { "Top-p must be in (0, 1]" }
-            val parsedTopK = requireNotNull(topK.trim().toIntOrNull()) { "Top-k must be an integer" }
+            val parsedTopK = requireNotNull(fields.topK.trim().toIntOrNull()) { "Top-k must be an integer" }
             require(parsedTopK in 0..1000) { "Top-k must be between 0 and 1000" }
-            val parsedSeed = seed.trim().takeIf(String::isNotEmpty)?.let {
+            val parsedRepeatPenalty = requireNotNull(fields.repeatPenalty.trim().toFloatOrNull()) {
+                "Repeat penalty must be a number"
+            }
+            require(parsedRepeatPenalty.isFinite() && parsedRepeatPenalty in 1f..2f) {
+                "Repeat penalty must be between 1 and 2"
+            }
+            val parsedRepeatLastN = requireNotNull(fields.repeatLastN.trim().toIntOrNull()) {
+                "Repeat window must be an integer"
+            }
+            require(parsedRepeatLastN in 0..4_096) { "Repeat window must be between 0 and 4096" }
+            require(parsedRepeatPenalty == 1f || parsedRepeatLastN > 0) {
+                "Repeat window must be positive when repeat penalty is enabled"
+            }
+            val parsedSeed = fields.seed.trim().takeIf(String::isNotEmpty)?.let {
                 SeedPolicy.Fixed(requireNotNull(it.toLongOrNull()) { "Seed must be an integer" })
             } ?: SeedPolicy.Random
-            val parsedContext = context.trim().takeIf(String::isNotEmpty)?.let {
+            val parsedContext = fields.context.trim().takeIf(String::isNotEmpty)?.let {
                 requireNotNull(it.toIntOrNull()) { "Context must be an integer or blank for Auto" }
             }
             return PlaygroundRequestOptions(
@@ -146,9 +153,11 @@ internal data class PlaygroundRequestOptions(
                 temperature = parsedTemperature,
                 topP = parsedTopP,
                 topK = parsedTopK,
+                repeatPenalty = parsedRepeatPenalty,
+                repeatLastN = parsedRepeatLastN,
                 seedPolicy = parsedSeed,
                 contextTokens = parsedContext,
-                presetId = presetId.trim().takeIf(String::isNotEmpty),
+                presetId = fields.presetId.trim().takeIf(String::isNotEmpty),
             )
         }
 
@@ -158,6 +167,18 @@ internal data class PlaygroundRequestOptions(
         private const val MAX_TEMPERATURE = 2f
     }
 }
+
+internal data class PlaygroundRequestFields(
+    val presetId: String,
+    val maxOutputTokens: String,
+    val temperature: String,
+    val topP: String,
+    val topK: String,
+    val repeatPenalty: String,
+    val repeatLastN: String,
+    val seed: String,
+    val context: String,
+)
 
 internal class SinglePhoneBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
@@ -210,13 +231,15 @@ internal fun resolvedPhoneUseCase(
             topP = 1f,
             topK = 0,
             seed = 42,
+            repeatPenalty = PHONE_REPEAT_PENALTY,
+            repeatLastN = PHONE_REPEAT_LAST_N,
         ),
         outputMode = OutputMode.TEXT,
         cachePolicy = UseCaseCachePolicy(0, false, false, false),
         healthSuiteId = "play-internal-phone-$profileSuffix-health",
         systemPrompt = "You are a concise, accurate assistant running entirely on the user's device.",
         presets = phoneInferencePresets(),
-        defaultPreset = InferencePresetRef(InferencePresetId("balanced-conversation"), 1),
+        defaultPreset = InferencePresetRef(InferencePresetId("balanced-conversation"), PHONE_INFERENCE_PRESET_VERSION),
     )
     return ResolvedUseCase(
         binding = AppModelBinding(applicationId, useCaseId, useCase.id),
@@ -236,13 +259,15 @@ internal fun resolvedPhonePlaygroundUseCase(model: ImportedPhoneModel): Resolved
 private fun phoneInferencePresets(): List<InferencePreset> = playgroundPresetOptions.map(::phonePreset)
 
 private fun phonePreset(preset: PlaygroundPresetOption): InferencePreset = InferencePreset(
-    ref = InferencePresetRef(InferencePresetId(preset.id), 1),
+    ref = InferencePresetRef(InferencePresetId(preset.id), PHONE_INFERENCE_PRESET_VERSION),
     generation = GenerationDefaults(
         maxOutputTokens = preset.maxOutputTokens.toInt(),
         temperature = preset.temperature.toFloat(),
         topP = preset.topP.toFloat(),
         topK = preset.topK.toInt(),
         seedPolicy = preset.seed.toLongOrNull()?.let(SeedPolicy::Fixed) ?: SeedPolicy.Random,
+        repeatPenalty = preset.repeatPenalty.toFloat(),
+        repeatLastN = preset.repeatLastN.toInt(),
     ),
     systemPromptVersion = "play-internal-phone-${preset.id}-v1",
     systemPrompt = preset.systemPrompt,
@@ -256,3 +281,7 @@ private fun phonePreset(preset: PlaygroundPresetOption): InferencePreset = Infer
         setOf(OutputMode.TEXT)
     },
 )
+
+internal const val PHONE_INFERENCE_PRESET_VERSION = 2
+private const val PHONE_REPEAT_PENALTY = 1.05f
+private const val PHONE_REPEAT_LAST_N = 64

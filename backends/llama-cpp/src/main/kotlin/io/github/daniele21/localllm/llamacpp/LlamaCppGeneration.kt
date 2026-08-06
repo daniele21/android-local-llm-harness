@@ -115,19 +115,35 @@ data class NativeGenerationConfig(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val seed: Long,
     val outputConstraintType: String = "TEXT",
     val outputSchema: String? = null,
     val stopTokenIds: IntArray = intArrayOf(),
     val stopSequences: List<String> = emptyList(),
 ) {
-    internal fun validationError(prompt: String): GenerationNativeError? = when {
+    internal fun validationError(prompt: String): GenerationNativeError? =
+        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError()
+
+    private fun baseValidationError(prompt: String): GenerationNativeError? = when {
         prompt.isBlank() -> invalid("Prompt must not be blank")
         maxOutputTokens <= 0 -> invalid("Maximum output tokens must be positive")
         temperature < 0F -> invalid("Temperature must not be negative")
         topP <= 0F || topP > 1F -> invalid("Top-p must be in (0, 1]")
         topK < 0 -> invalid("Top-k must not be negative")
         seed < 0 -> invalid("Seed must not be negative")
+        else -> null
+    }
+
+    private fun repeatValidationError(): GenerationNativeError? = when {
+        !repeatPenalty.isFinite() || repeatPenalty !in 1f..2f -> invalid("Repeat penalty must be in [1, 2]")
+        repeatLastN !in 0..4_096 -> invalid("Repeat window must be in [0, 4096]")
+        repeatPenalty != 1f && repeatLastN == 0 -> invalid("Repeat window must be positive when repeat penalty is enabled")
+        else -> null
+    }
+
+    private fun constraintValidationError(): GenerationNativeError? = when {
         outputConstraintType !in OUTPUT_CONSTRAINT_TYPES -> invalid("Unsupported output constraint type")
         outputConstraintType == "JSON_SCHEMA" && outputSchema.isNullOrBlank() -> invalid("JSON Schema must not be blank")
         stopSequences.any { it.isEmpty() } -> invalid("Stop sequences must not be empty")

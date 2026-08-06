@@ -131,6 +131,8 @@ class LlamaCppInferenceBackend(
             temperature = request.temperature,
             topP = request.topP,
             topK = request.topK,
+            repeatPenalty = request.repeatPenalty,
+            repeatLastN = request.repeatLastN,
             seed = request.seed,
             outputConstraintType = request.outputConstraint.nativeType,
             outputSchema = (request.outputConstraint as? OutputConstraint.JsonSchema)?.schema,

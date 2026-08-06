@@ -1,6 +1,8 @@
 package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ChatTemplateSource
+import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
@@ -8,6 +10,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
@@ -28,12 +31,33 @@ class RuntimeTelemetryTest {
     @Test
     fun `completed generation persists a privacy-safe timeline and metrics`() {
         val repository = InMemoryTelemetryRepository()
-        val clock = SequenceEpochClock(1_000L, 1_001L, 1_002L, 1_003L, 1_004L, 1_005L)
+        val clock = SequenceEpochClock(1_000L, 1_001L, 1_002L, 1_003L, 1_004L, 1_005L, 1_006L)
         val telemetry = RuntimeTelemetry(repository, clock)
         val request = request(input = "secret prompt text")
 
         telemetry.queued(request, ModelDigest("a".repeat(64)))
         telemetry.queuedPosition(request.requestId, 2)
+        telemetry.prepared(
+            request.requestId,
+            EffectiveGenerationMetadata(
+                preset = null,
+                temperature = 0.7f,
+                topP = 0.8f,
+                topK = 20,
+                repeatPenalty = 1.05f,
+                repeatLastN = 64,
+                requestedSeedPolicy = SeedPolicyType.RANDOM,
+                effectiveSeed = 42,
+                maxOutputTokens = 64,
+                contextSize = 1_024,
+                promptTokenCount = 12,
+                chatTemplateId = "template-v1",
+                chatTemplateSource = ChatTemplateSource.GGUF,
+                systemPromptVersion = "system-v1",
+            ),
+            promptPlanningMs = 2,
+            contextCreationMs = 3,
+        )
         telemetry.started(request.requestId)
         telemetry.completed(
             request.requestId,
@@ -54,10 +78,12 @@ class RuntimeTelemetryTest {
         val run = requireNotNull(repository.findRun(request.requestId))
         assertEquals(RunStatus.COMPLETED, run.status)
         assertEquals(1_000L, run.startedAtEpochMs)
-        assertEquals(1_004L, run.completedAtEpochMs)
+        assertEquals(1_005L, run.completedAtEpochMs)
         assertEquals(8L, run.prefillMs)
         assertEquals(9L, run.decodeMs)
         assertEquals(ModelLoadKind.COLD, run.modelLoadKind)
+        assertEquals(1.05f, run.repeatPenalty)
+        assertEquals(64, run.repeatLastN)
 
         val persistedText = repository.recentLogs()
             .flatMap { it.fields.entries }
@@ -69,6 +95,7 @@ class RuntimeTelemetryTest {
             listOf(
                 "generation.completed",
                 "generation.started",
+                "generation.prepared",
                 "generation.queue_position",
                 "generation.queued",
             ),
