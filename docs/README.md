@@ -83,3 +83,5 @@ python3 scripts/verify-agent-navigation.py
 python3 -m py_compile scripts/*.py
 git diff --check
 ```
+
+The agent-navigation guard verifies that every configured Gradle module remains discoverable through the concise repository overview or an applicable scoped guide, without requiring the root guide to duplicate the complete module map.
