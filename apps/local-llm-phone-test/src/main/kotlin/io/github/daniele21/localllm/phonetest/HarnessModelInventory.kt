@@ -64,71 +64,107 @@ internal object HarnessModelInventoryReconciler {
         loadedDigest: String? = null,
     ): HarnessModelInventoryState {
         val selectedDigest = selectedModel?.digest?.sha256
-        val catalogItems = distribution.models.map { model ->
-            val digest = model.installedModel?.digest?.sha256
-            val selected = digest != null && digest == selectedDigest
-            val loaded = digest != null && digest == loadedDigest
-            val mismatch = loaded && selectedDigest != null && selectedDigest != loadedDigest
-            HarnessModelInventoryItem(
-                stableId = model.stableId,
-                displayName = model.displayName,
-                origin = HarnessModelOrigin.CATALOG,
-                digest = digest,
-                lifecycle = when {
-                    mismatch -> HarnessModelLifecycle.DEGRADED
-                    loaded -> HarnessModelLifecycle.LOADED
-                    selected -> HarnessModelLifecycle.SELECTED
-                    else -> model.status.toLifecycle()
-                },
-                compatible = model.compatible,
-                installed = model.installedModel != null,
-                selected = selected,
-                loaded = loaded,
-                detail = model.detail,
-                degradation = if (mismatch) {
-                    HarnessModelDegradation.LOADED_MODEL_DIFFERS_FROM_SELECTION
-                } else {
-                    null
-                },
-            )
-        }.toMutableList()
+        val items = distribution.models
+            .map { it.toInventoryItem(selectedDigest, loadedDigest) }
+            .toMutableList()
 
-        val selectedRepresented = selectedDigest != null && catalogItems.any { it.digest == selectedDigest }
-        if (selectedModel != null && !selectedRepresented) {
-            val loaded = selectedDigest == loadedDigest
-            catalogItems += HarnessModelInventoryItem(
-                stableId = "imported::$selectedDigest",
-                displayName = selectedModel.fileName,
-                origin = HarnessModelOrigin.IMPORTED,
-                digest = selectedDigest,
-                lifecycle = if (loaded) HarnessModelLifecycle.LOADED else HarnessModelLifecycle.SELECTED,
-                installed = true,
-                selected = true,
-                loaded = loaded,
-                detail = "Imported GGUF selected for this application",
-            )
-        }
-
-        val loadedRepresented = loadedDigest != null && catalogItems.any { it.digest == loadedDigest }
-        if (loadedDigest != null && !loadedRepresented) {
-            catalogItems += HarnessModelInventoryItem(
-                stableId = "runtime::$loadedDigest",
-                displayName = "Runtime-owned model",
-                origin = HarnessModelOrigin.RUNTIME,
-                digest = loadedDigest,
-                lifecycle = HarnessModelLifecycle.DEGRADED,
-                loaded = true,
-                detail = "The runtime owns a model that is absent from the current inventory",
-                degradation = HarnessModelDegradation.LOADED_MODEL_NOT_IN_INVENTORY,
-            )
-        }
+        appendExternalSelection(items, selectedModel, selectedDigest, loadedDigest)
+        appendUnknownRuntimeOwnership(items, loadedDigest)
 
         return HarnessModelInventoryState(
-            items = catalogItems,
+            items = items,
             selectedDigest = selectedDigest,
             loadedDigest = loadedDigest,
         )
     }
+
+    private fun PhoneCatalogModelUi.toInventoryItem(
+        selectedDigest: String?,
+        loadedDigest: String?,
+    ): HarnessModelInventoryItem {
+        val installedDigest = installedModel?.digest?.sha256
+        val selected = installedDigest != null && installedDigest == selectedDigest
+        val loaded = installedDigest != null && installedDigest == loadedDigest
+        val mismatch = loaded && selectedDigest != null && selectedDigest != loadedDigest
+        return HarnessModelInventoryItem(
+            stableId = stableId,
+            displayName = displayName,
+            origin = HarnessModelOrigin.CATALOG,
+            digest = installedDigest,
+            lifecycle = lifecycle(mismatch, loaded, selected),
+            compatible = compatible,
+            installed = installedModel != null,
+            selected = selected,
+            loaded = loaded,
+            detail = detail,
+            degradation = mismatch.takeIf { it }?.let {
+                HarnessModelDegradation.LOADED_MODEL_DIFFERS_FROM_SELECTION
+            },
+        )
+    }
+
+    private fun lifecycle(
+        mismatch: Boolean,
+        loaded: Boolean,
+        selected: Boolean,
+    ): HarnessModelLifecycle = when {
+        mismatch -> HarnessModelLifecycle.DEGRADED
+        loaded -> HarnessModelLifecycle.LOADED
+        selected -> HarnessModelLifecycle.SELECTED
+        else -> error("Catalog lifecycle must be supplied by the model status")
+    }
+
+    private fun PhoneCatalogModelUi.lifecycle(
+        mismatch: Boolean,
+        loaded: Boolean,
+        selected: Boolean,
+    ): HarnessModelLifecycle = when {
+        mismatch -> HarnessModelLifecycle.DEGRADED
+        loaded -> HarnessModelLifecycle.LOADED
+        selected -> HarnessModelLifecycle.SELECTED
+        else -> status.toLifecycle()
+    }
+
+    private fun appendExternalSelection(
+        items: MutableList<HarnessModelInventoryItem>,
+        selectedModel: ImportedPhoneModel?,
+        selectedDigest: String?,
+        loadedDigest: String?,
+    ) {
+        if (selectedModel == null || items.represents(selectedDigest)) return
+        val loaded = selectedDigest == loadedDigest
+        items += HarnessModelInventoryItem(
+            stableId = "imported::$selectedDigest",
+            displayName = selectedModel.fileName,
+            origin = HarnessModelOrigin.IMPORTED,
+            digest = selectedDigest,
+            lifecycle = if (loaded) HarnessModelLifecycle.LOADED else HarnessModelLifecycle.SELECTED,
+            installed = true,
+            selected = true,
+            loaded = loaded,
+            detail = "Imported GGUF selected for this application",
+        )
+    }
+
+    private fun appendUnknownRuntimeOwnership(
+        items: MutableList<HarnessModelInventoryItem>,
+        loadedDigest: String?,
+    ) {
+        if (loadedDigest == null || items.represents(loadedDigest)) return
+        items += HarnessModelInventoryItem(
+            stableId = "runtime::$loadedDigest",
+            displayName = "Runtime-owned model",
+            origin = HarnessModelOrigin.RUNTIME,
+            digest = loadedDigest,
+            lifecycle = HarnessModelLifecycle.DEGRADED,
+            loaded = true,
+            detail = "The runtime owns a model that is absent from the current inventory",
+            degradation = HarnessModelDegradation.LOADED_MODEL_NOT_IN_INVENTORY,
+        )
+    }
+
+    private fun List<HarnessModelInventoryItem>.represents(digest: String?): Boolean =
+        digest != null && any { it.digest == digest }
 
     private fun PhoneCatalogModelStatus.toLifecycle(): HarnessModelLifecycle = when (this) {
         PhoneCatalogModelStatus.INCOMPATIBLE -> HarnessModelLifecycle.INCOMPATIBLE
