@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.Image
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -97,6 +99,7 @@ class MainActivity :
     private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
+    private val harnessViewModel: HarnessViewModel by viewModels()
 
     private var importedModel by mutableStateOf<ImportedPhoneModel?>(null)
     private var modelDistributionState by mutableStateOf(PhoneModelDistributionState())
@@ -106,17 +109,12 @@ class MainActivity :
     private var resourceCaptureRunning by mutableStateOf(false)
     private var benchmarkCaptureRunning by mutableStateOf(false)
     private var operationStatus by mutableStateOf("Ready")
-    private var playgroundState by mutableStateOf(PlaygroundState())
     private var diagnosticsState by mutableStateOf(DiagnosticsUiState(null, emptyList(), emptyList()))
     private var benchmarkState by mutableStateOf(BenchmarkUiState())
     private var logFilter by mutableStateOf(DiagnosticsLogFilter())
     private var logState by mutableStateOf(DiagnosticsLogUiState())
     private var selectedRequestTimeline by mutableStateOf<DiagnosticsRequestTimelineUi?>(null)
     private var diagnosticsSection by mutableStateOf(DiagnosticsSection.HEALTH)
-    private var playgroundPrompt by mutableStateOf(DEFAULT_PROMPT)
-    private var playgroundMaxTokens by mutableStateOf(DEFAULT_MAX_OUTPUT_TOKENS)
-    private var playgroundTemperature by mutableStateOf(DEFAULT_TEMPERATURE)
-    private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
     private var selectedRemovalConfirmationPending by mutableStateOf(false)
     private var themePreference by mutableStateOf(HarnessThemePreference.DARK)
 
@@ -162,12 +160,13 @@ class MainActivity :
                 runOnUiThread {
                     modelDistributionState = state
                     operationStatus = state.message
+                    harnessViewModel.dispatch(HarnessUiEvent.ModelDistributionChanged(state))
                     updateKeepScreenOn()
                 }
             },
         )
-        playgroundController = PhonePlaygroundController(this, ::onPlaygroundStateChanged)
-        playgroundState = playgroundController.snapshot()
+        playgroundController = PhonePlaygroundController(runtimeGraph, ::onPlaygroundStateChanged)
+        harnessViewModel.attachPlaygroundEffects(playgroundController)
         refreshDiagnostics()
 
         setContent {
@@ -200,6 +199,7 @@ class MainActivity :
     override fun onDestroy() {
         diagnosticsExecutor.shutdownNow()
         modelDistributionController.close()
+        harnessViewModel.detachPlaygroundEffects(playgroundController)
         playgroundController.close()
         controller.close()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -209,6 +209,7 @@ class MainActivity :
     override fun onBusyChanged(busy: Boolean) {
         runOnUiThread {
             controllerBusy = busy
+            harnessViewModel.dispatch(HarnessUiEvent.ControllerBusyChanged(busy))
             updateKeepScreenOn()
             refreshDiagnostics()
         }
@@ -225,6 +226,7 @@ class MainActivity :
         selectedModelForDiagnostics = model
         runOnUiThread {
             importedModel = model
+            harnessViewModel.dispatch(HarnessUiEvent.ModelChanged(model))
             selectedRemovalConfirmationPending = false
             if (::modelDistributionController.isInitialized) {
                 modelDistributionController.refresh()
@@ -236,6 +238,7 @@ class MainActivity :
     override fun onReport(report: String) {
         runOnUiThread {
             latestReport = report
+            harnessViewModel.dispatch(HarnessUiEvent.ReportChanged(report))
             operationStatus = "Validation completed"
             refreshDiagnostics()
         }
@@ -243,7 +246,7 @@ class MainActivity :
 
     private fun onPlaygroundStateChanged(state: PlaygroundState) {
         runOnUiThread {
-            playgroundState = state
+            harnessViewModel.dispatch(HarnessUiEvent.PlaygroundChanged(state))
             updateKeepScreenOn()
             refreshDiagnostics()
         }
@@ -370,6 +373,7 @@ class MainActivity :
 
     @Composable
     private fun HarnessApp() {
+        val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val destination = HarnessDestination.fromRoute(backStackEntry?.destination?.route)
@@ -445,6 +449,7 @@ class MainActivity :
                 ) {
                     composable(HarnessDestination.OVERVIEW.route) {
                         OverviewScreen(
+                            playground = uiState.playground,
                             onOpenPlayground = { navigate(HarnessDestination.PLAYGROUND) },
                             onOpenModels = { navigate(HarnessDestination.MODELS) },
                             onOpenDiagnostics = { navigate(HarnessDestination.DIAGNOSTICS) },
@@ -453,6 +458,7 @@ class MainActivity :
                     }
                     composable(HarnessDestination.PLAYGROUND.route) {
                         PlaygroundScreen(
+                            state = uiState,
                             onOpenModels = { navigate(HarnessDestination.MODELS) },
                         )
                     }
@@ -472,6 +478,7 @@ class MainActivity :
 
     @Composable
     private fun OverviewScreen(
+        playground: PlaygroundState,
         onOpenPlayground: () -> Unit,
         onOpenModels: () -> Unit,
         onOpenDiagnostics: () -> Unit,
@@ -530,7 +537,7 @@ class MainActivity :
                         label = "Load state",
                         value = diagnosticsState.runtime?.state?.name?.lowercase()?.replaceFirstChar(Char::uppercase)
                             ?: "Idle",
-                        status = if (playgroundState.active) "Running" else "Warm",
+                        status = if (playground.active) "Running" else "Warm",
                         statusPositive = true,
                         onClick = onOpenPlayground,
                     )
@@ -596,9 +603,9 @@ class MainActivity :
                     RuntimeInfoRow(
                         icon = HarnessDestination.PLAYGROUND,
                         label = "Latest inference",
-                        value = playgroundState.metrics?.totalMs?.let { "$it ms total" } ?: "No runs yet",
-                        status = playgroundState.phase.name.lowercase().replaceFirstChar(Char::uppercase),
-                        statusPositive = playgroundState.phase == PlaygroundPhase.IDLE,
+                        value = playground.metrics?.totalMs?.let { "$it ms total" } ?: "No runs yet",
+                        status = playground.phase.name.lowercase().replaceFirstChar(Char::uppercase),
+                        statusPositive = playground.phase == PlaygroundPhase.IDLE,
                         onClick = onOpenPlayground,
                         showDivider = false,
                     )
@@ -713,19 +720,24 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundScreen(onOpenModels: () -> Unit) {
+    private fun PlaygroundScreen(state: HarnessUiState, onOpenModels: () -> Unit) {
         var advancedVisible by rememberSaveable { mutableStateOf(true) }
         ScreenList(title = null) {
             item { DeviceOnlyStatus("Runs entirely on this device") }
-            item { PlaygroundModelState(onOpenModels) }
-            item { PlaygroundPromptCard(advancedVisible) { advancedVisible = !advancedVisible } }
-            item { PlaygroundResponseCard() }
+            item { PlaygroundModelState(state.importedModel, onOpenModels) }
+            item {
+                PlaygroundPromptCard(
+                    state = state,
+                    advancedVisible = advancedVisible,
+                    onToggleAdvanced = { advancedVisible = !advancedVisible },
+                )
+            }
+            item { PlaygroundResponseCard(state.playground) }
         }
     }
 
     @Composable
-    private fun PlaygroundModelState(onOpenModels: () -> Unit) {
-        val model = importedModel
+    private fun PlaygroundModelState(model: ImportedPhoneModel?, onOpenModels: () -> Unit) {
         Surface(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenModels),
             color = MaterialTheme.colorScheme.surface,
@@ -752,7 +764,7 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundPromptCard(advancedVisible: Boolean, onToggleAdvanced: () -> Unit) {
+    private fun PlaygroundPromptCard(state: HarnessUiState, advancedVisible: Boolean, onToggleAdvanced: () -> Unit) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -762,18 +774,18 @@ class MainActivity :
                 Text("Prompt", style = MaterialTheme.typography.titleLarge)
                 Text(
                     "Clear",
-                    modifier = Modifier.clickable { playgroundPrompt = "" },
+                    modifier = Modifier.clickable { harnessViewModel.updatePlaygroundPrompt("") },
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
             OutlinedTextField(
-                value = playgroundPrompt,
-                onValueChange = { playgroundPrompt = it },
+                value = state.playgroundPrompt,
+                onValueChange = harnessViewModel::updatePlaygroundPrompt,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Prompt") },
                 minLines = 4,
-                enabled = !isBusy(),
+                enabled = !state.busy,
             )
             HarnessSecondaryButton(
                 text = if (advancedVisible) "Generation settings  ·  Hide" else "Generation settings  ·  Show",
@@ -781,68 +793,65 @@ class MainActivity :
                 onClick = onToggleAdvanced,
             )
             if (advancedVisible) {
-                PlaygroundGenerationSettings()
+                PlaygroundGenerationSettings(state)
             }
-            PlaygroundRunControls()
+            PlaygroundRunControls(state)
         }
     }
 
     @Composable
-    private fun PlaygroundGenerationSettings() {
+    private fun PlaygroundGenerationSettings(state: HarnessUiState) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
-                value = playgroundMaxTokens,
-                onValueChange = { playgroundMaxTokens = it },
+                value = state.playgroundMaxTokens,
+                onValueChange = harnessViewModel::updatePlaygroundMaxTokens,
                 modifier = Modifier.weight(1f),
                 label = { Text("Max tokens") },
+                enabled = !state.busy,
             )
             OutlinedTextField(
-                value = playgroundTemperature,
-                onValueChange = { playgroundTemperature = it },
+                value = state.playgroundTemperature,
+                onValueChange = harnessViewModel::updatePlaygroundTemperature,
                 modifier = Modifier.weight(1f),
                 label = { Text("Temperature") },
+                enabled = !state.busy,
             )
             OutlinedTextField(
-                value = playgroundSeed,
-                onValueChange = { playgroundSeed = it },
+                value = state.playgroundSeed,
+                onValueChange = harnessViewModel::updatePlaygroundSeed,
                 modifier = Modifier.weight(1f),
                 label = { Text("Seed") },
+                enabled = !state.busy,
             )
         }
     }
 
     @Composable
-    private fun PlaygroundRunControls() {
+    private fun PlaygroundRunControls(state: HarnessUiState) {
+        val playground = state.playground
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HarnessPrimaryButton(
-                text = if (playgroundState.active) "Generating…" else "Run locally",
-                enabled = importedModel != null && !isBusy(),
+                text = if (playground.active) "Generating…" else "Run locally",
+                enabled = state.importedModel != null && !state.busy,
                 modifier = Modifier.weight(1f),
-            ) {
-                startPlayground(
-                    playgroundPrompt,
-                    playgroundMaxTokens,
-                    playgroundTemperature,
-                    playgroundSeed,
-                )
-            }
-            if (playgroundState.active || playgroundState.cancellationAvailable) {
+                onClick = ::startPlayground,
+            )
+            if (playground.active || playground.cancellationAvailable) {
                 HarnessSecondaryButton(
                     text = "Stop",
-                    enabled = playgroundState.cancellationAvailable,
+                    enabled = playground.cancellationAvailable,
                     modifier = Modifier.weight(0.62f),
-                ) {
-                    playgroundController.cancel()
-                }
+                    onClick = { harnessViewModel.cancelPlayground() },
+                )
             }
         }
     }
 
     @Composable
-    private fun PlaygroundResponseCard() {
+    private fun PlaygroundResponseCard(playground: PlaygroundState) {
         HarnessCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -851,24 +860,23 @@ class MainActivity :
             ) {
                 Text("Response", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    if (playgroundState.active) {
+                    if (playground.active) {
                         "●  Streaming"
                     } else {
-                        playgroundState.phase.name.lowercase()
-                            .replaceFirstChar(Char::uppercase)
+                        playground.phase.name.lowercase().replaceFirstChar(Char::uppercase)
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (playgroundState.active) HarnessColors.Secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (playground.active) HarnessColors.Secondary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(playgroundState.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(playground.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SelectionContainer {
                 Text(
-                    playgroundState.output.ifBlank { "Generated output will appear here." },
+                    playground.output.ifBlank { "Generated output will appear here." },
                     fontFamily = FontFamily.Monospace,
                 )
             }
-            val metrics = playgroundState.metrics
+            val metrics = playground.metrics
             HarnessMetricRow {
                 HarnessMetric(
                     "TTFT",
@@ -1659,28 +1667,36 @@ class MainActivity :
         }
     }
 
-    private fun startPlayground(prompt: String, maxTokens: String, temperature: String, seed: String) {
-        val model = importedModel ?: return
-        val options = runCatching {
-            PlaygroundRequestOptions.parse(maxTokens, temperature, seed)
-        }.getOrElse {
-            Toast.makeText(this, "Invalid generation settings", Toast.LENGTH_LONG).show()
-            return
-        }
-        runCatching { playgroundController.start(model, prompt, options) }
-            .onFailure {
-                Toast.makeText(this, "Unable to start local inference", Toast.LENGTH_LONG).show()
+    private fun startPlayground() {
+        when (harnessViewModel.startPlayground()) {
+            PlaygroundStartResult.STARTED -> Unit
+
+            PlaygroundStartResult.MODEL_REQUIRED -> {
+                Toast.makeText(this, "Select a local model first", Toast.LENGTH_SHORT).show()
             }
+
+            PlaygroundStartResult.BUSY -> {
+                Toast.makeText(this, "Wait for the active operation to finish", Toast.LENGTH_SHORT).show()
+            }
+
+            PlaygroundStartResult.INVALID_SETTINGS -> {
+                Toast.makeText(this, "Invalid generation settings", Toast.LENGTH_LONG).show()
+            }
+
+            PlaygroundStartResult.CONTROLLER_UNAVAILABLE,
+            PlaygroundStartResult.REJECTED,
+            -> Toast.makeText(this, "Unable to start local inference", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun afterPlaygroundRuntimeReleased(action: () -> Unit) {
-        if (!playgroundController.releaseRuntime { runOnUiThread(action) }) {
+        if (!harnessViewModel.releasePlaygroundRuntime { runOnUiThread(action) }) {
             Toast.makeText(this, "Cancel or wait for the active generation", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun updateKeepScreenOn() {
-        if (controllerBusy || modelDistributionState.operationActive || playgroundState.active) {
+        if (harnessViewModel.uiState.value.keepScreenOn) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1689,7 +1705,7 @@ class MainActivity :
 
     private fun diagnosticActionRunning(): Boolean = healthRunning || resourceCaptureRunning || benchmarkCaptureRunning
 
-    private fun isBusy(): Boolean = controllerBusy || modelDistributionState.operationActive || playgroundController.active
+    private fun isBusy(): Boolean = harnessViewModel.uiState.value.busy
 
     private fun copyLog(log: DiagnosticsLogUi) {
         copyToClipboard("Harness log entry", log.copyText())
@@ -1736,10 +1752,6 @@ class MainActivity :
         const val RESOURCE_HISTORY_VISIBLE_LIMIT = 10
         const val DEFAULT_ARCHITECTURE = "qwen3"
         const val DEFAULT_QUANTIZATION = "Q4_K_M"
-        const val DEFAULT_MAX_OUTPUT_TOKENS = "128"
-        const val DEFAULT_TEMPERATURE = "0.2"
-        const val DEFAULT_SEED = "42"
-        const val DEFAULT_PROMPT = "Explain in two sentences why local inference improves privacy."
         val MODEL_MIME_TYPES = arrayOf("application/octet-stream", "application/gguf", "application/x-gguf")
     }
 }
