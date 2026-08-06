@@ -4,7 +4,7 @@
 **Implementation audit:** `docs/harness-ux-ui-implementation-audit.md`
 **Integrated baseline:** `dev` after merged PR #67
 **Active implementation branch:** `agent/playground-presentation-tests`
-**Active pull request:** draft PR #68 toward `dev`
+**Active pull request:** PR #68 toward `dev`
 **Last updated:** 2026-08-06
 **Overall status:** In progress
 
@@ -41,7 +41,7 @@ This document is the living progress tracker for the Harness Android UX/UI imple
 | Durable multi-model catalog | PARTIAL | Metadata is persisted per digest; unified selection/loaded ownership, `lastUsedAt`, degraded-state recovery and restart UI tests remain. |
 | ViewModel and UDF migration | PARTIAL | PR #66 provides the shared immutable state and reducer foundation. PR #67 migrates the Playground vertical slice to lifecycle-aware `StateFlow` rendering and a testable effect boundary; Models, Diagnostics, Overview, and Settings remain Activity-owned. |
 | Compose UI and screenshot tests | PARTIAL | Initial shell-height and destination-reachability instrumentation exists. PR #68 adds state-derived Playground presentation tests, while Compose semantics, golden, accessibility and responsive matrices remain. |
-| CI and Android build validation | VALIDATION | PR #67 is merged into `dev`. PR #68 is running scoped validation for the Playground presentation contract and phase tests. |
+| CI and Android build validation | VALIDATION | PR #67 is merged into `dev`. PR #68 passed scoped repository, Spotless, Detekt, JVM test, Lint, APK and native-packaging validation in run `31071291383`. |
 | Physical-device validation | VALIDATION | Required with a real GGUF on representative arm64 Android hardware. |
 
 ## Implemented connected capabilities
@@ -146,7 +146,7 @@ The tracker previously still described the rebased UI/tooling candidate as unpub
 
 ### Complete Playground UI evidence
 
-Status: `PRESENTATION CONTRACT IMPLEMENTED / CI AND UI EVIDENCE NEXT`
+Status: `PRESENTATION CONTRACT VALIDATED / COMPOSE AND DEVICE EVIDENCE NEXT`
 
 Completed across the Playground UDF and presentation slices:
 
@@ -161,7 +161,7 @@ Completed across the Playground UDF and presentation slices:
 9. [x] cover idle, preparing, queued, generating, completed, failed and cancelled presentation states with JVM tests;
 10. [ ] add Compose semantics/render tests for the connected Playground screen;
 11. [ ] validate compact and expanded layouts plus navigation and back behavior on emulators;
-12. [ ] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification for PR #68;
+12. [x] pass Spotless, Detekt, JVM tests, Lint, APK assembly and packaging verification for PR #68;
 13. [ ] preserve real-GGUF physical arm64 validation as a separate release gate.
 
 ## Planned sequence after the Playground slice
