@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+@Suppress("TooManyFunctions")
 internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState()) : ViewModel() {
     private val mutableUiState = MutableStateFlow(initialState)
     private var playgroundEffects: PlaygroundEffects? = null
@@ -41,6 +42,14 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
         dispatch(HarnessUiEvent.PlaygroundTemperatureChanged(temperature))
     }
 
+    fun updatePlaygroundPreset(value: String) = dispatch(HarnessUiEvent.PlaygroundPresetChanged(value))
+
+    fun updatePlaygroundTopP(value: String) = dispatch(HarnessUiEvent.PlaygroundTopPChanged(value))
+
+    fun updatePlaygroundTopK(value: String) = dispatch(HarnessUiEvent.PlaygroundTopKChanged(value))
+
+    fun updatePlaygroundContext(value: String) = dispatch(HarnessUiEvent.PlaygroundContextChanged(value))
+
     fun updatePlaygroundSeed(seed: String) {
         dispatch(HarnessUiEvent.PlaygroundSeedChanged(seed))
     }
@@ -67,9 +76,13 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 private fun executePlaygroundStart(state: HarnessUiState, model: ImportedPhoneModel, effects: PlaygroundEffects?): PlaygroundStartResult {
     val options = runCatching {
         PlaygroundRequestOptions.parse(
+            state.playgroundPreset,
             state.playgroundMaxTokens,
             state.playgroundTemperature,
+            state.playgroundTopP,
+            state.playgroundTopK,
             state.playgroundSeed,
+            state.playgroundContext,
         )
     }.getOrElse { return PlaygroundStartResult.INVALID_SETTINGS }
     val attachedEffects = effects ?: return PlaygroundStartResult.CONTROLLER_UNAVAILABLE

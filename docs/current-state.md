@@ -202,6 +202,12 @@ privacy-safe deterministic tests without restoring the obsolete standalone conso
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
 
+### Block 9 — generation configuration and model-aware prompting
+
+Status: **PARTIALLY IMPLEMENTED LOCALLY; corrective validation and PR review pending**.
+
+The current integration candidate adds versioned sampling-plus-intent presets, per-request overrides, explicit random/fixed seed policy, structured generation inputs, model-aware chat-template resolution, exact prompt tokenization, lazy Auto/manual context allocation, grammar-backed JSON/JSON Schema constraints, bounded application stop sequences, stop reasons and privacy-safe effective-configuration telemetry with a Room 4→5 migration. Corrective work now also covers cancellation during planning and context creation, typed invalid-constraint failures, UTF-8-safe native output buffering, earliest-position stop matching and exported Room migration schemas. The connected phone playground exposes preset/custom sampling, seed and Auto/manual context controls and retains effective configuration for diagnostics. Host-native execution, connected-device migration/UI execution and representative physical-device GGUF quality, memory and benchmark evidence remain open; production readiness is not claimed.
+
 The current local integration candidate provides the connected phone app with compact branded
 chrome, Navigation Compose top-level routing, bottom navigation or navigation rail according
 to width and all five primary surfaces. A subsequent visual-matching pass replaces generic

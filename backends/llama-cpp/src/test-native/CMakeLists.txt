@@ -69,6 +69,18 @@ target_include_directories(
 find_package(Threads REQUIRED)
 target_link_libraries(native_cancellation_registry_test PRIVATE Threads::Threads)
 
+add_executable(
+    generation_output_buffer_test
+    generation_output_buffer_test.cpp
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp/generation_output_buffer.cpp"
+)
+target_include_directories(
+    generation_output_buffer_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+)
+
 enable_testing()
 add_test(NAME gguf_metadata_test COMMAND gguf_metadata_test)
 add_test(NAME native_cancellation_registry_test COMMAND native_cancellation_registry_test)
+add_test(NAME generation_output_buffer_test COMMAND generation_output_buffer_test)

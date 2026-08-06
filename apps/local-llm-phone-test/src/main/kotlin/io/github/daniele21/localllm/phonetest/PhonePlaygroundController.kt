@@ -1,13 +1,17 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
+import io.github.daniele21.localllm.contracts.InferencePresetId
+import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -132,6 +136,9 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
             val session = currentHarness.runtime.createSession(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
+                SessionOptions(
+                    contextPolicy = options.contextTokens?.let(ContextPolicy::Manual) ?: ContextPolicy.Auto,
+                ),
             )
             registerSession(requestId, session)
             val generationRequest = GenerationRequest(
@@ -143,7 +150,10 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 overrides = GenerationOverrides(
                     maxOutputTokens = options.maxOutputTokens,
                     temperature = options.temperature,
-                    seed = options.seed,
+                    topP = options.topP,
+                    topK = options.topK,
+                    seedPolicy = options.seedPolicy,
+                    preset = options.presetId?.let { InferencePresetRef(InferencePresetId(it), 1) },
                 ),
             )
             val handle = currentHarness.runtime.generate(
@@ -190,6 +200,12 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 is GenerationEvent.Started -> state.copy(
                     phase = PlaygroundPhase.GENERATING,
                     detail = "Generating locally",
+                )
+
+                is GenerationEvent.Prepared -> state.copy(
+                    detail = "${event.configuration.preset?.id?.value ?: "Custom"} · " +
+                        "${event.configuration.promptTokenCount}/${event.configuration.contextSize} context tokens",
+                    effectiveConfiguration = event.configuration,
                 )
 
                 is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)

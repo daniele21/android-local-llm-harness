@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import java.util.Locale
 
 internal enum class PlaygroundPresentationTone {
@@ -23,6 +24,8 @@ internal data class PlaygroundPresentation(
     val ttft: String,
     val total: String,
     val decode: String,
+    val stopReason: String,
+    val effectiveConfiguration: EffectiveGenerationMetadata?,
 )
 
 internal fun HarnessUiState.toPlaygroundPresentation(): PlaygroundPresentation {
@@ -43,6 +46,8 @@ internal fun HarnessUiState.toPlaygroundPresentation(): PlaygroundPresentation {
         decode = metrics?.decodeTokensPerSecond?.let {
             String.format(Locale.US, "%.2f tok/s", it)
         } ?: UNAVAILABLE,
+        stopReason = metrics?.stopReason ?: UNAVAILABLE,
+        effectiveConfiguration = playgroundState.effectiveConfiguration,
     )
 }
 

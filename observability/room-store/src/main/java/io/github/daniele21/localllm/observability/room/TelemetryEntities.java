@@ -87,6 +87,24 @@ public final class TelemetryEntities {
         @Nullable
         @ColumnInfo(name = "decode_ms")
         public Long decodeMs;
+
+        @Nullable @ColumnInfo(name = "preset_id") public String presetId;
+        @Nullable @ColumnInfo(name = "preset_version") public Integer presetVersion;
+        @Nullable public Float temperature;
+        @Nullable @ColumnInfo(name = "top_p") public Float topP;
+        @Nullable @ColumnInfo(name = "top_k") public Integer topK;
+        @Nullable @ColumnInfo(name = "seed_policy") public String seedPolicy;
+        @Nullable @ColumnInfo(name = "effective_seed") public Long effectiveSeed;
+        @Nullable @ColumnInfo(name = "max_output_tokens") public Integer maxOutputTokens;
+        @Nullable @ColumnInfo(name = "context_size") public Integer contextSize;
+        @Nullable @ColumnInfo(name = "prompt_token_count") public Integer promptTokenCount;
+        @Nullable @ColumnInfo(name = "chat_template_id") public String chatTemplateId;
+        @Nullable @ColumnInfo(name = "chat_template_source") public String chatTemplateSource;
+        @Nullable @ColumnInfo(name = "system_prompt_version") public String systemPromptVersion;
+        @Nullable @ColumnInfo(name = "stop_reason") public String stopReason;
+        @Nullable @ColumnInfo(name = "prompt_planning_ms") public Long promptPlanningMs;
+        @Nullable @ColumnInfo(name = "context_creation_ms") public Long contextCreationMs;
+
     }
 
     @Entity(

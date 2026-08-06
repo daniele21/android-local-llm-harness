@@ -198,7 +198,7 @@ val sessionId = localLlm.client.createSession(
 )
 ```
 
-`createSession` creates a native context for the exact resolved profile. It requires a valid installed model and may throw when configuration, integrity or native context creation fails.
+`createSession` resolves and retains the exact model but creates the native context lazily. Prompt compilation and exact tokenization happen first; the runtime then allocates the smallest approved context that fits the compiled prompt, output budget and safety reserve while treating the profile's preferred/recommended range as a soft target and the model capability as the hard ceiling. Pass `SessionOptions(contextPolicy = ContextPolicy.Manual(tokens))` when the caller requires an exact approved context size. An unsupported or insufficient manual value fails explicitly and is never increased or truncated silently.
 
 A session is bound to one `ApplicationId` and `UseCaseId`. Requests with a different binding are rejected.
 
@@ -239,6 +239,12 @@ val handle = localLlm.client.generate(
                 // event.modelDigest identifies the exact loaded artifact.
             }
 
+            is GenerationEvent.Prepared -> {
+                // Safe effective configuration after exact prompt tokenization.
+                event.configuration.contextSize
+                event.configuration.effectiveSeed
+            }
+
             is GenerationEvent.TextDelta -> {
                 // Append event.text to the visible response.
             }
@@ -261,6 +267,12 @@ val handle = localLlm.client.generate(
     },
 )
 ```
+
+Generation input can be plain text, structured user/assistant messages, or explicitly authorized raw completion. Request-level sampling overrides are resolved per field over a selected versioned preset and the use-case defaults. Use `SeedPolicy.Random` for a fresh unsigned 32-bit seed per execution or `SeedPolicy.Fixed(value)` for reproducibility; a missing seed is never coerced to zero.
+
+The backend compiles structured messages with the model-aware template chain: supported GGUF template, application-reviewed override, reviewed family fallback, then raw completion only when explicitly requested and allowed. An application-owned template policy may also provide at most eight nonblank stop sequences, each at most 128 UTF-8 bytes and at most 512 bytes in total. The native backend uses one streaming decode path; callers that need a complete result aggregate those events above the native boundary. The first stop sequence by output position wins independently of policy order, and its bytes are not emitted. Invalid grammar or schema constraints map to the typed `INVALID_OUTPUT_CONSTRAINT` configuration error before decode.
+
+`GenerationEvent.Prepared` exposes only safe effective metadata: preset/version, sampling values, effective seed, context size, prompt token count, template ID/source and system-prompt version. Prompt, output, system-prompt text, template text, schemas and stop sequences are not persisted in normal telemetry.
 
 Listener callbacks are not an Android main-thread API. Dispatch UI updates to the application's main-thread mechanism.
 

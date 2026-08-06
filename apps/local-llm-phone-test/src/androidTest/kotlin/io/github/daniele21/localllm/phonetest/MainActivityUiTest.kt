@@ -49,4 +49,18 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("APPEARANCE").assertIsDisplayed()
         composeRule.onNodeWithText("PRIVACY").assertIsDisplayed()
     }
+
+    @Test
+    fun playgroundGenerationControlsExposeAccessibleExplicitPolicies() {
+        composeRule.onNodeWithTag("nav-playground").performClick()
+        composeRule.onNodeWithText("Generation settings  ·  Show").performClick()
+
+        composeRule.onNodeWithTag("playground-temperature-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-top-p-slider").assertIsDisplayed()
+        composeRule.onNodeWithText("Seed policy").assertIsDisplayed()
+        composeRule.onNodeWithText("Random each run").assertIsDisplayed()
+        composeRule.onNodeWithText("Fixed").assertIsDisplayed()
+        composeRule.onNodeWithText("Context policy").assertIsDisplayed()
+        composeRule.onNodeWithText("Auto").assertIsDisplayed()
+    }
 }

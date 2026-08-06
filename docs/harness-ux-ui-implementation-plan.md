@@ -807,6 +807,12 @@ Provide the primary one-shot local-inference experience with explicit model sele
 
 ### Generation settings
 
+The expansion from the current three fields to versioned presets, top-p, top-k, random/fixed
+seed and Auto/manual context follows the staged
+[`generation configuration and prompting plan`](generation-configuration-and-prompting-plan.md).
+The Playground ViewModel/UDF migration may establish state and effect ownership first, but must
+not duplicate runtime precedence, seed generation, context sizing or prompt-template policy.
+
 Default collapsed presentation:
 
 ```text

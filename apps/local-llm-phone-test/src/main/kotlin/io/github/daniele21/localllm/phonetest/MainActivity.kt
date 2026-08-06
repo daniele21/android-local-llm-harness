@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -47,6 +48,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -907,12 +909,52 @@ class MainActivity :
 
     @Composable
     private fun PlaygroundGenerationSettings(state: HarnessUiState, presentation: PlaygroundPresentation) {
+        val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
+        val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
+        Text(
+            text = selectedPreset?.let { "Preset · ${it.label}" }
+                ?: "Preset · Personalizzato${basePreset?.let { " · Basato su ${it.label}" }.orEmpty()}",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(playgroundPresetOptions) { preset ->
+                FilterChip(
+                    selected = state.playgroundPreset == preset.id,
+                    onClick = { harnessViewModel.updatePlaygroundPreset(preset.id) },
+                    label = { Text(preset.label) },
+                    enabled = presentation.inputsEnabled,
+                )
+            }
+        }
+        Text(
+            text = selectedPreset?.description ?: basePreset?.description.orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val temperature = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+        Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = temperature,
+            onValueChange = { harnessViewModel.updatePlaygroundTemperature(formatControlValue(it)) },
+            valueRange = 0f..2f,
+            enabled = presentation.inputsEnabled,
+            modifier = Modifier.fillMaxWidth().testTag("playground-temperature-slider"),
+        )
+        val topP = state.playgroundTopP.toFloatOrNull()?.coerceIn(0.01f, 1f) ?: 0.9f
+        Text("Top-p · ${state.playgroundTopP}", style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = topP,
+            onValueChange = { harnessViewModel.updatePlaygroundTopP(formatControlValue(it)) },
+            valueRange = 0.01f..1f,
+            enabled = presentation.inputsEnabled && temperature != 0f,
+            modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundMaxTokens,
                 onValueChange = harnessViewModel::updatePlaygroundMaxTokens,
                 modifier = Modifier.weight(1f),
-                label = { Text("Max tokens") },
+                label = { Text("Max output tokens") },
                 enabled = presentation.inputsEnabled,
             )
             OutlinedTextField(
@@ -922,14 +964,60 @@ class MainActivity :
                 label = { Text("Temperature") },
                 enabled = presentation.inputsEnabled,
             )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundTopP,
+                onValueChange = harnessViewModel::updatePlaygroundTopP,
+                modifier = Modifier.weight(1f),
+                label = { Text("Top-p") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
+            OutlinedTextField(
+                value = state.playgroundTopK,
+                onValueChange = harnessViewModel::updatePlaygroundTopK,
+                modifier = Modifier.weight(1f),
+                label = { Text("Top-k") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
             OutlinedTextField(
                 value = state.playgroundSeed,
                 onValueChange = harnessViewModel::updatePlaygroundSeed,
                 modifier = Modifier.weight(1f),
-                label = { Text("Seed") },
-                enabled = presentation.inputsEnabled,
+                label = { Text("Seed · blank = random") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
             )
         }
+        Text("Seed policy", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = state.playgroundSeed.isBlank(),
+                onClick = { harnessViewModel.updatePlaygroundSeed("") },
+                label = { Text("Random each run") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+            FilterChip(
+                selected = state.playgroundSeed.isNotBlank(),
+                onClick = { if (state.playgroundSeed.isBlank()) harnessViewModel.updatePlaygroundSeed("42") },
+                label = { Text("Fixed") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+        }
+        Text("Context policy", style = MaterialTheme.typography.labelLarge)
+        FilterChip(
+            selected = state.playgroundContext.isBlank(),
+            onClick = { harnessViewModel.updatePlaygroundContext("") },
+            label = { Text("Auto") },
+            enabled = presentation.inputsEnabled,
+        )
+        OutlinedTextField(
+            value = state.playgroundContext,
+            onValueChange = harnessViewModel::updatePlaygroundContext,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Context size · blank = Auto") },
+            supportingText = { Text("Manual values are applied exactly; insufficient context fails without truncation.") },
+            enabled = presentation.inputsEnabled,
+        )
     }
 
     @Composable
@@ -991,6 +1079,21 @@ class MainActivity :
                 HarnessMetric("TTFT", presentation.ttft, Modifier.weight(1f))
                 HarnessMetric("Total", presentation.total, Modifier.weight(1f))
                 HarnessMetric("Decode", presentation.decode, Modifier.weight(1f))
+            }
+            Text("Stop reason · ${presentation.stopReason}", style = MaterialTheme.typography.bodySmall)
+            presentation.effectiveConfiguration?.let { configuration ->
+                Text(
+                    "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
+                        "Seed ${configuration.effectiveSeed}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name}) · " +
+                        "System ${configuration.systemPromptVersion ?: "none"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -2008,6 +2111,8 @@ class MainActivity :
     }
 
     private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
+
+    private fun formatControlValue(value: Float): String = "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
 
     private fun appVersionName(): String = runCatching {
         packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()

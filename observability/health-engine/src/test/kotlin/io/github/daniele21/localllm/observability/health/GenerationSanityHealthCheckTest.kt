@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.observability.health
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
+import io.github.daniele21.localllm.contracts.GenerationInput
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
@@ -36,7 +37,7 @@ class GenerationSanityHealthCheckTest {
 
         assertEquals(HealthStatus.PASS, result.status)
         assertEquals("generation-sanity:app:sanity", check.id)
-        assertEquals("health prompt", client.lastRequest?.input)
+        assertEquals(GenerationInput.Text("health prompt"), client.lastRequest?.input)
         assertEquals(16, client.lastRequest?.overrides?.maxOutputTokens)
         assertEquals(0f, client.lastRequest?.overrides?.temperature)
         assertEquals(0L, client.lastRequest?.overrides?.seed)

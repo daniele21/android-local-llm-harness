@@ -404,6 +404,12 @@ sono connessi; lo stato resta però posseduto dall'Activity e dai controller cal
 - [ ] verificare warm reuse, model switch sicuro e rilascio dopo cambio schermata/background;
 - [ ] aggiungere Compose UI test con fake deterministici, senza richiedere un GGUF nei test repository.
 
+L'espansione a preset versionati, top-p, top-k, seed casuale/fisso e context Auto/manuale è
+governata dal
+[`generation configuration and prompting plan`](generation-configuration-and-prompting-plan.md).
+Rimane un workstream separato: non entra automaticamente nel criterio di uscita UX-04 o nel
+perimetro Harness 0.5.0 finché non viene assegnata esplicitamente a quella release.
+
 Criterio di uscita: nessuna mutazione Playground risiede nell'Activity, tutte le transizioni
 terminali sono deterministiche e privacy/lifecycle restano equivalenti al controller attuale.
 
