@@ -21,6 +21,28 @@ jobs:
           ref: agent/playground-viewmodel-udf
           fetch-depth: 0
 
+      - name: Refine ownership assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/apply-playground-ui-migration.py")
+          text = path.read_text(encoding="utf-8")
+          start = text.index('for forbidden in ("playgroundState"')
+          end = text.index('activity_path.write_text', start)
+          replacement = '''for declaration in (
+              "private var playgroundState ",
+              "private var playgroundPrompt ",
+              "private var playgroundMaxTokens ",
+              "private var playgroundTemperature ",
+              "private var playgroundSeed ",
+          ):
+              if declaration in activity:
+                  raise RuntimeError(f"MainActivity still owns migrated field: {declaration}")
+          '''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+          PY
+
       - name: Apply deterministic migration
         run: python3 scripts/apply-playground-ui-migration.py
 
