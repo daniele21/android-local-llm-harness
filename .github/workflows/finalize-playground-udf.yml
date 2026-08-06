@@ -132,3 +132,5 @@ Completed in the Playground UDF slice:
           git diff --cached --check
           git commit -m "chore(phone-test): format and document Playground UDF slice"
           git push origin HEAD:agent/playground-viewmodel-udf
+
+# Triggered after workflow registration.
