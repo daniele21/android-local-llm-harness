@@ -57,6 +57,8 @@ class MainActivityUiTest {
 
         composeRule.onNodeWithTag("playground-temperature-slider").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-top-p-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-repeat-penalty").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-repeat-last-n").assertIsDisplayed()
         composeRule.onNodeWithText("Seed policy").assertIsDisplayed()
         composeRule.onNodeWithText("Random each run").assertIsDisplayed()
         composeRule.onNodeWithText("Fixed").assertIsDisplayed()

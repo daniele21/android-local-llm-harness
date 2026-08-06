@@ -2,6 +2,7 @@
 
 #include "native_cancellation_registry.h"
 #include "generation_output_buffer.h"
+#include "generation_sampler.h"
 
 namespace {
 
@@ -128,6 +129,8 @@ std::vector<std::string> stream_text(
     float temperature,
     float top_p,
     std::int32_t top_k,
+    float repeat_penalty,
+    std::int32_t repeat_last_n,
     std::uint32_t seed,
     const std::string& output_constraint_type,
     const std::string& output_schema,
@@ -159,7 +162,16 @@ std::vector<std::string> stream_text(
     } catch (const std::exception& error) {
         return error_response("INVALID_OUTPUT_CONSTRAINT", error.what());
     }
-    auto sampler = create_sampler(vocab, temperature, top_p, top_k, seed, grammar);
+    auto sampler = create_generation_sampler(
+        vocab,
+        temperature,
+        top_p,
+        top_k,
+        repeat_penalty,
+        repeat_last_n,
+        seed,
+        grammar
+    );
     if (!sampler) {
         return error_response("SAMPLER_FAILED", "Unable to create the llama.cpp sampler chain");
     }
@@ -307,6 +319,8 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_generateStreamin
     jfloat temperature,
     jfloat top_p,
     jint top_k,
+    jfloat repeat_penalty,
+    jint repeat_last_n,
     jlong seed,
     jstring output_constraint_type_value,
     jstring output_schema_value,
@@ -354,6 +368,8 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_generateStreamin
             temperature,
             top_p,
             top_k,
+            repeat_penalty,
+            repeat_last_n,
             static_cast<std::uint32_t>(seed),
             output_constraint_type.get(),
             output_schema,

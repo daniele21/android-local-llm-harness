@@ -249,6 +249,8 @@ data class EffectiveGenerationMetadata(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val requestedSeedPolicy: SeedPolicyType,
     val effectiveSeed: Long,
     val maxOutputTokens: Int,
@@ -312,10 +314,10 @@ Criterio di uscita:
 
 Ambito:
 
-- [ ] aggiungere `SeedPolicy` e gli override top-p/top-k;
+- [ ] aggiungere `SeedPolicy` e gli override top-p/top-k/repeat penalty;
 - [ ] introdurre un `SeedSource` iniettato nel runtime;
 - [ ] materializzare il seed casuale una sola volta per request plan;
-- [ ] validare temperatura `0..2`, top-p `(0, 1]`, top-k bounded e seed uint32;
+- [ ] validare temperatura `0..2`, top-p `(0, 1]`, top-k bounded, repeat penalty/window e seed uint32;
 - [ ] preservare il comportamento greedy esistente per temperatura zero;
 - [ ] aggiornare health engine, console, trasporto in-process, fake e app consumer;
 - [ ] mantenere temporaneamente compatibilità sorgente dove una delega sicura è possibile.
@@ -333,7 +335,7 @@ Criterio di uscita:
 
 - `null` non significa più implicitamente seed zero;
 - ogni richiesta possiede un seed effettivo riproducibile;
-- top-p e top-k attraversano contratto, runtime, backend e test.
+- top-p, top-k e repeat penalty/window attraversano contratto, runtime, backend e test.
 
 ### PRM-01 — Input strutturato e registry applicativi
 
@@ -493,7 +495,7 @@ Criterio di uscita:
 Ambito:
 
 - [ ] estendere `GenerationRunRecord` con soli campi metadata bounded;
-- [ ] registrare preset ID/version, sampling, seed policy/effettivo, max output, context,
+- [ ] registrare preset ID/version, sampling incluso repeat penalty/window, seed policy/effettivo, max output, context,
   prompt token count, template ID/origine, system prompt version e stop reason;
 - [ ] registrare tempi di prompt planning e context creation come misure nullable e source-backed;
 - [ ] aggiornare repository in-memory, Room, DAO, mapper, query e fake;
@@ -534,7 +536,7 @@ Ambito:
 
 - [ ] sostituire `PlaygroundRequestOptions` app-specifico con mapping verso contratti condivisi;
 - [ ] introdurre selezione preset e stato `Personalizzato`/`Basato su` in memoria;
-- [ ] aggiungere temperatura, top-p, top-k, seed policy, max output e context policy;
+- [ ] aggiungere temperatura, top-p, top-k, repeat penalty/window, seed policy, max output e context policy;
 - [ ] usare slider più input numerico dove migliora precisione e accessibilità;
 - [ ] disabilitare top-p, top-k e seed quando temperatura zero rende il percorso greedy;
 - [ ] distinguere valori richiesti, default e configurazione effettiva;
@@ -551,6 +553,7 @@ Regole UI:
 - `Max output tokens`, non `Max tokens`;
 - top-p usa `(0, 1]` e non accetta zero;
 - top-k zero significa filtro disabilitato;
+- repeat penalty `1` significa filtro disabilitato e un valore maggiore di `1` richiede una finestra positiva;
 - temperatura zero rende chiaramente inattivi gli altri sampler;
 - un manual context insufficiente non viene aumentato automaticamente;
 - preset e valori benchmark-dependent sono etichettati come configurazioni iniziali finché non
@@ -715,14 +718,14 @@ implementazione.
 - ripristino del KV state dopo resize conversazionale;
 - prefix snapshot e deterministic result cache;
 - GPU offload o variazioni automatiche dei thread basate sul preset;
-- min-p, repeat penalty e sampler ulteriori finché i sei controlli iniziali non sono stabili;
+- min-p, presence/frequency penalty, DRY e sampler ulteriori finché i controlli iniziali non sono stabili;
 - dichiarazioni di supporto device o performance senza evidenza fisica rappresentativa.
 
 ## 13. Criterio di completamento del workstream
 
 Il workstream è completo quando:
 
-- i sei controlli richiesti attraversano UI, contratti, resolver, runtime e backend reali;
+- gli otto controlli richiesti attraversano UI, contratti, resolver, runtime e backend reali;
 - preset e prompt policy sono applicativi, versionati, localizzabili e fail-closed;
 - il modello renderizza il proprio chat template supportato senza token speciali forniti dal
   chiamante;
@@ -750,6 +753,7 @@ quella successiva.
 - [x] aggiungere test del selettore context sui confini 1K/2K/4K/8K e sui target range;
 - [x] aggiungere test typed per output constraint non valido;
 - [x] aggiungere un test Room reale della migrazione 4→5.
+- [x] aggiungere test nativi e Kotlin per la catena repeat-penalty e i relativi limiti.
 
 Criterio di uscita: ogni difetto corretto nelle tranche successive possiede prima una regressione
 che fallisce sull'implementazione precedente.
@@ -762,6 +766,7 @@ che fallisce sull'implementazione precedente.
 - [x] introdurre una stop policy applicativa bounded e propagarla dal prompt plan al backend;
 - [x] scegliere la stop sequence con posizione più precoce e non emetterne il testo;
 - [x] preparare grammar e sampler prima del prefill e garantire cleanup RAII;
+- [x] applicare repeat penalty/window prima del greedy o dei filtri probabilistici;
 - [x] mantenere prompt, schema e stop sequence fuori da telemetry e report.
 
 Criterio di uscita: streaming e aggregato condividono sampling, grammar, stop, cancellazione e
@@ -787,6 +792,7 @@ con il target senza trasformare una recommendation in un hard cap.
   decode;
 - [x] abilitare l'export degli schemi Room e conservare gli schemi 4 e 5;
 - [x] validare la migrazione 4→5 con `MigrationTestHelper`, record storico e record nuovo;
+- [x] conservare lo schema 6 e validare la migrazione 5→6 con campi repeat nullable per i record storici;
 - [x] verificare parità mapper/DAO e assenza di prompt, output, schema e stop nei record.
 
 Criterio di uscita: gli errori correggibili dal chiamante non diventano `NATIVE_RUNTIME` e Room
@@ -798,13 +804,14 @@ valida automaticamente la migrazione contro lo schema esportato.
 - [x] eliminare la duplicazione dei valori preset tra registry e reducer;
 - [x] aggiungere slider più input per temperatura/top-p, quick values per output/top-k e
   selettori espliciti per seed e context;
+- [x] aggiungere override espliciti per repeat penalty/window e ripristino dai preset v2;
 - [ ] rendere accessibile lo stato greedy e i controlli inattivi;
 - [x] conservare `EffectiveGenerationMetadata` nello stato fino alla completion;
 - [x] mostrare context, prompt tokens, template, system prompt version, seed e stop reason usando
   soltanto dati reali;
 - [ ] aggiungere test UDF, Compose, accessibilità e layout compact/expanded.
 
-Criterio di uscita: i sei controlli modificano il piano runtime reale, la UI non replica policy
+Criterio di uscita: gli otto controlli modificano il piano runtime reale, la UI non replica policy
 di dominio e la configurazione effettiva resta consultabile dopo la generazione.
 
 ### REM-06 — Gate e riallineamento dei ledger

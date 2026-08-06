@@ -45,7 +45,7 @@ class LlamaCppStreamingTest {
             received,
         )
         assertEquals(
-            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 77L, "TEXT"),
+            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 1.05f, 64, 77L, "TEXT"),
             nativeApi.lastGeneration,
         )
     }
@@ -141,6 +141,26 @@ class LlamaCppStreamingTest {
         assertFalse(nativeApi.generateCalled)
     }
 
+    @Test
+    fun `enabled repeat penalty requires a positive token window before JNI`() {
+        val nativeApi = FakeNativeStreamingApi()
+
+        val result = LlamaCppStreamingBridge(nativeApi).generate(
+            testContext(),
+            "request-invalid-repeat",
+            "Prompt",
+            testConfig().copy(repeatPenalty = 1.05f, repeatLastN = 0),
+            NativeStreamingListener { true },
+        )
+
+        assertTrue(result is NativeStreamingResult.Failure)
+        assertEquals(
+            StreamingNativeErrorCode.INVALID_ARGUMENT,
+            (result as NativeStreamingResult.Failure).error.code,
+        )
+        assertFalse(nativeApi.generateCalled)
+    }
+
     private fun testContext(): LoadedNativeContext = LoadedNativeContext(
         handle = NativeContextHandle(11),
         model = LoadedNativeModel(
@@ -157,6 +177,8 @@ class LlamaCppStreamingTest {
         temperature = 0.1f,
         topP = 0.95f,
         topK = 40,
+        repeatPenalty = 1.05f,
+        repeatLastN = 64,
         seed = 77,
     )
 }
@@ -179,6 +201,8 @@ private class FakeNativeStreamingApi(
         temperature: Float,
         topP: Float,
         topK: Int,
+        repeatPenalty: Float,
+        repeatLastN: Int,
         seed: Long,
         outputConstraintType: String,
         outputSchema: String?,
@@ -195,6 +219,8 @@ private class FakeNativeStreamingApi(
             temperature,
             topP,
             topK,
+            repeatPenalty,
+            repeatLastN,
             seed,
             outputConstraintType,
         )

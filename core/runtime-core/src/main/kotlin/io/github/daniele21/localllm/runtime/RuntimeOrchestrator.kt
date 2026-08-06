@@ -324,6 +324,8 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                repeatPenalty = resolved.repeatPenalty,
+                repeatLastN = resolved.repeatLastN,
                 requestedSeedPolicy = resolved.seedPolicy.toType(),
                 effectiveSeed = resolved.effectiveSeed,
                 maxOutputTokens = resolved.maxOutputTokens,
@@ -353,6 +355,8 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                repeatPenalty = resolved.repeatPenalty,
+                repeatLastN = resolved.repeatLastN,
                 seed = resolved.effectiveSeed,
                 outputConstraint = request.outputConstraint,
                 stopTokenIds = promptPlan.stopTokenIds,
@@ -441,7 +445,9 @@ class RuntimeOrchestrator(
         val temperature = request.overrides.temperature ?: defaults.temperature
         val topP = request.overrides.topP ?: defaults.topP
         val topK = request.overrides.topK ?: defaults.topK
-        validateGenerationValues(maxOutputTokens, temperature, topP, topK)
+        val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty
+        val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN
+        validateGenerationValues(maxOutputTokens, temperature, topP, topK, repeatPenalty, repeatLastN)
 
         val seedPolicy = request.overrides.requestedSeedPolicy() ?: defaults.seedPolicy
         val effectiveSeed = when (seedPolicy) {
@@ -466,6 +472,8 @@ class RuntimeOrchestrator(
             temperature = temperature,
             topP = topP,
             topK = topK,
+            repeatPenalty = repeatPenalty,
+            repeatLastN = repeatLastN,
             seedPolicy = seedPolicy,
             effectiveSeed = effectiveSeed,
             systemPromptVersion = preset?.systemPromptVersion ?: useCase.systemPromptVersion,
@@ -475,11 +483,21 @@ class RuntimeOrchestrator(
     }
 
     @Suppress("ComplexCondition")
-    private fun validateGenerationValues(maxOutputTokens: Int, temperature: Float, topP: Float, topK: Int) {
+    private fun validateGenerationValues(
+        maxOutputTokens: Int,
+        temperature: Float,
+        topP: Float,
+        topK: Int,
+        repeatPenalty: Float,
+        repeatLastN: Int,
+    ) {
         if (maxOutputTokens !in 1..MAX_OUTPUT_TOKENS ||
             !temperature.isFinite() || temperature !in 0f..2f ||
             !topP.isFinite() || topP <= 0f || topP > 1f ||
-            topK !in 0..MAX_TOP_K
+            topK !in 0..MAX_TOP_K ||
+            !repeatPenalty.isFinite() || repeatPenalty !in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY ||
+            repeatLastN !in 0..MAX_REPEAT_LAST_N ||
+            (repeatPenalty != MIN_REPEAT_PENALTY && repeatLastN == 0)
         ) {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
@@ -789,6 +807,8 @@ class RuntimeOrchestrator(
         val temperature: Float,
         val topP: Float,
         val topK: Int,
+        val repeatPenalty: Float,
+        val repeatLastN: Int,
         val seedPolicy: SeedPolicy,
         val effectiveSeed: Long,
         val systemPromptVersion: String,
@@ -804,6 +824,9 @@ class RuntimeOrchestrator(
         const val MAX_SEED_EXCLUSIVE = 0x1_0000_0000L
         const val MAX_OUTPUT_TOKENS = 32_768
         const val MAX_TOP_K = 1_000
+        const val MIN_REPEAT_PENALTY = 1f
+        const val MAX_REPEAT_PENALTY = 2f
+        const val MAX_REPEAT_LAST_N = 4_096
         const val CONTEXT_RESERVE_TOKENS = 256
     }
 }

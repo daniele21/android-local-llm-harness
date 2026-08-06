@@ -48,6 +48,10 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun updatePlaygroundTopK(value: String) = dispatch(HarnessUiEvent.PlaygroundTopKChanged(value))
 
+    fun updatePlaygroundRepeatPenalty(value: String) = dispatch(HarnessUiEvent.PlaygroundRepeatPenaltyChanged(value))
+
+    fun updatePlaygroundRepeatLastN(value: String) = dispatch(HarnessUiEvent.PlaygroundRepeatLastNChanged(value))
+
     fun updatePlaygroundContext(value: String) = dispatch(HarnessUiEvent.PlaygroundContextChanged(value))
 
     fun updatePlaygroundSeed(seed: String) {
@@ -76,13 +80,17 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 private fun executePlaygroundStart(state: HarnessUiState, model: ImportedPhoneModel, effects: PlaygroundEffects?): PlaygroundStartResult {
     val options = runCatching {
         PlaygroundRequestOptions.parse(
-            state.playgroundPreset,
-            state.playgroundMaxTokens,
-            state.playgroundTemperature,
-            state.playgroundTopP,
-            state.playgroundTopK,
-            state.playgroundSeed,
-            state.playgroundContext,
+            PlaygroundRequestFields(
+                presetId = state.playgroundPreset,
+                maxOutputTokens = state.playgroundMaxTokens,
+                temperature = state.playgroundTemperature,
+                topP = state.playgroundTopP,
+                topK = state.playgroundTopK,
+                repeatPenalty = state.playgroundRepeatPenalty,
+                repeatLastN = state.playgroundRepeatLastN,
+                seed = state.playgroundSeed,
+                context = state.playgroundContext,
+            ),
         )
     }.getOrElse { return PlaygroundStartResult.INVALID_SETTINGS }
     val attachedEffects = effects ?: return PlaygroundStartResult.CONTROLLER_UNAVAILABLE

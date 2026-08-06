@@ -49,6 +49,35 @@ class TelemetryMigrationTest {
         }
     }
 
+    @Test
+    fun migrationFrom5To6PreservesHistoricalRunsAndAddsNullableRepetitionSettings() {
+        helper.createDatabase(DATABASE_NAME, 5).use { database ->
+            database.execSQL(
+                "INSERT INTO generation_runs (" +
+                    "request_id, application_id, use_case_id, model_digest, started_at_epoch_ms, status, model_load_kind" +
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+                arrayOf<Any>("request-v5", "app", "use-case", DIGEST, 200L, "COMPLETED", "WARM"),
+            )
+        }
+
+        helper.runMigrationsAndValidate(
+            DATABASE_NAME,
+            6,
+            true,
+            RoomTelemetryRepository.MIGRATION_5_6,
+        ).use { database ->
+            database.query(
+                "SELECT request_id, repeat_penalty, repeat_last_n FROM generation_runs WHERE request_id = ?",
+                arrayOf("request-v5"),
+            ).use { cursor ->
+                check(cursor.moveToFirst())
+                assertEquals("request-v5", cursor.getString(0))
+                assertTrueNull(cursor, 1)
+                assertTrueNull(cursor, 2)
+            }
+        }
+    }
+
     private fun assertTrueNull(cursor: android.database.Cursor, column: Int) {
         check(cursor.isNull(column))
     }

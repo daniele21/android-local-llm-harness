@@ -126,6 +126,8 @@ data class EffectiveGenerationMetadata(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val requestedSeedPolicy: SeedPolicyType,
     val effectiveSeed: Long,
     val maxOutputTokens: Int,

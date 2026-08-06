@@ -93,6 +93,8 @@ public final class TelemetryEntities {
         @Nullable public Float temperature;
         @Nullable @ColumnInfo(name = "top_p") public Float topP;
         @Nullable @ColumnInfo(name = "top_k") public Integer topK;
+        @Nullable @ColumnInfo(name = "repeat_penalty") public Float repeatPenalty;
+        @Nullable @ColumnInfo(name = "repeat_last_n") public Integer repeatLastN;
         @Nullable @ColumnInfo(name = "seed_policy") public String seedPolicy;
         @Nullable @ColumnInfo(name = "effective_seed") public Long effectiveSeed;
         @Nullable @ColumnInfo(name = "max_output_tokens") public Integer maxOutputTokens;

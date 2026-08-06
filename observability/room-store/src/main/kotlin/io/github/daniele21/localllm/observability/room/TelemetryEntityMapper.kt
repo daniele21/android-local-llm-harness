@@ -51,6 +51,8 @@ internal object TelemetryEntityMapper {
         temperature = run.temperature
         topP = run.topP
         topK = run.topK
+        repeatPenalty = run.repeatPenalty
+        repeatLastN = run.repeatLastN
         seedPolicy = run.seedPolicy?.name
         effectiveSeed = run.effectiveSeed
         maxOutputTokens = run.maxOutputTokens
@@ -88,6 +90,8 @@ internal object TelemetryEntityMapper {
         temperature = entity.temperature,
         topP = entity.topP,
         topK = entity.topK,
+        repeatPenalty = entity.repeatPenalty,
+        repeatLastN = entity.repeatLastN,
         seedPolicy = entity.seedPolicy?.let(SeedPolicyType::valueOf),
         effectiveSeed = entity.effectiveSeed,
         maxOutputTokens = entity.maxOutputTokens,

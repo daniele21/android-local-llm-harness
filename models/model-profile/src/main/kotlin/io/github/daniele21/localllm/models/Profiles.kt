@@ -45,12 +45,21 @@ data class GenerationDefaults(
     val topK: Int = 40,
     val seed: Long? = null,
     val seedPolicy: SeedPolicy = seed?.let(SeedPolicy::Fixed) ?: SeedPolicy.Random,
+    val repeatPenalty: Float = DEFAULT_REPEAT_PENALTY,
+    val repeatLastN: Int = DEFAULT_REPEAT_LAST_N,
 ) {
     init {
         require(maxOutputTokens > 0) { "Maximum output tokens must be positive" }
         require(temperature.isFinite() && temperature in 0f..2f) { "Temperature must be in [0, 2]" }
         require(topP.isFinite() && topP > 0f && topP <= 1f) { "Top-p must be in (0, 1]" }
         require(topK in 0..MAX_TOP_K) { "Top-k must be in [0, $MAX_TOP_K]" }
+        require(repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY) {
+            "Repeat penalty must be in [$MIN_REPEAT_PENALTY, $MAX_REPEAT_PENALTY]"
+        }
+        require(repeatLastN in 0..MAX_REPEAT_LAST_N) { "Repeat window must be in [0, $MAX_REPEAT_LAST_N]" }
+        require(repeatPenalty == DEFAULT_REPEAT_PENALTY || repeatLastN > 0) {
+            "Repeat window must be positive when repeat penalty is enabled"
+        }
     }
 }
 
@@ -149,6 +158,11 @@ interface ModelProfileRegistry {
 data class ResolvedUseCase(val binding: AppModelBinding, val useCase: UseCaseProfile, val model: GgufModelProfile)
 
 private const val MAX_TOP_K = 1_000
+private const val DEFAULT_REPEAT_PENALTY = 1f
+private const val DEFAULT_REPEAT_LAST_N = 64
+private const val MIN_REPEAT_PENALTY = 1f
+private const val MAX_REPEAT_PENALTY = 2f
+private const val MAX_REPEAT_LAST_N = 4_096
 private const val MAX_STOP_SEQUENCES = 8
 private const val MAX_STOP_SEQUENCE_BYTES = 128
 private const val MAX_TOTAL_STOP_SEQUENCE_BYTES = 512

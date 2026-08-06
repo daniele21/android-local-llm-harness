@@ -135,6 +135,8 @@ class RuntimeOrchestratorTest {
                 temperature = 0.7f,
                 topP = 0.8f,
                 topK = 25,
+                repeatPenalty = 1.1f,
+                repeatLastN = 96,
                 seedPolicy = SeedPolicy.Fixed(99),
             ),
         )
@@ -152,9 +154,13 @@ class RuntimeOrchestratorTest {
         assertEquals(0.7f, prepared.temperature)
         assertEquals(0.8f, prepared.topP)
         assertEquals(25, prepared.topK)
+        assertEquals(1.1f, prepared.repeatPenalty)
+        assertEquals(96, prepared.repeatLastN)
         assertEquals(99L, prepared.effectiveSeed)
         assertEquals(24, fixture.backend.lastGenerationRequest?.maxOutputTokens)
         assertEquals(99L, fixture.backend.lastGenerationRequest?.seed)
+        assertEquals(1.1f, fixture.backend.lastGenerationRequest?.repeatPenalty)
+        assertEquals(96, fixture.backend.lastGenerationRequest?.repeatLastN)
         fixture.close()
     }
 

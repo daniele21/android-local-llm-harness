@@ -36,6 +36,8 @@ data class GenerationOverrides(
     val topK: Int? = null,
     val seedPolicy: SeedPolicy? = null,
     val seed: Long? = null,
+    val repeatPenalty: Float? = null,
+    val repeatLastN: Int? = null,
 ) {
     init {
         require(seedPolicy == null || seed == null) { "Specify either seedPolicy or legacy seed, not both" }
