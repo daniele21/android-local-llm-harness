@@ -11,6 +11,10 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
     private var playgroundEffects: PlaygroundEffects? = null
 
     val uiState: StateFlow<HarnessUiState> = mutableUiState.asStateFlow()
+    val models = HarnessModelActions(
+        state = { uiState.value },
+        dispatch = ::dispatch,
+    )
 
     fun dispatch(event: HarnessUiEvent) {
         mutableUiState.update { current -> HarnessUiReducer.reduce(current, event) }
