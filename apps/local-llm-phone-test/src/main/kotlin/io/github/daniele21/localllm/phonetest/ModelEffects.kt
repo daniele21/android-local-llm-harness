@@ -6,32 +6,36 @@ internal data class ModelEffectsSnapshot(
     val loadedDigest: String?,
 )
 
+internal sealed interface ModelCatalogCommand {
+    data object Refresh : ModelCatalogCommand
+
+    data class Download(val stableId: String) : ModelCatalogCommand
+
+    data class CancelDownload(val stableId: String) : ModelCatalogCommand
+
+    data class Install(val stableId: String) : ModelCatalogCommand
+
+    data class VerifyInstalled(val stableId: String) : ModelCatalogCommand
+
+    data class RequestRemoval(val stableId: String) : ModelCatalogCommand
+
+    data class CancelRemoval(val stableId: String) : ModelCatalogCommand
+
+    data class ConfirmRemoval(val stableId: String) : ModelCatalogCommand
+}
+
 /**
  * Activity-scoped boundary around model import, catalog and model-management effects.
  *
- * The ViewModel retains only this interface. Android launchers, controllers, executors and the
- * process-scoped runtime graph remain owned by the Activity and must be detached on disposal.
+ * Android launchers, controllers, executors and the process-scoped runtime graph remain owned by
+ * the Activity. The ViewModel-side coordinator retains only this interface.
  */
 internal interface ModelEffects {
     fun snapshot(): ModelEffectsSnapshot
 
     fun requestImport(): Boolean
 
-    fun refresh(): Boolean
-
-    fun download(stableId: String): Boolean
-
-    fun cancelDownload(stableId: String): Boolean
-
-    fun install(stableId: String): Boolean
-
-    fun verifyInstalled(stableId: String): Boolean
-
-    fun requestCatalogRemoval(stableId: String): Boolean
-
-    fun cancelCatalogRemoval(stableId: String): Boolean
-
-    fun confirmCatalogRemoval(stableId: String): Boolean
+    fun executeCatalog(command: ModelCatalogCommand): Boolean
 
     fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean
 
