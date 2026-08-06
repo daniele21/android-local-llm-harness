@@ -69,6 +69,19 @@ Remote branch deletion remains an administrative cleanup after the recorded audi
 - secure remote transfer to a verified app-private holding area;
 - explicit verified-download installation into `ModelStore` with post-import integrity verification.
 
+### Open runtime residency controls
+
+The runtime already loads and unloads models through opaque handles, reuses the compatible loaded
+model, protects active sessions and queued work from unsafe unload, and can release idle resources
+for Android background or memory-pressure signals. These operations do not delete the installed
+GGUF from `ModelStore`.
+
+The product-facing `Load in memory` / `Unload from memory` controls and the configurable warm idle
+TTL remain open. The TTL must start only after the final context is released, cancel or rearm on
+reuse, recheck active and queued ownership before eviction, and preserve the installed artifact,
+binding and selected-model metadata. The active implementation and device-validation backlog is
+tracked as RT-01 in [`dev-integration-and-harness-0.5-plan.md`](dev-integration-and-harness-0.5-plan.md).
+
 ### Integrated connected distribution
 
 The phone-test Models surface now connects the existing distribution boundaries:
@@ -183,6 +196,7 @@ privacy-safe deterministic tests without restoring the obsolete standalone conso
 ### Block 8 — product and hardware completion
 
 - complete ViewModel/UDF and Navigation Compose detail routes;
+- complete explicit non-destructive model load/unload controls and the configurable warm idle TTL;
 - add Compose UI, screenshot, accessibility and responsive tests;
 - validate catalog download and installation on representative physical devices;
 - execute the complete real-GGUF production-readiness gate;

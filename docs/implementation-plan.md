@@ -578,11 +578,24 @@ Implement a model handle cache with:
 - one resident model by default;
 - configurable memory budget;
 - active context reference counts;
+- explicit load and unload controls that change only runtime residency, never the installed artifact, binding or selected-model metadata;
 - warm idle TTL;
 - explicit pin/unpin;
 - memory-pressure eviction;
 - model-switch cost metrics;
 - safe unload serialization.
+
+The warm idle TTL must use an injected monotonic clock and a cancellable scheduler. It starts only
+after the last context is released and no generation is active or queued, is cancelled or rearmed
+when the model is used again, and unloads only after rechecking the same ownership conditions.
+Manual unload follows the same safety checks. A pin may suppress normal TTL eviction but must not
+override critical memory-pressure handling. The default TTL must be selected from representative
+device measurements rather than assumed from desktop behavior.
+
+Every unload records a structured reason such as manual action, idle TTL, memory pressure, model
+switch or runtime shutdown. Reload remains an explicit `prepare` or session-creation operation and
+must be observable as cold load, warm file load or hot handle reuse where the backend can
+distinguish them.
 
 Eviction must consider:
 
@@ -646,7 +659,12 @@ Do not cache normal creative chat outputs by default.
 ### Acceptance criteria
 
 - hot model reuse removes unnecessary model reloads;
+- explicit unload releases the model/context runtime ownership without deleting or mutating the installed GGUF, binding or selected-model metadata;
+- manual and TTL unload are rejected or deferred while a context, active generation or queued request still owns the model;
+- reuse before TTL expiry cancels or rearms eviction, while the next explicit prepare after eviction reloads the same immutable model identity;
 - memory-pressure events can evict inactive model/context resources;
+- deterministic tests cover TTL expiry, reuse races, pinning, unload reasons and idempotent cleanup with an injected clock;
+- representative-device evidence records PSS before/after unload and the latency cost of the following cold reload without assuming immediate operating-system page-cache reclamation;
 - cache keys prevent incompatible state reuse;
 - cache invalidation is deterministic and testable;
 - cache effectiveness is visible through hit, miss, restore cost and avoided-work metrics;
