@@ -21,7 +21,7 @@ class HarnessModelEffectsViewModelTest {
         )
         val viewModel = HarnessViewModel()
 
-        viewModel.attachModelEffects(effects)
+        viewModel.models.attach(effects)
 
         assertEquals(distribution, viewModel.uiState.value.modelDistribution)
         assertSame(selected, viewModel.uiState.value.importedModel)
@@ -32,30 +32,23 @@ class HarnessModelEffectsViewModelTest {
     fun catalogCommandsDelegateToAttachedEffects() {
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel()
-        viewModel.attachModelEffects(effects)
+        viewModel.models.attach(effects)
 
-        assertTrue(viewModel.refreshModels())
-        assertTrue(viewModel.downloadModel("release"))
-        assertTrue(viewModel.cancelModelDownload("release"))
-        assertTrue(viewModel.installModel("release"))
-        assertTrue(viewModel.verifyInstalledModel("release"))
-        assertTrue(viewModel.requestCatalogModelRemoval("release"))
-        assertTrue(viewModel.cancelCatalogModelRemoval("release"))
-        assertTrue(viewModel.confirmCatalogModelRemoval("release"))
-
-        assertEquals(
-            listOf(
-                "refresh",
-                "download:release",
-                "cancel-download:release",
-                "install:release",
-                "verify-installed:release",
-                "request-remove:release",
-                "cancel-remove:release",
-                "confirm-remove:release",
-            ),
-            effects.commands,
+        val commands = listOf(
+            ModelCatalogCommand.Refresh,
+            ModelCatalogCommand.Download("release"),
+            ModelCatalogCommand.CancelDownload("release"),
+            ModelCatalogCommand.Install("release"),
+            ModelCatalogCommand.VerifyInstalled("release"),
+            ModelCatalogCommand.RequestRemoval("release"),
+            ModelCatalogCommand.CancelRemoval("release"),
+            ModelCatalogCommand.ConfirmRemoval("release"),
         )
+
+        commands.forEach { command ->
+            assertTrue(viewModel.models.executeCatalog(command))
+        }
+        assertEquals(commands, effects.catalogCommands)
     }
 
     @Test
@@ -65,11 +58,11 @@ class HarnessModelEffectsViewModelTest {
         val viewModel = HarnessViewModel(
             HarnessUiState(importedModel = selected, controllerBusy = true),
         )
-        viewModel.attachModelEffects(effects)
+        viewModel.models.attach(effects)
 
-        assertFalse(viewModel.requestModelImport())
-        assertFalse(viewModel.verifySelectedModel())
-        assertFalse(viewModel.requestSelectedModelRemoval())
+        assertFalse(viewModel.models.requestImport())
+        assertFalse(viewModel.models.verifySelected())
+        assertFalse(viewModel.models.requestSelectedRemoval())
         assertTrue(effects.commands.isEmpty())
     }
 
@@ -84,11 +77,11 @@ class HarnessModelEffectsViewModelTest {
             ),
         )
         val viewModel = HarnessViewModel()
-        viewModel.attachModelEffects(effects)
+        viewModel.models.attach(effects)
 
-        assertTrue(viewModel.requestSelectedModelRemoval())
+        assertTrue(viewModel.models.requestSelectedRemoval())
         assertTrue(viewModel.uiState.value.removalConfirmationPending)
-        assertTrue(viewModel.confirmSelectedModelRemoval())
+        assertTrue(viewModel.models.confirmSelectedRemoval())
         assertFalse(viewModel.uiState.value.removalConfirmationPending)
         assertEquals(listOf("remove-selected"), effects.commands)
     }
@@ -105,10 +98,10 @@ class HarnessModelEffectsViewModelTest {
             ),
         )
         val viewModel = HarnessViewModel()
-        viewModel.attachModelEffects(effects)
+        viewModel.models.attach(effects)
 
-        assertTrue(viewModel.selectInstalledModel(metadata))
-        assertTrue(viewModel.verifySelectedModel())
+        assertTrue(viewModel.models.selectInstalled(metadata))
+        assertTrue(viewModel.models.verifySelected())
         assertSame(metadata, effects.selectedMetadata)
         assertEquals(listOf("select-installed", "verify-selected"), effects.commands)
     }
@@ -117,11 +110,11 @@ class HarnessModelEffectsViewModelTest {
     fun detachedEffectsRejectCommands() {
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel()
-        viewModel.attachModelEffects(effects)
-        viewModel.detachModelEffects(effects)
+        viewModel.models.attach(effects)
+        viewModel.models.detach(effects)
 
-        assertFalse(viewModel.refreshModels())
-        assertFalse(viewModel.downloadModel("release"))
+        assertFalse(viewModel.models.executeCatalog(ModelCatalogCommand.Refresh))
+        assertFalse(viewModel.models.executeCatalog(ModelCatalogCommand.Download("release")))
     }
 
     private fun testModel(seed: String): ImportedPhoneModel = ImportedPhoneModel(
@@ -154,6 +147,7 @@ class HarnessModelEffectsViewModelTest {
             loadedDigest = null,
         ),
     ) : ModelEffects {
+        val catalogCommands = mutableListOf<ModelCatalogCommand>()
         val commands = mutableListOf<String>()
         var selectedMetadata: InstalledCatalogModelMetadata? = null
 
@@ -161,21 +155,10 @@ class HarnessModelEffectsViewModelTest {
 
         override fun requestImport(): Boolean = record("request-import")
 
-        override fun refresh(): Boolean = record("refresh")
-
-        override fun download(stableId: String): Boolean = record("download:$stableId")
-
-        override fun cancelDownload(stableId: String): Boolean = record("cancel-download:$stableId")
-
-        override fun install(stableId: String): Boolean = record("install:$stableId")
-
-        override fun verifyInstalled(stableId: String): Boolean = record("verify-installed:$stableId")
-
-        override fun requestCatalogRemoval(stableId: String): Boolean = record("request-remove:$stableId")
-
-        override fun cancelCatalogRemoval(stableId: String): Boolean = record("cancel-remove:$stableId")
-
-        override fun confirmCatalogRemoval(stableId: String): Boolean = record("confirm-remove:$stableId")
+        override fun executeCatalog(command: ModelCatalogCommand): Boolean {
+            catalogCommands += command
+            return true
+        }
 
         override fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean {
             selectedMetadata = metadata
