@@ -70,20 +70,22 @@ jobs:
           if effects_test.count(old_fixture) != 1:
               raise RuntimeError(f'Expected one recovery mismatch fixture, found {effects_test.count(old_fixture)}')
           effects_test = effects_test.replace(old_fixture, new_fixture, 1)
-          old_request = '''        val request =
-            viewModel.models.recovery.request(
-                identity = metadata.digest.sha256,
-                action = ModelRecoveryAction.ADOPT_LOADED,
-            )
-'''
-          new_request = '''        val loadedIdentity =
-            viewModel.state.value.modelInventory.items.single { it.loaded }.stableId
-          val request =
-            viewModel.models.recovery.request(
-                identity = loadedIdentity,
-                action = ModelRecoveryAction.ADOPT_LOADED,
-            )
-'''
+          old_request = (
+              '        val request =\n'
+              '            viewModel.models.recovery.request(\n'
+              '                identity = metadata.digest.sha256,\n'
+              '                action = ModelRecoveryAction.ADOPT_LOADED,\n'
+              '            )\n'
+          )
+          new_request = (
+              '        val loadedIdentity =\n'
+              '            viewModel.state.value.modelInventory.items.single { it.loaded }.stableId\n'
+              '        val request =\n'
+              '            viewModel.models.recovery.request(\n'
+              '                identity = loadedIdentity,\n'
+              '                action = ModelRecoveryAction.ADOPT_LOADED,\n'
+              '            )\n'
+          )
           if effects_test.count(old_request) != 1:
               raise RuntimeError(f'Expected one recovery request fixture, found {effects_test.count(old_request)}')
           effects_test_path.write_text(effects_test.replace(old_request, new_request, 1))
