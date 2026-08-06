@@ -1,0 +1,56 @@
+name: Correct detail navigation progress
+
+on:
+  push:
+    branches: [agent/detail-navigation]
+    paths:
+      - .github/workflows/correct-detail-navigation-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/detail-navigation
+          fetch-depth: 1
+
+      - name: Correct obsolete inline-navigation descriptions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/harness-ux-ui-implementation-progress.md")
+          text = path.read_text()
+
+          replacements = {
+              "| CI and Android build validation | VALIDATION | PR #67 is merged into `dev`. PR #68 passed scoped repository, Spotless, Detekt, JVM test, Lint, APK and native-packaging validation in run `31071291383`. |":
+                  "| CI and Android build validation | VALIDATION | PR #68 is merged into `dev`. PR #70 passed focused formatting, JVM tests and Kotlin compilation in run `31076390922`; cumulative repository validation remains pending. |",
+              "The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card switches directly to Logs; leaving Logs clears the selected timeline.":
+                  "The Diagnostics destination exposes a horizontally scrollable section selector for Runs, Health, Resources, Benchmarks, Logs, and Validation. Runtime status remains visible above the selected section. Opening a request timeline from a run card or correlated log now navigates to a dedicated detail destination; leaving that destination clears the loaded timeline state.",
+              "- automatic navigation to the Logs section when a run timeline is opened;":
+                  "- dedicated request-timeline navigation from run cards and correlated log entries;",
+              "- Runs is `PARTIAL`, because the canonical plan also requires dedicated detail navigation and complete state tests.":
+                  "- Runs remains `PARTIAL`: PR #70 supplies dedicated detail navigation, while complete restoration, state and emulator navigation evidence remain.",
+          }
+
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected one match for: {old[:80]!r}; found {count}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflow and commit correction
+        run: |
+          rm .github/workflows/correct-detail-navigation-progress.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: align request timeline navigation status"
+          git push origin HEAD:agent/detail-navigation
