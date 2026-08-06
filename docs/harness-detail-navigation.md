@@ -42,6 +42,8 @@ Navigation does not cancel active generation. Runtime and controller lifecycles 
 - Physical validation reuses the existing real-device coordinator and privacy-safe report actions.
 - Request timeline renders the existing allowlisted correlated events on a dedicated destination.
 
+Build metadata remains compatible with the application's API 26 minimum. Android 9 and later use `PackageInfo.longVersionCode`; API 26–27 use the deprecated integer version-code accessor behind an explicit SDK check.
+
 ## Validation
 
 The focused feature workflow validates:
@@ -49,10 +51,11 @@ The focused feature workflow validates:
 ```text
 spotlessApply
 :apps:local-llm-phone-test:testDebugUnitTest
+:apps:local-llm-phone-test:lintDebug
 :apps:local-llm-phone-test:compileDebugKotlin
 ```
 
-Pure JVM tests cover top-level routes, all Settings details, shell visibility, fallback behavior, opaque request-ID round trips, blank identifiers, and malformed arguments.
+Pure JVM tests cover top-level routes, all Settings details, shell visibility, fallback behavior, opaque request-ID round trips, blank identifiers, and malformed arguments. Android Lint verifies that the new Build detail preserves the API 26 compatibility boundary.
 
 ## Remaining work
 
