@@ -107,6 +107,87 @@ class HarnessModelEffectsViewModelTest {
     }
 
     @Test
+    fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
+        val metadata = testMetadata("6")
+        val loaded = HarnessModelInventoryItem(
+            stableId = "release",
+            displayName = metadata.displayName,
+            origin = HarnessModelOrigin.CATALOG,
+            digest = metadata.digest.sha256,
+            lifecycle = HarnessModelLifecycle.DEGRADED,
+            installed = true,
+            loaded = true,
+            degradation = HarnessModelDegradation.LOADED_MODEL_DIFFERS_FROM_SELECTION,
+        )
+        val distribution = PhoneModelDistributionState(
+            models = listOf(
+                PhoneCatalogModelUi(
+                    stableId = "release",
+                    displayName = metadata.displayName,
+                    description = "test",
+                    fileName = metadata.fileName,
+                    sizeBytes = metadata.sizeBytes,
+                    architecture = metadata.architecture,
+                    quantization = metadata.quantization,
+                    profileKey = metadata.profileKey,
+                    licenseName = "Apache-2.0",
+                    status = PhoneCatalogModelStatus.INSTALLED,
+                    compatible = true,
+                    compatibilityReasons = emptyList(),
+                    compatibilityWarnings = emptyList(),
+                    installedModel = metadata,
+                ),
+            ),
+        )
+        val effects = FakeModelEffects(
+            current = ModelEffectsSnapshot(distribution, testModel("8"), metadata.digest.sha256),
+        )
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+        val identity = HarnessModelDetails.identity(
+            viewModel.uiState.value.modelInventory.items.single { it.loaded },
+        )
+
+        assertTrue(
+            viewModel.models.recovery.request(
+                identity,
+                HarnessModelRecoveryAction.ADOPT_LOADED_SELECTION,
+            ),
+        )
+        assertEquals(
+            ModelRecoveryCommand.AdoptLoadedSelection(metadata),
+            effects.recoveryCommands.single(),
+        )
+        assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
+    }
+
+    @Test
+    fun runtimeReleaseRequiresConfirmationAndClearsPendingRequestWhenAccepted() {
+        val digest = "7".repeat(64)
+        val effects = FakeModelEffects(
+            current = ModelEffectsSnapshot(PhoneModelDistributionState(), null, digest),
+        )
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+        val runtime = viewModel.uiState.value.modelInventory.items.single()
+        val identity = HarnessModelDetails.identity(runtime)
+
+        assertTrue(
+            viewModel.models.recovery.request(
+                identity,
+                HarnessModelRecoveryAction.RELEASE_RUNTIME,
+            ),
+        )
+        assertEquals(
+            HarnessModelRecoveryRequest(identity, HarnessModelRecoveryAction.RELEASE_RUNTIME),
+            viewModel.uiState.value.modelRecoveryConfirmation,
+        )
+        assertTrue(viewModel.models.recovery.confirm())
+        assertEquals(listOf(ModelRecoveryCommand.ReleaseRuntime), effects.recoveryCommands)
+        assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
+    }
+
+    @Test
     fun detachedEffectsRejectCommands() {
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel()
@@ -150,6 +231,7 @@ class HarnessModelEffectsViewModelTest {
         val catalogCommands = mutableListOf<ModelCatalogCommand>()
         val commands = mutableListOf<String>()
         var selectedMetadata: InstalledCatalogModelMetadata? = null
+        val recoveryCommands = mutableListOf<ModelRecoveryCommand>()
 
         override fun snapshot(): ModelEffectsSnapshot = current
 
@@ -168,6 +250,11 @@ class HarnessModelEffectsViewModelTest {
         override fun verifySelected(): Boolean = record("verify-selected")
 
         override fun removeSelected(): Boolean = record("remove-selected")
+
+        override fun executeRecovery(command: ModelRecoveryCommand): Boolean {
+            recoveryCommands += command
+            return true
+        }
 
         private fun record(command: String): Boolean {
             commands += command

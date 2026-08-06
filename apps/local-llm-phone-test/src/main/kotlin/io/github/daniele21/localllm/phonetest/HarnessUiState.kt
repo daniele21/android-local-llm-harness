@@ -79,6 +79,7 @@ internal data class HarnessUiState(
     val playgroundSeed: String = DEFAULT_SEED,
     val playgroundContext: String = "",
     val removalConfirmationPending: Boolean = false,
+    val modelRecoveryConfirmation: HarnessModelRecoveryRequest? = null,
     val themePreference: HarnessThemePreference = HarnessThemePreference.DARK,
 ) {
     val diagnosticActionRunning: Boolean
@@ -123,6 +124,8 @@ internal sealed interface HarnessUiEvent {
     data class OperationStatusChanged(val status: String) : Runtime
 
     data class RemovalConfirmationChanged(val pending: Boolean) : Runtime
+
+    data class ModelRecoveryConfirmationChanged(val request: HarnessModelRecoveryRequest?) : Runtime
 
     data class PlaygroundChanged(val state: PlaygroundState) : Playground
 
@@ -178,6 +181,7 @@ internal object HarnessUiReducer {
                 loadedDigest = state.modelInventory.loadedDigest,
             ),
             operationStatus = event.state.message,
+            modelRecoveryConfirmation = null,
         )
 
         is HarnessUiEvent.ModelChanged -> state.copy(
@@ -188,6 +192,7 @@ internal object HarnessUiReducer {
                 loadedDigest = state.modelInventory.loadedDigest,
             ),
             removalConfirmationPending = false,
+            modelRecoveryConfirmation = null,
         )
 
         is HarnessUiEvent.LoadedModelChanged -> state.copy(
@@ -196,6 +201,7 @@ internal object HarnessUiReducer {
                 selectedModel = state.importedModel,
                 loadedDigest = event.digest,
             ),
+            modelRecoveryConfirmation = null,
         )
 
         is HarnessUiEvent.ReportChanged -> state.copy(
@@ -207,6 +213,10 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.RemovalConfirmationChanged -> state.copy(
             removalConfirmationPending = event.pending,
+        )
+
+        is HarnessUiEvent.ModelRecoveryConfirmationChanged -> state.copy(
+            modelRecoveryConfirmation = event.request,
         )
     }
 
