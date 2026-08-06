@@ -157,7 +157,7 @@ private data class LoadClassificationModel(
     override val loadDurationMs: Long = 25L,
 ) : BackendModelHandle
 
-private data class LoadClassificationContext(override val model: BackendModelHandle) : BackendContextHandle
+private data class LoadClassificationContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class LoadClassificationBackend : InferenceBackend {
     override val id: String = "classification"
@@ -174,8 +174,15 @@ private class LoadClassificationBackend : InferenceBackend {
 
     override fun unloadModel(model: BackendModelHandle) = Unit
 
-    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle =
-        LoadClassificationContext(model)
+    override fun modelCapabilities(model: BackendModelHandle) = BackendModelCapabilities(4_096, true)
+
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest) = fakePromptPlan(request)
+
+    override fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle = LoadClassificationContext(model, configuration.contextSize)
 
     override fun releaseContext(context: BackendContextHandle) = Unit
 

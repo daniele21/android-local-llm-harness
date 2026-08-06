@@ -257,6 +257,26 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val columns = listOf(
+                    "preset_id TEXT", "preset_version INTEGER", "temperature REAL", "top_p REAL", "top_k INTEGER",
+                    "seed_policy TEXT", "effective_seed INTEGER", "max_output_tokens INTEGER", "context_size INTEGER",
+                    "prompt_token_count INTEGER", "chat_template_id TEXT", "chat_template_source TEXT",
+                    "system_prompt_version TEXT", "stop_reason TEXT", "prompt_planning_ms INTEGER",
+                    "context_creation_ms INTEGER",
+                )
+                columns.forEach { database.execSQL("ALTER TABLE generation_runs ADD COLUMN $it") }
+            }
+        }
+
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_penalty REAL")
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_last_n INTEGER")
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -267,7 +287,7 @@ class RoomTelemetryRepository internal constructor(
                 context.applicationContext,
                 TelemetryDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
             }

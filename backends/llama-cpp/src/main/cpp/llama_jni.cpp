@@ -4,14 +4,18 @@
 #include "gguf_metadata.h"
 #include "llama.h"
 #include "native_handle_registry.h"
+#include "json-schema-to-grammar.h"
+#include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -95,29 +99,58 @@ std::string base64_encode(const std::string& input) {
 
 class UtfChars final {
 public:
-    UtfChars(JNIEnv* env, jstring value) : env_(env), value_(value) {
-        if (value_ != nullptr) {
-            chars_ = env_->GetStringUTFChars(value_, nullptr);
+    UtfChars(JNIEnv* env, jstring value) {
+        if (value == nullptr) return;
+        const jsize length = env->GetStringLength(value);
+        const jchar* units = env->GetStringChars(value, nullptr);
+        if (units == nullptr) return;
+        bool valid = true;
+        for (jsize index = 0; index < length && valid; ++index) {
+            std::uint32_t code_point = units[index];
+            if (code_point >= 0xD800U && code_point <= 0xDBFFU) {
+                if (++index >= length || units[index] < 0xDC00U || units[index] > 0xDFFFU) {
+                    valid = false;
+                    break;
+                }
+                code_point = 0x10000U + ((code_point - 0xD800U) << 10U) + (units[index] - 0xDC00U);
+            } else if (code_point >= 0xDC00U && code_point <= 0xDFFFU) {
+                valid = false;
+                break;
+            }
+            append_code_point(code_point);
         }
-    }
-
-    ~UtfChars() {
-        if (chars_ != nullptr) {
-            env_->ReleaseStringUTFChars(value_, chars_);
-        }
+        env->ReleaseStringChars(value, units);
+        valid_ = valid;
     }
 
     UtfChars(const UtfChars&) = delete;
     UtfChars& operator=(const UtfChars&) = delete;
 
     const char* get() const {
-        return chars_;
+        return valid_ ? chars_.c_str() : nullptr;
     }
 
 private:
-    JNIEnv* env_;
-    jstring value_;
-    const char* chars_ = nullptr;
+    void append_code_point(std::uint32_t code_point) {
+        if (code_point <= 0x7FU) {
+            chars_.push_back(static_cast<char>(code_point));
+        } else if (code_point <= 0x7FFU) {
+            chars_.push_back(static_cast<char>(0xC0U | (code_point >> 6U)));
+            chars_.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+        } else if (code_point <= 0xFFFFU) {
+            chars_.push_back(static_cast<char>(0xE0U | (code_point >> 12U)));
+            chars_.push_back(static_cast<char>(0x80U | ((code_point >> 6U) & 0x3FU)));
+            chars_.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+        } else {
+            chars_.push_back(static_cast<char>(0xF0U | (code_point >> 18U)));
+            chars_.push_back(static_cast<char>(0x80U | ((code_point >> 12U) & 0x3FU)));
+            chars_.push_back(static_cast<char>(0x80U | ((code_point >> 6U) & 0x3FU)));
+            chars_.push_back(static_cast<char>(0x80U | (code_point & 0x3FU)));
+        }
+    }
+
+    std::string chars_;
+    bool valid_ = false;
 };
 
 class BackendRuntime final {
@@ -298,113 +331,132 @@ std::string token_piece(const llama_vocab* vocab, llama_token token) {
     return written < 0 ? std::string{} : std::string(buffer.data(), static_cast<std::size_t>(written));
 }
 
-std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> create_sampler(
-    float temperature,
-    float top_p,
-    std::int32_t top_k,
-    std::uint32_t seed
-) {
-    llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    if (sampler == nullptr) {
-        return {nullptr, llama_sampler_free};
+bool read_java_string_array(JNIEnv* env, jobjectArray values, std::vector<std::string>& output) {
+    if (values == nullptr) {
+        return false;
     }
-
-    if (temperature <= 0.0F) {
-        llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
-    } else {
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(top_k));
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));
-        llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
-        llama_sampler_chain_add(sampler, llama_sampler_init_dist(seed));
+    const jsize size = env->GetArrayLength(values);
+    if (size < 0 || size > 128) {
+        return false;
     }
-    return {sampler, llama_sampler_free};
+    output.reserve(static_cast<std::size_t>(size));
+    for (jsize index = 0; index < size; ++index) {
+        auto value = static_cast<jstring>(env->GetObjectArrayElement(values, index));
+        if (value == nullptr) {
+            return false;
+        }
+        const UtfChars chars(env, value);
+        if (chars.get() == nullptr) {
+            env->DeleteLocalRef(value);
+            return false;
+        }
+        output.emplace_back(chars.get());
+        env->DeleteLocalRef(value);
+    }
+    return true;
 }
 
-std::vector<std::string> generate_text(
-    ContextRecord& record,
-    const std::string& prompt,
-    std::int32_t max_output_tokens,
-    float temperature,
-    float top_p,
-    std::int32_t top_k,
-    std::uint32_t seed
+std::vector<std::string> plan_prompt(
+    ModelRecord& record,
+    const std::vector<std::string>& roles,
+    const std::vector<std::string>& contents,
+    const std::string& system_prompt,
+    const std::string& application_template_id,
+    const std::string& application_template,
+    const std::string& family_template_id,
+    const std::string& family_template,
+    const std::string& raw_completion
 ) {
-    std::lock_guard<std::mutex> generation_lock(record.generation_mutex);
-    if (max_output_tokens <= 0) {
-        return error_response("INVALID_ARGUMENT", "Maximum output tokens must be positive");
-    }
-    if (llama_model_has_encoder(record.model->model)) {
-        return error_response("UNSUPPORTED_MODEL", "Encoder-decoder models are not supported by this runtime path");
-    }
-
-    const llama_vocab* vocab = llama_model_get_vocab(record.model->model);
-    const std::vector<llama_token> prompt_tokens = tokenize_prompt(vocab, prompt);
-    if (prompt_tokens.empty()) {
-        return error_response("TOKENIZATION_FAILED", "Prompt tokenization returned no tokens");
-    }
-    if (prompt_tokens.size() + static_cast<std::size_t>(max_output_tokens) > llama_n_ctx(record.context)) {
-        return error_response("CONTEXT_OVERFLOW", "Prompt and requested output exceed the configured context size");
-    }
-
-    ActiveGeneration active_generation;
-    llama_memory_clear(llama_get_memory(record.context), true);
-
-    const auto prompt_started = std::chrono::steady_clock::now();
-    for (std::size_t offset = 0; offset < prompt_tokens.size();) {
-        const std::size_t remaining = prompt_tokens.size() - offset;
-        const std::int32_t chunk_size = static_cast<std::int32_t>(
-            std::min<std::size_t>(remaining, static_cast<std::size_t>(record.batch_size))
-        );
-        llama_batch prompt_batch = llama_batch_get_one(
-            const_cast<llama_token*>(prompt_tokens.data() + offset),
-            chunk_size
-        );
-        if (llama_decode(record.context, prompt_batch) != 0) {
-            return error_response("DECODE_FAILED", "llama.cpp failed while processing the prompt");
+    const llama_vocab* vocab = llama_model_get_vocab(record.model);
+    if (!raw_completion.empty()) {
+        const std::vector<llama_token> tokens = tokenize_prompt(vocab, raw_completion);
+        if (tokens.empty()) {
+            return error_response("TOKENIZATION_FAILED", "Raw completion tokenization returned no tokens");
         }
-        offset += static_cast<std::size_t>(chunk_size);
+        return {
+            "ok",
+            base64_encode(raw_completion),
+            std::to_string(tokens.size()),
+            "raw-completion",
+            "RAW_COMPLETION",
+            "",
+        };
     }
-    const auto prompt_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - prompt_started
-    ).count();
-
-    auto sampler = create_sampler(temperature, top_p, top_k, seed);
-    if (!sampler) {
-        return error_response("SAMPLER_FAILED", "Unable to create the llama.cpp sampler chain");
+    if (roles.size() != contents.size() || roles.empty()) {
+        return error_response("INVALID_ARGUMENT", "Prompt roles and contents must have the same non-zero size");
     }
 
-    std::string output;
-    std::int32_t generated_tokens = 0;
-    const auto generation_started = std::chrono::steady_clock::now();
-    while (generated_tokens < max_output_tokens) {
-        llama_token token = llama_sampler_sample(sampler.get(), record.context, -1);
-        if (llama_vocab_is_eog(vocab, token)) {
-            break;
-        }
-
-        const std::string piece = token_piece(vocab, token);
-        if (piece.empty()) {
-            return error_response("TOKEN_DECODE_FAILED", "Unable to decode a generated token");
-        }
-        output.append(piece);
-        ++generated_tokens;
-
-        llama_batch token_batch = llama_batch_get_one(&token, 1);
-        if (generated_tokens < max_output_tokens && llama_decode(record.context, token_batch) != 0) {
-            return error_response("DECODE_FAILED", "llama.cpp failed while decoding a generated token");
-        }
+    const char* selected_template = nullptr;
+    std::string template_id;
+    std::string template_source;
+    selected_template = llama_model_chat_template(record.model, nullptr);
+    if (selected_template != nullptr && selected_template[0] != '\0') {
+        template_id = "gguf-default";
+        template_source = "GGUF";
+    } else if (!application_template.empty()) {
+        selected_template = application_template.c_str();
+        template_id = application_template_id;
+        template_source = "APPLICATION_OVERRIDE";
+    } else if (!family_template.empty()) {
+        selected_template = family_template.c_str();
+        template_id = family_template_id;
+        template_source = "FAMILY_FALLBACK";
+    } else {
+        return error_response("CHAT_TEMPLATE_UNAVAILABLE", "No approved chat template is available for this model");
     }
-    const auto generation_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - generation_started
-    ).count();
 
+    std::vector<std::string> owned_roles;
+    std::vector<std::string> owned_contents;
+    owned_roles.reserve(roles.size() + (system_prompt.empty() ? 0U : 1U));
+    owned_contents.reserve(contents.size() + (system_prompt.empty() ? 0U : 1U));
+    if (!system_prompt.empty()) {
+        owned_roles.emplace_back("system");
+        owned_contents.push_back(system_prompt);
+    }
+    owned_roles.insert(owned_roles.end(), roles.begin(), roles.end());
+    owned_contents.insert(owned_contents.end(), contents.begin(), contents.end());
+
+    std::vector<llama_chat_message> messages;
+    messages.reserve(owned_roles.size());
+    for (std::size_t index = 0; index < owned_roles.size(); ++index) {
+        messages.push_back({owned_roles[index].c_str(), owned_contents[index].c_str()});
+    }
+
+    const std::int32_t required = llama_chat_apply_template(
+        selected_template,
+        messages.data(),
+        messages.size(),
+        true,
+        nullptr,
+        0
+    );
+    if (required <= 0) {
+        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template is not supported by this runtime");
+    }
+    std::vector<char> buffer(static_cast<std::size_t>(required) + 1U, '\0');
+    const std::int32_t written = llama_chat_apply_template(
+        selected_template,
+        messages.data(),
+        messages.size(),
+        true,
+        buffer.data(),
+        static_cast<std::int32_t>(buffer.size())
+    );
+    if (written <= 0 || written > required) {
+        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be rendered");
+    }
+    const std::string prompt(buffer.data(), static_cast<std::size_t>(written));
+    const std::vector<llama_token> tokens = tokenize_prompt(vocab, prompt);
+    if (tokens.empty()) {
+        return error_response("TOKENIZATION_FAILED", "Rendered prompt tokenization returned no tokens");
+    }
     return {
         "ok",
-        base64_encode(output),
-        std::to_string(prompt_tokens.size()),
-        std::to_string(generated_tokens),
-        std::to_string(prompt_ms),
-        std::to_string(generation_ms),
+        base64_encode(prompt),
+        std::to_string(tokens.size()),
+        template_id,
+        template_source,
+        "",
     };
 }
 
@@ -585,40 +637,84 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_releaseContext(
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_generate(
+Java_io_github_daniele21_localllm_llamacpp_JniLlamaPromptApi_modelCapabilities(
     JNIEnv* env,
     jobject /* this */,
-    jlong context_handle,
-    jstring prompt_value,
-    jint max_output_tokens,
-    jfloat temperature,
-    jfloat top_p,
-    jint top_k,
-    jlong seed
+    jlong model_handle
 ) {
-    const auto context = contexts.get(static_cast<std::int64_t>(context_handle));
-    if (!context) {
-        return to_java_string_array(env, error_response("UNKNOWN_HANDLE", "Unknown native context handle"));
+    const auto model = models.get(static_cast<std::int64_t>(model_handle));
+    if (!model) {
+        return to_java_string_array(env, error_response("UNKNOWN_HANDLE", "Unknown native model handle"));
     }
-    if (prompt_value == nullptr) {
-        return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Prompt must not be null"));
+    const std::int32_t maximum_context = llama_model_n_ctx_train(model->model);
+    if (maximum_context <= 0) {
+        return to_java_string_array(env, error_response("INTERNAL", "Model context capacity is unavailable"));
+    }
+    return to_java_string_array(env, {"ok", std::to_string(maximum_context), "true"});
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_io_github_daniele21_localllm_llamacpp_JniLlamaPromptApi_planPrompt(
+    JNIEnv* env,
+    jobject /* this */,
+    jlong model_handle,
+    jobjectArray roles_value,
+    jobjectArray contents_value,
+    jstring system_prompt_value,
+    jstring application_template_id_value,
+    jstring application_template_value,
+    jstring family_template_id_value,
+    jstring family_template_value,
+    jstring raw_completion_value
+) {
+    const auto model = models.get(static_cast<std::int64_t>(model_handle));
+    if (!model) {
+        return to_java_string_array(env, error_response("UNKNOWN_HANDLE", "Unknown native model handle"));
+    }
+    std::vector<std::string> roles;
+    std::vector<std::string> contents;
+    if (!read_java_string_array(env, roles_value, roles) ||
+        !read_java_string_array(env, contents_value, contents)) {
+        return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Prompt message arrays are invalid"));
     }
 
-    const UtfChars prompt(env, prompt_value);
-    if (prompt.get() == nullptr) {
+    auto read_optional = [env](jstring value, std::string& output) -> bool {
+        if (value == nullptr) {
+            return true;
+        }
+        const UtfChars chars(env, value);
+        if (chars.get() == nullptr) {
+            return false;
+        }
+        output.assign(chars.get());
+        return true;
+    };
+    std::string system_prompt;
+    std::string application_template_id;
+    std::string application_template;
+    std::string family_template_id;
+    std::string family_template;
+    std::string raw_completion;
+    if (!read_optional(system_prompt_value, system_prompt) ||
+        !read_optional(application_template_id_value, application_template_id) ||
+        !read_optional(application_template_value, application_template) ||
+        !read_optional(family_template_id_value, family_template_id) ||
+        !read_optional(family_template_value, family_template) ||
+        !read_optional(raw_completion_value, raw_completion)) {
         return nullptr;
     }
-
     return to_java_string_array(
         env,
-        generate_text(
-            *context,
-            prompt.get(),
-            max_output_tokens,
-            temperature,
-            top_p,
-            top_k,
-            static_cast<std::uint32_t>(seed)
+        plan_prompt(
+            *model,
+            roles,
+            contents,
+            system_prompt,
+            application_template_id,
+            application_template,
+            family_template_id,
+            family_template,
+            raw_completion
         )
     );
 }

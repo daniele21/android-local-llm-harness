@@ -5,14 +5,20 @@ on:
   pull_request:
     paths:
       - scripts/generate_brand_assets.py
+      - scripts/generate_android_brand_assets.py
       - .github/workflows/generate-brand-assets.yml
       - docs/assets/brand/**
+      - apps/local-llm-phone-test/src/main/AndroidManifest.xml
+      - apps/local-llm-phone-test/src/main/res/**
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - scripts/generate_brand_assets.py
+      - scripts/generate_android_brand_assets.py
       - .github/workflows/generate-brand-assets.yml
       - docs/assets/brand/**
+      - apps/local-llm-phone-test/src/main/AndroidManifest.xml
+      - apps/local-llm-phone-test/src/main/res/**
 
 permissions:
   contents: read
@@ -27,15 +33,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow==11.3.0
 
-      - name: Generate dark and light assets
+      - name: Generate dark and light reference assets
         run: python scripts/generate_brand_assets.py
+
+      - name: Verify Android runtime assets
+        run: python scripts/generate_android_brand_assets.py --check
 
       - name: Verify generated assets are committed
         run: |
-          git add --intent-to-add docs/assets/brand
-          git diff --exit-code -- docs/assets/brand
+          git add --intent-to-add docs/assets/brand apps/local-llm-phone-test/src/main/res
+          git diff --exit-code -- docs/assets/brand apps/local-llm-phone-test/src/main/res

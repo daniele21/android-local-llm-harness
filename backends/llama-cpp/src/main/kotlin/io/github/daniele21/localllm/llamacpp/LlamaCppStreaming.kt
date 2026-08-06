@@ -16,7 +16,13 @@ interface NativeLlamaStreamingApi {
         temperature: Float,
         topP: Float,
         topK: Int,
+        repeatPenalty: Float,
+        repeatLastN: Int,
         seed: Long,
+        outputConstraintType: String,
+        outputSchema: String?,
+        stopTokenIds: IntArray,
+        stopSequences: Array<String>,
         callback: NativeStreamingCallback,
     ): Array<String>
 
@@ -37,7 +43,13 @@ class JniLlamaStreamingApi : NativeLlamaStreamingApi {
         temperature: Float,
         topP: Float,
         topK: Int,
+        repeatPenalty: Float,
+        repeatLastN: Int,
         seed: Long,
+        outputConstraintType: String,
+        outputSchema: String?,
+        stopTokenIds: IntArray,
+        stopSequences: Array<String>,
         callback: NativeStreamingCallback,
     ): Array<String>
 
@@ -75,7 +87,13 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
                 temperature = config.temperature,
                 topP = config.topP,
                 topK = config.topK,
+                repeatPenalty = config.repeatPenalty,
+                repeatLastN = config.repeatLastN,
                 seed = config.seed,
+                outputConstraintType = config.outputConstraintType,
+                outputSchema = config.outputSchema,
+                stopTokenIds = config.stopTokenIds,
+                stopSequences = config.stopSequences.toTypedArray(),
                 callback = callback,
             ),
         )
@@ -123,6 +141,7 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
                     outputTokens = response[2].toInt(),
                     promptDurationMs = response[3].toLong(),
                     generationDurationMs = response[4].toLong(),
+                    stopReason = response[5],
                 )
                 if (response[0] == OK) {
                     NativeStreamingResult.Completed(metrics)
@@ -156,7 +175,7 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
         const val OK = "ok"
         const val CANCELLED = "cancelled"
         const val ERROR = "error"
-        const val TERMINAL_FIELD_COUNT = 5
+        const val TERMINAL_FIELD_COUNT = 6
         const val CANCEL_FIELD_COUNT = 2
         const val ERROR_FIELD_COUNT = 3
     }
@@ -168,7 +187,13 @@ fun interface NativeStreamingListener {
 
 data class NativeTextChunk(val text: String, val generatedTokens: Int)
 
-data class NativeStreamingMetrics(val inputTokens: Int, val outputTokens: Int, val promptDurationMs: Long, val generationDurationMs: Long)
+data class NativeStreamingMetrics(
+    val inputTokens: Int,
+    val outputTokens: Int,
+    val promptDurationMs: Long,
+    val generationDurationMs: Long,
+    val stopReason: String,
+)
 
 sealed interface NativeStreamingResult {
     data class Completed(val metrics: NativeStreamingMetrics) : NativeStreamingResult
@@ -193,6 +218,7 @@ enum class StreamingNativeErrorCode {
     CONTEXT_OVERFLOW,
     DECODE_FAILED,
     SAMPLER_FAILED,
+    INVALID_OUTPUT_CONSTRAINT,
     TOKEN_DECODE_FAILED,
     INTERNAL,
     NATIVE_PROTOCOL,

@@ -1,7 +1,6 @@
 package io.github.daniele21.localllm.llamacpp
 
 import io.github.daniele21.localllm.models.GgufModelProfile
-import java.util.Base64
 
 interface NativeLlamaGenerationApi {
     fun createContext(
@@ -15,16 +14,6 @@ interface NativeLlamaGenerationApi {
     ): Array<String>
 
     fun releaseContext(contextHandle: Long): Array<String>
-
-    fun generate(
-        contextHandle: Long,
-        prompt: String,
-        maxOutputTokens: Int,
-        temperature: Float,
-        topP: Float,
-        topK: Int,
-        seed: Long,
-    ): Array<String>
 }
 
 class JniLlamaGenerationApi : NativeLlamaGenerationApi {
@@ -43,54 +32,26 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
     ): Array<String>
 
     external override fun releaseContext(contextHandle: Long): Array<String>
-
-    external override fun generate(
-        contextHandle: Long,
-        prompt: String,
-        maxOutputTokens: Int,
-        temperature: Float,
-        topP: Float,
-        topK: Int,
-        seed: Long,
-    ): Array<String>
 }
 
 class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi = JniLlamaGenerationApi()) {
-    fun createContext(model: LoadedNativeModel, profile: GgufModelProfile): ContextCreationResult = decodeContextCreation(
-        response = nativeApi.createContext(
-            modelHandle = model.handle.value,
-            contextSize = profile.contextSize,
-            batchSize = profile.batchSize,
-            microBatchSize = profile.microBatchSize,
-            threads = profile.cpuThreads,
-            batchThreads = profile.batchThreads,
-            flashAttention = profile.flashAttention,
-        ),
-        model = model,
-    )
+    fun createContext(model: LoadedNativeModel, profile: GgufModelProfile, contextSize: Int = profile.contextSize): ContextCreationResult =
+        decodeContextCreation(
+            response = nativeApi.createContext(
+                modelHandle = model.handle.value,
+                contextSize = contextSize,
+                batchSize = profile.batchSize,
+                microBatchSize = profile.microBatchSize,
+                threads = profile.cpuThreads,
+                batchThreads = profile.batchThreads,
+                flashAttention = profile.flashAttention,
+            ),
+            model = model,
+        )
 
     fun releaseContext(context: LoadedNativeContext): GenerationNativeOperationResult = decodeOperation(
         nativeApi.releaseContext(context.handle.value),
     )
-
-    fun generate(context: LoadedNativeContext, prompt: String, config: NativeGenerationConfig): NativeGenerationResult {
-        val validationError = config.validationError(prompt)
-        if (validationError != null) {
-            return NativeGenerationResult.Failure(validationError)
-        }
-
-        return decodeGeneration(
-            nativeApi.generate(
-                contextHandle = context.handle.value,
-                prompt = prompt,
-                maxOutputTokens = config.maxOutputTokens,
-                temperature = config.temperature,
-                topP = config.topP,
-                topK = config.topK,
-                seed = config.seed,
-            ),
-        )
-    }
 
     private fun decodeContextCreation(response: Array<String>, model: LoadedNativeModel): ContextCreationResult {
         if (response.size == CONTEXT_CREATION_FIELD_COUNT && response[0] == OK) {
@@ -108,27 +69,6 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
             }
         }
         return ContextCreationResult.Failure(decodeError(response))
-    }
-
-    private fun decodeGeneration(response: Array<String>): NativeGenerationResult {
-        if (response.size == GENERATION_FIELD_COUNT && response[0] == OK) {
-            return try {
-                NativeGenerationResult.Success(
-                    output = String(Base64.getDecoder().decode(response[1]), Charsets.UTF_8),
-                    metrics = NativeGenerationMetrics(
-                        inputTokens = response[2].toInt(),
-                        outputTokens = response[3].toInt(),
-                        promptDurationMs = response[4].toLong(),
-                        generationDurationMs = response[5].toLong(),
-                    ),
-                )
-            } catch (error: IllegalArgumentException) {
-                NativeGenerationResult.Failure(
-                    protocolError("Native generation response is invalid: ${error.message}"),
-                )
-            }
-        }
-        return NativeGenerationResult.Failure(decodeError(response))
     }
 
     private fun decodeOperation(response: Array<String>): GenerationNativeOperationResult {
@@ -156,7 +96,6 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
         const val OK = "ok"
         const val ERROR = "error"
         const val CONTEXT_CREATION_FIELD_COUNT = 2
-        const val GENERATION_FIELD_COUNT = 6
         const val OPERATION_FIELD_COUNT = 1
         const val ERROR_FIELD_COUNT = 3
     }
@@ -171,8 +110,23 @@ value class NativeContextHandle(val value: Long) {
 
 data class LoadedNativeContext(val handle: NativeContextHandle, val model: LoadedNativeModel)
 
-data class NativeGenerationConfig(val maxOutputTokens: Int, val temperature: Float, val topP: Float, val topK: Int, val seed: Long) {
-    internal fun validationError(prompt: String): GenerationNativeError? = when {
+data class NativeGenerationConfig(
+    val maxOutputTokens: Int,
+    val temperature: Float,
+    val topP: Float,
+    val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
+    val seed: Long,
+    val outputConstraintType: String = "TEXT",
+    val outputSchema: String? = null,
+    val stopTokenIds: IntArray = intArrayOf(),
+    val stopSequences: List<String> = emptyList(),
+) {
+    internal fun validationError(prompt: String): GenerationNativeError? =
+        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError()
+
+    private fun baseValidationError(prompt: String): GenerationNativeError? = when {
         prompt.isBlank() -> invalid("Prompt must not be blank")
         maxOutputTokens <= 0 -> invalid("Maximum output tokens must be positive")
         temperature < 0F -> invalid("Temperature must not be negative")
@@ -182,18 +136,28 @@ data class NativeGenerationConfig(val maxOutputTokens: Int, val temperature: Flo
         else -> null
     }
 
+    private fun repeatValidationError(): GenerationNativeError? = when {
+        !repeatPenalty.isFinite() || repeatPenalty !in 1f..2f -> invalid("Repeat penalty must be in [1, 2]")
+        repeatLastN !in 0..4_096 -> invalid("Repeat window must be in [0, 4096]")
+        repeatPenalty != 1f && repeatLastN == 0 -> invalid("Repeat window must be positive when repeat penalty is enabled")
+        else -> null
+    }
+
+    private fun constraintValidationError(): GenerationNativeError? = when {
+        outputConstraintType !in OUTPUT_CONSTRAINT_TYPES -> invalid("Unsupported output constraint type")
+        outputConstraintType == "JSON_SCHEMA" && outputSchema.isNullOrBlank() -> invalid("JSON Schema must not be blank")
+        stopSequences.any { it.isEmpty() } -> invalid("Stop sequences must not be empty")
+        else -> null
+    }
+
     private fun invalid(message: String): GenerationNativeError = GenerationNativeError(
         code = GenerationNativeErrorCode.INVALID_ARGUMENT,
         message = message,
     )
-}
 
-data class NativeGenerationMetrics(val inputTokens: Int, val outputTokens: Int, val promptDurationMs: Long, val generationDurationMs: Long)
-
-sealed interface NativeGenerationResult {
-    data class Success(val output: String, val metrics: NativeGenerationMetrics) : NativeGenerationResult
-
-    data class Failure(val error: GenerationNativeError) : NativeGenerationResult
+    private companion object {
+        val OUTPUT_CONSTRAINT_TYPES = setOf("TEXT", "JSON", "JSON_SCHEMA")
+    }
 }
 
 sealed interface ContextCreationResult {

@@ -1,12 +1,17 @@
 package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
+import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationListener
+import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SeedPolicy
+import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
 import io.github.daniele21.localllm.models.ArtifactSource
@@ -24,6 +29,7 @@ import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -65,7 +71,7 @@ class RuntimeOrchestratorTest {
 
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
         assertEquals(
-            listOf("Queued", "Started", "TextDelta", "TextDelta", "Completed"),
+            listOf("Queued", "Prepared", "Started", "TextDelta", "TextDelta", "Completed"),
             events.map { it::class.simpleName },
         )
         val completed = events.last() as GenerationEvent.Completed
@@ -73,6 +79,174 @@ class RuntimeOrchestratorTest {
         assertEquals(2, completed.metrics.inputTokens)
         assertEquals(2, completed.metrics.outputTokens)
         assertEquals(200.0, completed.metrics.decodeTokensPerSecond!!, 0.001)
+        fixture.close()
+    }
+
+    @Test
+    fun `auto context uses the smallest approved capacity after exact prompt planning`() {
+        val fixture = RuntimeFixture()
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+
+        fixture.runtime.generate(
+            fixture.request("auto-context", session),
+            GenerationListener { if (it is GenerationEvent.Completed || it is GenerationEvent.Failed) terminal.countDown() },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(listOf(1_024), fixture.backend.createdContextSizes)
+        fixture.close()
+    }
+
+    @Test
+    fun `insufficient manual context fails without creating native context`() {
+        val fixture = RuntimeFixture()
+        val session = fixture.runtime.createSession(
+            fixture.applicationId,
+            fixture.useCaseId,
+            SessionOptions(contextPolicy = ContextPolicy.Manual(256)),
+        )
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val terminal = CountDownLatch(1)
+
+        fixture.runtime.generate(
+            fixture.request("manual-context", session),
+            GenerationListener {
+                events += it
+                if (it is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertTrue(events.last() is GenerationEvent.Failed)
+        assertTrue(fixture.backend.createdContextSizes.isEmpty())
+        fixture.close()
+    }
+
+    @Test
+    fun `request sampling overrides reach backend and prepared metadata`() {
+        val fixture = RuntimeFixture()
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val terminal = CountDownLatch(1)
+        val request = fixture.request("overrides", session).copy(
+            overrides = GenerationOverrides(
+                maxOutputTokens = 24,
+                temperature = 0.7f,
+                topP = 0.8f,
+                topK = 25,
+                repeatPenalty = 1.1f,
+                repeatLastN = 96,
+                seedPolicy = SeedPolicy.Fixed(99),
+            ),
+        )
+
+        fixture.runtime.generate(
+            request,
+            GenerationListener {
+                events += it
+                if (it is GenerationEvent.Completed || it is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        val prepared = events.filterIsInstance<GenerationEvent.Prepared>().single().configuration
+        assertEquals(0.7f, prepared.temperature)
+        assertEquals(0.8f, prepared.topP)
+        assertEquals(25, prepared.topK)
+        assertEquals(1.1f, prepared.repeatPenalty)
+        assertEquals(96, prepared.repeatLastN)
+        assertEquals(99L, prepared.effectiveSeed)
+        assertEquals(24, fixture.backend.lastGenerationRequest?.maxOutputTokens)
+        assertEquals(99L, fixture.backend.lastGenerationRequest?.seed)
+        assertEquals(1.1f, fixture.backend.lastGenerationRequest?.repeatPenalty)
+        assertEquals(96, fixture.backend.lastGenerationRequest?.repeatLastN)
+        fixture.close()
+    }
+
+    @Test
+    fun `prompt stop policy reaches backend generation`() {
+        val fixture = RuntimeFixture()
+        fixture.backend.plannedStopSequences = listOf("<stop>")
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+
+        fixture.runtime.generate(
+            fixture.request("stops", session),
+            GenerationListener { if (it is GenerationEvent.Completed || it is GenerationEvent.Failed) terminal.countDown() },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(listOf("<stop>"), fixture.backend.lastGenerationRequest?.stopSequences)
+        fixture.close()
+    }
+
+    @Test
+    fun `cancellation after prompt planning avoids context creation and prefill`() {
+        val fixture = RuntimeFixture()
+        fixture.backend.blockPlanning = CountDownLatch(1)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+
+        val handle = fixture.runtime.generate(
+            fixture.request("cancel-planning", session),
+            GenerationListener {
+                events += it
+                if (it is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+        assertTrue(fixture.backend.planningStarted.await(2, TimeUnit.SECONDS))
+        handle.cancel()
+        fixture.backend.blockPlanning?.countDown()
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertTrue((events.last() as GenerationEvent.Failed).error is LocalLlmError.Cancelled)
+        assertTrue(fixture.backend.createdContextSizes.isEmpty())
+        assertEquals(0, fixture.backend.generationCalls)
+        fixture.close()
+    }
+
+    @Test
+    fun `cancellation during context creation releases new context before prefill`() {
+        val fixture = RuntimeFixture()
+        fixture.backend.blockContextCreation = CountDownLatch(1)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+
+        val handle = fixture.runtime.generate(
+            fixture.request("cancel-context", session),
+            GenerationListener { if (it is GenerationEvent.Failed) terminal.countDown() },
+        )
+        assertTrue(fixture.backend.contextCreationStarted.await(2, TimeUnit.SECONDS))
+        handle.cancel()
+        fixture.backend.blockContextCreation?.countDown()
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(1, fixture.backend.releaseCalls)
+        assertEquals(0, fixture.backend.generationCalls)
+        fixture.close()
+    }
+
+    @Test
+    fun `invalid output constraint is exposed as typed configuration failure`() {
+        val fixture = RuntimeFixture()
+        fixture.backend.generateFailureCode = "INVALID_OUTPUT_CONSTRAINT"
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+
+        fixture.runtime.generate(
+            fixture.request("invalid-schema", session),
+            GenerationListener {
+                events += it
+                if (it is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        val error = (events.last() as GenerationEvent.Failed).error as LocalLlmError.Configuration
+        assertEquals(ConfigurationErrorCode.INVALID_OUTPUT_CONSTRAINT, error.reason)
         fixture.close()
     }
 
@@ -175,6 +349,7 @@ class RuntimeOrchestratorTest {
         assertTrue(eventually { fixture.runtime.runtimeSnapshot().activeSessions == 0 })
         assertTrue(fixture.runtime.unloadIdleModel())
         assertEquals(1, fixture.backend.unloadCalls)
+        assertNull(fixture.runtime.runtimeSnapshot().loadedModel)
         fixture.close()
     }
 
@@ -293,7 +468,7 @@ private data class FakeBackendModel(
     override val loadDurationMs: Long = 12,
 ) : BackendModelHandle
 
-private data class FakeBackendContext(override val model: BackendModelHandle) : BackendContextHandle
+private data class FakeBackendContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class FakeInferenceBackend : InferenceBackend {
     override val id: String = "fake"
@@ -303,7 +478,17 @@ private class FakeInferenceBackend : InferenceBackend {
     var releaseCalls: Int = 0
     var cancelCalls: Int = 0
     var blockGeneration: CountDownLatch? = null
+    var blockPlanning: CountDownLatch? = null
+    var blockContextCreation: CountDownLatch? = null
     var generationStarted: CountDownLatch = CountDownLatch(1)
+    var planningStarted: CountDownLatch = CountDownLatch(1)
+    var contextCreationStarted: CountDownLatch = CountDownLatch(1)
+    var generationCalls: Int = 0
+    var plannedStopSequences: List<String> = emptyList()
+    var generateFailureCode: String? = null
+    val createdContextSizes = Collections.synchronizedList(mutableListOf<Int>())
+
+    @Volatile var lastGenerationRequest: BackendGenerationRequest? = null
 
     override fun initialize() {
         initializeCalls += 1
@@ -320,7 +505,24 @@ private class FakeInferenceBackend : InferenceBackend {
         unloadCalls += 1
     }
 
-    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle = FakeBackendContext(model)
+    override fun modelCapabilities(model: BackendModelHandle) = BackendModelCapabilities(4_096, true)
+
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan {
+        planningStarted.countDown()
+        blockPlanning?.await()
+        return fakePromptPlan(request).copy(stopSequences = plannedStopSequences)
+    }
+
+    override fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle {
+        contextCreationStarted.countDown()
+        blockContextCreation?.await()
+        createdContextSizes += configuration.contextSize
+        return FakeBackendContext(model, configuration.contextSize)
+    }
 
     override fun releaseContext(context: BackendContextHandle) {
         releaseCalls += 1
@@ -331,6 +533,9 @@ private class FakeInferenceBackend : InferenceBackend {
         request: BackendGenerationRequest,
         onChunk: (text: String, generatedTokens: Int) -> Boolean,
     ): BackendGenerationOutcome {
+        generationCalls += 1
+        generateFailureCode?.let { throw BackendException(it, "Invalid output constraint") }
+        lastGenerationRequest = request
         generationStarted.countDown()
         blockGeneration?.await()
         if (!onChunk("hello ", 1)) {

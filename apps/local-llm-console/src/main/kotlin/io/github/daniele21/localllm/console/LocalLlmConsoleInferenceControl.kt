@@ -186,6 +186,10 @@ class LocalLlmConsoleInferenceControl(
                     detail = "Generation running",
                 )
 
+                is GenerationEvent.Prepared -> state.copy(
+                    detail = "Prompt planned: ${event.configuration.promptTokenCount}/${event.configuration.contextSize} tokens",
+                )
+
                 is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)
 
                 is GenerationEvent.Completed -> completedState(event.output, event.metrics)

@@ -1,6 +1,11 @@
 package io.github.daniele21.localllm.runtime
 
+import io.github.daniele21.localllm.contracts.ChatTemplateSource
+import io.github.daniele21.localllm.contracts.GenerationInput
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.OutputConstraint
+import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.models.ChatTemplatePolicy
 import io.github.daniele21.localllm.models.GgufModelProfile
 import io.github.daniele21.localllm.store.StoredModel
 
@@ -12,6 +17,26 @@ interface BackendModelHandle {
 
 interface BackendContextHandle {
     val model: BackendModelHandle
+    val contextSize: Int
+}
+
+data class BackendModelCapabilities(val maximumContextTokens: Int, val supportsGrammar: Boolean)
+
+data class BackendPromptPlanningRequest(val input: GenerationInput, val systemPrompt: String?, val chatTemplatePolicy: ChatTemplatePolicy)
+
+data class BackendPromptPlan(
+    val prompt: String,
+    val tokenCount: Int,
+    val chatTemplateId: String,
+    val chatTemplateSource: ChatTemplateSource,
+    val stopTokenIds: Set<Int> = emptySet(),
+    val stopSequences: List<String> = emptyList(),
+)
+
+data class BackendContextConfiguration(val contextSize: Int) {
+    init {
+        require(contextSize > 0) { "Context size must be positive" }
+    }
 }
 
 data class BackendGenerationRequest(
@@ -21,7 +46,12 @@ data class BackendGenerationRequest(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
     val seed: Long,
+    val outputConstraint: OutputConstraint = OutputConstraint.Text,
+    val stopTokenIds: Set<Int> = emptySet(),
+    val stopSequences: List<String> = emptyList(),
 )
 
 data class BackendGenerationMetrics(
@@ -29,6 +59,7 @@ data class BackendGenerationMetrics(
     val outputTokens: Int,
     val promptDurationMs: Long,
     val generationDurationMs: Long,
+    val stopReason: StopReason = StopReason.UNKNOWN,
 )
 
 sealed interface BackendGenerationOutcome {
@@ -45,7 +76,15 @@ interface InferenceBackend {
     fun shutdown()
     fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle
     fun unloadModel(model: BackendModelHandle)
-    fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle
+    fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities
+    fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan
+
+    fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle
+
     fun releaseContext(context: BackendContextHandle)
 
     fun generate(

@@ -12,7 +12,8 @@
 *.jks
 *.keystore
 keystore.properties
-models/
+models/*
+!models/AGENTS.md
 *.gguf
 *.ggml
 
@@ -32,3 +33,5 @@ env/
 .env
 .env.*
 !.env.example
+.kotlin/errors/errors-1785944408134.log
+.kotlin/errors/errors-1785944408252.log

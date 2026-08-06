@@ -1,20 +1,24 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
+import io.github.daniele21.localllm.contracts.InferencePresetId
+import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntimeGraph, private val listener: (PlaygroundState) -> Unit) :
-    AutoCloseable {
+    PlaygroundEffects {
     private val executor = Executors.newSingleThreadExecutor()
     private val lock = Any()
 
@@ -27,9 +31,9 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     val active: Boolean
         get() = synchronized(lock) { state.active || activeSession != null }
 
-    fun snapshot(): PlaygroundState = synchronized(lock) { state }
+    override fun snapshot(): PlaygroundState = synchronized(lock) { state }
 
-    fun start(model: ImportedPhoneModel, prompt: String, options: PlaygroundRequestOptions): Boolean {
+    override fun start(model: ImportedPhoneModel, prompt: String, options: PlaygroundRequestOptions): Boolean {
         val normalizedPrompt = prompt.trim()
         require(normalizedPrompt.isNotBlank()) { "Prompt must not be blank" }
         require(normalizedPrompt.length <= MAX_PROMPT_CHARACTERS) {
@@ -57,7 +61,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         return true
     }
 
-    fun cancel(): Boolean {
+    override fun cancel(): Boolean {
         val handle = synchronized(lock) { activeHandle } ?: return false
         return runCatching {
             handle.cancel()
@@ -76,7 +80,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         }.getOrDefault(false)
     }
 
-    fun releaseRuntime(onComplete: () -> Unit): Boolean {
+    override fun releaseRuntime(onComplete: () -> Unit): Boolean {
         val resources = synchronized(lock) {
             if (state.active || activeSession != null) return false
             val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
@@ -132,6 +136,9 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
             val session = currentHarness.runtime.createSession(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
+                SessionOptions(
+                    contextPolicy = options.contextTokens?.let(ContextPolicy::Manual) ?: ContextPolicy.Auto,
+                ),
             )
             registerSession(requestId, session)
             val generationRequest = GenerationRequest(
@@ -143,7 +150,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 overrides = GenerationOverrides(
                     maxOutputTokens = options.maxOutputTokens,
                     temperature = options.temperature,
-                    seed = options.seed,
+                    topP = options.topP,
+                    topK = options.topK,
+                    repeatPenalty = options.repeatPenalty,
+                    repeatLastN = options.repeatLastN,
+                    seedPolicy = options.seedPolicy,
+                    preset = options.presetId?.let {
+                        InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION)
+                    },
                 ),
             )
             val handle = currentHarness.runtime.generate(
@@ -190,6 +204,12 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 is GenerationEvent.Started -> state.copy(
                     phase = PlaygroundPhase.GENERATING,
                     detail = "Generating locally",
+                )
+
+                is GenerationEvent.Prepared -> state.copy(
+                    detail = "${event.configuration.preset?.id?.value ?: "Custom"} · " +
+                        "${event.configuration.promptTokenCount}/${event.configuration.contextSize} context tokens",
+                    effectiveConfiguration = event.configuration,
                 )
 
                 is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)

@@ -16,7 +16,7 @@ class LlamaCppStreamingTest {
             chunks = chunks.mapIndexed { index, text ->
                 Base64.getEncoder().encodeToString(text.toByteArray(Charsets.UTF_8)) to index + 1
             },
-            terminal = arrayOf("ok", "5", "2", "10", "20"),
+            terminal = arrayOf("ok", "5", "2", "10", "20", "END_OF_GENERATION"),
         )
         val received = mutableListOf<NativeTextChunk>()
 
@@ -33,7 +33,7 @@ class LlamaCppStreamingTest {
 
         assertEquals(
             NativeStreamingResult.Completed(
-                NativeStreamingMetrics(5, 2, 10, 20),
+                NativeStreamingMetrics(5, 2, 10, 20, "END_OF_GENERATION"),
             ),
             result,
         )
@@ -45,7 +45,7 @@ class LlamaCppStreamingTest {
             received,
         )
         assertEquals(
-            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 77L),
+            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 1.05f, 64, 77L, "TEXT"),
             nativeApi.lastGeneration,
         )
     }
@@ -54,7 +54,7 @@ class LlamaCppStreamingTest {
     fun `listener rejection propagates cancellation`() {
         val nativeApi = FakeNativeStreamingApi(
             chunks = listOf(Base64.getEncoder().encodeToString("first".toByteArray()) to 1),
-            terminal = arrayOf("cancelled", "4", "1", "3", "5"),
+            terminal = arrayOf("cancelled", "4", "1", "3", "5", "UNKNOWN"),
         )
 
         val result = LlamaCppStreamingBridge(nativeApi).generate(
@@ -67,7 +67,7 @@ class LlamaCppStreamingTest {
 
         assertEquals(
             NativeStreamingResult.Cancelled(
-                NativeStreamingMetrics(4, 1, 3, 5),
+                NativeStreamingMetrics(4, 1, 3, 5, "UNKNOWN"),
             ),
             result,
         )
@@ -78,7 +78,7 @@ class LlamaCppStreamingTest {
     fun `invalid base64 chunk rejects callback safely`() {
         val nativeApi = FakeNativeStreamingApi(
             chunks = listOf("invalid%%%" to 1),
-            terminal = arrayOf("cancelled", "1", "0", "1", "1"),
+            terminal = arrayOf("cancelled", "1", "0", "1", "1", "UNKNOWN"),
         )
         var listenerCalled = false
 
@@ -141,6 +141,26 @@ class LlamaCppStreamingTest {
         assertFalse(nativeApi.generateCalled)
     }
 
+    @Test
+    fun `enabled repeat penalty requires a positive token window before JNI`() {
+        val nativeApi = FakeNativeStreamingApi()
+
+        val result = LlamaCppStreamingBridge(nativeApi).generate(
+            testContext(),
+            "request-invalid-repeat",
+            "Prompt",
+            testConfig().copy(repeatPenalty = 1.05f, repeatLastN = 0),
+            NativeStreamingListener { true },
+        )
+
+        assertTrue(result is NativeStreamingResult.Failure)
+        assertEquals(
+            StreamingNativeErrorCode.INVALID_ARGUMENT,
+            (result as NativeStreamingResult.Failure).error.code,
+        )
+        assertFalse(nativeApi.generateCalled)
+    }
+
     private fun testContext(): LoadedNativeContext = LoadedNativeContext(
         handle = NativeContextHandle(11),
         model = LoadedNativeModel(
@@ -157,13 +177,15 @@ class LlamaCppStreamingTest {
         temperature = 0.1f,
         topP = 0.95f,
         topK = 40,
+        repeatPenalty = 1.05f,
+        repeatLastN = 64,
         seed = 77,
     )
 }
 
 private class FakeNativeStreamingApi(
     private val chunks: List<Pair<String, Int>> = emptyList(),
-    private val terminal: Array<String> = arrayOf("ok", "0", "0", "0", "0"),
+    private val terminal: Array<String> = arrayOf("ok", "0", "0", "0", "0", "UNKNOWN"),
     private val cancel: Array<String> = arrayOf("ok", "false"),
 ) : NativeLlamaStreamingApi {
     var generateCalled: Boolean = false
@@ -179,7 +201,13 @@ private class FakeNativeStreamingApi(
         temperature: Float,
         topP: Float,
         topK: Int,
+        repeatPenalty: Float,
+        repeatLastN: Int,
         seed: Long,
+        outputConstraintType: String,
+        outputSchema: String?,
+        stopTokenIds: IntArray,
+        stopSequences: Array<String>,
         callback: NativeStreamingCallback,
     ): Array<String> {
         generateCalled = true
@@ -191,7 +219,10 @@ private class FakeNativeStreamingApi(
             temperature,
             topP,
             topK,
+            repeatPenalty,
+            repeatLastN,
             seed,
+            outputConstraintType,
         )
         for ((text, generatedTokens) in chunks) {
             lastCallbackAccepted = callback.onChunk(text, generatedTokens)

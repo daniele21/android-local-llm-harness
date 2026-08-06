@@ -1,7 +1,8 @@
 # Piano di integrazione `dev` e rilascio Harness 0.5.0
 
-**Stato:** proposto
-**Data:** 2026-08-05
+**Stato:** in esecuzione — Fasi 0, 2 e 3 completate; Fase 1 operativa con protezione amministrativa di `dev` ancora aperta (#59); Fase 4 parzialmente implementata e in attesa di integrazione/validazione remota
+**Data:** 2026-08-06
+**Ultimo avanzamento registrato:** `origin/dev` a `2850d03`; il candidato locale ribasato aggiunge shell Navigation Compose, visual matching delle cinque superfici e tooling riproducibile per build release/emulatore
 **Ambito:** governance Git, ripristino CI, recovery model management, brand Android, UX/UI, validazione e rilascio interno
 
 ## 1. Obiettivo
@@ -135,7 +136,7 @@ Modifiche richieste:
 - [x] aggiornare il workflow del brand da `actions/checkout@v4` a `actions/checkout@v7`;
 - [x] rimuovere dal workflow del brand il push diretto su `main`;
 - [x] trasformare la generazione del brand in un controllo riproducibile con `git diff --exit-code`, oppure in un'automazione che apra una PR separata;
-- [ ] eseguire il gate completo locale e CI;
+- [x] eseguire il gate completo locale e CI;
 - [x] aggiornare il ledger dello stato senza dichiarare completato il model management.
 
 Validazione minima:
@@ -160,20 +161,22 @@ Criterio di uscita:
 
 Applicare l'issue #46 tramite branch protection o repository ruleset.
 
-- [ ] richiedere pull request;
-- [ ] richiedere `Repository validation`;
-- [ ] richiedere branch aggiornata;
-- [ ] richiedere almeno una approvazione;
-- [ ] richiedere conversazioni risolte;
-- [ ] vietare force-push ed eliminazione;
-- [ ] applicare le regole anche agli amministratori, salvo procedura break-glass documentata;
-- [ ] impedire bypass ai workflow con `contents: write`;
-- [ ] abilitare eliminazione automatica dei branch integrati quando non serve conservarli per audit.
+- [x] richiedere pull request;
+- [x] richiedere `Repository validation`;
+- [x] richiedere branch aggiornata;
+- [x] richiedere almeno una approvazione;
+- [x] richiedere conversazioni risolte;
+- [x] vietare force-push ed eliminazione;
+- [x] applicare le regole anche agli amministratori, salvo procedura break-glass documentata;
+- [x] impedire bypass ai workflow con `contents: write`;
+- [x] conservare `dev` tra le promotion e rimuovere gli altri branch integrati dopo l'audit, senza attivare la cancellazione automatica globale.
 
 Criterio di uscita:
 
 - un push diretto di prova viene rifiutato;
 - una PR con check rosso non può essere unita.
+
+Evidenza della Fase 0: la PR #55 è stata unita con merge commit `2935743`; `Repository validation`, native host tests, brand reproducibility e packaging Android sono verdi sul commit di `main`. La configurazione riletta tramite API applica le regole anche agli amministratori e non consente force-push o eliminazione. Non è stato eseguito un push distruttivo di prova su `main`.
 
 ## Fase 1 — Creazione della linea `dev`
 
@@ -181,24 +184,24 @@ Criterio di uscita:
 
 Solo dopo OPS-01:
 
-- [ ] creare `dev` dall'esatto commit verde di `main`;
-- [ ] pubblicare `dev` senza commit aggiuntivi;
-- [ ] applicare protezioni equivalenti a quelle di `main` per push, force-push ed eliminazione;
-- [ ] richiedere `Repository validation` sulle PR verso `dev`;
-- [ ] mantenere `main` come default branch del repository;
-- [ ] aggiornare il template PR affinché una feature ordinaria selezioni `dev` come base;
-- [ ] aggiungere un controllo che segnali una feature PR aperta per errore verso `main`.
+- [x] creare `dev` dall'esatto commit verde di `main`;
+- [x] pubblicare `dev` senza commit aggiuntivi;
+- [ ] applicare protezioni equivalenti a quelle di `main` per push, force-push ed eliminazione (issue amministrativa #59);
+- [ ] richiedere `Repository validation` come regola GitHub bloccante sulle PR verso `dev` (issue amministrativa #59);
+- [x] mantenere `main` come default branch del repository;
+- [x] aggiornare il template PR affinché una feature ordinaria selezioni `dev` come base;
+- [x] aggiungere un controllo che segnali una feature PR aperta per errore verso `main`.
 
 ### OPS-04 — Adattare la CI a `dev`
 
-- [ ] eseguire `Validate` anche sui push a `dev`;
-- [ ] mantenere il percorso rapido per PR esclusivamente documentali;
-- [ ] eseguire tutti i moduli Android per modifiche a contratti pubblici;
-- [ ] eseguire native host tests quando cambiano JNI, C++, CMake o il pin `llama.cpp`;
-- [ ] eseguire packaging quando cambiano app, manifest, ABI, risorse launcher o configurazione Gradle;
-- [ ] eseguire una validazione cumulativa dopo ogni merge su `dev`;
-- [ ] aggiungere un workflow di promotion/release candidate per PR con base `main`;
-- [ ] mantenere `Package Android Artifacts` su `main` e renderlo eseguibile esplicitamente sul candidato `dev` prima della promotion.
+- [x] eseguire `Validate` anche sui push a `dev`;
+- [x] mantenere il percorso rapido per PR esclusivamente documentali;
+- [x] eseguire tutti i moduli Android per modifiche a contratti pubblici;
+- [x] eseguire native host tests quando cambiano JNI, C++, CMake o il pin `llama.cpp`;
+- [x] eseguire packaging quando cambiano app, manifest, ABI, risorse launcher o configurazione Gradle;
+- [x] eseguire una validazione cumulativa dopo ogni merge su `dev`;
+- [x] aggiungere un workflow di promotion/release candidate per PR con base `main`;
+- [x] mantenere `Package Android Artifacts` su `main` e renderlo eseguibile esplicitamente sul candidato `dev` prima della promotion.
 
 Matrice prevista:
 
@@ -214,15 +217,15 @@ Matrice prevista:
 
 Nella PR che introduce `dev`, aggiornare insieme:
 
-- [ ] `BRANCHING.md`;
-- [ ] `AGENTS.md`;
-- [ ] `README.md`;
-- [ ] `docs/current-state.md`;
-- [ ] `docs/roadmap.md`;
-- [ ] `docs/definition-of-done.md`;
-- [ ] `docs/versioning.md`;
-- [ ] un nuovo ADR sulla linea di integrazione `dev` e sulla promozione protetta verso `main`;
-- [ ] eventuali template PR e regole CODEOWNERS.
+- [x] `BRANCHING.md`;
+- [x] `AGENTS.md`;
+- [x] `README.md`;
+- [x] `docs/current-state.md`;
+- [x] `docs/roadmap.md`;
+- [x] `docs/definition-of-done.md`;
+- [x] `docs/versioning.md`;
+- [x] un nuovo ADR sulla linea di integrazione `dev` e sulla promozione protetta verso `main`;
+- [x] eventuali template PR e regole CODEOWNERS.
 
 Il nuovo ADR deve definire almeno:
 
@@ -240,26 +243,28 @@ Criterio di uscita della Fase 1:
 - i documenti non indicano più `main` come base ordinaria delle feature;
 - nessuna automazione esegue push diretto su entrambi.
 
+Evidenza della Fase 1: la PR #57 è stata unita in `dev` con commit `77ab158`; CI, policy di base delle PR, packaging del candidato, ADR 0008 e documentazione canonica sono integrati. La fase è operativa nel repository, ma il criterio amministrativo di protezione del branch non è ancora chiuso: l'issue #59 resta aperta per applicare e verificare il ruleset GitHub su `dev`.
+
 ## Fase 2 — Recovery model management
 
 ### REC-01 — Ripulire e retargettare la PR #53
 
 Dopo la creazione di `dev`:
 
-- [ ] cambiare la base della PR #53 da `main` a `dev`;
-- [ ] aggiornare il branch della PR sull'ultimo `dev`;
-- [ ] eliminare `.github/workflows/fix-model-management-compile.yml`;
-- [ ] eliminare `.github/workflows/finalize-model-management-fix.yml`;
-- [ ] applicare nel sorgente, non in un runner temporaneo, il fake stateful di `PhoneModelDistributionControllerTest`;
-- [ ] garantire che la rimozione aggiorni store simulato e metadata;
-- [ ] ereditare da `dev` il fix `benchmarkBaselineHistory()`;
-- [ ] applicare Spotless e verificare il diff completo;
-- [ ] verificare che il modello selezionato o caricato non possa essere rimosso;
-- [ ] verificare conferma, annullamento, successo, modello assente, errore store e cleanup metadata;
-- [ ] verificare che nessun path o URI venga mostrato, persistito o loggato;
-- [ ] aggiornare `docs/current-state.md`, `docs/roadmap.md` e la documentazione model management;
-- [ ] ottenere CI verde e review prima di rimuovere il draft;
-- [ ] eseguire squash merge verso `dev`.
+- [x] cambiare la base della PR #53 da `main` a `dev`;
+- [x] aggiornare il branch della PR sull'ultimo `dev`;
+- [x] eliminare `.github/workflows/fix-model-management-compile.yml`;
+- [x] eliminare `.github/workflows/finalize-model-management-fix.yml`;
+- [x] applicare nel sorgente, non in un runner temporaneo, il fake stateful di `PhoneModelDistributionControllerTest`;
+- [x] garantire che la rimozione aggiorni store simulato e metadata;
+- [x] ereditare da `dev` il fix `benchmarkBaselineHistory()`;
+- [x] applicare Spotless e verificare il diff completo;
+- [x] verificare che il modello selezionato o caricato non possa essere rimosso;
+- [x] verificare conferma, annullamento, successo, modello assente, errore store e cleanup metadata;
+- [x] verificare che nessun path o URI venga mostrato, persistito o loggato;
+- [x] aggiornare `docs/current-state.md`, `docs/roadmap.md` e la documentazione model management;
+- [x] ottenere CI verde e review prima di rimuovere il draft;
+- [x] eseguire squash merge verso `dev`.
 
 Comandi minimi prima del push finale:
 
@@ -278,11 +283,11 @@ python3 scripts/verify-android-packaging.py
 
 Solo dopo il merge di REC-01:
 
-- [ ] chiudere la PR #34 come superseded dalla PR #53;
-- [ ] aggiungere una nota con il mapping delle funzionalità recuperate;
-- [ ] confermare che non restino commit unici necessari;
+- [x] chiudere la PR #34 come superseded dalla PR #53;
+- [x] aggiungere una nota con il mapping delle funzionalità recuperate;
+- [x] confermare che non restino commit unici necessari;
 - [ ] eliminare il branch remoto legacy quando l'audit è completo;
-- [ ] non riaprire o rebasare la vecchia console come percorso prodotto.
+- [x] non riaprire o rebasare la vecchia console come percorso prodotto.
 
 Criterio di uscita della Fase 2:
 
@@ -290,33 +295,35 @@ Criterio di uscita della Fase 2:
 - nessuna implementazione concorrente aperta;
 - `docs/current-state.md` indica il blocco come completato su `dev`, non ancora rilasciato su `main`.
 
+Evidenza della Fase 2: la PR #53 è stata unita in `dev` con commit `9451314`; verifica, rimozione protetta, conferma, cleanup metadata e risultati privacy-safe sono integrati. La PR legacy #34 è stata chiusa come superseded. Resta soltanto la cancellazione del branch remoto legacy dopo l'audit amministrativo.
+
 ## Fase 3 — Brand Android reale
 
 ### UX-01 — Asset e identità Android
 
 Branch fresco da `dev`, senza modifiche al runtime.
 
-- [ ] definire master vector repository-owned per simbolo, wordmark e lockup;
-- [ ] convertire il simbolo in Android VectorDrawable;
-- [ ] creare adaptive launcher icon foreground/background;
-- [ ] creare monochrome/themed icon per Android 13+;
-- [ ] aggiungere le risorse `mipmap-anydpi-v26` e fallback necessari;
-- [ ] collegare `android:icon` e `android:roundIcon` nel manifest;
-- [ ] validare safe zone e leggibilità alle dimensioni previste;
-- [ ] mantenere i PNG documentali come reference, non come unica sorgente runtime;
-- [ ] rendere la generazione riproducibile e verificata dalla CI;
-- [ ] verificare che l'AAB contenga gli asset corretti.
+- [x] definire master vector repository-owned per simbolo, wordmark e lockup;
+- [x] convertire il simbolo in Android VectorDrawable;
+- [x] creare adaptive launcher icon foreground/background;
+- [x] creare monochrome/themed icon per Android 13+;
+- [x] aggiungere le risorse `mipmap-anydpi-v26` e fallback necessari;
+- [x] collegare `android:icon` e `android:roundIcon` nel manifest;
+- [x] validare safe zone e leggibilità alle dimensioni previste;
+- [x] mantenere i PNG documentali come reference, non come unica sorgente runtime;
+- [x] rendere la generazione riproducibile e verificata dalla CI;
+- [x] verificare che l'AAB contenga gli asset corretti.
 
 ### UX-02 — Design system e tema
 
-- [ ] separare colori, tipografia, shape, spacing e componenti nei file previsti dal piano;
-- [ ] rimuovere colori e stili locali duplicati dalle schermate;
-- [ ] completare dark, light e system theme;
-- [ ] decidere e documentare la policy font offline per Inter e JetBrains Mono;
-- [ ] introdurre componenti condivisi per app bar, navigation, card, status, metriche, empty/error/loading state e dialoghi;
-- [ ] aggiungere preview e test dei componenti;
-- [ ] verificare WCAG AA e touch target di almeno 48 dp;
-- [ ] aggiornare le brand guidelines se l'implementazione richiede una variazione approvata.
+- [x] separare colori, tipografia, shape, spacing e componenti nei file previsti dal piano;
+- [x] rimuovere colori e stili locali duplicati dalle schermate;
+- [x] completare dark, light e system theme;
+- [x] decidere e documentare la policy font offline per Inter e JetBrains Mono;
+- [x] introdurre componenti condivisi per app bar, navigation, card, status, metriche, empty/error/loading state e dialoghi;
+- [x] aggiungere preview e test dei componenti;
+- [x] verificare WCAG AA e touch target di almeno 48 dp;
+- [x] aggiornare le brand guidelines se l'implementazione richiede una variazione approvata.
 
 Criterio di uscita della Fase 3:
 
@@ -325,83 +332,209 @@ Criterio di uscita della Fase 3:
 - nessun valore illustrativo viene presentato come dato reale;
 - packaging, screenshot preliminari e accessibilità di base sono verdi.
 
+Evidenza della Fase 3: UX-01 è stata unita con PR #60 e commit `c9d7a2c`, includendo master SVG, launcher adaptive/monochrome, manifest e verifica riproducibile degli asset nel packaging. UX-02 è stata unita con PR #61 e commit `22c4d9c`, includendo tema light/dark/system, token centralizzati, componenti Compose condivisi, policy font offline, preview e test WCAG/touch target. La validazione cumulativa post-merge su `dev` è verde.
+
 ## Fase 4 — Nuova architettura UX/UI
 
 Le PR seguenti devono essere verticali e mantenere parità con il comportamento reale già connesso.
 
+### INT-01 — Integrare il candidato UI e tooling già implementato
+
+Stato: **IMPLEMENTATO LOCALMENTE / VALIDAZIONE REMOTA PENDENTE**.
+
+Il candidato locale è stato ribasato sull'attuale `origin/dev` e conserva sia UX-02 sia il
+visual matching approvato. Questo stato non equivale ancora a completamento della Fase 4:
+l'integrazione deve passare dalla normale review verso `dev` e dalla CI cumulativa.
+
+- [x] ribasare i commit locali sopra `origin/dev` senza merge commit o perdita di storia;
+- [x] risolvere l'overlap con UX-02 mantenendo separati token, tema, componenti e test del design system;
+- [x] integrare top-level Navigation Compose, cinque superfici e shell compact/expanded;
+- [x] mantenere touch target di almeno 48 dp e palette con contrasto verificabile;
+- [x] aggiungere il runner emulator e una sorgente di versione esplicita per il phone-test;
+- [x] creare una feature branch pubblicabile dal candidato locale;
+- [ ] pubblicare la feature branch e aprire una PR verso `dev`;
+- [x] eseguire review del diff completo dopo il rebase;
+- [x] passare localmente Spotless, Detekt, test, Lint, APK/AAB assembly e packaging verification;
+- [ ] ottenere `Repository validation` verde sul commit corrente della PR;
+- [x] verificare packaging release, ABI `arm64-v8a`, launcher assets e assenza di GGUF/GGML;
+- [ ] rieseguire gli smoke test strumentali compact; nessun emulatore era collegato durante il gate post-rebase;
+- [ ] eseguire la CI cumulativa sul commit risultante in `dev`;
+- [ ] aggiornare i riferimenti di commit e lo stato dei ledger dopo il merge remoto.
+
+Criterio di uscita: il candidato è integrato tramite PR, `dev` remoto è verde e il working tree
+locale non contiene commit di prodotto non pubblicati direttamente sulla branch protetta.
+
 ### UX-03 — Shell, Navigation Compose e back stack
 
-- [ ] introdurre `HarnessApp` e `HarnessNavHost`;
-- [ ] definire route top-level e detail route;
-- [ ] mantenere bottom navigation su compact e navigation rail su medium/expanded;
-- [ ] implementare back behavior e deep-link interni previsti;
-- [ ] preservare la generazione attiva durante la navigazione senza persistere prompt/output;
+Stato: **PARZIALE**. Il candidato contiene `HarnessApp`, un `NavHost` top-level, bottom
+navigation compact, navigation rail expanded e le cinque destinazioni primarie. Restano il
+confine architetturale del NavHost, le route di dettaglio e la rimozione dello stato di dominio
+dall'Activity.
+
+- [x] introdurre `HarnessApp` e un `NavHost` per le route top-level;
+- [x] definire Overview, Playground, Models, Diagnostics e Settings come destinazioni top-level;
+- [x] mantenere bottom navigation su compact e navigation rail su medium/expanded;
+- [x] mantenere Storage Access Framework tramite Activity Result API;
+- [x] conservare prompt/output soltanto in memoria di processo durante la navigazione;
+- [ ] estrarre un `HarnessNavHost` testabile fuori da `MainActivity`;
+- [ ] aggiungere route di dettaglio per modello, run/timeline, build info, storage e validazione fisica;
+- [ ] definire back behavior, ritorno da dettaglio e ripristino della destinazione senza salvare dati sensibili;
+- [ ] implementare i deep-link interni previsti soltanto verso route prive di side effect;
 - [ ] ridurre `MainActivity` a composition root, Activity Result e wiring di alto livello;
-- [ ] mantenere Storage Access Framework tramite Activity Result API;
-- [ ] aggiungere test di navigazione e state restoration non sensibile.
+- [ ] aggiungere test per top-level navigation, detail route, back stack, rotazione e process recreation;
+- [ ] dimostrare che cambiare schermata non avvia load, health, benchmark, resource capture o download.
+
+Criterio di uscita: navigazione e stato UI non dipendono da campi mutabili dell'Activity; ogni
+route ha comportamento back deterministico e nessuna transizione esegue lavoro runtime implicito.
 
 ### UX-04 — Playground ViewModel/UDF
 
-- [ ] introdurre stato immutabile, azioni ed effetti;
-- [ ] mantenere prompt/output esclusivamente in memoria di processo;
-- [ ] conservare streaming, cancellazione, cleanup e metriche reali;
-- [ ] aggiungere generation settings sheet;
-- [ ] implementare smart auto-scroll;
-- [ ] coalescere update troppo frequenti;
-- [ ] testare complete, failed, cancelled e cleanup failed;
-- [ ] verificare warm reuse e blocco di richieste concorrenti.
+Stato: **PARZIALE**. Inferenza reale, streaming, cancellazione, cleanup, metriche e warm reuse
+sono connessi; lo stato resta però posseduto dall'Activity e dai controller callback-based.
+
+- [ ] introdurre `PlaygroundUiState` immutabile, azioni utente ed effetti one-shot;
+- [ ] spostare ownership e coordinamento in `PlaygroundViewModel` con coroutine strutturate;
+- [ ] adattare `PhonePlaygroundController` senza duplicare policy di runtime o lifecycle;
+- [ ] mantenere prompt/output esclusivamente in memoria di processo e fuori da SavedState, Room e telemetry;
+- [ ] aggiungere generation settings sheet riusando i limiti di `PlaygroundRequestOptions`;
+- [ ] implementare smart auto-scroll che non sottragga il controllo quando l'utente legge output precedente;
+- [ ] coalescere i delta ad alta frequenza mantenendo streaming percepito e output bounded;
+- [ ] rappresentare prepare, queued, prefill, decode, cancelling e stato terminale senza gare tra callback;
+- [ ] testare complete, failed, cancelled, cleanup failed, doppio tap e richiesta concorrente;
+- [ ] verificare warm reuse, model switch sicuro e rilascio dopo cambio schermata/background;
+- [ ] aggiungere Compose UI test con fake deterministici, senza richiedere un GGUF nei test repository.
+
+L'espansione a preset versionati, top-p, top-k, seed casuale/fisso e context Auto/manuale è
+governata dal
+[`generation configuration and prompting plan`](generation-configuration-and-prompting-plan.md).
+Rimane un workstream separato: non entra automaticamente nel criterio di uscita UX-04 o nel
+perimetro Harness 0.5.0 finché non viene assegnata esplicitamente a quella release.
+
+Criterio di uscita: nessuna mutazione Playground risiede nell'Activity, tutte le transizioni
+terminali sono deterministiche e privacy/lifecycle restano equivalenti al controller attuale.
 
 ### UX-05 — Models ViewModel/UDF e catalogo multi-modello
 
-- [ ] incorporare verifica e rimozione recuperate dalla PR #53;
-- [ ] implementare lista, dettaglio e conferme;
-- [ ] completare catalog/store reconciliation;
-- [ ] mostrare stati orphaned, unavailable e failed verification;
-- [ ] rendere deterministica la selezione attiva;
-- [ ] preservare deduplicazione per digest;
-- [ ] bloccare rimozione durante ownership runtime;
-- [ ] non mostrare path, URI o URL firmati;
-- [ ] testare persistenza di più modelli dopo restart.
+Stato: **PARZIALE**. Download, installazione, metadata per digest, selezione, verifica e rimozione
+protetta esistono. Manca una rappresentazione unica e durevole dell'inventario multi-modello e
+dei suoi stati degradati.
+
+- [x] incorporare verifica, conferma e rimozione recuperate dalla PR #53;
+- [x] preservare deduplicazione e identità immutabile per SHA-256;
+- [x] bloccare la rimozione durante ownership runtime quando l'identità è disponibile;
+- [x] evitare path, document URI, download URL e signed URL nella presentazione e nei report;
+- [ ] introdurre `ModelsUiState` e `ModelsViewModel` sopra i contratti esistenti;
+- [ ] unificare release di catalogo, metadata installati, snapshot del `ModelStore` e selezione attiva;
+- [ ] implementare lista e dettaglio con stati downloading, verified, installing, installed, selected e loaded;
+- [ ] esporre azioni esplicite `Load in memory` e `Unload from memory`, separate da selezione e rimozione dallo storage;
+- [ ] rendere visibili e recuperabili gli stati orphaned, unavailable, incompatible e failed verification;
+- [ ] definire selezione deterministica e `lastUsedAt` senza attivazione runtime implicita;
+- [ ] completare reconciliation al bootstrap senza cancellazioni automatiche distruttive;
+- [ ] aggiungere storage summary e cleanup mirato con conferma e active-model protection;
+- [ ] testare più modelli dopo restart, metadata corrotti, artifact mancante e digest duplicato;
+- [ ] validare download, installazione, selezione, verifica e rimozione su hardware fisico.
+
+Criterio di uscita: più modelli sopravvivono al restart, una sola selezione è deterministica e
+ogni discrepanza catalogo/store è esplicita senza esporre backing path o applicare side effect.
+
+### RT-01 — Residenza RAM e warm idle TTL
+
+Stato: **DA IMPLEMENTARE**. Il runtime possiede già handle opachi di load/unload, riuso warm,
+unload manuale sicuro e reazione a background/low-memory. Manca la policy temporale automatica
+e l'azione prodotto dedicata che distingua chiaramente residenza RAM, selezione e installazione.
+
+- [ ] mantenere `prepare`/creazione sessione come load esplicito dell'identità risolta da `applicationId + useCaseId`;
+- [ ] rendere l'unload esplicito disponibile soltanto senza contesti, generazioni attive o richieste in coda;
+- [ ] garantire che unload manuale, TTL, memory pressure, switch e shutdown non rimuovano GGUF, metadata installati o selezione;
+- [ ] introdurre un warm idle TTL configurabile, guidato da clock monotono iniettato e scheduler cancellabile;
+- [ ] avviare il TTL dopo il rilascio dell'ultimo contesto, annullarlo o riarmarlo al riuso e ricontrollare l'ownership prima dell'eviction;
+- [ ] permettere pin/unpin esplicito per i casi latency-sensitive senza impedire il rilascio sotto pressione critica;
+- [ ] registrare reason e durata di unload/reload senza prompt, output, URI o backing path;
+- [ ] mostrare stato installed/selected/loaded e l'esito delle azioni senza presentare la page cache del sistema come memoria immediatamente liberata;
+- [ ] testare expiry, riuso vicino alla scadenza, sessione attiva, coda, generazione, pin, memory pressure, doppio unload e cold reload successivo;
+- [ ] misurare su hardware fisico PSS prima/dopo unload e latenza del reload per scegliere il default, senza fissarlo da evidenza desktop/emulator.
+
+Criterio di uscita: il modello può essere caricato e scaricato dalla RAM senza mutare lo storage;
+un modello realmente inattivo viene scaricato alla scadenza configurata, mentre lavoro attivo,
+riuso concorrente e pressione critica seguono una policy deterministica, osservabile e testata.
 
 ### UX-06 — Overview
 
-- [ ] usare soltanto dati reali o `Unavailable`;
-- [ ] mostrare modello selezionato/caricato, runtime cold/warm/busy e operazione attiva;
-- [ ] aggiungere risorse e attività recente;
-- [ ] collegare quick action senza side effect di navigazione;
-- [ ] coprire no-model, loading, ready, busy, thermal warning, low-memory ed error state.
+Stato: **PARZIALE**. La composizione visuale e le quick action esistono e non inventano i valori
+illustrativi dei mockup; serve completare il modello di stato e la copertura.
+
+- [x] usare soltanto dati reali o `Unavailable`;
+- [x] mostrare modello selezionato e stato runtime disponibile;
+- [x] collegare quick action come navigazione esplicita;
+- [ ] introdurre `OverviewUiState` derivato da sorgenti osservabili e bounded;
+- [ ] distinguere modello selected/loaded e runtime cold/warm/busy;
+- [ ] mostrare operazione attiva, ultima run reale e timestamp privacy-safe;
+- [ ] aggiungere memoria disponibile, PSS, low-memory e thermal pressure senza capture implicita;
+- [ ] coprire no-model, loading, ready, busy, thermal warning, low-memory, stale ed error state;
+- [ ] verificare che l'apertura di Overview non carichi modelli e non esegua refresh mutanti.
+
+Criterio di uscita: ogni valore è attribuibile a una sorgente reale o marcato indisponibile e la
+dashboard rimane completamente osservazionale.
 
 ### UX-07 — Diagnostics
 
-- [ ] completare Health con azioni mirate e capability state;
-- [ ] completare Runs con route dettaglio e timeline;
-- [ ] aggiungere resource charts con gap per valori null;
-- [ ] completare benchmark key selection, readiness, confronto e history;
-- [ ] mantenere filtri, copy e request correlation dei log;
-- [ ] usare query bounded;
-- [ ] separare osservazione, health e azioni distruttive;
-- [ ] non avviare operazioni durante refresh o navigazione.
+Stato: **PARZIALE**. Health, Runs, Resources, Benchmarks, Logs e Validation sono connessi a dati
+reali o unavailable; filtri log, timeline e history benchmark sono presenti. Mancano route di
+dettaglio, grafici, capability complete e la decisione sulla persistenza della telemetry.
+
+- [x] mantenere filtri, copy privacy-safe e request correlation dei log;
+- [x] usare query bounded e timeline cronologiche deterministiche;
+- [x] separare refresh osservazionale da health, benchmark e resource capture espliciti;
+- [x] presentare history benchmark senza modificare la baseline attiva;
+- [ ] introdurre un `DiagnosticsViewModel` o ViewModel per sezione con stato immutabile;
+- [ ] completare Health con run-all, azioni mirate, capability state e risultato persistito;
+- [ ] spostare Runs e request timeline su route di dettaglio con back behavior;
+- [ ] aggiungere resource charts con gap per valori null e riepilogo testuale accessibile;
+- [ ] completare benchmark key selection, readiness, confronto, history e stati non azionabili;
+- [ ] collegare cache health/repair soltanto quando la capability runtime è realmente disponibile;
+- [ ] decidere e documentare in ADR l'uso di Room oppure il limite process-only della telemetry;
+- [ ] testare empty, loading, populated, warning, failure, source unavailable e dataset al limite;
+- [ ] verificare che navigazione e refresh non avviino health, capture, repair o baseline mutation.
+
+Criterio di uscita: tutte le sezioni sono source-backed, bounded, privacy-safe e testabili senza
+Activity; ogni operazione costosa o mutante richiede un'azione utente esplicita.
 
 ### UX-08 — Settings e developer tools
 
-- [ ] tema System/Dark/Light;
-- [ ] privacy disclosure coerente con il permesso Internet e il download catalogo;
-- [ ] storage summary e cleanup con conferma;
-- [ ] app version, commit SHA, ABI e revisione backend;
-- [ ] accesso a health, logs, resources e physical validation;
-- [ ] copy/share soltanto di dati privacy-safe;
-- [ ] spostare la validazione fisica fuori dal flusso primario.
+Stato: **PARZIALE**. Tema, privacy, storage sintetico, versione app e accesso ai developer tools
+sono presenti, ma alcuni valori sono soltanto session-scoped o incompleti.
+
+- [x] rendere selezionabile il tema System/Dark/Light durante la sessione;
+- [x] mostrare privacy disclosure per prompt/output on-device;
+- [x] fornire accesso a health, logs, resources e physical validation;
+- [x] mantenere copy/share limitato a report privacy-safe;
+- [x] spostare la validazione fisica fuori dal flusso primario;
+- [ ] persistere la preferenza tema senza salvare stato sensibile;
+- [ ] allineare la privacy disclosure al permesso Internet e al download catalogo;
+- [ ] calcolare storage summary sull'intero store e non solo sul modello selezionato;
+- [ ] aggiungere cleanup selettivo/totale con conferma, protezione del modello attivo e risultato esplicito;
+- [ ] mostrare app version, version code, commit SHA, ABI, Android e revisione backend;
+- [ ] creare route dedicate per build info, storage e developer tools;
+- [ ] distinguere controlli di sviluppo dalle funzioni sicure disponibili in release;
+- [ ] testare preferenze, conferme distruttive, capability mancanti e report redaction.
+
+Criterio di uscita: le impostazioni descrivono il comportamento effettivo, le azioni distruttive
+sono protette e nessuna informazione privata entra in UI condivisibile o telemetry.
 
 Criterio di uscita della Fase 4:
 
 - nessuna schermata chiama direttamente `RuntimeOrchestrator`, `ModelStore`, repository o executor;
 - `MainActivity` non possiede stato di dominio delle schermate;
 - tutte le funzioni esistenti restano raggiungibili;
+- load/unload modifica soltanto la residenza runtime e il warm idle TTL non interrompe ownership attiva;
 - le schermate non introducono lavoro runtime implicito.
 
 ## Fase 5 — Hardening UX e release candidate
 
 ### UX-09 — Test e qualità
+
+Stato: **PARZIALE**. Sono presenti smoke test strumentali per altezza shell e raggiungibilità
+delle destinazioni su emulatore compact; non esiste ancora la matrice di regressione richiesta.
 
 - [ ] Compose UI test per i flussi principali;
 - [ ] screenshot/golden test dark e light;
@@ -416,12 +549,34 @@ Criterio di uscita della Fase 4:
 - [ ] profiling streaming e memoria UI bounded;
 - [ ] verifica che il first frame non inizializzi `llama.cpp`.
 
+Matrice minima da conservare come evidenza:
+
+| Dimensione | Varianti obbligatorie | Evidenza |
+| --- | --- | --- |
+| Stato | empty, loading, populated, warning, failure, unavailable | Compose test e screenshot |
+| Tema | dark, light, system | golden e contrast check |
+| Finestra | 360x800, 411x891, medium/tablet, landscape | screenshot e navigation test |
+| Testo | font scale 1.0, 1.5, controllo manuale 2.0 | screenshot, clipping audit e TalkBack |
+| Interazione | keyboard/IME, scroll, back, rotazione, cancel | instrumentation test |
+| Performance | cold start, navigazione, streaming lungo | Macrobenchmark e profiler |
+| Privacy | prompt/output/path assenti da telemetry, log e report | unit/instrumentation assertion |
+
+Criterio di uscita: la matrice è automatizzata dove deterministica, i passaggi manuali sono
+registrati con device/configurazione e non esistono regressioni bloccanti di accessibilità,
+layout o memoria UI.
+
 ### REL-01 — Preparare Harness 0.5.0
+
+Stato: **PENDENTE**. Il repository dispone del workflow di firma esterna e del nuovo runner di
+build, ma la versione locale `0.4.1` non è ancora una release candidate 0.5.0 e nessun artefatto
+del candidato corrente è stato promosso su Play.
 
 - [ ] congelare nuove feature su `dev`;
 - [ ] aggiornare `CHANGELOG.md`;
-- [ ] riservare `versionName` 0.5.0 e incrementare `versionCode` per ogni upload Play;
-- [ ] usare versioni `0.5.0-rc.N` durante internal testing;
+- [ ] impostare `versionName` a `0.5.0-rc.N` durante internal testing e a `0.5.0` soltanto per la promotion finale;
+- [ ] assegnare un `versionCode` strettamente superiore a ogni upload Play e registrarlo nel release record;
+- [ ] rendere l'incremento ripetibile e sicuro anche quando Gradle o la firma falliscono;
+- [ ] verificare che sorgente di versione, output Gradle, release name Play e note concordino;
 - [ ] aggiornare note di compatibilità, limitazioni e rollback;
 - [ ] eseguire il gate completo da checkout pulito;
 - [ ] produrre APK, AAB, AAR e checksum;
@@ -432,7 +587,21 @@ Criterio di uscita della Fase 4:
 - [ ] pubblicare su Google Play Internal Testing;
 - [ ] conservare il precedente artefatto noto come buono.
 
+Artefatti obbligatori del candidato:
+
+- AAB firmato con upload key esterna e certificato atteso;
+- APK debug per riproduzione locale e AAR dei moduli distribuibili previsti;
+- checksum SHA-256 e inventario con commit, versione, ABI e backend revision;
+- report di packaging che conferma `arm64-v8a`, ELF AArch64, icone e assenza di modelli;
+- changelog, release notes, limitazioni device/model e istruzioni di rollback.
+
+Criterio di uscita: il medesimo commit pulito supera il gate completo, produce artefatti
+identificabili e viene caricato sul track Internal Testing senza riutilizzare un `versionCode`.
+
 ### REL-02 — Evidenza fisica
+
+Stato: **BLOCCO DI PRODUCTION READINESS**. Emulator e host test sono preflight, non evidenza
+fisica. Il gate deve usare l'AAB installato da Google Play e un GGUF supportato reale.
 
 - [ ] installare tramite Google Play su hardware fisico rappresentativo;
 - [ ] importare o scaricare un GGUF supportato;
@@ -440,11 +609,22 @@ Criterio di uscita della Fase 4:
 - [ ] eseguire generazione e streaming;
 - [ ] verificare cancellazione durante prefill e decode;
 - [ ] eseguire cicli ripetuti load/generate/unload;
+- [ ] verificare unload manuale e warm idle TTL senza perdita del GGUF installato, metadata o selezione;
+- [ ] verificare che riuso prima della scadenza, sessioni attive e richieste in coda impediscano l'eviction;
 - [ ] registrare PSS, TTFT, throughput e thermal state;
 - [ ] verificare Overview, Models, Playground, Diagnostics e Settings sul device;
 - [ ] completare TalkBack, font scaling, portrait e landscape;
 - [ ] allegare evidenza privacy-safe al release record;
 - [ ] creare il tag finale soltanto quando la Definition of Done applicabile è soddisfatta.
+
+Ogni esecuzione deve registrare almeno commit, app version/code, device, Android, ABI, RAM,
+model digest, architettura, quantizzazione, esito JNI, TTFT, throughput, PSS e thermal state.
+Prompt, output, URI documento, signed URL e backing path restano esclusi. Un singolo device può
+chiudere il gate interno iniziale ma non autorizza claim di compatibilità generale.
+
+Criterio di uscita: il lifecycle completo e la cancellazione prefill/decode passano, i cicli
+ripetuti non mostrano crescita memoria non bounded e l'archivio privacy-safe è collegato al
+release record del commit esatto.
 
 ## 5. Ordine delle pull request
 
@@ -455,14 +635,16 @@ Criterio di uscita della Fase 4:
 | 3 | REC-01 Recover safe phone model management | `dev` | pulizia e completamento PR #53 | REC-02 |
 | 4 | UX-01 Android brand assets | `dev` | launcher e vector asset | UX-02 |
 | 5 | UX-02 Complete design system | `dev` | token, tema e componenti | UX-03 |
-| 6 | UX-03 Navigation shell | `dev` | NavHost e Activity slim | UX-04 |
-| 7 | UX-04 Playground UDF | `dev` | inferenza UI | UX-05 |
-| 8 | UX-05 Models UDF | `dev` | multi-model e management | UX-06 |
-| 9 | UX-06 Overview | `dev` | dashboard reale | UX-07 |
-| 10 | UX-07 Diagnostics | `dev` | health/runs/resources/benchmarks/logs | UX-08 |
-| 11 | UX-08 Settings | `dev` | amministrazione e developer tools | UX-09 |
-| 12 | UX-09 Hardening | `dev` | UI, screenshot, a11y, performance | REL-01 |
-| 13 | REL-01 Promotion Harness 0.5.0 | `main` da `dev` | versione e release candidate | REL-02 |
+| 6 | INT-01 Integrate local UI/tooling candidate | `dev` | rebase, design-system reconciliation, CI | UX-03B |
+| 7 | UX-03B Navigation details and Activity slimming | `dev` | detail route, back stack, composition root | UX-04 |
+| 8 | UX-04 Playground UDF | `dev` | inferenza UI e lifecycle | UX-05 |
+| 9 | UX-05 Models UDF | `dev` | multi-model e management | RT-01 |
+| 10 | RT-01 Model RAM lifecycle | `dev` | load/unload esplicito, warm idle TTL e osservabilità | UX-06 |
+| 11 | UX-06 Overview | `dev` | dashboard reale | UX-07 |
+| 12 | UX-07 Diagnostics | `dev` | health/runs/resources/benchmarks/logs | UX-08 |
+| 13 | UX-08 Settings | `dev` | amministrazione e developer tools | UX-09 |
+| 14 | UX-09 Hardening | `dev` | UI, screenshot, a11y, performance | REL-01 |
+| 15 | REL-01 Promotion Harness 0.5.0 | `main` da `dev` | versione e release candidate | REL-02 |
 
 Le PR possono essere ulteriormente divise quando il diff supera un confine di responsabilità. Non devono essere accorpate per compensare ritardi di pianificazione.
 
@@ -533,6 +715,7 @@ Durante internal testing osservare e raccogliere in forma privacy-safe:
 - TTFT, durata totale e decode throughput;
 - PSS, heap nativo, heap Java e thermal state;
 - crescita memoria nei cicli ripetuti;
+- unload per azione manuale, idle TTL, memory pressure o switch e latenza del reload successivo;
 - errori di navigazione, contenuto tagliato e problemi TalkBack;
 - differenze tra cold, warm e loaded runtime;
 - commit SHA, app version, device, Android version, ABI e model digest.
@@ -560,14 +743,15 @@ Questi elementi restano nel piano generale e devono partire da `dev` dopo la sta
 Il piano è completato quando:
 
 - [ ] `main` e `dev` sono protetti e verdi;
-- [ ] le feature PR puntano a `dev`;
-- [ ] le promotion PR sono l'unico percorso ordinario verso `main`;
+- [x] le feature PR puntano a `dev`;
+- [x] le promotion PR sono l'unico percorso ordinario verso `main`;
 - [ ] gli hotfix vengono forward-portati;
-- [ ] PR #53 è integrata e PR #34 è chiusa come superseded;
-- [ ] nessun workflow auto-modificante o push diretto resta attivo;
-- [ ] brand launcher e design system sono integrati nell'app;
+- [x] PR #53 è integrata e PR #34 è chiusa come superseded;
+- [x] nessun workflow auto-modificante o push diretto resta attivo;
+- [x] brand launcher e design system sono integrati nell'app;
 - [ ] Navigation Compose e ViewModel/UDF sostituiscono lo stato di dominio in `MainActivity`;
 - [ ] le principali funzionalità del piano UX/UI sono collegate a dati reali;
+- [ ] load/unload RAM è distinto da selezione e rimozione storage, e il warm idle TTL è deterministico e configurabile;
 - [ ] UI test, screenshot, accessibilità e responsive gate passano;
 - [ ] CI e packaging completi passano da checkout pulito;
 - [ ] Harness 0.5.0 è promossa da `dev` a `main`;
@@ -577,4 +761,11 @@ Il piano è completato quando:
 
 ## 11. Prima azione
 
-Eseguire OPS-01 sul branch locale `dev`, creato dall'esatto commit dell'attuale `main`, e usarlo esclusivamente come bootstrap. Aprire la promotion PR verso `main`, ottenere il gate completo verde e sincronizzare il merge commit di `main` in `dev`; soltanto allora applicare OPS-03 e iniziare a usarlo come linea di integrazione per le feature.
+Completare **INT-01**: pubblicare il candidato ribasato su una feature branch, aprire la PR verso
+`dev`, eseguire il gate completo proporzionato e ottenere la CI cumulativa verde. La PR deve
+includere l'allineamento dei ledger e non deve dichiarare conclusa UX-03: top-level navigation e
+visual matching sono implementati, mentre detail route, back stack completo, ViewModel/UDF e
+Activity slimming restano il successivo blocco UX-03B.
+
+In parallelo, completare l'issue amministrativa #59 applicando il ruleset di protezione a `dev`.
+Il residuo non blocca la review di INT-01, ma blocca la promotion Harness 0.5.0 verso `main`.

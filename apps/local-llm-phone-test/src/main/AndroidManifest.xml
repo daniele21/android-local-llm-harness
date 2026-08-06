@@ -5,7 +5,9 @@
     <application
         android:allowBackup="false"
         android:extractNativeLibs="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="Harness"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity

@@ -1,21 +1,26 @@
 # Current Repository State
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
 This document is the active integration and recovery ledger for the repository. It complements the historical detail in `docs/roadmap.md` and must be updated whenever a merged pull request changes the next operational block.
 
-## Canonical line
+## Canonical lines
 
-`main` is the only canonical integrated implementation line.
+`dev` is the canonical integration base and target for ordinary repository work. `main` is the protected stable and release-oriented line.
 
-Integrated head before the next recovery block:
+Current remote integration baseline:
 
 ```text
-34fb5f37f626d229dbef80e2cfffa738ff403b38
-Recover retained benchmark history (#51)
+2850d03
+Update Harness 0.5 execution plan (#63)
 ```
 
-Historical implementation, staging and sandbox branches are audit references only. New work must start from current `main` unless a pull request explicitly documents a temporary stacked dependency.
+The local integration candidate is rebased on this commit and adds the mockup-aligned phone UI
+plus reproducible release/emulator tooling. Those local commits are not remote merge evidence:
+they must move through a feature PR into `dev` and pass cumulative validation before this ledger
+can mark their integration complete.
+
+The normal path is a focused pull request into `dev`, cumulative validation on the merged `dev` commit, then a complete `dev -> main` promotion. Historical implementation, staging and sandbox branches are audit references only. New work starts from the latest green `dev` unless it is an explicit hotfix based on `main`.
 
 ## Completed repository cleanup and infrastructure
 
@@ -25,8 +30,14 @@ Historical implementation, staging and sandbox branches are audit references onl
 - PR #48 added the verified-download installation boundary, opaque verified handles, metadata-only GGUF inspection and non-destructive post-import failure handling.
 - PR #49 connected the phone Models UI to catalog, secure download and verified installation, and added durable path-free installed metadata.
 - PR #51 recovered retained benchmark history on the current connected phone-test architecture without restoring the obsolete standalone console.
+- PR #55 completed the telemetry test doubles, made public-contract validation repository-wide, made technical metric formatting locale-independent and converted brand generation into a read-only reproducibility check.
+- PR #57 established the `dev` integration line, promotion gates, branch-target policy and ADR 0008.
+- PR #53 recovered safe connected-phone verification and model removal, and PR #34 was closed as superseded.
+- PR #60 integrated reproducible Android launcher, adaptive and monochrome brand assets.
+- PR #61 completed the shared Compose design-system structure, theme modes, reusable components and baseline accessibility tests.
+- PR #63 updated the Harness 0.5 execution plan to match the completed governance, recovery and brand phases.
 - PRs #20, #3, #4 and #33 were closed with explicit superseded/obsolete disposition notes.
-- Issue #46 tracks branch protection and the required `Repository validation` repository setting.
+- Issue #46 is implemented: `main` requires an up-to-date pull request, one approval, resolved conversations and the `Repository validation` check; administrators follow the same rules, and force-push and deletion are disabled.
 
 ## Repository validation hardening
 
@@ -36,21 +47,14 @@ Brand asset generation is a read-only reproducibility check. It regenerates the 
 
 Phone-test technical metrics use locale-independent decimal formatting so repository tests and privacy-safe reports remain stable across developer and CI locales.
 
-## Legacy feature branch requiring selective recovery
+The repository baseline was restored on `main` through PR #55. `dev` contains the curated-catalog expansion, governance and promotion gates, focused model-management recovery, Android identity and the shared Compose design system. Repository-level protection for `dev` remains an administrative gate that cannot be applied from the code tree.
 
-PR #34 must not be merged directly. It is based on the pre-Compose console line and has diverged materially from current `main`.
+## Legacy model-management disposition
 
-### PR #34 — model management
-
-Potentially unique behavior to recover on a fresh branch:
-
-- explicit model verification action;
-- confirmation before removal;
-- blocking removal of the currently loaded model;
-- reusable privacy-safe model-management controls;
-- staged-file cleanup and operation-state tests not already present in the connected app.
-
-Do not create a parallel model store or reconnect the old standalone-console sandbox as the product path.
+PR #53 is merged into `dev` and contains the focused verification, confirmation, removal
+protection, metadata cleanup and privacy-safe error behavior. PR #34 is closed as superseded;
+its branch is historical audit material only and must not be merged or revived as a product path.
+Remote branch deletion remains an administrative cleanup after the recorded audit.
 
 ## Current functional boundary
 
@@ -64,6 +68,19 @@ Do not create a parallel model store or reconnect the old standalone-console san
 - administrator-managed catalog contracts, persistence and compatibility;
 - secure remote transfer to a verified app-private holding area;
 - explicit verified-download installation into `ModelStore` with post-import integrity verification.
+
+### Open runtime residency controls
+
+The runtime already loads and unloads models through opaque handles, reuses the compatible loaded
+model, protects active sessions and queued work from unsafe unload, and can release idle resources
+for Android background or memory-pressure signals. These operations do not delete the installed
+GGUF from `ModelStore`.
+
+The product-facing `Load in memory` / `Unload from memory` controls and the configurable warm idle
+TTL remain open. The TTL must start only after the final context is released, cancel or rearm on
+reuse, recheck active and queued ownership before eviction, and preserve the installed artifact,
+binding and selected-model metadata. The active implementation and device-validation backlog is
+tracked as RT-01 in [`dev-integration-and-harness-0.5-plan.md`](dev-integration-and-harness-0.5-plan.md).
 
 ### Integrated connected distribution
 
@@ -170,17 +187,40 @@ Recovered on the current phone-test architecture: immutable retained captures, a
 
 ### Block 7 — selective model-management recovery
 
-Status: **NEXT**.
+Status: **DONE through PR #53**.
 
-Recover unique verification, confirmation, loaded-model protection, cleanup and operation-state behavior from PR #34 on a fresh branch from current `main`. Do not restore its parallel store or old console composition.
+PR #53 was squash-merged into `dev` as `9451314`. The connected-phone implementation includes
+explicit verification, confirmation, loaded-model removal protection, metadata cleanup and
+privacy-safe deterministic tests without restoring the obsolete standalone console.
 
 ### Block 8 — product and hardware completion
 
 - complete ViewModel/UDF and Navigation Compose detail routes;
+- complete explicit non-destructive model load/unload controls and the configurable warm idle TTL;
 - add Compose UI, screenshot, accessibility and responsive tests;
 - validate catalog download and installation on representative physical devices;
 - execute the complete real-GGUF production-readiness gate;
 - record privacy-safe release evidence.
+
+### Block 9 — generation configuration and model-aware prompting
+
+Status: **PARTIALLY IMPLEMENTED LOCALLY; corrective validation and PR review pending**.
+
+The current integration candidate adds versioned sampling-plus-intent presets, per-request overrides, explicit random/fixed seed policy, structured generation inputs, model-aware chat-template resolution, exact prompt tokenization, lazy Auto/manual context allocation, grammar-backed JSON/JSON Schema constraints, bounded application stop sequences, stop reasons and privacy-safe effective-configuration telemetry. Corrective work now also covers cancellation during planning and context creation, typed invalid-constraint failures, UTF-8-safe native output buffering, earliest-position stop matching, a bounded repeat penalty/window applied by the native sampler and exported Room migration schemas through version 6. The connected phone playground exposes preset/custom sampling, repeat protection, seed and Auto/manual context controls and retains effective configuration for diagnostics. Phone preset version 2 enables a conservative `1.05` penalty over the last 64 generated tokens; other consumers remain disabled by default until they opt in. Host-native execution, connected-device migration/UI execution and representative physical-device GGUF quality, memory and benchmark evidence remain open; production readiness is not claimed.
+
+The current local integration candidate provides the connected phone app with compact branded
+chrome, Navigation Compose top-level routing, bottom navigation or navigation rail according
+to width and all five primary surfaces. A subsequent visual-matching pass replaces generic
+Material sizing and large hero cards with the mockups' dense typography, restrained radii,
+thin panels, list-oriented runtime and health states, compact action tiles, underline tabs,
+unboxed bottom-navigation selection and the runtime hexagon visual. Real empty, unavailable
+and not-run states remain explicit instead of displaying the populated illustrative values from
+the mockups. Instrumented checks cover shell height and destination reachability. This is
+partial completion of the block: the candidate still requires PR review and cumulative remote
+CI; controller state still needs migration to ViewModel/UDF; detail routes, screenshot and
+accessibility matrices remain; emulator evidence does not replace the required physical-device
+gate. The detailed executable backlog is maintained in
+[`dev-integration-and-harness-0.5-plan.md`](dev-integration-and-harness-0.5-plan.md).
 
 ## Deferred after connected distribution
 
@@ -198,23 +238,18 @@ Recover unique verification, confirmation, loaded-model protection, cleanup and 
 Each block follows:
 
 ```text
-fresh branch from current main
+fresh branch from latest green dev
   -> focused implementation
   -> deterministic tests
   -> documentation and this ledger updated
-  -> complete CI
-  -> merge
-  -> next block starts from refreshed main
+  -> pull request and scoped CI
+  -> squash merge into dev
+  -> cumulative dev validation
+  -> later complete promotion into main
 ```
 
 Do not merge legacy stacked PRs merely because GitHub reports them as mergeable. Mergeability is not evidence of architectural currency or absence of duplication.
 
 ## Repository administration still required
 
-Issue #46 tracks operational hardening outside the code tree:
-
-- protect `main`;
-- require pull requests;
-- require the stable `Repository validation` check;
-- block force pushes and deletion of `main`;
-- enable automatic deletion of merged feature branches where appropriate.
+`main` protection is implemented through issue #46. The remaining repository-level action for Harness 0.5.0 is to apply equivalent push, force-push and deletion protection to `dev`, require an up-to-date pull request and `Repository validation`, and require resolved conversations. The default branch remains `main`; feature branches are removed after merge and audit rather than through an indiscriminate global deletion rule.

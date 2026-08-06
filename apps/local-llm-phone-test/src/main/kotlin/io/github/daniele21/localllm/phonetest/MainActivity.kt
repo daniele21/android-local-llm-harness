@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
@@ -13,46 +15,82 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
+import io.github.daniele21.localllm.ui.designsystem.HarnessColors
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import io.github.daniele21.localllm.ui.designsystem.HarnessTheme
-import java.util.Locale
+import io.github.daniele21.localllm.ui.designsystem.harnessColorScheme
 import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "LongMethod", "LargeClass")
@@ -67,31 +105,24 @@ class MainActivity :
     private lateinit var logSource: HarnessLogSource
     private lateinit var controller: PhoneTestController
     private lateinit var modelDistributionController: PhoneModelDistributionController
+    private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
+    private val harnessViewModel: HarnessViewModel by viewModels()
 
-    private var importedModel by mutableStateOf<ImportedPhoneModel?>(null)
-    private var modelDistributionState by mutableStateOf(PhoneModelDistributionState())
     private var latestReport by mutableStateOf("")
     private var controllerBusy by mutableStateOf(false)
     private var healthRunning by mutableStateOf(false)
     private var resourceCaptureRunning by mutableStateOf(false)
     private var benchmarkCaptureRunning by mutableStateOf(false)
     private var operationStatus by mutableStateOf("Ready")
-    private var playgroundState by mutableStateOf(PlaygroundState())
     private var diagnosticsState by mutableStateOf(DiagnosticsUiState(null, emptyList(), emptyList()))
     private var benchmarkState by mutableStateOf(BenchmarkUiState())
     private var logFilter by mutableStateOf(DiagnosticsLogFilter())
     private var logState by mutableStateOf(DiagnosticsLogUiState())
     private var selectedRequestTimeline by mutableStateOf<DiagnosticsRequestTimelineUi?>(null)
-    private var diagnosticsSection by mutableStateOf(DiagnosticsSection.RUNS)
-    private var playgroundPrompt by mutableStateOf(DEFAULT_PROMPT)
-    private var playgroundMaxTokens by mutableStateOf(DEFAULT_MAX_OUTPUT_TOKENS)
-    private var playgroundTemperature by mutableStateOf(DEFAULT_TEMPERATURE)
-    private var playgroundSeed by mutableStateOf(DEFAULT_SEED)
-
-    @Volatile
-    private var selectedModelForDiagnostics: ImportedPhoneModel? = null
+    private var diagnosticsSection by mutableStateOf(DiagnosticsSection.HEALTH)
+    private var themePreference by mutableStateOf(HarnessThemePreference.DARK)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,31 +143,53 @@ class MainActivity :
         healthSource = HarnessHealthSource(
             modelStore = runtimeGraph.modelStore,
             telemetryRepository = runtimeGraph.telemetryRepository,
-            selectedModel = { selectedModelForDiagnostics },
+            selectedModel = { harnessViewModel.uiState.value.importedModel },
             runtimeState = { runtimeGraph.runtimeSnapshot()?.state },
         )
         benchmarkSource = HarnessBenchmarkSource(runtimeGraph.telemetryRepository) {
-            selectedModelForDiagnostics
+            harnessViewModel.uiState.value.importedModel
         }
         logSource = HarnessLogSource(runtimeGraph.telemetryRepository)
         controller = PhoneTestController(this, this)
+        selectedModelManagement = ModelStorePhoneModelManagementControl(
+            modelStore = runtimeGraph.modelStore,
+            protectedModelDigest = { runtimeGraph.loadedModelDigest },
+            removeMetadata = { true },
+        )
         modelDistributionController = PhoneModelDistributionController.from(
             context = this,
             runtimeGraph = runtimeGraph,
             listener = PhoneModelDistributionListener { state ->
                 runOnUiThread {
-                    modelDistributionState = state
                     operationStatus = state.message
+                    harnessViewModel.dispatch(HarnessUiEvent.ModelDistributionChanged(state))
                     updateKeepScreenOn()
                 }
             },
         )
-        playgroundController = PhonePlaygroundController(this, ::onPlaygroundStateChanged)
-        playgroundState = playgroundController.snapshot()
+        playgroundController = PhonePlaygroundController(runtimeGraph, ::onPlaygroundStateChanged)
+        harnessViewModel.attachPlaygroundEffects(playgroundController)
         refreshDiagnostics()
 
         setContent {
-            HarnessTheme { HarnessApp() }
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themePreference) {
+                HarnessThemePreference.DARK -> true
+                HarnessThemePreference.LIGHT -> false
+                HarnessThemePreference.SYSTEM -> systemDark
+            }
+            val colorScheme = harnessColorScheme(darkTheme)
+            SideEffect {
+                @Suppress("DEPRECATION")
+                window.statusBarColor = colorScheme.background.toArgb()
+                @Suppress("DEPRECATION")
+                window.navigationBarColor = colorScheme.background.toArgb()
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
+            HarnessTheme(darkTheme = darkTheme) { HarnessApp() }
         }
     }
 
@@ -148,6 +201,7 @@ class MainActivity :
     override fun onDestroy() {
         diagnosticsExecutor.shutdownNow()
         modelDistributionController.close()
+        harnessViewModel.detachPlaygroundEffects(playgroundController)
         playgroundController.close()
         controller.close()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -157,6 +211,7 @@ class MainActivity :
     override fun onBusyChanged(busy: Boolean) {
         runOnUiThread {
             controllerBusy = busy
+            harnessViewModel.dispatch(HarnessUiEvent.ControllerBusyChanged(busy))
             updateKeepScreenOn()
             refreshDiagnostics()
         }
@@ -165,14 +220,15 @@ class MainActivity :
     override fun onProgress(message: String) {
         runOnUiThread {
             operationStatus = message
+            syncLoadedModelOwnership()
             refreshDiagnostics()
         }
     }
 
     override fun onModelChanged(model: ImportedPhoneModel?) {
-        selectedModelForDiagnostics = model
         runOnUiThread {
-            importedModel = model
+            harnessViewModel.dispatch(HarnessUiEvent.ModelChanged(model))
+            syncLoadedModelOwnership()
             if (::modelDistributionController.isInitialized) {
                 modelDistributionController.refresh()
             }
@@ -183,6 +239,8 @@ class MainActivity :
     override fun onReport(report: String) {
         runOnUiThread {
             latestReport = report
+            harnessViewModel.dispatch(HarnessUiEvent.ReportChanged(report))
+            syncLoadedModelOwnership()
             operationStatus = "Validation completed"
             refreshDiagnostics()
         }
@@ -190,10 +248,26 @@ class MainActivity :
 
     private fun onPlaygroundStateChanged(state: PlaygroundState) {
         runOnUiThread {
-            playgroundState = state
+            harnessViewModel.dispatch(HarnessUiEvent.PlaygroundChanged(state))
+            syncLoadedModelOwnership()
             updateKeepScreenOn()
             refreshDiagnostics()
         }
+    }
+
+    private fun verifySelectedModel(): Boolean {
+        val model = harnessViewModel.uiState.value.importedModel ?: return false
+        if (isBusy()) return false
+        operationStatus = "Verifying selected model integrity…"
+        diagnosticsExecutor.execute {
+            val outcome = selectedModelManagement.verify(model.digest)
+            runOnUiThread {
+                operationStatus = outcome.detail
+                modelDistributionController.refresh()
+                refreshDiagnostics()
+            }
+        }
+        return true
     }
 
     private fun refreshDiagnostics() {
@@ -301,53 +375,58 @@ class MainActivity :
         selectedRequestTimeline = null
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun HarnessApp() {
-        var destination by rememberSaveable { mutableStateOf(HarnessDestination.OVERVIEW) }
+        val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
+        val navController = rememberNavController()
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
+        val destination = shellState.destination
         val expanded = LocalConfiguration.current.screenWidthDp >= 720
         val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                afterPlaygroundRuntimeReleased {
-                    controller.importModel(
-                        uri = uri,
-                        architecture = DEFAULT_ARCHITECTURE,
-                        quantization = DEFAULT_QUANTIZATION,
-                    )
-                }
+            if (uri != null) importModelDocument(uri)
+        }
+        val modelEffects = remember(modelPicker) {
+            createModelEffects { modelPicker.launch(MODEL_MIME_TYPES) }
+        }
+        DisposableEffect(modelEffects) {
+            harnessViewModel.models.attach(modelEffects)
+            onDispose { harnessViewModel.models.detach(modelEffects) }
+        }
+        val navigate: (HarnessDestination) -> Unit = { target ->
+            navController.navigate(target.route) {
+                launchSingleTop = true
+                restoreState = true
+                popUpTo(HarnessDestination.OVERVIEW.route) { saveState = true }
+            }
+        }
+        val navigateToSettings: () -> Unit = {
+            navController.navigate(HarnessDestination.SETTINGS.route) {
+                launchSingleTop = true
             }
         }
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text("Harness", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                "Local AI Console",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    actions = {
-                        HarnessSecondaryButton("Settings") { destination = HarnessDestination.SETTINGS }
-                    },
-                )
+                if (shellState.isDetail) {
+                    HarnessDetailTopBar(
+                        title = requireNotNull(shellState.detailTitle),
+                        subtitle = shellState.detailSubtitle.orEmpty(),
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                } else {
+                    HarnessTopBar(
+                        destination = destination,
+                        onOpenSettings = navigateToSettings,
+                        onNavigateBack = {
+                            if (!navController.popBackStack()) navigate(HarnessDestination.OVERVIEW)
+                        },
+                    )
+                }
             },
             bottomBar = {
-                if (!expanded && destination != HarnessDestination.SETTINGS) {
-                    NavigationBar {
-                        HarnessDestination.main.forEach { item ->
-                            NavigationBarItem(
-                                selected = destination == item,
-                                onClick = { destination = item },
-                                icon = { Text(item.shortLabel) },
-                                label = { Text(item.label) },
-                            )
-                        }
-                    }
+                if (!expanded && shellState.showBottomNavigation) {
+                    HarnessBottomBar(destination = destination, onNavigate = navigate)
                 }
             },
         ) { padding ->
@@ -356,38 +435,168 @@ class MainActivity :
                     NavigationRail(modifier = Modifier.fillMaxHeight()) {
                         HarnessDestination.main.forEach { item ->
                             NavigationRailItem(
+                                modifier = Modifier.testTag("nav-${item.route}"),
                                 selected = destination == item,
-                                onClick = { destination = item },
-                                icon = { Text(item.shortLabel) },
+                                onClick = { navigate(item) },
+                                icon = { HarnessDestinationIcon(item, selected = destination == item) },
                                 label = { Text(item.label) },
                             )
                         }
                         NavigationRailItem(
                             selected = destination == HarnessDestination.SETTINGS,
-                            onClick = { destination = HarnessDestination.SETTINGS },
-                            icon = { Text("S") },
+                            onClick = navigateToSettings,
+                            icon = {
+                                HarnessDestinationIcon(
+                                    HarnessDestination.SETTINGS,
+                                    selected = destination == HarnessDestination.SETTINGS,
+                                )
+                            },
                             label = { Text("Settings") },
                         )
                     }
                 }
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when (destination) {
-                        HarnessDestination.OVERVIEW -> OverviewScreen(
-                            onOpenPlayground = { destination = HarnessDestination.PLAYGROUND },
+                NavHost(
+                    navController = navController,
+                    startDestination = HarnessDestination.OVERVIEW.route,
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
+                    composable(HarnessDestination.OVERVIEW.route) {
+                        OverviewScreen(
+                            model = uiState.importedModel,
+                            playground = uiState.playground,
+                            onOpenPlayground = { navigate(HarnessDestination.PLAYGROUND) },
+                            onOpenModels = { navigate(HarnessDestination.MODELS) },
+                            onOpenDiagnostics = { navigate(HarnessDestination.DIAGNOSTICS) },
                             onImport = { modelPicker.launch(MODEL_MIME_TYPES) },
                         )
-
-                        HarnessDestination.PLAYGROUND -> PlaygroundScreen()
-
-                        HarnessDestination.MODELS -> ModelsScreen(
-                            onImport = { modelPicker.launch(MODEL_MIME_TYPES) },
+                    }
+                    composable(HarnessDestination.PLAYGROUND.route) {
+                        PlaygroundScreen(
+                            state = uiState,
+                            onOpenModels = { navigate(HarnessDestination.MODELS) },
                         )
-
-                        HarnessDestination.DIAGNOSTICS -> DiagnosticsScreen()
-
-                        HarnessDestination.SETTINGS -> SettingsScreen {
-                            destination = HarnessDestination.OVERVIEW
+                    }
+                    composable(HarnessDestination.MODELS.route) {
+                        ModelsScreen(
+                            state = uiState,
+                            onOpenModelDetails = { item ->
+                                navController.navigate(HarnessRoutes.modelDetail(item))
+                            },
+                        )
+                    }
+                    composable(
+                        route = HarnessRoutes.MODEL_DETAIL_PATTERN,
+                        arguments = listOf(
+                            navArgument(HarnessRoutes.MODEL_IDENTITY_ARGUMENT) {
+                                type = NavType.StringType
+                            },
+                        ),
+                    ) { entry ->
+                        val identity = HarnessRoutes.decodeModelIdentity(
+                            entry.arguments?.getString(HarnessRoutes.MODEL_IDENTITY_ARGUMENT),
+                        )
+                        HarnessModelDetailScreen(
+                            presentation = HarnessModelDetails.present(uiState.modelInventory, identity),
+                            pendingRecovery = uiState.modelRecoveryConfirmation,
+                            busy = uiState.busy,
+                            onRequestRecovery = { identity, action ->
+                                harnessViewModel.models.recovery.request(identity, action)
+                            },
+                            onConfirmRecovery = { harnessViewModel.models.recovery.confirm() },
+                            onCancelRecovery = harnessViewModel.models.recovery::cancel,
+                        )
+                    }
+                    composable(HarnessDestination.DIAGNOSTICS.route) {
+                        DiagnosticsScreen(
+                            state = uiState,
+                            onOpenRequestTimeline = { requestId ->
+                                navController.navigate(HarnessRoutes.requestTimeline(requestId))
+                            },
+                        )
+                    }
+                    composable(HarnessDestination.SETTINGS.route) {
+                        SettingsScreen(
+                            model = uiState.importedModel,
+                            onOpenPrivacy = {
+                                navController.navigate(HarnessSettingsDetail.PRIVACY.route)
+                            },
+                            onOpenStorage = {
+                                navController.navigate(HarnessSettingsDetail.STORAGE.route)
+                            },
+                            onOpenBuild = {
+                                navController.navigate(HarnessSettingsDetail.BUILD.route)
+                            },
+                            onOpenDeveloperTools = {
+                                navController.navigate(HarnessSettingsDetail.DEVELOPER_TOOLS.route)
+                            },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.PRIVACY.route) {
+                        PrivacyDetailScreen()
+                    }
+                    composable(HarnessSettingsDetail.STORAGE.route) {
+                        StorageDetailScreen(
+                            importedModel = uiState.importedModel,
+                            onOpenModels = { navigate(HarnessDestination.MODELS) },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.BUILD.route) {
+                        BuildDetailScreen(
+                            versionName = appVersionName(),
+                            versionCode = appVersionCode(),
+                            applicationId = packageName,
+                        )
+                    }
+                    composable(HarnessSettingsDetail.DEVELOPER_TOOLS.route) {
+                        DeveloperToolsDetailScreen(
+                            onOpenHealth = {
+                                selectDiagnosticsSection(DiagnosticsSection.HEALTH)
+                                navigate(HarnessDestination.DIAGNOSTICS)
+                            },
+                            onOpenLogs = {
+                                selectDiagnosticsSection(DiagnosticsSection.LOGS)
+                                navigate(HarnessDestination.DIAGNOSTICS)
+                            },
+                            onOpenPhysicalValidation = {
+                                navController.navigate(HarnessSettingsDetail.PHYSICAL_VALIDATION.route)
+                            },
+                        )
+                    }
+                    composable(HarnessSettingsDetail.PHYSICAL_VALIDATION.route) {
+                        PhysicalValidationDetailScreen(
+                            modelAvailable = uiState.importedModel != null,
+                            busy = isBusy() || diagnosticActionRunning(),
+                            latestReport = latestReport,
+                            onRunValidation = ::runPhysicalValidation,
+                            onCopyReport = ::copyReport,
+                            onShareReport = ::shareReport,
+                        )
+                    }
+                    composable(
+                        route = HarnessRoutes.REQUEST_TIMELINE_PATTERN,
+                        arguments = listOf(
+                            navArgument(HarnessRoutes.REQUEST_ID_ARGUMENT) {
+                                type = NavType.StringType
+                            },
+                        ),
+                    ) { entry ->
+                        val requestId = HarnessRoutes.decodeRequestId(
+                            entry.arguments?.getString(HarnessRoutes.REQUEST_ID_ARGUMENT),
+                        )
+                        LaunchedEffect(requestId) {
+                            if (requestId != null) openRequestTimeline(requestId)
                         }
+                        DisposableEffect(requestId) {
+                            onDispose { closeRequestTimeline() }
+                        }
+                        RequestTimelineDetailScreen(
+                            timeline = selectedRequestTimeline,
+                            onCopyLog = ::copyLog,
+                        )
                     }
                 }
             }
@@ -395,226 +604,924 @@ class MainActivity :
     }
 
     @Composable
-    private fun OverviewScreen(onOpenPlayground: () -> Unit, onImport: () -> Unit) {
-        ScreenList("Overview") {
+    private fun OverviewScreen(
+        model: ImportedPhoneModel?,
+        playground: PlaygroundState,
+        onOpenPlayground: () -> Unit,
+        onOpenModels: () -> Unit,
+        onOpenDiagnostics: () -> Unit,
+        onImport: () -> Unit,
+    ) {
+        ScreenList(title = null) {
             item {
-                HarnessCard {
-                    Text(
-                        if (importedModel == null) "No model selected" else "Model ready",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    Text(
-                        importedModel?.fileName ?: "Import a GGUF model to start local inference.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HarnessMetricRow {
-                        HarnessMetric(
-                            "Runtime",
-                            if (playgroundState.phase == PlaygroundPhase.IDLE) {
-                                "Idle"
-                            } else {
-                                playgroundState.phase.name
-                            },
-                            Modifier.weight(1f),
-                        )
-                        HarnessMetric("Privacy", "On-device", Modifier.weight(1f))
+                DeviceOnlyStatus("Runtime ready on this device")
+            }
+            item {
+                HarnessCard(emphasized = true) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Text(
+                                if (model == null) "MODEL REQUIRED" else "LOCAL RUNTIME",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
+                            )
+                            Text(
+                                if (model == null) "Add a model to begin" else "Your local runtime is ready",
+                                style = MaterialTheme.typography.headlineMedium,
+                            )
+                            Text(
+                                if (model == null) {
+                                    "Import a GGUF or choose one from the catalog"
+                                } else {
+                                    "All systems operational · ready for inference"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        HarnessRuntimeGlyph(ready = model != null)
                     }
-                    HarnessPrimaryButton(
-                        "Open playground",
-                        enabled = importedModel != null,
+                }
+            }
+            item {
+                HarnessSectionPanel("Runtime") {
+                    RuntimeInfoRow(
+                        icon = HarnessDestination.MODELS,
+                        label = "Active model",
+                        value = model?.fileName ?: "No model selected",
+                        status = if (model == null) "Select" else "Loaded",
+                        statusPositive = model != null,
+                        onClick = onOpenModels,
+                    )
+                    RuntimeInfoRow(
+                        icon = HarnessDestination.PLAYGROUND,
+                        label = "Load state",
+                        value = diagnosticsState.runtime?.state?.name?.lowercase()?.replaceFirstChar(Char::uppercase)
+                            ?: "Idle",
+                        status = if (playground.active) "Running" else "Warm",
+                        statusPositive = true,
                         onClick = onOpenPlayground,
                     )
-                    HarnessSecondaryButton("Import GGUF", enabled = !isBusy(), onClick = onImport)
-                }
-            }
-            item {
-                HarnessCard {
-                    Text("Latest performance", style = MaterialTheme.typography.titleMedium)
-                    val metrics = playgroundState.metrics
-                    HarnessMetricRow {
-                        HarnessMetric(
-                            "TTFT",
-                            metrics?.timeToFirstTokenMs?.let { "$it ms" } ?: "Unavailable",
-                            Modifier.weight(1f),
-                        )
-                        HarnessMetric(
-                            "Decode",
-                            metrics?.decodeTokensPerSecond?.let { "%.2f tok/s".format(Locale.ROOT, it) }
-                                ?: "Unavailable",
-                            Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun PlaygroundScreen() {
-        ScreenList("Playground") {
-            item {
-                HarnessCard {
-                    Text("One-shot local inference", style = MaterialTheme.typography.titleLarge)
-                    Text("Prompts and generated output stay in process memory and are not persisted.")
-                    OutlinedTextField(
-                        value = playgroundPrompt,
-                        onValueChange = { playgroundPrompt = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Prompt") },
-                        minLines = 5,
-                        enabled = !isBusy(),
+                    RuntimeInfoRow(
+                        icon = HarnessDestination.DIAGNOSTICS,
+                        label = "Runtime health",
+                        value = diagnosticsState.healthStatus,
+                        status = if (diagnosticsState.healthStatus.equals("healthy", true)) "Healthy" else "Check",
+                        statusPositive = diagnosticsState.healthStatus.equals("healthy", true),
+                        onClick = onOpenDiagnostics,
+                        showDivider = false,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = playgroundMaxTokens,
-                            onValueChange = { playgroundMaxTokens = it },
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CompactActionTile(
+                        destination = HarnessDestination.PLAYGROUND,
+                        label = "New prompt",
+                        supporting = "Start a conversation",
+                        enabled = model != null,
+                        onClick = onOpenPlayground,
+                    )
+                    CompactActionTile(
+                        destination = HarnessDestination.MODELS,
+                        label = "Import model",
+                        supporting = "GGUF · on-device",
+                        enabled = !isBusy(),
+                        onClick = onImport,
+                    )
+                    CompactActionTile(
+                        destination = HarnessDestination.DIAGNOSTICS,
+                        label = "Run health check",
+                        supporting = "Validate runtime",
+                        enabled = !diagnosticActionRunning(),
+                        onClick = onOpenDiagnostics,
+                    )
+                }
+            }
+            item {
+                HarnessSectionPanel("Device resources", trailing = "View details ›") {
+                    HarnessMetricRow {
+                        CompactResourceMetric(
+                            label = "Memory",
+                            value = resourceSource.history().snapshots.firstOrNull()?.processPss ?: "Unavailable",
+                            detail = "Process PSS",
                             modifier = Modifier.weight(1f),
-                            label = { Text("Max tokens") },
                         )
-                        OutlinedTextField(
-                            value = playgroundTemperature,
-                            onValueChange = { playgroundTemperature = it },
+                        CompactResourceMetric(
+                            label = "Thermal",
+                            value = resourceSource.history().snapshots.firstOrNull()?.thermalStatus ?: "Normal",
+                            detail = "Device state",
                             modifier = Modifier.weight(1f),
-                            label = { Text("Temperature") },
                         )
-                        OutlinedTextField(
-                            value = playgroundSeed,
-                            onValueChange = { playgroundSeed = it },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("Seed") },
-                        )
-                    }
-                    HarnessPrimaryButton(
-                        "Generate locally",
-                        enabled = importedModel != null && !isBusy(),
-                    ) {
-                        startPlayground(
-                            playgroundPrompt,
-                            playgroundMaxTokens,
-                            playgroundTemperature,
-                            playgroundSeed,
-                        )
-                    }
-                    HarnessSecondaryButton(
-                        "Cancel generation",
-                        enabled = playgroundState.cancellationAvailable,
-                    ) {
-                        playgroundController.cancel()
                     }
                 }
             }
             item {
-                HarnessCard {
-                    Text(playgroundState.detail, style = MaterialTheme.typography.titleMedium)
-                    SelectionContainer {
-                        Text(
-                            playgroundState.output.ifBlank { "Generated output will appear here." },
-                            fontFamily = FontFamily.Monospace,
-                        )
-                    }
-                    val metrics = playgroundState.metrics
-                    HarnessMetricRow {
-                        HarnessMetric(
-                            "TTFT",
-                            metrics?.timeToFirstTokenMs?.let { "$it ms" } ?: "Unavailable",
-                            Modifier.weight(1f),
-                        )
-                        HarnessMetric(
-                            "Total",
-                            metrics?.totalMs?.let { "$it ms" } ?: "Unavailable",
-                            Modifier.weight(1f),
-                        )
-                    }
+                HarnessSectionPanel("Recent activity", trailing = "View all ›") {
+                    RuntimeInfoRow(
+                        icon = HarnessDestination.PLAYGROUND,
+                        label = "Latest inference",
+                        value = playground.metrics?.totalMs?.let { "$it ms total" } ?: "No runs yet",
+                        status = playground.phase.name.lowercase().replaceFirstChar(Char::uppercase),
+                        statusPositive = playground.phase == PlaygroundPhase.IDLE,
+                        onClick = onOpenPlayground,
+                        showDivider = false,
+                    )
                 }
             }
         }
     }
 
     @Composable
-    private fun ModelsScreen(onImport: () -> Unit) {
-        ScreenList("Models") {
+    private fun DeviceOnlyStatus(text: String) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(Modifier.size(5.dp).clip(CircleShape).background(HarnessColors.Secondary))
+            Text(text, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
+        }
+    }
+
+    @Composable
+    private fun HarnessSectionPanel(title: String, trailing: String? = null, content: @Composable () -> Unit) {
+        HarnessCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (trailing != null) {
+                    Text(trailing, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+            content()
+        }
+    }
+
+    @Composable
+    private fun RuntimeInfoRow(
+        icon: HarnessDestination,
+        label: String,
+        value: String,
+        status: String,
+        statusPositive: Boolean,
+        onClick: () -> Unit,
+        showDivider: Boolean = true,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HarnessDestinationIcon(icon, selected = false, modifier = Modifier.size(15.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(value, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            }
+            Text(
+                status,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (statusPositive) HarnessColors.Secondary else HarnessColors.Warning,
+            )
+            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (showDivider) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
+    }
+
+    @Composable
+    private fun RowScope.CompactActionTile(
+        destination: HarnessDestination,
+        label: String,
+        supporting: String,
+        enabled: Boolean,
+        onClick: () -> Unit,
+    ) {
+        Surface(
+            modifier = Modifier.weight(1f).clickable(enabled = enabled, onClick = onClick),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Column(
+                modifier = Modifier.padding(9.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                HarnessDestinationIcon(destination, selected = true, modifier = Modifier.size(16.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Text(
+                    supporting,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun CompactResourceMetric(label: String, value: String, detail: String, modifier: Modifier = Modifier) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, maxLines = 1)
+            LinearProgressIndicator(
+                progress = { if (value == "Unavailable") 0f else 0.39f },
+                modifier = Modifier.fillMaxWidth().height(3.dp),
+                color = HarnessColors.Secondary,
+                trackColor = MaterialTheme.colorScheme.outline,
+            )
+            Text(detail, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    @Composable
+    private fun PlaygroundScreen(state: HarnessUiState, onOpenModels: () -> Unit) {
+        var advancedVisible by rememberSaveable { mutableStateOf(true) }
+        val presentation = state.toPlaygroundPresentation()
+        ScreenList(title = null) {
+            item { DeviceOnlyStatus("Runs entirely on this device") }
+            item { PlaygroundModelState(state.importedModel, onOpenModels) }
             item {
-                PhoneModelDistributionCatalog(
-                    state = modelDistributionState,
-                    onDownload = modelDistributionController::download,
-                    onCancel = modelDistributionController::cancelDownload,
-                    onInstall = modelDistributionController::install,
-                    onSelectInstalled = { metadata ->
-                        afterPlaygroundRuntimeReleased {
-                            controller.selectInstalledModel(metadata.asImportedPhoneModel())
-                        }
+                PlaygroundPromptCard(
+                    state = state,
+                    presentation = presentation,
+                    advancedVisible = advancedVisible,
+                    onToggleAdvanced = { advancedVisible = !advancedVisible },
+                )
+            }
+            item { PlaygroundResponseCard(presentation) }
+        }
+    }
+
+    @Composable
+    private fun PlaygroundModelState(model: ImportedPhoneModel?, onOpenModels: () -> Unit) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenModels),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.small,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HarnessDestinationIcon(HarnessDestination.MODELS, selected = model != null, modifier = Modifier.size(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (model == null) "NO ACTIVE MODEL" else "ACTIVE MODEL",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
+                    )
+                    Text(model?.fileName ?: "Choose a local GGUF model", style = MaterialTheme.typography.bodyMedium)
+                }
+                Text("Change  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+
+    @Composable
+    private fun PlaygroundPromptCard(
+        state: HarnessUiState,
+        presentation: PlaygroundPresentation,
+        advancedVisible: Boolean,
+        onToggleAdvanced: () -> Unit,
+    ) {
+        HarnessCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Prompt", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Clear",
+                    modifier = Modifier.clickable { harnessViewModel.updatePlaygroundPrompt("") },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            OutlinedTextField(
+                value = state.playgroundPrompt,
+                onValueChange = harnessViewModel::updatePlaygroundPrompt,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Prompt") },
+                minLines = 4,
+                enabled = presentation.inputsEnabled,
+            )
+            HarnessSecondaryButton(
+                text = if (advancedVisible) "Generation settings  ·  Hide" else "Generation settings  ·  Show",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onToggleAdvanced,
+            )
+            if (advancedVisible) {
+                PlaygroundGenerationSettings(state, presentation)
+            }
+            PlaygroundRunControls(presentation)
+        }
+    }
+
+    @Composable
+    private fun PlaygroundGenerationSettings(state: HarnessUiState, presentation: PlaygroundPresentation) {
+        val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
+        val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
+        Text(
+            text = selectedPreset?.let { "Preset · ${it.label}" }
+                ?: "Preset · Personalizzato${basePreset?.let { " · Basato su ${it.label}" }.orEmpty()}",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(playgroundPresetOptions) { preset ->
+                FilterChip(
+                    selected = state.playgroundPreset == preset.id,
+                    onClick = { harnessViewModel.updatePlaygroundPreset(preset.id) },
+                    label = { Text(preset.label) },
+                    enabled = presentation.inputsEnabled,
+                )
+            }
+        }
+        Text(
+            text = selectedPreset?.description ?: basePreset?.description.orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val temperature = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+        Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = temperature,
+            onValueChange = { harnessViewModel.updatePlaygroundTemperature(formatControlValue(it)) },
+            valueRange = 0f..2f,
+            enabled = presentation.inputsEnabled,
+            modifier = Modifier.fillMaxWidth().testTag("playground-temperature-slider"),
+        )
+        val topP = state.playgroundTopP.toFloatOrNull()?.coerceIn(0.01f, 1f) ?: 0.9f
+        Text("Top-p · ${state.playgroundTopP}", style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = topP,
+            onValueChange = { harnessViewModel.updatePlaygroundTopP(formatControlValue(it)) },
+            valueRange = 0.01f..1f,
+            enabled = presentation.inputsEnabled && temperature != 0f,
+            modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundMaxTokens,
+                onValueChange = harnessViewModel::updatePlaygroundMaxTokens,
+                modifier = Modifier.weight(1f),
+                label = { Text("Max output tokens") },
+                enabled = presentation.inputsEnabled,
+            )
+            OutlinedTextField(
+                value = state.playgroundTemperature,
+                onValueChange = harnessViewModel::updatePlaygroundTemperature,
+                modifier = Modifier.weight(1f),
+                label = { Text("Temperature") },
+                enabled = presentation.inputsEnabled,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundTopP,
+                onValueChange = harnessViewModel::updatePlaygroundTopP,
+                modifier = Modifier.weight(1f),
+                label = { Text("Top-p") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
+            OutlinedTextField(
+                value = state.playgroundTopK,
+                onValueChange = harnessViewModel::updatePlaygroundTopK,
+                modifier = Modifier.weight(1f),
+                label = { Text("Top-k") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
+            OutlinedTextField(
+                value = state.playgroundSeed,
+                onValueChange = harnessViewModel::updatePlaygroundSeed,
+                modifier = Modifier.weight(1f),
+                label = { Text("Seed · blank = random") },
+                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundRepeatPenalty,
+                onValueChange = harnessViewModel::updatePlaygroundRepeatPenalty,
+                modifier = Modifier.weight(1f).testTag("playground-repeat-penalty"),
+                label = { Text("Repeat penalty") },
+                supportingText = { Text("1 = off") },
+                enabled = presentation.inputsEnabled,
+            )
+            OutlinedTextField(
+                value = state.playgroundRepeatLastN,
+                onValueChange = harnessViewModel::updatePlaygroundRepeatLastN,
+                modifier = Modifier.weight(1f).testTag("playground-repeat-last-n"),
+                label = { Text("Repeat last N") },
+                supportingText = { Text("0 = off") },
+                enabled = presentation.inputsEnabled,
+            )
+        }
+        Text("Seed policy", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = state.playgroundSeed.isBlank(),
+                onClick = { harnessViewModel.updatePlaygroundSeed("") },
+                label = { Text("Random each run") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+            FilterChip(
+                selected = state.playgroundSeed.isNotBlank(),
+                onClick = { if (state.playgroundSeed.isBlank()) harnessViewModel.updatePlaygroundSeed("42") },
+                label = { Text("Fixed") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+        }
+        Text("Context policy", style = MaterialTheme.typography.labelLarge)
+        FilterChip(
+            selected = state.playgroundContext.isBlank(),
+            onClick = { harnessViewModel.updatePlaygroundContext("") },
+            label = { Text("Auto") },
+            enabled = presentation.inputsEnabled,
+        )
+        OutlinedTextField(
+            value = state.playgroundContext,
+            onValueChange = harnessViewModel::updatePlaygroundContext,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Context size · blank = Auto") },
+            supportingText = { Text("Manual values are applied exactly; insufficient context fails without truncation.") },
+            enabled = presentation.inputsEnabled,
+        )
+    }
+
+    @Composable
+    private fun PlaygroundRunControls(presentation: PlaygroundPresentation) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            HarnessPrimaryButton(
+                text = presentation.runLabel,
+                enabled = presentation.runEnabled,
+                modifier = Modifier.weight(1f),
+                onClick = ::startPlayground,
+            )
+            if (presentation.stopVisible) {
+                HarnessSecondaryButton(
+                    text = "Stop",
+                    enabled = presentation.stopEnabled,
+                    modifier = Modifier.weight(0.62f),
+                    onClick = { harnessViewModel.cancelPlayground() },
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun PlaygroundResponseCard(presentation: PlaygroundPresentation) {
+        HarnessCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Response", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    presentation.statusLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = when (presentation.statusTone) {
+                        PlaygroundPresentationTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+
+                        PlaygroundPresentationTone.ACTIVE,
+                        PlaygroundPresentationTone.SUCCESS,
+                        -> HarnessColors.Secondary
+
+                        PlaygroundPresentationTone.ERROR -> MaterialTheme.colorScheme.error
+
+                        PlaygroundPresentationTone.WARNING -> HarnessColors.Warning
                     },
                 )
             }
-            item {
-                HarnessCard {
-                    Text("Manual GGUF import", style = MaterialTheme.typography.titleLarge)
+            Text(presentation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SelectionContainer {
+                Text(
+                    presentation.responseText,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+            HarnessMetricRow {
+                HarnessMetric("TTFT", presentation.ttft, Modifier.weight(1f))
+                HarnessMetric("Total", presentation.total, Modifier.weight(1f))
+                HarnessMetric("Decode", presentation.decode, Modifier.weight(1f))
+            }
+            Text("Stop reason · ${presentation.stopReason}", style = MaterialTheme.typography.bodySmall)
+            presentation.effectiveConfiguration?.let { configuration ->
+                Text(
+                    "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
+                        "Seed ${configuration.effectiveSeed} · Repeat ${configuration.repeatPenalty}/${configuration.repeatLastN}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name}) · " +
+                        "System ${configuration.systemPromptVersion ?: "none"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun ModelsScreen(state: HarnessUiState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
+        val inventory = state.modelInventory
+        ScreenList(title = null) {
+            item { ModelsHeader(state.busy) }
+            item { ModelsSummaryCard(inventory) }
+            if (inventory.degradedCount > 0) {
+                item { ModelsRecoveryCard(inventory, onOpenModelDetails) }
+            }
+            item { SelectedModelCard(state, inventory.selectedItem, onOpenModelDetails) }
+            item { ModelInventoryDetailCards(inventory, onOpenModelDetails) }
+            item { ModelCatalogHeader(state.modelDistribution) }
+            item { ModelCatalogContent(state.modelDistribution) }
+        }
+    }
+
+    @Composable
+    private fun ModelsHeader(busy: Boolean) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Models", style = MaterialTheme.typography.headlineLarge)
+                Text(
+                    "Manage your locally installed models",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HarnessPrimaryButton(
+                text = "+  Import model",
+                enabled = !busy,
+                modifier = Modifier,
+                onClick = { harnessViewModel.models.requestImport() },
+            )
+        }
+    }
+
+    @Composable
+    private fun ModelsSummaryCard(inventory: HarnessModelInventoryState) {
+        HarnessCard {
+            HarnessMetricRow {
+                HarnessMetric(
+                    "Storage",
+                    formatBytes(inventory.installedBytes),
+                    Modifier.weight(1f),
+                )
+                HarnessMetric(
+                    "Installed models",
+                    inventory.installedCount.toString(),
+                    Modifier.weight(1f),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun ModelsRecoveryCard(inventory: HarnessModelInventoryState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
+        HarnessCard {
+            HarnessStatusBadge("RECOVERY REQUIRED", HarnessStatusTone.WARNING)
+            Text("Runtime and model selection are not aligned.")
+            inventory.items
+                .filter { it.lifecycle == HarnessModelLifecycle.DEGRADED }
+                .forEach { item ->
                     Text(
-                        "Use Android's document picker for a local GGUF that is not present in the curated catalog.",
+                        item.detail ?: item.degradation?.name.orEmpty().replace('_', ' '),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    HarnessPrimaryButton("Import GGUF", enabled = !isBusy(), onClick = onImport)
+                    HarnessSecondaryButton("Review ${item.displayName}") {
+                        onOpenModelDetails(item)
+                    }
                 }
+            HarnessSecondaryButton("Refresh model state") {
+                harnessViewModel.models.executeCatalog(ModelCatalogCommand.Refresh)
             }
-            item {
-                val model = importedModel
-                if (model == null) {
-                    HarnessCard {
-                        Text("No model selected", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "Downloading and installing does not activate a model. Choose Use in Playground " +
-                                "on an installed catalog model, or import a GGUF manually.",
+        }
+    }
+
+    @Composable
+    private fun SelectedModelCard(
+        state: HarnessUiState,
+        selected: HarnessModelInventoryItem?,
+        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
+    ) {
+        if (selected == null) {
+            EmptySelectedModelCard()
+        } else {
+            ActiveSelectedModelCard(state, selected, onOpenModelDetails)
+        }
+    }
+
+    @Composable
+    private fun EmptySelectedModelCard() {
+        HarnessCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HarnessDestinationIcon(
+                    HarnessDestination.MODELS,
+                    selected = true,
+                    modifier = Modifier.size(18.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("No active model", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Import a GGUF or download a compatible catalog model",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    "Not loaded",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = HarnessColors.Warning,
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun ActiveSelectedModelCard(
+        state: HarnessUiState,
+        selected: HarnessModelInventoryItem,
+        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
+    ) {
+        HarnessCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("ACTIVE MODEL", style = MaterialTheme.typography.labelLarge)
+                HarnessStatusBadge(
+                    selected.lifecycle.name.replace('_', ' '),
+                    selected.lifecycle.statusTone(),
+                )
+            }
+            Text(selected.displayName, style = MaterialTheme.typography.titleLarge)
+            HarnessMetricRow {
+                HarnessMetric(
+                    "Architecture",
+                    selected.architecture ?: "Unavailable",
+                    Modifier.weight(1f),
+                )
+                HarnessMetric(
+                    "Quantization",
+                    selected.quantization ?: "Unavailable",
+                    Modifier.weight(1f),
+                )
+            }
+            Text(
+                "${selected.sizeBytes?.let(::formatBytes) ?: "Unavailable"} · " +
+                    (selected.digest?.take(12)?.plus("…") ?: "Digest unavailable"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HarnessSecondaryButton("View model details") {
+                onOpenModelDetails(selected)
+            }
+            SelectedModelActions(state)
+            SelectedModelRemoval(state)
+        }
+    }
+
+    @Composable
+    private fun SelectedModelActions(state: HarnessUiState) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            HarnessSecondaryButton(
+                text = "Verify",
+                enabled = !state.busy,
+                modifier = Modifier.weight(1f),
+                onClick = { harnessViewModel.models.verifySelected() },
+            )
+            HarnessSecondaryButton(
+                text = "Import another",
+                enabled = !state.busy,
+                modifier = Modifier.weight(1f),
+                onClick = { harnessViewModel.models.requestImport() },
+            )
+        }
+    }
+
+    @Composable
+    private fun SelectedModelRemoval(state: HarnessUiState) {
+        if (state.removalConfirmationPending) {
+            Text(
+                "Removal permanently deletes the app-private model copy.",
+                color = MaterialTheme.colorScheme.error,
+            )
+            HarnessPrimaryButton(
+                "Confirm removal",
+                enabled = !state.busy,
+            ) {
+                harnessViewModel.models.confirmSelectedRemoval()
+            }
+            HarnessSecondaryButton("Cancel removal") {
+                harnessViewModel.models.cancelSelectedRemoval()
+            }
+        } else {
+            HarnessSecondaryButton("Remove active model", enabled = !state.busy) {
+                harnessViewModel.models.requestSelectedRemoval()
+            }
+        }
+    }
+
+    @Composable
+    private fun ModelCatalogHeader(distribution: PhoneModelDistributionState) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Model catalog", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Compatible with this device",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HarnessStatusBadge(
+                label = distribution.catalogStatus.name.replace('_', ' '),
+                tone = distribution.catalogStatus.statusTone(),
+            )
+        }
+    }
+
+    @Composable
+    private fun ModelCatalogContent(distribution: PhoneModelDistributionState) {
+        PhoneModelDistributionCatalog(
+            state = distribution,
+            actions = PhoneModelDistributionActions(
+                download = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.Download(it))
+                },
+                cancelDownload = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelDownload(it))
+                },
+                install = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.Install(it))
+                },
+                verifyInstalled = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.VerifyInstalled(it))
+                },
+                requestRemove = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.RequestRemoval(it))
+                },
+                cancelRemove = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelRemoval(it))
+                },
+                confirmRemove = {
+                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.ConfirmRemoval(it))
+                },
+                selectInstalled = { harnessViewModel.models.selectInstalled(it) },
+            ),
+        )
+    }
+
+    @Composable
+    private fun ModelInventoryDetailCards(inventory: HarnessModelInventoryState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Inventory", style = MaterialTheme.typography.titleLarge)
+            if (inventory.items.isEmpty()) {
+                Text(
+                    "No catalog, imported or runtime-owned models are available.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            inventory.items.forEach { item ->
+                HarnessCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.displayName, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "${item.origin.name.lowercase()} · ${item.lifecycle.name.lowercase().replace('_', ' ')}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        HarnessStatusBadge(
+                            item.lifecycle.name.replace('_', ' '),
+                            item.lifecycle.statusTone(),
                         )
                     }
-                } else {
-                    HarnessCard {
-                        Text("Selected for local inference", style = MaterialTheme.typography.titleMedium)
-                        Text(model.fileName, style = MaterialTheme.typography.titleLarge)
-                        HarnessMetricRow {
-                            HarnessMetric("Architecture", model.architecture, Modifier.weight(1f))
-                            HarnessMetric("Quantization", model.quantization, Modifier.weight(1f))
-                        }
-                        HarnessMetric("SHA-256", model.digest.sha256.take(24) + "…")
-                        HarnessMetric("Size", formatBytes(model.sizeBytes))
-                        HarnessSecondaryButton("Remove model", enabled = !isBusy()) {
-                            afterPlaygroundRuntimeReleased { controller.removeModel() }
-                        }
+                    HarnessSecondaryButton("View details") {
+                        onOpenModelDetails(item)
                     }
                 }
             }
         }
     }
 
+    private fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
+        HarnessModelLifecycle.SELECTED,
+        HarnessModelLifecycle.LOADED,
+        HarnessModelLifecycle.INSTALLED,
+        -> HarnessStatusTone.SUCCESS
+
+        HarnessModelLifecycle.DEGRADED,
+        HarnessModelLifecycle.FAILED,
+        HarnessModelLifecycle.INCOMPATIBLE,
+        -> HarnessStatusTone.WARNING
+
+        HarnessModelLifecycle.DOWNLOADING,
+        HarnessModelLifecycle.INSTALLING,
+        HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
+        -> HarnessStatusTone.INFO
+
+        HarnessModelLifecycle.READY_TO_DOWNLOAD,
+        HarnessModelLifecycle.CANCELLED,
+        -> HarnessStatusTone.NEUTRAL
+    }
+
+    private fun PhoneCatalogLoadStatus.statusTone(): HarnessStatusTone = if (this == PhoneCatalogLoadStatus.READY) {
+        HarnessStatusTone.SUCCESS
+    } else {
+        HarnessStatusTone.WARNING
+    }
+
     @Composable
-    private fun DiagnosticsScreen() {
-        ScreenList("Diagnostics") {
+    private fun DiagnosticsScreen(state: HarnessUiState, onOpenRequestTimeline: (String) -> Unit) {
+        ScreenList(
+            title = "Diagnostics",
+            supportingText = "Health, performance and privacy-safe evidence",
+        ) {
             item {
                 DiagnosticsSectionSelector(
                     selected = diagnosticsSection,
                     onSelected = ::selectDiagnosticsSection,
                 )
             }
-            runtimeDiagnostics()
             when (diagnosticsSection) {
-                DiagnosticsSection.RUNS -> runDiagnostics()
+                DiagnosticsSection.HEALTH -> {
+                    healthDiagnostics(state)
+                    runtimeDiagnostics()
+                }
 
-                DiagnosticsSection.HEALTH -> healthDiagnostics()
+                DiagnosticsSection.RUNS -> {
+                    runtimeDiagnostics()
+                    runDiagnostics(onOpenRequestTimeline)
+                }
 
-                DiagnosticsSection.RESOURCES -> resourceDiagnostics()
+                DiagnosticsSection.RESOURCES -> {
+                    runtimeDiagnostics()
+                    resourceDiagnostics()
+                }
 
-                DiagnosticsSection.BENCHMARKS -> benchmarkDiagnostics()
+                DiagnosticsSection.BENCHMARKS -> {
+                    runtimeDiagnostics()
+                    benchmarkDiagnostics(state)
+                }
 
-                DiagnosticsSection.LOGS -> logDiagnostics(
-                    state = logState,
-                    filter = logFilter,
-                    timeline = selectedRequestTimeline,
-                    onFilterChange = ::updateLogFilter,
-                    onOpenTimeline = ::openRequestTimeline,
-                    onCloseTimeline = ::closeRequestTimeline,
-                    onCopyLog = ::copyLog,
-                )
+                DiagnosticsSection.LOGS -> {
+                    runtimeDiagnostics()
+                    logDiagnostics(
+                        state = logState,
+                        filter = logFilter,
+                        timeline = selectedRequestTimeline,
+                        onFilterChange = ::updateLogFilter,
+                        onOpenTimeline = onOpenRequestTimeline,
+                        onCloseTimeline = ::closeRequestTimeline,
+                        onCopyLog = ::copyLog,
+                    )
+                }
 
-                DiagnosticsSection.VALIDATION -> validationDiagnostics()
+                DiagnosticsSection.VALIDATION -> {
+                    runtimeDiagnostics()
+                    validationDiagnostics(state)
+                }
             }
         }
     }
@@ -622,18 +1529,18 @@ class MainActivity :
     private fun androidx.compose.foundation.lazy.LazyListScope.runtimeDiagnostics() {
         item {
             HarnessCard {
-                Text("Runtime status", style = MaterialTheme.typography.titleLarge)
-                Text(operationStatus)
-                HarnessMetricRow {
-                    HarnessMetric(
-                        "Runtime",
-                        diagnosticsState.runtime?.state?.name ?: "Unavailable",
-                        Modifier.weight(1f),
-                    )
-                    HarnessMetric(
-                        "Active sessions",
-                        diagnosticsState.runtime?.activeSessions?.toString() ?: "Unavailable",
-                        Modifier.weight(1f),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Runtime", style = MaterialTheme.typography.titleLarge)
+                        Text(operationStatus, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    HarnessStatusBadge(
+                        diagnosticsState.runtime?.state?.name ?: "UNAVAILABLE",
+                        if (diagnosticsState.runtime == null) HarnessStatusTone.NEUTRAL else HarnessStatusTone.SUCCESS,
                     )
                 }
                 HarnessSecondaryButton("Refresh diagnostics", onClick = ::refreshDiagnostics)
@@ -641,23 +1548,53 @@ class MainActivity :
         }
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.healthDiagnostics() {
+    private fun androidx.compose.foundation.lazy.LazyListScope.healthDiagnostics(state: HarnessUiState) {
         item {
-            HarnessCard {
-                Text("Health", style = MaterialTheme.typography.titleLarge)
-                HarnessMetricRow {
-                    HarnessMetric("Overall", diagnosticsState.healthStatus, Modifier.weight(1f))
-                    HarnessMetric("Checks", diagnosticsState.health.size.toString(), Modifier.weight(1f))
+            HarnessCard(emphasized = true) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    HarnessRuntimeGlyph(
+                        ready = diagnosticsState.healthStatus.equals("healthy", ignoreCase = true),
+                        modifier = Modifier.size(52.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Overall health", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            diagnosticsState.healthStatus,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = if (diagnosticsState.healthStatus.equals("healthy", ignoreCase = true)) {
+                                HarnessColors.Secondary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        Text(
+                            if (diagnosticsState.health.isEmpty()) {
+                                "Run checks to validate the local runtime"
+                            } else {
+                                "All available checks have completed"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                Text(
-                    if (diagnosticsState.health.isEmpty()) {
-                        "Health checks have not been run in this process."
-                    } else {
-                        "Results are retained in the process-scoped telemetry repository."
-                    },
-                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+                if (diagnosticsState.health.isEmpty()) {
+                    listOf(
+                        "Runtime" to "Not run",
+                        "Model integrity" to if (state.importedModel == null) "No model" else "Not run",
+                        "Generation sanity" to "Not run",
+                        "Cache" to "Not run",
+                    ).forEachIndexed { index, (label, status) ->
+                        HealthCheckPreviewRow(label, status, index < 3)
+                    }
+                }
                 HarnessPrimaryButton(
-                    "Run health checks",
+                    if (diagnosticsState.health.isEmpty()) "Run all checks" else "Run checks again",
                     enabled = !isBusy() && !diagnosticActionRunning(),
                     onClick = ::runHealthChecks,
                 )
@@ -673,6 +1610,20 @@ class MainActivity :
                 }
             }
         }
+    }
+
+    @Composable
+    private fun HealthCheckPreviewRow(label: String, status: String, showDivider: Boolean) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HarnessDestinationIcon(HarnessDestination.DIAGNOSTICS, selected = false, modifier = Modifier.size(14.dp))
+            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Text(status, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (showDivider) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
     }
 
     private fun androidx.compose.foundation.lazy.LazyListScope.resourceDiagnostics() {
@@ -740,7 +1691,7 @@ class MainActivity :
         }
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.benchmarkDiagnostics() {
+    private fun androidx.compose.foundation.lazy.LazyListScope.benchmarkDiagnostics(state: HarnessUiState) {
         item {
             HarnessCard {
                 Text("Benchmarks", style = MaterialTheme.typography.titleLarge)
@@ -756,7 +1707,7 @@ class MainActivity :
                 )
                 HarnessPrimaryButton(
                     "Capture all ready baselines",
-                    enabled = importedModel != null &&
+                    enabled = state.importedModel != null &&
                         benchmarkState.readiness.any { it.captureReady } &&
                         !isBusy() &&
                         !diagnosticActionRunning(),
@@ -849,7 +1800,7 @@ class MainActivity :
         }
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.runDiagnostics() {
+    private fun androidx.compose.foundation.lazy.LazyListScope.runDiagnostics(onOpenRequestTimeline: (String) -> Unit) {
         item {
             HarnessCard {
                 Text("Generation runs", style = MaterialTheme.typography.titleLarge)
@@ -881,27 +1832,30 @@ class MainActivity :
                 HarnessMetric("Model", run.modelDigestPrefix + "…")
                 HarnessMetric("Request", run.requestId.take(12) + "…")
                 HarnessSecondaryButton("View request timeline") {
-                    openRequestTimeline(run.requestId)
+                    onOpenRequestTimeline(run.requestId)
                 }
             }
         }
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.validationDiagnostics() {
+    private fun runPhysicalValidation() {
+        afterPlaygroundRuntimeReleased {
+            latestReport = ""
+            operationStatus = "Starting validation…"
+            controller.runFullValidation()
+        }
+    }
+
+    private fun androidx.compose.foundation.lazy.LazyListScope.validationDiagnostics(state: HarnessUiState) {
         item {
             HarnessCard {
                 Text("Physical-device validation", style = MaterialTheme.typography.titleLarge)
                 Text("Runs generation, cancellation and repeated load/generate/unload memory cycles.")
                 HarnessPrimaryButton(
                     "Run full validation",
-                    enabled = importedModel != null && !isBusy() && !diagnosticActionRunning(),
-                ) {
-                    afterPlaygroundRuntimeReleased {
-                        latestReport = ""
-                        operationStatus = "Starting validation…"
-                        controller.runFullValidation()
-                    }
-                }
+                    enabled = state.importedModel != null && !isBusy() && !diagnosticActionRunning(),
+                    onClick = ::runPhysicalValidation,
+                )
             }
         }
         item {
@@ -928,65 +1882,307 @@ class MainActivity :
     }
 
     @Composable
-    private fun SettingsScreen(onBack: () -> Unit) {
-        ScreenList("Settings") {
+    private fun SettingsScreen(
+        model: ImportedPhoneModel?,
+        onOpenPrivacy: () -> Unit,
+        onOpenStorage: () -> Unit,
+        onOpenBuild: () -> Unit,
+        onOpenDeveloperTools: () -> Unit,
+    ) {
+        ScreenList(title = null) {
             item {
-                HarnessCard {
-                    Text("Privacy", style = MaterialTheme.typography.titleLarge)
-                    Text("Inference, prompts, generated output and GGUF artifacts remain on this device.")
-                    Text(
-                        "Runs, health, resources, benchmark baselines and logs are bounded and " +
-                            "process-memory-only; prompt and output content are excluded.",
-                    )
-                }
+                SettingsSectionLabel("Brand")
             }
             item {
                 HarnessCard {
-                    Text("Build", style = MaterialTheme.typography.titleLarge)
-                    HarnessMetric("Application", "Harness 0.4.0")
-                    HarnessMetric("Format", "GGUF only")
-                    HarnessMetric("Transport", "In-process")
-                    HarnessMetric("Telemetry", "In-memory")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.harness_launcher_foreground),
+                            contentDescription = null,
+                            modifier = Modifier.size(42.dp),
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Harness", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Local AI Console",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("Brand palette", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(
+                            HarnessColors.Primary,
+                            Color(0xFF9A7BFF),
+                            HarnessColors.Secondary,
+                            Color(0xFF167C77),
+                            MaterialTheme.colorScheme.outline,
+                        ).forEach { color ->
+                            Box(Modifier.size(20.dp).clip(MaterialTheme.shapes.small).background(color))
+                        }
+                    }
                 }
             }
-            item { HarnessSecondaryButton("Back to overview", onClick = onBack) }
+            item {
+                SettingsSectionLabel("Appearance")
+            }
+            item {
+                HarnessCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Theme", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Customize the look and feel",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        HarnessThemePreference.entries.forEach { preference ->
+                            FilterChip(
+                                selected = themePreference == preference,
+                                onClick = { themePreference = preference },
+                                label = { Text(preference.label) },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                SettingsSectionLabel("Privacy")
+            }
+            item {
+                SettingsRow(
+                    destination = HarnessDestination.DIAGNOSTICS,
+                    title = "Privacy",
+                    detail = "Prompts are not persisted",
+                    trailing = "On-device",
+                    onClick = onOpenPrivacy,
+                )
+            }
+            item {
+                SettingsSectionLabel("Storage")
+            }
+            item {
+                SettingsRow(
+                    destination = HarnessDestination.MODELS,
+                    title = "Storage",
+                    detail = "Manage cache and local data",
+                    trailing = model?.let { "${formatBytes(it.sizeBytes)} used" } ?: "Empty",
+                    onClick = onOpenStorage,
+                )
+            }
+            item {
+                SettingsSectionLabel("About")
+            }
+            item {
+                SettingsRow(
+                    destination = HarnessDestination.OVERVIEW,
+                    title = "Build info",
+                    detail = "Version, build, and runtime details",
+                    trailing = appVersionName(),
+                    onClick = onOpenBuild,
+                )
+            }
+            item {
+                SettingsSectionLabel("Advanced")
+            }
+            item {
+                SettingsRow(
+                    destination = HarnessDestination.DIAGNOSTICS,
+                    title = "Developer tools",
+                    detail = "Logs, diagnostics, and advanced options",
+                    trailing = "›",
+                    onClick = onOpenDeveloperTools,
+                )
+            }
         }
     }
 
     @Composable
-    private fun ScreenList(title: String, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    private fun SettingsSectionLabel(text: String) {
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    @Composable
+    private fun SettingsRow(
+        destination: HarnessDestination,
+        title: String,
+        detail: String,
+        trailing: String,
+        onClick: (() -> Unit)? = null,
+    ) {
+        Surface(
+            modifier = if (onClick == null) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.fillMaxWidth().clickable(onClick = onClick)
+            },
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                HarnessDestinationIcon(destination, selected = true, modifier = Modifier.size(17.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(trailing, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
+            }
+        }
+    }
+
+    @Composable
+    private fun ScreenList(
+        title: String?,
+        supportingText: String? = null,
+        content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+    ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { Text(title, style = MaterialTheme.typography.headlineLarge) }
-            content()
-        }
-    }
-
-    private fun startPlayground(prompt: String, maxTokens: String, temperature: String, seed: String) {
-        val model = importedModel ?: return
-        val options = runCatching {
-            PlaygroundRequestOptions.parse(maxTokens, temperature, seed)
-        }.getOrElse {
-            Toast.makeText(this, "Invalid generation settings", Toast.LENGTH_LONG).show()
-            return
-        }
-        runCatching { playgroundController.start(model, prompt, options) }
-            .onFailure {
-                Toast.makeText(this, "Unable to start local inference", Toast.LENGTH_LONG).show()
+            if (title != null) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(title, style = MaterialTheme.typography.headlineLarge)
+                        if (supportingText != null) {
+                            Text(
+                                supportingText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
+            content()
+            item { Spacer(Modifier.height(8.dp)) }
+        }
     }
 
-    private fun afterPlaygroundRuntimeReleased(action: () -> Unit) {
-        if (!playgroundController.releaseRuntime { runOnUiThread(action) }) {
+    private fun createModelEffects(onImport: () -> Unit): ModelEffects = object : ModelEffects {
+        override fun snapshot(): ModelEffectsSnapshot = ModelEffectsSnapshot(
+            distribution = modelDistributionController.snapshot(),
+            selectedModel = controller.snapshotModel(),
+            loadedDigest = runtimeGraph.loadedModelDigest?.sha256,
+        )
+
+        override fun requestImport(): Boolean = modelEffect(onImport)
+
+        override fun executeCatalog(command: ModelCatalogCommand): Boolean = modelEffect {
+            when (command) {
+                ModelCatalogCommand.Refresh -> modelDistributionController.refresh()
+                is ModelCatalogCommand.Download -> modelDistributionController.download(command.stableId)
+                is ModelCatalogCommand.CancelDownload -> modelDistributionController.cancelDownload(command.stableId)
+                is ModelCatalogCommand.Install -> modelDistributionController.install(command.stableId)
+                is ModelCatalogCommand.VerifyInstalled -> modelDistributionController.verifyInstalled(command.stableId)
+                is ModelCatalogCommand.RequestRemoval -> modelDistributionController.requestRemove(command.stableId)
+                is ModelCatalogCommand.CancelRemoval -> modelDistributionController.cancelRemove(command.stableId)
+                is ModelCatalogCommand.ConfirmRemoval -> modelDistributionController.confirmRemove(command.stableId)
+            }
+        }
+
+        override fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean = afterPlaygroundRuntimeReleased {
+            controller.selectInstalledModel(metadata.asImportedPhoneModel())
+        }
+
+        override fun verifySelected(): Boolean = verifySelectedModel()
+
+        override fun removeSelected(): Boolean = afterPlaygroundRuntimeReleased(controller::removeModel)
+
+        override fun executeRecovery(command: ModelRecoveryCommand): Boolean = when (command) {
+            is ModelRecoveryCommand.AdoptLoadedSelection -> {
+                if (runtimeGraph.loadedModelDigest?.sha256 != command.metadata.digest.sha256) {
+                    false
+                } else {
+                    modelEffect {
+                        controller.selectInstalledModel(command.metadata.asImportedPhoneModel())
+                    }
+                }
+            }
+
+            ModelRecoveryCommand.ReleaseRuntime -> afterPlaygroundRuntimeReleased(::syncLoadedModelOwnership)
+        }
+    }
+
+    private fun importModelDocument(uri: Uri) {
+        afterPlaygroundRuntimeReleased {
+            controller.importModel(
+                uri = uri,
+                architecture = DEFAULT_ARCHITECTURE,
+                quantization = DEFAULT_QUANTIZATION,
+            )
+        }
+    }
+
+    private fun modelEffect(action: () -> Unit): Boolean = runCatching {
+        action()
+        true
+    }.getOrDefault(false)
+
+    private fun syncLoadedModelOwnership() {
+        harnessViewModel.dispatch(
+            HarnessUiEvent.LoadedModelChanged(runtimeGraph.loadedModelDigest?.sha256),
+        )
+    }
+
+    private fun startPlayground() {
+        when (harnessViewModel.startPlayground()) {
+            PlaygroundStartResult.STARTED -> Unit
+
+            PlaygroundStartResult.MODEL_REQUIRED -> {
+                Toast.makeText(this, "Select a local model first", Toast.LENGTH_SHORT).show()
+            }
+
+            PlaygroundStartResult.BUSY -> {
+                Toast.makeText(this, "Wait for the active operation to finish", Toast.LENGTH_SHORT).show()
+            }
+
+            PlaygroundStartResult.INVALID_SETTINGS -> {
+                Toast.makeText(this, "Invalid generation settings", Toast.LENGTH_LONG).show()
+            }
+
+            PlaygroundStartResult.CONTROLLER_UNAVAILABLE,
+            PlaygroundStartResult.REJECTED,
+            -> Toast.makeText(this, "Unable to start local inference", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun afterPlaygroundRuntimeReleased(action: () -> Unit): Boolean {
+        val released = harnessViewModel.releasePlaygroundRuntime {
+            runOnUiThread {
+                syncLoadedModelOwnership()
+                action()
+            }
+        }
+        if (!released) {
             Toast.makeText(this, "Cancel or wait for the active generation", Toast.LENGTH_SHORT).show()
         }
+        return released
     }
 
     private fun updateKeepScreenOn() {
-        if (controllerBusy || modelDistributionState.operationActive || playgroundState.active) {
+        if (harnessViewModel.uiState.value.keepScreenOn) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -995,7 +2191,7 @@ class MainActivity :
 
     private fun diagnosticActionRunning(): Boolean = healthRunning || resourceCaptureRunning || benchmarkCaptureRunning
 
-    private fun isBusy(): Boolean = controllerBusy || modelDistributionState.operationActive || playgroundController.active
+    private fun isBusy(): Boolean = harnessViewModel.uiState.value.busy
 
     private fun copyLog(log: DiagnosticsLogUi) {
         copyToClipboard("Harness log entry", log.copyText())
@@ -1025,19 +2221,28 @@ class MainActivity :
         )
     }
 
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
+    private fun formatBytes(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
 
-    private enum class HarnessDestination(val label: String, val shortLabel: String) {
-        OVERVIEW("Overview", "O"),
-        PLAYGROUND("Playground", "P"),
-        MODELS("Models", "M"),
-        DIAGNOSTICS("Diagnostics", "D"),
-        SETTINGS("Settings", "S"),
-        ;
+    private fun formatControlValue(value: Float): String = "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
 
-        companion object {
-            val main = listOf(OVERVIEW, PLAYGROUND, MODELS, DIAGNOSTICS)
+    private fun appVersionName(): String = runCatching {
+        packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+    }.getOrDefault("0.0.0")
+
+    private fun appVersionCode(): String = runCatching {
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode.toString()
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toString()
         }
+    }.getOrDefault("0")
+
+    private enum class HarnessThemePreference(val label: String) {
+        DARK("Dark"),
+        LIGHT("Light"),
+        SYSTEM("System"),
     }
 
     private companion object {
@@ -1045,10 +2250,6 @@ class MainActivity :
         const val RESOURCE_HISTORY_VISIBLE_LIMIT = 10
         const val DEFAULT_ARCHITECTURE = "qwen3"
         const val DEFAULT_QUANTIZATION = "Q4_K_M"
-        const val DEFAULT_MAX_OUTPUT_TOKENS = "128"
-        const val DEFAULT_TEMPERATURE = "0.2"
-        const val DEFAULT_SEED = "42"
-        const val DEFAULT_PROMPT = "Explain in two sentences why local inference improves privacy."
         val MODEL_MIME_TYPES = arrayOf("application/octet-stream", "application/gguf", "application/x-gguf")
     }
 }

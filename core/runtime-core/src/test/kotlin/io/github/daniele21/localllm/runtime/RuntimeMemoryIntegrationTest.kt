@@ -209,7 +209,7 @@ private data class MemoryBackendModel(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class MemoryBackendContext(override val model: BackendModelHandle) : BackendContextHandle
+private data class MemoryBackendContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class MemoryFakeBackend : InferenceBackend {
     override val id: String = "memory-fake"
@@ -230,7 +230,15 @@ private class MemoryFakeBackend : InferenceBackend {
         unloadCalls += 1
     }
 
-    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle = MemoryBackendContext(model)
+    override fun modelCapabilities(model: BackendModelHandle) = BackendModelCapabilities(4_096, true)
+
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest) = fakePromptPlan(request)
+
+    override fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle = MemoryBackendContext(model, configuration.contextSize)
 
     override fun releaseContext(context: BackendContextHandle) {
         releaseCalls += 1

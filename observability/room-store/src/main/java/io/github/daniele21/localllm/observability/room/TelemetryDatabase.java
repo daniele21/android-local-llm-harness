@@ -12,8 +12,8 @@ import androidx.room.RoomDatabase;
             TelemetryEntities.BenchmarkBaselineEntity.class,
             TelemetryEntities.BenchmarkBaselineHistoryEntity.class
         },
-        version = 4,
-        exportSchema = false)
+        version = 6,
+        exportSchema = true)
 public abstract class TelemetryDatabase extends RoomDatabase {
     public abstract TelemetryDao telemetryDao();
 }

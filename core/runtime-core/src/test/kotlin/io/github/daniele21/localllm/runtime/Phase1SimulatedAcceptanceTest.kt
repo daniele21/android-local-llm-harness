@@ -52,7 +52,7 @@ class Phase1SimulatedAcceptanceTest {
             val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
             val successEvents = fixture.generateAndAwait("success", session)
             assertEquals(
-                listOf("Queued", "Started", "TextDelta", "TextDelta", "Completed"),
+                listOf("Queued", "Prepared", "Started", "TextDelta", "TextDelta", "Completed"),
                 successEvents.map { it::class.simpleName },
             )
             assertEquals("simulated ready", (successEvents.last() as GenerationEvent.Completed).output)
@@ -215,7 +215,7 @@ private data class SimulatedAcceptanceModel(
     override val loadDurationMs: Long = 4,
 ) : BackendModelHandle
 
-private data class SimulatedAcceptanceContext(override val model: BackendModelHandle) : BackendContextHandle
+private data class SimulatedAcceptanceContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class SimulatedAcceptanceBackend : InferenceBackend {
     override val id: String = "simulated-llama-backend"
@@ -251,8 +251,15 @@ private class SimulatedAcceptanceBackend : InferenceBackend {
         unloadCalls += 1
     }
 
-    override fun createContext(model: BackendModelHandle, profile: GgufModelProfile): BackendContextHandle =
-        SimulatedAcceptanceContext(model)
+    override fun modelCapabilities(model: BackendModelHandle) = BackendModelCapabilities(4_096, true)
+
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest) = fakePromptPlan(request)
+
+    override fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle = SimulatedAcceptanceContext(model, configuration.contextSize)
 
     override fun releaseContext(context: BackendContextHandle) {
         releaseContextCalls += 1

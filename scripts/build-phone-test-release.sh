@@ -124,15 +124,37 @@ clear_signing_configuration() {
     unset PHONE_TEST_JARSIGNER_PASSWORD
 }
 
+increment_version_code() {
+    local prop_file="${ROOT_DIR}/apps/local-llm-phone-test/version.properties"
+    if [[ -f "${prop_file}" ]]; then
+        local current_code
+        current_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
+        if [[ -n "${current_code}" ]]; then
+            local next_code=$((current_code + 1))
+            sed -i '' "s/^versionCode=.*/versionCode=${next_code}/" "${prop_file}"
+        fi
+    fi
+}
+
 build_release() {
     load_signing_configuration
     configure_android_sdk
+    increment_version_code
     cd "${ROOT_DIR}"
     ./gradlew :apps:local-llm-phone-test:bundleRelease
+
+    local prop_file="${ROOT_DIR}/apps/local-llm-phone-test/version.properties"
+    local v_code=""
+    local v_name=""
+    if [[ -f "${prop_file}" ]]; then
+        v_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
+        v_name="$(sed -n 's/^versionName=//p' "${prop_file}")"
+    fi
 
     echo
     echo "Signed Android App Bundle created:"
     echo "${ROOT_DIR}/apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab"
+    echo "Bundle Version: versionCode: ${v_code:-N/A} versionName: ${v_name:-N/A}"
 }
 
 sign_ci_aab() {

@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.runtime
 
+import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
@@ -17,6 +18,7 @@ fun interface EpochClock {
     fun nowEpochMs(): Long
 }
 
+@Suppress("TooManyFunctions")
 internal class RuntimeTelemetry(private val repository: TelemetryRepository, private val clock: EpochClock) {
     private val activeRuns = ConcurrentHashMap<RequestId, GenerationRunRecord>()
 
@@ -74,6 +76,48 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
+    fun prepared(requestId: RequestId, configuration: EffectiveGenerationMetadata, promptPlanningMs: Long, contextCreationMs: Long?) {
+        val current = activeRuns[requestId] ?: return
+        val updated = current.copy(
+            presetId = configuration.preset?.id,
+            presetVersion = configuration.preset?.version,
+            temperature = configuration.temperature,
+            topP = configuration.topP,
+            topK = configuration.topK,
+            repeatPenalty = configuration.repeatPenalty,
+            repeatLastN = configuration.repeatLastN,
+            seedPolicy = configuration.requestedSeedPolicy,
+            effectiveSeed = configuration.effectiveSeed,
+            maxOutputTokens = configuration.maxOutputTokens,
+            contextSize = configuration.contextSize,
+            promptTokenCount = configuration.promptTokenCount,
+            chatTemplateId = configuration.chatTemplateId,
+            chatTemplateSource = configuration.chatTemplateSource,
+            systemPromptVersion = configuration.systemPromptVersion,
+            promptPlanningMs = promptPlanningMs,
+            contextCreationMs = contextCreationMs,
+        )
+        activeRuns[requestId] = updated
+        persist(updated)
+        log(
+            level = LogLevel.INFO,
+            event = "generation.prepared",
+            requestId = requestId,
+            fields = buildMap {
+                put("contextSize", configuration.contextSize.toString())
+                put("promptTokenCount", configuration.promptTokenCount.toString())
+                put("chatTemplateId", configuration.chatTemplateId)
+                put("chatTemplateSource", configuration.chatTemplateSource.name)
+                put("repeatPenalty", configuration.repeatPenalty.toString())
+                put("repeatLastN", configuration.repeatLastN.toString())
+                configuration.preset?.let {
+                    put("presetId", it.id.value)
+                    put("presetVersion", it.version.toString())
+                }
+            },
+        )
+    }
+
     fun completed(requestId: RequestId, metrics: GenerationMetrics) {
         val current = activeRuns.remove(requestId) ?: return
         val updated = current.copy(
@@ -89,6 +133,9 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             prefillMs = metrics.prefillMs,
             decodeMs = metrics.decodeMs,
             modelLoadKind = metrics.modelLoadKind,
+            stopReason = metrics.stopReason,
+            promptPlanningMs = metrics.promptPlanningMs ?: current.promptPlanningMs,
+            contextCreationMs = metrics.contextCreationMs ?: current.contextCreationMs,
         )
         persist(updated)
         log(
@@ -152,6 +199,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         put("queueMs", metrics.queueMs.toString())
         put("totalMs", metrics.totalMs.toString())
         put("modelLoadKind", metrics.modelLoadKind.name)
+        put("stopReason", metrics.stopReason.name)
         metrics.modelLoadMs?.let { put("modelLoadMs", it.toString()) }
         metrics.timeToFirstTokenMs?.let { put("timeToFirstTokenMs", it.toString()) }
         metrics.prefillMs?.let { put("prefillMs", it.toString()) }

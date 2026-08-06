@@ -41,6 +41,9 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         ),
     )
 
+    val loadedModelDigest: ModelDigest?
+        get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
+
     private var runtime: RuntimeOrchestrator? = null
     private var runtimeModelDigest: ModelDigest? = null
 

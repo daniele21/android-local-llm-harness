@@ -24,7 +24,7 @@ class CuratedModelCatalogTest {
     }
 
     @Test
-    fun exposesFourCandidateReleasesForThePhonePlayground() {
+    fun exposesEighteenCandidateReleasesForThePhonePlayground() {
         val target =
             CatalogTarget(
                 applicationId = ApplicationId("play-internal-phone-test"),
@@ -34,7 +34,7 @@ class CuratedModelCatalogTest {
 
         assertEquals(EXPECTED_MODEL_IDS, releases.mapTo(linkedSetOf()) { it.id.modelId.value })
         assertTrue(releases.all { it.availability == CatalogAvailability.CANDIDATE })
-        assertTrue(releases.all { it.artifact.quantization == "Q4_K_M" })
+        assertTrue(releases.all { it.artifact.quantization.isNotBlank() })
         assertTrue(releases.all { it.compatibility.minSdk == 26 })
         assertTrue(releases.all { it.compatibility.supportedAbis == setOf("arm64-v8a") })
         assertTrue(releases.all { it.compatibility.supportedBackendIds == setOf("llama.cpp") })
@@ -87,13 +87,27 @@ class CuratedModelCatalogTest {
     private companion object {
         const val GENERATED_AT = 1_800_000_000_000
         const val EXPIRES_AT = 1_800_086_400_000
-        const val EXPECTED_CANONICAL_SHA256 = "c18fe4508bc20b920f7f68d52ab8a3b8377c4a4511c13a8d476d9117619717e0"
+        const val EXPECTED_CANONICAL_SHA256 = "34cc269ec1bf57555c675bfe98380469b86008bb0d4d6969ef3951af4c53a7b7"
         val EXPECTED_MODEL_IDS =
             setOf(
-                "qwen3.5-0.8b-instruct-q4-k-m",
                 "lfm2.5-1.2b-instruct-q4-k-m",
                 "smollm2-360m-instruct-q4-k-m",
-                "qwen3.5-2b-instruct-q4-k-m",
+                "qwen3-8b-ud-iq1-s",
+                "qwen3-8b-ud-iq1-m",
+                "qwen3-8b-q2-k",
+                "qwen3-8b-q3-k-m",
+                "qwen3-8b-q4-k-m",
+                "qwen3-8b-q5-k-m",
+                "qwen35-08b-q4-k-m",
+                "qwen35-08b-q5-k-m",
+                "qwen35-08b-q8-0",
+                "qwen35-08b-ud-iq2-xxs",
+                "qwen35-2b-q4-k-m",
+                "qwen35-2b-q5-k-m",
+                "qwen35-2b-ud-iq2-xxs",
+                "qwen35-4b-q4-k-m",
+                "qwen35-4b-q5-k-m",
+                "qwen35-4b-ud-iq2-xxs",
             )
     }
 }

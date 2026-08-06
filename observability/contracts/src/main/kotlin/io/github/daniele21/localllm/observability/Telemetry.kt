@@ -1,10 +1,14 @@
 package io.github.daniele21.localllm.observability
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ChatTemplateSource
+import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 data class GenerationRunRecord(
@@ -26,6 +30,24 @@ data class GenerationRunRecord(
     val prefillMs: Long? = null,
     val decodeMs: Long? = null,
     val modelLoadKind: ModelLoadKind = ModelLoadKind.UNKNOWN,
+    val presetId: InferencePresetId? = null,
+    val presetVersion: Int? = null,
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val topK: Int? = null,
+    val repeatPenalty: Float? = null,
+    val repeatLastN: Int? = null,
+    val seedPolicy: SeedPolicyType? = null,
+    val effectiveSeed: Long? = null,
+    val maxOutputTokens: Int? = null,
+    val contextSize: Int? = null,
+    val promptTokenCount: Int? = null,
+    val chatTemplateId: String? = null,
+    val chatTemplateSource: ChatTemplateSource? = null,
+    val systemPromptVersion: String? = null,
+    val stopReason: StopReason? = null,
+    val promptPlanningMs: Long? = null,
+    val contextCreationMs: Long? = null,
 )
 
 enum class RunStatus {
