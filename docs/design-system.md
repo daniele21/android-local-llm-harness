@@ -1,5 +1,12 @@
 # Harness Android design system
 
+Status: active
+Document type: feature-specification
+Owner: ui/design-system
+Canonical scope: ui.design-system
+Read when: changing shared Compose tokens, components, theme behavior or accessibility contracts
+Last reviewed: 2026-08-06
+
 The shared Compose design system lives in `ui/design-system` and is the only place where application-wide visual tokens and reusable primitives are defined.
 
 ## Structure

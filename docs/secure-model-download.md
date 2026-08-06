@@ -1,5 +1,12 @@
 # Secure model download core
 
+Status: active
+Document type: feature-specification
+Owner: models/model-download
+Canonical scope: models.download
+Read when: changing network policy, transfer, verification, cancellation or partial-file cleanup
+Last reviewed: 2026-08-06
+
 The secure downloader transfers one catalog-approved GGUF artifact into a verified app-private holding area. It is intentionally separated from model installation and runtime activation.
 
 ## API flow

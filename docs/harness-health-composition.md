@@ -1,5 +1,12 @@
 # Harness embedded health composition
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.diagnostics.health
+Read when: changing connected-app health checks, composition or presentation
+Last reviewed: 2026-08-06
+
 ## Scope
 
 The Play-installable Harness application exposes an explicit, non-destructive health suite over the embedded runtime graph. The suite uses the existing `HealthEngine` and writes results to the same process-scoped telemetry repository used by generation observability.

@@ -1,5 +1,12 @@
 # Harness diagnostics logs composition
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.diagnostics.logs
+Read when: changing connected-app log queries, privacy filtering or presentation
+Last reviewed: 2026-08-06
+
 ## Purpose
 
 The connected phone-test application presents structured runtime logs and request timelines from the same process-scoped `TelemetryRepository` used by generation runs, health checks, resource snapshots, and benchmark baselines.

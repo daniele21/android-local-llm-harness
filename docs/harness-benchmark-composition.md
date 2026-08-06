@@ -1,5 +1,12 @@
 # Harness benchmark composition
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-phone-test
+Canonical scope: phone.diagnostics.benchmarks
+Read when: changing connected-app benchmark assembly, execution or presentation
+Last reviewed: 2026-08-06
+
 The connected phone-test application reuses the existing benchmark-engine contracts rather than introducing a UI-specific statistics implementation.
 
 ## Ownership

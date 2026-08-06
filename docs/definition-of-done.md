@@ -1,5 +1,12 @@
 # Definition of Done
 
+Status: active
+Document type: completion-policy
+Owner: repository
+Canonical scope: delivery.definition-of-done
+Read when: assessing merge readiness, release readiness or required validation evidence
+Last reviewed: 2026-08-06
+
 A feature is complete only when its behavior, resource lifecycle, tests, observability and documentation are all complete.
 
 Passing compilation alone is not sufficient.

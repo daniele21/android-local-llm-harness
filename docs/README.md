@@ -3,9 +3,13 @@
 Status: active
 Document type: documentation-governance
 Owner: repository
+Canonical scope: documentation.routing
+Read when: locating the canonical owner of repository documentation or changing documentation governance
 Last reviewed: 2026-08-06
 
-This directory separates current state, target behavior, durable architecture, operational procedures, release gates and historical records. A fact should have one canonical owner; other documents link to it instead of restating it.
+Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
+
+Machine-enforced document types, reading budgets and duplication thresholds are defined in [`documentation-policy.json`](documentation-policy.json).
 
 ## Canonical sources
 
@@ -13,75 +17,139 @@ This directory separates current state, target behavior, durable architecture, o
 | --- | --- |
 | What is integrated, blocked or next? | [`current-state.md`](current-state.md) |
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
-| What is the target behavior and acceptance criteria? | [`implementation-plan.md`](implementation-plan.md) and focused feature specifications |
-| What architecture exists today? | [`architecture.md`](architecture.md) and accepted ADRs under [`adr/`](adr/) |
+| What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
+| What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
 | What is required before merge or release? | [`definition-of-done.md`](definition-of-done.md) |
 | What remains for Harness 0.5.0? | [`releases/harness-0.5.md`](releases/harness-0.5.md) |
-| How is a feature intended to behave? | Focused feature documentation under [`features/`](features/) or an existing domain document |
 | How is a procedure executed? | The applicable build, signing, device or evidence runbook |
 | What happened in a completed plan or audit? | [`archive/`](archive/) |
 
-## Document types
+## Active source index
 
-- `current-state`: short operational ledger. It may contain the integration baseline, open blockers and one ordered next sequence.
-- `roadmap`: capability-level milestones. It must not repeat active branch names, pull-request narratives or commit-by-commit history.
-- `target-specification`: intended behavior and acceptance criteria, independent of a temporary branch or pull request.
-- `architecture`: current dependency and ownership boundaries.
-- `feature-specification`: durable lifecycle, contracts, failure behavior, privacy and testing for one domain.
-- `runbook`: executable operational procedure.
-- `release-checklist`: gates for one named release.
-- `evidence`: immutable validation result or matrix.
-- `historical-plan` or `historical-audit`: read-only context that is never an active source of truth.
+Use this index to locate a source, not as a mandatory reading list.
 
-## Precedence
+### Architecture, delivery and API
 
-When sources disagree, use this order:
+- [`implementation-plan.md`](implementation-plan.md) — repository target overview and focused-spec routing
+- [`architecture.md`](architecture.md) — current dependency and ownership boundaries
+- [`adr/README.md`](adr/README.md) — accepted durable decisions
+- [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
+- [`definition-of-done.md`](definition-of-done.md) — merge and production completion policy
+- [`versioning.md`](versioning.md) — version and release policy
+- [`releases/harness-0.5.md`](releases/harness-0.5.md) — Harness 0.5.0 release gates
 
-1. executable contracts and tests;
-2. accepted ADRs;
-3. current architecture documentation;
-4. focused feature specifications;
-5. target implementation plan;
-6. current-state ledger;
-7. roadmap;
-8. README and coding-agent guides;
-9. archived material.
+### Model lifecycle and generation
 
-Do not silently reconcile a contradiction that can change behavior. Correct the owning source or surface the conflict in the pull request.
+- [`model-catalog-download-plan.md`](model-catalog-download-plan.md) — distribution lifecycle entry point
+- [`curated-model-catalog.md`](curated-model-catalog.md) — catalog releases and compatibility
+- [`secure-model-download.md`](secure-model-download.md) — verified network transfer
+- [`model-installation.md`](model-installation.md) — inspection, publication and rollback
+- [`phone-model-distribution.md`](phone-model-distribution.md) — phone catalog/download/install orchestration
+- [`model-management-phone.md`](model-management-phone.md) — phone import, selection and removal controls
+- [`harness-model-inventory-state.md`](harness-model-inventory-state.md) — unified model presentation state
+- [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md) — model-aware generation planning
 
-## Maintenance rules
+### Observability and diagnostics
 
-- Keep volatile branch, PR, workflow-run and local-candidate state only in pull requests or the short current-state ledger when operationally necessary.
-- Do not add completion ledgers to `AGENTS.md`, README or feature specifications.
-- Update `current-state.md` when a merged change alters the next operational block.
-- Update `roadmap.md` only when capability or milestone status changes.
-- Update a feature specification when public behavior, ownership, failure handling, privacy or validation requirements change.
-- Archive a plan or audit when its branch, PR or decision checkpoint is closed and the remaining durable behavior has been transferred to an active source.
-- Historical documents must begin with an explicit archival banner and must not be referenced as canonical sources.
-- Prefer a redirect stub at an old well-known path during migrations so existing links do not break.
+- [`console-observability.md`](console-observability.md) — standalone console observability
+- [`health-engine.md`](health-engine.md) — health and sanity behavior
+- [`resource-observability.md`](resource-observability.md) — resource capture and load classification
+- [`benchmark-engine.md`](benchmark-engine.md) — benchmark history and regression policy
+- [`harness-telemetry-composition.md`](harness-telemetry-composition.md) — connected telemetry composition
+- [`harness-logs-composition.md`](harness-logs-composition.md) — connected log composition
+- [`harness-health-composition.md`](harness-health-composition.md) — connected health composition
+- [`harness-resource-composition.md`](harness-resource-composition.md) — connected resource composition
+- [`harness-benchmark-composition.md`](harness-benchmark-composition.md) — connected benchmark composition
+
+### Applications, UX and brand
+
+- [`features/phone-app-architecture.md`](features/phone-app-architecture.md) — connected app state, effect and navigation boundary
+- [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md) — connected UX/UI acceptance criteria
+- [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md) — focused phone UX workstream state
+- [`phone-inference-playground.md`](phone-inference-playground.md) — connected inference workflow
+- [`console-inference-playground.md`](console-inference-playground.md) — standalone console inference workflow
+- [`design-system.md`](design-system.md) — shared Compose tokens and components
+- [`harness-brand-guidelines.md`](harness-brand-guidelines.md) — concise brand and product-language contract
+- [`android-brand-assets.md`](android-brand-assets.md) — generated Android identity
+- [`assets/brand/README.md`](assets/brand/README.md) and [`assets/brand/master/README.md`](assets/brand/master/README.md) — asset routing and vector masters
+
+### Build, distribution and evidence
+
+- [`android-build-and-run.md`](android-build-and-run.md) — Android build and launch runbook
+- [`android-upload-key.md`](android-upload-key.md) — external upload-key custody
+- [`device-e2e-testing.md`](device-e2e-testing.md) — ADB/instrumentation device execution
+- [`device-e2e-evidence.md`](device-e2e-evidence.md) — physical-device evidence bundle
+- [`play-internal-phone-test.md`](play-internal-phone-test.md) — Google Play Internal Testing
+- [`emulator-e2e-results.md`](emulator-e2e-results.md) — explicitly labelled emulator evidence
+
+## Document lifecycle
+
+- `current-state`: one short repository operational ledger.
+- `workstream-state`: one bounded domain ledger that links to the repository state.
+- `roadmap`: capability milestones without branch or commit history.
+- `target-specification`: intended behavior and acceptance criteria.
+- `feature-index`: a small routing document for a cross-module lifecycle.
+- `feature-specification`: durable behavior for one owner.
+- `architecture` and `adr-index`: current boundaries and durable decisions.
+- `api-reference`: public assembly and lifecycle usage.
+- `runbook` and `evidence-runbook`: executable operational procedures.
+- `evidence`: immutable, explicitly scoped results.
+- `release-policy`, `release-checklist` and `completion-policy`: delivery constraints and gates.
+- `design-guideline`, `asset-specification` and `asset-index`: brand intent and asset ownership.
+- `historical-plan`, `historical-audit` or archived `evidence`: read-only context, never current truth.
+
+## Before creating a document
+
+1. Search `Canonical scope` and this index for the owning source.
+2. Update the existing owner when the fact fits its scope.
+3. Create a document only for a durable, independently readable concern.
+4. Give it one supported type, owner, unique canonical scope and a precise `Read when` condition.
+5. Link it from this index or the closest domain index in the same change.
+6. State which source it replaces, or why no source already owns the concern.
+7. Archive a completed plan or temporary ledger after transferring durable behavior.
+
+Do not create a document solely to report that a branch, pull request or isolated implementation step completed.
 
 ## Required metadata
 
-New active planning and governance documents should include:
+Every active non-ADR Markdown document under `docs/` contains:
 
 ```text
 Status: active
-Document type: <type>
+Document type: <supported type>
 Owner: <repository or domain>
+Canonical scope: <unique dotted scope>
+Read when: <specific trigger>
 Last reviewed: YYYY-MM-DD
 ```
 
-Archived documents use `Status: historical` and identify the active replacement.
+ADRs retain their accepted ADR status and date format. Archived documents use `Status: historical`. A compatibility redirect outside `archive/` stays below the configured redirect budget and links to its replacement or archive record.
+
+## Reading and writing budgets
+
+- CI enforces line and estimated-token limits by document type.
+- New documents must fit their type budget.
+- An explicitly baselined oversized document may only shrink; growth fails validation.
+- Root and scoped `AGENTS.md` files have separate budgets.
+- Active documents must be reachable from this map or an agent guide.
+- Duplicate canonical scopes and long exact duplicate paragraphs fail validation.
+- Near-duplicate paragraphs are reported for human review.
+
+Summaries may restate a high-level conclusion when they clearly link to the canonical owner. They must not copy detailed checklists, status tables or acceptance criteria.
+
+## Precedence
+
+When sources disagree: executable contracts and tests, accepted ADRs, architecture, focused feature specifications, target overview, current state, roadmap, README/agent guides, then archived material.
+
+Do not silently reconcile a contradiction that changes behavior. Correct the owning source or surface it in review.
 
 ## Validation
 
-Run after adding, removing, renaming or reclassifying documentation:
-
 ```bash
-python3 scripts/verify-docs.py
+python3 scripts/verify-docs.py --base <target-branch-commit>
 python3 scripts/verify-agent-navigation.py
 python3 -m py_compile scripts/*.py
 git diff --check
 ```
 
-The agent-navigation guard verifies that every configured Gradle module remains discoverable through the concise repository overview or an applicable scoped guide, without requiring the root guide to duplicate the complete module map.
+The cost report shows active token delta, largest changed source, canonical scopes and mandatory agent-guide bundles. The CI workflow publishes it for every documentation change.

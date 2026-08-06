@@ -3,6 +3,8 @@
 Status: active
 Document type: release-checklist
 Owner: repository
+Canonical scope: release.harness-0.5
+Read when: preparing, validating or promoting the Harness 0.5.0 release candidate
 Last reviewed: 2026-08-06
 
 This file owns only the remaining release gates for Harness 0.5.0. Historical integration sequencing is retained through Git history and the archived integration summary; current implementation status belongs in [`../current-state.md`](../current-state.md).

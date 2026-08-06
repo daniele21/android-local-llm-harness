@@ -1,5 +1,12 @@
 # Resource observability and model-load classification
 
+Status: active
+Document type: feature-specification
+Owner: observability/android-resource-probe
+Canonical scope: observability.resources
+Read when: changing memory, thermal, load-classification or resource sampling behavior
+Last reviewed: 2026-08-06
+
 Phase 2 exposes Android process-resource snapshots and explicit cold-versus-warm model-load classification without coupling the runtime to Android system services.
 
 ## Ownership

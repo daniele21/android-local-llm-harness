@@ -1,5 +1,12 @@
 # Android device end-to-end testing
 
+Status: active
+Document type: runbook
+Owner: apps/device-test-runner
+Canonical scope: validation.device-e2e
+Read when: running ADB or instrumentation validation with a real GGUF model
+Last reviewed: 2026-08-06
+
 This procedure validates the Phase 1 runtime on a physical Android `arm64-v8a` device with a real GGUF model.
 
 The test model is never committed to the repository or packaged in an APK. The host runner streams it into the private data directory of a debuggable test application through `adb run-as`.

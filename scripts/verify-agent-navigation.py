@@ -38,6 +38,7 @@ REQUIRED_LINK_TARGETS = {
     "docs/roadmap.md",
     "docs/implementation-plan.md",
     "docs/definition-of-done.md",
+    "docs/documentation-policy.json",
     "docs/releases/harness-0.5.md",
     "docs/adr/README.md",
 }

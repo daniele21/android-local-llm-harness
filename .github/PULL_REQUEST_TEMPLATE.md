@@ -20,6 +20,14 @@ List the checks executed and any evidence still pending.
 - [ ] Tests cover the changed behavior.
 - [ ] Documentation and repository state ledgers are updated when the functional boundary changed.
 
+## Documentation impact
+
+- [ ] I searched `Canonical scope` and updated the existing owner instead of creating a duplicate source.
+- [ ] New active documents declare supported metadata, fit their reading budget and are linked from the documentation map.
+- [ ] Completed plans, temporary progress ledgers and superseded evidence are archived or redirected.
+- [ ] `python3 scripts/verify-docs.py --base <target commit>` reports an intentional reading-cost delta.
+- [ ] Detailed facts, checklists and acceptance criteria have one canonical owner; summaries link instead of copying them.
+
 ## Safety and privacy
 
 - [ ] No GGUF/GGML model binary, credential, signing material, private path, URI, prompt or generated output is committed or exposed.

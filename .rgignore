@@ -1,6 +1,9 @@
 # Pinned upstream source: search explicitly only for backend integration work.
 third_party/llama.cpp/**
 
+# Historical documentation: search explicitly only for audits or provenance work.
+docs/archive/**
+
 # Generated and local build output.
 .gradle/**
 build/**

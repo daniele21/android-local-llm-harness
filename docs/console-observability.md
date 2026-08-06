@@ -1,5 +1,12 @@
 # Local LLM Console observability foundation
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-console
+Canonical scope: console.observability
+Read when: changing standalone console queries, timelines, logs, resources, health or benchmark presentation
+Last reviewed: 2026-08-06
+
 ## Scope
 
 The console implementation turns `apps/local-llm-console` from a static shell into an observability, runtime-inspection and explicit diagnostics-control application.

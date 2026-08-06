@@ -1,5 +1,12 @@
 # Console manual inference playground
 
+Status: active
+Document type: feature-specification
+Owner: apps/local-llm-console
+Canonical scope: console.inference
+Read when: changing the standalone console inference workflow or its observability presentation
+Last reviewed: 2026-08-06
+
 ## Scope
 
 The manual inference playground adds an explicit one-shot generation surface to `apps/local-llm-console`.
