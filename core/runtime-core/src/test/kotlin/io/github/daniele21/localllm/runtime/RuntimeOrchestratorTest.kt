@@ -29,6 +29,7 @@ import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -342,6 +343,7 @@ class RuntimeOrchestratorTest {
         assertTrue(eventually { fixture.runtime.runtimeSnapshot().activeSessions == 0 })
         assertTrue(fixture.runtime.unloadIdleModel())
         assertEquals(1, fixture.backend.unloadCalls)
+        assertNull(fixture.runtime.runtimeSnapshot().loadedModel)
         fixture.close()
     }
 

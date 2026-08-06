@@ -112,10 +112,13 @@ This evidence validates the connected Kotlin/Compose contract. It does not const
 
 ## Current boundary
 
-The next Models slice must add model detail and deterministic recovery:
+PR #74 implements the model-detail and deterministic-recovery slice:
 
-1. introduce a URL-safe model-detail route using digest when available and stable catalog identity otherwise;
-2. derive one presentation contract for compatibility, integrity, installation, selection and loaded ownership;
-3. expose recovery for loaded-versus-selected mismatch and unknown runtime ownership;
-4. keep destructive recovery behind explicit confirmation and runtime release;
-5. add route, presentation, reducer and effects tests before claiming connected UI evidence.
+1. URL-safe model-detail routes use the digest when available and stable catalog identity otherwise;
+2. one pure presentation contract reports compatibility, integrity, installation, selection and loaded ownership;
+3. loaded-versus-selected mismatch can adopt the compatible loaded catalog model explicitly;
+4. unknown or mismatched runtime ownership can be released only after confirmation and never deletes a model file;
+5. loaded ownership comes from `RuntimeSnapshot.loadedModel`, not the graph's configured model identity, so successful unload converges the inventory;
+6. route, presentation, reducer and effects behavior has deterministic JVM coverage.
+
+Connected UI/restoration execution and representative physical-device evidence remain validation gates. They are not inferred from JVM tests, Android assembly or emulator preflight.
