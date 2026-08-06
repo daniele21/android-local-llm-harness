@@ -14,7 +14,7 @@ import java.util.concurrent.Executors
 
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntimeGraph, private val listener: (PlaygroundState) -> Unit) :
-    AutoCloseable {
+    PlaygroundEffects {
     private val executor = Executors.newSingleThreadExecutor()
     private val lock = Any()
 
@@ -27,9 +27,9 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     val active: Boolean
         get() = synchronized(lock) { state.active || activeSession != null }
 
-    fun snapshot(): PlaygroundState = synchronized(lock) { state }
+    override fun snapshot(): PlaygroundState = synchronized(lock) { state }
 
-    fun start(model: ImportedPhoneModel, prompt: String, options: PlaygroundRequestOptions): Boolean {
+    override fun start(model: ImportedPhoneModel, prompt: String, options: PlaygroundRequestOptions): Boolean {
         val normalizedPrompt = prompt.trim()
         require(normalizedPrompt.isNotBlank()) { "Prompt must not be blank" }
         require(normalizedPrompt.length <= MAX_PROMPT_CHARACTERS) {
@@ -57,7 +57,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         return true
     }
 
-    fun cancel(): Boolean {
+    override fun cancel(): Boolean {
         val handle = synchronized(lock) { activeHandle } ?: return false
         return runCatching {
             handle.cancel()
@@ -76,7 +76,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         }.getOrDefault(false)
     }
 
-    fun releaseRuntime(onComplete: () -> Unit): Boolean {
+    override fun releaseRuntime(onComplete: () -> Unit): Boolean {
         val resources = synchronized(lock) {
             if (state.active || activeSession != null) return false
             val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
