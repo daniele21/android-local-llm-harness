@@ -15,6 +15,7 @@ internal enum class HarnessDiagnosticAction {
 internal data class HarnessUiState(
     val importedModel: ImportedPhoneModel? = null,
     val modelDistribution: PhoneModelDistributionState = PhoneModelDistributionState(),
+    val modelInventory: HarnessModelInventoryState = HarnessModelInventoryState(),
     val latestReport: String = "",
     val controllerBusy: Boolean = false,
     val activeDiagnosticActions: Set<HarnessDiagnosticAction> = emptySet(),
@@ -65,6 +66,8 @@ internal sealed interface HarnessUiEvent {
 
     data class ModelChanged(val model: ImportedPhoneModel?) : Runtime
 
+    data class LoadedModelChanged(val digest: String?) : Runtime
+
     data class ReportChanged(val report: String) : Runtime
 
     data class OperationStatusChanged(val status: String) : Runtime
@@ -111,12 +114,30 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.ModelDistributionChanged -> state.copy(
             modelDistribution = event.state,
+            modelInventory = HarnessModelInventoryReconciler.reconcile(
+                distribution = event.state,
+                selectedModel = state.importedModel,
+                loadedDigest = state.modelInventory.loadedDigest,
+            ),
             operationStatus = event.state.message,
         )
 
         is HarnessUiEvent.ModelChanged -> state.copy(
             importedModel = event.model,
+            modelInventory = HarnessModelInventoryReconciler.reconcile(
+                distribution = state.modelDistribution,
+                selectedModel = event.model,
+                loadedDigest = state.modelInventory.loadedDigest,
+            ),
             removalConfirmationPending = false,
+        )
+
+        is HarnessUiEvent.LoadedModelChanged -> state.copy(
+            modelInventory = HarnessModelInventoryReconciler.reconcile(
+                distribution = state.modelDistribution,
+                selectedModel = state.importedModel,
+                loadedDigest = event.digest,
+            ),
         )
 
         is HarnessUiEvent.ReportChanged -> state.copy(
