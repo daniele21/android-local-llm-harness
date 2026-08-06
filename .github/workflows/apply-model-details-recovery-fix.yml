@@ -1,4 +1,4 @@
-name: Inspect model details recovery failure
+name: Validate model details recovery
 
 on:
   push:
@@ -7,16 +7,31 @@ on:
       - .github/workflows/apply-model-details-recovery-fix.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: agent/model-details-recovery
           fetch-depth: 1
+
+      - name: Initialize native sources
+        run: git submodule update --init --recursive
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Reapply implementation and focused corrections
         run: |
@@ -35,16 +50,26 @@ jobs:
           patch.write_bytes(zlib.decompress(base64.b64decode(encoded.group(1))))
           subprocess.run(['python3', str(patch)], check=True)
 
-          test_path = Path('apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelDetailsTest.kt')
-          text = test_path.read_text()
+          details_test_path = Path('apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelDetailsTest.kt')
+          details_test = details_test_path.read_text()
           marker = '    private fun item(\n'
-          text = text.replace(marker, '    @Suppress("LongParameterList")\n    private fun item(\n', 1)
-          text = text.replace(
+          if details_test.count(marker) != 1:
+              raise RuntimeError(f'Expected one fixture helper, found {details_test.count(marker)}')
+          details_test = details_test.replace(marker, '    @Suppress("LongParameterList")\n    private fun item(\n', 1)
+          details_test = details_test.replace(
               'selectedModel = null,\n                loadedDigest = metadata.digest.sha256,',
               'selectedModel = testModel("8"),\n                loadedDigest = metadata.digest.sha256,',
               1,
           )
-          test_path.write_text(text)
+          details_test_path.write_text(details_test)
+
+          effects_test_path = Path('apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelEffectsViewModelTest.kt')
+          effects_test = effects_test_path.read_text()
+          old_fixture = 'current = ModelEffectsSnapshot(distribution, null, metadata.digest.sha256),'
+          new_fixture = 'current = ModelEffectsSnapshot(distribution, testModel("8"), metadata.digest.sha256),'
+          if effects_test.count(old_fixture) != 1:
+              raise RuntimeError(f'Expected one recovery mismatch fixture, found {effects_test.count(old_fixture)}')
+          effects_test_path.write_text(effects_test.replace(old_fixture, new_fixture, 1))
 
           activity_path = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt')
           activity = activity_path.read_text()
@@ -59,9 +84,34 @@ jobs:
           activity_path.write_text(activity)
           PY
 
-      - name: Print failing test and recovery implementation
+      - name: Format implementation
+        run: ./gradlew spotlessApply
+
+      - name: Validate static contracts
+        run: ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+
+      - name: Validate phone application
+        run: >-
+          ./gradlew
+          :apps:local-llm-phone-test:compileDebugKotlin
+          :apps:local-llm-phone-test:compileDebugUnitTestKotlin
+          :apps:local-llm-phone-test:testDebugUnitTest
+          :apps:local-llm-phone-test:lintDebug
+          :apps:local-llm-phone-test:assembleDebug
+
+      - name: Verify model detail integration
         run: |
-          echo '--- HarnessModelEffectsViewModelTest ---'
-          nl -ba apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelEffectsViewModelTest.kt | sed -n '90,190p'
-          echo '--- Recovery implementation ---'
-          grep -R -n -A35 -B15 'executeRecovery\|class ModelRecovery\|fun request(identity' apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest || true
+          test -f apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelDetails.kt
+          test -f apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelDetailScreen.kt
+          grep -q 'MODEL_DETAIL_PATTERN' apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessNavigation.kt
+          grep -q 'executeRecovery' apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/ModelEffects.kt
+
+      - name: Remove temporary workflows and commit implementation
+        run: |
+          rm .github/workflows/apply-model-details-recovery.yml
+          rm .github/workflows/apply-model-details-recovery-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(phone-test): add model details and recovery'
+          git push origin HEAD:agent/model-details-recovery
