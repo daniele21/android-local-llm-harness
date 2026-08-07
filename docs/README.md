@@ -5,7 +5,7 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating the canonical owner of repository documentation or changing documentation governance
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-07
 
 Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
 
@@ -18,6 +18,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | What is integrated, blocked or next? | [`current-state.md`](current-state.md) |
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
 | What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
+| What is the Qwen3.5 specialization status and plan? | [`qwen35/README.md`](qwen35/README.md) |
 | What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
 | What is required before merge or release? | [`definition-of-done.md`](definition-of-done.md) |
 | What remains for Harness 0.5.0? | [`releases/harness-0.5.md`](releases/harness-0.5.md) |
@@ -40,6 +41,7 @@ Use this index to locate a source, not as a mandatory reading list.
 
 ### Model lifecycle and generation
 
+- [`qwen35/README.md`](qwen35/README.md) — Qwen3.5 0.8B/2B specialization status, routing and implementation plan
 - [`model-catalog-download-plan.md`](model-catalog-download-plan.md) — distribution lifecycle entry point
 - [`curated-model-catalog.md`](curated-model-catalog.md) — catalog releases and compatibility
 - [`secure-model-download.md`](secure-model-download.md) — verified network transfer
