@@ -2,7 +2,7 @@
   <img src="docs/assets/brand/master/harness-symbol.svg" width="128" alt="Harness symbol">
 </p>
 
-<h1 align="center">Harness</h1>
+<h1 align="center">Android Local LLM Harness</h1>
 
 <p align="center">
   <strong>Local AI Gateway for Android</strong><br>
