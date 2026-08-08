@@ -1,0 +1,223 @@
+@file:Suppress("FunctionName")
+
+package io.github.daniele21.localllm.phonetest
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import io.github.daniele21.localllm.ui.designsystem.HarnessCard
+import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
+import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
+import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
+import java.util.Locale
+
+@Composable
+internal fun PhoneModelDistributionCatalog(state: PhoneModelDistributionState, actions: PhoneModelDistributionActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        state.models.forEach { model ->
+            CatalogModelCard(
+                model = model,
+                operationActive = state.operationActive,
+                actions = actions,
+            )
+        }
+        Text(
+            "${state.sourceLabel} · revision ${state.catalogRevision ?: "unavailable"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(state.message, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun CatalogModelCard(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
+    HarnessCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                model.displayName,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            HarnessStatusBadge(
+                label = model.status.name.displayLabel(),
+                tone = model.status.statusTone(),
+            )
+        }
+        HarnessMetricRow {
+            HarnessMetric("Architecture", model.architecture, Modifier.weight(1f))
+            HarnessMetric("Quantization", model.quantization, Modifier.weight(1f))
+            HarnessMetric("Size", formatDistributionBytes(model.sizeBytes), Modifier.weight(1f))
+            HarnessMetric("License", model.licenseName, Modifier.weight(1f))
+        }
+
+        if (model.compatibilityWarnings.isNotEmpty()) {
+            Text(
+                model.compatibilityWarnings.joinToString(prefix = "Check before download: ") { it.displayLabel() },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (model.compatibilityReasons.isNotEmpty()) {
+            Text(
+                model.compatibilityReasons.joinToString(prefix = "Unavailable: ") { it.displayLabel() },
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        model.detail?.let { detail ->
+            Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        when (model.status) {
+            PhoneCatalogModelStatus.DOWNLOADING -> DownloadProgress(model, actions.cancelDownload)
+
+            PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL ->
+                HarnessPrimaryButton("Install verified model") {
+                    actions.install(model.stableId)
+                }
+
+            PhoneCatalogModelStatus.INSTALLING -> {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text("Installation is running in the app-private model store.")
+            }
+
+            PhoneCatalogModelStatus.INSTALLED ->
+                InstalledModelActions(
+                    model = model,
+                    operationActive = operationActive,
+                    actions = actions,
+                )
+
+            PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
+            PhoneCatalogModelStatus.CANCELLED,
+            PhoneCatalogModelStatus.FAILED,
+            -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                HarnessPrimaryButton(
+                    if (model.status == PhoneCatalogModelStatus.READY_TO_DOWNLOAD) {
+                        "Download"
+                    } else {
+                        "Retry download"
+                    },
+                    enabled = model.compatible && !operationActive,
+                    modifier = Modifier,
+                ) {
+                    actions.download(model.stableId)
+                }
+            }
+
+            PhoneCatalogModelStatus.INCOMPATIBLE -> Unit
+        }
+    }
+}
+
+private fun PhoneCatalogModelStatus.statusTone(): HarnessStatusTone = when (this) {
+    PhoneCatalogModelStatus.INSTALLED -> HarnessStatusTone.SUCCESS
+
+    PhoneCatalogModelStatus.DOWNLOADING,
+    PhoneCatalogModelStatus.INSTALLING,
+    PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL,
+    -> HarnessStatusTone.INFO
+
+    PhoneCatalogModelStatus.INCOMPATIBLE,
+    PhoneCatalogModelStatus.FAILED,
+    -> HarnessStatusTone.WARNING
+
+    PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
+    PhoneCatalogModelStatus.CANCELLED,
+    -> HarnessStatusTone.NEUTRAL
+}
+
+@Composable
+private fun InstalledModelActions(model: PhoneCatalogModelUi, operationActive: Boolean, actions: PhoneModelDistributionActions) {
+    val installed = model.installedModel ?: return
+    HarnessMetric("SHA-256", installed.digest.sha256.take(24) + "…")
+    Text(
+        "Installed. Runtime activation remains an explicit action.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    HarnessPrimaryButton(
+        "Use in Playground",
+        enabled = !operationActive,
+    ) {
+        actions.selectInstalled(installed)
+    }
+    HarnessSecondaryButton(
+        "Verify integrity",
+        enabled = !operationActive,
+    ) {
+        actions.verifyInstalled(model.stableId)
+    }
+    if (model.removalConfirmationPending) {
+        Text(
+            "Removal permanently deletes the app-private model copy.",
+            color = MaterialTheme.colorScheme.error,
+        )
+        HarnessPrimaryButton(
+            "Confirm removal",
+            enabled = !operationActive,
+        ) {
+            actions.confirmRemove(model.stableId)
+        }
+        HarnessSecondaryButton("Cancel removal") {
+            actions.cancelRemove(model.stableId)
+        }
+    } else {
+        HarnessSecondaryButton(
+            "Remove installed model",
+            enabled = !operationActive,
+        ) {
+            actions.requestRemove(model.stableId)
+        }
+    }
+}
+
+@Composable
+private fun DownloadProgress(model: PhoneCatalogModelUi, onCancel: (String) -> Unit) {
+    val expected = model.expectedBytes.coerceAtLeast(1L)
+    val progress = (model.bytesDownloaded.toDouble() / expected.toDouble()).coerceIn(0.0, 1.0)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LinearProgressIndicator(
+            progress = { progress.toFloat() },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "${formatDistributionBytes(model.bytesDownloaded)} / " +
+                    formatDistributionBytes(model.expectedBytes),
+            )
+            Text("${(progress * 100.0).toInt()}%")
+        }
+        HarnessSecondaryButton("Cancel download") { onCancel(model.stableId) }
+    }
+}
+
+private fun formatDistributionBytes(bytes: Long): String {
+    if (bytes < 1_024L) return "$bytes B"
+    val kib = bytes / 1_024.0
+    if (kib < 1_024.0) return "%.1f KiB".format(kib)
+    val mib = kib / 1_024.0
+    if (mib < 1_024.0) return "%.1f MiB".format(mib)
+    return "%.2f GiB".format(mib / 1_024.0)
+}
+
+private fun String.displayLabel(): String = lowercase(Locale.ROOT)
+    .replace('_', ' ')
+    .replaceFirstChar { character -> character.titlecase(Locale.ROOT) }
