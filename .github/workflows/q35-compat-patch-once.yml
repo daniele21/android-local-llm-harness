@@ -107,6 +107,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/q35-compat-patch-once.yml
-          git add models/model-install backends/llama-cpp
+          git add -u
           git commit -m "feat: enforce qwen35 reference gguf fingerprints"
           git push origin HEAD:dev
