@@ -58,6 +58,12 @@ Do not introduce multi-family adapters or unsupported-family taxonomies.
 | Q35-COMP-08 | PLANNED | Produce privacy-safe compatibility evidence with exact model digest and backend build. |
 | Q35-COMP-09 | PLANNED | Add deterministic unit/integration tests for valid artifacts, digest mismatch, manifest mismatch, malformed metadata and backend failure. |
 
+## Validation evidence
+
+Implementation uses pinned `llama.cpp` revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3` and exact Q4_K_M reference artifacts for Qwen3.5 0.8B and 2B. Trusted structural GGUF fingerprints, fail-closed manifest validation, privacy-safe compatibility evidence and deterministic installer/unit coverage are present on `dev`.
+
+Repository validation and Android artifact packaging are green on the Q35-3 implementation, including the runtime `libllama-common.so` required by the typed Jinja chat-template renderer. This document change intentionally triggers the final exact-artifact compatibility smoke before Q35-2 is marked `DONE`.
+
 ## Failure behavior
 
 The remaining failures describe problems with an expected curated artifact, not unsupported user choices. Examples:
