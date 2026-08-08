@@ -45,16 +45,17 @@ jobs:
               return textwrap.dedent(block)
 
           apply_script = step_script('Apply Qwen3.5 generation semantics')
-          apply_script = apply_script.replace(
-              '''                thinkingMode = resolved.thinkingMode,\\n                minP = resolved.minP,\\n                presencePenalty = resolved.presencePenalty,\\n            )''')''',
-              '''                thinkingMode = resolved.thinkingMode,\\n            )''')''',
-              1,
-          )
-          needle = '''            ''' + "'''" + '''                topK = resolved.topK,\\n                minP = resolved.minP,\\n                presencePenalty = resolved.presencePenalty,\\n                repeatPenalty = resolved.repeatPenalty,''''' + "'''" + ''')'''
-          replacement = needle[:-1] + ', count=2)'
-          if needle not in apply_script:
+          system_old = "                thinkingMode = resolved.thinkingMode,\\n                minP = resolved.minP,\\n                presencePenalty = resolved.presencePenalty,\\n            )''')"
+          system_new = "                thinkingMode = resolved.thinkingMode,\\n            )''')"
+          if system_old not in apply_script:
+              raise SystemExit('effective metadata patch block not found')
+          apply_script = apply_script.replace(system_old, system_new, 1)
+
+          resolved_old = "                topK = resolved.topK,\\n                minP = resolved.minP,\\n                presencePenalty = resolved.presencePenalty,\\n                repeatPenalty = resolved.repeatPenalty,''')"
+          resolved_new = "                topK = resolved.topK,\\n                minP = resolved.minP,\\n                presencePenalty = resolved.presencePenalty,\\n                repeatPenalty = resolved.repeatPenalty,''', count=2)"
+          if resolved_old not in apply_script:
               raise SystemExit('resolved topK patch block not found')
-          apply_script = apply_script.replace(needle, replacement, 1)
+          apply_script = apply_script.replace(resolved_old, resolved_new, 1)
           subprocess.run(['bash', '-lc', apply_script], check=True)
 
           p = Path('backends/llama-cpp/src/test/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppStreamingTest.kt')
@@ -65,13 +66,13 @@ jobs:
               1,
           )
           text = text.replace(
-              '''        topK: Int,\n        repeatPenalty: Float,''',
-              '''        topK: Int,\n        minP: Float,\n        presencePenalty: Float,\n        repeatPenalty: Float,''',
+              '        topK: Int,\n        repeatPenalty: Float,',
+              '        topK: Int,\n        minP: Float,\n        presencePenalty: Float,\n        repeatPenalty: Float,',
               1,
           )
           text = text.replace(
-              '''            topK,\n            repeatPenalty,''',
-              '''            topK,\n            minP,\n            presencePenalty,\n            repeatPenalty,''',
+              '            topK,\n            repeatPenalty,',
+              '            topK,\n            minP,\n            presencePenalty,\n            repeatPenalty,',
               1,
           )
           p.write_text(text)
