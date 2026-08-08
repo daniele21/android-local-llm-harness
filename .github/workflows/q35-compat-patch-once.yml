@@ -87,6 +87,14 @@ jobs:
           text = text.replace('''                            "15",\n                        ),''', '''                            "15",\n                            "262144",\n                            "24",\n                            "1024",\n                        ),''', 1)
           text = text.replace('''        assertEquals(15L, result.metadata.fileType)''', '''        assertEquals(15L, result.metadata.fileType)\n        assertEquals(4L, result.metadata.keyValueCount)\n        assertEquals(2L, result.metadata.tensorCount)\n        assertEquals(262144L, result.metadata.contextLength)\n        assertEquals(24L, result.metadata.blockCount)\n        assertEquals(1024L, result.metadata.embeddingLength)''', 1)
           p.write_text(text)
+
+          p = Path('backends/llama-cpp/src/test/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppBridgeTest.kt')
+          text = p.read_text()
+          text = text.replace('''                "fixture-model",\n                "15",\n            ),''', '''                "fixture-model",\n                "15",\n                "262144",\n                "24",\n                "1024",\n            ),''', 1)
+          text = text.replace('''        assertEquals(15L, metadata.fileType)\n        assertEquals(model.absolutePath, nativeApi.lastInspectedPath)''', '''        assertEquals(15L, metadata.fileType)\n        assertEquals(262144L, metadata.contextLength)\n        assertEquals(24L, metadata.blockCount)\n        assertEquals(1024L, metadata.embeddingLength)\n        assertEquals(model.absolutePath, nativeApi.lastInspectedPath)''', 1)
+          text = text.replace('''inspection = arrayOf("ok", "3", "32", "0", "0", "0", "", "", ""),''', '''inspection = arrayOf("ok", "3", "32", "0", "0", "0", "", "", "", "", "", ""),''', 1)
+          text = text.replace('''        assertEquals(null, result.metadata.fileType)''', '''        assertEquals(null, result.metadata.fileType)\n        assertEquals(null, result.metadata.contextLength)\n        assertEquals(null, result.metadata.blockCount)\n        assertEquals(null, result.metadata.embeddingLength)''', 1)
+          p.write_text(text)
           PY
       - name: Format and test
         run: |
