@@ -52,7 +52,7 @@ class HarnessModelEffectsViewModelTest {
     }
 
     @Test
-    fun importAndSelectedModelCommandsRespectBusyState() {
+    fun selectedModelCommandsRespectBusyState() {
         val selected = testModel("2")
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel(
@@ -60,7 +60,6 @@ class HarnessModelEffectsViewModelTest {
         )
         viewModel.models.attach(effects)
 
-        assertFalse(viewModel.models.requestImport())
         assertFalse(viewModel.models.verifySelected())
         assertFalse(viewModel.models.requestSelectedRemoval())
         assertTrue(effects.commands.isEmpty())
@@ -234,8 +233,6 @@ class HarnessModelEffectsViewModelTest {
         val recoveryCommands = mutableListOf<ModelRecoveryCommand>()
 
         override fun snapshot(): ModelEffectsSnapshot = current
-
-        override fun requestImport(): Boolean = record("request-import")
 
         override fun executeCatalog(command: ModelCatalogCommand): Boolean {
             catalogCommands += command
