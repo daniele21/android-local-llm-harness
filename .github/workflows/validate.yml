@@ -172,7 +172,7 @@ jobs:
           java-version: "17"
           check-latest: false
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
