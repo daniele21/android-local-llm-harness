@@ -4,7 +4,7 @@ Status: active
 Document type: architecture
 Owner: qwen35
 Canonical scope: qwen35.architecture
-Read when: changing Qwen3.5 module ownership, model admission, generation planning or backend/runtime boundaries
+Read when: changing Qwen3.5 module ownership, curated model handling, generation planning or backend/runtime boundaries
 Last reviewed: 2026-08-08
 
 This document defines only the Qwen3.5 policy delta. Repository dependency direction and generic execution mechanics remain owned by [`../architecture.md`](../architecture.md).
@@ -12,29 +12,30 @@ This document defines only the Qwen3.5 policy delta. Repository dependency direc
 ## Runtime flow
 
 ```text
-Qwen3.5 GGUF / curated manifest
+built-in curated Qwen3.5 release
+        |
+        v
+verified download + SHA-256
         |
         v
 neutral GGUF inspector
         |
         v
-Qwen35CompatibilityValidator
+Qwen35 artifact/backend validation
         |
-        +--> Qwen35ArtifactDescriptor
-        +--> CompatibilityDecision
-                     |
-                     v
-        Qwen35 policy resolution
-          /         |          \
- prompt/sampling  context    guard thresholds
-          \         |          /
-           neutral execution plan
-                     |
-                     v
-       runtime lifecycle + llama.cpp
+        v
+Qwen35 policy resolution
+  /         |          \
+prompt    context    guard thresholds
+sampling  runtime
+  \         |          /
+   neutral execution plan
+        |
+        v
+runtime lifecycle + llama.cpp
 ```
 
-The exact class names may change during implementation, but the ownership boundaries must remain.
+There is no consumer path for arbitrary GGUF import, family selection or architecture extension.
 
 ## Placement by existing owner
 
@@ -43,12 +44,12 @@ Qwen3.5 code may use focused packages inside existing modules. Do not create one
 | Concern | Owner |
 | --- | --- |
 | Tier, reviewed generation profile and runtime-policy intent | `models/model-profile` |
-| Structural metadata adaptation and installation-time admission | `models/model-install`, using the neutral backend inspector |
-| Curated eligibility, availability and certification references | `models/model-catalog` |
+| Verified installation and GGUF metadata inspection | existing model installation/store owners |
+| Curated releases, availability and certification references | `models/model-catalog` |
 | Resolution, streaming guard execution and terminal mapping | `core/runtime-core` |
 | Template kwargs, sampler primitives and backend capabilities | `backends/llama-cpp` |
 | Safe effective fields and evidence identity | existing observability owners |
-| Presentation and migration actions | connected app controllers over the owning contracts |
+| Product model presentation | connected app controllers over the owning contracts |
 
 Do not introduce `ModelFamilyAdapter`, sibling family adapters or another runtime path. A new Gradle module requires a demonstrated dependency boundary and a separate architectural decision.
 
@@ -56,8 +57,8 @@ Do not introduce `ModelFamilyAdapter`, sibling family adapters or another runtim
 
 ### Qwen3.5 policy owns
 
-- dense-Qwen3.5 admission semantics;
-- supported tier declaration (`0.8B`, `2B`);
+- curated tier declaration (`0.8B`, `2B`);
+- reviewed generation and runtime profile mapping for exact catalog artifacts;
 - translation of neutral thinking intent into Qwen3.5 template semantics;
 - chat-template kwargs required by Qwen3.5;
 - Qwen3.5 sampler baseline selection;
@@ -89,25 +90,42 @@ The runtime executes the guard because it owns streaming and terminal lifecycle.
 
 Kotlin/JNI must not reimplement Qwen3.5 model math.
 
+## Closed model boundary
+
+Product model choice is represented by reviewed catalog identity, not by arbitrary model metadata supplied by the user.
+
+```text
+catalog release id
+  -> exact artifact SHA-256
+  -> reviewed profile key
+  -> verified downloaded bytes
+  -> inspected GGUF facts match expected artifact
+  -> backend compatibility evidence
+```
+
+The catalog does not make runtime proof unnecessary. SHA-256, GGUF integrity and the pinned backend must still be validated for the exact artifact. Those checks protect the known product path from corruption or backend regressions; they are not a generic arbitrary-model admission system.
+
+Developer validation tools may inject exact test artifacts into isolated test applications. This capability must not appear in consumer contracts or connected product UI.
+
 ## Hybrid/recurrent capability boundary
 
-Current upstream `llama.cpp` Qwen3.5 code uses recurrent memory support and loads Gated DeltaNet/SSM parameters. Therefore session reuse, prefix snapshots and context restore must not assume that all persistent model state is conventional transformer KV cache.
+Qwen3.5 execution uses recurrent state in addition to full-attention behavior. Session reuse, prefix snapshots and context restore must therefore not assume that all persistent state is conventional transformer KV cache.
 
 Architecture rule:
 
 ```text
 optimization requested
   -> Qwen35RuntimeCapability says supported?
-      -> backend revision proven?
+      -> exact backend revision proven?
           -> enable
           -> otherwise reject/disable explicitly
 ```
 
-The initial safe state is conservative: existing basic context lifecycle is allowed; new snapshot/restore or prefix-cache optimizations stay disabled for Qwen3.5 until validated.
+The initial safe state is conservative: ordinary context lifecycle is allowed; snapshot/restore or prefix-cache optimizations stay disabled until validated against the exact backend build and curated artifact.
 
-## Artifact, decision and evidence boundaries
+## Artifact and evidence boundaries
 
-An artifact descriptor contains inspected, stable facts only:
+A Qwen3.5 artifact descriptor contains inspected stable facts for a known catalog artifact:
 
 ```kotlin
 data class Qwen35ArtifactDescriptor(
@@ -120,20 +138,19 @@ data class Qwen35ArtifactDescriptor(
 )
 ```
 
-`tier` and dense/MoE classification come from inspected structural metadata validated against a trusted manifest when one exists. Filename, display name, URL and user-entered import labels are never authoritative.
+Descriptor facts must agree with the trusted catalog manifest. Filename, display name and URL are never authoritative identity.
 
-Compatibility is an explicit, testable decision over the artifact and the execution environment:
+Compatibility evidence is keyed by the exact artifact and execution environment:
 
 ```kotlin
-data class Qwen35CompatibilityDecision(
+data class Qwen35CompatibilityEvidence(
     val artifactDigest: String,
     val backendBuildId: String,
-    val supported: Boolean,
+    val validated: Boolean,
     val capabilities: Set<Qwen35RuntimeCapability>,
-    val failure: Qwen35CompatibilityFailure?,
 )
 ```
 
-Certification is a third record keyed by the exact artifact, backend, profiles and device envelope. It is not embedded in either the artifact descriptor or catalog availability. Field names are illustrative; the separation is mandatory.
+Certification is a separate record keyed by the exact artifact, backend, profiles and device envelope. It is not implied by catalog availability.
 
 Upstream evidence is only a design input. Compatibility and risky runtime capabilities require proof against the repository's exact backend build; the owning checks are in [`workstreams/model-compatibility.md`](workstreams/model-compatibility.md) and [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md).
