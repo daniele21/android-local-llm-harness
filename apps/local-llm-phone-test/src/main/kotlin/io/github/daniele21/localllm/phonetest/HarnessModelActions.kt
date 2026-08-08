@@ -18,11 +18,6 @@ internal class HarnessModelActions(private val state: () -> HarnessUiState, priv
         recovery.detach(attachedEffects)
     }
 
-    fun requestImport(): Boolean {
-        if (state().busy) return false
-        return execute(ModelEffects::requestImport)
-    }
-
     fun executeCatalog(command: ModelCatalogCommand): Boolean = execute { it.executeCatalog(command) }
 
     fun selectInstalled(metadata: InstalledCatalogModelMetadata): Boolean = execute { it.selectInstalled(metadata) }
