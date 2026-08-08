@@ -5,9 +5,11 @@ Document type: api-reference
 Owner: core/contracts
 Canonical scope: api.embedded-lifecycle
 Read when: assembling, invoking or closing the public embedded runtime API
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 This document describes the implemented embedded runtime API. It is based on the current public contracts and production runtime classes; it does not describe the future Binder service or Capacitor plugin.
+
+The API remains model-family neutral under [ADR 0011](adr/0011-qwen35-only-product-support.md). Examples using older architectures describe the implemented pre-migration baseline, not the supported Qwen3.5-only target; migration status is owned by [`qwen35/current-state.md`](qwen35/current-state.md).
 
 The current integration is intentionally explicit. An application owns:
 

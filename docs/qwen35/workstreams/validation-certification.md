@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.validation-certification
 Read when: adding Qwen3.5 tests, defining physical-device evidence or deciding whether an artifact can be marked certified
-Last reviewed: 2026-08-07
+Last reviewed: 2026-08-08
 
 ## Goal
 
@@ -21,17 +21,19 @@ compatible artifact
   -> certification status
 ```
 
-## Certification states
+## Independent decision axes
 
-| State | Meaning |
-| --- | --- |
-| `CERTIFIED` | Exact artifact/backend/device envelope passed all mandatory semantic and physical-device gates. |
-| `TESTED` | Meaningful automated/device evidence exists, but at least one certification gate is incomplete. |
-| `EXPERIMENTAL` | Allowed for controlled testing with known evidence gaps. |
-| `UNVERIFIED` | Compatible imported artifact without exact certification evidence. |
-| `UNSUPPORTED` | Outside the active Qwen3.5 0.8B/2B dense target or incompatible with the runtime. |
+Catalog lifecycle, runtime compatibility and evidence status must not share one enum or overwrite one another.
 
-A status attaches to exact evidence identity, not a display name such as “Qwen3.5 2B Q4”.
+| Axis | Values | Meaning |
+| --- | --- | --- |
+| Catalog availability | existing `ACTIVE`, `CANDIDATE`, `DEPRECATED`, `REVOKED`, `UNAVAILABLE` | Administrator distribution lifecycle only. |
+| Compatibility decision | compatible or typed incompatible reason | Whether this artifact can run with the current backend/device policy. |
+| Evidence status | `CERTIFIED`, `TESTED`, `EXPERIMENTAL`, `UNVERIFIED` | Strength of proof for one exact evidence identity. |
+
+`UNSUPPORTED` is a compatibility outcome, not an evidence status. An evidence status attaches to an exact artifact/backend/profile/device envelope, not a display name such as “Qwen3.5 2B Q4”.
+
+The catalog schema must add evidence references or status as a separate field and preserve availability semantics during migration. A document without that field projects `UNVERIFIED`; it never derives evidence from `CANDIDATE`. Unknown future schema versions fail closed, and any last-good document remains subject to the Qwen3.5 support boundary.
 
 ## Golden semantic suite
 
@@ -61,7 +63,14 @@ Golden template/tokenization fixtures should be generated from a trusted Qwen/Qw
 
 ## Physical-device suite
 
-For each candidate certified artifact/quantization:
+Run the initial suite for exactly:
+
+| Catalog model ID | Tier / quantization | SHA-256 |
+| --- | --- | --- |
+| `qwen35-08b-q4-k-m` | 0.8B Q4_K_M | `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517` |
+| `qwen35-2b-q4-k-m` | 2B Q4_K_M | `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223` |
+
+Each additional artifact or quantization is a separate later candidate and repeats the applicable suite:
 
 1. clean install/import and integrity verification;
 2. cold model load;
@@ -112,10 +121,10 @@ Device-family grouping may be added later only if measured evidence justifies it
 | Q35-VAL-04 | PLANNED | Add thinking enabled/disabled and sampler-resolution coverage. |
 | Q35-VAL-05 | PLANNED | Add streaming, aggregate, cancellation and guard coverage. |
 | Q35-VAL-06 | PLANNED | Add output-constraint coverage for `TEXT`, `JSON`, `JSON_SCHEMA`. |
-| Q35-VAL-07 | PLANNED | Define exact certification matrix schema and status transitions. |
-| Q35-VAL-08 | PLANNED | Run 0.8B physical-device matrix for candidate quantizations. |
-| Q35-VAL-09 | PLANNED | Run 2B physical-device matrix for candidate quantizations. |
-| Q35-VAL-10 | PLANNED | Feed certified artifact metadata into the curated catalog. |
+| Q35-VAL-07 | PLANNED | Define exact certification-record schema and transitions without changing catalog availability semantics. |
+| Q35-VAL-08 | PLANNED | Run the 0.8B Q4_K_M physical-device matrix. |
+| Q35-VAL-09 | PLANNED | Run the 2B Q4_K_M physical-device matrix on the same device classes. |
+| Q35-VAL-10 | PLANNED | Add separate evidence status/reference fields to the curated catalog schema and migrate decoding tests. |
 | Q35-VAL-11 | PLANNED | Surface `UNVERIFIED` for arbitrary compatible imports and prevent inherited certification. |
 | Q35-VAL-12 | PLANNED | Add release evidence links and regression baselines for certified combinations. |
 
@@ -134,6 +143,8 @@ An artifact may become `CERTIFIED` only when:
 - applicable repository clean-checkout and release gates pass.
 
 Changing the model artifact, quantization, backend revision, template semantics, sampler implementation or runtime tuning profile invalidates the affected certification evidence until revalidated.
+
+Q35-7 completes when the semantic and physical suites produce reviewable evidence for both initial candidates. Q35-8 completes when the separate evidence records and catalog projection enforce these status rules end to end.
 
 ## Upstream references
 

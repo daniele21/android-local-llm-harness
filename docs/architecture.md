@@ -5,7 +5,7 @@ Document type: architecture
 Owner: repository
 Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 ![Architecture Diagram](assets/architecture.png)
 
@@ -32,6 +32,12 @@ Native app / Capacitor plugin
 The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change.
 
 Runtime orchestration depends only on `observability/contracts`. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+
+## Product support envelope
+
+The product admits only Qwen3.5 dense 0.8B and 2B artifacts under [ADR 0011](adr/0011-qwen35-only-product-support.md). Public lifecycle, binding, telemetry and backend contracts remain model-family neutral; this is an architectural boundary, not a generic model-support promise. Qwen3.5 policy plugs into the existing owners, while unsupported artifacts fail explicitly before runtime preparation.
+
+The focused ownership map and capability rules live in [`qwen35/architecture.md`](qwen35/architecture.md). The staged migration from the current multi-family catalog is owned by [`qwen35/workstreams/product-migration.md`](qwen35/workstreams/product-migration.md).
 
 ## Persistent observability
 
@@ -127,6 +133,8 @@ A model is represented at three levels:
 3. `UseCaseProfile`: prompt, generation, output and cache policy for a product use case.
 
 `AppModelBinding` resolves `applicationId + useCaseId` to a single explicit use-case profile.
+
+Multiple profiles may target different supported Qwen3.5 artifacts or quantizations. Model-aware identity and scheduling do not authorize a non-Qwen family or an unsupported Qwen3.5 tier.
 
 ## Cache hierarchy
 

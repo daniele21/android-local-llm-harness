@@ -5,17 +5,18 @@ Document type: target-specification
 Owner: repository
 Canonical scope: target.repository
 Read when: a change affects repository-wide product behavior, phase boundaries or acceptance criteria
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 This document defines the repository-level target and routes work to the focused specification that owns each behavior. It intentionally avoids repeating module contracts, implementation status or release evidence.
 
 ## Product target
 
-The harness provides a local-first Android runtime for explicitly selected GGUF models through `llama.cpp`. Applications embed the runtime today through backend-neutral public contracts; future Binder or Capacitor adapters must preserve the same domain boundary.
+The harness provides a local-first Android runtime intentionally supported, tuned and certified for Qwen3.5 dense 0.8B and 2B GGUF models through `llama.cpp`. Applications embed the runtime through model-family-neutral public contracts; neutral contracts preserve dependency boundaries but do not imply support for other model families.
 
 The product must:
 
 - resolve models explicitly from `applicationId + useCaseId` without silent substitution;
+- reject non-Qwen3.5, unsupported Qwen3.5 tiers and unproven variants before runtime preparation;
 - keep catalog selection, verified transfer, installation, binding, runtime loading and inference as separate operations;
 - keep public contracts independent from Android UI, persistence and backend-owned native types;
 - treat cancellation, shutdown, partial failure and cleanup as normal lifecycle paths;
@@ -53,6 +54,7 @@ catalog release
 | Concern | Canonical source |
 | --- | --- |
 | Dependency direction and current module ownership | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
+| Qwen3.5 product envelope and specialization sequence | [`qwen35/README.md`](qwen35/README.md) and [ADR 0011](adr/0011-qwen35-only-product-support.md) |
 | Public embedded assembly and lifecycle | [`api-usage.md`](api-usage.md) |
 | Model distribution and installation routing | [`model-catalog-download-plan.md`](model-catalog-download-plan.md) |
 | Curated catalog behavior | [`curated-model-catalog.md`](curated-model-catalog.md) |

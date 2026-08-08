@@ -1,15 +1,21 @@
-# Curated candidate model catalog
+# Current curated candidate model catalog
 
 Status: active
 Document type: feature-specification
 Owner: models/model-catalog
 Canonical scope: models.catalog
 Read when: changing curated releases, compatibility targeting or application-reviewed model profiles
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 The repository includes a bootstrap catalog for administrator-curated GGUF releases through `CuratedModelCatalog` in `models/model-catalog`.
 
 This bootstrap is metadata only. It does not bundle or download model bytes, and it does not bypass the secure download and `ModelStore` installation flow.
+
+## Current state versus target
+
+The inventory below describes the current executable multi-family bootstrap. It is not the supported target established by [ADR 0011](adr/0011-qwen35-only-product-support.md). Q35-1 will replace eligibility with Qwen3.5 dense 0.8B/2B while retaining already installed unsupported artifacts as non-runnable legacy data. Until that implementation lands, do not describe the current catalog or runtime as Qwen3.5-only.
+
+The non-destructive transition is owned by [`qwen35/workstreams/product-migration.md`](qwen35/workstreams/product-migration.md). Structural admission is owned by [`qwen35/workstreams/model-compatibility.md`](qwen35/workstreams/model-compatibility.md); this document continues to own catalog lifecycle semantics.
 
 ## Included releases
 
@@ -41,6 +47,8 @@ All releases require Android API 26 or later, `arm64-v8a`, and the `llama.cpp` b
 The supplied `candidate` state maps to `CatalogAvailability.CANDIDATE`. Candidate releases remain selectable when all target and device checks pass, but compatibility evaluation emits `CatalogCompatibilityWarning.RELEASE_CANDIDATE` so the UI can distinguish them from fully approved active releases.
 
 Promotion to `ACTIVE`, deprecation, revocation and replacement remain administrator-controlled catalog lifecycle operations.
+
+`CatalogAvailability` describes only distribution lifecycle. Runtime compatibility is a separate decision, and Qwen3.5 evidence status (`CERTIFIED`, `TESTED`, `EXPERIMENTAL`, `UNVERIFIED`) will be added as a separate schema field/reference under the certification workstream. No availability value implies compatibility or certification.
 
 ## Target mapping
 

@@ -5,7 +5,7 @@ Document type: runbook
 Owner: apps/local-llm-phone-test
 Canonical scope: release.play-internal
 Read when: preparing, uploading or validating the phone application through Google Play Internal Testing
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 `apps/local-llm-phone-test` is a standalone Android application for validating the real local-LLM runtime on a physical device when developer mode, USB debugging or ADB is unavailable.
 
@@ -29,6 +29,8 @@ The app provides an on-device flow for:
 Prompts, generated output, document URIs, private storage paths and model bytes are not included in the shared report.
 
 ## Current test profile
+
+This profile records the implemented pre-migration Qwen3 validation path. It is legacy preflight, not Qwen3.5 compatibility or certification evidence. Q35-1 will retire its product eligibility; Q35-7 defines the replacement physical-device matrix.
 
 The UI defaults to the emulator-proven profile:
 
@@ -181,9 +183,9 @@ Official references:
 
 ## Run the physical-device validation
 
-1. Download the supported GGUF to the phone or make it available through a Storage Access Framework provider such as Google Drive.
+1. Download the configured legacy preflight GGUF to the phone or make it available through a Storage Access Framework provider such as Google Drive.
 2. Open **Local LLM Phone Test**.
-3. Confirm `qwen3` and `Q4_K_M` for the current Qwen3 0.6B test model.
+3. Confirm `qwen3` and `Q4_K_M` for the current pre-migration Qwen3 0.6B test model.
 4. Tap **Select and import GGUF**.
 5. Keep the application open while the model is copied, hashed and imported.
 6. Tap **Run full validation**.

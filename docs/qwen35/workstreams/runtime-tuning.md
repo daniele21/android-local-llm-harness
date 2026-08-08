@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.runtime-tuning
 Read when: changing Qwen3.5 context policy, cache/session reuse, Android CPU parameters or performance benchmark keys
-Last reviewed: 2026-08-07
+Last reviewed: 2026-08-08
 
 ## Goal
 
@@ -125,7 +125,7 @@ Optimize for:
 
 ## Acceptance criteria
 
-Q35-4 and Q35-5 are complete when:
+Q35-5 and Q35-6 are complete when:
 
 - context selection never blindly allocates the model-advertised maximum;
 - runtime capability flags default conservative and are backed by the exact backend revision;

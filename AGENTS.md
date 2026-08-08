@@ -37,6 +37,7 @@ Do not load every plan for a local change. README, BRANCHING, current state and 
 - Never expose native pointers, backend structures or backend-owned handles outside the backend module.
 - Keep runtime orchestration independent from transport and persistence implementations.
 - Resolve models explicitly through `applicationId + useCaseId`; never silently select or substitute a model.
+- Support only Qwen3.5 dense 0.8B and 2B at the product boundary under [`ADR 0011`](docs/adr/0011-qwen35-only-product-support.md) while keeping public lifecycle and backend contracts model-family neutral; reject unsupported artifacts explicitly and never delete legacy installed bytes as part of admission.
 - Keep catalog selection, verified transfer, installation, binding, selection and runtime loading as separate explicit operations.
 - Never expose the verified-download backing path.
 - Store GGUF artifacts by immutable SHA-256 identity and never commit or bundle model binaries.

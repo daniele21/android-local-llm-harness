@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -46,6 +46,8 @@ The repository-level ruleset for `dev` remains an administrative verification it
 - explicit degraded states for loaded-model absence or loaded-versus-selected mismatch;
 - model-detail presentation and deterministic recovery that never deletes a GGUF as part of runtime release.
 
+The integrated catalog and fixtures are still multi-family. [ADR 0011](adr/0011-qwen35-only-product-support.md) establishes the Qwen3.5-only target, but catalog, binding, import and preparation enforcement remain planned; the current implementation must not yet be described as Qwen3.5-only.
+
 ### Connected Android application
 
 `apps/local-llm-phone-test` is the connected Compose surface with:
@@ -76,14 +78,24 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 
 ## Open implementation blocks
 
-### 1. Remaining phone-app UDF migration
+### 1. Qwen3.5-only product migration
+
+- restrict new catalog eligibility, selection and binding to Qwen3.5 dense 0.8B/2B;
+- add non-destructive legacy/unsupported state for retained installed artifacts;
+- invalidate unsupported bindings without substitution;
+- enforce the support envelope beyond UI/catalog filtering so stale catalogs and imports fail closed;
+- preserve neutral core lifecycle contracts while moving Qwen policy into existing domain owners.
+
+The milestone sequence and focused acceptance criteria start at [`qwen35/README.md`](qwen35/README.md).
+
+### 2. Remaining phone-app UDF migration
 
 - move Overview, Diagnostics and Settings renderable state and user-intent coordination behind typed state/effect boundaries;
 - remove the corresponding Activity-owned mirrors;
 - keep Android launchers and native lifecycle resources scoped to the Activity only where ownership requires it;
 - complete state restoration and deterministic Back behavior without persisting sensitive content.
 
-### 2. RAM residency controls
+### 3. RAM residency controls
 
 - expose explicit `Load in memory` and `Unload from memory` actions separate from installation and selection;
 - reject or defer unload while contexts, active generation or queued work own the model;
@@ -93,7 +105,7 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 - record privacy-safe unload reasons for manual action, TTL, memory pressure, switch and shutdown;
 - validate races, pinning, idempotent cleanup and reload classification.
 
-### 3. UI and accessibility evidence
+### 4. UI and accessibility evidence
 
 - complete deterministic Compose state fixtures;
 - add compact, expanded, landscape and large-font coverage;
@@ -101,7 +113,7 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 - complete TalkBack and focus-order validation;
 - verify navigation restoration and process recreation.
 
-### 4. Physical-device and release evidence
+### 5. Physical-device and release evidence
 
 - build and sign the exact release candidate;
 - distribute it through Google Play Internal Testing;
@@ -112,16 +124,9 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 
 ## Immediate next block
 
-Implement the remaining phone-app UDF migration as one focused vertical slice, starting with Diagnostics because it owns the broadest remaining Activity state and effect surface.
+Implement Q35-1, the non-destructive Qwen3.5-only product migration, before model-specific compatibility, prompting or tuning work.
 
-The slice should:
-
-1. define immutable Diagnostics state and typed actions/effects;
-2. move section selection, refresh, health, resource, benchmark, log and timeline coordination behind the ViewModel boundary;
-3. keep repository, executor and Android-resource ownership in the Activity-scoped effect implementation;
-4. remove migrated Activity state only after deterministic JVM coverage passes;
-5. verify that navigation and refresh remain observational and do not start diagnostics work implicitly;
-6. run focused phone-test formatting, JVM tests, Lint and compilation before the repository clean-checkout gate.
+Start with the shared support-envelope decision and curated eligibility, then migrate bindings and retained legacy inventory. The exact task ledger and exit gate are owned by [`qwen35/workstreams/product-migration.md`](qwen35/workstreams/product-migration.md); Q35-2 must not start until that gate passes.
 
 ## Blockers and deferred evidence
 
@@ -134,6 +139,7 @@ The slice should:
 
 - Capability milestones: [`roadmap.md`](roadmap.md)
 - Target behavior: [`implementation-plan.md`](implementation-plan.md)
+- Qwen3.5-only product status: [`qwen35/README.md`](qwen35/README.md)
 - Phone application architecture: [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
 - UX/UI acceptance criteria: [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
 - Generation behavior: [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md)

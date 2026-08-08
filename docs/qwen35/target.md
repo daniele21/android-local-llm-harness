@@ -1,15 +1,15 @@
-# Qwen3.5 specialization target
+# Qwen3.5-only product target
 
 Status: active
 Document type: target-specification
 Owner: qwen35
 Canonical scope: qwen35.target
-Read when: deciding whether a model, runtime feature or API behavior belongs in the Qwen3.5 specialization
-Last reviewed: 2026-08-07
+Read when: deciding whether a model, runtime feature or API behavior belongs in the Qwen3.5-only product envelope
+Last reviewed: 2026-08-08
 
 ## Objective
 
-Turn the Android Local LLM Harness into a runtime that is intentionally optimized, validated and safe-by-default for **Qwen3.5 dense 0.8B and 2B GGUF models**, instead of treating Qwen3.5 as one generic model family among many.
+Turn the Android Local LLM Harness into a product that is intentionally optimized, validated and safe-by-default for **Qwen3.5 dense 0.8B and 2B GGUF models**. This is the complete supported product envelope, not a preferred path beside a generic fallback.
 
 For an application developer, the intended experience is:
 
@@ -24,14 +24,22 @@ supported Qwen3.5 model + use case
 
 The harness, not each consumer application, owns Qwen3.5-specific template semantics, sampling defaults, context policy, generation guards and Android tuning.
 
+## Product focus versus contract neutrality
+
+The product is Qwen3.5-only. Public request, binding, session, streaming, cancellation, result and telemetry contracts remain model-family neutral so the runtime and transport layers do not depend on Qwen implementation types.
+
+Neutral contracts do not authorize another model family. Admission policy rejects unsupported artifacts before runtime preparation, and a future family requires an explicit target and ADR change. Public thinking intent is family-neutral; only the internal Qwen3.5 planner knows how it maps to `enable_thinking`.
+
 ## Supported envelope
 
 ### Models
 
 - Qwen3.5 dense `0.8B`;
 - Qwen3.5 dense `2B`;
-- GGUF artifacts whose architecture and compatibility are verified from metadata plus trusted catalog/manifest identity;
+- GGUF artifacts whose supported class is proven from structural metadata and, for catalog-managed artifacts, a matching trusted manifest;
 - exact artifact SHA-256 remains the immutable identity.
+
+The initial certification candidates are Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M. Other 0.8B/2B quantizations may become compatible or experimental, but certification is never inherited across digests or quantizations.
 
 ### Runtime
 
@@ -44,7 +52,7 @@ The harness, not each consumer application, owns Qwen3.5-specific template seman
 ### Generation
 
 - non-thinking mode;
-- thinking mode controlled through typed Qwen3.5 template configuration;
+- model-family-neutral thinking intent mapped internally to Qwen3.5 template configuration;
 - streaming and cooperative cancellation;
 - `TEXT`, `JSON` and `JSON_SCHEMA` output modes already owned by the generation layer;
 - Qwen3.5-aware sampling presets with explicit effective configuration;
@@ -52,7 +60,7 @@ The harness, not each consumer application, owns Qwen3.5-specific template seman
 
 ## Explicit non-goals for this plan
 
-The following must not be pulled into this specialization unless the target is intentionally revised:
+The following must not be pulled into this plan unless the target is intentionally revised:
 
 - Qwen3.5 `4B` or `9B`;
 - Qwen3.5 MoE variants;
@@ -67,6 +75,17 @@ The following must not be pulled into this specialization unless the target is i
 
 Unsupported model families must fail explicitly rather than silently falling back to generic behavior.
 
+## Legacy transition
+
+The current catalog and installed inventory may contain models outside this envelope. The transition is non-destructive:
+
+- unsupported releases stop being eligible for new installation or selection;
+- unsupported bindings become invalid and require explicit rebinding;
+- already installed bytes remain visible as legacy/unsupported until the user removes them;
+- no migration, admission failure or runtime release deletes an installed GGUF.
+
+Detailed states and acceptance criteria belong to [`workstreams/product-migration.md`](workstreams/product-migration.md).
+
 ## Product invariants
 
 1. **Metadata over filename.** Architecture admission never depends on filename parsing.
@@ -77,10 +96,12 @@ Unsupported model families must fail explicitly rather than silently falling bac
 6. **Capability-gated reuse.** Cache/session optimizations are enabled only after Qwen3.5 hybrid/recurrent behavior is validated.
 7. **No silent substitution.** An unsupported artifact, mode or capability returns a typed failure.
 8. **Evidence before certification.** Emulator or desktop success is insufficient for production Android compatibility claims.
+9. **Neutral core, focused product.** Generic contracts preserve architecture but never act as a support fallback.
+10. **Non-destructive retirement.** Legacy model bytes remain user-controlled even when they are no longer runnable.
 
 ## Success criteria
 
-The specialization is complete when:
+The transition is complete when:
 
 - supported 0.8B and 2B reference artifacts pass metadata and backend compatibility checks;
 - unsupported architectures are rejected before native preparation;
@@ -91,6 +112,8 @@ The specialization is complete when:
 - separate evidence-backed Android runtime profiles exist for 0.8B and 2B;
 - tokenizer/template/output/streaming/cancellation golden and integration tests pass;
 - representative physical-device memory, thermal and latency evidence passes the certification gate;
-- catalog entries distinguish certified artifacts from merely compatible or unverified imports.
+- catalog entries distinguish certified artifacts from merely compatible or unverified imports;
+- no non-Qwen3.5 or unsupported-tier catalog entry, binding or imported artifact can reach runtime preparation;
+- legacy installed artifacts remain visible and removable without being silently loaded or deleted.
 
 Milestone sequencing is owned by [`roadmap.md`](roadmap.md).

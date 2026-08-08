@@ -5,7 +5,7 @@ Document type: adr-index
 Owner: repository
 Canonical scope: architecture.decisions
 Read when: a change may alter a durable architectural constraint or supersede an accepted decision
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
@@ -21,6 +21,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0008-dev-integration-and-protected-promotion.md`](0008-dev-integration-and-protected-promotion.md) — protected `dev` integration and validated promotion to `main`
 - [`0009-model-aware-generation-planning.md`](0009-model-aware-generation-planning.md) — versioned generation planning, trusted prompt templates and lazy context materialization
 - [`0010-model-aware-embedded-first.md`](0010-model-aware-embedded-first.md) — explicit application/use-case model binding and embedded-first deployment
+- [`0011-qwen35-only-product-support.md`](0011-qwen35-only-product-support.md) — Qwen3.5-only product support over family-neutral lifecycle contracts
 
 ## Status values
 
