@@ -1,0 +1,65 @@
+name: Cleanup Models UI Once
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/cleanup-models-ui-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Remove superseded Models UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt")
+          text = path.read_text()
+
+          summary_start = text.index("    @Composable\n    private fun ModelsSummaryCard")
+          recovery_start = text.index("    @Composable\n    private fun ModelsRecoveryCard", summary_start)
+          text = text[:summary_start] + text[recovery_start:]
+
+          legacy_start = text.index("    @Composable\n    private fun SelectedModelCard")
+          diagnostics_start = text.index("    @Composable\n    private fun DiagnosticsScreen", legacy_start)
+          text = text[:legacy_start] + text[diagnostics_start:]
+
+          path.write_text(text)
+          PY
+
+          rm apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionUi.kt
+          rm .github/workflows/cleanup-models-ui-once.yml
+
+          if grep -qE 'private fun (ModelsSummaryCard|SelectedModelCard|EmptySelectedModelCard|ActiveSelectedModelCard|SelectedModelActions|SelectedModelRemoval|ModelCatalogHeader|ModelCatalogContent|ModelInventoryDetailCards)' apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt; then
+            echo "Superseded Models UI remains" >&2
+            exit 1
+          fi
+
+          if grep -q 'PhoneModelDistributionCatalog' apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt; then
+            echo "Legacy catalog helper is still referenced" >&2
+            exit 1
+          fi
+
+          git diff --check
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: remove superseded models UI"
+          git push origin HEAD:dev
