@@ -28,6 +28,12 @@ internal class HarnessModelActions(private val state: () -> HarnessUiState, priv
         return execute(ModelEffects::verifySelected)
     }
 
+    fun unloadLoaded(): Boolean {
+        val current = state()
+        if (current.modelInventory.loadedDigest == null || current.busy) return false
+        return execute { it.executeRecovery(ModelRecoveryCommand.ReleaseRuntime) }
+    }
+
     fun requestSelectedRemoval(): Boolean {
         val current = state()
         if (current.importedModel == null || current.busy) return false
