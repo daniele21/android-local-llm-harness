@@ -106,6 +106,35 @@ class HarnessModelEffectsViewModelTest {
     }
 
     @Test
+    fun loadedModelCanBeUnloadedWithoutRemovalConfirmation() {
+        val digest = "9".repeat(64)
+        val effects = FakeModelEffects(
+            current = ModelEffectsSnapshot(
+                distribution = PhoneModelDistributionState(),
+                selectedModel = null,
+                loadedDigest = digest,
+            ),
+        )
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+
+        assertTrue(viewModel.models.unloadLoaded())
+        assertEquals(listOf(ModelRecoveryCommand.ReleaseRuntime), effects.recoveryCommands)
+        assertFalse(viewModel.uiState.value.removalConfirmationPending)
+        assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
+    }
+
+    @Test
+    fun unloadRejectsWhenNoRuntimeModelIsLoaded() {
+        val effects = FakeModelEffects()
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+
+        assertFalse(viewModel.models.unloadLoaded())
+        assertTrue(effects.recoveryCommands.isEmpty())
+    }
+
+    @Test
     fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
         val loadedMetadata = testMetadata("6")
         val selectedMetadata = testMetadata("8")
