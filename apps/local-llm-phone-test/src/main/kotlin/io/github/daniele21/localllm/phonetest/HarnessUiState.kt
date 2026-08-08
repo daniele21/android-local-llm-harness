@@ -104,7 +104,7 @@ internal data class HarnessUiState(
         const val DEFAULT_REPEAT_PENALTY = "1.05"
         const val DEFAULT_REPEAT_LAST_N = "64"
         const val DEFAULT_SEED = ""
-        const val DEFAULT_PROMPT = "Explain in two sentences why local inference improves privacy."
+        const val DEFAULT_PROMPT = "how much is the earth radius?"
     }
 }
 
