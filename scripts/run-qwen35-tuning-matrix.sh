@@ -117,6 +117,7 @@ fi
 
 cd "$ROOT_DIR"
 HARNESS_COMMIT="$(git rev-parse HEAD)"
+THINKING_MODE_SLUG="$(printf '%s' "$THINKING_MODE" | tr '[:upper:]' '[:lower:]')"
 ./gradlew \
     :apps:device-test-runner:assembleDebug \
     :apps:device-test-runner:assembleDebugAndroidTest
@@ -147,15 +148,15 @@ if [[ -z "$RUNNER" ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
-JSONL="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}.jsonl"
-CSV="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}-summary.csv"
+JSONL="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE_SLUG}.jsonl"
+CSV="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE_SLUG}-summary.csv"
 : > "$JSONL"
 
-for context in 1024 2048 4096; do
+for context in 1024 2048 4096 8192; do
     for threads in 2 4; do
         for pair in "64 32" "128 64"; do
             read -r batch ubatch <<< "$pair"
-            case_id="${TIER}-ctx${context}-t${threads}-bt${threads}-b${batch}-ub${ubatch}-${THINKING_MODE,,}"
+            case_id="${TIER}-ctx${context}-t${threads}-bt${threads}-b${batch}-ub${ubatch}-${THINKING_MODE_SLUG}"
             for ((sample = 1; sample <= REPEATS; sample++)); do
                 echo "Running $case_id sample $sample/$REPEATS"
                 set +e
@@ -184,12 +185,13 @@ for context in 1024 2048 4096; do
                     echo "Tuning case failed: $case_id" >&2
                     exit 1
                 fi
-                mapfile -t evidence_lines < <(printf '%s\n' "$output" | sed -n 's/^.*LOCAL_LLM_TUNING_JSON //p')
-                if [[ ${#evidence_lines[@]} -ne 2 ]]; then
+                evidence_lines="$(printf '%s\n' "$output" | sed -n 's/^.*LOCAL_LLM_TUNING_JSON //p')"
+                evidence_count="$(printf '%s\n' "$evidence_lines" | sed '/^$/d' | wc -l | tr -d ' ')"
+                if [[ "$evidence_count" -ne 2 ]]; then
                     echo "Expected cold and warm evidence for $case_id" >&2
                     exit 1
                 fi
-                printf '%s\n' "${evidence_lines[@]}" >> "$JSONL"
+                printf '%s\n' "$evidence_lines" >> "$JSONL"
             done
         done
     done
