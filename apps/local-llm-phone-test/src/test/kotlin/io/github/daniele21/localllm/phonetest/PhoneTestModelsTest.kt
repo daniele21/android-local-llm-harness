@@ -1,6 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,8 +14,8 @@ class PhoneTestModelsTest {
         val resolved = resolvedPhoneUseCase(model, maxOutputTokens = 32)
 
         assertEquals(model.digest, resolved.model.artifact.digest)
-        assertEquals("qwen3", resolved.model.artifact.architecture)
-        assertEquals("Q4_K_M", resolved.model.artifact.quantization)
+        assertEquals("qwen35", resolved.model.artifact.architecture)
+        assertEquals(model.quantization, resolved.model.artifact.quantization)
         assertEquals(32, resolved.useCase.generationDefaults.maxOutputTokens)
         assertEquals(0, resolved.model.gpuLayers)
     }
@@ -108,11 +108,14 @@ class PhoneTestModelsTest {
         assertTrue(error is IllegalArgumentException)
     }
 
-    private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(
-        digest = ModelDigest("0".repeat(64)),
-        fileName = "test.gguf",
-        sizeBytes = 1234,
-        architecture = "qwen3",
-        quantization = "Q4_K_M",
-    )
+    private fun testModel(): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases.first().artifact
+        return ImportedPhoneModel(
+            digest = artifact.digest,
+            fileName = artifact.fileName,
+            sizeBytes = artifact.sizeBytes,
+            architecture = artifact.architecture,
+            quantization = artifact.quantization,
+        )
+    }
 }
