@@ -2,30 +2,39 @@ package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.SeedPolicy
+import io.github.daniele21.localllm.models.ArtifactSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhoneTestModelsTest {
     @Test
-    fun resolvedUseCaseKeepsTheExplicitModelIdentityAndCpuOnlyProfile() {
+    fun resolvedUseCaseKeepsTheCuratedModelIdentityAndCpuOnlyProfile() {
         val model = testModel()
+        val release = CuratedModelCatalog.releases.first()
 
         val resolved = resolvedPhoneUseCase(model, maxOutputTokens = 32)
 
         assertEquals(model.digest, resolved.model.artifact.digest)
         assertEquals("qwen35", resolved.model.artifact.architecture)
         assertEquals(model.quantization, resolved.model.artifact.quantization)
+        assertEquals("${release.profileKey.value}-validation", resolved.model.id)
+        assertEquals(
+            ArtifactSource.Download("administrator-curated-catalog"),
+            resolved.model.artifact.source,
+        )
         assertEquals(32, resolved.useCase.generationDefaults.maxOutputTokens)
         assertEquals(0, resolved.model.gpuLayers)
     }
 
     @Test
     fun playgroundProfileUsesAnExplicitTargetAndLargerContext() {
+        val release = CuratedModelCatalog.releases.first()
         val resolved = resolvedPhonePlaygroundUseCase(testModel())
 
         assertEquals("play-internal-phone-test", resolved.binding.applicationId.value)
         assertEquals("manual-inference-playground", resolved.binding.useCaseId.value)
+        assertEquals("${release.profileKey.value}-playground", resolved.model.id)
         assertEquals(128, resolved.useCase.generationDefaults.maxOutputTokens)
         assertEquals(2048, resolved.model.contextSize)
         assertEquals(0, resolved.model.gpuLayers)
