@@ -66,21 +66,17 @@ class HarnessModelInventoryTest {
     }
 
     @Test
-    fun `external imported selection remains a valid inventory item`() {
-        val imported = importedModel(digest('b'), "external.gguf")
+    fun `selection absent from curated catalog is not projected into inventory`() {
+        val staleSelection = selectedModel(digest('b'), "stale.gguf")
 
         val state = HarnessModelInventoryReconciler.reconcile(
             distribution = distribution(),
-            selectedModel = imported,
+            selectedModel = staleSelection,
         )
 
-        val item = state.items.single()
-        assertEquals(HarnessModelOrigin.IMPORTED, item.origin)
-        assertEquals(HarnessModelLifecycle.SELECTED, item.lifecycle)
-        assertTrue(item.installed)
-        assertTrue(item.selected)
-        assertNull(item.degradation)
-        assertEquals(imported.digest.sha256, state.selectedDigest)
+        assertTrue(state.items.isEmpty())
+        assertNull(state.selectedDigest)
+        assertNull(state.selectedItem)
     }
 
     @Test
@@ -190,7 +186,7 @@ class HarnessModelInventoryTest {
         installedAtEpochMs = 1L,
     )
 
-    private fun importedModel(digest: ModelDigest, fileName: String): ImportedPhoneModel = ImportedPhoneModel(
+    private fun selectedModel(digest: ModelDigest, fileName: String): ImportedPhoneModel = ImportedPhoneModel(
         digest = digest,
         fileName = fileName,
         sizeBytes = 1_024L,
