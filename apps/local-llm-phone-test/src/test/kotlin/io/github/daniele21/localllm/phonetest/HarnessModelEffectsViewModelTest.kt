@@ -107,39 +107,20 @@ class HarnessModelEffectsViewModelTest {
 
     @Test
     fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
-        val metadata = testMetadata("6")
-        val loaded = HarnessModelInventoryItem(
-            stableId = "release",
-            displayName = metadata.displayName,
-            origin = HarnessModelOrigin.CATALOG,
-            digest = metadata.digest.sha256,
-            lifecycle = HarnessModelLifecycle.DEGRADED,
-            installed = true,
-            loaded = true,
-            degradation = HarnessModelDegradation.LOADED_MODEL_DIFFERS_FROM_SELECTION,
-        )
+        val loadedMetadata = testMetadata("6")
+        val selectedMetadata = testMetadata("8")
         val distribution = PhoneModelDistributionState(
             models = listOf(
-                PhoneCatalogModelUi(
-                    stableId = "release",
-                    displayName = metadata.displayName,
-                    description = "test",
-                    fileName = metadata.fileName,
-                    sizeBytes = metadata.sizeBytes,
-                    architecture = metadata.architecture,
-                    quantization = metadata.quantization,
-                    profileKey = metadata.profileKey,
-                    licenseName = "Apache-2.0",
-                    status = PhoneCatalogModelStatus.INSTALLED,
-                    compatible = true,
-                    compatibilityReasons = emptyList(),
-                    compatibilityWarnings = emptyList(),
-                    installedModel = metadata,
-                ),
+                catalogModel("loaded-release", loadedMetadata),
+                catalogModel("selected-release", selectedMetadata),
             ),
         )
         val effects = FakeModelEffects(
-            current = ModelEffectsSnapshot(distribution, testModel("8"), metadata.digest.sha256),
+            current = ModelEffectsSnapshot(
+                distribution = distribution,
+                selectedModel = testModel("8"),
+                loadedDigest = loadedMetadata.digest.sha256,
+            ),
         )
         val viewModel = HarnessViewModel()
         viewModel.models.attach(effects)
@@ -154,7 +135,7 @@ class HarnessModelEffectsViewModelTest {
             ),
         )
         assertEquals(
-            ModelRecoveryCommand.AdoptLoadedSelection(metadata),
+            ModelRecoveryCommand.AdoptLoadedSelection(loadedMetadata),
             effects.recoveryCommands.single(),
         )
         assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
@@ -218,6 +199,26 @@ class HarnessModelEffectsViewModelTest {
         architecture = "qwen35",
         quantization = "Q4_K_M",
         installedAtEpochMs = 1L,
+    )
+
+    private fun catalogModel(
+        stableId: String,
+        metadata: InstalledCatalogModelMetadata,
+    ): PhoneCatalogModelUi = PhoneCatalogModelUi(
+        stableId = stableId,
+        displayName = metadata.displayName,
+        description = "test",
+        fileName = metadata.fileName,
+        sizeBytes = metadata.sizeBytes,
+        architecture = metadata.architecture,
+        quantization = metadata.quantization,
+        profileKey = metadata.profileKey,
+        licenseName = "Apache-2.0",
+        status = PhoneCatalogModelStatus.INSTALLED,
+        compatible = true,
+        compatibilityReasons = emptyList(),
+        compatibilityWarnings = emptyList(),
+        installedModel = metadata,
     )
 
     private class FakeModelEffects(
