@@ -11,6 +11,11 @@ import org.junit.Test
 
 class HarnessViewModelTest {
     @Test
+    fun defaultPlaygroundPromptAsksForEarthRadius() {
+        assertEquals("how much is the earth radius?", HarnessViewModel().uiState.value.playgroundPrompt)
+    }
+
+    @Test
     fun modelSelectionClearsPendingRemovalConfirmation() {
         val viewModel = HarnessViewModel(
             HarnessUiState(removalConfirmationPending = true),
