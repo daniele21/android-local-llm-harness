@@ -12,10 +12,13 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.SessionOptions
+import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
 import io.github.daniele21.localllm.models.ArtifactSource
 import io.github.daniele21.localllm.models.GenerationDefaults
+import io.github.daniele21.localllm.models.GenerationGuardPolicy
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
 import io.github.daniele21.localllm.models.ModelProfileRegistry
@@ -305,6 +308,44 @@ class RuntimeOrchestratorTest {
     }
 
     @Test
+    fun `generation guard completes with typed reason instead of cancellation`() {
+        val fixture = RuntimeFixture(
+            generationDefaults = GenerationDefaults(
+                maxOutputTokens = 16,
+                temperature = 0f,
+                topP = 1f,
+                topK = 0,
+                seed = 42,
+                thinkingMode = ThinkingMode.ENABLED,
+                guardPolicy = GenerationGuardPolicy(
+                    enabled = true,
+                    thinkingTokenBudget = 1,
+                    repetitionActivationTokens = 8,
+                    observationWindowChars = 512,
+                    minPatternChars = 24,
+                    maxPatternChars = 64,
+                    repetitionOccurrences = 4,
+                ),
+            ),
+        )
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val terminal = CountDownLatch(1)
+        fixture.runtime.generate(
+            fixture.request("guard", session),
+            GenerationListener { event ->
+                events += event
+                if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        val completed = events.last() as GenerationEvent.Completed
+        assertEquals(StopReason.GENERATION_GUARD_THINKING_BUDGET, completed.metrics.stopReason)
+        assertEquals("hello ", completed.output)
+        fixture.close()
+    }
+
+    @Test
     fun `closing session defers context release until active request terminates`() {
         val fixture = RuntimeFixture()
         val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
@@ -363,7 +404,7 @@ class RuntimeOrchestratorTest {
     }
 }
 
-private class RuntimeFixture {
+private class RuntimeFixture(private val generationDefaults: GenerationDefaults = defaultGenerationDefaults()) {
     val applicationId = ApplicationId("app")
     val useCaseId = UseCaseId("primary")
     val secondUseCaseId = UseCaseId("secondary")
@@ -395,6 +436,16 @@ private class RuntimeFixture {
         modelFile.delete()
     }
 
+    companion object {
+        private fun defaultGenerationDefaults() = GenerationDefaults(
+            maxOutputTokens = 16,
+            temperature = 0f,
+            topP = 1f,
+            topK = 0,
+            seed = 42,
+        )
+    }
+
     private fun resolved(useCaseId: UseCaseId, profileId: String, modelDigest: ModelDigest): ResolvedUseCase {
         val model = GgufModelProfile(
             id = profileId,
@@ -417,13 +468,7 @@ private class RuntimeFixture {
             id = "use-case-${useCaseId.value}",
             modelProfileId = profileId,
             systemPromptVersion = "v1",
-            generationDefaults = GenerationDefaults(
-                maxOutputTokens = 16,
-                temperature = 0f,
-                topP = 1f,
-                topK = 0,
-                seed = 42,
-            ),
+            generationDefaults = generationDefaults,
             outputMode = OutputMode.TEXT,
             cachePolicy = UseCaseCachePolicy(0, false, false, false),
             healthSuiteId = "health",
@@ -539,10 +584,10 @@ private class FakeInferenceBackend : InferenceBackend {
         generationStarted.countDown()
         blockGeneration?.await()
         if (!onChunk("hello ", 1)) {
-            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 0, 5, 1))
+            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 1, 5, 1))
         }
         if (!onChunk("world", 2)) {
-            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 1, 5, 5))
+            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 2, 5, 5))
         }
         return BackendGenerationOutcome.Completed(
             BackendGenerationMetrics(

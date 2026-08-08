@@ -79,6 +79,8 @@ class BackendException(val code: String, message: String, cause: Throwable? = nu
 
 interface InferenceBackend {
     val id: String
+    val revision: String?
+        get() = null
 
     fun initialize()
     fun shutdown()

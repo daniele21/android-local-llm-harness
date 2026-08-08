@@ -29,4 +29,13 @@ class ContextSizeSelectorTest {
         assertFalse(ContextSizeSelector.supportsManual(2_048, 3_000, 8_192))
         assertTrue(ContextSizeSelector.supportsManual(4_096, 3_000, 8_192))
     }
+
+    @Test
+    fun `qwen context candidates cap auto and manual selection`() {
+        val candidates = listOf(1_024, 2_048, 4_096, 8_192)
+        assertEquals(4_096, ContextSizeSelector.selectAuto(3_000, 262_144, null, candidates))
+        assertNull(ContextSizeSelector.selectAuto(9_000, 262_144, null, candidates))
+        assertTrue(ContextSizeSelector.supportsManual(8_192, 4_000, 262_144, candidates))
+        assertFalse(ContextSizeSelector.supportsManual(16_384, 4_000, 262_144, candidates))
+    }
 }

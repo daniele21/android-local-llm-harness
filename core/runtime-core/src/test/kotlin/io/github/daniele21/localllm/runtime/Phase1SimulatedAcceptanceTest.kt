@@ -77,7 +77,7 @@ class Phase1SimulatedAcceptanceTest {
 
             fixture.runtime.closeSession(session)
             assertTrue(eventually { fixture.runtime.runtimeSnapshot().activeSessions == 0 })
-            assertEquals(1, fixture.backend.releaseContextCalls)
+            assertEquals(3, fixture.backend.releaseContextCalls)
 
             val memoryResult = fixture.runtime.handleMemoryPressure(RuntimeMemoryPressure.UI_HIDDEN)
             assertEquals(RuntimeMemoryAction.UNLOAD_IDLE_MODEL, memoryResult.action)

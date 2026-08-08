@@ -32,6 +32,7 @@ class LlamaCppInferenceBackend(
     private val streamingBridge: LlamaCppStreamingBridge = LlamaCppStreamingBridge(),
 ) : InferenceBackend {
     override val id: String = "llama.cpp"
+    override val revision: String = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 
     override fun initialize() {
         when (val result = lifecycleBridge.initializeRuntime(nativeLibraryDir)) {

@@ -22,6 +22,59 @@ sealed interface ArtifactSource {
     data class Imported(val displayName: String) : ArtifactSource
 }
 
+data class RuntimeCapabilityProfile(
+    val requiredBackendId: String? = null,
+    val requiredBackendRevision: String? = null,
+    val approvedContextTiers: List<Int> = emptyList(),
+    val contextSafetyReserveTokens: Int = 256,
+    val supportsStatelessContextReuse: Boolean = true,
+    val supportsPrefixSnapshot: Boolean = false,
+    val supportsSessionRestore: Boolean = false,
+    val supportsPrefixReuse: Boolean = false,
+) {
+    init {
+        require(requiredBackendId == null || requiredBackendId.isNotBlank()) { "Required backend ID must not be blank" }
+        require(requiredBackendRevision == null || requiredBackendRevision.isNotBlank()) {
+            "Required backend revision must not be blank"
+        }
+        require(contextSafetyReserveTokens >= 0) { "Context safety reserve must not be negative" }
+        require(approvedContextTiers.all { it > 0 }) { "Approved context tiers must be positive" }
+        require(approvedContextTiers == approvedContextTiers.distinct().sorted()) {
+            "Approved context tiers must be unique and sorted"
+        }
+    }
+}
+
+data class GenerationGuardPolicy(
+    val version: Int = 1,
+    val enabled: Boolean = false,
+    val thinkingTokenBudget: Int = 0,
+    val repetitionActivationTokens: Int = 0,
+    val observationWindowChars: Int = 0,
+    val minPatternChars: Int = 0,
+    val maxPatternChars: Int = 0,
+    val repetitionOccurrences: Int = 0,
+) {
+    init {
+        require(version > 0) { "Generation guard version must be positive" }
+        if (enabled) {
+            require(thinkingTokenBudget > 0) { "Thinking token budget must be positive" }
+            require(repetitionActivationTokens > 0) { "Repetition activation threshold must be positive" }
+            require(observationWindowChars > 0) { "Observation window must be positive" }
+            require(minPatternChars > 0) { "Minimum repetition pattern must be positive" }
+            require(maxPatternChars >= minPatternChars) { "Maximum repetition pattern must not be smaller than minimum" }
+            require(repetitionOccurrences >= 2) { "Repetition occurrences must be at least two" }
+            require(observationWindowChars >= maxPatternChars * repetitionOccurrences) {
+                "Observation window must contain the configured repetition evidence"
+            }
+        }
+    }
+
+    companion object {
+        fun disabled(): GenerationGuardPolicy = GenerationGuardPolicy()
+    }
+}
+
 data class GgufModelProfile(
     val id: String,
     val artifact: GgufArtifact,
@@ -37,6 +90,7 @@ data class GgufModelProfile(
     val kvCacheTypeK: String? = null,
     val kvCacheTypeV: String? = null,
     val chatTemplatePolicy: ChatTemplatePolicy = ChatTemplatePolicy(),
+    val runtimeCapabilities: RuntimeCapabilityProfile = RuntimeCapabilityProfile(),
 )
 
 data class GenerationDefaults(
@@ -51,6 +105,7 @@ data class GenerationDefaults(
     val seedPolicy: SeedPolicy = seed?.let(SeedPolicy::Fixed) ?: SeedPolicy.Random,
     val repeatPenalty: Float = DEFAULT_REPEAT_PENALTY,
     val repeatLastN: Int = DEFAULT_REPEAT_LAST_N,
+    val guardPolicy: GenerationGuardPolicy = GenerationGuardPolicy.disabled(),
 ) {
     init {
         require(maxOutputTokens > 0) { "Maximum output tokens must be positive" }

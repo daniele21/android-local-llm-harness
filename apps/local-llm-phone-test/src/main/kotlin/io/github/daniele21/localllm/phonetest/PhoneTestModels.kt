@@ -21,6 +21,7 @@ import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.OutputMode
 import io.github.daniele21.localllm.models.Qwen35GenerationProfiles
 import io.github.daniele21.localllm.models.Qwen35ModelTier
+import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseProfile
@@ -228,17 +229,23 @@ internal fun resolvedPhoneUseCase(
     val useCaseId = UseCaseId(useCaseValue)
     val modelProfileId = "${release.profileKey.value}-$profileSuffix"
     val useCaseProfileId = "play-internal-phone-use-case-$profileSuffix"
-    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1).coerceAtMost(4)
+    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+    val runtimeProfile = Qwen35RuntimeTuningProfiles.candidateForTier(tier)
+    val runtimeTuning = runtimeProfile.resolve(availableProcessors)
     val modelProfile = GgufModelProfile(
         id = modelProfileId,
         artifact = model.artifact(),
         contextSize = contextSize,
-        batchSize = 128,
-        microBatchSize = 64,
-        cpuThreads = availableProcessors,
-        batchThreads = availableProcessors,
+        batchSize = runtimeTuning.batchSize,
+        microBatchSize = runtimeTuning.microBatchSize,
+        cpuThreads = runtimeTuning.cpuThreads,
+        batchThreads = runtimeTuning.batchThreads,
         gpuLayers = 0,
+        useMmap = runtimeTuning.useMmap,
+        useMlock = runtimeTuning.useMlock,
+        flashAttention = runtimeTuning.flashAttention,
         chatTemplatePolicy = ChatTemplatePolicy(),
+        runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
 
     )
     val useCase = UseCaseProfile(
