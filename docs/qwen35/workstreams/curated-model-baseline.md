@@ -50,22 +50,32 @@ No new `LEGACY_UNSUPPORTED`, `UNSUPPORTED_FAMILY` or equivalent product state is
 
 | ID | State | Task |
 | --- | --- | --- |
-| Q35-BASE-01 | PLANNED | Replace the executable curated catalog with Qwen3.5 dense 0.8B/2B releases only. |
-| Q35-BASE-02 | PLANNED | Remove consumer-facing manual GGUF import actions, routes and product contracts that exist only for arbitrary imports. |
+| Q35-BASE-01 | DONE | Executable curated catalog contains only Qwen3.5 dense 0.8B/2B releases. |
+| Q35-BASE-02 | DONE | Consumer GGUF document-picker/import actions, effects and controller path are removed. |
 | Q35-BASE-03 | PLANNED | Remove product profile/binding mappings and fixtures for non-Qwen3.5 and unsupported Qwen3.5 tiers. |
 | Q35-BASE-04 | PLANNED | Simplify inventory projection and model presentation after external-import/legacy states disappear. |
-| Q35-BASE-05 | PLANNED | Keep verified catalog download/install as the only product acquisition path and preserve isolated developer test injection. |
-| Q35-BASE-06 | PLANNED | Update connected Models/Playground UI so only curated downloadable/installed Qwen3.5 models can be chosen. |
-| Q35-BASE-07 | PLANNED | Replace product-level multi-family tests with closed-catalog tests while preserving family-neutral lifecycle contract tests. |
+| Q35-BASE-05 | IN PROGRESS | Keep verified catalog download/install as the only product acquisition path and preserve isolated developer test injection. |
+| Q35-BASE-06 | IN PROGRESS | Connected Models/Playground UI now routes users to the curated catalog; remaining inventory cleanup follows BASE-04. |
+| Q35-BASE-07 | IN PROGRESS | Catalog and connected-UI tests cover the closed model surface; remaining multi-family product fixtures are removed with BASE-03. |
 
-## Initial curated set
+## Implemented closed catalog
 
-The initial catalog is limited to existing reviewed 0.8B and 2B Qwen3.5 releases. The first certification candidates remain:
+The executable catalog currently contains exactly seven reviewed releases:
 
-- Qwen3.5 0.8B Q4_K_M;
-- Qwen3.5 2B Q4_K_M.
+### Qwen3.5 0.8B
 
-Other 0.8B/2B quantizations may remain catalog candidates for experimentation, but certification is attached only to exact artifacts that pass Q35-7/Q35-8 evidence.
+- `qwen35-08b-q4-k-m`;
+- `qwen35-08b-q5-k-m`;
+- `qwen35-08b-q8-0`;
+- `qwen35-08b-ud-iq2-xxs`.
+
+### Qwen3.5 2B
+
+- `qwen35-2b-q4-k-m`;
+- `qwen35-2b-q5-k-m`;
+- `qwen35-2b-ud-iq2-xxs`.
+
+The first certification candidates remain Qwen3.5 0.8B Q4_K_M and Qwen3.5 2B Q4_K_M. Other listed quantizations are catalog candidates, not automatically certified artifacts.
 
 ## Acceptance criteria
 
