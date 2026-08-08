@@ -1,9 +1,8 @@
 package io.github.daniele21.localllm.phonetest
 
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +33,7 @@ class MainActivityUiTest {
         composeRule.onNodeWithTag("nav-overview").assertIsDisplayed()
         composeRule.onNodeWithText("Models").assertIsDisplayed()
         composeRule.onNodeWithText("Qwen3.5 catalog").assertIsDisplayed()
-        composeRule.onNodeWithText("Import model").assertDoesNotExist()
+        assertTextAbsent("Import model")
         composeRule.onNodeWithText("Device resources").assertIsDisplayed()
     }
 
@@ -48,11 +47,11 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Status").assertIsDisplayed()
         composeRule.onNodeWithText("Model size").assertIsDisplayed()
         composeRule.onNodeWithText("All sizes").assertIsDisplayed()
-        composeRule.onNodeWithText("0.8B").assertExists()
-        composeRule.onNodeWithText("2B").assertExists()
-        composeRule.onNodeWithText("Inventory").assertDoesNotExist()
-        composeRule.onNodeWithText("Model catalog").assertDoesNotExist()
-        composeRule.onNodeWithText("Import model").assertDoesNotExist()
+        composeRule.onNodeWithText("0.8B").assertIsDisplayed()
+        composeRule.onNodeWithText("2B").assertIsDisplayed()
+        assertTextAbsent("Inventory")
+        assertTextAbsent("Model catalog")
+        assertTextAbsent("Import model")
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
         composeRule.onNodeWithText("Overall health").assertIsDisplayed()
@@ -76,5 +75,12 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Fixed").assertIsDisplayed()
         composeRule.onNodeWithText("Context policy").assertIsDisplayed()
         composeRule.onNodeWithText("Auto").assertIsDisplayed()
+    }
+
+    private fun assertTextAbsent(text: String) {
+        assertTrue(
+            "$text must not be present in the UI",
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty(),
+        )
     }
 }
