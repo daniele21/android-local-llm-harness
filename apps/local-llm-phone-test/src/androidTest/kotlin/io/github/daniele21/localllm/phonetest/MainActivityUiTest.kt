@@ -66,8 +66,11 @@ class MainActivityUiTest {
         composeRule.onNodeWithTag("nav-playground").performClick()
         composeRule.onNodeWithText("Generation settings  ·  Show").performClick()
 
+        composeRule.onNodeWithTag("playground-thinking-on").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-temperature-slider").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-top-p-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-min-p").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-presence-penalty").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-repeat-penalty").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-repeat-last-n").assertIsDisplayed()
         composeRule.onNodeWithText("Seed policy").assertIsDisplayed()
