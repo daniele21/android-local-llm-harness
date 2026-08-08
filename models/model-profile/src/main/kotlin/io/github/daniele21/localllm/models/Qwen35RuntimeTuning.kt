@@ -120,7 +120,7 @@ object Qwen35RuntimeTuningProfiles {
     )
 
     fun tuningMatrixForTier(tier: Qwen35ModelTier): List<Qwen35TuningCandidate> =
-        listOf(1_024, 2_048, 4_096).flatMap { context ->
+        APPROVED_CONTEXT_TIERS.flatMap { context ->
             listOf(2, 4).flatMap { threads ->
                 listOf(64 to 32, 128 to 64).map { (batch, microBatch) ->
                     Qwen35TuningCandidate(
