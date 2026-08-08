@@ -27,11 +27,18 @@ internal data class Qwen35ArtifactDescriptor(
     val blockCount: Long,
     val embeddingLength: Long,
 ) {
-    fun mismatch(release: CatalogModelRelease, metadata: GgufArtifactMetadata): String? = when {
+    fun mismatch(release: CatalogModelRelease, metadata: GgufArtifactMetadata): String? =
+        releaseMismatch(release) ?: metadataMismatch(metadata)
+
+    private fun releaseMismatch(release: CatalogModelRelease): String? = when {
         release.id != releaseId -> "release identity"
         release.artifact.digest != digest -> "artifact digest"
         release.artifact.sizeBytes != sizeBytes -> "artifact size"
         normalize(release.artifact.quantization) != normalize(quantization) -> "quantization"
+        else -> null
+    }
+
+    private fun metadataMismatch(metadata: GgufArtifactMetadata): String? = when {
         metadata.version != ggufVersion -> "GGUF version"
         normalize(metadata.architecture) != normalize(architecture) -> "GGUF architecture"
         metadata.name != name -> "GGUF model name"

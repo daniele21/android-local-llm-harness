@@ -138,6 +138,8 @@ internal sealed interface HarnessUiEvent {
 
     sealed interface Playground : HarnessUiEvent
 
+    sealed interface PlaygroundControl : Playground
+
     sealed interface Diagnostics : HarnessUiEvent
 
     sealed interface Preferences : HarnessUiEvent
@@ -162,29 +164,29 @@ internal sealed interface HarnessUiEvent {
 
     data class PlaygroundPromptChanged(val prompt: String) : Playground
 
-    data class PlaygroundMaxTokensChanged(val maxTokens: String) : Playground
+    data class PlaygroundMaxTokensChanged(val maxTokens: String) : PlaygroundControl
 
-    data class PlaygroundTemperatureChanged(val temperature: String) : Playground
+    data class PlaygroundTemperatureChanged(val temperature: String) : PlaygroundControl
 
     data class PlaygroundPresetChanged(val preset: String) : Playground
 
-    data class PlaygroundTopPChanged(val topP: String) : Playground
+    data class PlaygroundTopPChanged(val topP: String) : PlaygroundControl
 
-    data class PlaygroundTopKChanged(val topK: String) : Playground
+    data class PlaygroundTopKChanged(val topK: String) : PlaygroundControl
 
-    data class PlaygroundMinPChanged(val minP: String) : Playground
+    data class PlaygroundMinPChanged(val minP: String) : PlaygroundControl
 
-    data class PlaygroundPresencePenaltyChanged(val presencePenalty: String) : Playground
+    data class PlaygroundPresencePenaltyChanged(val presencePenalty: String) : PlaygroundControl
 
-    data class PlaygroundThinkingModeChanged(val mode: ThinkingMode) : Playground
+    data class PlaygroundThinkingModeChanged(val mode: ThinkingMode) : PlaygroundControl
 
-    data class PlaygroundRepeatPenaltyChanged(val repeatPenalty: String) : Playground
+    data class PlaygroundRepeatPenaltyChanged(val repeatPenalty: String) : PlaygroundControl
 
-    data class PlaygroundRepeatLastNChanged(val repeatLastN: String) : Playground
+    data class PlaygroundRepeatLastNChanged(val repeatLastN: String) : PlaygroundControl
 
-    data class PlaygroundSeedChanged(val seed: String) : Playground
+    data class PlaygroundSeedChanged(val seed: String) : PlaygroundControl
 
-    data class PlaygroundContextChanged(val context: String) : Playground
+    data class PlaygroundContextChanged(val context: String) : PlaygroundControl
 
     data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : Diagnostics
 
@@ -201,6 +203,45 @@ internal sealed interface HarnessUiEvent {
     data class DiagnosticsSectionChanged(val section: DiagnosticsSection) : Diagnostics
 
     data class ThemeChanged(val preference: HarnessThemePreference) : Preferences
+}
+
+private fun reducePlaygroundControl(state: HarnessUiState, event: HarnessUiEvent.PlaygroundControl): HarnessUiState = when (event) {
+    is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens, playgroundPreset = "")
+
+    is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
+        playgroundTemperature = event.temperature,
+        playgroundPreset = "",
+    )
+
+    is HarnessUiEvent.PlaygroundTopPChanged -> state.copy(playgroundTopP = event.topP, playgroundPreset = "")
+
+    is HarnessUiEvent.PlaygroundTopKChanged -> state.copy(playgroundTopK = event.topK, playgroundPreset = "")
+
+    is HarnessUiEvent.PlaygroundMinPChanged -> state.copy(playgroundMinP = event.minP, playgroundPreset = "")
+
+    is HarnessUiEvent.PlaygroundPresencePenaltyChanged -> state.copy(
+        playgroundPresencePenalty = event.presencePenalty,
+        playgroundPreset = "",
+    )
+
+    is HarnessUiEvent.PlaygroundThinkingModeChanged -> state.copy(
+        playgroundThinkingMode = event.mode,
+        playgroundPreset = "",
+    )
+
+    is HarnessUiEvent.PlaygroundRepeatPenaltyChanged -> state.copy(
+        playgroundRepeatPenalty = event.repeatPenalty,
+        playgroundPreset = "",
+    )
+
+    is HarnessUiEvent.PlaygroundRepeatLastNChanged -> state.copy(
+        playgroundRepeatLastN = event.repeatLastN,
+        playgroundPreset = "",
+    )
+
+    is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed, playgroundPreset = "")
+
+    is HarnessUiEvent.PlaygroundContextChanged -> state.copy(playgroundContext = event.context, playgroundPreset = "")
 }
 
 internal object HarnessUiReducer {
@@ -263,47 +304,9 @@ internal object HarnessUiReducer {
 
     private fun reducePlayground(state: HarnessUiState, event: HarnessUiEvent.Playground): HarnessUiState = when (event) {
         is HarnessUiEvent.PlaygroundChanged -> state.copy(playground = event.state)
-
         is HarnessUiEvent.PlaygroundPromptChanged -> state.copy(playgroundPrompt = event.prompt)
-
-        is HarnessUiEvent.PlaygroundMaxTokensChanged -> state.copy(playgroundMaxTokens = event.maxTokens, playgroundPreset = "")
-
-        is HarnessUiEvent.PlaygroundTemperatureChanged -> state.copy(
-            playgroundTemperature = event.temperature,
-            playgroundPreset = "",
-        )
-
         is HarnessUiEvent.PlaygroundPresetChanged -> state.applyPreset(event.preset)
-
-        is HarnessUiEvent.PlaygroundTopPChanged -> state.copy(playgroundTopP = event.topP, playgroundPreset = "")
-
-        is HarnessUiEvent.PlaygroundTopKChanged -> state.copy(playgroundTopK = event.topK, playgroundPreset = "")
-
-        is HarnessUiEvent.PlaygroundMinPChanged -> state.copy(playgroundMinP = event.minP, playgroundPreset = "")
-
-        is HarnessUiEvent.PlaygroundPresencePenaltyChanged -> state.copy(
-            playgroundPresencePenalty = event.presencePenalty,
-            playgroundPreset = "",
-        )
-
-        is HarnessUiEvent.PlaygroundThinkingModeChanged -> state.copy(
-            playgroundThinkingMode = event.mode,
-            playgroundPreset = "",
-        )
-
-        is HarnessUiEvent.PlaygroundRepeatPenaltyChanged -> state.copy(
-            playgroundRepeatPenalty = event.repeatPenalty,
-            playgroundPreset = "",
-        )
-
-        is HarnessUiEvent.PlaygroundRepeatLastNChanged -> state.copy(
-            playgroundRepeatLastN = event.repeatLastN,
-            playgroundPreset = "",
-        )
-
-        is HarnessUiEvent.PlaygroundSeedChanged -> state.copy(playgroundSeed = event.seed, playgroundPreset = "")
-
-        is HarnessUiEvent.PlaygroundContextChanged -> state.copy(playgroundContext = event.context, playgroundPreset = "")
+        is HarnessUiEvent.PlaygroundControl -> reducePlaygroundControl(state, event)
     }
 
     private fun HarnessUiState.applyPreset(id: String): HarnessUiState {

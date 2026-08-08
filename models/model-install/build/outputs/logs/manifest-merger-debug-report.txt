@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml:2:13-83
+INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml:2:13-83
+	package
+		INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml
+	xmlns:android
+		ADDED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml:2:23-81
+uses-sdk
+INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml reason: use-sdk injection requested
+INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml
+INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml
+	android:targetSdkVersion
+		INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml
+	android:minSdkVersion
+		INJECTED from /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest11107169289081672652.xml

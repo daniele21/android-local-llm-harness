@@ -510,7 +510,6 @@ class RuntimeOrchestrator(
         )
     }
 
-    @Suppress("ComplexCondition")
     private fun validateGenerationValues(
         maxOutputTokens: Int,
         temperature: Float,
@@ -521,22 +520,29 @@ class RuntimeOrchestrator(
         repeatPenalty: Float,
         repeatLastN: Int,
     ) {
-        if (maxOutputTokens !in 1..MAX_OUTPUT_TOKENS ||
-            !temperature.isFinite() || temperature !in 0f..2f ||
-            !topP.isFinite() || topP <= 0f || topP > 1f ||
-            topK !in 0..MAX_TOP_K ||
-            !minP.isFinite() || minP !in 0f..1f ||
-            !presencePenalty.isFinite() || presencePenalty !in 0f..2f ||
-            !repeatPenalty.isFinite() || repeatPenalty !in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY ||
-            repeatLastN !in 0..MAX_REPEAT_LAST_N ||
-            (repeatPenalty != MIN_REPEAT_PENALTY && repeatLastN == 0)
-        ) {
+        val valid = outputAndTemperatureValid(maxOutputTokens, temperature) &&
+            samplingValuesValid(topP, topK, minP) &&
+            penaltyValuesValid(presencePenalty, repeatPenalty, repeatLastN)
+        if (!valid) {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
                 "Generation settings are outside the supported bounds",
             )
         }
     }
+
+    private fun outputAndTemperatureValid(maxOutputTokens: Int, temperature: Float): Boolean =
+        maxOutputTokens in 1..MAX_OUTPUT_TOKENS && temperature.isFinite() && temperature in 0f..2f
+
+    private fun samplingValuesValid(topP: Float, topK: Int, minP: Float): Boolean = topP.isFinite() && topP > 0f && topP <= 1f &&
+        topK in 0..MAX_TOP_K &&
+        minP.isFinite() && minP in 0f..1f
+
+    private fun penaltyValuesValid(presencePenalty: Float, repeatPenalty: Float, repeatLastN: Int): Boolean =
+        presencePenalty.isFinite() && presencePenalty in 0f..2f &&
+            repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY &&
+            repeatLastN in 0..MAX_REPEAT_LAST_N &&
+            (repeatPenalty == MIN_REPEAT_PENALTY || repeatLastN != 0)
 
     private fun validateOutputConstraint(
         request: GenerationRequest,

@@ -929,6 +929,22 @@ class MainActivity :
     private fun PlaygroundGenerationSettings(state: HarnessUiState, presentation: PlaygroundPresentation) {
         val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
         val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
+        PlaygroundPresetControls(state, presentation, selectedPreset, basePreset)
+        PlaygroundThinkingControls(state, presentation)
+        val temperature = playgroundTemperature(state)
+        PlaygroundPrimarySamplingControls(state, presentation, temperature)
+        PlaygroundSamplingFields(state, presentation)
+        PlaygroundPenaltyControls(state, presentation, temperature)
+        PlaygroundSeedAndContextControls(state, presentation, temperature)
+    }
+
+    @Composable
+    private fun PlaygroundPresetControls(
+        state: HarnessUiState,
+        presentation: PlaygroundPresentation,
+        selectedPreset: PlaygroundPresetOption?,
+        basePreset: PlaygroundPresetOption?,
+    ) {
         Text(
             text = selectedPreset?.let { "Preset · ${it.label}" }
                 ?: "Preset · Personalizzato${basePreset?.let { " · Basato su ${it.label}" }.orEmpty()}",
@@ -949,6 +965,10 @@ class MainActivity :
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+
+    @Composable
+    private fun PlaygroundThinkingControls(state: HarnessUiState, presentation: PlaygroundPresentation) {
         Text("Thinking", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
@@ -965,7 +985,12 @@ class MainActivity :
                 modifier = Modifier.testTag("playground-thinking-on"),
             )
         }
-        val temperature = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+    }
+
+    private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+
+    @Composable
+    private fun PlaygroundPrimarySamplingControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
         Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
         Slider(
             value = temperature,
@@ -983,6 +1008,10 @@ class MainActivity :
             enabled = presentation.inputsEnabled && temperature != 0f,
             modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
         )
+    }
+
+    @Composable
+    private fun PlaygroundSamplingFields(state: HarnessUiState, presentation: PlaygroundPresentation) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundMaxTokens,
@@ -999,29 +1028,34 @@ class MainActivity :
                 enabled = presentation.inputsEnabled,
             )
         }
+        val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundTopP,
                 onValueChange = harnessViewModel::updatePlaygroundTopP,
                 modifier = Modifier.weight(1f),
                 label = { Text("Top-p") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundTopK,
                 onValueChange = harnessViewModel::updatePlaygroundTopK,
                 modifier = Modifier.weight(1f),
                 label = { Text("Top-k") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundSeed,
                 onValueChange = harnessViewModel::updatePlaygroundSeed,
                 modifier = Modifier.weight(1f),
                 label = { Text("Seed · blank = random") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
             )
         }
+    }
+
+    @Composable
+    private fun PlaygroundPenaltyControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundMinP,
@@ -1056,19 +1090,24 @@ class MainActivity :
                 enabled = presentation.inputsEnabled,
             )
         }
+    }
+
+    @Composable
+    private fun PlaygroundSeedAndContextControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
+        val samplingEnabled = presentation.inputsEnabled && temperature != 0f
         Text("Seed policy", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = state.playgroundSeed.isBlank(),
                 onClick = { harnessViewModel.updatePlaygroundSeed("") },
                 label = { Text("Random each run") },
-                enabled = presentation.inputsEnabled && temperature != 0f,
+                enabled = samplingEnabled,
             )
             FilterChip(
                 selected = state.playgroundSeed.isNotBlank(),
                 onClick = { if (state.playgroundSeed.isBlank()) harnessViewModel.updatePlaygroundSeed("42") },
                 label = { Text("Fixed") },
-                enabled = presentation.inputsEnabled && temperature != 0f,
+                enabled = samplingEnabled,
             )
         }
         Text("Context policy", style = MaterialTheme.typography.labelLarge)
