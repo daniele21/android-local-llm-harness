@@ -201,10 +201,7 @@ class HarnessModelEffectsViewModelTest {
         installedAtEpochMs = 1L,
     )
 
-    private fun catalogModel(
-        stableId: String,
-        metadata: InstalledCatalogModelMetadata,
-    ): PhoneCatalogModelUi = PhoneCatalogModelUi(
+    private fun catalogModel(stableId: String, metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi = PhoneCatalogModelUi(
         stableId = stableId,
         displayName = metadata.displayName,
         description = "test",
