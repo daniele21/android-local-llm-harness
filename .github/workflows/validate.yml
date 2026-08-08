@@ -113,7 +113,7 @@ jobs:
           echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Restore native compiler cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
           key: ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**', 'backends/llama-cpp/src/test-native/**') }}
@@ -203,7 +203,7 @@ jobs:
 
       - name: Restore Android native compiler cache
         if: needs.scope.outputs.packaging == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
           key: android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**') }}
