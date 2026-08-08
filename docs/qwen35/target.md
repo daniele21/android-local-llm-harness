@@ -9,13 +9,13 @@ Last reviewed: 2026-08-08
 
 ## Objective
 
-Turn the Android Local LLM Harness into a product that is intentionally optimized, validated and safe-by-default for **Qwen3.5 dense 0.8B and 2B GGUF models**. This is the complete supported product envelope, not a preferred path beside a generic fallback.
+Turn the Android Local LLM Harness into a product intentionally optimized and validated for **Qwen3.5 dense 0.8B and 2B GGUF models**.
 
 For an application developer, the intended experience is:
 
 ```text
-supported Qwen3.5 model + use case
-  -> validated artifact
+curated Qwen3.5 model + use case
+  -> verified catalog artifact
   -> Qwen3.5-aware prompt/thinking/sampling plan
   -> bounded context/runtime configuration
   -> llama.cpp execution
@@ -24,22 +24,24 @@ supported Qwen3.5 model + use case
 
 The harness, not each consumer application, owns Qwen3.5-specific template semantics, sampling defaults, context policy, generation guards and Android tuning.
 
-## Product focus versus contract neutrality
+## Closed model surface
 
-The product is Qwen3.5-only. Public request, binding, session, streaming, cancellation, result and telemetry contracts remain model-family neutral so the runtime and transport layers do not depend on Qwen implementation types.
+The product model set is closed and repository-reviewed. Users can download and select the models exposed by the built-in catalog, but cannot add arbitrary GGUF files, URLs, model families or architectures.
 
-Neutral contracts do not authorize another model family. Admission policy rejects unsupported artifacts before runtime preparation, and a future family requires an explicit target and ADR change. Public thinking intent is family-neutral; only the internal Qwen3.5 planner knows how it maps to `enable_thinking`.
+The product therefore does not need a legacy-model compatibility layer, generic family fallback, arbitrary-import admission policy or unsupported-family presentation state. Cases outside the curated set are removed from product code rather than represented as runtime choices.
+
+Public request, binding, session, streaming, cancellation, result and telemetry contracts remain model-family neutral so runtime and transport layers stay decoupled from Qwen implementation types. Neutral contracts are architectural reuse, not a product extension point.
 
 ## Supported envelope
 
 ### Models
 
-- Qwen3.5 dense `0.8B`;
-- Qwen3.5 dense `2B`;
-- GGUF artifacts whose supported class is proven from structural metadata and, for catalog-managed artifacts, a matching trusted manifest;
-- exact artifact SHA-256 remains the immutable identity.
+- Qwen3.5 dense `0.8B` curated releases;
+- Qwen3.5 dense `2B` curated releases;
+- exact SHA-256 identity for every downloadable artifact;
+- trusted catalog metadata reviewed with the application profile.
 
-The initial certification candidates are Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M. Other 0.8B/2B quantizations may become compatible or experimental, but certification is never inherited across digests or quantizations.
+The initial certification candidates are Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M. Other curated 0.8B/2B quantizations may be used experimentally, but certification is never inherited across digests or quantizations.
 
 ### Runtime
 
@@ -47,24 +49,27 @@ The initial certification candidates are Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M. Othe
 - CPU-first execution;
 - repository-pinned and explicitly validated `llama.cpp`;
 - text input and text generation;
-- one active decode by default, preserving the current repository scheduling boundary.
+- one active decode by default, preserving the current scheduling boundary.
 
 ### Generation
 
 - non-thinking mode;
-- model-family-neutral thinking intent mapped internally to Qwen3.5 template configuration;
+- family-neutral thinking intent mapped internally to Qwen3.5 template configuration;
 - streaming and cooperative cancellation;
-- `TEXT`, `JSON` and `JSON_SCHEMA` output modes already owned by the generation layer;
+- `TEXT`, `JSON` and `JSON_SCHEMA` output modes;
 - Qwen3.5-aware sampling presets with explicit effective configuration;
 - bounded generation guards with typed stop reasons.
 
-## Explicit non-goals for this plan
+## Explicit non-goals
 
-The following must not be pulled into this plan unless the target is intentionally revised:
+The following are outside this plan:
 
+- user-facing manual GGUF import;
+- arbitrary remote model URLs or third-party catalog extension;
+- compatibility with user-supplied GGUF artifacts;
 - Qwen3.5 `4B` or `9B`;
 - Qwen3.5 MoE variants;
-- Qwen3, Qwen2.5 or any non-Qwen3.5 family;
+- Qwen3, Qwen2.5 or non-Qwen3.5 families;
 - image/video input or vision encoder support;
 - tool calling / agent protocol parsing;
 - Vulkan/GPU production support;
@@ -73,47 +78,35 @@ The following must not be pulled into this plan unless the target is intentional
 - Capacitor integration;
 - maximizing advertised model context length on phone.
 
-Unsupported model families must fail explicitly rather than silently falling back to generic behavior.
-
-## Legacy transition
-
-The current catalog and installed inventory may contain models outside this envelope. The transition is non-destructive:
-
-- unsupported releases stop being eligible for new installation or selection;
-- unsupported bindings become invalid and require explicit rebinding;
-- already installed bytes remain visible as legacy/unsupported until the user removes them;
-- no migration, admission failure or runtime release deletes an installed GGUF.
-
-Detailed states and acceptance criteria belong to [`workstreams/product-migration.md`](workstreams/product-migration.md).
+Developer-only device validation may still inject an exact test artifact into an isolated test application. That path is not exposed as a consumer model-import capability.
 
 ## Product invariants
 
-1. **Metadata over filename.** Architecture admission never depends on filename parsing.
-2. **Exact identity.** Certification is attached to an artifact digest and reproducible backend/configuration evidence.
+1. **Closed catalog.** Product model choice comes only from repository-reviewed Qwen3.5 0.8B/2B releases.
+2. **Exact identity.** Every artifact is verified by immutable SHA-256 identity before installation.
 3. **Qwen3.5-aware by default.** Template, thinking and sampler semantics resolve in the harness.
 4. **Mobile bounds first.** Context and runtime resources are chosen from approved Android tiers, not model-advertised maxima.
-5. **Backend owns math.** `llama.cpp` owns Qwen3.5 kernels and model execution; Kotlin/JNI must not reimplement Gated DeltaNet or attention math.
-6. **Capability-gated reuse.** Cache/session optimizations are enabled only after Qwen3.5 hybrid/recurrent behavior is validated.
-7. **No silent substitution.** An unsupported artifact, mode or capability returns a typed failure.
-8. **Evidence before certification.** Emulator or desktop success is insufficient for production Android compatibility claims.
-9. **Neutral core, focused product.** Generic contracts preserve architecture but never act as a support fallback.
-10. **Non-destructive retirement.** Legacy model bytes remain user-controlled even when they are no longer runnable.
+5. **Backend owns math.** `llama.cpp` owns Qwen3.5 kernels and model execution; Kotlin/JNI does not reimplement model math.
+6. **Capability-gated reuse.** Cache/session optimizations are enabled only after hybrid/recurrent behavior is validated.
+7. **No generic fallback.** Public contract neutrality never creates another product model path.
+8. **Evidence before certification.** Emulator or desktop success is insufficient for production Android claims.
+9. **No legacy layer.** Retired product cases are deleted rather than preserved as selectable or representable model states.
+10. **Catalog acquisition only.** Verified catalog download/install is the only consumer model acquisition path.
 
 ## Success criteria
 
-The transition is complete when:
+The Qwen3.5-only product target is complete when:
 
-- supported 0.8B and 2B reference artifacts pass metadata and backend compatibility checks;
-- unsupported architectures are rejected before native preparation;
-- thinking/non-thinking render through the correct Qwen3.5 template semantics without `/think` or `/nothink` hacks;
+- the executable catalog contains only curated Qwen3.5 dense 0.8B/2B releases;
+- consumer-facing manual model import is removed;
+- exact 0.8B and 2B reference artifacts pass metadata and backend compatibility checks;
+- thinking/non-thinking render through correct Qwen3.5 template semantics without `/think` or `/nothink` hacks;
 - recommended Qwen3.5 sampling baselines can be represented and overridden deterministically;
 - anomalous repetition/thinking has bounded detection and typed termination;
 - context, cache and reuse behavior is safe for the backend's Qwen3.5 hybrid/recurrent execution model;
 - separate evidence-backed Android runtime profiles exist for 0.8B and 2B;
 - tokenizer/template/output/streaming/cancellation golden and integration tests pass;
 - representative physical-device memory, thermal and latency evidence passes the certification gate;
-- catalog entries distinguish certified artifacts from merely compatible or unverified imports;
-- no non-Qwen3.5 or unsupported-tier catalog entry, binding or imported artifact can reach runtime preparation;
-- legacy installed artifacts remain visible and removable without being silently loaded or deleted.
+- certification is attached only to exact curated artifacts and validated backend/runtime evidence.
 
 Milestone sequencing is owned by [`roadmap.md`](roadmap.md).
