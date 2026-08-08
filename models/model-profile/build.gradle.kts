@@ -26,4 +26,5 @@ android {
 
 dependencies {
     api(project(":core:contracts"))
+    testImplementation(libs.junit4)
 }
