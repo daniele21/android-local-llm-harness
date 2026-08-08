@@ -15,8 +15,8 @@ The following capabilities already exist generically on `dev` and are inputs to 
 
 | Capability | State | Qwen3.5 work still required |
 | --- | --- | --- |
-| GGUF metadata inspection and SHA-256 identity | AVAILABLE | Add Qwen3.5 dense classification and compatibility rules. |
-| Model import/install and curated catalog | AVAILABLE | Add Qwen3.5-only admission and certification metadata. |
+| GGUF metadata inspection and SHA-256 identity | AVAILABLE | Validate the exact curated Qwen3.5 artifacts and backend pin. |
+| Model download/install and curated catalog | AVAILABLE | Remove multi-family entries and arbitrary user import from the product path. |
 | Generation, streaming and cancellation | AVAILABLE | Add Qwen3.5 template semantics, sampling and guard behavior. |
 | Exact tokenization and Auto/manual context planning | AVAILABLE | Add Qwen3.5 context tiers and hybrid/recurrent capability rules. |
 | Sampling presets and request overrides | AVAILABLE | Add `minP`, `presencePenalty` and Qwen3.5 presets. |
@@ -25,33 +25,36 @@ The following capabilities already exist generically on `dev` and are inputs to 
 
 `AVAILABLE` means a reusable generic capability is present. It does not mean Qwen3.5 behavior is validated.
 
-## Product-transition progress
+## Product progress
 
 | ID | Workstream | State | Exit condition |
 | --- | --- | --- | --- |
 | Q35-0 | Decision and progressive-disclosure plan | DONE | ADR 0011, target, architecture, roadmap and focused owners agree. |
-| Q35-1 | Product support migration | PLANNED | Catalog, bindings and legacy inventory enforce the Qwen3.5-only envelope non-destructively. |
-| Q35-2 | Model/backend compatibility | PLANNED | Only supported dense Qwen3.5 0.8B/2B artifacts can reach preparation; backend pin is proven compatible. |
+| Q35-1 | Curated model baseline | PLANNED | Product model selection is closed to curated Qwen3.5 dense 0.8B/2B releases; manual import and multi-family product paths are removed. |
+| Q35-2 | Model/backend compatibility | PLANNED | Exact curated 0.8B/2B artifacts are proven against the pinned backend. |
 | Q35-3 | Thinking/template/sampling | PLANNED | Neutral thinking intent and Qwen3.5 sampler profiles resolve deterministically. |
 | Q35-4 | Generation guard | PLANNED | Runaway/repetitive thinking can be interrupted with bounded, typed stop reasons. |
 | Q35-5 | Runtime/context/cache capability model | PLANNED | Context and reuse paths do not assume pure KV-cache semantics. |
 | Q35-6 | Android runtime tuning | PLANNED | 0.8B and 2B have evidence-backed CPU profiles on representative devices. |
 | Q35-7 | Validation suite | PLANNED | Golden/integration/device gates pass for the supported matrix. |
-| Q35-8 | Certification and catalog | PLANNED | Exact evidence status is separate from availability and compatibility. |
+| Q35-8 | Certification | PLANNED | Exact curated artifacts receive evidence-backed certification independently of catalog availability. |
 
 ## Immediate next slice: Q35-1
 
-Align the current product surfaces with ADR 0011 before claiming that compatibility is Qwen3.5-only.
+Delete generic product choices before adding Qwen3.5-specific execution behavior.
 
-Begin with the shared support-envelope decision and curated eligibility. Then migrate binding and legacy-inventory behavior before updating connected presentation and fixtures. Detailed tasks and acceptance criteria belong only to [`workstreams/product-migration.md`](workstreams/product-migration.md).
+Start by replacing the executable catalog with Qwen3.5 dense 0.8B/2B entries only. Then remove consumer-facing manual GGUF import and the inventory/UI states that exist only to represent arbitrary external models. Keep verified catalog download/install and isolated developer test injection.
+
+Detailed tasks and acceptance criteria belong only to [`workstreams/curated-model-baseline.md`](workstreams/curated-model-baseline.md).
 
 ## Blockers and evidence gaps
 
+- The executable catalog still contains non-Qwen3.5, Qwen3 and Qwen3.5 4B entries.
+- Consumer-facing manual GGUF import still exists in the current implementation and must be removed from the product path.
 - No Qwen3.5 artifact/quantization combination is certified by this workstream yet.
-- The executable catalog still exposes non-Qwen3.5, Qwen3 and Qwen3.5 4B entries; ADR 0011 is not implemented yet.
-- The current pinned `llama.cpp` revision must be validated against reference Qwen3.5 GGUFs before compatibility is claimed.
-- Runtime tuning values must not be chosen from desktop assumptions; they require representative Android evidence.
-- Prefix/session restore or reuse must remain capability-gated until the backend behavior for Qwen3.5 hybrid/recurrent state is verified.
+- The current pinned `llama.cpp` revision must be validated against the exact curated Qwen3.5 GGUFs before compatibility is claimed.
+- Runtime tuning values require representative Android evidence.
+- Prefix/session restore or reuse remains capability-gated until the backend behavior for Qwen3.5 hybrid/recurrent state is verified.
 - Production-ready compatibility claims remain blocked on physical-device evidence.
 
 ## State transition rule
