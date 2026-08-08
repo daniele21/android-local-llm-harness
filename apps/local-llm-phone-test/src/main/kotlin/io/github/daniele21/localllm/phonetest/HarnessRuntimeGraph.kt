@@ -48,8 +48,9 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private var runtimeModelDigest: ModelDigest? = null
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
-        registry.select(model)
+        Qwen35PhoneModelPolicy.requireCurated(model)
         ensureRuntimeFor(model)
+        registry.select(model)
         val resolved = registry.resolve(APPLICATION_ID, purpose.useCaseId)
         PhoneHarness(
             runtime = requireNotNull(runtime),
