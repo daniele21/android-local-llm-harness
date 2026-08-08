@@ -201,7 +201,7 @@ class HarnessModelEffectsViewModelTest {
         digest = ModelDigest(seed.repeat(64)),
         fileName = "model-$seed.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen3",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
     )
 
@@ -215,7 +215,7 @@ class HarnessModelEffectsViewModelTest {
         useCaseId = "manual-inference-playground",
         fileName = "model-$seed.gguf",
         sizeBytes = 2_048L,
-        architecture = "qwen3",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         installedAtEpochMs = 1L,
     )
