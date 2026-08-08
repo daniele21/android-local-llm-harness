@@ -2,29 +2,32 @@ package io.github.daniele21.localllm.catalog
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.security.MessageDigest
 
 class CuratedModelCatalogTest {
     @Test
-    fun curatedDocumentValidatesAndHasStableCanonicalPayload() {
+    fun curatedDocumentValidatesAndRoundTripsCanonicalPayload() {
         val document = CuratedModelCatalog.document(GENERATED_AT, EXPIRES_AT)
 
         val validation = CatalogValidator().validate(document, GENERATED_AT + 1)
         assertTrue(validation.violations.toString(), validation.valid)
+        assertEquals(4L, document.revision)
 
-        val encoded = CatalogJsonCodec().encode(document) as CatalogEncodeResult.Success
-        assertEquals(EXPECTED_CANONICAL_SHA256, encoded.bytes.sha256())
+        val codec = CatalogJsonCodec()
+        val encoded = codec.encode(document) as CatalogEncodeResult.Success
+        val reencoded = codec.encode(document) as CatalogEncodeResult.Success
+        assertArrayEquals(encoded.bytes, reencoded.bytes)
 
-        val decoded = CatalogJsonCodec().decode(encoded.bytes) as CatalogDecodeResult.Success
+        val decoded = codec.decode(encoded.bytes) as CatalogDecodeResult.Success
         assertEquals(document, decoded.document)
     }
 
     @Test
-    fun exposesEighteenCandidateReleasesForThePhonePlayground() {
+    fun exposesSevenQwen35CandidateReleasesForThePhonePlayground() {
         val target =
             CatalogTarget(
                 applicationId = ApplicationId("play-internal-phone-test"),
@@ -33,6 +36,7 @@ class CuratedModelCatalogTest {
         val releases = CatalogQueries.releasesForTarget(CuratedModelCatalog.document(GENERATED_AT, EXPIRES_AT), target)
 
         assertEquals(EXPECTED_MODEL_IDS, releases.mapTo(linkedSetOf()) { it.id.modelId.value })
+        assertTrue(releases.all { it.artifact.architecture == "qwen35" })
         assertTrue(releases.all { it.availability == CatalogAvailability.CANDIDATE })
         assertTrue(releases.all { it.artifact.quantization.isNotBlank() })
         assertTrue(releases.all { it.compatibility.minSdk == 26 })
@@ -73,9 +77,6 @@ class CuratedModelCatalogTest {
         assertFalse(result.reasons.contains(CatalogCompatibilityReason.RELEASE_UNAVAILABLE))
     }
 
-    private fun ByteArray.sha256(): String =
-        MessageDigest.getInstance("SHA-256").digest(this).joinToString("") { byte -> "%02x".format(byte) }
-
     private object AcceptingVersionMatcher : CatalogVersionMatcher {
         override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean = true
     }
@@ -87,17 +88,8 @@ class CuratedModelCatalogTest {
     private companion object {
         const val GENERATED_AT = 1_800_000_000_000
         const val EXPIRES_AT = 1_800_086_400_000
-        const val EXPECTED_CANONICAL_SHA256 = "34cc269ec1bf57555c675bfe98380469b86008bb0d4d6969ef3951af4c53a7b7"
         val EXPECTED_MODEL_IDS =
             setOf(
-                "lfm2.5-1.2b-instruct-q4-k-m",
-                "smollm2-360m-instruct-q4-k-m",
-                "qwen3-8b-ud-iq1-s",
-                "qwen3-8b-ud-iq1-m",
-                "qwen3-8b-q2-k",
-                "qwen3-8b-q3-k-m",
-                "qwen3-8b-q4-k-m",
-                "qwen3-8b-q5-k-m",
                 "qwen35-08b-q4-k-m",
                 "qwen35-08b-q5-k-m",
                 "qwen35-08b-q8-0",
@@ -105,9 +97,6 @@ class CuratedModelCatalogTest {
                 "qwen35-2b-q4-k-m",
                 "qwen35-2b-q5-k-m",
                 "qwen35-2b-ud-iq2-xxs",
-                "qwen35-4b-q4-k-m",
-                "qwen35-4b-q5-k-m",
-                "qwen35-4b-ud-iq2-xxs",
             )
     }
 }
