@@ -17,7 +17,6 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -377,8 +376,6 @@ internal class PhoneTestController(
     private fun post(action: () -> Unit) {
         mainHandler.post(action)
     }
-
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
 
     private data class GenerationSummary(
         val inputTokens: String,
