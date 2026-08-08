@@ -40,13 +40,13 @@ The repository-level ruleset for `dev` remains an administrative verification it
 - HTTPS-only verified transfer with bounded redirects, size checks, SHA-256 validation and cancellation;
 - opaque verified-download handle and explicit installation boundary;
 - durable path-free installed catalog/profile metadata;
-- explicit import, download, install, select, verify and remove operations;
+- explicit import, download, install, select, verify and remove operations in the current generic baseline;
 - protected removal while the runtime owns or uses a model;
 - unified immutable projection across catalog releases, installed metadata, external imports, selection and runtime-loaded ownership;
 - explicit degraded states for loaded-model absence or loaded-versus-selected mismatch;
 - model-detail presentation and deterministic recovery that never deletes a GGUF as part of runtime release.
 
-The integrated catalog and fixtures are still multi-family. [ADR 0011](adr/0011-qwen35-only-product-support.md) establishes the Qwen3.5-only target, but catalog, binding, import and preparation enforcement remain planned; the current implementation must not yet be described as Qwen3.5-only.
+The integrated baseline is still multi-family and still exposes generic manual-import behavior. [ADR 0011](adr/0011-qwen35-only-product-support.md) now defines a simpler Qwen3.5-only target: those generic product paths are implementation debt to remove, not compatibility cases to preserve.
 
 ### Connected Android application
 
@@ -55,7 +55,7 @@ The integrated catalog and fixtures are still multi-family. [ADR 0011](adr/0011-
 - Overview, Playground, Models, Diagnostics and Settings;
 - compact bottom navigation and expanded navigation rail;
 - one process-scoped runtime graph shared by Playground and physical validation;
-- real GGUF import, inference, streaming, cancellation, cleanup and validation;
+- current generic GGUF import plus inference, streaming, cancellation, cleanup and validation;
 - ViewModel/UDF ownership for Playground and Models;
 - typed Settings, request-timeline and model-detail routes;
 - real run, health, resource, benchmark, log and request-timeline data;
@@ -78,13 +78,14 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 
 ## Open implementation blocks
 
-### 1. Qwen3.5-only product migration
+### 1. Qwen3.5 curated model baseline
 
-- restrict new catalog eligibility, selection and binding to Qwen3.5 dense 0.8B/2B;
-- add non-destructive legacy/unsupported state for retained installed artifacts;
-- invalidate unsupported bindings without substitution;
-- enforce the support envelope beyond UI/catalog filtering so stale catalogs and imports fail closed;
-- preserve neutral core lifecycle contracts while moving Qwen policy into existing domain owners.
+- replace the executable catalog with Qwen3.5 dense 0.8B/2B releases only;
+- remove consumer-facing arbitrary GGUF import from product contracts, navigation and UI;
+- remove product bindings, profiles and fixtures for retired families and tiers;
+- simplify inventory state after external-import and legacy compatibility concepts disappear;
+- keep verified catalog download/install as the only consumer acquisition path;
+- keep developer-only artifact injection isolated in validation tooling.
 
 The milestone sequence and focused acceptance criteria start at [`qwen35/README.md`](qwen35/README.md).
 
@@ -117,16 +118,17 @@ The milestone sequence and focused acceptance criteria start at [`qwen35/README.
 
 - build and sign the exact release candidate;
 - distribute it through Google Play Internal Testing;
-- validate remote download/install, imported GGUF and real JNI inference on representative `arm64-v8a` hardware;
+- validate curated remote download/install and real JNI inference on representative `arm64-v8a` hardware;
+- use exact known artifacts in isolated validation tooling where direct artifact injection is required;
 - cancel during prefill and decode;
 - record repeated lifecycle memory stability, cold/warm latency, throughput, PSS and thermal evidence;
 - preserve privacy-safe evidence without committing model or signing material.
 
 ## Immediate next block
 
-Implement Q35-1, the non-destructive Qwen3.5-only product migration, before model-specific compatibility, prompting or tuning work.
+Implement Q35-1, the closed Qwen3.5 curated model baseline.
 
-Start with the shared support-envelope decision and curated eligibility, then migrate bindings and retained legacy inventory. The exact task ledger and exit gate are owned by [`qwen35/workstreams/product-migration.md`](qwen35/workstreams/product-migration.md); Q35-2 must not start until that gate passes.
+Start by deleting non-Qwen3.5 and unsupported-tier catalog entries, then remove consumer-facing manual import and the product states/fixtures that exist only for generic model management. The exact task ledger and exit gate are owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md). Q35-2 then validates the exact remaining artifacts against the pinned backend.
 
 ## Blockers and deferred evidence
 
