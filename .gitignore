@@ -12,8 +12,6 @@
 *.jks
 *.keystore
 keystore.properties
-models/*
-!models/AGENTS.md
 *.gguf
 *.ggml
 
