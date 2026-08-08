@@ -84,6 +84,9 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             temperature = configuration.temperature,
             topP = configuration.topP,
             topK = configuration.topK,
+            minP = configuration.minP,
+            presencePenalty = configuration.presencePenalty,
+            thinkingMode = configuration.thinkingMode,
             repeatPenalty = configuration.repeatPenalty,
             repeatLastN = configuration.repeatLastN,
             seedPolicy = configuration.requestedSeedPolicy,
@@ -108,6 +111,9 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
                 put("promptTokenCount", configuration.promptTokenCount.toString())
                 put("chatTemplateId", configuration.chatTemplateId)
                 put("chatTemplateSource", configuration.chatTemplateSource.name)
+                put("thinkingMode", configuration.thinkingMode.name)
+                put("minP", configuration.minP.toString())
+                put("presencePenalty", configuration.presencePenalty.toString())
                 put("repeatPenalty", configuration.repeatPenalty.toString())
                 put("repeatLastN", configuration.repeatLastN.toString())
                 configuration.preset?.let {

@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkKey
@@ -51,6 +52,9 @@ internal object TelemetryEntityMapper {
         temperature = run.temperature
         topP = run.topP
         topK = run.topK
+        minP = run.minP
+        presencePenalty = run.presencePenalty
+        thinkingMode = run.thinkingMode?.name
         repeatPenalty = run.repeatPenalty
         repeatLastN = run.repeatLastN
         seedPolicy = run.seedPolicy?.name
@@ -90,6 +94,9 @@ internal object TelemetryEntityMapper {
         temperature = entity.temperature,
         topP = entity.topP,
         topK = entity.topK,
+        minP = entity.minP,
+        presencePenalty = entity.presencePenalty,
+        thinkingMode = entity.thinkingMode?.let(ThinkingMode::valueOf),
         repeatPenalty = entity.repeatPenalty,
         repeatLastN = entity.repeatLastN,
         seedPolicy = entity.seedPolicy?.let(SeedPolicyType::valueOf),

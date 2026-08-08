@@ -115,6 +115,8 @@ data class NativeGenerationConfig(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val minP: Float = 0f,
+    val presencePenalty: Float = 0f,
     val repeatPenalty: Float,
     val repeatLastN: Int,
     val seed: Long,
@@ -132,6 +134,8 @@ data class NativeGenerationConfig(
         temperature < 0F -> invalid("Temperature must not be negative")
         topP <= 0F || topP > 1F -> invalid("Top-p must be in (0, 1]")
         topK < 0 -> invalid("Top-k must not be negative")
+        !minP.isFinite() || minP !in 0f..1f -> invalid("Min-p must be in [0, 1]")
+        !presencePenalty.isFinite() || presencePenalty !in 0f..2f -> invalid("Presence penalty must be in [0, 2]")
         seed < 0 -> invalid("Seed must not be negative")
         else -> null
     }

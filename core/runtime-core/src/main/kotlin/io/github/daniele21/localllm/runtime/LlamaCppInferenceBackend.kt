@@ -85,6 +85,7 @@ class LlamaCppInferenceBackend(
                 input = request.input,
                 systemPrompt = request.systemPrompt,
                 policy = request.chatTemplatePolicy,
+                thinkingMode = request.thinkingMode,
             )
         ) {
             is NativePromptPlanningResult.Success -> BackendPromptPlan(
@@ -131,6 +132,8 @@ class LlamaCppInferenceBackend(
             temperature = request.temperature,
             topP = request.topP,
             topK = request.topK,
+            minP = request.minP,
+            presencePenalty = request.presencePenalty,
             repeatPenalty = request.repeatPenalty,
             repeatLastN = request.repeatLastN,
             seed = request.seed,

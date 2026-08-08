@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.GenerationInput
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.ChatTemplatePolicy
 import io.github.daniele21.localllm.models.GgufModelProfile
 import io.github.daniele21.localllm.store.StoredModel
@@ -22,7 +23,12 @@ interface BackendContextHandle {
 
 data class BackendModelCapabilities(val maximumContextTokens: Int, val supportsGrammar: Boolean)
 
-data class BackendPromptPlanningRequest(val input: GenerationInput, val systemPrompt: String?, val chatTemplatePolicy: ChatTemplatePolicy)
+data class BackendPromptPlanningRequest(
+    val input: GenerationInput,
+    val systemPrompt: String?,
+    val chatTemplatePolicy: ChatTemplatePolicy,
+    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
+)
 
 data class BackendPromptPlan(
     val prompt: String,
@@ -46,6 +52,8 @@ data class BackendGenerationRequest(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val minP: Float = 0f,
+    val presencePenalty: Float = 0f,
     val repeatPenalty: Float,
     val repeatLastN: Int,
     val seed: Long,

@@ -125,7 +125,7 @@ private class LoadClassificationFixture {
             id = "assistant-use-case",
             modelProfileId = model.id,
             systemPromptVersion = "v1",
-            generationDefaults = GenerationDefaults(8, 0f, 1f, 0, 0L),
+            generationDefaults = GenerationDefaults(maxOutputTokens = 8, temperature = 0f, topP = 1f, topK = 0, seed = 0L),
             outputMode = OutputMode.TEXT,
             cachePolicy = UseCaseCachePolicy(0, false, false, false),
             healthSuiteId = "health",

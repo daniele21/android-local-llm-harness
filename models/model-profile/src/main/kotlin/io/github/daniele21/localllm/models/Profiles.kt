@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SeedPolicy
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 data class GgufArtifact(
@@ -43,6 +44,9 @@ data class GenerationDefaults(
     val temperature: Float,
     val topP: Float = 0.95f,
     val topK: Int = 40,
+    val minP: Float = 0f,
+    val presencePenalty: Float = 0f,
+    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
     val seed: Long? = null,
     val seedPolicy: SeedPolicy = seed?.let(SeedPolicy::Fixed) ?: SeedPolicy.Random,
     val repeatPenalty: Float = DEFAULT_REPEAT_PENALTY,
@@ -53,6 +57,10 @@ data class GenerationDefaults(
         require(temperature.isFinite() && temperature in 0f..2f) { "Temperature must be in [0, 2]" }
         require(topP.isFinite() && topP > 0f && topP <= 1f) { "Top-p must be in (0, 1]" }
         require(topK in 0..MAX_TOP_K) { "Top-k must be in [0, $MAX_TOP_K]" }
+        require(minP.isFinite() && minP in 0f..1f) { "Min-p must be in [0, 1]" }
+        require(presencePenalty.isFinite() && presencePenalty in 0f..2f) {
+            "Presence penalty must be in [0, 2]"
+        }
         require(repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY) {
             "Repeat penalty must be in [$MIN_REPEAT_PENALTY, $MAX_REPEAT_PENALTY]"
         }

@@ -5,6 +5,7 @@
 #include "llama.h"
 #include "native_handle_registry.h"
 #include "json-schema-to-grammar.h"
+#include "chat.h"
 #include <nlohmann/json.hpp>
 
 #include <atomic>
@@ -368,7 +369,8 @@ std::vector<std::string> plan_prompt(
     const std::string& application_template,
     const std::string& family_template_id,
     const std::string& family_template,
-    const std::string& raw_completion
+    const std::string& raw_completion,
+    bool enable_thinking
 ) {
     const llama_vocab* vocab = llama_model_get_vocab(record.model);
     if (!raw_completion.empty()) {
@@ -408,47 +410,44 @@ std::vector<std::string> plan_prompt(
         return error_response("CHAT_TEMPLATE_UNAVAILABLE", "No approved chat template is available for this model");
     }
 
-    std::vector<std::string> owned_roles;
-    std::vector<std::string> owned_contents;
-    owned_roles.reserve(roles.size() + (system_prompt.empty() ? 0U : 1U));
-    owned_contents.reserve(contents.size() + (system_prompt.empty() ? 0U : 1U));
-    if (!system_prompt.empty()) {
-        owned_roles.emplace_back("system");
-        owned_contents.push_back(system_prompt);
-    }
-    owned_roles.insert(owned_roles.end(), roles.begin(), roles.end());
-    owned_contents.insert(owned_contents.end(), contents.begin(), contents.end());
-
-    std::vector<llama_chat_message> messages;
-    messages.reserve(owned_roles.size());
-    for (std::size_t index = 0; index < owned_roles.size(); ++index) {
-        messages.push_back({owned_roles[index].c_str(), owned_contents[index].c_str()});
-    }
-
-    const std::int32_t required = llama_chat_apply_template(
-        selected_template,
-        messages.data(),
-        messages.size(),
-        true,
-        nullptr,
-        0
-    );
-    if (required <= 0) {
+    common_chat_templates_ptr templates;
+    try {
+        const std::string override_template = template_source == "GGUF" ? std::string{} : std::string(selected_template);
+        templates = common_chat_templates_init(record.model, override_template);
+    } catch (const std::exception&) {
         return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template is not supported by this runtime");
     }
-    std::vector<char> buffer(static_cast<std::size_t>(required) + 1U, '\0');
-    const std::int32_t written = llama_chat_apply_template(
-        selected_template,
-        messages.data(),
-        messages.size(),
-        true,
-        buffer.data(),
-        static_cast<std::int32_t>(buffer.size())
-    );
-    if (written <= 0 || written > required) {
+    if (!templates) {
+        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be initialized");
+    }
+
+    common_chat_templates_inputs inputs;
+    inputs.add_generation_prompt = true;
+    inputs.use_jinja = true;
+    inputs.enable_thinking = enable_thinking;
+    inputs.messages.reserve(roles.size() + (system_prompt.empty() ? 0U : 1U));
+    if (!system_prompt.empty()) {
+        common_chat_msg message;
+        message.role = "system";
+        message.content = system_prompt;
+        inputs.messages.push_back(std::move(message));
+    }
+    for (std::size_t index = 0; index < roles.size(); ++index) {
+        common_chat_msg message;
+        message.role = roles[index];
+        message.content = contents[index];
+        inputs.messages.push_back(std::move(message));
+    }
+
+    std::string prompt;
+    try {
+        prompt = common_chat_templates_apply(templates.get(), inputs).prompt;
+    } catch (const std::exception&) {
         return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be rendered");
     }
-    const std::string prompt(buffer.data(), static_cast<std::size_t>(written));
+    if (prompt.empty()) {
+        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template rendered an empty prompt");
+    }
     const std::vector<llama_token> tokens = tokenize_prompt(vocab, prompt);
     if (tokens.empty()) {
         return error_response("TOKENIZATION_FAILED", "Rendered prompt tokenization returned no tokens");
@@ -668,7 +667,8 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaPromptApi_planPrompt(
     jstring application_template_value,
     jstring family_template_id_value,
     jstring family_template_value,
-    jstring raw_completion_value
+    jstring raw_completion_value,
+    jboolean enable_thinking
 ) {
     const auto model = models.get(static_cast<std::int64_t>(model_handle));
     if (!model) {
@@ -717,7 +717,8 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaPromptApi_planPrompt(
             application_template,
             family_template_id,
             family_template,
-            raw_completion
+            raw_completion,
+            enable_thinking == JNI_TRUE
         )
     );
 }

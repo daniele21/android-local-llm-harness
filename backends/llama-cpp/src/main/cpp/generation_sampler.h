@@ -13,6 +13,8 @@ GenerationSampler create_generation_sampler(
     float temperature,
     float top_p,
     std::int32_t top_k,
+    float min_p,
+    float presence_penalty,
     float repeat_penalty,
     std::int32_t repeat_last_n,
     std::uint32_t seed,

@@ -28,6 +28,11 @@ sealed interface SeedPolicy {
     }
 }
 
+enum class ThinkingMode {
+    ENABLED,
+    DISABLED,
+}
+
 enum class SeedPolicyType {
     RANDOM,
     FIXED,
@@ -136,12 +141,19 @@ data class EffectiveGenerationMetadata(
     val chatTemplateId: String,
     val chatTemplateSource: ChatTemplateSource,
     val systemPromptVersion: String?,
+    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
+    val minP: Float = 0f,
+    val presencePenalty: Float = 0f,
 ) {
     init {
         require(chatTemplateId.isNotBlank()) { "Chat template ID must not be blank" }
         require(chatTemplateId.length <= 128) { "Chat template ID must not exceed 128 characters" }
         require(systemPromptVersion == null || systemPromptVersion.length <= 128) {
             "System prompt version must not exceed 128 characters"
+        }
+        require(minP.isFinite() && minP in 0f..1f) { "Min-p must be in [0, 1]" }
+        require(presencePenalty.isFinite() && presencePenalty in 0f..2f) {
+            "Presence penalty must be in [0, 2]"
         }
     }
 }

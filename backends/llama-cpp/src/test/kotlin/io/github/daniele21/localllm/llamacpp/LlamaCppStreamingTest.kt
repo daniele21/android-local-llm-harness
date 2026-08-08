@@ -45,7 +45,7 @@ class LlamaCppStreamingTest {
             received,
         )
         assertEquals(
-            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 1.05f, 64, 77L, "TEXT"),
+            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 0f, 0f, 1.05f, 64, 77L, "TEXT"),
             nativeApi.lastGeneration,
         )
     }
@@ -201,6 +201,8 @@ private class FakeNativeStreamingApi(
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
         seed: Long,
@@ -219,6 +221,8 @@ private class FakeNativeStreamingApi(
             temperature,
             topP,
             topK,
+            minP,
+            presencePenalty,
             repeatPenalty,
             repeatLastN,
             seed,

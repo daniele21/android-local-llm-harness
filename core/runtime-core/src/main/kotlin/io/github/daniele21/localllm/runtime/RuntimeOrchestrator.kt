@@ -24,6 +24,7 @@ import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ContextPreference
 import io.github.daniele21.localllm.models.GenerationDefaults
@@ -299,6 +300,7 @@ class RuntimeOrchestrator(
                     input = request.input,
                     systemPrompt = resolved.systemPrompt,
                     chatTemplatePolicy = session.resolved.model.chatTemplatePolicy,
+                    thinkingMode = resolved.thinkingMode,
                 ),
             )
             lifecycle.ensureNotCancelled()
@@ -324,6 +326,8 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
                 repeatPenalty = resolved.repeatPenalty,
                 repeatLastN = resolved.repeatLastN,
                 requestedSeedPolicy = resolved.seedPolicy.toType(),
@@ -334,6 +338,7 @@ class RuntimeOrchestrator(
                 chatTemplateId = promptPlan.chatTemplateId,
                 chatTemplateSource = promptPlan.chatTemplateSource,
                 systemPromptVersion = resolved.systemPromptVersion,
+                thinkingMode = resolved.thinkingMode,
             )
             runtimeTelemetry.prepared(
                 requestId = request.requestId,
@@ -355,6 +360,8 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
                 repeatPenalty = resolved.repeatPenalty,
                 repeatLastN = resolved.repeatLastN,
                 seed = resolved.effectiveSeed,
@@ -445,9 +452,21 @@ class RuntimeOrchestrator(
         val temperature = request.overrides.temperature ?: defaults.temperature
         val topP = request.overrides.topP ?: defaults.topP
         val topK = request.overrides.topK ?: defaults.topK
+        val minP = request.overrides.minP ?: defaults.minP
+        val presencePenalty = request.overrides.presencePenalty ?: defaults.presencePenalty
+        val thinkingMode = request.overrides.thinkingMode ?: defaults.thinkingMode
         val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty
         val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN
-        validateGenerationValues(maxOutputTokens, temperature, topP, topK, repeatPenalty, repeatLastN)
+        validateGenerationValues(
+            maxOutputTokens,
+            temperature,
+            topP,
+            topK,
+            minP,
+            presencePenalty,
+            repeatPenalty,
+            repeatLastN,
+        )
 
         val seedPolicy = request.overrides.requestedSeedPolicy() ?: defaults.seedPolicy
         val effectiveSeed = when (seedPolicy) {
@@ -458,6 +477,12 @@ class RuntimeOrchestrator(
             throw GenerationPlanningException(
                 ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
                 "Seed source returned a value outside the unsigned 32-bit range",
+            )
+        }
+        if (request.input is GenerationInput.RawCompletion && thinkingMode == ThinkingMode.ENABLED) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking mode requires chat-template rendering and cannot be used with raw completion",
             )
         }
         if (request.input is GenerationInput.RawCompletion && !session.resolved.model.chatTemplatePolicy.allowRawCompletion) {
@@ -472,6 +497,9 @@ class RuntimeOrchestrator(
             temperature = temperature,
             topP = topP,
             topK = topK,
+            minP = minP,
+            presencePenalty = presencePenalty,
+            thinkingMode = thinkingMode,
             repeatPenalty = repeatPenalty,
             repeatLastN = repeatLastN,
             seedPolicy = seedPolicy,
@@ -488,6 +516,8 @@ class RuntimeOrchestrator(
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
     ) {
@@ -495,6 +525,8 @@ class RuntimeOrchestrator(
             !temperature.isFinite() || temperature !in 0f..2f ||
             !topP.isFinite() || topP <= 0f || topP > 1f ||
             topK !in 0..MAX_TOP_K ||
+            !minP.isFinite() || minP !in 0f..1f ||
+            !presencePenalty.isFinite() || presencePenalty !in 0f..2f ||
             !repeatPenalty.isFinite() || repeatPenalty !in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY ||
             repeatLastN !in 0..MAX_REPEAT_LAST_N ||
             (repeatPenalty != MIN_REPEAT_PENALTY && repeatLastN == 0)
@@ -807,6 +839,9 @@ class RuntimeOrchestrator(
         val temperature: Float,
         val topP: Float,
         val topK: Int,
+        val minP: Float,
+        val presencePenalty: Float,
+        val thinkingMode: ThinkingMode,
         val repeatPenalty: Float,
         val repeatLastN: Int,
         val seedPolicy: SeedPolicy,

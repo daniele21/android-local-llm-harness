@@ -9,6 +9,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 data class GenerationRunRecord(
@@ -35,6 +36,9 @@ data class GenerationRunRecord(
     val temperature: Float? = null,
     val topP: Float? = null,
     val topK: Int? = null,
+    val minP: Float? = null,
+    val presencePenalty: Float? = null,
+    val thinkingMode: ThinkingMode? = null,
     val repeatPenalty: Float? = null,
     val repeatLastN: Int? = null,
     val seedPolicy: SeedPolicyType? = null,

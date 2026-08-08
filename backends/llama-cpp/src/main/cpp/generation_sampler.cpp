@@ -5,6 +5,8 @@ GenerationSampler create_generation_sampler(
     float temperature,
     float top_p,
     std::int32_t top_k,
+    float min_p,
+    float presence_penalty,
     float repeat_penalty,
     std::int32_t repeat_last_n,
     std::uint32_t seed,
@@ -26,13 +28,16 @@ GenerationSampler create_generation_sampler(
 
     llama_sampler_chain_add(
         sampler,
-        llama_sampler_init_penalties(repeat_last_n, repeat_penalty, 0.0F, 0.0F)
+        llama_sampler_init_penalties(repeat_last_n, repeat_penalty, 0.0F, presence_penalty)
     );
     if (temperature <= 0.0F) {
         llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
     } else {
         llama_sampler_chain_add(sampler, llama_sampler_init_top_k(top_k));
         llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));
+        if (min_p > 0.0F) {
+            llama_sampler_chain_add(sampler, llama_sampler_init_min_p(min_p, 1));
+        }
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(seed));
     }
