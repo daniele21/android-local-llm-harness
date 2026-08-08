@@ -54,9 +54,23 @@ Exit gate:
 
 ## Q35-1 — Curated model baseline
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: make the product expose only the reviewed Qwen3.5 dense 0.8B/2B model set and delete generic model-import/product paths that are no longer needed.
+
+Implemented on `dev`:
+
+- executable catalog restricted to the seven reviewed Qwen3.5 dense 0.8B/2B releases;
+- consumer-facing manual GGUF import removed from Android UI, effects and controller;
+- product runtime binding anchored to exact curated release metadata and release profile identity;
+- former imported/SAF product provenance removed from the consumer runtime path;
+- product fixtures migrated away from retired model families while generic lifecycle contracts remain family-neutral;
+- external-import inventory origin/projection removed;
+- out-of-catalog selections and persisted metadata are ignored rather than surfaced through legacy/unsupported states;
+- Models, Overview and Playground use the curated catalog path;
+- developer-only artifact injection remains isolated in validation tooling.
+
+Current gate: complete applicable Android/package validation and final closed-surface assertions before marking Q35-1 done.
 
 Exit gate:
 
@@ -67,7 +81,8 @@ Exit gate:
 - no legacy/unsupported model state is introduced to preserve retired cases;
 - verified catalog download/install remains the only product acquisition path;
 - isolated developer test artifact injection remains outside product APIs;
-- deterministic catalog, binding, inventory and UI tests pass.
+- deterministic catalog, binding, inventory and UI tests pass;
+- applicable Android/package repository validation is green for the implementation head.
 
 Owner: [`workstreams/curated-model-baseline.md`](workstreams/curated-model-baseline.md)
 
