@@ -11,7 +11,7 @@ Last reviewed: 2026-08-08
 
 Prove that the exact curated **Qwen3.5 dense 0.8B and 2B** artifacts used by the product are valid and executable with the repository-pinned `llama.cpp` backend.
 
-This is not a generic arbitrary-GGUF admission layer. Q35-1 already closes the product model surface, so Q35-2 validates known artifacts and protects that path from corrupted downloads, manifest mismatches or backend regressions.
+This is not a generic arbitrary-GGUF admission layer. Q35-1 closes the product model surface; Q35-2 validates known artifacts and protects that path from corrupted downloads, manifest mismatches and backend regressions.
 
 ## Validation model
 
@@ -21,76 +21,50 @@ curated release
   -> downloaded artifact bytes
   -> SHA-256 verification
   -> GGUF metadata inspection
-  -> expected Qwen3.5 structural facts match
+  -> trusted structural fingerprint match
   -> pinned backend load
   -> tokenize
   -> minimal generation
-  -> compatibility evidence
+  -> privacy-safe compatibility evidence
 ```
-
-Filename, display name and download URL are descriptive metadata, never immutable identity. Exact artifact digest plus inspected GGUF facts must agree with the reviewed catalog manifest.
-
-Expected Qwen3.5 metadata should be recorded from the chosen reference artifacts during implementation rather than inferred from filename conventions.
-
-## Required domain concepts
-
-Introduce or adapt only what the closed product path needs:
-
-- `Qwen35Tier`: `B0_8`, `B2`;
-- `Qwen35ArtifactDescriptor` containing inspected stable artifact facts;
-- compatibility evidence keyed by exact artifact digest and backend build;
-- typed failures for artifact integrity, manifest mismatch, malformed metadata and backend incompatibility;
-- certification evidence kept separate from basic compatibility proof.
-
-Do not introduce multi-family adapters or unsupported-family taxonomies.
 
 ## Task ledger
 
 | ID | State | Task |
 | --- | --- | --- |
-| Q35-COMP-01 | PLANNED | Resolve and record the current pinned `llama.cpp` revision/build used by Android. |
-| Q35-COMP-02 | PLANNED | Use the exact 0.8B Q4_K_M and 2B Q4_K_M reference artifacts and verify their SHA-256, size and quantization metadata. |
-| Q35-COMP-03 | PLANNED | Record the minimal inspected GGUF facts required to prove each curated artifact matches its reviewed manifest. |
-| Q35-COMP-04 | PLANNED | Add `Qwen35ArtifactDescriptor` without backend-native or environment-dependent fields. |
-| Q35-COMP-05 | PLANNED | Validate downloaded artifact facts against the trusted catalog manifest before runtime preparation. |
-| Q35-COMP-06 | PLANNED | Prove load, tokenize and minimal generation on both reference artifacts using the pinned backend. |
-| Q35-COMP-07 | PLANNED | If the pin lacks required support, update it as a separate reviewed dependency change and rerun Android packaging gates. |
-| Q35-COMP-08 | PLANNED | Produce privacy-safe compatibility evidence with exact model digest and backend build. |
-| Q35-COMP-09 | PLANNED | Add deterministic unit/integration tests for valid artifacts, digest mismatch, manifest mismatch, malformed metadata and backend failure. |
+| Q35-COMP-01 | DONE | Pinned Android backend revision is recorded as `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`. |
+| Q35-COMP-02 | DONE | Exact 0.8B Q4_K_M and 2B Q4_K_M artifacts are pinned by SHA-256, size and quantization. |
+| Q35-COMP-03 | DONE | Trusted minimal GGUF structural fingerprints are recorded from inspected artifacts. |
+| Q35-COMP-04 | DONE | `Qwen35ArtifactDescriptor` carries stable inspected artifact facts only. |
+| Q35-COMP-05 | DONE | Installer validation fails closed on catalog/descriptor/GGUF mismatch before publication/runtime use. |
+| Q35-COMP-06 | DONE | Both reference artifacts pass load, tokenize and minimal generation with the pinned backend. |
+| Q35-COMP-07 | DONE | Existing backend pin provides the required Qwen3.5 support; no dependency update was required. |
+| Q35-COMP-08 | DONE | Compatibility evidence records exact model digest and backend build without private paths/content. |
+| Q35-COMP-09 | DONE | Deterministic artifact mismatch tests plus the exact-backend smoke gate cover failure of the approved compatibility boundary. |
 
-## Validation evidence
+## Reference evidence
 
-Implementation uses pinned `llama.cpp` revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3` and exact Q4_K_M reference artifacts for Qwen3.5 0.8B and 2B. Trusted structural GGUF fingerprints, fail-closed manifest validation, privacy-safe compatibility evidence and deterministic installer/unit coverage are present on `dev`.
+Pinned backend:
 
-Repository validation and Android artifact packaging are green on the Q35-3 implementation, including the runtime `libllama-common.so` required by the typed Jinja chat-template renderer. This document change intentionally triggers the final exact-artifact compatibility smoke before Q35-2 is marked `DONE`.
+`aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`
+
+Reference artifacts:
+
+- Qwen3.5 0.8B Q4_K_M — SHA-256 `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517`, size `532517120`;
+- Qwen3.5 2B Q4_K_M — SHA-256 `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`, size `1280835840`.
+
+Both inspected artifacts are GGUF v3, architecture `qwen35`, file type 15, 24 blocks and context length 262144. Embedding length is 1024 for 0.8B and 2048 for 2B.
+
+Final `Qwen3.5 compatibility` run #6 passed exact download identity verification and `load -> tokenize -> minimal generate` for both artifacts. Repository Validate and Android Package gates also pass with the pinned backend/runtime packaging.
 
 ## Failure behavior
 
-The remaining failures describe problems with an expected curated artifact, not unsupported user choices. Examples:
-
-- downloaded bytes do not match expected SHA-256 or size;
-- inspected GGUF metadata does not match the reviewed manifest;
-- GGUF metadata is malformed or incomplete;
-- pinned backend cannot load or execute the expected Qwen3.5 artifact;
-- validated backend build differs from the build used for recorded compatibility evidence.
-
-Do not leak native backend error strings through public contracts.
+Failures describe problems with an expected curated artifact, not unsupported user choices: SHA/size mismatch, trusted-manifest mismatch, malformed/incomplete GGUF metadata, or inability of the pinned backend to execute the expected artifact. Native backend error strings do not leak through public contracts.
 
 ## Certification separation
 
-Compatibility answers: **does this exact curated artifact work correctly with this backend build?**
-
-Certification answers: **has this exact artifact/quantization/backend/device envelope passed the complete validation evidence?**
-
-Catalog availability does not imply either result, and certification cannot be inherited across quantizations or artifact digests.
+Compatibility answers whether this exact curated artifact works with this exact backend build. Certification remains a later evidence layer and cannot be inherited across quantizations, artifact digests or device/runtime envelopes.
 
 ## Acceptance criteria
 
-Q35-2 is complete when:
-
-- the exact 0.8B and 2B reference GGUFs match their trusted catalog identities and inspected metadata;
-- their minimal load/tokenize/generate smoke path succeeds with the recorded backend revision;
-- digest, size, manifest or metadata mismatch is detected before runtime preparation;
-- compatibility evidence contains exact artifact digest and backend build without private paths or prompt/output content;
-- deterministic tests cover the expected success path and artifact/backend failure paths;
-- applicable repository validation gates pass.
+Q35-2 is complete: exact identity and inspected metadata are matched, both reference smoke paths succeed with the pinned backend, mismatch is rejected before runtime preparation, compatibility evidence is privacy-safe, deterministic failure coverage exists and applicable repository gates are green.
