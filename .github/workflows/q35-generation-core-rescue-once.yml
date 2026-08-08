@@ -77,6 +77,15 @@ jobs:
           )
           p.write_text(text)
 
+          p = Path('core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/RuntimeLoadClassificationTest.kt')
+          text = p.read_text()
+          text = text.replace(
+              'generationDefaults = GenerationDefaults(8, 0f, 1f, 0, 0L),',
+              'generationDefaults = GenerationDefaults(maxOutputTokens = 8, temperature = 0f, topP = 1f, topK = 0, seed = 0L),',
+              1,
+          )
+          p.write_text(text)
+
           subprocess.run(['bash', '-lc', step_script('Add Q35 generation tests')], check=True)
           PY
       - name: Format and validate corrected core generation slice
