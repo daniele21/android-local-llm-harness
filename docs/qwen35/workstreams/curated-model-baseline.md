@@ -25,7 +25,7 @@ built-in curated catalog
   -> verified download
   -> SHA-256 + GGUF inspection
   -> ModelStore installation
-  -> explicit supported binding
+  -> catalog-anchored binding
 ```
 
 A consumer cannot supply a filename, URL, family, architecture or local GGUF to extend this set.
@@ -52,11 +52,11 @@ No new `LEGACY_UNSUPPORTED`, `UNSUPPORTED_FAMILY` or equivalent product state is
 | --- | --- | --- |
 | Q35-BASE-01 | DONE | Executable curated catalog contains only Qwen3.5 dense 0.8B/2B releases. |
 | Q35-BASE-02 | DONE | Consumer GGUF document-picker/import actions, effects and controller path are removed. |
-| Q35-BASE-03 | PLANNED | Remove product profile/binding mappings and fixtures for non-Qwen3.5 and unsupported Qwen3.5 tiers. |
-| Q35-BASE-04 | PLANNED | Simplify inventory projection and model presentation after external-import/legacy states disappear. |
-| Q35-BASE-05 | IN PROGRESS | Keep verified catalog download/install as the only product acquisition path and preserve isolated developer test injection. |
-| Q35-BASE-06 | IN PROGRESS | Connected Models/Playground UI now routes users to the curated catalog; remaining inventory cleanup follows BASE-04. |
-| Q35-BASE-07 | IN PROGRESS | Catalog and connected-UI tests cover the closed model surface; remaining multi-family product fixtures are removed with BASE-03. |
+| Q35-BASE-03 | IN PROGRESS | Catalog-only profile/binding enforcement and Qwen3.5 product fixtures are implemented; close applicable validation before marking done. |
+| Q35-BASE-04 | IN PROGRESS | External-import inventory origin/projection is removed and out-of-catalog selections are no longer synthesized; close applicable validation before marking done. |
+| Q35-BASE-05 | IN PROGRESS | Verified catalog download/install is the only consumer acquisition/persistence path; developer test injection remains isolated. Validation is pending. |
+| Q35-BASE-06 | IN PROGRESS | Models/Overview/Playground expose the curated Qwen3.5 path and no consumer import CTA; final connected validation is pending. |
+| Q35-BASE-07 | IN PROGRESS | Catalog, binding, persistence, inventory and connected-UI assertions are updated; complete applicable repository/package validation. |
 
 ## Implemented closed catalog
 
@@ -77,6 +77,27 @@ The executable catalog currently contains exactly seven reviewed releases:
 
 The first certification candidates remain Qwen3.5 0.8B Q4_K_M and Qwen3.5 2B Q4_K_M. Other listed quantizations are catalog candidates, not automatically certified artifacts.
 
+## Implemented product-boundary cleanup
+
+The current `dev` implementation also enforces the closed catalog beyond presentation:
+
+- runtime binding accepts only model metadata matching a release in `CuratedModelCatalog`;
+- runtime profile identity is anchored to the release `profileKey`;
+- product artifact provenance is catalog-download provenance rather than the former manual-import/SAF provenance;
+- product fixtures no longer use Qwen2/Qwen3/other-family identities to represent selectable consumer models;
+- `HarnessModelOrigin.IMPORTED` and external-selection inventory synthesis are removed;
+- a selection outside the current curated catalog does not become an invented inventory item;
+- persisted installed metadata outside the current catalog is ignored rather than represented as legacy/unsupported state;
+- developer-only artifact injection remains available in isolated validation tooling and is not exposed through consumer APIs.
+
+The implementation is intentionally fail-closed by absence: the consumer product has no extension point for additional model families or arbitrary local artifacts.
+
+## Validation status
+
+Q35-1 is not `DONE` yet. The implementation above still requires the applicable Android/package validation to pass on the current implementation head.
+
+Repository/native guards that have already passed do not substitute for the Android/package gate. Any remaining compiler, Detekt, packaging or connected test failure must be fixed at its source rather than suppressed.
+
 ## Acceptance criteria
 
 Q35-1 is complete when:
@@ -88,6 +109,7 @@ Q35-1 is complete when:
 - no legacy/unsupported model state is introduced to preserve retired product cases;
 - catalog download/install still verifies exact size, SHA-256 and GGUF integrity before publication;
 - isolated device-test artifact injection remains clearly outside product APIs;
-- deterministic catalog, binding, inventory and connected-UI tests pass.
+- deterministic catalog, binding, inventory and connected-UI tests pass;
+- applicable Android/package repository validation is green for the implementation head.
 
-Artifact/backend proof begins in [`model-compatibility.md`](model-compatibility.md) after this closed model surface is established.
+Artifact/backend proof begins in [`model-compatibility.md`](model-compatibility.md) only after this closed model surface is established and validated.
