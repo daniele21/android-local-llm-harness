@@ -6,15 +6,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -383,12 +380,7 @@ class MainActivity :
         val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
         val destination = shellState.destination
         val expanded = LocalConfiguration.current.screenWidthDp >= 720
-        val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) importModelDocument(uri)
-        }
-        val modelEffects = remember(modelPicker) {
-            createModelEffects { modelPicker.launch(MODEL_MIME_TYPES) }
-        }
+        val modelEffects = remember { createModelEffects() }
         DisposableEffect(modelEffects) {
             harnessViewModel.models.attach(modelEffects)
             onDispose { harnessViewModel.models.detach(modelEffects) }
@@ -471,7 +463,6 @@ class MainActivity :
                             onOpenPlayground = { navigate(HarnessDestination.PLAYGROUND) },
                             onOpenModels = { navigate(HarnessDestination.MODELS) },
                             onOpenDiagnostics = { navigate(HarnessDestination.DIAGNOSTICS) },
-                            onImport = { modelPicker.launch(MODEL_MIME_TYPES) },
                         )
                     }
                     composable(HarnessDestination.PLAYGROUND.route) {
@@ -610,7 +601,6 @@ class MainActivity :
         onOpenPlayground: () -> Unit,
         onOpenModels: () -> Unit,
         onOpenDiagnostics: () -> Unit,
-        onImport: () -> Unit,
     ) {
         ScreenList(title = null) {
             item {
@@ -633,12 +623,12 @@ class MainActivity :
                                 color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
                             )
                             Text(
-                                if (model == null) "Add a model to begin" else "Your local runtime is ready",
+                                if (model == null) "Choose a model to begin" else "Your local runtime is ready",
                                 style = MaterialTheme.typography.headlineMedium,
                             )
                             Text(
                                 if (model == null) {
-                                    "Import a GGUF or choose one from the catalog"
+                                    "Choose a reviewed Qwen3.5 model from the catalog"
                                 } else {
                                     "All systems operational · ready for inference"
                                 },
@@ -694,10 +684,10 @@ class MainActivity :
                     )
                     CompactActionTile(
                         destination = HarnessDestination.MODELS,
-                        label = "Import model",
-                        supporting = "GGUF · on-device",
+                        label = "Models",
+                        supporting = "Qwen3.5 catalog",
                         enabled = !isBusy(),
-                        onClick = onImport,
+                        onClick = onOpenModels,
                     )
                     CompactActionTile(
                         destination = HarnessDestination.DIAGNOSTICS,
@@ -886,7 +876,7 @@ class MainActivity :
                         style = MaterialTheme.typography.labelLarge,
                         color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
                     )
-                    Text(model?.fileName ?: "Choose a local GGUF model", style = MaterialTheme.typography.bodyMedium)
+                    Text(model?.fileName ?: "Choose a Qwen3.5 catalog model", style = MaterialTheme.typography.bodyMedium)
                 }
                 Text("Change  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
@@ -1147,7 +1137,7 @@ class MainActivity :
     private fun ModelsScreen(state: HarnessUiState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
         val inventory = state.modelInventory
         ScreenList(title = null) {
-            item { ModelsHeader(state.busy) }
+            item { ModelsHeader() }
             item { ModelsSummaryCard(inventory) }
             if (inventory.degradedCount > 0) {
                 item { ModelsRecoveryCard(inventory, onOpenModelDetails) }
@@ -1160,25 +1150,13 @@ class MainActivity :
     }
 
     @Composable
-    private fun ModelsHeader(busy: Boolean) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Models", style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    "Manage your locally installed models",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            HarnessPrimaryButton(
-                text = "+  Import model",
-                enabled = !busy,
-                modifier = Modifier,
-                onClick = { harnessViewModel.models.requestImport() },
+    private fun ModelsHeader() {
+        Column {
+            Text("Models", style = MaterialTheme.typography.headlineLarge)
+            Text(
+                "Manage reviewed Qwen3.5 models from the catalog",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1252,7 +1230,7 @@ class MainActivity :
                 Column(modifier = Modifier.weight(1f)) {
                     Text("No active model", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Import a GGUF or download a compatible catalog model",
+                        "Download and select a reviewed Qwen3.5 catalog model",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1313,23 +1291,12 @@ class MainActivity :
 
     @Composable
     private fun SelectedModelActions(state: HarnessUiState) {
-        Row(
+        HarnessSecondaryButton(
+            text = "Verify",
+            enabled = !state.busy,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            HarnessSecondaryButton(
-                text = "Verify",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-                onClick = { harnessViewModel.models.verifySelected() },
-            )
-            HarnessSecondaryButton(
-                text = "Import another",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-                onClick = { harnessViewModel.models.requestImport() },
-            )
-        }
+            onClick = { harnessViewModel.models.verifySelected() },
+        )
     }
 
     @Composable
@@ -1365,7 +1332,7 @@ class MainActivity :
             Column {
                 Text("Model catalog", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Compatible with this device",
+                    "Reviewed Qwen3.5 models compatible with this device",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1414,7 +1381,7 @@ class MainActivity :
             Text("Inventory", style = MaterialTheme.typography.titleLarge)
             if (inventory.items.isEmpty()) {
                 Text(
-                    "No catalog, imported or runtime-owned models are available.",
+                    "No catalog or runtime-owned models are available.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -2080,14 +2047,12 @@ class MainActivity :
         }
     }
 
-    private fun createModelEffects(onImport: () -> Unit): ModelEffects = object : ModelEffects {
+    private fun createModelEffects(): ModelEffects = object : ModelEffects {
         override fun snapshot(): ModelEffectsSnapshot = ModelEffectsSnapshot(
             distribution = modelDistributionController.snapshot(),
             selectedModel = controller.snapshotModel(),
             loadedDigest = runtimeGraph.loadedModelDigest?.sha256,
         )
-
-        override fun requestImport(): Boolean = modelEffect(onImport)
 
         override fun executeCatalog(command: ModelCatalogCommand): Boolean = modelEffect {
             when (command) {
@@ -2122,16 +2087,6 @@ class MainActivity :
             }
 
             ModelRecoveryCommand.ReleaseRuntime -> afterPlaygroundRuntimeReleased(::syncLoadedModelOwnership)
-        }
-    }
-
-    private fun importModelDocument(uri: Uri) {
-        afterPlaygroundRuntimeReleased {
-            controller.importModel(
-                uri = uri,
-                architecture = DEFAULT_ARCHITECTURE,
-                quantization = DEFAULT_QUANTIZATION,
-            )
         }
     }
 
@@ -2248,8 +2203,5 @@ class MainActivity :
     private companion object {
         const val STATE_REPORT = "report"
         const val RESOURCE_HISTORY_VISIBLE_LIMIT = 10
-        const val DEFAULT_ARCHITECTURE = "qwen3"
-        const val DEFAULT_QUANTIZATION = "Q4_K_M"
-        val MODEL_MIME_TYPES = arrayOf("application/octet-stream", "application/gguf", "application/x-gguf")
     }
 }
