@@ -36,11 +36,11 @@ jobs:
             -DLLAMA_CURL=OFF \
             -DGGML_NATIVE=OFF \
             -DGGML_OPENMP=OFF \
-            -DLLAMA_BUILD_TOOLS=ON \
+            -DLLAMA_BUILD_TOOLS=OFF \
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_BUILD_SERVER=OFF \
-            -DLLAMA_BUILD_EXAMPLES=OFF
-          cmake --build build/qwen35-compat --target llama-cli -j2
+            -DLLAMA_BUILD_EXAMPLES=ON
+          cmake --build build/qwen35-compat --target llama-simple -j2
       - name: Download exact reference artifacts
         run: |
           mkdir -p build/qwen35-models
@@ -56,12 +56,12 @@ jobs:
           test "$(stat -c%s build/qwen35-models/qwen35-2b-q4-k-m.gguf)" = "1280835840"
       - name: Smoke load tokenize generate
         run: |
-          CLI=build/qwen35-compat/bin/llama-cli
+          CLI=build/qwen35-compat/bin/llama-simple
           for MODEL in \
             build/qwen35-models/qwen35-08b-q4-k-m.gguf \
             build/qwen35-models/qwen35-2b-q4-k-m.gguf
           do
-            timeout 120 "$CLI" -m "$MODEL" -p "Reply OK." -n 1 --temp 0 --no-display-prompt >/dev/null
+            timeout 120 "$CLI" -m "$MODEL" -ngl 0 -n 1 "Reply OK." >/dev/null
           done
       - name: Record privacy-safe compatibility evidence
         run: |
