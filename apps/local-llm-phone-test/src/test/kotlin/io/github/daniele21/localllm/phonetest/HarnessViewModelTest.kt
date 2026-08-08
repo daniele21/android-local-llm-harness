@@ -1,6 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -230,13 +230,16 @@ class HarnessViewModelTest {
         assertEquals("96", viewModel.uiState.value.playgroundRepeatLastN)
     }
 
-    private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(
-        digest = ModelDigest("0".repeat(64)),
-        fileName = "test.gguf",
-        sizeBytes = 1234,
-        architecture = "qwen3",
-        quantization = "Q4_K_M",
-    )
+    private fun testModel(): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases.first().artifact
+        return ImportedPhoneModel(
+            digest = artifact.digest,
+            fileName = artifact.fileName,
+            sizeBytes = artifact.sizeBytes,
+            architecture = artifact.architecture,
+            quantization = artifact.quantization,
+        )
+    }
 
     private class FakePlaygroundEffects(private val current: PlaygroundState = PlaygroundState()) : PlaygroundEffects {
         var startedModel: ImportedPhoneModel? = null
