@@ -11,15 +11,13 @@ The repository uses an administrator-curated GGUF catalog through `CuratedModelC
 
 The catalog is metadata only. Model binaries are downloaded through the secure transfer path and published through `ModelStore` only after size, SHA-256 and GGUF verification.
 
-## Qwen3.5-only target
+## Current product catalog
 
 [ADR 0011](adr/0011-qwen35-only-product-support.md) closes the product model surface to Qwen3.5 dense 0.8B and 2B releases. Users do not add arbitrary models, URLs or local GGUF files.
 
-The current executable bootstrap still contains older multi-family and unsupported-tier entries. Q35-1 removes those entries and the consumer manual-import product path; it does not introduce legacy compatibility states for them. The cleanup owner is [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md).
+The executable bootstrap now contains only the seven reviewed Qwen3.5 0.8B/2B releases below. Earlier LFM, SmolLM, Qwen3 and Qwen3.5 4B bootstrap definitions were removed rather than represented as unsupported product states. Remaining Q35-1 cleanup is owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md).
 
-After Q35-1, only the reviewed releases below remain product-eligible.
-
-## Target releases
+## Releases
 
 | Model ID | Artifact | SHA-256 | Size | Architecture | Minimum RAM | Recommended RAM | Profile key |
 | --- | --- | --- | ---: | --- | ---: | ---: | --- |
@@ -47,7 +45,7 @@ curated release
   -> explicit application/use-case binding
 ```
 
-There is no consumer-facing manual import path in the target product. Developer-only device validation may inject an exact test artifact into an isolated test application; that path is not part of catalog or consumer API semantics.
+There is no consumer-facing manual import path. Developer-only device validation may inject an exact test artifact into an isolated test application; that path is not part of catalog or consumer API semantics.
 
 ## Availability and certification
 
