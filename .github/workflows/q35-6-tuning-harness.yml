@@ -1,0 +1,220 @@
+name: Q35-6 tuning harness staging
+
+on:
+  push:
+    paths:
+      - ".github/workflows/q35-6-tuning-harness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement-validate-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Add device tuning evidence path
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_one(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected one match in {path}: {old[:100]!r}; found {text.count(old)}")
+              p.write_text(text.replace(old, new, 1))
+
+          device = 'apps/device-test-runner/src/androidTest/kotlin/io/github/daniele21/localllm/devicetest/LocalLlmDeviceE2eTest.kt'
+          replace_one(device, 'import android.content.Context\nimport android.os.Debug\n', 'import android.app.ActivityManager\nimport android.content.Context\nimport android.os.Build\nimport android.os.Debug\nimport android.os.PowerManager\n')
+          replace_one(device, 'import io.github.daniele21.localllm.contracts.SessionId\n', 'import io.github.daniele21.localllm.contracts.SessionId\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          replace_one(device, 'import io.github.daniele21.localllm.models.OutputMode\n', 'import io.github.daniele21.localllm.models.OutputMode\nimport io.github.daniele21.localllm.models.Qwen35GenerationProfileId\nimport io.github.daniele21.localllm.models.Qwen35GenerationProfiles\nimport io.github.daniele21.localllm.models.Qwen35ModelTier\nimport io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles\n')
+          replace_one(device, 'import org.junit.Test\n', 'import org.json.JSONObject\nimport org.junit.Test\n')
+
+          marker = '''    @Test\n    fun activeGenerationCanBeCancelled() {\n'''
+          tuning_test = '''    @Test\n    fun qwen35TuningSampleRecordsColdAndWarmEvidence() {\n        assumeTrue("Qwen3.5 tuning validation disabled", config.tuning.enabled)\n        val harness = buildHarness(config.generation.maxOutputTokens)\n        val runtime = harness.runtime\n\n        try {\n            val coldSession = runtime.createSession(harness.applicationId, harness.useCaseId)\n            val cold = generateAndAwait(runtime, harness, coldSession, config.generation.prompt)\n            println("LOCAL_LLM_TUNING_JSON ${tuningEvidence(cold)}")\n            closeSession(runtime, coldSession)\n\n            val warmSession = runtime.createSession(harness.applicationId, harness.useCaseId)\n            val warm = generateAndAwait(runtime, harness, warmSession, config.generation.prompt)\n            println("LOCAL_LLM_TUNING_JSON ${tuningEvidence(warm)}")\n            closeSessionAndUnload(runtime, warmSession)\n        } finally {\n            runtime.close()\n        }\n    }\n\n''' + marker
+          replace_one(device, marker, tuning_test)
+
+          replace_one(device, '        val useCaseId = UseCaseId("generation")\n        val modelProfileId = "device-e2e-model"\n', '        val useCaseId = UseCaseId("generation-${config.tuning.caseId}")\n        val modelProfileId = "device-e2e-model-${config.tuning.caseId}"\n')
+          replace_one(device, '        val modelProfile = GgufModelProfile(\n', '''        val tier = config.model.tier\n        val runtimeProfile = Qwen35RuntimeTuningProfiles.candidateForTier(tier)\n        val generationProfileId = if (config.generation.thinkingMode == ThinkingMode.ENABLED) {\n            Qwen35GenerationProfileId.QWEN35_THINKING\n        } else {\n            Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY\n        }\n        val generationDefaults = Qwen35GenerationProfiles.forTier(tier)\n            .single { it.id == generationProfileId }\n            .defaults\n            .copy(maxOutputTokens = maxOutputTokens)\n\n        val modelProfile = GgufModelProfile(\n''')
+          replace_one(device, '            batchThreads = config.model.cpuThreads,\n            gpuLayers = 0,\n        )\n', '            batchThreads = config.model.batchThreads,\n            gpuLayers = 0,\n            runtimeCapabilities = runtimeProfile.runtimeCapabilities(),\n        )\n')
+          replace_one(device, '''            generationDefaults = GenerationDefaults(\n                maxOutputTokens = maxOutputTokens,\n                temperature = 0f,\n                topP = 1f,\n                topK = 0,\n                seed = 42,\n            ),\n''', '            generationDefaults = generationDefaults,\n')
+
+          replace_one(device, '    private fun closeSessionAndUnload(runtime: RuntimeOrchestrator, session: SessionId) {\n        runtime.closeSession(session)\n        assertTrue(\n            "Session context was not released",\n            eventually(config.timeoutSeconds) { runtime.runtimeSnapshot().activeSessions == 0 },\n        )\n        assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())\n    }\n', '''    private fun closeSession(runtime: RuntimeOrchestrator, session: SessionId) {\n        runtime.closeSession(session)\n        assertTrue(\n            "Session context was not released",\n            eventually(config.timeoutSeconds) { runtime.runtimeSnapshot().activeSessions == 0 },\n        )\n    }\n\n    private fun closeSessionAndUnload(runtime: RuntimeOrchestrator, session: SessionId) {\n        closeSession(runtime, session)\n        assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())\n    }\n\n    private fun tuningEvidence(completed: GenerationEvent.Completed): JSONObject {\n        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager\n        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)\n        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager\n        val inputTokens = completed.metrics.inputTokens\n        val prefillMs = completed.metrics.prefillMs\n        val prefillTokensPerSecond = if (inputTokens != null && prefillMs != null && prefillMs > 0) {\n            inputTokens * 1_000.0 / prefillMs\n        } else {\n            null\n        }\n        return JSONObject()\n            .put("schemaVersion", 1)\n            .put("tuningCaseId", config.tuning.caseId)\n            .put("modelDigest", config.model.digest.sha256)\n            .put("modelTier", config.model.tier.name)\n            .put("architecture", config.model.architecture)\n            .put("quantization", config.model.quantization)\n            .put("backendRevision", Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION)\n            .put("runtimeProfileVersion", Qwen35RuntimeTuningProfiles.VERSION)\n            .put("generationProfileVersion", Qwen35GenerationProfiles.VERSION)\n            .put("contextTokens", config.model.contextSize)\n            .put("cpuThreads", config.model.cpuThreads)\n            .put("batchThreads", config.model.batchThreads)\n            .put("batchSize", config.model.batchSize)\n            .put("microBatchSize", config.model.microBatchSize)\n            .put("thinkingMode", config.generation.thinkingMode.name)\n            .put("modelLoadKind", completed.metrics.modelLoadKind.name)\n            .put("deviceModel", Build.MODEL)\n            .put("androidRelease", Build.VERSION.RELEASE)\n            .put("sdkInt", Build.VERSION.SDK_INT)\n            .put("abi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")\n            .put("ttftMs", completed.metrics.timeToFirstTokenMs)\n            .put("prefillMs", completed.metrics.prefillMs)\n            .put("decodeMs", completed.metrics.decodeMs)\n            .put("totalMs", completed.metrics.totalMs)\n            .put("inputTokens", completed.metrics.inputTokens)\n            .put("outputTokens", completed.metrics.outputTokens)\n            .put("prefillTokensPerSecond", prefillTokensPerSecond)\n            .put("decodeTokensPerSecond", completed.metrics.decodeTokensPerSecond)\n            .put("stopReason", completed.metrics.stopReason.name)\n            .put("processPssKb", totalPssKb())\n            .put("availableMemoryBytes", memoryInfo.availMem)\n            .put(\n                "thermalStatus",\n                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,\n            )\n    }\n''')
+
+          replace_one(device, '    val cancellation: CancellationArguments,\n    val memory: MemoryArguments,\n', '    val cancellation: CancellationArguments,\n    val memory: MemoryArguments,\n    val tuning: TuningArguments,\n')
+          replace_one(device, '                    cpuThreads = reader.positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),\n                ),\n                generation = GenerationArguments(\n', '                    cpuThreads = reader.positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),\n                    batchThreads = reader.positiveInt("batchThreads", availableProcessors.coerceAtMost(4)),\n                    tier = when (reader.string("modelTier", "0.8b").lowercase()) {\n                        "2b" -> Qwen35ModelTier.B2\n                        else -> Qwen35ModelTier.B0_8\n                    },\n                ),\n                generation = GenerationArguments(\n')
+          replace_one(device, '                    maxOutputTokens = reader.positiveInt("maxOutputTokens", 32),\n                ),\n                cancellation = CancellationArguments(\n', '                    maxOutputTokens = reader.positiveInt("maxOutputTokens", 32),\n                    thinkingMode = when (reader.string("thinkingMode", "DISABLED").uppercase()) {\n                        "ENABLED" -> ThinkingMode.ENABLED\n                        else -> ThinkingMode.DISABLED\n                    },\n                ),\n                cancellation = CancellationArguments(\n')
+          replace_one(device, '                timeoutSeconds = reader.positiveLong("timeoutSeconds", 120),\n', '                tuning = TuningArguments(\n                    enabled = reader.string("tuningEnabled", "false").toBooleanStrict(),\n                    caseId = reader.string("tuningCaseId", "manual"),\n                ),\n                timeoutSeconds = reader.positiveLong("timeoutSeconds", 120),\n')
+          replace_one(device, '    val cpuThreads: Int,\n) {\n', '    val cpuThreads: Int,\n    val batchThreads: Int,\n    val tier: Qwen35ModelTier,\n) {\n')
+          replace_one(device, 'private data class GenerationArguments(val prompt: String, val maxOutputTokens: Int)\n', 'private data class GenerationArguments(\n    val prompt: String,\n    val maxOutputTokens: Int,\n    val thinkingMode: ThinkingMode,\n)\n\nprivate data class TuningArguments(val enabled: Boolean, val caseId: String)\n')
+
+          run_device = 'scripts/run-device-e2e.sh'
+          replace_one(run_device, 'CPU_THREADS=""\n', 'CPU_THREADS=""\nBATCH_THREADS=""\n')
+          replace_one(run_device, '  --cpu-threads VALUE        Explicit llama.cpp CPU thread count.\n', '  --cpu-threads VALUE        Explicit llama.cpp CPU thread count.\n  --batch-threads VALUE      Explicit llama.cpp prefill/batch thread count.\n')
+          replace_one(run_device, '        --cpu-threads)\n            CPU_THREADS="${2:-}"\n            shift 2\n            ;;\n', '        --cpu-threads)\n            CPU_THREADS="${2:-}"\n            shift 2\n            ;;\n        --batch-threads)\n            BATCH_THREADS="${2:-}"\n            shift 2\n            ;;\n')
+          replace_one(run_device, 'if [[ -n "$CPU_THREADS" ]]; then\n    require_positive_integer "--cpu-threads" "$CPU_THREADS"\nfi\n', 'if [[ -n "$CPU_THREADS" ]]; then\n    require_positive_integer "--cpu-threads" "$CPU_THREADS"\nfi\nif [[ -n "$BATCH_THREADS" ]]; then\n    require_positive_integer "--batch-threads" "$BATCH_THREADS"\nfi\n')
+          replace_one(run_device, 'if [[ -n "$CPU_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e cpuThreads "$CPU_THREADS" )\nfi\n', 'if [[ -n "$CPU_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e cpuThreads "$CPU_THREADS" )\nfi\nif [[ -n "$BATCH_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e batchThreads "$BATCH_THREADS" )\nfi\n')
+
+          Path('scripts/summarize-qwen35-tuning.py').write_text('''#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport argparse\nimport csv\nimport json\nimport statistics\nfrom collections import defaultdict\nfrom pathlib import Path\n\nIDENTITY_FIELDS = [\n    "tuningCaseId", "modelDigest", "modelTier", "architecture", "quantization",\n    "backendRevision", "runtimeProfileVersion", "generationProfileVersion",\n    "contextTokens", "cpuThreads", "batchThreads", "batchSize", "microBatchSize",\n    "thinkingMode", "modelLoadKind", "deviceModel", "androidRelease", "sdkInt", "abi",\n]\nMETRIC_FIELDS = [\n    "ttftMs", "prefillMs", "decodeMs", "totalMs", "prefillTokensPerSecond",\n    "decodeTokensPerSecond", "processPssKb", "availableMemoryBytes", "thermalStatus",\n]\n\ndef median(records, field):\n    values = [float(record[field]) for record in records if record.get(field) is not None]\n    return statistics.median(values) if values else None\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description="Summarize privacy-safe Qwen3.5 device tuning evidence")\n    parser.add_argument("input", type=Path)\n    parser.add_argument("output", type=Path)\n    args = parser.parse_args()\n\n    groups = defaultdict(list)\n    for line in args.input.read_text().splitlines():\n        if not line.strip():\n            continue\n        record = json.loads(line)\n        key = (record["tuningCaseId"], record["modelLoadKind"])\n        groups[key].append(record)\n\n    rows = []\n    for _, records in sorted(groups.items()):\n        first = records[0]\n        for field in IDENTITY_FIELDS:\n            if any(record.get(field) != first.get(field) for record in records):\n                raise SystemExit(f"identity drift for {first['tuningCaseId']}: {field}")\n        row = {field: first.get(field) for field in IDENTITY_FIELDS}\n        row["samples"] = len(records)\n        for field in METRIC_FIELDS:\n            row[f"median_{field}"] = median(records, field)\n        rows.append(row)\n\n    args.output.parent.mkdir(parents=True, exist_ok=True)\n    fieldnames = IDENTITY_FIELDS + ["samples"] + [f"median_{field}" for field in METRIC_FIELDS]\n    with args.output.open("w", newline="") as handle:\n        writer = csv.DictWriter(handle, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n    print(f"Wrote {len(rows)} Qwen3.5 tuning summaries to {args.output}")\n    return 0\n\nif __name__ == "__main__":\n    raise SystemExit(main())\n''')
+
+          Path('scripts/run-qwen35-tuning-matrix.sh').write_text(r'''#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_ID="io.github.daniele21.localllm.devicetest.debug"
+ADB="${ADB:-adb}"
+MODEL_PATH=""
+TIER=""
+REPEATS=3
+THINKING_MODE="DISABLED"
+OUTPUT_DIR="$ROOT_DIR/build/qwen35-tuning"
+
+usage() {
+    cat <<'EOF'
+Usage: bash scripts/run-qwen35-tuning-matrix.sh --model /absolute/model.gguf --tier 0.8b|2b [options]
+
+Options:
+  --repeats N                 Samples per tuning case (default: 3).
+  --thinking-mode MODE        DISABLED or ENABLED (default: DISABLED).
+  --output-dir PATH           Local privacy-safe evidence output directory.
+  --help                      Show this help.
+
+Only the exact curated Qwen3.5 Q4_K_M certification candidates are accepted.
+This harness records evidence; it never promotes CANDIDATE runtime profiles automatically.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --model) MODEL_PATH="${2:-}"; shift 2 ;;
+        --tier) TIER="${2:-}"; shift 2 ;;
+        --repeats) REPEATS="${2:-}"; shift 2 ;;
+        --thinking-mode) THINKING_MODE="${2:-}"; shift 2 ;;
+        --output-dir) OUTPUT_DIR="${2:-}"; shift 2 ;;
+        --help|-h) usage; exit 0 ;;
+        *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
+[[ -f "$MODEL_PATH" && -r "$MODEL_PATH" ]] || { echo "--model must be a readable file" >&2; exit 2; }
+[[ "$REPEATS" =~ ^[1-9][0-9]*$ ]] || { echo "--repeats must be positive" >&2; exit 2; }
+[[ "$THINKING_MODE" == "DISABLED" || "$THINKING_MODE" == "ENABLED" ]] || { echo "Invalid --thinking-mode" >&2; exit 2; }
+command -v "$ADB" >/dev/null 2>&1 || { echo "adb is required" >&2; exit 2; }
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+    else openssl dgst -sha256 "$1" | awk '{print $NF}'; fi
+}
+
+case "$TIER" in
+    0.8b) EXPECTED_SHA="bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517" ;;
+    2b) EXPECTED_SHA="aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223" ;;
+    *) echo "--tier must be 0.8b or 2b" >&2; exit 2 ;;
+esac
+
+ACTUAL_SHA="$(sha256_file "$MODEL_PATH" | tr '[:upper:]' '[:lower:]')"
+[[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || { echo "Model SHA does not match the curated $TIER Q4_K_M reference" >&2; exit 2; }
+"$ADB" get-state >/dev/null
+DEVICE_ABI="$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')"
+[[ "$DEVICE_ABI" == arm64-v8a* ]] || { echo "Qwen3.5 tuning requires arm64-v8a; device reports $DEVICE_ABI" >&2; exit 2; }
+
+cd "$ROOT_DIR"
+./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
+APP_APK="$(find apps/device-test-runner/build/outputs/apk/debug -type f -name '*.apk' | sort | tail -n 1)"
+TEST_APK="$(find apps/device-test-runner/build/outputs/apk/androidTest/debug -type f -name '*.apk' | sort | tail -n 1)"
+"$ADB" install -r -t "$APP_APK"
+"$ADB" install -r -t "$TEST_APK"
+"$ADB" shell run-as "$APP_ID" mkdir -p files/e2e
+"$ADB" shell -T run-as "$APP_ID" dd of=files/e2e/model.gguf bs=1048576 < "$MODEL_PATH" >/dev/null
+
+RUNNER="$("$ADB" shell pm list instrumentation | tr -d '\r' | grep -F "(target=$APP_ID)" | head -n 1 | sed -E 's/^instrumentation:([^ ]+).*/\1/')"
+[[ -n "$RUNNER" ]] || { echo "Unable to discover AndroidJUnitRunner" >&2; exit 1; }
+mkdir -p "$OUTPUT_DIR"
+JSONL="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}.jsonl"
+CSV="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}-summary.csv"
+: > "$JSONL"
+
+for context in 1024 2048 4096; do
+    for threads in 2 4; do
+        for pair in "64 32" "128 64"; do
+            read -r batch ubatch <<< "$pair"
+            case_id="${TIER}-ctx${context}-t${threads}-bt${threads}-b${batch}-ub${ubatch}-${THINKING_MODE,,}"
+            for ((sample=1; sample<=REPEATS; sample++)); do
+                echo "Running $case_id sample $sample/$REPEATS"
+                set +e
+                output="$("$ADB" shell am instrument -w -r \
+                    -e class io.github.daniele21.localllm.devicetest.LocalLlmDeviceE2eTest#qwen35TuningSampleRecordsColdAndWarmEvidence \
+                    -e modelRelativePath files/e2e/model.gguf \
+                    -e modelSha256 "$EXPECTED_SHA" \
+                    -e modelArchitecture qwen35 \
+                    -e modelQuantization Q4_K_M \
+                    -e modelTier "$TIER" \
+                    -e contextSize "$context" \
+                    -e batchSize "$batch" \
+                    -e microBatchSize "$ubatch" \
+                    -e cpuThreads "$threads" \
+                    -e batchThreads "$threads" \
+                    -e maxOutputTokens 64 \
+                    -e thinkingMode "$THINKING_MODE" \
+                    -e tuningEnabled true \
+                    -e tuningCaseId "$case_id" \
+                    -e cancellationEnabled false \
+                    -e memoryRepeatCount 0 \
+                    "$RUNNER" 2>&1)"
+                status=$?
+                set -e
+                output="${output//$'\r'/}"
+                printf '%s\n' "$output"
+                (( status == 0 )) || { echo "Tuning case failed: $case_id" >&2; exit 1; }
+                mapfile -t evidence_lines < <(printf '%s\n' "$output" | sed -n 's/^.*LOCAL_LLM_TUNING_JSON //p')
+                [[ ${#evidence_lines[@]} -eq 2 ]] || { echo "Expected cold and warm evidence for $case_id" >&2; exit 1; }
+                printf '%s\n' "${evidence_lines[@]}" >> "$JSONL"
+            done
+        done
+    done
+done
+
+python3 scripts/summarize-qwen35-tuning.py "$JSONL" "$CSV"
+echo "Qwen3.5 tuning evidence written to:"
+echo "  $JSONL"
+echo "  $CSV"
+''')
+          PY
+          chmod +x scripts/run-qwen35-tuning-matrix.sh scripts/summarize-qwen35-tuning.py
+      - name: Format
+        run: ./gradlew spotlessApply
+      - name: Validate harness
+        shell: bash
+        run: |
+          ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+          ./gradlew :apps:device-test-runner:compileDebugAndroidTestKotlin
+          bash -n scripts/run-device-e2e.sh scripts/run-qwen35-tuning-matrix.sh
+          python3 -m py_compile scripts/summarize-qwen35-tuning.py
+          cat > /tmp/tuning.jsonl <<'EOF'
+          {"tuningCaseId":"case","modelDigest":"abc","modelTier":"B0_8","architecture":"qwen35","quantization":"Q4_K_M","backendRevision":"rev","runtimeProfileVersion":1,"generationProfileVersion":2,"contextTokens":2048,"cpuThreads":4,"batchThreads":4,"batchSize":128,"microBatchSize":64,"thinkingMode":"DISABLED","modelLoadKind":"COLD","deviceModel":"phone","androidRelease":"16","sdkInt":36,"abi":"arm64-v8a","ttftMs":100,"prefillMs":50,"decodeMs":40,"totalMs":150,"prefillTokensPerSecond":100.0,"decodeTokensPerSecond":20.0,"processPssKb":1000,"availableMemoryBytes":100000,"thermalStatus":0}
+          {"tuningCaseId":"case","modelDigest":"abc","modelTier":"B0_8","architecture":"qwen35","quantization":"Q4_K_M","backendRevision":"rev","runtimeProfileVersion":1,"generationProfileVersion":2,"contextTokens":2048,"cpuThreads":4,"batchThreads":4,"batchSize":128,"microBatchSize":64,"thinkingMode":"DISABLED","modelLoadKind":"COLD","deviceModel":"phone","androidRelease":"16","sdkInt":36,"abi":"arm64-v8a","ttftMs":120,"prefillMs":60,"decodeMs":50,"totalMs":170,"prefillTokensPerSecond":90.0,"decodeTokensPerSecond":18.0,"processPssKb":1100,"availableMemoryBytes":90000,"thermalStatus":1}
+          EOF
+          python3 scripts/summarize-qwen35-tuning.py /tmp/tuning.jsonl /tmp/tuning.csv
+          test "$(wc -l < /tmp/tuning.csv)" -eq 2
+      - name: Commit validated tuning harness
+        shell: bash
+        run: |
+          rm .github/workflows/q35-6-tuning-harness.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add qwen35 android tuning evidence harness"
+          git push origin HEAD:dev
