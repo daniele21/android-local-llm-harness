@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,7 +20,7 @@ class MainActivityUiTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun compactShellKeepsBrandAndPrimaryActionVisible() {
+    fun compactShellKeepsBrandAndCuratedModelEntryPointVisible() {
         val topBarHeight = composeRule.onNodeWithTag("harnessTopBar").fetchSemanticsNode().boundsInRoot.height
         val topBarHeightDp = with(composeRule.density) { topBarHeight.toDp() }
         val maximumHeight = 120.dp
@@ -30,7 +31,9 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Harness").assertIsDisplayed()
         composeRule.onNodeWithText("Local AI Console").assertIsDisplayed()
         composeRule.onNodeWithTag("nav-overview").assertIsDisplayed()
-        composeRule.onNodeWithText("Import model").assertIsDisplayed()
+        composeRule.onNodeWithText("Models").assertIsDisplayed()
+        composeRule.onNodeWithText("Qwen3.5 catalog").assertIsDisplayed()
+        composeRule.onNodeWithText("Import model").assertDoesNotExist()
         composeRule.onNodeWithText("Device resources").assertIsDisplayed()
     }
 
@@ -41,6 +44,8 @@ class MainActivityUiTest {
 
         composeRule.onNodeWithTag("nav-models").performClick()
         composeRule.onNodeWithText("Model catalog").assertIsDisplayed()
+        composeRule.onNodeWithText("Reviewed Qwen3.5 models compatible with this device").assertIsDisplayed()
+        composeRule.onNodeWithText("Import model").assertDoesNotExist()
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
         composeRule.onNodeWithText("Overall health").assertIsDisplayed()
