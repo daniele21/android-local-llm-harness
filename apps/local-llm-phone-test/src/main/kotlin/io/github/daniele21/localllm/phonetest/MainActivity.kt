@@ -1138,14 +1138,33 @@ class MainActivity :
         val inventory = state.modelInventory
         ScreenList(title = null) {
             item { ModelsHeader() }
-            item { ModelsSummaryCard(inventory) }
             if (inventory.degradedCount > 0) {
                 item { ModelsRecoveryCard(inventory, onOpenModelDetails) }
             }
-            item { SelectedModelCard(state, inventory.selectedItem, onOpenModelDetails) }
-            item { ModelInventoryDetailCards(inventory, onOpenModelDetails) }
-            item { ModelCatalogHeader(state.modelDistribution) }
-            item { ModelCatalogContent(state.modelDistribution) }
+            item {
+                UnifiedModelsCatalog(
+                    state = state,
+                    actions = UnifiedModelsActions(
+                        catalog = PhoneModelDistributionActions(
+                            download = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Download(it)) },
+                            cancelDownload = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelDownload(it)) },
+                            install = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Install(it)) },
+                            verifyInstalled = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.VerifyInstalled(it)) },
+                            requestRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.RequestRemoval(it)) },
+                            cancelRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelRemoval(it)) },
+                            confirmRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.ConfirmRemoval(it)) },
+                            selectInstalled = { harnessViewModel.models.selectInstalled(it) },
+                        ),
+                        verifySelected = { harnessViewModel.models.verifySelected() },
+                        unloadLoaded = { harnessViewModel.models.unloadLoaded() },
+                        requestSelectedRemoval = { harnessViewModel.models.requestSelectedRemoval() },
+                        cancelSelectedRemoval = harnessViewModel.models::cancelSelectedRemoval,
+                        confirmSelectedRemoval = { harnessViewModel.models.confirmSelectedRemoval() },
+                        refresh = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Refresh) },
+                    ),
+                    onOpenModelDetails = onOpenModelDetails,
+                )
+            }
         }
     }
 
