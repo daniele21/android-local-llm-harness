@@ -164,7 +164,7 @@ class HarnessModelInventoryTest {
         description = "Test model",
         fileName = "$stableId.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen2",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         profileKey = "profile-$stableId",
         licenseName = "Apache-2.0",
@@ -185,7 +185,7 @@ class HarnessModelInventoryTest {
         useCaseId = "manual-inference-playground",
         fileName = "$stableId.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen2",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         installedAtEpochMs = 1L,
     )
@@ -194,7 +194,7 @@ class HarnessModelInventoryTest {
         digest = digest,
         fileName = fileName,
         sizeBytes = 1_024L,
-        architecture = "qwen2",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
     )
 
