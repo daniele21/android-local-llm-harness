@@ -29,7 +29,7 @@ Core lifecycle and backend contracts remain model-family neutral. That neutralit
 | Milestone | State | Meaning |
 | --- | --- | --- |
 | Q35-0 Decision and plan | DONE | The support envelope, decision record and progressive-disclosure routing are canonical. |
-| Q35-1 Curated model baseline | PLANNED | Remove generic/import paths and expose only curated Qwen3.5 dense 0.8B/2B releases. |
+| Q35-1 Curated model baseline | IN PROGRESS | Closed catalog/import removal plus catalog-only binding, persistence and inventory cleanup are implemented; applicable Android/package validation still gates completion. |
 | Q35-2 Compatibility gate | PLANNED | Prove the exact curated artifacts against the pinned backend. |
 | Q35-3 Thinking and sampling | PLANNED | Make Qwen3.5 template semantics and sampling first-class behind neutral intent. |
 | Q35-4 Generation guard | PLANNED | Add bounded detection and typed stop reasons for anomalous generation. |
@@ -38,7 +38,7 @@ Core lifecycle and backend contracts remain model-family neutral. That neutralit
 | Q35-7 Validation | PLANNED | Add golden, integration and physical-device Qwen3.5 validation. |
 | Q35-8 Certification | PLANNED | Attach evidence-backed certification to exact curated artifacts. |
 
-The next implementation gate is **Q35-1 Curated model baseline**. Q35-2 starts after the product no longer exposes arbitrary/manual or multi-family model choices.
+The current implementation gate is **Q35-1 validation closure**. The product-side closed Qwen3.5 surface is implemented, but Q35-1 remains `IN PROGRESS` until its applicable repository/Android/package checks pass. Q35-2 starts only after that gate closes.
 
 ## What to read
 
