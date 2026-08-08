@@ -1,10 +1,19 @@
 package io.github.daniele21.localllm.phonetest
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessModelsCatalogUiTest {
+    @Test
+    fun catalogExposesOnlyTheTwoSupportedQwen35SizeGroups() {
+        assertEquals(
+            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B"),
+            ModelsSizeFilter.entries.mapNotNull(ModelsSizeFilter::groupLabel),
+        )
+    }
+
     @Test
     fun sizeFiltersMatchOnlyTheirQwen35ParameterGroup() {
         val compact = item("qwen35-08b-q4-k-m")
