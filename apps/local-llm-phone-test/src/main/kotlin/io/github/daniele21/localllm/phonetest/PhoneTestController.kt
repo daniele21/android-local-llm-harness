@@ -41,6 +41,12 @@ internal class PhoneTestController(
     private val runtimeGraph: HarnessRuntimeGraph,
     private val listener: PhoneTestListener,
 ) : AutoCloseable {
+    constructor(context: Context, listener: PhoneTestListener) : this(
+        context = context,
+        runtimeGraph = HarnessRuntimeGraph.from(context),
+        listener = listener,
+    )
+
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
