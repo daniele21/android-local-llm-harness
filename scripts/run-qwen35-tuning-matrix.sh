@@ -116,6 +116,7 @@ if [[ "$DEVICE_ABI" != arm64-v8a* ]]; then
 fi
 
 cd "$ROOT_DIR"
+HARNESS_COMMIT="$(git rev-parse HEAD)"
 ./gradlew \
     :apps:device-test-runner:assembleDebug \
     :apps:device-test-runner:assembleDebugAndroidTest
@@ -160,11 +161,9 @@ for context in 1024 2048 4096; do
                 set +e
                 output="$(
                     "$ADB" shell am instrument -w -r \
-                        -e class io.github.daniele21.localllm.devicetest.LocalLlmDeviceE2eTest#qwen35TuningSampleRecordsColdAndWarmEvidence \
+                        -e class io.github.daniele21.localllm.devicetest.Qwen35TuningInstrumentedTest#recordsColdAndWarmEvidence \
                         -e modelRelativePath files/e2e/model.gguf \
                         -e modelSha256 "$EXPECTED_SHA" \
-                        -e modelArchitecture qwen35 \
-                        -e modelQuantization Q4_K_M \
                         -e modelTier "$TIER" \
                         -e contextSize "$context" \
                         -e batchSize "$batch" \
@@ -173,17 +172,15 @@ for context in 1024 2048 4096; do
                         -e batchThreads "$threads" \
                         -e maxOutputTokens 64 \
                         -e thinkingMode "$THINKING_MODE" \
-                        -e tuningEnabled true \
                         -e tuningCaseId "$case_id" \
-                        -e cancellationEnabled false \
-                        -e memoryRepeatCount 0 \
+                        -e harnessCommit "$HARNESS_COMMIT" \
                         "$RUNNER" 2>&1
                 )"
                 status=$?
                 set -e
                 output="${output//$'\r'/}"
                 printf '%s\n' "$output"
-                if ((status != 0)); then
+                if ((status != 0)) || grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg=' <<< "$output"; then
                     echo "Tuning case failed: $case_id" >&2
                     exit 1
                 fi
