@@ -100,38 +100,18 @@ object Qwen35RuntimeTuningProfiles {
     const val LLAMA_CPP_REVISION = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
     val APPROVED_CONTEXT_TIERS: List<Int> = listOf(1_024, 2_048, 4_096, 8_192)
 
-    fun candidateForTier(tier: Qwen35ModelTier): Qwen35RuntimeTuningProfile = Qwen35RuntimeTuningProfile(
-        id = when (tier) {
-            Qwen35ModelTier.B0_8 -> "qwen35-08b-android-candidate"
-            Qwen35ModelTier.B2 -> "qwen35-2b-android-candidate"
-        },
-        version = VERSION,
-        tier = tier,
-        approvedContextTiers = APPROVED_CONTEXT_TIERS,
-        defaultContextTokens = 2_048,
-        batchSize = 128,
-        microBatchSize = 64,
-        maxCpuThreads = 4,
-        maxBatchThreads = 4,
-        useMmap = true,
-        useMlock = false,
-        flashAttention = false,
-        evidenceStatus = Qwen35RuntimeEvidenceStatus.CANDIDATE,
-    )
-
-    fun tuningMatrixForTier(tier: Qwen35ModelTier): List<Qwen35TuningCandidate> =
-        APPROVED_CONTEXT_TIERS.flatMap { context ->
-            listOf(2, 4).flatMap { threads ->
-                listOf(64 to 32, 128 to 64).map { (batch, microBatch) ->
-                    Qwen35TuningCandidate(
-                        tier = tier,
-                        contextTokens = context,
-                        cpuThreads = threads,
-                        batchThreads = threads,
-                        batchSize = batch,
-                        microBatchSize = microBatch,
-                    )
-                }
+    fun candidateForTier(tier: Qwen35ModelTier): List<Qwen35TuningCandidate> = APPROVED_CONTEXT_TIERS.flatMap { context ->
+        listOf(2, 4).flatMap { threads ->
+            listOf(64 to 32, 128 to 64).map { (batch, microBatch) ->
+                Qwen35TuningCandidate(
+                    tier = tier,
+                    contextTokens = context,
+                    cpuThreads = threads,
+                    batchThreads = threads,
+                    batchSize = batch,
+                    microBatchSize = microBatch,
+                )
             }
         }
+    }
 }
