@@ -1,0 +1,431 @@
+name: Q35 4 5 6 implementation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/q35-456-implementation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Apply Q35-4 Q35-5 Q35-6 implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_one(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"pattern not found in {path}: {old[:120]!r}")
+              if text.count(old) != 1:
+                  raise SystemExit(f"pattern not unique in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          profiles = "models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Profiles.kt"
+          replace_one(
+              profiles,
+              "data class GgufModelProfile(\n",
+              '''data class RuntimeCapabilityProfile(\n    val requiredBackendId: String? = null,\n    val requiredBackendRevision: String? = null,\n    val approvedContextTiers: List<Int> = emptyList(),\n    val contextSafetyReserveTokens: Int = 256,\n    val supportsStatelessContextReuse: Boolean = true,\n    val supportsPrefixSnapshot: Boolean = false,\n    val supportsSessionRestore: Boolean = false,\n    val supportsPrefixReuse: Boolean = false,\n) {\n    init {\n        require(requiredBackendId == null || requiredBackendId.isNotBlank()) { "Required backend ID must not be blank" }\n        require(requiredBackendRevision == null || requiredBackendRevision.isNotBlank()) {\n            "Required backend revision must not be blank"\n        }\n        require(contextSafetyReserveTokens >= 0) { "Context safety reserve must not be negative" }\n        require(approvedContextTiers.all { it > 0 }) { "Approved context tiers must be positive" }\n        require(approvedContextTiers == approvedContextTiers.distinct().sorted()) {\n            "Approved context tiers must be unique and sorted"\n        }\n    }\n}\n\ndata class GenerationGuardPolicy(\n    val version: Int = 1,\n    val enabled: Boolean = false,\n    val thinkingTokenBudget: Int = 0,\n    val repetitionActivationTokens: Int = 0,\n    val observationWindowChars: Int = 0,\n    val minPatternChars: Int = 0,\n    val maxPatternChars: Int = 0,\n    val repetitionOccurrences: Int = 0,\n) {\n    init {\n        require(version > 0) { "Generation guard version must be positive" }\n        if (enabled) {\n            require(thinkingTokenBudget > 0) { "Thinking token budget must be positive" }\n            require(repetitionActivationTokens > 0) { "Repetition activation threshold must be positive" }\n            require(observationWindowChars > 0) { "Observation window must be positive" }\n            require(minPatternChars > 0) { "Minimum repetition pattern must be positive" }\n            require(maxPatternChars >= minPatternChars) { "Maximum repetition pattern must not be smaller than minimum" }\n            require(observationWindowChars >= maxPatternChars * repetitionOccurrences) {\n                "Observation window must contain the configured repetition evidence"\n            }\n            require(repetitionOccurrences >= 2) { "Repetition occurrences must be at least two" }\n        }\n    }\n\n    companion object {\n        fun disabled(): GenerationGuardPolicy = GenerationGuardPolicy()\n    }\n}\n\ndata class GgufModelProfile(\n''',
+          )
+          replace_one(
+              profiles,
+              "    val chatTemplatePolicy: ChatTemplatePolicy = ChatTemplatePolicy(),\n)\n",
+              "    val chatTemplatePolicy: ChatTemplatePolicy = ChatTemplatePolicy(),\n    val runtimeCapabilities: RuntimeCapabilityProfile = RuntimeCapabilityProfile(),\n)\n",
+          )
+          replace_one(
+              profiles,
+              "    val repeatLastN: Int = DEFAULT_REPEAT_LAST_N,\n) {\n",
+              "    val repeatLastN: Int = DEFAULT_REPEAT_LAST_N,\n    val guardPolicy: GenerationGuardPolicy = GenerationGuardPolicy.disabled(),\n) {\n",
+          )
+
+          qwen_generation = Path("models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35GenerationProfiles.kt")
+          qwen_generation.write_text('''package io.github.daniele21.localllm.models\n\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n\nenum class Qwen35ModelTier {\n    B0_8,\n    B2,\n}\n\nenum class Qwen35GenerationProfileId {\n    QWEN35_TEXT_FAST,\n    QWEN35_TEXT_QUALITY,\n    QWEN35_THINKING,\n    QWEN35_PRECISE,\n    QWEN35_JSON,\n}\n\ndata class Qwen35GenerationProfile(val id: Qwen35GenerationProfileId, val version: Int, val defaults: GenerationDefaults)\n\nobject Qwen35GenerationGuardPolicies {\n    const val VERSION = 1\n\n    fun forTier(tier: Qwen35ModelTier): GenerationGuardPolicy = when (tier) {\n        Qwen35ModelTier.B0_8 -> policy(thinkingBudget = 768, activationTokens = 64)\n        Qwen35ModelTier.B2 -> policy(thinkingBudget = 1_536, activationTokens = 96)\n    }\n\n    private fun policy(thinkingBudget: Int, activationTokens: Int) = GenerationGuardPolicy(\n        version = VERSION,\n        enabled = true,\n        thinkingTokenBudget = thinkingBudget,\n        repetitionActivationTokens = activationTokens,\n        observationWindowChars = 4_096,\n        minPatternChars = 24,\n        maxPatternChars = 256,\n        repetitionOccurrences = 4,\n    )\n}\n\nobject Qwen35GenerationProfiles {\n    const val VERSION = 2\n\n    fun forTier(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> {\n        val qualityTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 768\n        val thinkingTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 1_024\n        return listOf(\n            profile(tier, Qwen35GenerationProfileId.QWEN35_TEXT_FAST, 256, ThinkingMode.DISABLED, 1f, 1f, 2f),\n            profile(tier, Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY, qualityTokens, ThinkingMode.DISABLED, 1f, 1f, 2f),\n            profile(tier, Qwen35GenerationProfileId.QWEN35_THINKING, thinkingTokens, ThinkingMode.ENABLED, 1f, 0.95f, 1.5f),\n            profile(tier, Qwen35GenerationProfileId.QWEN35_PRECISE, thinkingTokens, ThinkingMode.ENABLED, 0.6f, 0.95f, 0f),\n            profile(tier, Qwen35GenerationProfileId.QWEN35_JSON, 512, ThinkingMode.DISABLED, 1f, 1f, 2f),\n        )\n    }\n\n    fun defaultForTier(tier: Qwen35ModelTier): GenerationDefaults =\n        forTier(tier).single { it.id == Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY }.defaults\n\n    private fun profile(\n        tier: Qwen35ModelTier,\n        id: Qwen35GenerationProfileId,\n        maxOutputTokens: Int,\n        thinkingMode: ThinkingMode,\n        temperature: Float,\n        topP: Float,\n        presencePenalty: Float,\n    ) = Qwen35GenerationProfile(\n        id = id,\n        version = VERSION,\n        defaults = GenerationDefaults(\n            maxOutputTokens = maxOutputTokens,\n            temperature = temperature,\n            topP = topP,\n            topK = 20,\n            minP = 0f,\n            presencePenalty = presencePenalty,\n            thinkingMode = thinkingMode,\n            repeatPenalty = 1f,\n            repeatLastN = 64,\n            guardPolicy = Qwen35GenerationGuardPolicies.forTier(tier),\n        ),\n    )\n}\n''')
+
+          Path("models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuning.kt").write_text('''package io.github.daniele21.localllm.models\n\nenum class Qwen35RuntimeEvidenceStatus {\n    CANDIDATE,\n    MEASURED,\n}\n\ndata class Qwen35RuntimeTuningProfile(\n    val id: String,\n    val version: Int,\n    val tier: Qwen35ModelTier,\n    val approvedContextTiers: List<Int>,\n    val defaultContextTokens: Int,\n    val batchSize: Int,\n    val microBatchSize: Int,\n    val maxCpuThreads: Int,\n    val maxBatchThreads: Int,\n    val useMmap: Boolean,\n    val useMlock: Boolean,\n    val flashAttention: Boolean,\n    val evidenceStatus: Qwen35RuntimeEvidenceStatus,\n) {\n    init {\n        require(id.isNotBlank()) { "Runtime tuning profile ID must not be blank" }\n        require(version > 0) { "Runtime tuning profile version must be positive" }\n        require(approvedContextTiers.isNotEmpty()) { "Qwen3.5 context tiers must not be empty" }\n        require(defaultContextTokens in approvedContextTiers) { "Default context must be an approved tier" }\n        require(batchSize > 0 && microBatchSize > 0 && microBatchSize <= batchSize) { "Invalid batch configuration" }\n        require(maxCpuThreads > 0 && maxBatchThreads > 0) { "Thread caps must be positive" }\n    }\n\n    fun resolve(availableProcessors: Int): Qwen35ResolvedRuntimeTuning {\n        val processors = availableProcessors.coerceAtLeast(1)\n        return Qwen35ResolvedRuntimeTuning(\n            profileId = id,\n            profileVersion = version,\n            tier = tier,\n            contextTokens = defaultContextTokens,\n            batchSize = batchSize,\n            microBatchSize = microBatchSize,\n            cpuThreads = processors.coerceAtMost(maxCpuThreads),\n            batchThreads = processors.coerceAtMost(maxBatchThreads),\n            useMmap = useMmap,\n            useMlock = useMlock,\n            flashAttention = flashAttention,\n            evidenceStatus = evidenceStatus,\n        )\n    }\n\n    fun runtimeCapabilities(): RuntimeCapabilityProfile = RuntimeCapabilityProfile(\n        requiredBackendId = "llama.cpp",\n        requiredBackendRevision = Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION,\n        approvedContextTiers = approvedContextTiers,\n        contextSafetyReserveTokens = 256,\n        supportsStatelessContextReuse = false,\n        supportsPrefixSnapshot = false,\n        supportsSessionRestore = false,\n        supportsPrefixReuse = false,\n    )\n}\n\ndata class Qwen35ResolvedRuntimeTuning(\n    val profileId: String,\n    val profileVersion: Int,\n    val tier: Qwen35ModelTier,\n    val contextTokens: Int,\n    val batchSize: Int,\n    val microBatchSize: Int,\n    val cpuThreads: Int,\n    val batchThreads: Int,\n    val useMmap: Boolean,\n    val useMlock: Boolean,\n    val flashAttention: Boolean,\n    val evidenceStatus: Qwen35RuntimeEvidenceStatus,\n)\n\ndata class Qwen35TuningCandidate(\n    val tier: Qwen35ModelTier,\n    val contextTokens: Int,\n    val cpuThreads: Int,\n    val batchThreads: Int,\n    val batchSize: Int,\n    val microBatchSize: Int,\n) {\n    val stableId: String\n        get() = listOf(\n            tier.name.lowercase(),\n            "ctx$contextTokens",\n            "t$cpuThreads",\n            "bt$batchThreads",\n            "b$batchSize",\n            "ub$microBatchSize",\n        ).joinToString("-")\n}\n\nobject Qwen35RuntimeTuningProfiles {\n    const val VERSION = 1\n    const val LLAMA_CPP_REVISION = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"\n    val APPROVED_CONTEXT_TIERS: List<Int> = listOf(1_024, 2_048, 4_096, 8_192)\n\n    fun candidateForTier(tier: Qwen35ModelTier): Qwen35RuntimeTuningProfile = Qwen35RuntimeTuningProfile(\n        id = when (tier) {\n            Qwen35ModelTier.B0_8 -> "qwen35-08b-android-candidate"\n            Qwen35ModelTier.B2 -> "qwen35-2b-android-candidate"\n        },\n        version = VERSION,\n        tier = tier,\n        approvedContextTiers = APPROVED_CONTEXT_TIERS,\n        defaultContextTokens = 2_048,\n        batchSize = 128,\n        microBatchSize = 64,\n        maxCpuThreads = 4,\n        maxBatchThreads = 4,\n        useMmap = true,\n        useMlock = false,\n        flashAttention = false,\n        evidenceStatus = Qwen35RuntimeEvidenceStatus.CANDIDATE,\n    )\n\n    fun tuningMatrixForTier(tier: Qwen35ModelTier): List<Qwen35TuningCandidate> =\n        listOf(1_024, 2_048, 4_096).flatMap { context ->\n            listOf(2, 4).flatMap { threads ->\n                listOf(64 to 32, 128 to 64).map { (batch, microBatch) ->\n                    Qwen35TuningCandidate(\n                        tier = tier,\n                        contextTokens = context,\n                        cpuThreads = threads,\n                        batchThreads = threads,\n                        batchSize = batch,\n                        microBatchSize = microBatch,\n                    )\n                }\n            }\n        }\n}\n''')
+
+          generation_config = "core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/GenerationConfiguration.kt"
+          replace_one(
+              generation_config,
+              "    GRAMMAR_COMPLETE,\n    UNKNOWN,\n",
+              "    GRAMMAR_COMPLETE,\n    GENERATION_GUARD_REPETITION,\n    GENERATION_GUARD_THINKING_BUDGET,\n    UNKNOWN,\n",
+          )
+
+          backend_contract = "core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/InferenceBackend.kt"
+          replace_one(
+              backend_contract,
+              "interface InferenceBackend {\n    val id: String\n",
+              "interface InferenceBackend {\n    val id: String\n    val revision: String?\n        get() = null\n",
+          )
+
+          llama_backend = "core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/LlamaCppInferenceBackend.kt"
+          replace_one(
+              llama_backend,
+              '    override val id: String = "llama.cpp"\n',
+              '    override val id: String = "llama.cpp"\n    override val revision: String = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"\n',
+          )
+
+          Path("core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/GenerationGuard.kt").write_text('''package io.github.daniele21.localllm.runtime\n\nimport io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\nimport io.github.daniele21.localllm.models.GenerationGuardPolicy\n\ninternal class GenerationGuard(\n    private val thinkingMode: ThinkingMode,\n    private val policy: GenerationGuardPolicy,\n) {\n    private val observation = StringBuilder()\n    private var thinkingClosed = false\n\n    fun observe(text: String, generatedTokens: Int): StopReason? {\n        if (!policy.enabled || thinkingMode != ThinkingMode.ENABLED || thinkingClosed) return null\n        appendBounded(text)\n        if (THINKING_CLOSE in observation) {\n            thinkingClosed = true\n            return null\n        }\n        if (generatedTokens >= policy.thinkingTokenBudget) {\n            return StopReason.GENERATION_GUARD_THINKING_BUDGET\n        }\n        if (generatedTokens >= policy.repetitionActivationTokens && repeatedSuffix()) {\n            return StopReason.GENERATION_GUARD_REPETITION\n        }\n        return null\n    }\n\n    internal fun retainedCharacters(): Int = observation.length\n\n    private fun appendBounded(text: String) {\n        observation.append(text)\n        val overflow = observation.length - policy.observationWindowChars\n        if (overflow > 0) observation.delete(0, overflow)\n    }\n\n    private fun repeatedSuffix(): Boolean {\n        val normalized = observation.toString()\n            .lowercase()\n            .replace(WHITESPACE, " ")\n            .trim()\n        val maximumPattern = minOf(policy.maxPatternChars, normalized.length / policy.repetitionOccurrences)\n        if (maximumPattern < policy.minPatternChars) return false\n        for (length in policy.minPatternChars..maximumPattern) {\n            val evidenceLength = length * policy.repetitionOccurrences\n            val evidence = normalized.takeLast(evidenceLength)\n            val pattern = evidence.take(length)\n            if (!pattern.any(Char::isLetterOrDigit) || pattern.toSet().size < MIN_PATTERN_DIVERSITY) continue\n            if (evidence == pattern.repeat(policy.repetitionOccurrences)) return true\n        }\n        return false\n    }\n\n    private companion object {\n        const val THINKING_CLOSE = "</think>"\n        const val MIN_PATTERN_DIVERSITY = 4\n        val WHITESPACE = Regex("\\\\s+")\n    }\n}\n''')
+
+          context_selector = Path("core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/ContextSizeSelector.kt")
+          context_selector.write_text('''package io.github.daniele21.localllm.runtime\n\ninternal object ContextSizeSelector {\n    val supportedSizes: List<Int> = listOf(1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536)\n\n    fun selectAuto(\n        required: Int,\n        maximum: Int,\n        preferredMinimum: Int?,\n        candidateSizes: List<Int> = supportedSizes,\n    ): Int? {\n        if (required <= 0 || maximum <= 0 || required > maximum) return null\n        val sizes = candidateSizes.distinct().sorted().filter { it > 0 }\n        val target = maxOf(required, preferredMinimum?.coerceAtMost(maximum) ?: required)\n        return sizes.firstOrNull { it >= target && it <= maximum }\n    }\n\n    fun supportsManual(\n        tokens: Int,\n        required: Int,\n        maximum: Int,\n        candidateSizes: List<Int> = supportedSizes,\n    ): Boolean = tokens in candidateSizes && tokens >= required && tokens <= maximum\n}\n''')
+
+          orchestrator = "core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt"
+          replace_one(
+              orchestrator,
+              "import io.github.daniele21.localllm.models.InferencePreset\n",
+              "import io.github.daniele21.localllm.models.GenerationGuardPolicy\nimport io.github.daniele21.localllm.models.InferencePreset\n",
+          )
+          replace_one(
+              orchestrator,
+              "import io.github.daniele21.localllm.contracts.SessionOptions\n",
+              "import io.github.daniele21.localllm.contracts.SessionOptions\nimport io.github.daniele21.localllm.contracts.StopReason\n",
+          )
+          replace_one(
+              orchestrator,
+              "            val backendRequest = BackendGenerationRequest(\n",
+              "            val generationGuard = GenerationGuard(resolved.thinkingMode, resolved.guardPolicy)\n            val guardStopReason = AtomicReference<StopReason?>(null)\n            val backendRequest = BackendGenerationRequest(\n",
+          )
+          old_callback = '''            val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->\n                if (lifecycle.cancelRequested.get()) {\n                    false\n                } else {\n                    firstTokenAt.compareAndSet(0, clock.nowNanos())\n                    output.append(text)\n                    lifecycle.emit(\n                        GenerationEvent.TextDelta(\n                            requestId = request.requestId,\n                            text = text,\n                            generatedTokens = generatedTokens,\n                        ),\n                    )\n                    !lifecycle.cancelRequested.get()\n                }\n            }\n\n            if (lifecycle.cancelRequested.get() || outcome is BackendGenerationOutcome.Cancelled) {\n                val cancellation = LocalLlmError.Cancelled()\n                runtimeTelemetry.failed(request.requestId, cancellation)\n                lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))\n            } else {\n                val backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics\n                val publicMetrics = backendMetrics.toPublicMetrics(\n                    queueMs = nanosToMillis(executionStartedAt - enqueuedAt),\n                    modelLoadMs = session.modelLoadDurationMs,\n                    modelLoadKind = session.modelLoadKind,\n                    timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }\n                        ?.let { nanosToMillis(it - executionStartedAt) },\n                    totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),\n                    promptPlanningMs = promptPlanningMs,\n                    contextCreationMs = contextResult.creationMs,\n                )\n                runtimeTelemetry.completed(request.requestId, publicMetrics)\n                lifecycle.finish(\n                    GenerationEvent.Completed(\n                        requestId = request.requestId,\n                        output = output.toString(),\n                        metrics = publicMetrics,\n                    ),\n                )\n            }\n'''
+          new_callback = '''            val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->\n                if (lifecycle.cancelRequested.get()) {\n                    false\n                } else {\n                    firstTokenAt.compareAndSet(0, clock.nowNanos())\n                    output.append(text)\n                    lifecycle.emit(\n                        GenerationEvent.TextDelta(\n                            requestId = request.requestId,\n                            text = text,\n                            generatedTokens = generatedTokens,\n                        ),\n                    )\n                    val guardReason = generationGuard.observe(text, generatedTokens)\n                    if (guardReason != null) guardStopReason.compareAndSet(null, guardReason)\n                    guardReason == null && !lifecycle.cancelRequested.get()\n                }\n            }\n\n            val guardReason = guardStopReason.get()\n            if (lifecycle.cancelRequested.get()) {\n                val cancellation = LocalLlmError.Cancelled()\n                runtimeTelemetry.failed(request.requestId, cancellation)\n                lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))\n            } else if (guardReason != null) {\n                val guardedMetrics = outcome.metrics().copy(stopReason = guardReason)\n                completeGeneration(\n                    request = request,\n                    session = session,\n                    lifecycle = lifecycle,\n                    output = output.toString(),\n                    backendMetrics = guardedMetrics,\n                    executionStartedAt = executionStartedAt,\n                    enqueuedAt = enqueuedAt,\n                    firstTokenAt = firstTokenAt,\n                    promptPlanningMs = promptPlanningMs,\n                    contextCreationMs = contextResult.creationMs,\n                )\n            } else if (outcome is BackendGenerationOutcome.Cancelled) {\n                val cancellation = LocalLlmError.Cancelled()\n                runtimeTelemetry.failed(request.requestId, cancellation)\n                lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))\n            } else {\n                completeGeneration(\n                    request = request,\n                    session = session,\n                    lifecycle = lifecycle,\n                    output = output.toString(),\n                    backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics,\n                    executionStartedAt = executionStartedAt,\n                    enqueuedAt = enqueuedAt,\n                    firstTokenAt = firstTokenAt,\n                    promptPlanningMs = promptPlanningMs,\n                    contextCreationMs = contextResult.creationMs,\n                )\n            }\n'''
+          replace_one(orchestrator, old_callback, new_callback)
+          replace_one(
+              orchestrator,
+              "            contextPreference = preset?.contextPreference ?: ContextPreference(),\n        )\n",
+              "            contextPreference = preset?.contextPreference ?: ContextPreference(),\n            guardPolicy = defaults.guardPolicy,\n        )\n",
+          )
+          replace_one(
+              orchestrator,
+              "        val required = runCatching {\n            Math.addExact(Math.addExact(promptTokenCount, maxOutputTokens), CONTEXT_RESERVE_TOKENS)\n",
+              "        val runtimeCapabilities = session.resolved.model.runtimeCapabilities\n        val required = runCatching {\n            Math.addExact(Math.addExact(promptTokenCount, maxOutputTokens), runtimeCapabilities.contextSafetyReserveTokens)\n",
+          )
+          replace_one(
+              orchestrator,
+              "        val maximum = minOf(capabilities.maximumContextTokens, preference.maximumTokens ?: Int.MAX_VALUE)\n",
+              "        val approvedTiers = runtimeCapabilities.approvedContextTiers.ifEmpty { ContextSizeSelector.supportedSizes }\n        val maximum = minOf(\n            capabilities.maximumContextTokens,\n            preference.maximumTokens ?: Int.MAX_VALUE,\n            approvedTiers.maxOrNull() ?: Int.MAX_VALUE,\n        )\n",
+          )
+          replace_one(
+              orchestrator,
+              "                if (!ContextSizeSelector.supportsManual(policy.tokens, required, maximum)) {\n",
+              "                if (!ContextSizeSelector.supportsManual(policy.tokens, required, maximum, approvedTiers)) {\n",
+          )
+          replace_one(
+              orchestrator,
+              "                preferredMinimum = preference.preferredTokens,\n            ) ?: throw GenerationPlanningException(\n",
+              "                preferredMinimum = preference.preferredTokens,\n                candidateSizes = approvedTiers,\n            ) ?: throw GenerationPlanningException(\n",
+          )
+          old_materialize = '''            val current = session.context\n            if (current != null && current.contextSize >= requestedContextSize) {\n                return@synchronized ContextMaterialization(current, null, created = false)\n            }\n            if (current != null && session.options.kind == SessionKind.CONVERSATIONAL) {\n'''
+          new_materialize = '''            val current = session.context\n            val capabilities = session.resolved.model.runtimeCapabilities\n            val statelessReuse = session.resolved.useCase.cachePolicy.reuseStatelessContext &&\n                capabilities.supportsStatelessContextReuse\n            val liveReuseAllowed = session.options.kind == SessionKind.CONVERSATIONAL || statelessReuse\n            if (current != null && current.contextSize >= requestedContextSize && liveReuseAllowed) {\n                return@synchronized ContextMaterialization(current, null, created = false)\n            }\n            if (current != null && session.options.kind == SessionKind.CONVERSATIONAL) {\n'''
+          replace_one(orchestrator, old_materialize, new_materialize)
+          replace_one(
+              orchestrator,
+              "    private fun ensureModelLoaded(resolved: ResolvedUseCase): LoadedModelDescriptor {\n        check(!closed.get()) { \"Runtime is closed\" }\n",
+              "    private fun ensureModelLoaded(resolved: ResolvedUseCase): LoadedModelDescriptor {\n        check(!closed.get()) { \"Runtime is closed\" }\n        validateRuntimeCapabilities(resolved)\n",
+          )
+          replace_one(
+              orchestrator,
+              "    private fun releaseSessionRequest(session: SessionDescriptor) {\n",
+              '''    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {\n        val capabilities = resolved.model.runtimeCapabilities\n        capabilities.requiredBackendId?.let { required ->\n            check(backend.id == required) { "Runtime profile requires backend $required" }\n        }\n        capabilities.requiredBackendRevision?.let { required ->\n            check(backend.revision == required) { "Runtime profile requires backend revision $required" }\n        }\n        check(!resolved.useCase.cachePolicy.enablePrefixSnapshot || capabilities.supportsPrefixSnapshot) {\n            "Runtime profile does not allow prefix snapshots"\n        }\n        check(!resolved.useCase.cachePolicy.reuseStatelessContext || capabilities.supportsStatelessContextReuse) {\n            "Runtime profile does not allow stateless context reuse"\n        }\n    }\n\n    private fun BackendGenerationOutcome.metrics(): BackendGenerationMetrics = when (this) {\n        is BackendGenerationOutcome.Completed -> metrics\n        is BackendGenerationOutcome.Cancelled -> metrics\n    }\n\n    private fun completeGeneration(\n        request: GenerationRequest,\n        session: SessionDescriptor,\n        lifecycle: RequestLifecycle,\n        output: String,\n        backendMetrics: BackendGenerationMetrics,\n        executionStartedAt: Long,\n        enqueuedAt: Long,\n        firstTokenAt: AtomicLong,\n        promptPlanningMs: Long,\n        contextCreationMs: Long?,\n    ) {\n        val publicMetrics = backendMetrics.toPublicMetrics(\n            queueMs = nanosToMillis(executionStartedAt - enqueuedAt),\n            modelLoadMs = session.modelLoadDurationMs,\n            modelLoadKind = session.modelLoadKind,\n            timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }\n                ?.let { nanosToMillis(it - executionStartedAt) },\n            totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),\n            promptPlanningMs = promptPlanningMs,\n            contextCreationMs = contextCreationMs,\n        )\n        runtimeTelemetry.completed(request.requestId, publicMetrics)\n        lifecycle.finish(\n            GenerationEvent.Completed(\n                requestId = request.requestId,\n                output = output,\n                metrics = publicMetrics,\n            ),\n        )\n    }\n\n    private fun releaseSessionRequest(session: SessionDescriptor) {\n''',
+          )
+          replace_one(
+              orchestrator,
+              "        val contextPreference: ContextPreference,\n    )\n",
+              "        val contextPreference: ContextPreference,\n        val guardPolicy: GenerationGuardPolicy,\n    )\n",
+          )
+          replace_one(orchestrator, "        const val CONTEXT_RESERVE_TOKENS = 256\n", "")
+
+          Path("core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/GenerationGuardTest.kt").write_text('''package io.github.daniele21.localllm.runtime\n\nimport io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\nimport io.github.daniele21.localllm.models.GenerationGuardPolicy\nimport org.junit.Assert.assertEquals\nimport org.junit.Assert.assertNull\nimport org.junit.Assert.assertTrue\nimport org.junit.Test\n\nclass GenerationGuardTest {\n    @Test\n    fun `thinking budget has a typed stop reason`() {\n        val guard = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 8))\n\n        assertNull(guard.observe("reasoning", 7))\n        assertEquals(StopReason.GENERATION_GUARD_THINKING_BUDGET, guard.observe(" more", 8))\n    }\n\n    @Test\n    fun `closing thinking disables the thinking guard`() {\n        val guard = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 4))\n\n        assertNull(guard.observe("analysis </thi", 3))\n        assertNull(guard.observe("nk> final answer", 8))\n        assertNull(guard.observe(" continues", 40))\n    }\n\n    @Test\n    fun `repetition detection is independent from chunk boundaries`() {\n        val repeated = "loop pattern with enough entropy "\n        val whole = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 500, activation = 4))\n        val split = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 500, activation = 4))\n\n        val wholeReason = whole.observe(repeated.repeat(4), 4)\n        val parts = listOf(repeated.take(13), repeated.drop(13) + repeated, repeated.repeat(2))\n        var splitReason: StopReason? = null\n        parts.forEachIndexed { index, part -> splitReason = split.observe(part, index + 2) ?: splitReason }\n\n        assertEquals(StopReason.GENERATION_GUARD_REPETITION, wholeReason)\n        assertEquals(wholeReason, splitReason)\n    }\n\n    @Test\n    fun `guard retains only bounded output`() {\n        val guard = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 10_000, window = 128))\n        repeat(20) { guard.observe("abcdefghij", it + 1) }\n        assertTrue(guard.retainedCharacters() <= 128)\n    }\n\n    @Test\n    fun `disabled and non thinking modes never guard`() {\n        val enabled = policy(thinkingBudget = 1)\n        assertNull(GenerationGuard(ThinkingMode.DISABLED, enabled).observe("x", 100))\n        assertNull(GenerationGuard(ThinkingMode.ENABLED, GenerationGuardPolicy.disabled()).observe("x", 100))\n    }\n\n    private fun policy(\n        thinkingBudget: Int,\n        activation: Int = 4,\n        window: Int = 512,\n    ) = GenerationGuardPolicy(\n        enabled = true,\n        thinkingTokenBudget = thinkingBudget,\n        repetitionActivationTokens = activation,\n        observationWindowChars = window,\n        minPatternChars = 24,\n        maxPatternChars = 64,\n        repetitionOccurrences = 4,\n    )\n}\n''')
+
+          selector_test = "core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/ContextSizeSelectorTest.kt"
+          replace_one(
+              selector_test,
+              "}\n",
+              '''\n    @Test\n    fun `qwen context candidates cap auto and manual selection`() {\n        val candidates = listOf(1_024, 2_048, 4_096, 8_192)\n\n        assertEquals(4_096, ContextSizeSelector.selectAuto(3_000, 262_144, null, candidates))\n        assertNull(ContextSizeSelector.selectAuto(9_000, 262_144, null, candidates))\n        assertTrue(ContextSizeSelector.supportsManual(8_192, 4_000, 262_144, candidates))\n        assertFalse(ContextSizeSelector.supportsManual(16_384, 4_000, 262_144, candidates))\n    }\n}\n''',
+          )
+
+          Path("models/model-profile/src/test/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuningTest.kt").parent.mkdir(parents=True, exist_ok=True)
+          Path("models/model-profile/src/test/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuningTest.kt").write_text('''package io.github.daniele21.localllm.models\n\nimport org.junit.Assert.assertEquals\nimport org.junit.Assert.assertFalse\nimport org.junit.Assert.assertTrue\nimport org.junit.Test\n\nclass Qwen35RuntimeTuningTest {\n    @Test\n    fun `candidate profiles are conservative and backend pinned`() {\n        Qwen35ModelTier.entries.forEach { tier ->\n            val profile = Qwen35RuntimeTuningProfiles.candidateForTier(tier)\n            val capabilities = profile.runtimeCapabilities()\n\n            assertEquals(Qwen35RuntimeEvidenceStatus.CANDIDATE, profile.evidenceStatus)\n            assertEquals("llama.cpp", capabilities.requiredBackendId)\n            assertEquals(Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION, capabilities.requiredBackendRevision)\n            assertEquals(listOf(1_024, 2_048, 4_096, 8_192), capabilities.approvedContextTiers)\n            assertFalse(capabilities.supportsStatelessContextReuse)\n            assertFalse(capabilities.supportsPrefixSnapshot)\n            assertFalse(capabilities.supportsSessionRestore)\n            assertFalse(capabilities.supportsPrefixReuse)\n        }\n    }\n\n    @Test\n    fun `tuning matrix is stable and covers both thread and batch candidates`() {\n        val matrix = Qwen35RuntimeTuningProfiles.tuningMatrixForTier(Qwen35ModelTier.B0_8)\n\n        assertEquals(12, matrix.size)\n        assertEquals(12, matrix.map { it.stableId }.distinct().size)\n        assertEquals(setOf(1_024, 2_048, 4_096), matrix.map { it.contextTokens }.toSet())\n        assertEquals(setOf(2, 4), matrix.map { it.cpuThreads }.toSet())\n        assertTrue(matrix.any { it.batchSize == 64 && it.microBatchSize == 32 })\n        assertTrue(matrix.any { it.batchSize == 128 && it.microBatchSize == 64 })\n    }\n}\n''')
+
+          runtime_test = "core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestratorTest.kt"
+          replace_one(
+              runtime_test,
+              "import io.github.daniele21.localllm.contracts.SessionOptions\n",
+              "import io.github.daniele21.localllm.contracts.SessionOptions\nimport io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n",
+          )
+          replace_one(
+              runtime_test,
+              "import io.github.daniele21.localllm.models.GenerationDefaults\n",
+              "import io.github.daniele21.localllm.models.GenerationDefaults\nimport io.github.daniele21.localllm.models.GenerationGuardPolicy\n",
+          )
+          insert_before = '''    @Test\n    fun `closing session defers context release until active request terminates`() {\n'''
+          new_test = '''    @Test\n    fun `generation guard completes with typed reason instead of cancellation`() {\n        val fixture = RuntimeFixture(\n            generationDefaults = GenerationDefaults(\n                maxOutputTokens = 16,\n                temperature = 0f,\n                topP = 1f,\n                topK = 0,\n                seed = 42,\n                thinkingMode = ThinkingMode.ENABLED,\n                guardPolicy = GenerationGuardPolicy(\n                    enabled = true,\n                    thinkingTokenBudget = 1,\n                    repetitionActivationTokens = 8,\n                    observationWindowChars = 512,\n                    minPatternChars = 24,\n                    maxPatternChars = 64,\n                    repetitionOccurrences = 4,\n                ),\n            ),\n        )\n        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)\n        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())\n        val terminal = CountDownLatch(1)\n\n        fixture.runtime.generate(\n            fixture.request("guard", session),\n            GenerationListener { event ->\n                events += event\n                if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) terminal.countDown()\n            },\n        )\n\n        assertTrue(terminal.await(2, TimeUnit.SECONDS))\n        val completed = events.last() as GenerationEvent.Completed\n        assertEquals(StopReason.GENERATION_GUARD_THINKING_BUDGET, completed.metrics.stopReason)\n        assertEquals("hello ", completed.output)\n        fixture.close()\n    }\n\n''' + insert_before
+          replace_one(runtime_test, insert_before, new_test)
+          replace_one(
+              runtime_test,
+              "private class RuntimeFixture {\n",
+              "private class RuntimeFixture(\n    private val generationDefaults: GenerationDefaults = defaultGenerationDefaults(),\n) {\n",
+          )
+          old_defaults = '''            generationDefaults = GenerationDefaults(\n                maxOutputTokens = 16,\n                temperature = 0f,\n                topP = 1f,\n                topK = 0,\n                seed = 42,\n            ),\n'''
+          replace_one(runtime_test, old_defaults, "            generationDefaults = generationDefaults,\n")
+          replace_one(
+              runtime_test,
+              "    private fun resolved(useCaseId: UseCaseId, profileId: String, modelDigest: ModelDigest): ResolvedUseCase {\n",
+              '''    companion object {\n        private fun defaultGenerationDefaults() = GenerationDefaults(\n            maxOutputTokens = 16,\n            temperature = 0f,\n            topP = 1f,\n            topK = 0,\n            seed = 42,\n        )\n    }\n\n    private fun resolved(useCaseId: UseCaseId, profileId: String, modelDigest: ModelDigest): ResolvedUseCase {\n''',
+          )
+          old_fake_generate = '''        if (!onChunk("hello ", 1)) {\n            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 0, 5, 1))\n        }\n        if (!onChunk("world", 2)) {\n            return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 1, 5, 5))\n        }\n        return BackendGenerationOutcome.Completed(\n            BackendGenerationMetrics(\n                inputTokens = 2,\n                outputTokens = 2,\n                promptDurationMs = 5,\n                generationDurationMs = 10,\n            ),\n        )\n'''
+          new_fake_generate = '''        val chunks = listOf("hello " to 1, "world" to 2)\n        for ((text, generatedTokens) in chunks) {\n            if (!onChunk(text, generatedTokens)) {\n                return BackendGenerationOutcome.Cancelled(\n                    BackendGenerationMetrics(2, generatedTokens, 5, 5),\n                )\n            }\n        }\n        return BackendGenerationOutcome.Completed(\n            BackendGenerationMetrics(\n                inputTokens = 2,\n                outputTokens = 2,\n                promptDurationMs = 5,\n                generationDurationMs = 10,\n            ),\n        )\n'''
+          replace_one(runtime_test, old_fake_generate, new_fake_generate)
+
+          phone_models = "apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneTestModels.kt"
+          replace_one(
+              phone_models,
+              "import io.github.daniele21.localllm.models.Qwen35ModelTier\n",
+              "import io.github.daniele21.localllm.models.Qwen35ModelTier\nimport io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles\n",
+          )
+          replace_one(
+              phone_models,
+              "    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1).coerceAtMost(4)\n    val modelProfile = GgufModelProfile(\n",
+              "    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)\n    val runtimeProfile = Qwen35RuntimeTuningProfiles.candidateForTier(tier)\n    val runtimeTuning = runtimeProfile.resolve(availableProcessors)\n    val modelProfile = GgufModelProfile(\n",
+          )
+          replace_one(
+              phone_models,
+              '''        batchSize = 128,\n        microBatchSize = 64,\n        cpuThreads = availableProcessors,\n        batchThreads = availableProcessors,\n        gpuLayers = 0,\n        chatTemplatePolicy = ChatTemplatePolicy(),\n\n''',
+              '''        batchSize = runtimeTuning.batchSize,\n        microBatchSize = runtimeTuning.microBatchSize,\n        cpuThreads = runtimeTuning.cpuThreads,\n        batchThreads = runtimeTuning.batchThreads,\n        gpuLayers = 0,\n        useMmap = runtimeTuning.useMmap,\n        useMlock = runtimeTuning.useMlock,\n        flashAttention = runtimeTuning.flashAttention,\n        chatTemplatePolicy = ChatTemplatePolicy(),\n        runtimeCapabilities = runtimeProfile.runtimeCapabilities(),\n\n''',
+          )
+
+          device_test = "apps/device-test-runner/src/androidTest/kotlin/io/github/daniele21/localllm/devicetest/LocalLlmDeviceE2eTest.kt"
+          replace_one(device_test, "import android.os.Debug\n", "import android.app.ActivityManager\nimport android.os.Build\nimport android.os.Debug\nimport android.os.PowerManager\n")
+          replace_one(device_test, "import io.github.daniele21.localllm.contracts.UseCaseId\n", "import io.github.daniele21.localllm.contracts.ThinkingMode\nimport io.github.daniele21.localllm.contracts.UseCaseId\n")
+          replace_one(device_test, "import io.github.daniele21.localllm.models.OutputMode\n", "import io.github.daniele21.localllm.models.OutputMode\nimport io.github.daniele21.localllm.models.Qwen35GenerationProfiles\nimport io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles\n")
+          replace_one(device_test, "import org.junit.runner.RunWith\n", "import org.json.JSONObject\nimport org.junit.runner.RunWith\n")
+          replace_one(
+              device_test,
+              '''            println(\n                "LOCAL_LLM_E2E generation " +\n                    "inputTokens=${completed.metrics.inputTokens} " +\n                    "outputTokens=${completed.metrics.outputTokens} " +\n                    "ttftMs=${completed.metrics.timeToFirstTokenMs} " +\n                    "totalMs=${completed.metrics.totalMs} " +\n                    "decodeTokensPerSecond=${completed.metrics.decodeTokensPerSecond}",\n            )\n''',
+              '''            println(\n                "LOCAL_LLM_E2E generation " +\n                    "inputTokens=${completed.metrics.inputTokens} " +\n                    "outputTokens=${completed.metrics.outputTokens} " +\n                    "ttftMs=${completed.metrics.timeToFirstTokenMs} " +\n                    "totalMs=${completed.metrics.totalMs} " +\n                    "decodeTokensPerSecond=${completed.metrics.decodeTokensPerSecond}",\n            )\n            println("LOCAL_LLM_TUNING_JSON ${tuningEvidence(completed)}")\n''',
+          )
+          replace_one(
+              device_test,
+              '        val useCaseId = UseCaseId("generation")\n',
+              '        val useCaseId = UseCaseId("generation-${config.tuningCaseId}")\n',
+          )
+          replace_one(
+              device_test,
+              "            batchThreads = config.model.cpuThreads,\n",
+              "            batchThreads = config.model.batchThreads,\n",
+          )
+          replace_one(
+              device_test,
+              '''                seed = 42,\n            ),\n''',
+              '''                seed = 42,\n                thinkingMode = config.generation.thinkingMode,\n            ),\n''',
+          )
+          replace_one(
+              device_test,
+              "    private fun totalPssKb(): Int {\n",
+              '''    private fun tuningEvidence(completed: GenerationEvent.Completed): JSONObject {\n        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager\n        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)\n        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager\n        return JSONObject()\n            .put("schemaVersion", 1)\n            .put("tuningCaseId", config.tuningCaseId)\n            .put("modelDigest", config.model.digest.sha256)\n            .put("architecture", config.model.architecture)\n            .put("quantization", config.model.quantization)\n            .put("backendRevision", Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION)\n            .put("runtimeProfileVersion", Qwen35RuntimeTuningProfiles.VERSION)\n            .put("generationProfileVersion", Qwen35GenerationProfiles.VERSION)\n            .put("contextTokens", config.model.contextSize)\n            .put("cpuThreads", config.model.cpuThreads)\n            .put("batchThreads", config.model.batchThreads)\n            .put("batchSize", config.model.batchSize)\n            .put("microBatchSize", config.model.microBatchSize)\n            .put("thinkingMode", config.generation.thinkingMode.name)\n            .put("deviceModel", Build.MODEL ?: "unknown")\n            .put("androidRelease", Build.VERSION.RELEASE ?: "unknown")\n            .put("sdkInt", Build.VERSION.SDK_INT)\n            .put("abi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")\n            .put("ttftMs", completed.metrics.timeToFirstTokenMs)\n            .put("prefillMs", completed.metrics.prefillMs)\n            .put("decodeMs", completed.metrics.decodeMs)\n            .put("totalMs", completed.metrics.totalMs)\n            .put("inputTokens", completed.metrics.inputTokens)\n            .put("outputTokens", completed.metrics.outputTokens)\n            .put("decodeTokensPerSecond", completed.metrics.decodeTokensPerSecond)\n            .put("stopReason", completed.metrics.stopReason.name)\n            .put("processPssKb", totalPssKb())\n            .put("availableMemoryBytes", memoryInfo.availMem)\n            .put("thermalStatus", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1)\n    }\n\n    private fun totalPssKb(): Int {\n''',
+          )
+          replace_one(
+              device_test,
+              '''private data class DeviceTestConfig(\n    val model: ModelArguments,\n    val generation: GenerationArguments,\n''',
+              '''private data class DeviceTestConfig(\n    val model: ModelArguments,\n    val generation: GenerationArguments,\n    val tuningCaseId: String,\n''',
+          )
+          replace_one(
+              device_test,
+              '''                    cpuThreads = reader.positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),\n                ),\n                generation = GenerationArguments(\n                    prompt = reader.decoded("promptBase64", "Reply with the single word READY."),\n                    maxOutputTokens = reader.positiveInt("maxOutputTokens", 32),\n                ),\n''',
+              '''                    cpuThreads = reader.positiveInt("cpuThreads", availableProcessors.coerceAtMost(4)),\n                    batchThreads = reader.positiveInt("batchThreads", availableProcessors.coerceAtMost(4)),\n                ),\n                generation = GenerationArguments(\n                    prompt = reader.decoded("promptBase64", "Reply with the single word READY."),\n                    maxOutputTokens = reader.positiveInt("maxOutputTokens", 32),\n                    thinkingMode = if (reader.string("thinkingMode", "DISABLED") == "ENABLED") {\n                        ThinkingMode.ENABLED\n                    } else {\n                        ThinkingMode.DISABLED\n                    },\n                ),\n                tuningCaseId = reader.string("tuningCaseId", "manual"),\n''',
+          )
+          replace_one(
+              device_test,
+              '''    val microBatchSize: Int,\n    val cpuThreads: Int,\n) {\n''',
+              '''    val microBatchSize: Int,\n    val cpuThreads: Int,\n    val batchThreads: Int,\n) {\n''',
+          )
+          replace_one(
+              device_test,
+              "private data class GenerationArguments(val prompt: String, val maxOutputTokens: Int)\n",
+              "private data class GenerationArguments(val prompt: String, val maxOutputTokens: Int, val thinkingMode: ThinkingMode)\n",
+          )
+
+          run_device = "scripts/run-device-e2e.sh"
+          replace_one(run_device, 'CPU_THREADS=""\n', 'CPU_THREADS=""\nBATCH_THREADS=""\n')
+          replace_one(run_device, '  --cpu-threads VALUE        Explicit llama.cpp CPU thread count.\n', '  --cpu-threads VALUE        Explicit llama.cpp CPU thread count.\n  --batch-threads VALUE      Explicit llama.cpp prefill/batch thread count.\n')
+          replace_one(
+              run_device,
+              '''        --cpu-threads)\n            CPU_THREADS="${2:-}"\n            shift 2\n            ;;\n''',
+              '''        --cpu-threads)\n            CPU_THREADS="${2:-}"\n            shift 2\n            ;;\n        --batch-threads)\n            BATCH_THREADS="${2:-}"\n            shift 2\n            ;;\n''',
+          )
+          replace_one(
+              run_device,
+              '''if [[ -n "$CPU_THREADS" ]]; then\n    require_positive_integer "--cpu-threads" "$CPU_THREADS"\nfi\n''',
+              '''if [[ -n "$CPU_THREADS" ]]; then\n    require_positive_integer "--cpu-threads" "$CPU_THREADS"\nfi\nif [[ -n "$BATCH_THREADS" ]]; then\n    require_positive_integer "--batch-threads" "$BATCH_THREADS"\nfi\n''',
+          )
+          replace_one(
+              run_device,
+              '''if [[ -n "$CPU_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e cpuThreads "$CPU_THREADS" )\nfi\n''',
+              '''if [[ -n "$CPU_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e cpuThreads "$CPU_THREADS" )\nfi\nif [[ -n "$BATCH_THREADS" ]]; then\n    INSTRUMENTATION_ARGS+=( -e batchThreads "$BATCH_THREADS" )\nfi\n''',
+          )
+
+          Path("scripts/summarize-qwen35-tuning.py").write_text('''#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport argparse\nimport csv\nimport json\nimport statistics\nfrom collections import defaultdict\nfrom pathlib import Path\n\nNUMERIC_FIELDS = [\n    "ttftMs",\n    "prefillMs",\n    "decodeMs",\n    "totalMs",\n    "decodeTokensPerSecond",\n    "processPssKb",\n    "availableMemoryBytes",\n    "thermalStatus",\n]\nIDENTITY_FIELDS = [\n    "tuningCaseId",\n    "modelDigest",\n    "architecture",\n    "quantization",\n    "backendRevision",\n    "runtimeProfileVersion",\n    "generationProfileVersion",\n    "contextTokens",\n    "cpuThreads",\n    "batchThreads",\n    "batchSize",\n    "microBatchSize",\n    "thinkingMode",\n    "deviceModel",\n    "androidRelease",\n    "sdkInt",\n    "abi",\n]\n\ndef median(values):\n    filtered = [float(v) for v in values if v is not None]\n    return statistics.median(filtered) if filtered else None\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description="Summarize privacy-safe Qwen3.5 device tuning JSONL")\n    parser.add_argument("input", type=Path)\n    parser.add_argument("output", type=Path)\n    args = parser.parse_args()\n\n    groups = defaultdict(list)\n    for line in args.input.read_text().splitlines():\n        if line.strip():\n            record = json.loads(line)\n            groups[record["tuningCaseId"]].append(record)\n\n    rows = []\n    for case_id, records in sorted(groups.items()):\n        first = records[0]\n        for field in IDENTITY_FIELDS:\n            if any(record.get(field) != first.get(field) for record in records):\n                raise SystemExit(f"identity drift for {case_id}: {field}")\n        row = {field: first.get(field) for field in IDENTITY_FIELDS}\n        row["samples"] = len(records)\n        for field in NUMERIC_FIELDS:\n            row[f"median_{field}"] = median(record.get(field) for record in records)\n        rows.append(row)\n\n    args.output.parent.mkdir(parents=True, exist_ok=True)\n    fieldnames = IDENTITY_FIELDS + ["samples"] + [f"median_{field}" for field in NUMERIC_FIELDS]\n    with args.output.open("w", newline="") as handle:\n        writer = csv.DictWriter(handle, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n    print(f"Wrote {len(rows)} tuning case summaries to {args.output}")\n    return 0\n\nif __name__ == "__main__":\n    raise SystemExit(main())\n''')
+
+          Path("scripts/run-qwen35-tuning-matrix.sh").write_text(r'''#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_ID="io.github.daniele21.localllm.devicetest.debug"
+ADB="${ADB:-adb}"
+MODEL_PATH=""
+TIER=""
+REPEATS=3
+OUTPUT_DIR="$ROOT_DIR/build/qwen35-tuning"
+THINKING_MODE="DISABLED"
+
+usage() {
+  cat <<'EOF'
+Usage: bash scripts/run-qwen35-tuning-matrix.sh --model /absolute/model.gguf --tier 0.8b|2b [options]
+
+Options:
+  --repeats N                 Samples per tuning case (default 3).
+  --thinking-mode MODE        DISABLED or ENABLED (default DISABLED).
+  --output-dir PATH           Evidence output directory.
+  --help                      Show this help.
+
+Only the exact curated Qwen3.5 Q4_K_M certification candidates are accepted.
+The script records privacy-safe JSONL and CSV evidence; it never promotes a tuning profile automatically.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model) MODEL_PATH="${2:-}"; shift 2 ;;
+    --tier) TIER="${2:-}"; shift 2 ;;
+    --repeats) REPEATS="${2:-}"; shift 2 ;;
+    --thinking-mode) THINKING_MODE="${2:-}"; shift 2 ;;
+    --output-dir) OUTPUT_DIR="${2:-}"; shift 2 ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[[ -f "$MODEL_PATH" ]] || { echo "--model must be a readable file" >&2; exit 2; }
+[[ "$REPEATS" =~ ^[1-9][0-9]*$ ]] || { echo "--repeats must be positive" >&2; exit 2; }
+[[ "$THINKING_MODE" == "DISABLED" || "$THINKING_MODE" == "ENABLED" ]] || { echo "Invalid --thinking-mode" >&2; exit 2; }
+command -v "$ADB" >/dev/null || { echo "adb is required" >&2; exit 2; }
+
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+
+case "$TIER" in
+  0.8b)
+    EXPECTED_SHA="bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
+    ;;
+  2b)
+    EXPECTED_SHA="aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+    ;;
+  *) echo "--tier must be 0.8b or 2b" >&2; exit 2 ;;
+esac
+
+ACTUAL_SHA="$(sha256_file "$MODEL_PATH" | tr '[:upper:]' '[:lower:]')"
+[[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || { echo "Model SHA does not match the curated $TIER Q4_K_M candidate" >&2; exit 2; }
+"$ADB" get-state >/dev/null
+ABI="$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')"
+[[ "$ABI" == arm64-v8a* ]] || { echo "Physical tuning requires arm64-v8a" >&2; exit 2; }
+
+cd "$ROOT_DIR"
+./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
+APP_APK="$(find apps/device-test-runner/build/outputs/apk/debug -type f -name '*.apk' | sort | tail -n 1)"
+TEST_APK="$(find apps/device-test-runner/build/outputs/apk/androidTest/debug -type f -name '*.apk' | sort | tail -n 1)"
+"$ADB" install -r -t "$APP_APK"
+"$ADB" install -r -t "$TEST_APK"
+"$ADB" shell run-as "$APP_ID" mkdir -p files/e2e
+"$ADB" shell -T run-as "$APP_ID" dd of=files/e2e/model.gguf bs=1048576 < "$MODEL_PATH" >/dev/null
+
+RUNNER="$("$ADB" shell pm list instrumentation | tr -d '\r' | grep -F "(target=$APP_ID)" | head -n1 | sed -E 's/^instrumentation:([^ ]+).*/\1/')"
+mkdir -p "$OUTPUT_DIR"
+JSONL="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}.jsonl"
+CSV="$OUTPUT_DIR/qwen35-${TIER}-${THINKING_MODE,,}-summary.csv"
+: > "$JSONL"
+
+for context in 1024 2048 4096; do
+  for threads in 2 4; do
+    for pair in "64 32" "128 64"; do
+      read -r batch ubatch <<< "$pair"
+      case_id="${TIER}-ctx${context}-t${threads}-bt${threads}-b${batch}-ub${ubatch}-${THINKING_MODE,,}"
+      for ((sample=1; sample<=REPEATS; sample++)); do
+        echo "Running $case_id sample $sample/$REPEATS"
+        set +e
+        output="$("$ADB" shell am instrument -w -r \
+          -e class io.github.daniele21.localllm.devicetest.LocalLlmDeviceE2eTest#fullLifecycleGeneratesAndReleasesResources \
+          -e modelRelativePath files/e2e/model.gguf \
+          -e modelSha256 "$EXPECTED_SHA" \
+          -e modelArchitecture qwen35 \
+          -e modelQuantization Q4_K_M \
+          -e contextSize "$context" \
+          -e batchSize "$batch" \
+          -e microBatchSize "$ubatch" \
+          -e cpuThreads "$threads" \
+          -e batchThreads "$threads" \
+          -e maxOutputTokens 64 \
+          -e thinkingMode "$THINKING_MODE" \
+          -e tuningCaseId "$case_id" \
+          -e cancellationEnabled false \
+          -e memoryRepeatCount 0 \
+          "$RUNNER" 2>&1)"
+        status=$?
+        set -e
+        output="${output//$'\r'/}"
+        printf '%s\n' "$output"
+        (( status == 0 )) || { echo "Tuning case failed: $case_id" >&2; exit 1; }
+        evidence="$(printf '%s\n' "$output" | sed -n 's/^.*LOCAL_LLM_TUNING_JSON //p' | tail -n1)"
+        [[ -n "$evidence" ]] || { echo "Missing tuning evidence for $case_id" >&2; exit 1; }
+        printf '%s\n' "$evidence" >> "$JSONL"
+      done
+    done
+  done
+done
+
+python3 scripts/summarize-qwen35-tuning.py "$JSONL" "$CSV"
+echo "Qwen3.5 tuning evidence written to:"
+echo "  $JSONL"
+echo "  $CSV"
+''')
+          PY
+          chmod +x scripts/run-qwen35-tuning-matrix.sh scripts/summarize-qwen35-tuning.py
+      - name: Format
+        run: ./gradlew spotlessApply
+      - name: Static analysis
+        run: ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+      - name: Targeted validation
+        run: |
+          ./gradlew \
+            :models:model-profile:testDebugUnitTest \
+            :core:runtime-core:testDebugUnitTest \
+            :backends:llama-cpp:testDebugUnitTest \
+            :apps:local-llm-phone-test:testDebugUnitTest \
+            :apps:device-test-runner:compileDebugAndroidTestKotlin
+          python3 -m py_compile scripts/summarize-qwen35-tuning.py
+          bash -n scripts/run-qwen35-tuning-matrix.sh scripts/run-device-e2e.sh
+      - name: Commit validated implementation and remove staging workflow
+        shell: bash
+        run: |
+          rm .github/workflows/q35-456-implementation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add qwen35 guard runtime capabilities and tuning harness"
+          git push origin HEAD:dev
