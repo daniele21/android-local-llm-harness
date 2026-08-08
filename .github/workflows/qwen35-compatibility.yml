@@ -1,0 +1,71 @@
+name: Qwen3.5 compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/qwen35-compatibility.yml"
+      - "third_party/llama.cpp"
+      - "models/model-install/**"
+      - "backends/llama-cpp/src/main/cpp/gguf_metadata.*"
+      - "docs/qwen35/workstreams/model-compatibility.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qwen35-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      LLAMA_CPP_REVISION: aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Verify pinned backend
+        run: |
+          test "$(git -C third_party/llama.cpp rev-parse HEAD)" = "$LLAMA_CPP_REVISION"
+      - name: Build pinned llama.cpp smoke runner
+        run: |
+          cmake -S third_party/llama.cpp -B build/qwen35-compat \
+            -DLLAMA_CURL=OFF \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build/qwen35-compat --target llama-cli -j2
+      - name: Download exact reference artifacts
+        run: |
+          mkdir -p build/qwen35-models
+          curl --fail --location --retry 3 --output build/qwen35-models/qwen35-08b-q4-k-m.gguf \
+            "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/5aea8824cba95d22990acc6ea66c2c1909530650/Qwen3.5-0.8B-Q4_K_M.gguf?download=true"
+          curl --fail --location --retry 3 --output build/qwen35-models/qwen35-2b-q4-k-m.gguf \
+            "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/802854bfd388ed92748de119df31327962811548/Qwen3.5-2B-Q4_K_M.gguf?download=true"
+      - name: Verify exact artifact identity
+        run: |
+          echo "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517  build/qwen35-models/qwen35-08b-q4-k-m.gguf" | sha256sum --check
+          echo "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223  build/qwen35-models/qwen35-2b-q4-k-m.gguf" | sha256sum --check
+          test "$(stat -c%s build/qwen35-models/qwen35-08b-q4-k-m.gguf)" = "532517120"
+          test "$(stat -c%s build/qwen35-models/qwen35-2b-q4-k-m.gguf)" = "1280835840"
+      - name: Smoke load tokenize generate
+        run: |
+          CLI=build/qwen35-compat/bin/llama-cli
+          for MODEL in \
+            build/qwen35-models/qwen35-08b-q4-k-m.gguf \
+            build/qwen35-models/qwen35-2b-q4-k-m.gguf
+          do
+            timeout 120 "$CLI" -m "$MODEL" -p "Reply OK." -n 1 --temp 0 --no-display-prompt >/dev/null
+          done
+      - name: Record privacy-safe compatibility evidence
+        run: |
+          printf '%s\n' \
+            "backend=llama.cpp" \
+            "backend_revision=$LLAMA_CPP_REVISION" \
+            "qwen35-08b-q4-k-m=bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517:compatible" \
+            "qwen35-2b-q4-k-m=aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223:compatible"
