@@ -17,7 +17,7 @@ activityCompose = "1.12.1"
 navigationCompose = "2.9.5"
 lifecycle = "2.9.4"
 coroutines = "1.10.2"
-kotlin = "2.2.10"
+kotlin = "2.4.10"
 
 [libraries]
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
