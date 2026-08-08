@@ -221,7 +221,7 @@ internal fun resolvedPhoneUseCase(
     maxOutputTokens: Int,
     useCaseValue: String = "physical-device-validation",
     profileSuffix: String = "validation",
-    contextSize: Int = 512,
+    contextSize: Int = 2_048,
 ): ResolvedUseCase {
     val release = Qwen35PhoneModelPolicy.requireCurated(model)
     val tier = if (release.id.modelId.value.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
