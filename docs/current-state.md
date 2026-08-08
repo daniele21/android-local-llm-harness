@@ -43,11 +43,16 @@ The repository-level ruleset for `dev` remains an administrative verification it
 - durable path-free installed catalog/profile metadata;
 - catalog download, install, select, verify and remove operations;
 - consumer-facing arbitrary GGUF document import removed from the connected product surface and controller path;
+- product runtime binding anchored to exact curated release metadata rather than arbitrary family/architecture input;
+- runtime profile identity anchored to the curated release profile key;
+- consumer artifact provenance uses the curated download path rather than manual-import/SAF provenance;
+- external-import inventory origin/projection removed; out-of-catalog selections are not synthesized as inventory items;
+- persisted installed metadata outside the current curated catalog is ignored rather than represented through a legacy/unsupported state;
 - protected removal while the runtime owns or uses a model;
 - explicit degraded states for loaded-model absence or loaded-versus-selected mismatch remain part of runtime recovery;
 - model-detail presentation and deterministic recovery never delete a GGUF as part of runtime release.
 
-Q35-1 remains in progress because product profiles/bindings, fixtures and inventory projections still require cleanup where they describe retired model families or external-import-only product state.
+Q35-1 remains in progress because the closed product-model implementation still requires its applicable Android/package validation gate to pass before milestone closure.
 
 ### Connected Android application
 
@@ -58,10 +63,13 @@ Q35-1 remains in progress because product profiles/bindings, fixtures and invent
 - one process-scoped runtime graph shared by Playground and physical validation;
 - curated Qwen3.5 catalog download/install plus inference, streaming, cancellation, cleanup and validation;
 - no consumer document picker or arbitrary GGUF import action;
+- Models, Overview and Playground acquisition routed through the curated Qwen3.5 catalog;
 - ViewModel/UDF ownership for Playground and Models;
 - typed Settings, request-timeline and model-detail routes;
 - real run, health, resource, benchmark, log and request-timeline data;
 - reproducible launcher identity, dark/light/system design-system foundations and baseline accessibility checks.
+
+Developer/device-test artifact injection remains intentionally isolated from the consumer acquisition path.
 
 Overview, Diagnostics and Settings still retain Activity-owned renderable state or effects. `MainActivity` is not yet reduced to a pure composition and lifecycle root.
 
@@ -82,18 +90,26 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 
 ### 1. Qwen3.5 curated model baseline
 
-Integrated:
+Implemented on `dev`:
 
 - closed executable catalog containing only Qwen3.5 dense 0.8B/2B releases;
 - consumer-facing arbitrary GGUF import removed from product contracts, Android document picking, UI and controller;
 - Models, Overview and Playground route model acquisition through the curated catalog;
-- closed-catalog and connected-UI assertions added.
+- product binding validates selected model metadata against the current curated release set;
+- runtime profile identity is anchored to curated release `profileKey`;
+- product provenance no longer uses manual-import/storage-access-framework semantics;
+- product fixtures that represented retired families were migrated while genuinely family-neutral lifecycle tests remain generic;
+- `HarnessModelOrigin.IMPORTED` and external-selection inventory synthesis were removed;
+- out-of-catalog persisted model metadata is ignored rather than surfaced as legacy/unsupported inventory;
+- developer-only artifact injection remains outside consumer product APIs;
+- catalog, binding, persistence, inventory and connected-UI assertions were updated for the closed surface.
 
-Remaining:
+Remaining before Q35-1 can close:
 
-- remove product bindings, profiles and fixtures for retired families and unsupported tiers;
-- simplify inventory state after external-import-only concepts disappear;
-- verify catalog download/install remains the sole consumer acquisition path while developer-only artifact injection stays isolated.
+- resolve any remaining Android/package validation failure on the current implementation;
+- rerun the applicable repository validation for the closed Qwen3.5 surface;
+- perform a final search for consumer-facing multi-family/import-only paths;
+- mark Q35-1 `DONE` only after the workstream acceptance criteria and applicable gates pass.
 
 The milestone sequence and focused acceptance criteria start at [`qwen35/README.md`](qwen35/README.md).
 
@@ -134,12 +150,18 @@ The milestone sequence and focused acceptance criteria start at [`qwen35/README.
 
 ## Immediate next block
 
-Continue Q35-1 with `Q35-BASE-03`: remove product profile/binding mappings and fixtures for non-Qwen3.5 models and unsupported Qwen3.5 tiers while retaining genuinely family-neutral contract tests.
+Close Q35-1 validation rather than adding more model-selection compatibility logic:
 
-Then simplify external-import-only inventory state under `Q35-BASE-04`. The exact task ledger and exit gate are owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md). Q35-2 starts only after the closed product model surface is complete.
+1. fix the remaining Android/package validation failure on the current closed-surface implementation;
+2. rerun scoped validation for catalog, binding, persistence, inventory and connected UI;
+3. verify no consumer-facing multi-family/import-only path remains;
+4. close Q35-1 only after the workstream acceptance criteria and applicable repository gates are green.
+
+The exact task ledger and exit gate are owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md). Q35-2 starts only after this validation closure.
 
 ## Blockers and deferred evidence
 
+- Q35-1 still requires green applicable Android/package validation before milestone closure.
 - Representative physical-device GGUF evidence remains mandatory before production readiness or device-performance claims.
 - The standalone console remains intentionally disconnected from another application's private runtime and telemetry unless an explicit bridge is introduced later.
 - Binder/AIDL shared-runtime work and Capacitor integration remain later phases; they must not be pulled into the current phone-app or release blocks.
