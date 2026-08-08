@@ -1,0 +1,46 @@
+name: Q35 metadata probe once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/q35-metadata-probe-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Read pinned GGUF metadata
+        run: |
+          mkdir probe && cd probe
+          npm init -y >/dev/null
+          npm install @huggingface/gguf >/dev/null
+          cat > probe.mjs <<'EOF'
+          import { gguf } from '@huggingface/gguf';
+          const artifacts = [
+            ['qwen35-08b-q4-k-m', 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/5aea8824cba95d22990acc6ea66c2c1909530650/Qwen3.5-0.8B-Q4_K_M.gguf'],
+            ['qwen35-2b-q4-k-m', 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/802854bfd388ed92748de119df31327962811548/Qwen3.5-2B-Q4_K_M.gguf'],
+          ];
+          for (const [id, url] of artifacts) {
+            const { metadata } = await gguf(url);
+            console.log(JSON.stringify({
+              id,
+              version: metadata.version,
+              tensor_count: metadata.tensor_count?.toString(),
+              kv_count: metadata.kv_count?.toString(),
+              architecture: metadata['general.architecture'],
+              name: metadata['general.name'],
+              file_type: metadata['general.file_type'],
+              context_length: metadata[`${metadata['general.architecture']}.context_length`],
+              block_count: metadata[`${metadata['general.architecture']}.block_count`],
+              embedding_length: metadata[`${metadata['general.architecture']}.embedding_length`],
+            }));
+          }
+          EOF
+          node probe.mjs
