@@ -2,7 +2,6 @@ package io.github.daniele21.localllm.phonetest
 
 internal enum class HarnessModelOrigin {
     CATALOG,
-    IMPORTED,
     RUNTIME,
 }
 
@@ -72,12 +71,14 @@ internal object HarnessModelInventoryReconciler {
         selectedModel: ImportedPhoneModel?,
         loadedDigest: String? = null,
     ): HarnessModelInventoryState {
-        val selectedDigest = selectedModel?.digest?.sha256
+        val requestedSelectedDigest = selectedModel?.digest?.sha256
+        val selectedDigest = requestedSelectedDigest?.takeIf { digest ->
+            distribution.models.any { it.installedModel?.digest?.sha256 == digest }
+        }
         val items = distribution.models
             .map { it.toInventoryItem(selectedDigest, loadedDigest) }
             .toMutableList()
 
-        appendExternalSelection(items, selectedModel, selectedDigest, loadedDigest)
         appendUnknownRuntimeOwnership(items, loadedDigest)
 
         return HarnessModelInventoryState(
@@ -119,30 +120,6 @@ internal object HarnessModelInventoryReconciler {
         else -> status.toLifecycle()
     }
 
-    private fun appendExternalSelection(
-        items: MutableList<HarnessModelInventoryItem>,
-        selectedModel: ImportedPhoneModel?,
-        selectedDigest: String?,
-        loadedDigest: String?,
-    ) {
-        if (selectedModel == null || items.represents(selectedDigest)) return
-        val loaded = selectedDigest == loadedDigest
-        items += HarnessModelInventoryItem(
-            stableId = "imported::$selectedDigest",
-            displayName = selectedModel.fileName,
-            origin = HarnessModelOrigin.IMPORTED,
-            digest = selectedDigest,
-            sizeBytes = selectedModel.sizeBytes,
-            architecture = selectedModel.architecture,
-            quantization = selectedModel.quantization,
-            lifecycle = if (loaded) HarnessModelLifecycle.LOADED else HarnessModelLifecycle.SELECTED,
-            installed = true,
-            selected = true,
-            loaded = loaded,
-            detail = "Imported GGUF selected for this application",
-        )
-    }
-
     private fun appendUnknownRuntimeOwnership(items: MutableList<HarnessModelInventoryItem>, loadedDigest: String?) {
         if (loadedDigest == null || items.represents(loadedDigest)) return
         items += HarnessModelInventoryItem(
@@ -152,7 +129,7 @@ internal object HarnessModelInventoryReconciler {
             digest = loadedDigest,
             lifecycle = HarnessModelLifecycle.DEGRADED,
             loaded = true,
-            detail = "The runtime owns a model that is absent from the current inventory",
+            detail = "The runtime owns a model that is absent from the current catalog inventory",
             degradation = HarnessModelDegradation.LOADED_MODEL_NOT_IN_INVENTORY,
         )
     }
