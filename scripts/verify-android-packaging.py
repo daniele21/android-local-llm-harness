@@ -19,6 +19,7 @@ EXPECTED_RUNTIME_LIBRARIES = {
     "libggml-cpu-android_armv9.2_1.so",
     "libggml-cpu-android_armv9.2_2.so",
     "libggml.so",
+    "libllama-common.so",
     "libllama.so",
     "liblocal_llm_jni.so",
 }
