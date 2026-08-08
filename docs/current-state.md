@@ -26,7 +26,7 @@ The repository-level ruleset for `dev` remains an administrative verification it
 - pinned `llama.cpp` source and reproducible Android `arm64-v8a` packaging;
 - metadata-only GGUF inspection;
 - opaque model and context handles;
-- content-addressed import, SHA-256 verification, deduplication and integrity checks;
+- content-addressed model storage, SHA-256 verification, deduplication and integrity checks;
 - load, context creation, generation, aggregated streaming and cooperative cancellation;
 - single-decode scheduling with priorities and queue cancellation;
 - compatible warm model reuse, protected model switching and Android memory-pressure handling;
@@ -37,16 +37,17 @@ The repository-level ruleset for `dev` remains an administrative verification it
 ### Model distribution and inventory
 
 - curated administrator-managed catalog with application/use-case and device compatibility filtering;
+- executable catalog restricted to seven Qwen3.5 dense 0.8B/2B releases;
 - HTTPS-only verified transfer with bounded redirects, size checks, SHA-256 validation and cancellation;
 - opaque verified-download handle and explicit installation boundary;
 - durable path-free installed catalog/profile metadata;
-- explicit import, download, install, select, verify and remove operations in the current generic baseline;
+- catalog download, install, select, verify and remove operations;
+- consumer-facing arbitrary GGUF document import removed from the connected product surface and controller path;
 - protected removal while the runtime owns or uses a model;
-- unified immutable projection across catalog releases, installed metadata, external imports, selection and runtime-loaded ownership;
-- explicit degraded states for loaded-model absence or loaded-versus-selected mismatch;
-- model-detail presentation and deterministic recovery that never deletes a GGUF as part of runtime release.
+- explicit degraded states for loaded-model absence or loaded-versus-selected mismatch remain part of runtime recovery;
+- model-detail presentation and deterministic recovery never delete a GGUF as part of runtime release.
 
-The integrated baseline is still multi-family and still exposes generic manual-import behavior. [ADR 0011](adr/0011-qwen35-only-product-support.md) now defines a simpler Qwen3.5-only target: those generic product paths are implementation debt to remove, not compatibility cases to preserve.
+Q35-1 remains in progress because product profiles/bindings, fixtures and inventory projections still require cleanup where they describe retired model families or external-import-only product state.
 
 ### Connected Android application
 
@@ -55,7 +56,8 @@ The integrated baseline is still multi-family and still exposes generic manual-i
 - Overview, Playground, Models, Diagnostics and Settings;
 - compact bottom navigation and expanded navigation rail;
 - one process-scoped runtime graph shared by Playground and physical validation;
-- current generic GGUF import plus inference, streaming, cancellation, cleanup and validation;
+- curated Qwen3.5 catalog download/install plus inference, streaming, cancellation, cleanup and validation;
+- no consumer document picker or arbitrary GGUF import action;
 - ViewModel/UDF ownership for Playground and Models;
 - typed Settings, request-timeline and model-detail routes;
 - real run, health, resource, benchmark, log and request-timeline data;
@@ -80,12 +82,18 @@ Normal telemetry excludes prompt, generated output, system-prompt text, template
 
 ### 1. Qwen3.5 curated model baseline
 
-- replace the executable catalog with Qwen3.5 dense 0.8B/2B releases only;
-- remove consumer-facing arbitrary GGUF import from product contracts, navigation and UI;
-- remove product bindings, profiles and fixtures for retired families and tiers;
-- simplify inventory state after external-import and legacy compatibility concepts disappear;
-- keep verified catalog download/install as the only consumer acquisition path;
-- keep developer-only artifact injection isolated in validation tooling.
+Integrated:
+
+- closed executable catalog containing only Qwen3.5 dense 0.8B/2B releases;
+- consumer-facing arbitrary GGUF import removed from product contracts, Android document picking, UI and controller;
+- Models, Overview and Playground route model acquisition through the curated catalog;
+- closed-catalog and connected-UI assertions added.
+
+Remaining:
+
+- remove product bindings, profiles and fixtures for retired families and unsupported tiers;
+- simplify inventory state after external-import-only concepts disappear;
+- verify catalog download/install remains the sole consumer acquisition path while developer-only artifact injection stays isolated.
 
 The milestone sequence and focused acceptance criteria start at [`qwen35/README.md`](qwen35/README.md).
 
@@ -126,9 +134,9 @@ The milestone sequence and focused acceptance criteria start at [`qwen35/README.
 
 ## Immediate next block
 
-Implement Q35-1, the closed Qwen3.5 curated model baseline.
+Continue Q35-1 with `Q35-BASE-03`: remove product profile/binding mappings and fixtures for non-Qwen3.5 models and unsupported Qwen3.5 tiers while retaining genuinely family-neutral contract tests.
 
-Start by deleting non-Qwen3.5 and unsupported-tier catalog entries, then remove consumer-facing manual import and the product states/fixtures that exist only for generic model management. The exact task ledger and exit gate are owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md). Q35-2 then validates the exact remaining artifacts against the pinned backend.
+Then simplify external-import-only inventory state under `Q35-BASE-04`. The exact task ledger and exit gate are owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md). Q35-2 starts only after the closed product model surface is complete.
 
 ## Blockers and deferred evidence
 
