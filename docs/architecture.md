@@ -35,9 +35,9 @@ Runtime orchestration depends only on `observability/contracts`. Android Room re
 
 ## Product support envelope
 
-The product admits only Qwen3.5 dense 0.8B and 2B artifacts under [ADR 0011](adr/0011-qwen35-only-product-support.md). Public lifecycle, binding, telemetry and backend contracts remain model-family neutral; this is an architectural boundary, not a generic model-support promise. Qwen3.5 policy plugs into the existing owners, while unsupported artifacts fail explicitly before runtime preparation.
+The product exposes only repository-reviewed Qwen3.5 dense 0.8B and 2B artifacts under [ADR 0011](adr/0011-qwen35-only-product-support.md). Public lifecycle, binding, telemetry and backend contracts remain model-family neutral; this is an architectural boundary, not a generic model-support promise.
 
-The focused ownership map and capability rules live in [`qwen35/architecture.md`](qwen35/architecture.md). The staged migration from the current multi-family catalog is owned by [`qwen35/workstreams/product-migration.md`](qwen35/workstreams/product-migration.md).
+Users do not extend the product with arbitrary GGUF files. Verified download/install from the curated catalog is the only consumer model acquisition path. Generic manual-import, legacy-model and multi-family product cases are removed rather than represented through compatibility states. The focused ownership map lives in [`qwen35/architecture.md`](qwen35/architecture.md), and Q35-1 cleanup is owned by [`qwen35/workstreams/curated-model-baseline.md`](qwen35/workstreams/curated-model-baseline.md).
 
 ## Persistent observability
 
@@ -110,19 +110,19 @@ LlamaCppInferenceBackend
 JNI / llama.cpp
 ```
 
-A host-side `adb` runner streams a developer-provided GGUF into the test application's private data directory. The model remains outside the repository and APK artifacts.
+A host-side `adb` runner may stream an exact developer-selected validation GGUF into the test application's private data directory. This is test infrastructure only; it does not create a consumer model-import path. The model remains outside the repository and APK artifacts.
 
 The validation plane covers behavior that cannot be established by JVM or host-native tests alone:
 
 - Android ABI and JNI packaging;
 - GGUF inspection on device;
-- app-private import and integrity verification;
+- app-private test artifact installation and integrity verification;
 - native model and context lifecycle;
 - streaming generation and metrics;
 - cooperative active cancellation;
 - repeated lifecycle and process-memory regression checks.
 
-Test configuration may describe a specific model and device, but it must preserve the same explicit binding path used by applications. Device tests may measure production code; they must not duplicate or bypass model resolution, store integrity or runtime ownership rules.
+Test configuration may describe a specific curated model and device, but it must preserve the same explicit binding path used by applications. Device tests may measure production code; they must not duplicate or bypass model resolution, store integrity or runtime ownership rules.
 
 ## Model identity
 
@@ -134,7 +134,7 @@ A model is represented at three levels:
 
 `AppModelBinding` resolves `applicationId + useCaseId` to a single explicit use-case profile.
 
-Multiple profiles may target different supported Qwen3.5 artifacts or quantizations. Model-aware identity and scheduling do not authorize a non-Qwen family or an unsupported Qwen3.5 tier.
+Multiple profiles may target different curated Qwen3.5 0.8B/2B artifacts or quantizations. Model-aware identity and scheduling do not make the catalog extensible to other families or tiers.
 
 ## Cache hierarchy
 
