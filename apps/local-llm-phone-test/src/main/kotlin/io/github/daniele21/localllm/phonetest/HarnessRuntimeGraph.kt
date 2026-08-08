@@ -48,8 +48,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private var runtimeModelDigest: ModelDigest? = null
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
-        ensureRuntimeFor(model)
         registry.select(model)
+        ensureRuntimeFor(model)
         val resolved = registry.resolve(APPLICATION_ID, purpose.useCaseId)
         PhoneHarness(
             runtime = requireNotNull(runtime),
@@ -89,7 +89,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         if (runtime != null && runtimeModelDigest == model.digest) return
 
         closeRuntimeLocked()
-        registry.select(model)
         val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
         require(nativeLibraryDirectory.isDirectory) {
             "Native library directory is unavailable"
@@ -138,6 +137,7 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
     private var selectedModel: ImportedPhoneModel? = null
 
     fun select(model: ImportedPhoneModel) {
+        Qwen35PhoneModelPolicy.requireCurated(model)
         synchronized(lock) { selectedModel = model }
     }
 
