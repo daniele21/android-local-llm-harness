@@ -48,6 +48,7 @@ jobs:
             .github/workflows/q35-detekt-refactor-once.yml \
             .github/scripts/q35_detekt_refactor_once.py \
             .github/scripts/q35_detekt_reducer_followup_once.py
-          git add models/model-install core/runtime-core apps/local-llm-phone-test
+          git add core/runtime-core apps/local-llm-phone-test
+          git add -f models/model-install
           git commit -m "refactor: simplify qwen35 generation validation"
           git push origin HEAD:dev
