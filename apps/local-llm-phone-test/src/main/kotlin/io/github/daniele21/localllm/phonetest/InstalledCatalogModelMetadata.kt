@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.catalog.CatalogModelRelease
 import io.github.daniele21.localllm.catalog.CatalogTarget
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ModelDigest
 import java.io.File
 import java.io.FileOutputStream
@@ -32,6 +33,21 @@ data class InstalledCatalogModelMetadata(
         architecture = architecture,
         quantization = quantization,
     )
+
+    fun matchesCuratedRelease(): Boolean = CuratedModelCatalog.releases.any { release ->
+        release.id.modelId.value == modelId &&
+            release.id.version.value == version &&
+            release.displayName == displayName &&
+            release.profileKey.value == profileKey &&
+            release.artifact.digest == digest &&
+            release.artifact.fileName == fileName &&
+            release.artifact.sizeBytes == sizeBytes &&
+            release.artifact.architecture == architecture &&
+            release.artifact.quantization == quantization &&
+            release.allowedTargets.any { target ->
+                target.applicationId.value == applicationId && target.useCaseId.value == useCaseId
+            }
+    }
 
     companion object {
         fun from(release: CatalogModelRelease, target: CatalogTarget, installedAtEpochMs: Long): InstalledCatalogModelMetadata =
@@ -74,7 +90,7 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
         .sortedByDescending(InstalledCatalogModelMetadata::installedAtEpochMs)
 
     override fun save(metadata: InstalledCatalogModelMetadata): Boolean {
-        if (!InstalledCatalogMetadataCodec.valid(metadata)) return false
+        if (!InstalledCatalogMetadataCodec.valid(metadata) || !metadata.matchesCuratedRelease()) return false
         val destination = fileFor(metadata.digest)
         val temporary =
             runCatching { File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, root) }.getOrNull()
@@ -103,6 +119,7 @@ internal class FileInstalledCatalogMetadataRepository(rootDirectory: File) : Ins
         file.inputStream().use(properties::load)
         InstalledCatalogMetadataCodec.decode(properties)
             .takeIf(InstalledCatalogMetadataCodec::valid)
+            ?.takeIf(InstalledCatalogModelMetadata::matchesCuratedRelease)
     }.getOrNull()
 
     private fun fileFor(digest: ModelDigest): File {
