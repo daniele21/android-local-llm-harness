@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -41,10 +42,16 @@ class MainActivityUiTest {
     fun primaryDestinationsAndSettingsRemainReachable() {
         composeRule.onNodeWithTag("nav-playground").performClick()
         composeRule.onNodeWithText("Runs entirely on this device").assertIsDisplayed()
+        composeRule.onNodeWithText("how much is the earth radius?").assertIsDisplayed()
 
         composeRule.onNodeWithTag("nav-models").performClick()
-        composeRule.onNodeWithText("Model catalog").assertIsDisplayed()
-        composeRule.onNodeWithText("Reviewed Qwen3.5 models compatible with this device").assertIsDisplayed()
+        composeRule.onNodeWithText("Status").assertIsDisplayed()
+        composeRule.onNodeWithText("Model size").assertIsDisplayed()
+        composeRule.onNodeWithText("All sizes").assertIsDisplayed()
+        composeRule.onNodeWithText("0.8B").assertExists()
+        composeRule.onNodeWithText("2B").assertExists()
+        composeRule.onNodeWithText("Inventory").assertDoesNotExist()
+        composeRule.onNodeWithText("Model catalog").assertDoesNotExist()
         composeRule.onNodeWithText("Import model").assertDoesNotExist()
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
