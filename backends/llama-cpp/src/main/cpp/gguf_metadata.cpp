@@ -97,6 +97,12 @@ GgufInspection inspect_gguf_metadata(const std::string& path) {
     result.metadata.architecture = read_optional_string(context, "general.architecture");
     result.metadata.name = read_optional_string(context, "general.name");
     result.metadata.file_type = read_optional_integer(context, "general.file_type");
+    if (!result.metadata.architecture.empty()) {
+        const std::string prefix = result.metadata.architecture + ".";
+        result.metadata.context_length = read_optional_integer(context, (prefix + "context_length").c_str());
+        result.metadata.block_count = read_optional_integer(context, (prefix + "block_count").c_str());
+        result.metadata.embedding_length = read_optional_integer(context, (prefix + "embedding_length").c_str());
+    }
 
     gguf_free(context);
     return result;

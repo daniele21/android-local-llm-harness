@@ -47,11 +47,7 @@ internal data class Qwen35ArtifactDescriptor(
     private fun normalize(value: String?): String? = value?.trim()?.lowercase()?.replace('-', '_')
 }
 
-internal data class Qwen35CompatibilityEvidence(
-    val modelDigest: ModelDigest,
-    val backendId: String,
-    val backendRevision: String,
-)
+internal data class Qwen35CompatibilityEvidence(val modelDigest: ModelDigest, val backendId: String, val backendRevision: String)
 
 internal object Qwen35CompatibilityManifest {
     const val LLAMA_CPP_REVISION = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"

@@ -69,6 +69,9 @@ std::vector<std::string> encode_inspection(const local_llm::GgufInspection& insp
         metadata.architecture,
         metadata.name,
         metadata.file_type.has_value() ? std::to_string(metadata.file_type.value()) : std::string{},
+        metadata.context_length.has_value() ? std::to_string(metadata.context_length.value()) : std::string{},
+        metadata.block_count.has_value() ? std::to_string(metadata.block_count.value()) : std::string{},
+        metadata.embedding_length.has_value() ? std::to_string(metadata.embedding_length.value()) : std::string{},
     };
 }
 
