@@ -15,7 +15,7 @@ This roadmap owns milestone order and exit gates. Task-level implementation belo
 Q35-0 Decision/plan
    |
    v
-Q35-1 Product migration
+Q35-1 Curated model baseline
    |
    v
 Q35-2 Compatibility gate
@@ -36,10 +36,10 @@ Q35-6 Android tuning
 Q35-7 Validation
    |
    v
-Q35-8 Certification/catalog
+Q35-8 Certification
 ```
 
-Q35-1 makes the product boundary enforceable before model-specific execution work begins. Q35-3 and parts of Q35-5 may be developed in parallel only after Q35-2 establishes the supported artifact/backend boundary. Certification consumes Q35-6 and Q35-7 evidence.
+Q35-1 closes the product model surface before model-specific execution work begins. The product does not preserve arbitrary import or retired-family compatibility. Q35-3 and parts of Q35-5 may be developed in parallel only after Q35-2 proves the exact curated artifact/backend boundary. Certification consumes Q35-6 and Q35-7 evidence.
 
 ## Q35-0 — Decision and planning
 
@@ -52,36 +52,39 @@ Exit gate:
 - progressive-disclosure routing exists;
 - workstream owners and acceptance gates are documented.
 
-## Q35-1 — Product support migration
+## Q35-1 — Curated model baseline
 
 State: **PLANNED**
 
-Goal: make catalog, binding and installed-inventory behavior enforce the Qwen3.5-only decision without destructive cleanup.
+Goal: make the product expose only the reviewed Qwen3.5 dense 0.8B/2B model set and delete generic model-import/product paths that are no longer needed.
 
 Exit gate:
 
-- unsupported releases are ineligible for new install, selection and binding;
-- stale catalogs cannot bypass the support boundary, and manual imports remain ineligible until Q35-2 proves their structure;
-- unsupported bindings fail explicitly without substitution;
-- retained installed artifacts are visible as legacy/unsupported and remain user-removable;
-- upgrade and reconciliation tests prove that no legacy GGUF is silently deleted.
+- the executable catalog contains only Qwen3.5 dense 0.8B/2B releases;
+- consumer-facing manual GGUF import is removed;
+- product bindings and profiles reference only curated releases;
+- Models and Playground expose only curated downloadable/installed Qwen3.5 models;
+- no legacy/unsupported model state is introduced to preserve retired cases;
+- verified catalog download/install remains the only product acquisition path;
+- isolated developer test artifact injection remains outside product APIs;
+- deterministic catalog, binding, inventory and UI tests pass.
 
-Owner: [`workstreams/product-migration.md`](workstreams/product-migration.md)
+Owner: [`workstreams/curated-model-baseline.md`](workstreams/curated-model-baseline.md)
 
 ## Q35-2 — Model/backend compatibility
 
 State: **PLANNED**
 
-Goal: prevent unsupported or unproven artifacts from reaching native execution.
+Goal: prove the exact curated Qwen3.5 artifacts against the repository-pinned backend before relying on them for product inference.
 
 Exit gate:
 
 - actual pinned `llama.cpp` revision is inspected and recorded;
 - selected 0.8B and 2B reference GGUFs complete load/tokenize/minimal-generate smoke tests;
-- GGUF metadata produces a typed artifact descriptor and a separate backend compatibility decision;
-- MoE and non-Qwen3.5 artifacts fail before native preparation;
+- GGUF metadata for each curated artifact matches the trusted catalog manifest;
 - exact artifact digest and backend revision are carried into compatibility evidence;
-- deterministic accepted/rejected integration tests pass.
+- corrupted, mismatched or backend-incompatible curated artifacts fail before runtime preparation;
+- deterministic compatibility integration tests pass.
 
 Owner: [`workstreams/model-compatibility.md`](workstreams/model-compatibility.md)
 
@@ -154,7 +157,7 @@ Owner: [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md)
 
 State: **PLANNED**
 
-Goal: prove semantic correctness before catalog certification.
+Goal: prove semantic correctness before certification.
 
 Exit gate:
 
@@ -168,20 +171,19 @@ Exit gate:
 
 Owner: [`workstreams/validation-certification.md`](workstreams/validation-certification.md)
 
-## Q35-8 — Certification and catalog release
+## Q35-8 — Certification
 
 State: **PLANNED**
 
-Goal: surface only reproducible, evidence-backed Qwen3.5 combinations as certified.
+Goal: attach reproducible, evidence-backed certification to exact curated Qwen3.5 combinations.
 
 Exit gate:
 
 - certification matrix keys exact artifact SHA-256, quantization and validated backend revision;
 - supported device/runtime envelope is recorded;
-- catalog availability remains separate from `CERTIFIED`, `TESTED`, `EXPERIMENTAL` and `UNVERIFIED` evidence status;
-- runtime compatibility is evaluated separately and carries typed unsupported reasons;
+- catalog availability remains separate from `CERTIFIED`, `TESTED` and `EXPERIMENTAL` evidence status;
 - initial certification is limited to the exact 0.8B Q4_K_M and 2B Q4_K_M candidates;
-- arbitrary compatible Qwen3.5 imports remain `UNVERIFIED` unless their exact evidence identity is certified;
+- additional curated quantizations require their own evidence identity and cannot inherit certification;
 - release documentation contains physical-device evidence references without model binaries or private paths.
 
 Owner: [`workstreams/validation-certification.md`](workstreams/validation-certification.md)
