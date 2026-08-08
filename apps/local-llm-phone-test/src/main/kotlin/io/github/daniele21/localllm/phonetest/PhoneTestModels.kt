@@ -30,14 +30,17 @@ data class ImportedPhoneModel(
     val architecture: String,
     val quantization: String,
 ) {
-    fun artifact(): GgufArtifact = GgufArtifact(
-        digest = digest,
-        fileName = fileName,
-        sizeBytes = sizeBytes,
-        architecture = architecture,
-        quantization = quantization,
-        source = ArtifactSource.Imported("storage-access-framework"),
-    )
+    fun artifact(): GgufArtifact {
+        Qwen35PhoneModelPolicy.requireCurated(this)
+        return GgufArtifact(
+            digest = digest,
+            fileName = fileName,
+            sizeBytes = sizeBytes,
+            architecture = architecture,
+            quantization = quantization,
+            source = ArtifactSource.Download("administrator-curated-catalog"),
+        )
+    }
 }
 
 internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
@@ -199,9 +202,10 @@ internal fun resolvedPhoneUseCase(
     profileSuffix: String = "validation",
     contextSize: Int = 512,
 ): ResolvedUseCase {
+    val release = Qwen35PhoneModelPolicy.requireCurated(model)
     val applicationId = ApplicationId("play-internal-phone-test")
     val useCaseId = UseCaseId(useCaseValue)
-    val modelProfileId = "play-internal-phone-model-$profileSuffix"
+    val modelProfileId = "${release.profileKey.value}-$profileSuffix"
     val useCaseProfileId = "play-internal-phone-use-case-$profileSuffix"
     val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1).coerceAtMost(4)
     val modelProfile = GgufModelProfile(
