@@ -1,5 +1,11 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.contracts.ThinkingMode
+import io.github.daniele21.localllm.models.GenerationDefaults
+import io.github.daniele21.localllm.models.Qwen35GenerationProfileId
+import io.github.daniele21.localllm.models.Qwen35GenerationProfiles
+import io.github.daniele21.localllm.models.Qwen35ModelTier
+
 internal enum class HarnessThemePreference(val label: String) {
     DARK("Dark"),
     LIGHT("Light"),
@@ -14,15 +20,9 @@ internal enum class HarnessDiagnosticAction {
 
 internal data class PlaygroundPresetOption(
     val id: String,
+    val profileId: Qwen35GenerationProfileId,
     val label: String,
     val description: String,
-    val maxOutputTokens: String,
-    val temperature: String,
-    val topP: String,
-    val topK: String,
-    val repeatPenalty: String,
-    val repeatLastN: String,
-    val seed: String,
     val preferredContextTokens: Int,
     val recommendedMaximumContextTokens: Int,
     val systemPrompt: String,
@@ -30,29 +30,49 @@ internal data class PlaygroundPresetOption(
 
 internal val playgroundPresetOptions = listOf(
     PlaygroundPresetOption(
-        "precise-structured", "Preciso e strutturato", "Estrazione, JSON e benchmark riproducibili",
-        "256", "0", "1", "40", "1.05", "64", "42", 2_048, 4_096,
+        "qwen35-text-fast",
+        Qwen35GenerationProfileId.QWEN35_TEXT_FAST,
+        "Fast",
+        "Short non-thinking answers with the Qwen3.5 mobile baseline",
+        2_048,
+        4_096,
+        "Answer directly and concisely.",
+    ),
+    PlaygroundPresetOption(
+        "qwen35-text-quality",
+        Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY,
+        "Quality",
+        "General-purpose non-thinking Qwen3.5 profile",
+        4_096,
+        8_192,
+        "Be accurate, direct, and concise.",
+    ),
+    PlaygroundPresetOption(
+        "qwen35-thinking",
+        Qwen35GenerationProfileId.QWEN35_THINKING,
+        "Thinking",
+        "Qwen3.5 reasoning mode using enable_thinking",
+        4_096,
+        8_192,
+        "Reason carefully before giving the final answer.",
+    ),
+    PlaygroundPresetOption(
+        "qwen35-precise",
+        Qwen35GenerationProfileId.QWEN35_PRECISE,
+        "Precise",
+        "Lower-temperature thinking profile for precise tasks",
+        4_096,
+        8_192,
+        "Reason carefully and return a precise answer without unnecessary commentary.",
+    ),
+    PlaygroundPresetOption(
+        "qwen35-json",
+        Qwen35GenerationProfileId.QWEN35_JSON,
+        "JSON",
+        "Non-thinking structured-output profile",
+        4_096,
+        8_192,
         "Return only the requested structured result. Do not add commentary outside the required format.",
-    ),
-    PlaygroundPresetOption(
-        "short-form", "Titoli e sintesi brevi", "Risposte concise senza preamboli",
-        "384", "0.25", "0.85", "30", "1.05", "64", "42", 4_096, 4_096,
-        "Return only the requested result. Avoid introductions and conclusions. Be concise and informative.",
-    ),
-    PlaygroundPresetOption(
-        "accurate-summary", "Riassunto accurato", "Aderenza al testo e nessuna aggiunta",
-        "768", "0.2", "0.9", "30", "1.05", "64", "42", 4_096, 8_192,
-        "Summarize accurately using only information supported by the input. Do not invent details.",
-    ),
-    PlaygroundPresetOption(
-        "balanced-conversation", "Conversazione bilanciata", "Impostazione generale naturale e controllata",
-        "768", "0.6", "0.9", "40", "1.05", "64", "", 4_096, 8_192,
-        "Be natural, accurate, and concise.",
-    ),
-    PlaygroundPresetOption(
-        "creative-conversation", "Conversazione creativa", "Brainstorming e variazioni meno deterministiche",
-        "1024", "0.85", "0.95", "50", "1.05", "64", "", 8_192, 8_192,
-        "Be imaginative and offer useful variations while respecting the user's constraints.",
     ),
 )
 
@@ -78,6 +98,9 @@ internal data class HarnessUiState(
     val playgroundBasePreset: String? = DEFAULT_PRESET,
     val playgroundTopP: String = DEFAULT_TOP_P,
     val playgroundTopK: String = DEFAULT_TOP_K,
+    val playgroundMinP: String = DEFAULT_MIN_P,
+    val playgroundPresencePenalty: String = DEFAULT_PRESENCE_PENALTY,
+    val playgroundThinkingMode: ThinkingMode = ThinkingMode.DISABLED,
     val playgroundRepeatPenalty: String = DEFAULT_REPEAT_PENALTY,
     val playgroundRepeatLastN: String = DEFAULT_REPEAT_LAST_N,
     val playgroundSeed: String = DEFAULT_SEED,
@@ -96,12 +119,14 @@ internal data class HarnessUiState(
         get() = busy
 
     private companion object {
-        const val DEFAULT_MAX_OUTPUT_TOKENS = "768"
-        const val DEFAULT_TEMPERATURE = "0.6"
-        const val DEFAULT_PRESET = "balanced-conversation"
-        const val DEFAULT_TOP_P = "0.9"
-        const val DEFAULT_TOP_K = "40"
-        const val DEFAULT_REPEAT_PENALTY = "1.05"
+        const val DEFAULT_MAX_OUTPUT_TOKENS = "512"
+        const val DEFAULT_TEMPERATURE = "1"
+        const val DEFAULT_PRESET = "qwen35-text-quality"
+        const val DEFAULT_TOP_P = "1"
+        const val DEFAULT_TOP_K = "20"
+        const val DEFAULT_MIN_P = "0"
+        const val DEFAULT_PRESENCE_PENALTY = "2"
+        const val DEFAULT_REPEAT_PENALTY = "1"
         const val DEFAULT_REPEAT_LAST_N = "64"
         const val DEFAULT_SEED = ""
         const val DEFAULT_PROMPT = "how much is the earth radius?"
@@ -146,6 +171,12 @@ internal sealed interface HarnessUiEvent {
     data class PlaygroundTopPChanged(val topP: String) : Playground
 
     data class PlaygroundTopKChanged(val topK: String) : Playground
+
+    data class PlaygroundMinPChanged(val minP: String) : Playground
+
+    data class PlaygroundPresencePenaltyChanged(val presencePenalty: String) : Playground
+
+    data class PlaygroundThinkingModeChanged(val mode: ThinkingMode) : Playground
 
     data class PlaygroundRepeatPenaltyChanged(val repeatPenalty: String) : Playground
 
@@ -248,6 +279,18 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.PlaygroundTopKChanged -> state.copy(playgroundTopK = event.topK, playgroundPreset = "")
 
+        is HarnessUiEvent.PlaygroundMinPChanged -> state.copy(playgroundMinP = event.minP, playgroundPreset = "")
+
+        is HarnessUiEvent.PlaygroundPresencePenaltyChanged -> state.copy(
+            playgroundPresencePenalty = event.presencePenalty,
+            playgroundPreset = "",
+        )
+
+        is HarnessUiEvent.PlaygroundThinkingModeChanged -> state.copy(
+            playgroundThinkingMode = event.mode,
+            playgroundPreset = "",
+        )
+
         is HarnessUiEvent.PlaygroundRepeatPenaltyChanged -> state.copy(
             playgroundRepeatPenalty = event.repeatPenalty,
             playgroundPreset = "",
@@ -265,19 +308,35 @@ internal object HarnessUiReducer {
 
     private fun HarnessUiState.applyPreset(id: String): HarnessUiState {
         val preset = playgroundPresetOptions.firstOrNull { it.id == id } ?: return copy(playgroundPreset = id)
+        val defaults = preset.defaultsFor(importedModel)
         return copy(
             playgroundPreset = id,
             playgroundBasePreset = id,
-            playgroundMaxTokens = preset.maxOutputTokens,
-            playgroundTemperature = preset.temperature,
-            playgroundTopP = preset.topP,
-            playgroundTopK = preset.topK,
-            playgroundRepeatPenalty = preset.repeatPenalty,
-            playgroundRepeatLastN = preset.repeatLastN,
-            playgroundSeed = preset.seed,
+            playgroundMaxTokens = defaults.maxOutputTokens.toString(),
+            playgroundTemperature = defaults.temperature.toControlValue(),
+            playgroundTopP = defaults.topP.toControlValue(),
+            playgroundTopK = defaults.topK.toString(),
+            playgroundMinP = defaults.minP.toControlValue(),
+            playgroundPresencePenalty = defaults.presencePenalty.toControlValue(),
+            playgroundThinkingMode = defaults.thinkingMode,
+            playgroundRepeatPenalty = defaults.repeatPenalty.toControlValue(),
+            playgroundRepeatLastN = defaults.repeatLastN.toString(),
+            playgroundSeed = "",
             playgroundContext = "",
         )
     }
+
+    private fun PlaygroundPresetOption.defaultsFor(model: ImportedPhoneModel?): GenerationDefaults {
+        val tier = model?.let(::qwen35Tier) ?: Qwen35ModelTier.B0_8
+        return Qwen35GenerationProfiles.forTier(tier).single { it.id == profileId }.defaults
+    }
+
+    private fun qwen35Tier(model: ImportedPhoneModel): Qwen35ModelTier {
+        val stableId = Qwen35PhoneModelPolicy.requireCurated(model).id.modelId.value
+        return if (stableId.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
+    }
+
+    private fun Float.toControlValue(): String = toString().removeSuffix(".0")
 
     private fun reduceDiagnostics(state: HarnessUiState, event: HarnessUiEvent.Diagnostics): HarnessUiState = when (event) {
         is HarnessUiEvent.DiagnosticActionChanged -> state.copy(

@@ -38,17 +38,17 @@ class PhoneTestModelsTest {
         assertEquals(128, resolved.useCase.generationDefaults.maxOutputTokens)
         assertEquals(2048, resolved.model.contextSize)
         assertEquals(0, resolved.model.gpuLayers)
-        assertEquals(listOf("<|user|>", "<|system|>"), resolved.model.chatTemplatePolicy.stopSequences)
-        val precise = resolved.useCase.presets.first { it.ref.id.value == "precise-structured" }
-        assertEquals(2_048, precise.contextPreference.preferredTokens)
-        assertEquals(4_096, precise.contextPreference.recommendedMaximumTokens)
+        assertTrue(resolved.model.chatTemplatePolicy.stopSequences.isEmpty())
+        val precise = resolved.useCase.presets.first { it.ref.id.value == "qwen35-precise" }
+        assertEquals(4_096, precise.contextPreference.preferredTokens)
+        assertEquals(8_192, precise.contextPreference.recommendedMaximumTokens)
         assertEquals(null, precise.contextPreference.maximumTokens)
-        val balanced = resolved.useCase.presets.first { it.ref.id.value == "balanced-conversation" }
-        assertEquals(PHONE_INFERENCE_PRESET_VERSION, balanced.ref.version)
-        assertEquals(1.05f, balanced.generation.repeatPenalty)
-        assertEquals(64, balanced.generation.repeatLastN)
-        assertEquals(4_096, balanced.contextPreference.preferredTokens)
-        assertEquals(8_192, balanced.contextPreference.recommendedMaximumTokens)
+        val quality = resolved.useCase.presets.first { it.ref.id.value == "qwen35-text-quality" }
+        assertEquals(PHONE_INFERENCE_PRESET_VERSION, quality.ref.version)
+        assertEquals(1f, quality.generation.repeatPenalty)
+        assertEquals(64, quality.generation.repeatLastN)
+        assertEquals(4_096, quality.contextPreference.preferredTokens)
+        assertEquals(8_192, quality.contextPreference.recommendedMaximumTokens)
     }
 
     @Test

@@ -16,6 +16,24 @@ import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.Executors
 
+private fun PlaygroundRequestOptions.toGenerationOverrides(): GenerationOverrides {
+    val preset = presetId?.let { InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION) }
+    val custom = preset == null
+    return GenerationOverrides(
+        maxOutputTokens = maxOutputTokens.takeIf { custom },
+        temperature = temperature.takeIf { custom },
+        topP = topP.takeIf { custom },
+        topK = topK.takeIf { custom },
+        minP = minP.takeIf { custom },
+        presencePenalty = presencePenalty.takeIf { custom },
+        thinkingMode = thinkingMode.takeIf { custom },
+        repeatPenalty = repeatPenalty.takeIf { custom },
+        repeatLastN = repeatLastN.takeIf { custom },
+        seedPolicy = seedPolicy.takeIf { custom },
+        preset = preset,
+    )
+}
+
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntimeGraph, private val listener: (PlaygroundState) -> Unit) :
     PlaygroundEffects {
@@ -147,18 +165,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 applicationId = currentHarness.applicationId,
                 useCaseId = currentHarness.useCaseId,
                 input = prompt,
-                overrides = GenerationOverrides(
-                    maxOutputTokens = options.maxOutputTokens,
-                    temperature = options.temperature,
-                    topP = options.topP,
-                    topK = options.topK,
-                    repeatPenalty = options.repeatPenalty,
-                    repeatLastN = options.repeatLastN,
-                    seedPolicy = options.seedPolicy,
-                    preset = options.presetId?.let {
-                        InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION)
-                    },
-                ),
+                overrides = options.toGenerationOverrides(),
             )
             val handle = currentHarness.runtime.generate(
                 generationRequest,

@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import androidx.lifecycle.ViewModel
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +49,12 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun updatePlaygroundTopK(value: String) = dispatch(HarnessUiEvent.PlaygroundTopKChanged(value))
 
+    fun updatePlaygroundMinP(value: String) = dispatch(HarnessUiEvent.PlaygroundMinPChanged(value))
+
+    fun updatePlaygroundPresencePenalty(value: String) = dispatch(HarnessUiEvent.PlaygroundPresencePenaltyChanged(value))
+
+    fun updatePlaygroundThinkingMode(mode: ThinkingMode) = dispatch(HarnessUiEvent.PlaygroundThinkingModeChanged(mode))
+
     fun updatePlaygroundRepeatPenalty(value: String) = dispatch(HarnessUiEvent.PlaygroundRepeatPenaltyChanged(value))
 
     fun updatePlaygroundRepeatLastN(value: String) = dispatch(HarnessUiEvent.PlaygroundRepeatLastNChanged(value))
@@ -86,6 +93,9 @@ private fun executePlaygroundStart(state: HarnessUiState, model: ImportedPhoneMo
                 temperature = state.playgroundTemperature,
                 topP = state.playgroundTopP,
                 topK = state.playgroundTopK,
+                minP = state.playgroundMinP,
+                presencePenalty = state.playgroundPresencePenalty,
+                thinkingMode = state.playgroundThinkingMode,
                 repeatPenalty = state.playgroundRepeatPenalty,
                 repeatLastN = state.playgroundRepeatLastN,
                 seed = state.playgroundSeed,

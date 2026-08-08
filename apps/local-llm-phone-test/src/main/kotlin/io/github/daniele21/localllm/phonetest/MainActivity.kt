@@ -76,6 +76,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -948,6 +949,22 @@ class MainActivity :
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text("Thinking", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = state.playgroundThinkingMode == ThinkingMode.DISABLED,
+                onClick = { harnessViewModel.updatePlaygroundThinkingMode(ThinkingMode.DISABLED) },
+                label = { Text("Off") },
+                enabled = presentation.inputsEnabled,
+            )
+            FilterChip(
+                selected = state.playgroundThinkingMode == ThinkingMode.ENABLED,
+                onClick = { harnessViewModel.updatePlaygroundThinkingMode(ThinkingMode.ENABLED) },
+                label = { Text("On") },
+                enabled = presentation.inputsEnabled,
+                modifier = Modifier.testTag("playground-thinking-on"),
+            )
+        }
         val temperature = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
         Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
         Slider(
@@ -1003,6 +1020,22 @@ class MainActivity :
                 modifier = Modifier.weight(1f),
                 label = { Text("Seed · blank = random") },
                 enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundMinP,
+                onValueChange = harnessViewModel::updatePlaygroundMinP,
+                modifier = Modifier.weight(1f).testTag("playground-min-p"),
+                label = { Text("Min-p") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+            OutlinedTextField(
+                value = state.playgroundPresencePenalty,
+                onValueChange = harnessViewModel::updatePlaygroundPresencePenalty,
+                modifier = Modifier.weight(1f).testTag("playground-presence-penalty"),
+                label = { Text("Presence penalty") },
+                enabled = presentation.inputsEnabled,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1119,13 +1152,14 @@ class MainActivity :
             presentation.effectiveConfiguration?.let { configuration ->
                 Text(
                     "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
-                        "Seed ${configuration.effectiveSeed} · Repeat ${configuration.repeatPenalty}/${configuration.repeatLastN}",
+                        "Thinking ${configuration.thinkingMode.name.lowercase()} · Seed ${configuration.effectiveSeed}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name}) · " +
-                        "System ${configuration.systemPromptVersion ?: "none"}",
+                    "Sampler min-p ${configuration.minP} · presence ${configuration.presencePenalty} · " +
+                        "repeat ${configuration.repeatPenalty}/${configuration.repeatLastN} · " +
+                        "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name})",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
