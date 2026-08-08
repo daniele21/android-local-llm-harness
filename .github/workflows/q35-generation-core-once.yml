@@ -1,0 +1,358 @@
+name: Q35 generation core once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/q35-generation-core-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Apply Qwen3.5 generation semantics
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def patch(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"pattern missing in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, count))
+
+          # Public/domain generation configuration.
+          patch(
+            'core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/GenerationConfiguration.kt',
+            '''enum class SeedPolicyType {\n    RANDOM,\n    FIXED,\n}\n''',
+            '''enum class ThinkingMode {\n    ENABLED,\n    DISABLED,\n}\n\nenum class SeedPolicyType {\n    RANDOM,\n    FIXED,\n}\n''')
+          patch(
+            'core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/GenerationConfiguration.kt',
+            '''    val systemPromptVersion: String?,\n) {''',
+            '''    val systemPromptVersion: String?,\n    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,\n    val minP: Float = 0f,\n    val presencePenalty: Float = 0f,\n) {''')
+          patch(
+            'core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/GenerationConfiguration.kt',
+            '''        require(systemPromptVersion == null || systemPromptVersion.length <= 128) {\n            "System prompt version must not exceed 128 characters"\n        }''',
+            '''        require(systemPromptVersion == null || systemPromptVersion.length <= 128) {\n            "System prompt version must not exceed 128 characters"\n        }\n        require(minP.isFinite() && minP in 0f..1f) { "Min-p must be in [0, 1]" }\n        require(presencePenalty.isFinite() && presencePenalty in 0f..2f) {\n            "Presence penalty must be in [0, 2]"\n        }''')
+          patch(
+            'core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/Generation.kt',
+            '''    val repeatPenalty: Float? = null,\n    val repeatLastN: Int? = null,\n) {''',
+            '''    val repeatPenalty: Float? = null,\n    val repeatLastN: Int? = null,\n    val thinkingMode: ThinkingMode? = null,\n    val minP: Float? = null,\n    val presencePenalty: Float? = null,\n) {''')
+
+          # Model-profile defaults and Qwen3.5 typed profiles.
+          patch(
+            'models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Profiles.kt',
+            'import io.github.daniele21.localllm.contracts.SeedPolicy\n',
+            'import io.github.daniele21.localllm.contracts.SeedPolicy\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Profiles.kt',
+            '''    val topK: Int = 40,\n    val seed: Long? = null,''',
+            '''    val topK: Int = 40,\n    val minP: Float = 0f,\n    val presencePenalty: Float = 0f,\n    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,\n    val seed: Long? = null,''')
+          patch(
+            'models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Profiles.kt',
+            '''        require(topK in 0..MAX_TOP_K) { "Top-k must be in [0, $MAX_TOP_K]" }\n        require(repeatPenalty.isFinite()''',
+            '''        require(topK in 0..MAX_TOP_K) { "Top-k must be in [0, $MAX_TOP_K]" }\n        require(minP.isFinite() && minP in 0f..1f) { "Min-p must be in [0, 1]" }\n        require(presencePenalty.isFinite() && presencePenalty in 0f..2f) {\n            "Presence penalty must be in [0, 2]"\n        }\n        require(repeatPenalty.isFinite()''')
+
+          profiles = Path('models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35GenerationProfiles.kt')
+          profiles.write_text('''package io.github.daniele21.localllm.models\n\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n\nenum class Qwen35ModelTier {\n    B0_8,\n    B2,\n}\n\nenum class Qwen35GenerationProfileId {\n    QWEN35_TEXT_FAST,\n    QWEN35_TEXT_QUALITY,\n    QWEN35_THINKING,\n    QWEN35_PRECISE,\n    QWEN35_JSON,\n}\n\ndata class Qwen35GenerationProfile(\n    val id: Qwen35GenerationProfileId,\n    val version: Int,\n    val defaults: GenerationDefaults,\n)\n\nobject Qwen35GenerationProfiles {\n    const val VERSION = 1\n\n    fun forTier(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> {\n        val qualityTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 768\n        val thinkingTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 1_024\n        return listOf(\n            profile(Qwen35GenerationProfileId.QWEN35_TEXT_FAST, 256, ThinkingMode.DISABLED, 1f, 1f, 2f),\n            profile(Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY, qualityTokens, ThinkingMode.DISABLED, 1f, 1f, 2f),\n            profile(Qwen35GenerationProfileId.QWEN35_THINKING, thinkingTokens, ThinkingMode.ENABLED, 1f, 0.95f, 1.5f),\n            profile(Qwen35GenerationProfileId.QWEN35_PRECISE, thinkingTokens, ThinkingMode.ENABLED, 0.6f, 0.95f, 0f),\n            profile(Qwen35GenerationProfileId.QWEN35_JSON, 512, ThinkingMode.DISABLED, 1f, 1f, 2f),\n        )\n    }\n\n    fun defaultForTier(tier: Qwen35ModelTier): GenerationDefaults =\n        forTier(tier).single { it.id == Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY }.defaults\n\n    private fun profile(\n        id: Qwen35GenerationProfileId,\n        maxOutputTokens: Int,\n        thinkingMode: ThinkingMode,\n        temperature: Float,\n        topP: Float,\n        presencePenalty: Float,\n    ) = Qwen35GenerationProfile(\n        id = id,\n        version = VERSION,\n        defaults = GenerationDefaults(\n            maxOutputTokens = maxOutputTokens,\n            temperature = temperature,\n            topP = topP,\n            topK = 20,\n            minP = 0f,\n            presencePenalty = presencePenalty,\n            thinkingMode = thinkingMode,\n            repeatPenalty = 1f,\n            repeatLastN = 64,\n        ),\n    )\n}\n''')
+
+          test = Path('models/model-profile/src/test/kotlin/io/github/daniele21/localllm/models/Qwen35GenerationProfilesTest.kt')
+          test.parent.mkdir(parents=True, exist_ok=True)
+          test.write_text('''package io.github.daniele21.localllm.models\n\nimport io.github.daniele21.localllm.contracts.ThinkingMode\nimport org.junit.Assert.assertEquals\nimport org.junit.Test\n\nclass Qwen35GenerationProfilesTest {\n    @Test\n    fun profilesResolveOfficialSamplerBaselinesDeterministically() {\n        Qwen35ModelTier.entries.forEach { tier ->\n            val profiles = Qwen35GenerationProfiles.forTier(tier)\n            assertEquals(Qwen35GenerationProfileId.entries.toSet(), profiles.map { it.id }.toSet())\n            val text = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY }.defaults\n            assertEquals(ThinkingMode.DISABLED, text.thinkingMode)\n            assertEquals(1f, text.temperature)\n            assertEquals(1f, text.topP)\n            assertEquals(20, text.topK)\n            assertEquals(0f, text.minP)\n            assertEquals(2f, text.presencePenalty)\n            assertEquals(1f, text.repeatPenalty)\n            val thinking = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_THINKING }.defaults\n            assertEquals(ThinkingMode.ENABLED, thinking.thinkingMode)\n            assertEquals(1f, thinking.temperature)\n            assertEquals(0.95f, thinking.topP)\n            assertEquals(1.5f, thinking.presencePenalty)\n            val precise = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_PRECISE }.defaults\n            assertEquals(ThinkingMode.ENABLED, precise.thinkingMode)\n            assertEquals(0.6f, precise.temperature)\n            assertEquals(0f, precise.presencePenalty)\n        }\n    }\n}\n''')
+
+          # Runtime request/configuration resolution.
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/InferenceBackend.kt',
+            'import io.github.daniele21.localllm.contracts.StopReason\n',
+            'import io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/InferenceBackend.kt',
+            'data class BackendPromptPlanningRequest(val input: GenerationInput, val systemPrompt: String?, val chatTemplatePolicy: ChatTemplatePolicy)\n',
+            '''data class BackendPromptPlanningRequest(\n    val input: GenerationInput,\n    val systemPrompt: String?,\n    val chatTemplatePolicy: ChatTemplatePolicy,\n    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,\n)\n''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/InferenceBackend.kt',
+            '''    val topK: Int,\n    val repeatPenalty: Float,''',
+            '''    val topK: Int,\n    val minP: Float = 0f,\n    val presencePenalty: Float = 0f,\n    val repeatPenalty: Float,''')
+
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            'import io.github.daniele21.localllm.contracts.StopReason\n',
+            'import io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n') if False else None
+          # RuntimeOrchestrator does not import StopReason directly; add ThinkingMode after SessionOptions.
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            'import io.github.daniele21.localllm.contracts.SessionOptions\n',
+            'import io.github.daniele21.localllm.contracts.SessionOptions\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''                    chatTemplatePolicy = session.resolved.model.chatTemplatePolicy,\n                ),''',
+            '''                    chatTemplatePolicy = session.resolved.model.chatTemplatePolicy,\n                    thinkingMode = resolved.thinkingMode,\n                ),''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''                systemPromptVersion = resolved.systemPromptVersion,\n            )''',
+            '''                systemPromptVersion = resolved.systemPromptVersion,\n                thinkingMode = resolved.thinkingMode,\n                minP = resolved.minP,\n                presencePenalty = resolved.presencePenalty,\n            )''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''                topK = resolved.topK,\n                repeatPenalty = resolved.repeatPenalty,''',
+            '''                topK = resolved.topK,\n                minP = resolved.minP,\n                presencePenalty = resolved.presencePenalty,\n                repeatPenalty = resolved.repeatPenalty,''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''        val topK = request.overrides.topK ?: defaults.topK\n        val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty\n        val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN\n        validateGenerationValues(maxOutputTokens, temperature, topP, topK, repeatPenalty, repeatLastN)''',
+            '''        val topK = request.overrides.topK ?: defaults.topK\n        val minP = request.overrides.minP ?: defaults.minP\n        val presencePenalty = request.overrides.presencePenalty ?: defaults.presencePenalty\n        val thinkingMode = request.overrides.thinkingMode ?: defaults.thinkingMode\n        val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty\n        val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN\n        validateGenerationValues(\n            maxOutputTokens, temperature, topP, topK, minP, presencePenalty, repeatPenalty, repeatLastN,\n        )''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''        if (request.input is GenerationInput.RawCompletion && !session.resolved.model.chatTemplatePolicy.allowRawCompletion) {''',
+            '''        if (request.input is GenerationInput.RawCompletion && thinkingMode == ThinkingMode.ENABLED) {\n            throw GenerationPlanningException(\n                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,\n                "Thinking mode requires chat-template rendering and cannot be used with raw completion",\n            )\n        }\n        if (request.input is GenerationInput.RawCompletion && !session.resolved.model.chatTemplatePolicy.allowRawCompletion) {''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''            topK = topK,\n            repeatPenalty = repeatPenalty,''',
+            '''            topK = topK,\n            minP = minP,\n            presencePenalty = presencePenalty,\n            thinkingMode = thinkingMode,\n            repeatPenalty = repeatPenalty,''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''        topK: Int,\n        repeatPenalty: Float,\n        repeatLastN: Int,''',
+            '''        topK: Int,\n        minP: Float,\n        presencePenalty: Float,\n        repeatPenalty: Float,\n        repeatLastN: Int,''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''            topK !in 0..MAX_TOP_K ||\n            !repeatPenalty.isFinite()''',
+            '''            topK !in 0..MAX_TOP_K ||\n            !minP.isFinite() || minP !in 0f..1f ||\n            !presencePenalty.isFinite() || presencePenalty !in 0f..2f ||\n            !repeatPenalty.isFinite()''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt',
+            '''        val topK: Int,\n        val repeatPenalty: Float,''',
+            '''        val topK: Int,\n        val minP: Float,\n        val presencePenalty: Float,\n        val thinkingMode: ThinkingMode,\n        val repeatPenalty: Float,''')
+
+          # Privacy-safe telemetry fields.
+          patch(
+            'observability/contracts/src/main/kotlin/io/github/daniele21/localllm/observability/Telemetry.kt',
+            'import io.github.daniele21.localllm.contracts.StopReason\n',
+            'import io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'observability/contracts/src/main/kotlin/io/github/daniele21/localllm/observability/Telemetry.kt',
+            '''    val topK: Int? = null,\n    val repeatPenalty: Float? = null,''',
+            '''    val topK: Int? = null,\n    val minP: Float? = null,\n    val presencePenalty: Float? = null,\n    val thinkingMode: ThinkingMode? = null,\n    val repeatPenalty: Float? = null,''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeTelemetry.kt',
+            '''            topK = configuration.topK,\n            repeatPenalty = configuration.repeatPenalty,''',
+            '''            topK = configuration.topK,\n            minP = configuration.minP,\n            presencePenalty = configuration.presencePenalty,\n            thinkingMode = configuration.thinkingMode,\n            repeatPenalty = configuration.repeatPenalty,''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeTelemetry.kt',
+            '''                put("repeatPenalty", configuration.repeatPenalty.toString())\n                put("repeatLastN", configuration.repeatLastN.toString())''',
+            '''                put("thinkingMode", configuration.thinkingMode.name)\n                put("minP", configuration.minP.toString())\n                put("presencePenalty", configuration.presencePenalty.toString())\n                put("repeatPenalty", configuration.repeatPenalty.toString())\n                put("repeatLastN", configuration.repeatLastN.toString())''')
+
+          # Room telemetry schema v7.
+          patch(
+            'observability/room-store/src/main/java/io/github/daniele21/localllm/observability/room/TelemetryDatabase.java',
+            'version = 6,', 'version = 7,')
+          patch(
+            'observability/room-store/src/main/java/io/github/daniele21/localllm/observability/room/TelemetryEntities.java',
+            '''        @Nullable @ColumnInfo(name = "top_k") public Integer topK;\n        @Nullable @ColumnInfo(name = "repeat_penalty")''',
+            '''        @Nullable @ColumnInfo(name = "top_k") public Integer topK;\n        @Nullable @ColumnInfo(name = "min_p") public Float minP;\n        @Nullable @ColumnInfo(name = "presence_penalty") public Float presencePenalty;\n        @Nullable @ColumnInfo(name = "thinking_mode") public String thinkingMode;\n        @Nullable @ColumnInfo(name = "repeat_penalty")''')
+          patch(
+            'observability/room-store/src/main/kotlin/io/github/daniele21/localllm/observability/room/TelemetryEntityMapper.kt',
+            'import io.github.daniele21.localllm.contracts.StopReason\n',
+            'import io.github.daniele21.localllm.contracts.StopReason\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'observability/room-store/src/main/kotlin/io/github/daniele21/localllm/observability/room/TelemetryEntityMapper.kt',
+            '''        topK = run.topK\n        repeatPenalty = run.repeatPenalty''',
+            '''        topK = run.topK\n        minP = run.minP\n        presencePenalty = run.presencePenalty\n        thinkingMode = run.thinkingMode?.name\n        repeatPenalty = run.repeatPenalty''')
+          patch(
+            'observability/room-store/src/main/kotlin/io/github/daniele21/localllm/observability/room/TelemetryEntityMapper.kt',
+            '''        topK = entity.topK,\n        repeatPenalty = entity.repeatPenalty,''',
+            '''        topK = entity.topK,\n        minP = entity.minP,\n        presencePenalty = entity.presencePenalty,\n        thinkingMode = entity.thinkingMode?.let(ThinkingMode::valueOf),\n        repeatPenalty = entity.repeatPenalty,''')
+          patch(
+            'observability/room-store/src/main/kotlin/io/github/daniele21/localllm/observability/room/RoomTelemetryRepository.kt',
+            '''        internal val MIGRATION_5_6 = object : Migration(5, 6) {\n            override fun migrate(database: SupportSQLiteDatabase) {\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_penalty REAL")\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_last_n INTEGER")\n            }\n        }\n\n        fun open(''',
+            '''        internal val MIGRATION_5_6 = object : Migration(5, 6) {\n            override fun migrate(database: SupportSQLiteDatabase) {\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_penalty REAL")\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN repeat_last_n INTEGER")\n            }\n        }\n\n        internal val MIGRATION_6_7 = object : Migration(6, 7) {\n            override fun migrate(database: SupportSQLiteDatabase) {\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN min_p REAL")\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN presence_penalty REAL")\n                database.execSQL("ALTER TABLE generation_runs ADD COLUMN thinking_mode TEXT")\n            }\n        }\n\n        fun open(''')
+          patch(
+            'observability/room-store/src/main/kotlin/io/github/daniele21/localllm/observability/room/RoomTelemetryRepository.kt',
+            '''            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()''',
+            '''            ).addMigrations(\n                MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,\n            ).build()''')
+
+          # Backend typed plumbing.
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/LlamaCppInferenceBackend.kt',
+            '''                policy = request.chatTemplatePolicy,\n            )''',
+            '''                policy = request.chatTemplatePolicy,\n                thinkingMode = request.thinkingMode,\n            )''')
+          patch(
+            'core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/LlamaCppInferenceBackend.kt',
+            '''            topK = request.topK,\n            repeatPenalty = request.repeatPenalty,''',
+            '''            topK = request.topK,\n            minP = request.minP,\n            presencePenalty = request.presencePenalty,\n            repeatPenalty = request.repeatPenalty,''')
+
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppGeneration.kt',
+            '''    val topK: Int,\n    val repeatPenalty: Float,''',
+            '''    val topK: Int,\n    val minP: Float = 0f,\n    val presencePenalty: Float = 0f,\n    val repeatPenalty: Float,''')
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppGeneration.kt',
+            '''        topK < 0 -> invalid("Top-k must not be negative")\n        seed < 0''',
+            '''        topK < 0 -> invalid("Top-k must not be negative")\n        !minP.isFinite() || minP !in 0f..1f -> invalid("Min-p must be in [0, 1]")\n        !presencePenalty.isFinite() || presencePenalty !in 0f..2f -> invalid("Presence penalty must be in [0, 2]")\n        seed < 0''')
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppStreaming.kt',
+            '''        topK: Int,\n        repeatPenalty: Float,''',
+            '''        topK: Int,\n        minP: Float,\n        presencePenalty: Float,\n        repeatPenalty: Float,''', count=2)
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppStreaming.kt',
+            '''                topK = config.topK,\n                repeatPenalty = config.repeatPenalty,''',
+            '''                topK = config.topK,\n                minP = config.minP,\n                presencePenalty = config.presencePenalty,\n                repeatPenalty = config.repeatPenalty,''')
+
+          # Native sampler.
+          patch(
+            'backends/llama-cpp/src/main/cpp/generation_sampler.h',
+            '''    std::int32_t top_k,\n    float repeat_penalty,''',
+            '''    std::int32_t top_k,\n    float min_p,\n    float presence_penalty,\n    float repeat_penalty,''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/generation_sampler.cpp',
+            '''    std::int32_t top_k,\n    float repeat_penalty,''',
+            '''    std::int32_t top_k,\n    float min_p,\n    float presence_penalty,\n    float repeat_penalty,''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/generation_sampler.cpp',
+            'llama_sampler_init_penalties(repeat_last_n, repeat_penalty, 0.0F, 0.0F)',
+            'llama_sampler_init_penalties(repeat_last_n, repeat_penalty, 0.0F, presence_penalty)')
+          patch(
+            'backends/llama-cpp/src/main/cpp/generation_sampler.cpp',
+            '''        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));\n        llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));''',
+            '''        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));\n        if (min_p > 0.0F) {\n            llama_sampler_chain_add(sampler, llama_sampler_init_min_p(min_p, 1));\n        }\n        llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));''')
+
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp',
+            '''    std::int32_t top_k,\n    float repeat_penalty,''',
+            '''    std::int32_t top_k,\n    float min_p,\n    float presence_penalty,\n    float repeat_penalty,''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp',
+            '''        top_k,\n        repeat_penalty,''',
+            '''        top_k,\n        min_p,\n        presence_penalty,\n        repeat_penalty,''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp',
+            '''    jint top_k,\n    jfloat repeat_penalty,''',
+            '''    jint top_k,\n    jfloat min_p,\n    jfloat presence_penalty,\n    jfloat repeat_penalty,''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp',
+            '''            top_k,\n            repeat_penalty,''',
+            '''            top_k,\n            min_p,\n            presence_penalty,\n            repeat_penalty,''')
+
+          # Proper Jinja chat-template kwargs / enable_thinking.
+          patch(
+            'backends/llama-cpp/src/main/cpp/CMakeLists.txt',
+            'set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)',
+            'set(LLAMA_BUILD_COMMON ON CACHE BOOL "" FORCE)')
+          patch(
+            'backends/llama-cpp/src/main/cpp/CMakeLists.txt',
+            '''    llama_jni_entry.cpp\n    "${LLAMA_CPP_DIR}/common/json-schema-to-grammar.cpp"\n)''',
+            '''    llama_jni_entry.cpp\n)''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/CMakeLists.txt',
+            '''    llama\n    ggml''',
+            '''    llama\n    llama-common\n    ggml''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni.cpp',
+            '#include "json-schema-to-grammar.h"\n',
+            '#include "json-schema-to-grammar.h"\n#include "chat.h"\n')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni.cpp',
+            '''    const std::string& family_template,\n    const std::string& raw_completion\n) {''',
+            '''    const std::string& family_template,\n    const std::string& raw_completion,\n    bool enable_thinking\n) {''')
+          old_render = '''    std::vector<std::string> owned_roles;\n    std::vector<std::string> owned_contents;\n    owned_roles.reserve(roles.size() + (system_prompt.empty() ? 0U : 1U));\n    owned_contents.reserve(contents.size() + (system_prompt.empty() ? 0U : 1U));\n    if (!system_prompt.empty()) {\n        owned_roles.emplace_back("system");\n        owned_contents.push_back(system_prompt);\n    }\n    owned_roles.insert(owned_roles.end(), roles.begin(), roles.end());\n    owned_contents.insert(owned_contents.end(), contents.begin(), contents.end());\n\n    std::vector<llama_chat_message> messages;\n    messages.reserve(owned_roles.size());\n    for (std::size_t index = 0; index < owned_roles.size(); ++index) {\n        messages.push_back({owned_roles[index].c_str(), owned_contents[index].c_str()});\n    }\n\n    const std::int32_t required = llama_chat_apply_template(\n        selected_template,\n        messages.data(),\n        messages.size(),\n        true,\n        nullptr,\n        0\n    );\n    if (required <= 0) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template is not supported by this runtime");\n    }\n    std::vector<char> buffer(static_cast<std::size_t>(required) + 1U, '\\0');\n    const std::int32_t written = llama_chat_apply_template(\n        selected_template,\n        messages.data(),\n        messages.size(),\n        true,\n        buffer.data(),\n        static_cast<std::int32_t>(buffer.size())\n    );\n    if (written <= 0 || written > required) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be rendered");\n    }\n    const std::string prompt(buffer.data(), static_cast<std::size_t>(written));'''
+          new_render = '''    common_chat_templates_ptr templates;\n    try {\n        const std::string override_template = template_source == "GGUF" ? std::string{} : std::string(selected_template);\n        templates = common_chat_templates_init(record.model, override_template);\n    } catch (const std::exception&) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template is not supported by this runtime");\n    }\n    if (!templates) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be initialized");\n    }\n\n    common_chat_templates_inputs inputs;\n    inputs.add_generation_prompt = true;\n    inputs.use_jinja = true;\n    inputs.enable_thinking = enable_thinking;\n    inputs.messages.reserve(roles.size() + (system_prompt.empty() ? 0U : 1U));\n    if (!system_prompt.empty()) {\n        common_chat_msg message;\n        message.role = "system";\n        message.content = system_prompt;\n        inputs.messages.push_back(std::move(message));\n    }\n    for (std::size_t index = 0; index < roles.size(); ++index) {\n        common_chat_msg message;\n        message.role = roles[index];\n        message.content = contents[index];\n        inputs.messages.push_back(std::move(message));\n    }\n\n    std::string prompt;\n    try {\n        prompt = common_chat_templates_apply(templates.get(), inputs).prompt;\n    } catch (const std::exception&) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template could not be rendered");\n    }\n    if (prompt.empty()) {\n        return error_response("CHAT_TEMPLATE_UNSUPPORTED", "The selected chat template rendered an empty prompt");\n    }'''
+          patch('backends/llama-cpp/src/main/cpp/llama_jni.cpp', old_render, new_render)
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni.cpp',
+            '''    jstring family_template_value,\n    jstring raw_completion_value\n) {''',
+            '''    jstring family_template_value,\n    jstring raw_completion_value,\n    jboolean enable_thinking\n) {''')
+          patch(
+            'backends/llama-cpp/src/main/cpp/llama_jni.cpp',
+            '''            family_template,\n            raw_completion\n        )''',
+            '''            family_template,\n            raw_completion,\n            enable_thinking == JNI_TRUE\n        )''')
+
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppPromptPlanning.kt',
+            'import io.github.daniele21.localllm.contracts.GenerationInput\n',
+            'import io.github.daniele21.localllm.contracts.GenerationInput\nimport io.github.daniele21.localllm.contracts.ThinkingMode\n')
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppPromptPlanning.kt',
+            '''        rawCompletion: String?,\n    ): Array<String>''',
+            '''        rawCompletion: String?,\n        enableThinking: Boolean,\n    ): Array<String>''', count=2)
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppPromptPlanning.kt',
+            '''        policy: ChatTemplatePolicy,\n    ): NativePromptPlanningResult {''',
+            '''        policy: ChatTemplatePolicy,\n        thinkingMode: ThinkingMode = ThinkingMode.DISABLED,\n    ): NativePromptPlanningResult {''')
+          patch(
+            'backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/llamacpp/LlamaCppPromptPlanning.kt',
+            '''            rawCompletion = (input as? GenerationInput.RawCompletion)?.value,\n        )''',
+            '''            rawCompletion = (input as? GenerationInput.RawCompletion)?.value,\n            enableThinking = thinkingMode == ThinkingMode.ENABLED,\n        )''')
+          PY
+      - name: Add Q35 generation tests
+        run: |
+          mkdir -p core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime
+          cat > core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/Qwen35GenerationConfigurationTest.kt <<'EOF'
+          package io.github.daniele21.localllm.runtime
+
+          import io.github.daniele21.localllm.contracts.GenerationOverrides
+          import io.github.daniele21.localllm.contracts.ThinkingMode
+          import io.github.daniele21.localllm.models.GenerationDefaults
+          import org.junit.Assert.assertEquals
+          import org.junit.Test
+
+          class Qwen35GenerationConfigurationTest {
+              @Test
+              fun neutralThinkingAndSamplerFieldsAreRepresentable() {
+                  val defaults = GenerationDefaults(
+                      maxOutputTokens = 512,
+                      temperature = 1f,
+                      topP = 0.95f,
+                      topK = 20,
+                      minP = 0f,
+                      presencePenalty = 1.5f,
+                      thinkingMode = ThinkingMode.ENABLED,
+                  )
+                  val override = GenerationOverrides(
+                      thinkingMode = ThinkingMode.DISABLED,
+                      minP = 0.1f,
+                      presencePenalty = 0.5f,
+                  )
+                  assertEquals(ThinkingMode.ENABLED, defaults.thinkingMode)
+                  assertEquals(0f, defaults.minP)
+                  assertEquals(1.5f, defaults.presencePenalty)
+                  assertEquals(ThinkingMode.DISABLED, override.thinkingMode)
+                  assertEquals(0.1f, override.minP)
+                  assertEquals(0.5f, override.presencePenalty)
+              }
+          }
+          EOF
+      - name: Format and validate core generation slice
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply \
+            :core:contracts:testDebugUnitTest \
+            :models:model-profile:testDebugUnitTest \
+            :core:runtime-core:testDebugUnitTest \
+            :backends:llama-cpp:testDebugUnitTest \
+            :observability:room-store:testDebugUnitTest \
+            :backends:llama-cpp:assembleDebug
+      - name: Commit Q35 generation core and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/q35-generation-core-once.yml
+          git add -u
+          git add -f \
+            models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35GenerationProfiles.kt \
+            models/model-profile/src/test/kotlin/io/github/daniele21/localllm/models/Qwen35GenerationProfilesTest.kt \
+            core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/Qwen35GenerationConfigurationTest.kt
+          git commit -m "feat: add qwen35 thinking and sampling core"
+          git push origin HEAD:dev
