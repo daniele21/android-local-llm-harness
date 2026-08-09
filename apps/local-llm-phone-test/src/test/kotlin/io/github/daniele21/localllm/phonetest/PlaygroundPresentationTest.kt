@@ -117,6 +117,23 @@ class PlaygroundPresentationTest {
     }
 
     @Test
+    fun failedRuntimeDetailRemainsVisible() {
+        val detail = "Model preparation failed: MODEL_LOAD_FAILED: llama.cpp could not load the GGUF model"
+        val presentation = HarnessUiState(
+            importedModel = testModel(),
+            playground = PlaygroundState(
+                phase = PlaygroundPhase.FAILED,
+                errorCode = "INFERENCE_START_FAILED",
+                detail = detail,
+            ),
+        ).toPlaygroundPresentation()
+
+        assertEquals(detail, presentation.detail)
+        assertEquals("Failed", presentation.statusLabel)
+        assertEquals(PlaygroundPresentationTone.ERROR, presentation.statusTone)
+    }
+
+    @Test
     fun blankOutputAndMissingMetricsUseStableFallbacks() {
         val presentation = HarnessUiState(
             playground = PlaygroundState(
