@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: qwen35
 Canonical scope: qwen35.state
 Read when: determining Qwen3.5-only product progress, blockers or the next implementation slice
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-09
 
 This ledger reports only Qwen3.5-only product progress. Repository-wide integrated state remains owned by [`../current-state.md`](../current-state.md).
 
@@ -17,9 +17,9 @@ This ledger reports only Qwen3.5-only product progress. Repository-wide integrat
 | Q35-1 | Curated model baseline | DONE | Closed Qwen3.5-only product surface and applicable repository/package validation pass. |
 | Q35-2 | Model/backend compatibility | DONE | Exact curated 0.8B/2B Q4_K_M artifacts pass identity, GGUF and pinned-backend smoke validation. |
 | Q35-3 | Thinking/template/sampling | DONE | Neutral thinking intent, typed Jinja kwargs, tier-aware profiles and sampler fields resolve end-to-end. |
-| Q35-4 | Generation guard | PLANNED | Runaway/repetitive thinking can be interrupted with bounded, typed stop reasons. |
-| Q35-5 | Runtime/context/cache capability model | PLANNED | Context and reuse paths do not assume pure KV-cache semantics. |
-| Q35-6 | Android runtime tuning | PLANNED | 0.8B and 2B have evidence-backed CPU profiles on representative devices. |
+| Q35-4 | Generation guard | DONE | Runaway/repetitive thinking is bounded with typed stop reasons and deterministic runtime tests. |
+| Q35-5 | Runtime/context/cache capability model | DONE | Context and reuse paths are backend-revision-bound and do not assume pure KV-cache semantics. |
+| Q35-6 | Android runtime tuning | IN PROGRESS | Software matrix/evidence tooling is complete; 0.8B/2B physical-device evidence and measured-profile selection remain. |
 | Q35-7 | Validation suite | PLANNED | Golden/integration/device gates pass for the supported matrix. |
 | Q35-8 | Certification | PLANNED | Exact curated artifacts receive evidence-backed certification independently of catalog availability. |
 
@@ -53,25 +53,44 @@ This ledger reports only Qwen3.5-only product progress. Repository-wide integrat
 - Playground controls plus unit/native/instrumentation coverage;
 - `libllama-common.so` explicitly verified in Android packaging.
 
-## Immediate next slice: Q35-4 generation guard
+### Q35-4
 
-Implement the bounded guard without changing the completed Q35-3 sampling/template contract:
+- versioned bounded generation guard policy;
+- thinking budget plus chunk-boundary-independent repetition/runaway detection;
+- typed guard stop reasons distinct from user cancellation, max-token completion and backend failure;
+- streaming is interrupted through the backend callback while the public terminal preserves the guard stop reason;
+- privacy-safe stop telemetry and deterministic runtime tests cover guard behavior.
 
-1. define versioned Qwen3.5 guard thresholds and optional thinking budget;
-2. implement bounded token-window anomaly detection in `core/runtime-core`;
-3. add typed guard stop reasons distinct from cancel/max-token/backend failure;
-4. preserve correct streaming cleanup and privacy-safe telemetry;
-5. add deterministic guard tests before any device tuning work.
+### Q35-5
 
-Detailed ownership remains in [`workstreams/generation-thinking.md`](workstreams/generation-thinking.md).
+- Qwen3.5 runtime capabilities are bound to the exact pinned llama.cpp revision;
+- approved mobile context tiers are `1024`, `2048`, `4096` and `8192` tokens with a 256-token safety reserve;
+- Auto context chooses the smallest approved tier that satisfies prompt + output + reserve;
+- stateless context reuse, prefix snapshot, session restore and prefix reuse are fail-closed/disabled pending explicit proof;
+- candidate 0.8B and 2B runtime profiles remain separate and carry `CANDIDATE` evidence status.
 
-## Remaining evidence gaps
+## Current slice: Q35-6 Android runtime tuning
 
-- generation-loop protection remains Q35-4;
-- Qwen3.5 hybrid/recurrent context, snapshot and prefix-reuse capability proof remains Q35-5;
-- runtime tuning still requires representative Android device evidence;
-- certification still requires the Q35-6/Q35-7 physical-device evidence matrix;
-- catalog availability is not certification.
+The repository-side tuning harness is implemented:
+
+1. exact benchmark execution identity is SHA-256 fingerprinted from context, preset/version, thinking, sampler, seed, template and output configuration;
+2. baseline matching rejects incompatible execution identities;
+3. Room schema v8 persists execution identity; legacy benchmark baselines are dropped rather than assigned invented identity during migration;
+4. the physical-device matrix covers both curated Q4_K_M reference artifacts across 1K/2K/4K/8K contexts, 2/4 threads, 64/32 and 128/64 batch/ubatch, and thinking enabled/disabled;
+5. each case records one true cold sample followed by at least three warm samples in the same loaded runtime;
+6. evidence schema v2 records model/backend/harness/profile/device identity plus TTFT, prefill/decode throughput, memory and thermal snapshots;
+7. the summarizer validates identity/sample completeness and marks only comparable cases as `eligibleForProfileSelection`;
+8. no script automatically promotes a runtime profile from `CANDIDATE` to `MEASURED`.
+
+Q35-6 remains `IN PROGRESS` because physical evidence must still be collected for both tiers and reviewed before selecting versioned measured defaults.
+
+## Remaining Q35-6 evidence
+
+- run the complete 0.8B Q4_K_M matrix on representative physical Android hardware;
+- run the complete 2B Q4_K_M matrix on the same device classes;
+- review eligible evidence separately by tier and choose evidence-backed runtime defaults;
+- mark selected profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
+- validate cancellation, model switching, memory pressure and idle unload on the measured configurations.
 
 ## State transition rule
 
