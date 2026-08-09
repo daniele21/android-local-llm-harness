@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.generation
 Read when: implementing Qwen3.5 thinking mode, chat-template arguments, sampling defaults, generation overrides or anomalous-generation guards
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-09
 
 ## Goal
 
@@ -59,9 +59,9 @@ Qwen upstream baselines remain evidence inputs rather than immutable constants. 
 | Q35-GEN-05 | DONE | Versioned 0.8B/2B Qwen3.5 generation profiles are implemented. |
 | Q35-GEN-06 | DONE | Generation overrides are validated against supported scalar bounds and deterministic precedence. |
 | Q35-GEN-07 | DONE | Effective thinking mode and scalar sampler configuration are recorded in privacy-safe telemetry. |
-| Q35-GEN-08 | PLANNED | Implement bounded anomalous-generation guard execution in `core/runtime-core`. |
-| Q35-GEN-09 | PLANNED | Add typed guard stop reasons and lifecycle mapping. |
-| Q35-GEN-10 | IN PROGRESS | Template/sampler golden coverage is implemented; guard-specific coverage completes with Q35-4. |
+| Q35-GEN-08 | DONE | Bounded anomalous-generation guard execution is implemented in `core/runtime-core`. |
+| Q35-GEN-09 | DONE | Typed guard stop reasons and lifecycle mapping distinguish guard termination from cancellation/backend failure. |
+| Q35-GEN-10 | DONE | Template/sampler and guard-specific deterministic coverage pass. |
 
 ## Q35-3 acceptance
 
@@ -78,9 +78,16 @@ Q35-3 is complete because:
 
 ## Q35-4 generation guard
 
-The 0.8B/2B model guidance warns that thinking can loop. Q35-4 therefore remains responsible for bounded repetition/runaway detection, optional thinking budgets, typed guard stop reasons, streaming cleanup and guard-specific tests. It must not duplicate JSON/schema validation already owned by the output layer.
+Q35-4 is complete. The guard now owns bounded generation protection without changing Q35-3 template/sampler semantics:
 
-Q35-3 does **not** claim these guard capabilities.
+- a versioned policy defines repetition/runaway thresholds and the optional thinking budget;
+- detection is bounded and independent of streamed chunk boundaries;
+- the backend callback stops decode when the guard fires;
+- the public terminal preserves a typed guard stop reason instead of reporting a false user cancellation;
+- guard stop telemetry remains privacy-safe;
+- deterministic runtime tests cover thinking-budget and repetition termination plus normal generation behavior.
+
+The guard does not duplicate JSON/schema validation owned by the output layer.
 
 ## Upstream references
 
