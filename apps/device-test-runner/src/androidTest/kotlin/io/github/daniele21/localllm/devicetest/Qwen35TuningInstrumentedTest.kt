@@ -72,11 +72,7 @@ class Qwen35TuningInstrumentedTest {
         }
     }
 
-    private fun runMeasuredGeneration(
-        runtime: RuntimeOrchestrator,
-        harness: Qwen35TuningHarness,
-        sampleIndex: Int,
-    ): MeasuredGeneration {
+    private fun runMeasuredGeneration(runtime: RuntimeOrchestrator, harness: Qwen35TuningHarness, sampleIndex: Int): MeasuredGeneration {
         val before = deviceSnapshot()
         val session = runtime.createSession(harness.applicationId, harness.useCaseId)
         val completed = generateAndAwait(runtime, harness, session)
@@ -285,11 +281,7 @@ private data class MeasuredGeneration(
     val after: DeviceSnapshot,
 )
 
-private data class DeviceSnapshot(
-    val processPssKb: Int,
-    val availableMemoryBytes: Long,
-    val thermalStatus: Int,
-)
+private data class DeviceSnapshot(val processPssKb: Int, val availableMemoryBytes: Long, val thermalStatus: Int)
 
 private data class Qwen35TuningHarness(
     val runtime: RuntimeOrchestrator,
