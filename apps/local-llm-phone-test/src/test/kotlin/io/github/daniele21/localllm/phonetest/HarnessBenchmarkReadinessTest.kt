@@ -15,7 +15,7 @@ import org.junit.Test
 
 class HarnessBenchmarkReadinessTest {
     private val digest = ModelDigest("c".repeat(64))
-    private val model = ImportedPhoneModel(digest, "model.gguf", 100, "qwen3", "Q4_K_M")
+    private val model = ImportedPhoneModel(digest, "model.gguf", 100, "qwen35", "Q4_K_M")
 
     @Test
     fun `reports missing samples for each cold or warm key`() {
