@@ -1,0 +1,40 @@
+name: Q35-6 Device Evidence Format
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+      - name: Format device evidence test
+        run: ./gradlew spotlessApply
+      - name: Validate Q35-6 device tooling
+        run: ./gradlew :apps:device-test-runner:compileDebugAndroidTestKotlin detekt
+      - name: Validate scripts
+        run: |
+          bash -n scripts/run-qwen35-tuning-matrix.sh
+          python3 -m py_compile scripts/summarize-qwen35-tuning.py
+      - name: Commit validated formatting and remove staging workflow
+        run: |
+          git rm .github/workflows/q35-6-device-evidence-format.yml
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style: format qwen35 device evidence tooling"
+          git push origin HEAD:dev
