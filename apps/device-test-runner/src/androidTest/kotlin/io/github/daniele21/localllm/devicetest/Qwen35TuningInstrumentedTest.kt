@@ -55,23 +55,38 @@ class Qwen35TuningInstrumentedTest {
         val harness = buildHarness()
         val runtime = harness.runtime
         try {
-            val coldSession = runtime.createSession(harness.applicationId, harness.useCaseId)
-            val cold = generateAndAwait(runtime, harness, coldSession)
-            assertEquals("Expected a cold first tuning run", "COLD", cold.metrics.modelLoadKind.name)
+            val cold = runMeasuredGeneration(runtime, harness, sampleIndex = 0)
+            assertEquals("Expected a cold first tuning run", "COLD", cold.completed.metrics.modelLoadKind.name)
             println("LOCAL_LLM_TUNING_JSON ${evidence(cold)}")
-            closeSession(runtime, coldSession)
 
-            val warmSession = runtime.createSession(harness.applicationId, harness.useCaseId)
-            val warm = generateAndAwait(runtime, harness, warmSession)
-            assertEquals("Expected a warm second tuning run", "WARM", warm.metrics.modelLoadKind.name)
-            println("LOCAL_LLM_TUNING_JSON ${evidence(warm)}")
-            closeSession(runtime, warmSession)
+            repeat(config.warmRepetitions) { index ->
+                val warm = runMeasuredGeneration(runtime, harness, sampleIndex = index + 1)
+                assertEquals("Expected a warm tuning run", "WARM", warm.completed.metrics.modelLoadKind.name)
+                println("LOCAL_LLM_TUNING_JSON ${evidence(warm)}")
+            }
 
             assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())
             assertFalse(runtime.memoryResourceSnapshot().modelLoaded)
         } finally {
             runtime.close()
         }
+    }
+
+    private fun runMeasuredGeneration(
+        runtime: RuntimeOrchestrator,
+        harness: Qwen35TuningHarness,
+        sampleIndex: Int,
+    ): MeasuredGeneration {
+        val before = deviceSnapshot()
+        val session = runtime.createSession(harness.applicationId, harness.useCaseId)
+        val completed = generateAndAwait(runtime, harness, session)
+        closeSession(runtime, session)
+        return MeasuredGeneration(
+            completed = completed,
+            sampleIndex = sampleIndex,
+            before = before,
+            after = deviceSnapshot(),
+        )
     }
 
     private fun buildHarness(): Qwen35TuningHarness {
@@ -191,10 +206,8 @@ class Qwen35TuningInstrumentedTest {
         return condition()
     }
 
-    private fun evidence(completed: GenerationEvent.Completed): JSONObject {
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    private fun evidence(measured: MeasuredGeneration): JSONObject {
+        val completed = measured.completed
         val inputTokens = completed.metrics.inputTokens
         val prefillMs = completed.metrics.prefillMs
         val prefillTokensPerSecond = if (inputTokens != null && prefillMs != null && prefillMs > 0) {
@@ -205,6 +218,8 @@ class Qwen35TuningInstrumentedTest {
         return JSONObject()
             .put("schemaVersion", EVIDENCE_SCHEMA_VERSION)
             .put("tuningCaseId", config.caseId)
+            .put("sampleIndex", measured.sampleIndex)
+            .put("warmRepetitionsRequested", config.warmRepetitions)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -235,24 +250,46 @@ class Qwen35TuningInstrumentedTest {
             .put("prefillTokensPerSecond", prefillTokensPerSecond)
             .put("decodeTokensPerSecond", completed.metrics.decodeTokensPerSecond)
             .put("stopReason", completed.metrics.stopReason.name)
-            .put("processPssKb", totalPssKb())
-            .put("availableMemoryBytes", memoryInfo.availMem)
-            .put(
-                "thermalStatus",
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,
-            )
+            .put("processPssBeforeKb", measured.before.processPssKb)
+            .put("processPssAfterKb", measured.after.processPssKb)
+            .put("processPssKb", maxOf(measured.before.processPssKb, measured.after.processPssKb))
+            .put("availableMemoryBeforeBytes", measured.before.availableMemoryBytes)
+            .put("availableMemoryAfterBytes", measured.after.availableMemoryBytes)
+            .put("availableMemoryBytes", minOf(measured.before.availableMemoryBytes, measured.after.availableMemoryBytes))
+            .put("thermalStatusBefore", measured.before.thermalStatus)
+            .put("thermalStatusAfter", measured.after.thermalStatus)
+            .put("thermalStatus", maxOf(measured.before.thermalStatus, measured.after.thermalStatus))
     }
 
-    private fun totalPssKb(): Int {
-        val memoryInfo = Debug.MemoryInfo()
-        Debug.getMemoryInfo(memoryInfo)
-        return memoryInfo.totalPss
+    private fun deviceSnapshot(): DeviceSnapshot {
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val debugMemory = Debug.MemoryInfo().also(Debug::getMemoryInfo)
+        return DeviceSnapshot(
+            processPssKb = debugMemory.totalPss,
+            availableMemoryBytes = memoryInfo.availMem,
+            thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,
+        )
     }
 
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 1
+        const val EVIDENCE_SCHEMA_VERSION = 2
     }
 }
+
+private data class MeasuredGeneration(
+    val completed: GenerationEvent.Completed,
+    val sampleIndex: Int,
+    val before: DeviceSnapshot,
+    val after: DeviceSnapshot,
+)
+
+private data class DeviceSnapshot(
+    val processPssKb: Int,
+    val availableMemoryBytes: Long,
+    val thermalStatus: Int,
+)
 
 private data class Qwen35TuningHarness(
     val runtime: RuntimeOrchestrator,
@@ -280,6 +317,7 @@ private data class Qwen35TuningConfig(
     val cpuThreads: Int,
     val batchThreads: Int,
     val maxOutputTokens: Int,
+    val warmRepetitions: Int,
     val thinkingMode: ThinkingMode,
     val caseId: String,
     val harnessCommit: String,
@@ -326,6 +364,8 @@ private data class Qwen35TuningConfig(
             require(contextSize in Qwen35RuntimeTuningProfiles.APPROVED_CONTEXT_TIERS) {
                 "contextSize must be an approved Qwen3.5 tier"
             }
+            val warmRepetitions = positiveInt("warmRepetitions", 3)
+            require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
             return Qwen35TuningConfig(
                 relativePath = string("modelRelativePath", "files/e2e/model.gguf"),
                 digest = ModelDigest(required("modelSha256").lowercase()),
@@ -336,6 +376,7 @@ private data class Qwen35TuningConfig(
                 cpuThreads = positiveInt("cpuThreads", processors.coerceAtMost(4)),
                 batchThreads = positiveInt("batchThreads", processors.coerceAtMost(4)),
                 maxOutputTokens = positiveInt("maxOutputTokens", 64),
+                warmRepetitions = warmRepetitions,
                 thinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
                     "ENABLED" -> ThinkingMode.ENABLED
                     "DISABLED" -> ThinkingMode.DISABLED
