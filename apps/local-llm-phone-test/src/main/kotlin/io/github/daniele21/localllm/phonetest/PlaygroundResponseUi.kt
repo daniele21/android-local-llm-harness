@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -312,7 +313,7 @@ private fun PlaygroundMarkdownResponse(source: String, placeholder: Boolean) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Box(
-                        modifier = Modifier.width(3.dp).size(width = 3.dp, height = 42.dp)
+                        modifier = Modifier.width(3.dp).height(42.dp)
                             .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.primary),
                     )
@@ -347,22 +348,28 @@ private fun MarkdownInlineText(
         inline.forEach { part ->
             val span = when (part.style) {
                 PlaygroundMarkdownInlineStyle.PLAIN -> SpanStyle(color = primary)
+
                 PlaygroundMarkdownInlineStyle.BOLD -> SpanStyle(color = primary, fontWeight = FontWeight.Bold)
+
                 PlaygroundMarkdownInlineStyle.ITALIC -> SpanStyle(color = primary, fontStyle = FontStyle.Italic)
+
                 PlaygroundMarkdownInlineStyle.BOLD_ITALIC -> SpanStyle(
                     color = primary,
                     fontWeight = FontWeight.Bold,
                     fontStyle = FontStyle.Italic,
                 )
+
                 PlaygroundMarkdownInlineStyle.CODE -> SpanStyle(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     background = codeBackground,
                     fontFamily = FontFamily.Monospace,
                 )
+
                 PlaygroundMarkdownInlineStyle.STRIKETHROUGH -> SpanStyle(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textDecoration = TextDecoration.LineThrough,
                 )
+
                 PlaygroundMarkdownInlineStyle.LINK -> SpanStyle(
                     color = linkColor,
                     textDecoration = TextDecoration.Underline,
