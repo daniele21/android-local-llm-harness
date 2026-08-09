@@ -12,6 +12,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -56,6 +57,7 @@ internal fun UnifiedModelsCatalog(
 ) {
     var availabilityFilter by rememberSaveable { mutableStateOf(ModelsAvailabilityFilter.ALL) }
     var sizeFilter by rememberSaveable { mutableStateOf(ModelsSizeFilter.ALL) }
+    val feedback by ModelActionFeedbackStore.state.collectAsState()
     val catalogItems = state.modelInventory.items.filter { it.origin == HarnessModelOrigin.CATALOG }
     val visibleItems = catalogItems.filter { item ->
         availabilityFilter.matches(item) && sizeFilter.matches(item)
@@ -64,6 +66,7 @@ internal fun UnifiedModelsCatalog(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ModelsCatalogSummary(state, catalogItems.size)
+        ModelActionStatusCard(feedback)
         ModelsCatalogFilters(
             availabilityFilter = availabilityFilter,
             sizeFilter = sizeFilter,
@@ -97,6 +100,55 @@ internal fun UnifiedModelsCatalog(
         )
         Text(state.modelDistribution.message, style = MaterialTheme.typography.bodySmall)
         HarnessSecondaryButton("Refresh model state", onClick = actions.refresh)
+    }
+}
+
+@Composable
+private fun ModelActionStatusCard(feedback: ModelActionFeedbackState) {
+    HarnessCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Model activity", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    feedback.latest,
+                    color = if (feedback.tone == ModelActionFeedbackTone.ERROR) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            HarnessStatusBadge(
+                label = when (feedback.tone) {
+                    ModelActionFeedbackTone.INFO -> "STATUS"
+                    ModelActionFeedbackTone.SUCCESS -> "OK"
+                    ModelActionFeedbackTone.ERROR -> "ERROR"
+                },
+                tone = when (feedback.tone) {
+                    ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
+                    ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
+                    ModelActionFeedbackTone.ERROR -> HarnessStatusTone.WARNING
+                },
+            )
+        }
+        val previous = feedback.history.drop(1).take(3)
+        if (previous.isNotEmpty()) {
+            Text(
+                "Recent",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            previous.forEach { message ->
+                Text(
+                    "• $message",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
