@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: qwen35
 Canonical scope: qwen35.routing
 Read when: locating the current Qwen3.5-only product status, next implementation gate or owning specification
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-09
 
 This is the single entry point for the Qwen3.5-only product work. Start here, then open only the document that owns the question.
 
@@ -30,13 +30,13 @@ The product model surface is closed. Users choose only repository-reviewed catal
 | Q35-1 Curated model baseline | DONE | Closed catalog-only product surface, unified Models lifecycle and validation are complete. |
 | Q35-2 Compatibility gate | DONE | Exact 0.8B/2B Q4_K_M artifacts pass trusted GGUF and pinned-backend compatibility proof. |
 | Q35-3 Thinking and sampling | DONE | Typed thinking/Jinja semantics and tier-aware sampling resolve end-to-end through Playground, backend and telemetry. |
-| Q35-4 Generation guard | PLANNED | Add bounded detection and typed stop reasons for anomalous generation. |
-| Q35-5 Runtime/context/cache capabilities | PLANNED | Make hybrid/recurrent-state assumptions explicit and safe. |
-| Q35-6 Android tuning | PLANNED | Establish separate 0.8B and 2B runtime profiles from device evidence. |
+| Q35-4 Generation guard | DONE | Bounded runaway/repetition protection and typed guard stops are implemented and tested. |
+| Q35-5 Runtime/context/cache capabilities | DONE | Backend-revision-bound context/reuse policy is conservative and fail-closed. |
+| Q35-6 Android tuning | IN PROGRESS | Matrix, strict benchmark identity and evidence tooling are ready; physical 0.8B/2B measurements remain. |
 | Q35-7 Validation | PLANNED | Complete golden, integration and physical-device Qwen3.5 validation. |
 | Q35-8 Certification | PLANNED | Attach evidence-backed certification to exact curated artifacts. |
 
-The immediate implementation gate is **Q35-4 generation guard**. Q35-1 through Q35-3 are closed with green repository/Android/package gates and final exact-artifact compatibility smoke evidence.
+The immediate gate is **Q35-6 physical Android tuning evidence**. Repository-side tuning infrastructure is complete; profiles remain `CANDIDATE` until both reference tiers are measured and reviewed.
 
 ## What to read
 
