@@ -1,0 +1,38 @@
+name: Apply playground response UI once
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "scripts/apply-playground-response-ui-once.py"
+      - ".github/workflows/apply-playground-response-ui-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Apply focused source edit
+        run: python3 scripts/apply-playground-response-ui-once.py
+
+      - name: Commit focused source edit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt; then
+            echo "No source edit required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt
+          git commit -m "feat: wire modern playground response UI"
+          git push origin HEAD:dev
