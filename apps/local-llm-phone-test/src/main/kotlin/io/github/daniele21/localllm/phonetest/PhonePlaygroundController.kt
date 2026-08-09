@@ -143,14 +143,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     private fun startOnWorker(model: ImportedPhoneModel, requestId: RequestId, prompt: String, options: PlaygroundRequestOptions) {
         try {
             val verification = runtimeGraph.modelStore.verify(model.digest)
-            check(verification.valid) { "Model integrity verification failed" }
+            check(verification.valid) { "Model integrity verification failed: ${verification.detail}" }
             val currentHarness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
             synchronized(lock) { harness = currentHarness }
             val prepared = currentHarness.runtime.prepare(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
             )
-            check(prepared.ready) { "Model preparation failed" }
+            check(prepared.ready) { "Model preparation failed: ${prepared.detail}" }
             val session = currentHarness.runtime.createSession(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
@@ -172,8 +172,8 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 GenerationListener(::onGenerationEvent),
             )
             registerHandle(requestId, handle)
-        } catch (_: Throwable) {
-            failStart(requestId)
+        } catch (error: Throwable) {
+            failStart(requestId, error)
         }
     }
 
@@ -261,7 +261,11 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         phase = if (error is LocalLlmError.Cancelled) PlaygroundPhase.CANCELLED else PlaygroundPhase.FAILED,
         cancellationAvailable = false,
         errorCode = error.code,
-        detail = if (error is LocalLlmError.Cancelled) "Generation cancelled" else "Generation failed",
+        detail = if (error is LocalLlmError.Cancelled) {
+            "Generation cancelled"
+        } else {
+            sanitizeFailure("${error.code}: ${error.message}")
+        },
     )
 
     private fun cleanupAfterTerminal() {
@@ -285,13 +289,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         publish(current)
     }
 
-    private fun failStart(requestId: RequestId) {
+    private fun failStart(requestId: RequestId, error: Throwable) {
         val session = synchronized(lock) {
             if (activeRequestId != requestId) return
             activeSession
         }
         val runtime = synchronized(lock) { harness?.runtime }
         val cleanupFailed = session != null && runCatching { runtime?.closeSession(session) }.isFailure
+        val failureDetail = sanitizeFailure(error.message ?: error.javaClass.simpleName)
         val current = synchronized(lock) {
             if (activeRequestId != requestId) return
             activeSession = if (cleanupFailed) session else null
@@ -302,15 +307,20 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 cancellationAvailable = false,
                 errorCode = if (cleanupFailed) "SESSION_CLEANUP_FAILED" else "INFERENCE_START_FAILED",
                 detail = if (cleanupFailed) {
-                    "Inference session cleanup failed"
+                    "Inference session cleanup failed; original failure: $failureDetail"
                 } else {
-                    "Local inference could not be started"
+                    failureDetail
                 },
             )
             state
         }
         publish(current)
     }
+
+    private fun sanitizeFailure(detail: String): String = detail
+        .replace('\n', ' ')
+        .replace('\r', ' ')
+        .take(MAX_FAILURE_DETAIL_CHARACTERS)
 
     private fun closeSessionResources(resources: RuntimeResources) {
         runCatching { resources.handle?.cancel() }
@@ -326,5 +336,6 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     private companion object {
         const val MAX_PROMPT_CHARACTERS = 32_768
         const val MAX_OUTPUT_CHARACTERS = 131_072
+        const val MAX_FAILURE_DETAIL_CHARACTERS = 1_024
     }
 }
