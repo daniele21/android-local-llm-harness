@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import org.junit.Assert.assertEquals
@@ -30,10 +31,11 @@ class InMemoryTelemetryRepositoryTest {
 
     private fun baseline(capturedAt: Long, samples: Int) = BenchmarkBaseline(
         key = BenchmarkKey(
-            ApplicationId("app"),
-            UseCaseId("use-case"),
-            ModelDigest("a".repeat(64)),
-            ModelLoadKind.WARM,
+            applicationId = ApplicationId("app"),
+            useCaseId = UseCaseId("use-case"),
+            modelDigest = ModelDigest("a".repeat(64)),
+            modelLoadKind = ModelLoadKind.WARM,
+            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint("b".repeat(64)),
         ),
         capturedAtEpochMs = capturedAt,
         sampleCount = samples,
