@@ -220,7 +220,7 @@ class ConsoleDataSourceTest {
             useCaseId = UseCaseId("chat"),
             modelDigest = ModelDigest("b".repeat(64)),
             modelLoadKind = ModelLoadKind.COLD,
-            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint("console-data-source-test"),
+            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint("e".repeat(64)),
         ),
         capturedAtEpochMs = 1,
         sampleCount = 3,
