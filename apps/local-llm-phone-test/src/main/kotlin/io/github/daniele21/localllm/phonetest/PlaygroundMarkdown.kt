@@ -21,11 +21,7 @@ internal sealed interface PlaygroundMarkdownBlock {
 
     data class Heading(val level: Int, val inline: List<PlaygroundMarkdownInline>) : PlaygroundMarkdownBlock
 
-    data class ListItem(
-        val marker: String,
-        val ordered: Boolean,
-        val inline: List<PlaygroundMarkdownInline>,
-    ) : PlaygroundMarkdownBlock
+    data class ListItem(val marker: String, val ordered: Boolean, val inline: List<PlaygroundMarkdownInline>) : PlaygroundMarkdownBlock
 
     data class Quote(val inline: List<PlaygroundMarkdownInline>) : PlaygroundMarkdownBlock
 
@@ -167,12 +163,19 @@ internal object PlaygroundMarkdownParser {
                 }
 
                 delimited("***", PlaygroundMarkdownInlineStyle.BOLD_ITALIC) -> Unit
+
                 delimited("___", PlaygroundMarkdownInlineStyle.BOLD_ITALIC) -> Unit
+
                 delimited("**", PlaygroundMarkdownInlineStyle.BOLD) -> Unit
+
                 delimited("__", PlaygroundMarkdownInlineStyle.BOLD) -> Unit
+
                 delimited("~~", PlaygroundMarkdownInlineStyle.STRIKETHROUGH) -> Unit
+
                 delimited("`", PlaygroundMarkdownInlineStyle.CODE) -> Unit
+
                 delimited("*", PlaygroundMarkdownInlineStyle.ITALIC) -> Unit
+
                 delimited("_", PlaygroundMarkdownInlineStyle.ITALIC) -> Unit
 
                 else -> {
