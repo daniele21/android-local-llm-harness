@@ -1,0 +1,96 @@
+name: Fix model lifecycle
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/fix-model-lifecycle.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Patch lifecycle semantics
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path_str, old, new):
+              path = Path(path_str)
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}: found {count}\n--- OLD ---\n{old}")
+              path.write_text(text.replace(old, new, 1))
+
+          controller = "apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionController.kt"
+          replace_once(
+              controller,
+              """    val metadataRepository: InstalledCatalogMetadataRepository,\n    val modelExists: (ModelDigest) -> Boolean,\n    val management: PhoneModelManagementGateway,\n""",
+              """    val metadataRepository: InstalledCatalogMetadataRepository,\n    val management: PhoneModelManagementGateway,\n""",
+          )
+          replace_once(
+              controller,
+              """    private val metadataRepository = services.metadataRepository\n    private val modelExists = services.modelExists\n    private val management = services.management\n""",
+              """    private val metadataRepository = services.metadataRepository\n    private val management = services.management\n""",
+          )
+          replace_once(
+              controller,
+              """    private fun reconcileInstalledMetadata(): MutableMap<ModelDigest, InstalledCatalogModelMetadata> {\n        val valid = linkedMapOf<ModelDigest, InstalledCatalogModelMetadata>()\n        metadataRepository.loadAll().forEach { metadata ->\n            if (modelExists(metadata.digest)) {\n                valid[metadata.digest] = metadata\n            } else {\n                metadataRepository.remove(metadata.digest)\n            }\n        }\n        return valid\n    }\n""",
+              """    private fun reconcileInstalledMetadata(): MutableMap<ModelDigest, InstalledCatalogModelMetadata> =\n        metadataRepository.loadAll().associateByTo(linkedMapOf(), InstalledCatalogModelMetadata::digest)\n""",
+          )
+          replace_once(
+              controller,
+              """                    metadataRepository = metadataRepository,\n                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },\n                    management = management,\n""",
+              """                    metadataRepository = metadataRepository,\n                    management = management,\n""",
+          )
+
+          controller_test = "apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionControllerTest.kt"
+          replace_once(
+              controller_test,
+              """    fun reconcilesStaleMetadataWhenModelStoreNoLongerContainsDigest() {\n        val metadataRepository = InMemoryInstalledMetadataRepository().apply {\n            save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))\n        }\n        var latest = PhoneModelDistributionState()\n\n        val controller =\n            controller(\n                executor = ImmediateExecutorService(),\n                metadataRepository = metadataRepository,\n                installedDigests = mutableSetOf(),\n                downloadGateway = successfulDownloadGateway(),\n                installGateway = PhoneModelInstallGateway { _, _ -> error(\"Install must not run\") },\n                discard = { false },\n                listener = { latest = it },\n            )\n\n        assertEquals(PhoneCatalogModelStatus.READY_TO_DOWNLOAD, latest.models.single().status)\n        assertTrue(metadataRepository.loadAll().isEmpty())\n        controller.close()\n    }\n""",
+              """    fun refreshPreservesInstalledMetadataWithoutUsingRuntimeStoreAsDeleteAuthority() {\n        val metadataRepository = InMemoryInstalledMetadataRepository().apply {\n            save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))\n        }\n        var latest = PhoneModelDistributionState()\n\n        val controller =\n            controller(\n                executor = ImmediateExecutorService(),\n                metadataRepository = metadataRepository,\n                installedDigests = mutableSetOf(),\n                downloadGateway = successfulDownloadGateway(),\n                installGateway = PhoneModelInstallGateway { _, _ -> error(\"Install must not run\") },\n                discard = { false },\n                listener = { latest = it },\n            )\n\n        assertEquals(PhoneCatalogModelStatus.INSTALLED, latest.models.single().status)\n        controller.refresh()\n        assertEquals(PhoneCatalogModelStatus.INSTALLED, latest.models.single().status)\n        assertEquals(1, metadataRepository.loadAll().size)\n        controller.close()\n    }\n""",
+          )
+          replace_once(
+              controller_test,
+              """            metadataRepository = metadataRepository,\n            modelExists = installedDigests::contains,\n            management = object : PhoneModelManagementGateway {\n""",
+              """            metadataRepository = metadataRepository,\n            management = object : PhoneModelManagementGateway {\n""",
+          )
+
+          phone_controller = "apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneTestController.kt"
+          replace_once(
+              phone_controller,
+              """    fun selectInstalledModel(model: ImportedPhoneModel) {\n        runExclusive {\n            progress(\"Verifying installed model before selection\")\n            val stored = requireNotNull(modelStore.find(model.digest)) {\n                \"Installed model is no longer available\"\n            }\n            check(stored.verified) { \"Installed model is not marked as verified\" }\n            val verification = modelStore.verify(model.digest)\n            check(verification.valid) { verification.detail }\n            persist(model)\n            currentModel = model\n            post { listener.onModelChanged(model) }\n            progress(\"${model.fileName} selected for local inference\")\n        }\n    }\n""",
+              """    fun selectInstalledModel(model: ImportedPhoneModel) {\n        runExclusive {\n            progress(\"Verifying installed model before activation\")\n            val stored = requireNotNull(modelStore.find(model.digest)) {\n                \"Installed model is no longer available\"\n            }\n            check(stored.verified) { \"Installed model is not marked as verified\" }\n            val verification = modelStore.verify(model.digest)\n            check(verification.valid) { verification.detail }\n\n            progress(\"Loading ${model.fileName} into the local runtime\")\n            val harness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)\n            val prepared = runCatching {\n                harness.runtime.prepare(harness.applicationId, harness.useCaseId)\n            }.getOrElse { error ->\n                runtimeGraph.releaseModel(model.digest)\n                throw error\n            }\n            if (!prepared.ready) {\n                runtimeGraph.releaseModel(model.digest)\n                error(\"Prepare failed: ${prepared.detail}\")\n            }\n\n            persist(model)\n            currentModel = model\n            post { listener.onModelChanged(model) }\n            progress(\"${model.fileName} loaded and ready in Playground\")\n        }\n    }\n""",
+          )
+
+          cards = "apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelsCatalogCards.kt"
+          replace_once(
+              cards,
+              """    if (!item.selected) {\n        HarnessPrimaryButton(\n            \"Use in Playground\",\n""",
+              """    if (!item.loaded) {\n        HarnessPrimaryButton(\n            \"Use in Playground\",\n""",
+          )
+          PY
+
+      - name: Show diff
+        run: git diff --check && git diff --stat && git diff
+      - name: Commit lifecycle fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionController.kt \
+            apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/PhoneModelDistributionControllerTest.kt \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/PhoneTestController.kt \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessModelsCatalogCards.kt
+          git commit -m "fix: make model activation and refresh lifecycle safe"
+          git push origin HEAD:dev
