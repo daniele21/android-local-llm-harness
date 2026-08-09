@@ -853,7 +853,7 @@ class MainActivity :
                     onToggleAdvanced = { advancedVisible = !advancedVisible },
                 )
             }
-            item { PlaygroundResponseCard(presentation) }
+            item { ModernPlaygroundResponseCard(presentation) }
         }
     }
 
