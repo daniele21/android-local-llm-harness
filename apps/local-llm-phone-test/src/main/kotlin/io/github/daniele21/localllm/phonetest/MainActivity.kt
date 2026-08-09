@@ -1151,62 +1151,6 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundResponseCard(presentation: PlaygroundPresentation) {
-        HarnessCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Response", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    presentation.statusLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = when (presentation.statusTone) {
-                        PlaygroundPresentationTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-
-                        PlaygroundPresentationTone.ACTIVE,
-                        PlaygroundPresentationTone.SUCCESS,
-                        -> HarnessColors.Secondary
-
-                        PlaygroundPresentationTone.ERROR -> MaterialTheme.colorScheme.error
-
-                        PlaygroundPresentationTone.WARNING -> HarnessColors.Warning
-                    },
-                )
-            }
-            Text(presentation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SelectionContainer {
-                Text(
-                    presentation.responseText,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            HarnessMetricRow {
-                HarnessMetric("TTFT", presentation.ttft, Modifier.weight(1f))
-                HarnessMetric("Total", presentation.total, Modifier.weight(1f))
-                HarnessMetric("Decode", presentation.decode, Modifier.weight(1f))
-            }
-            Text("Stop reason · ${presentation.stopReason}", style = MaterialTheme.typography.bodySmall)
-            presentation.effectiveConfiguration?.let { configuration ->
-                Text(
-                    "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
-                        "Thinking ${configuration.thinkingMode.name.lowercase()} · Seed ${configuration.effectiveSeed}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "Sampler min-p ${configuration.minP} · presence ${configuration.presencePenalty} · " +
-                        "repeat ${configuration.repeatPenalty}/${configuration.repeatLastN} · " +
-                        "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-
-    @Composable
     private fun ModelsScreen(state: HarnessUiState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
         val inventory = state.modelInventory
         ScreenList(title = null) {
