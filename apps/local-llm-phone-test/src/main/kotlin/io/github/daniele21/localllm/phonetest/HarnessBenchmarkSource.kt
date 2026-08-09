@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.RunStatus
@@ -200,14 +201,12 @@ internal class HarnessBenchmarkSource(private val repository: TelemetryRepositor
         useCaseId = useCaseId,
         modelDigest = modelDigest,
         modelLoadKind = modelLoadKind,
+        executionIdentity = BenchmarkExecutionIdentity.fromRun(this),
     )
 
     private fun GenerationRunRecord.matches(key: BenchmarkKey): Boolean = status == RunStatus.COMPLETED &&
         completedAtEpochMs != null &&
-        applicationId == key.applicationId &&
-        useCaseId == key.useCaseId &&
-        modelDigest == key.modelDigest &&
-        modelLoadKind == key.modelLoadKind
+        key.matches(this)
 
     private fun toUi(baseline: BenchmarkBaseline): BenchmarkUi {
         val assessment = BenchmarkRegressionHealthCheck(repository, baseline.key).evaluate()
@@ -247,11 +246,7 @@ private fun BenchmarkBaseline.toHistoryUi(activeBaselines: List<BenchmarkBaselin
     active = activeBaselines.any { it == this },
 )
 
-private fun BenchmarkKey.safeStableId(): String = listOf(
-    applicationId.value,
-    useCaseId.value,
-    modelLoadKind.name,
-).joinToString(separator = ":")
+private fun BenchmarkKey.safeStableId(): String = stableId
 
 private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(Locale.ROOT, it) } ?: "Unavailable"
 
