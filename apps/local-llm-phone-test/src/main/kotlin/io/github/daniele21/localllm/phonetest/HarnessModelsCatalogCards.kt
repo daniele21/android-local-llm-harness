@@ -102,7 +102,7 @@ private fun InstalledLifecycleActions(
     actions: UnifiedModelsActions,
 ) {
     val installed = model.installedModel ?: return
-    if (!item.selected) {
+    if (!item.loaded) {
         HarnessPrimaryButton(
             "Use in Playground",
             enabled = !state.busy,

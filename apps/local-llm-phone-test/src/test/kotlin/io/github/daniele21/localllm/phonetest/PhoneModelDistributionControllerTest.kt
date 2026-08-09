@@ -129,7 +129,7 @@ class PhoneModelDistributionControllerTest {
     }
 
     @Test
-    fun reconcilesStaleMetadataWhenModelStoreNoLongerContainsDigest() {
+    fun refreshPreservesInstalledMetadataWithoutUsingRuntimeStoreAsDeleteAuthority() {
         val metadataRepository = InMemoryInstalledMetadataRepository().apply {
             save(InstalledCatalogModelMetadata.from(RELEASE, TARGET, 1L))
         }
@@ -146,8 +146,10 @@ class PhoneModelDistributionControllerTest {
                 listener = { latest = it },
             )
 
-        assertEquals(PhoneCatalogModelStatus.READY_TO_DOWNLOAD, latest.models.single().status)
-        assertTrue(metadataRepository.loadAll().isEmpty())
+        assertEquals(PhoneCatalogModelStatus.INSTALLED, latest.models.single().status)
+        controller.refresh()
+        assertEquals(PhoneCatalogModelStatus.INSTALLED, latest.models.single().status)
+        assertEquals(1, metadataRepository.loadAll().size)
         controller.close()
     }
 
@@ -223,7 +225,6 @@ class PhoneModelDistributionControllerTest {
             installer = installGateway,
             discardVerifiedDownload = discard,
             metadataRepository = metadataRepository,
-            modelExists = installedDigests::contains,
             management = object : PhoneModelManagementGateway {
                 override fun verify(digest: ModelDigest): PhoneModelManagementOutcome = PhoneModelManagementOutcome(
                     operation = PhoneModelManagementOperation.VERIFY,
