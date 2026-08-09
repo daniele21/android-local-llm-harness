@@ -101,7 +101,7 @@ Repository-side tuning infrastructure is complete. Remaining work:
 - choose versioned measured defaults only from complete comparable evidence;
 - validate cancellation, model switching, memory pressure and idle unload on the selected configurations.
 
-Owner: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
+Specification: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
 
 ### 2. Q35-7 validation suite
 
