@@ -351,12 +351,7 @@ private fun PlaygroundMarkdownResponse(source: String, placeholder: Boolean) {
 }
 
 @Composable
-private fun MarkdownInlineText(
-    inline: List<PlaygroundMarkdownInline>,
-    style: TextStyle,
-    muted: Boolean,
-    modifier: Modifier = Modifier,
-) {
+private fun MarkdownInlineText(inline: List<PlaygroundMarkdownInline>, style: TextStyle, muted: Boolean, modifier: Modifier = Modifier) {
     val primary = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     val codeBackground = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
     val linkColor = MaterialTheme.colorScheme.secondary
