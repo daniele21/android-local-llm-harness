@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.RunStatus
@@ -17,7 +18,7 @@ import org.junit.Test
 
 class HarnessBenchmarkSourceTest {
     private val digest = ModelDigest("a".repeat(64))
-    private val model = ImportedPhoneModel(digest, "private-model.gguf", 100, "qwen3", "Q4_K_M")
+    private val model = ImportedPhoneModel(digest, "private-model.gguf", 100, "qwen35", "Q4_K_M")
 
     @Test
     fun `captures separate cold and warm baselines after enough samples`() {
@@ -82,10 +83,11 @@ class HarnessBenchmarkSourceTest {
     fun `exposes retained history separately from active baselines`() {
         val repository = InMemoryTelemetryRepository(maxRuns = 100, maxLogs = 10)
         val key = BenchmarkKey(
-            ApplicationId("play-internal-phone-test"),
-            UseCaseId("manual-inference-playground"),
-            digest,
-            ModelLoadKind.WARM,
+            applicationId = ApplicationId("play-internal-phone-test"),
+            useCaseId = UseCaseId("manual-inference-playground"),
+            modelDigest = digest,
+            modelLoadKind = ModelLoadKind.WARM,
+            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint("f".repeat(64)),
         )
         repository.saveBenchmarkBaseline(baseline(key, 10L, 5))
         repository.saveBenchmarkBaseline(baseline(key, 20L, 6))
