@@ -66,12 +66,7 @@ internal class PhoneTestController(
     fun selectInstalledModel(model: ImportedPhoneModel) {
         runExclusive {
             progress("Verifying installed model before Playground selection")
-            val stored = requireNotNull(modelStore.find(model.digest)) {
-                "Installed model is no longer available"
-            }
-            check(stored.verified) { "Installed model is not marked as verified" }
-            val verification = modelStore.verify(model.digest)
-            check(verification.valid) { verification.detail }
+            verifyStoredModelForSelection(modelStore, model.digest)
 
             persist(model)
             currentModel = model
