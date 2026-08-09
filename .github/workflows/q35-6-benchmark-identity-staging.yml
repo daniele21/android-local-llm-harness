@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   stage:
-    if: github.event.head_commit.message == 'chore: stage q35-6 benchmark identity'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -28,17 +27,12 @@ jobs:
       - name: Format
         run: ./gradlew spotlessApply
       - name: Validate benchmark identity and persistence
-        run: >-
-          ./gradlew
-          :observability:contracts:test
-          :observability:benchmark-engine:test
-          :observability:room-store:testDebugUnitTest
-          detekt
+        run: ./gradlew :observability:contracts:test :observability:benchmark-engine:test :observability:room-store:testDebugUnitTest detekt
       - name: Commit validated changes and remove staging files
         run: |
           git rm .github/workflows/q35-6-benchmark-identity-staging.yml scripts/q35-6-benchmark-identity-patch.py
           git add -A
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat: make benchmark identity execution-strict'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat: make benchmark identity execution-strict"
           git push origin HEAD:dev
