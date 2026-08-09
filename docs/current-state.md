@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-09
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -27,6 +27,9 @@ This is the single operational ledger for what is integrated, what remains block
 - Qwen3.5 typed thinking through Jinja `enable_thinking`, with no `/think` or `/nothink` prompt injection;
 - Qwen3.5 end-to-end `minP`, `presencePenalty`, temperature, top-p, top-k, repetition, seed and output-token configuration;
 - tier-aware Fast, Quality, Thinking, Precise and JSON Qwen3.5 generation profiles;
+- bounded Qwen3.5 generation guard with thinking budget, repetition/runaway detection and typed terminal stop reasons;
+- approved Qwen3.5 1K/2K/4K/8K mobile context tiers with a safety reserve and smallest-fitting Auto selection;
+- Qwen3.5 recurrent-state reuse capabilities fail closed against the exact pinned backend revision;
 - native packaging includes and verifies the `libllama-common.so` renderer dependency;
 - typed configuration/runtime/cancellation failures without backend-message disclosure.
 
@@ -42,16 +45,18 @@ This is the single operational ledger for what is integrated, what remains block
 - `Unload from memory` is distinct from destructive `Remove installed model` and preserves installed/selected identity;
 - developer/device-test artifact injection remains isolated from consumer APIs.
 
-### Qwen3.5 compatibility baseline
+### Qwen3.5 compatibility and runtime baseline
 
-Q35-1, Q35-2 and Q35-3 are complete:
+Q35-1 through Q35-5 are complete; Q35-6 is active:
 
 - closed catalog-only product surface is validated;
 - exact Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M artifacts are pinned by SHA-256, size and trusted GGUF structural fingerprints;
 - pinned llama.cpp revision is `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`;
 - final compatibility smoke passes `load -> tokenize -> minimal generate` for both reference artifacts;
 - effective thinking/sampler configuration is privacy-safe telemetry;
-- repository Validate and Android Package gates are green on the completed implementation.
+- anomalous thinking/repetition is bounded with typed stop semantics;
+- recurrent-state snapshot/session/prefix reuse remains disabled until explicitly proved safe;
+- 0.8B and 2B candidate runtime profiles are separate and remain `CANDIDATE` pending physical evidence.
 
 Catalog availability still does not imply certification.
 
@@ -78,30 +83,34 @@ Overview, Diagnostics and Settings still retain some Activity-owned renderable s
 - effective generation metadata including thinking and scalar sampling configuration;
 - model-integrity, generation-sanity and cache-health checks;
 - Android memory and thermal snapshots;
-- benchmark baseline/history separation and matching-sample regression evaluation.
+- benchmark baseline/history separation and matching-sample regression evaluation;
+- strict benchmark execution identity prevents comparisons across incompatible context/preset/thinking/sampler/seed/template configurations;
+- Room schema v8 persists execution identity and drops unverifiable legacy baselines rather than inventing compatibility identity.
 
 Normal telemetry excludes prompt/output/system-prompt/template/schema/stop-sequence text, filesystem paths, document URIs and signed URLs.
 
 ## Open implementation blocks
 
-### 1. Q35-4 generation guard
+### 1. Q35-6 physical Android tuning evidence
 
-Next Qwen3.5 milestone:
+Repository-side tuning infrastructure is complete. Remaining work:
 
-- define versioned bounded anomaly/repetition thresholds and optional thinking budget;
-- implement bounded token-window guard execution in `core/runtime-core`;
-- emit typed guard stop reasons distinct from cancellation, max tokens and backend failure;
-- preserve correct streaming cleanup and privacy-safe telemetry;
-- add deterministic guard tests without duplicating JSON/schema validation.
+- run the controlled matrix for both curated Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M artifacts on representative physical Android hardware;
+- collect one cold plus at least three warm samples per case with exact device/runtime identity;
+- review TTFT, prefill/decode throughput, peak PSS, available memory and thermal evidence independently by model tier;
+- choose versioned measured defaults only from complete comparable evidence;
+- validate cancellation, model switching, memory pressure and idle unload on the selected configurations.
 
-Owner: [`qwen35/workstreams/generation-thinking.md`](qwen35/workstreams/generation-thinking.md).
+Owner: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
 
-### 2. Q35-5 runtime/context/cache capability model
+### 2. Q35-7 validation suite
 
-- define approved mobile context tiers;
-- verify Qwen3.5 hybrid/recurrent state behavior before enabling snapshot/restore/prefix reuse;
-- capability-gate unsupported reuse optimizations;
-- preserve memory-pressure and cancellation cleanup.
+After Q35-6 measured profiles exist:
+
+- execute semantic/golden validation across supported thinking/output modes;
+- validate context boundaries and cancellation during prefill/decode;
+- run repeated lifecycle, memory and thermal device evidence for both tiers;
+- prepare certification-consumable evidence without conflating catalog availability with support certification.
 
 ### 3. Remaining phone-app UDF migration
 
@@ -118,23 +127,20 @@ Explicit manual unload is implemented. Remaining residency work is:
 - privacy-safe automatic unload reasons for TTL, memory pressure, switch and shutdown;
 - race, pinning, idempotent cleanup and reload-classification validation.
 
-### 5. UI/accessibility and physical-device evidence
+### 5. UI/accessibility and release evidence
 
 - compact/expanded/landscape/large-font and screenshot-regression coverage;
 - TalkBack/focus-order and recreation evidence;
-- signed Internal Testing candidate;
-- representative `arm64-v8a` load/generate/memory/thermal evidence;
-- cancellation during prefill/decode and repeated lifecycle stability.
+- signed Internal Testing candidate.
 
 ## Immediate next block
 
-Proceed with **Q35-4 generation guard**. Do not reopen generic model-selection or retired-family compatibility paths. Q35-1 through Q35-3 are closed; Q35-5 tuning/cache work starts only after the guard boundary is explicit and tested.
+Proceed with **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh`. Do not promote candidate profiles to `MEASURED` from synthetic/emulator/CI results. Q35-4 and Q35-5 are closed.
 
 ## Blockers and deferred evidence
 
-- generation-loop/runaway protection remains Q35-4;
-- hybrid/recurrent snapshot/prefix reuse remains unproven and capability-gated pending Q35-5;
-- representative physical-device performance evidence is still required before production-readiness or certification claims;
+- representative physical-device performance evidence is required to close Q35-6;
+- Q35-7/Q35-8 require the measured Q35-6 profile evidence;
 - Binder/AIDL shared runtime and Capacitor remain later phases;
 - GPU/Vulkan, simultaneous decode, multimodal and speculative decoding remain outside the current production-capable embedded scope.
 
