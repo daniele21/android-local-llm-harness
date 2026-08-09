@@ -7,6 +7,7 @@ import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.widget.Toast
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationMetrics
@@ -371,7 +372,13 @@ internal class PhoneTestController(
         .take(MAX_ERROR_LENGTH)
 
     private fun progress(message: String) {
-        post { listener.onProgress(message) }
+        ModelActionFeedbackStore.publish(message)
+        post {
+            listener.onProgress(message)
+            if (message.startsWith("Failed:", ignoreCase = true)) {
+                Toast.makeText(appContext, message, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun post(action: () -> Unit) {
