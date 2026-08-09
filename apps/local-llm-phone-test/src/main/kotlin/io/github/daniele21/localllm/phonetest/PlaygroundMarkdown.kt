@@ -28,12 +28,18 @@ internal sealed interface PlaygroundMarkdownBlock {
     data class Code(val language: String?, val text: String) : PlaygroundMarkdownBlock
 }
 
+/**
+ * Small dependency-free renderer model for model output. The two parsing entry points are intentionally
+ * branch-heavy because they recognize a bounded Markdown subset in a single pass. Keeping that branching
+ * here avoids leaking Markdown concerns into the Compose presentation layer; behavior is covered by unit tests.
+ */
 internal object PlaygroundMarkdownParser {
     private val heading = Regex("^(#{1,4})\\s+(.+)$")
     private val bullet = Regex("^\\s*[-+*]\\s+(.+)$")
     private val ordered = Regex("^\\s*(\\d+[.)])\\s+(.+)$")
     private val quote = Regex("^\\s*>\\s?(.*)$")
 
+    @Suppress("CyclomaticComplexMethod")
     fun parse(source: String): List<PlaygroundMarkdownBlock> {
         if (source.isBlank()) return emptyList()
         val lines = source.replace("\r\n", "\n").replace('\r', '\n').split('\n')
@@ -110,6 +116,7 @@ internal object PlaygroundMarkdownParser {
         return blocks
     }
 
+    @Suppress("CyclomaticComplexMethod")
     fun parseInline(source: String): List<PlaygroundMarkdownInline> {
         if (source.isEmpty()) return emptyList()
         val output = mutableListOf<PlaygroundMarkdownInline>()
