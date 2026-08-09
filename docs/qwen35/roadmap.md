@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: qwen35
 Canonical scope: qwen35.roadmap
 Read when: selecting the next Qwen3.5 milestone, checking dependencies or deciding whether a later capability can start
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-09
 
 This roadmap owns milestone order and exit gates. Task-level implementation belongs in the linked workstream specifications; current progress belongs in [`current-state.md`](current-state.md).
 
@@ -20,15 +20,15 @@ Q35-2 Compatibility gate          DONE
    |
 Q35-3 Thinking + sampling         DONE
    |
-Q35-4 Generation guard            NEXT
+Q35-4 Generation guard            DONE
    |
-Q35-5 Runtime/context/cache capabilities
+Q35-5 Runtime/context/cache       DONE
    |
-Q35-6 Android tuning
+Q35-6 Android tuning              IN PROGRESS
    |
-Q35-7 Validation
+Q35-7 Validation                  PLANNED
    |
-Q35-8 Certification
+Q35-8 Certification               PLANNED
 ```
 
 ## Q35-0 — Decision and planning
@@ -57,40 +57,38 @@ Owner: [`workstreams/model-compatibility.md`](workstreams/model-compatibility.md
 
 State: **DONE**
 
-Neutral thinking intent maps to typed Jinja `enable_thinking`; no prompt soft-switch is injected. `minP`, `presencePenalty` and existing sampler controls resolve through tier-aware Qwen3.5 profiles, request overrides and validation, reach the native sampler, appear in privacy-safe effective telemetry and are exposed in the Playground. Native/Android/package gates pass including `libllama-common.so` packaging.
+Neutral thinking intent maps to typed Jinja `enable_thinking`; no prompt soft-switch is injected. `minP`, `presencePenalty` and existing sampler controls resolve through tier-aware Qwen3.5 profiles, request overrides and validation, reach the native sampler, appear in privacy-safe effective telemetry and are exposed in the Playground.
 
 Owner: [`workstreams/generation-thinking.md`](workstreams/generation-thinking.md)
 
 ## Q35-4 — Generation guard
 
-State: **PLANNED**
+State: **DONE**
 
-Goal: bound known small-model runaway/repetition modes without hiding normal cancellation or backend failures.
-
-Exit gate:
-
-- versioned bounded repetition/runaway detection;
-- optional thinking budget policy;
-- typed guard stop reasons distinct from cancellation, max tokens and native failure;
-- correct streaming cleanup after guard termination;
-- privacy-safe stop telemetry;
-- deterministic guard tests independent of the UI.
+A bounded runtime guard now covers repetition/runaway behavior and optional thinking budget. Guard termination has typed stop reasons distinct from cancellation/max-token/backend failure, preserves correct streaming cleanup, records privacy-safe terminal telemetry and has deterministic runtime tests.
 
 Owner: [`workstreams/generation-thinking.md`](workstreams/generation-thinking.md)
 
 ## Q35-5 — Runtime, context and cache capabilities
 
-State: **PLANNED**
+State: **DONE**
 
-Goal: make mobile memory policy safe for Qwen3.5 hybrid/recurrent execution and gate snapshot/prefix reuse by verified backend capability.
+Qwen3.5 runtime capability is bound to the pinned backend revision. Mobile context is restricted to approved 1K/2K/4K/8K tiers with a safety reserve and smallest-fitting Auto selection. Prefix/session/snapshot/reuse optimizations fail closed because hybrid/recurrent state reuse has not been proved safe.
 
 Owner: [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md)
 
 ## Q35-6 — Android runtime tuning
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
-Goal: produce separate evidence-backed CPU tuning profiles for 0.8B and 2B on representative hardware.
+Repository-side tuning infrastructure is complete: separate 0.8B/2B candidate profiles, controlled context/thread/batch/ubatch/thinking matrix, strict benchmark execution identity, Room persistence, repeatable physical-device instrumentation, evidence schema v2 and selection-safe aggregation are implemented.
+
+Remaining exit gate:
+
+- run the full matrix on representative physical Android hardware for both reference Q4_K_M artifacts;
+- choose separate versioned defaults from eligible TTFT, prefill/decode throughput, memory and thermal evidence;
+- prove cancellation, model switch, memory pressure and idle unload on the measured configurations;
+- promote profiles to `MEASURED` only after evidence review.
 
 Owner: [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md)
 
