@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -44,8 +45,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 
 @Composable
 internal fun ModernPlaygroundResponseCard(presentation: PlaygroundPresentation) {
-    val statusTone = presentation.statusTone.toHarnessStatusTone()
-    val accent = presentation.statusTone.accentColor()
     val hasMetrics = listOf(presentation.ttft, presentation.total, presentation.decode).any { it != UNAVAILABLE_VALUE }
     val hasRuntimeDetails = presentation.stopReason != UNAVAILABLE_VALUE || presentation.effectiveConfiguration != null
 
@@ -53,100 +52,117 @@ internal fun ModernPlaygroundResponseCard(presentation: PlaygroundPresentation) 
         emphasized = true,
         modifier = Modifier.testTag("playground-response-card"),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ) {
-                    Box(
-                        modifier = Modifier.size(34.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = ">_",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-                Text("Response", style = MaterialTheme.typography.titleLarge)
-            }
-            HarnessStatusBadge(
-                label = presentation.statusLabel.removePrefix("●  "),
-                tone = statusTone,
-                modifier = Modifier.testTag("playground-response-status"),
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(
-                modifier = Modifier.size(7.dp).clip(CircleShape).background(accent),
-            )
-            Text(
-                text = presentation.detail.ifBlank { presentation.statusTone.defaultDetail() },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        SelectionContainer {
-            PlaygroundMarkdownResponse(
-                source = presentation.responseText,
-                placeholder = presentation.responseText == EMPTY_RESPONSE_VALUE,
-            )
-        }
-
-        if (hasMetrics) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ResponseMetricTile(
-                    label = "TTFT",
-                    value = presentation.ttft,
-                    glyph = "◴",
-                    modifier = Modifier.weight(1f),
-                )
-                ResponseMetricTile(
-                    label = "Total",
-                    value = presentation.total,
-                    glyph = "◷",
-                    modifier = Modifier.weight(1f),
-                )
-                ResponseMetricTile(
-                    label = "Decode",
-                    value = presentation.decode,
-                    glyph = "≈",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        if (hasRuntimeDetails) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.72f))
-            Text(
-                text = "Run details",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            RuntimeMetadataChips(presentation)
-        }
+        ResponseHeader(presentation)
+        ResponseStatusLine(presentation)
+        ResponseMarkdown(presentation)
+        if (hasMetrics) ResponseMetrics(presentation)
+        if (hasRuntimeDetails) ResponseRunDetails(presentation)
     }
+}
+
+@Composable
+private fun ResponseHeader(presentation: PlaygroundPresentation) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Box(
+                    modifier = Modifier.size(34.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = ">_",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            Text("Response", style = MaterialTheme.typography.titleLarge)
+        }
+        HarnessStatusBadge(
+            label = presentation.statusLabel.removePrefix("●  "),
+            tone = presentation.statusTone.toHarnessStatusTone(),
+            modifier = Modifier.testTag("playground-response-status"),
+        )
+    }
+}
+
+@Composable
+private fun ResponseStatusLine(presentation: PlaygroundPresentation) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(7.dp).clip(CircleShape).background(presentation.statusTone.accentColor()),
+        )
+        Text(
+            text = presentation.detail.ifBlank { presentation.statusTone.defaultDetail() },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ResponseMarkdown(presentation: PlaygroundPresentation) {
+    SelectionContainer {
+        PlaygroundMarkdownResponse(
+            source = presentation.responseText,
+            placeholder = presentation.responseText == EMPTY_RESPONSE_VALUE,
+        )
+    }
+}
+
+@Composable
+private fun ResponseMetrics(presentation: PlaygroundPresentation) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ResponseMetricTile(
+            label = "TTFT",
+            value = presentation.ttft,
+            glyph = "◴",
+            modifier = Modifier.weight(1f),
+        )
+        ResponseMetricTile(
+            label = "Total",
+            value = presentation.total,
+            glyph = "◷",
+            modifier = Modifier.weight(1f),
+        )
+        ResponseMetricTile(
+            label = "Decode",
+            value = presentation.decode,
+            glyph = "≈",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun ResponseRunDetails(presentation: PlaygroundPresentation) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.72f))
+    Text(
+        text = "Run details",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    RuntimeMetadataChips(presentation)
 }
 
 @Composable
@@ -337,7 +353,7 @@ private fun PlaygroundMarkdownResponse(source: String, placeholder: Boolean) {
 @Composable
 private fun MarkdownInlineText(
     inline: List<PlaygroundMarkdownInline>,
-    style: androidx.compose.ui.text.TextStyle,
+    style: TextStyle,
     muted: Boolean,
     modifier: Modifier = Modifier,
 ) {
