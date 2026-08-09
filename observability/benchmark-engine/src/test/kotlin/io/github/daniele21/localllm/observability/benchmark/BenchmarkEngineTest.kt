@@ -3,9 +3,12 @@
 package io.github.daniele21.localllm.observability.benchmark
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
@@ -22,7 +25,7 @@ class BenchmarkEngineTest {
     private val applicationId = ApplicationId("app")
     private val useCaseId = UseCaseId("assistant")
     private val digest = ModelDigest("a".repeat(64))
-    private val warmKey = BenchmarkKey(applicationId, useCaseId, digest, ModelLoadKind.WARM)
+    private val warmKey by lazy { BenchmarkKey.fromRun(run("identity", 10, 100, 50.0, 1L)) }
     private val policy = BenchmarkPolicy(
         baselineWindowSize = 5,
         comparisonWindowSize = 3,
@@ -64,6 +67,24 @@ class BenchmarkEngineTest {
         val result = BenchmarkBaselineRecorder(repository, policy).capture(warmKey)
 
         assertEquals(BenchmarkCaptureResult.InsufficientSamples(4, 5), result)
+    }
+
+    @Test
+    fun `does not mix different execution identities`() {
+        val repository = InMemoryTelemetryRepository()
+        repeat(4) { index -> repository.recordRun(run("matching-$index", 10, 100, 50.0, index.toLong() + 1)) }
+        repository.recordRun(
+            run("other-context", 10, 100, 50.0, 5L, contextSize = 4_096),
+        )
+        repository.recordRun(
+            run("other-thinking", 10, 100, 50.0, 6L, thinkingMode = ThinkingMode.ENABLED),
+        )
+
+        val result = BenchmarkBaselineRecorder(repository, policy).capture(warmKey)
+
+        assertEquals(BenchmarkCaptureResult.InsufficientSamples(4, 5), result)
+        assertFalse(warmKey.matches(run("mismatch", 10, 100, 50.0, 7L, contextSize = 4_096)))
+        assertTrue(warmKey.stableId.endsWith(warmKey.executionIdentity.fingerprint))
     }
 
     @Test
@@ -167,6 +188,8 @@ class BenchmarkEngineTest {
         throughput: Double,
         completedAt: Long,
         loadKind: ModelLoadKind = ModelLoadKind.WARM,
+        contextSize: Int = 2_048,
+        thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
     ): GenerationRunRecord = GenerationRunRecord(
         requestId = RequestId(id),
         applicationId = applicationId,
@@ -184,5 +207,22 @@ class BenchmarkEngineTest {
         decodeTokensPerSecond = throughput,
         errorCode = null,
         modelLoadKind = loadKind,
+        presetId = InferencePresetId("qwen35-text-quality"),
+        presetVersion = 1,
+        temperature = 1.0f,
+        topP = 1.0f,
+        topK = 20,
+        minP = 0.0f,
+        presencePenalty = 2.0f,
+        thinkingMode = thinkingMode,
+        repeatPenalty = 1.0f,
+        repeatLastN = 64,
+        seedPolicy = SeedPolicyType.FIXED,
+        effectiveSeed = 20260307L,
+        maxOutputTokens = 64,
+        contextSize = contextSize,
+        promptTokenCount = 10,
+        chatTemplateId = "qwen35",
+        systemPromptVersion = "benchmark-v1",
     )
 }

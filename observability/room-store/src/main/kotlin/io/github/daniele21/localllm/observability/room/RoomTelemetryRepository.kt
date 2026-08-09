@@ -285,6 +285,53 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP TABLE IF EXISTS benchmark_baselines")
+                database.execSQL("DROP TABLE IF EXISTS benchmark_baseline_history")
+                database.execSQL(
+                    "CREATE TABLE benchmark_baselines (" +
+                        "baseline_id TEXT NOT NULL PRIMARY KEY, " +
+                        "application_id TEXT NOT NULL, " +
+                        "use_case_id TEXT NOT NULL, " +
+                        "model_digest TEXT NOT NULL, " +
+                        "model_load_kind TEXT NOT NULL, " +
+                        "execution_identity TEXT NOT NULL, " +
+                        "captured_at_epoch_ms INTEGER NOT NULL, " +
+                        "sample_count INTEGER NOT NULL, " +
+                        "median_time_to_first_token_ms REAL, " +
+                        "p95_time_to_first_token_ms REAL, " +
+                        "median_total_ms REAL, " +
+                        "p95_total_ms REAL, " +
+                        "median_decode_tokens_per_second REAL)",
+                )
+                database.execSQL(
+                    "CREATE TABLE benchmark_baseline_history (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "application_id TEXT NOT NULL, " +
+                        "use_case_id TEXT NOT NULL, " +
+                        "model_digest TEXT NOT NULL, " +
+                        "model_load_kind TEXT NOT NULL, " +
+                        "execution_identity TEXT NOT NULL, " +
+                        "captured_at_epoch_ms INTEGER NOT NULL, " +
+                        "sample_count INTEGER NOT NULL, " +
+                        "median_time_to_first_token_ms REAL, " +
+                        "p95_time_to_first_token_ms REAL, " +
+                        "median_total_ms REAL, " +
+                        "p95_total_ms REAL, " +
+                        "median_decode_tokens_per_second REAL)",
+                )
+                database.execSQL(
+                    "CREATE INDEX index_benchmark_baseline_history_captured_at_epoch_ms " +
+                        "ON benchmark_baseline_history(captured_at_epoch_ms)",
+                )
+                database.execSQL(
+                    "CREATE INDEX index_benchmark_baseline_history_application_id_use_case_id_model_digest_model_load_kind " +
+                        "ON benchmark_baseline_history(application_id, use_case_id, model_digest, model_load_kind)",
+                )
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
@@ -302,6 +349,7 @@ class RoomTelemetryRepository internal constructor(
                 MIGRATION_4_5,
                 MIGRATION_5_6,
                 MIGRATION_6_7,
+                MIGRATION_7_8,
             ).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }

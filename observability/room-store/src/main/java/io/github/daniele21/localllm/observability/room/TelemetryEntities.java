@@ -217,6 +217,10 @@ public final class TelemetryEntities {
         @ColumnInfo(name = "model_load_kind")
         public String modelLoadKind = "";
 
+        @NonNull
+        @ColumnInfo(name = "execution_identity")
+        public String executionIdentity = "";
+
         @ColumnInfo(name = "captured_at_epoch_ms")
         public long capturedAtEpochMs;
 
@@ -275,6 +279,10 @@ public final class TelemetryEntities {
         @NonNull
         @ColumnInfo(name = "model_load_kind")
         public String modelLoadKind = "";
+
+        @NonNull
+        @ColumnInfo(name = "execution_identity")
+        public String executionIdentity = "";
 
         @ColumnInfo(name = "captured_at_epoch_ms")
         public long capturedAtEpochMs;

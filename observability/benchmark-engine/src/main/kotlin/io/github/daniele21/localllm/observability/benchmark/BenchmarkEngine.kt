@@ -183,6 +183,7 @@ class BenchmarkRegressionHealthCheck(
         key.useCaseId.value,
         key.modelDigest.sha256,
         key.modelLoadKind.name,
+        key.executionIdentity.fingerprint,
     ).joinToString(":")
 
     override fun evaluate(): HealthAssessment {
@@ -245,10 +246,7 @@ private fun metricComparison(
 
 private fun matchingRuns(runs: List<GenerationRunRecord>, key: BenchmarkKey): List<GenerationRunRecord> = runs.asSequence()
     .filter { it.status == RunStatus.COMPLETED }
-    .filter { it.applicationId == key.applicationId }
-    .filter { it.useCaseId == key.useCaseId }
-    .filter { it.modelDigest == key.modelDigest }
-    .filter { it.modelLoadKind == key.modelLoadKind }
+    .filter(key::matches)
     .filter { it.completedAtEpochMs != null }
     .sortedByDescending { it.completedAtEpochMs }
     .toList()
