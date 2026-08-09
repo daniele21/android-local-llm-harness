@@ -10,6 +10,8 @@ import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkBaselineRecorder
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkCaptureResult
 import io.github.daniele21.localllm.observability.benchmark.BenchmarkRegressionHealthCheck
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.Locale
 
 internal data class BenchmarkUi(
@@ -246,7 +248,9 @@ private fun BenchmarkBaseline.toHistoryUi(activeBaselines: List<BenchmarkBaselin
     active = activeBaselines.any { it == this },
 )
 
-private fun BenchmarkKey.safeStableId(): String = stableId
+private fun BenchmarkKey.safeStableId(): String = MessageDigest.getInstance("SHA-256")
+    .digest(stableId.toByteArray(StandardCharsets.UTF_8))
+    .joinToString("") { byte -> "%02x".format(Locale.ROOT, byte) }
 
 private fun Double?.asMilliseconds(): String = this?.let { "%.1f ms".format(Locale.ROOT, it) } ?: "Unavailable"
 
