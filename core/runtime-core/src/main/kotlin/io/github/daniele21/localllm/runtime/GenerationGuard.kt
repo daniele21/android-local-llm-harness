@@ -25,8 +25,9 @@ internal class GenerationGuard(
             enforceThinkingBudget && generatedTokens >= policy.thinkingTokenBudget ->
                 StopReason.GENERATION_GUARD_THINKING_BUDGET
 
-            generatedTokens >= policy.repetitionActivationTokens && repeatedSuffix() ->
-                StopReason.GENERATION_GUARD_REPETITION
+            enforceThinkingBudget &&
+                generatedTokens >= policy.repetitionActivationTokens &&
+                repeatedSuffix() -> StopReason.GENERATION_GUARD_REPETITION
 
             else -> null
         }
