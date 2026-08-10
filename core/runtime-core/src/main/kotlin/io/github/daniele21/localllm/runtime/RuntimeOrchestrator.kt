@@ -379,6 +379,7 @@ class RuntimeOrchestrator(
             val emitParsedChunk: (ParsedGenerationChunk, Int) -> Unit = { parsed, generatedTokens ->
                 when (parsed.contentType) {
                     GenerationContentType.REASONING -> reasoningOutput.append(parsed.text)
+
                     GenerationContentType.ANSWER -> {
                         answerOutput.append(parsed.text)
                         if (parsed.text.isNotBlank()) {
@@ -868,7 +869,7 @@ class RuntimeOrchestrator(
                 ?.let { nanosToMillis(it - executionStartedAt) },
             totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
             promptPlanningMs = promptPlanningMs,
-            contextCreationMs = contextCreationMs,
+            contextCreationMs = contextResult.creationMs,
         )
         runtimeTelemetry.completed(request.requestId, publicMetrics)
         lifecycle.finish(
