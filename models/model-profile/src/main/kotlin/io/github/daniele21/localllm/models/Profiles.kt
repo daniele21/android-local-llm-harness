@@ -178,7 +178,7 @@ data class ContextPreference(val preferredTokens: Int? = null, val recommendedMa
             "Preferred context tokens must not exceed the maximum"
         }
         require(recommendedMaximumTokens == null || maximumTokens == null || recommendedMaximumTokens <= maximumTokens) {
-            "Recommended maximum tokens must not exceed the hard maximum"
+            "Recommended maximum context tokens must not exceed the hard maximum"
         }
     }
 }
