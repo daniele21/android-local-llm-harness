@@ -13,13 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessColors
-import io.github.daniele21.locallm.ui.designsystem.HarnessStatusTone
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 
 @Composable
 internal fun PlaygroundResponseMetricTile(label: String, value: String, glyph: String, modifier: Modifier = Modifier) {
@@ -38,7 +39,10 @@ internal fun PlaygroundResponseMetricTile(label: String, value: String, glyph: S
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
                 Text(
                     glyph,
                     style = MaterialTheme.typography.titleMedium,
@@ -103,6 +107,7 @@ private fun MetadataChip(label: String, value: String, highlight: Boolean = fals
         Row(
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 label,
