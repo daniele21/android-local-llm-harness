@@ -26,16 +26,23 @@ internal data class PlaygroundPresentation(
     val decode: String,
     val stopReason: String,
     val effectiveConfiguration: EffectiveGenerationMetadata?,
+    val reasoningText: String = "",
+    val answerText: String = "",
+    val timeToFirstAnswer: String = UNAVAILABLE,
 )
 
 internal fun HarnessUiState.toPlaygroundPresentation(): PlaygroundPresentation {
     val playgroundState = playground
     val metrics = playgroundState.metrics
+    val legacyAnswer = playgroundState.output.takeIf {
+        playgroundState.reasoningOutput.isBlank() && playgroundState.answerOutput.isBlank()
+    }.orEmpty()
+    val answer = playgroundState.answerOutput.ifBlank { legacyAnswer }
     return PlaygroundPresentation(
         statusLabel = playgroundState.phase.statusLabel(),
         statusTone = playgroundState.phase.statusTone(),
         detail = playgroundState.detail,
-        responseText = playgroundState.output.ifBlank { EMPTY_RESPONSE },
+        responseText = answer.ifBlank { EMPTY_RESPONSE },
         runLabel = if (playgroundState.active) "Generating…" else "Run locally",
         runEnabled = importedModel != null && !busy,
         stopVisible = playgroundState.active || playgroundState.cancellationAvailable,
@@ -48,6 +55,9 @@ internal fun HarnessUiState.toPlaygroundPresentation(): PlaygroundPresentation {
         } ?: UNAVAILABLE,
         stopReason = metrics?.stopReason ?: UNAVAILABLE,
         effectiveConfiguration = playgroundState.effectiveConfiguration,
+        reasoningText = playgroundState.reasoningOutput,
+        answerText = answer,
+        timeToFirstAnswer = metrics?.timeToFirstAnswerMs?.let { "$it ms" } ?: UNAVAILABLE,
     )
 }
 
