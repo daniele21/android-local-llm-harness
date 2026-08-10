@@ -170,9 +170,13 @@ data class NativeGenerationConfig(
         return when {
             maxReasoning !in 1 until maxOutputTokens ->
                 invalid("Reasoning token budget must leave output capacity for the final answer")
+
             closeMarker.isBlank() -> invalid("Reasoning close marker must not be blank")
+
             forcedClose.isBlank() -> invalid("Forced reasoning close text must not be blank")
+
             closeMarker !in forcedClose -> invalid("Forced reasoning close text must contain the close marker")
+
             else -> null
         }
     }
