@@ -190,10 +190,7 @@ private data class ReasoningBackendModel(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class ReasoningBackendContext(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class ReasoningBackendContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class ReasoningBackend : InferenceBackend {
     override val id: String = "reasoning-backend"
