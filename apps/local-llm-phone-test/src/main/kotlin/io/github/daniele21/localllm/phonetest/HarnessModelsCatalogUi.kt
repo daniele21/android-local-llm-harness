@@ -58,13 +58,13 @@ internal fun UnifiedModelsCatalog(
     var sizeFilter by rememberSaveable { mutableStateOf(ModelsSizeFilter.ALL) }
     val feedback by ModelActionFeedbackStore.state.collectAsState()
     val catalogItems = state.modelInventory.items.filter { it.origin == HarnessModelOrigin.CATALOG }
-    val visibleItems = catalogItems.filter { item ->
-        availabilityFilter.matches(item) && sizeFilter.matches(item)
-    }
     val distributionByStableId = state.modelDistribution.models.associateBy(PhoneCatalogModelUi::stableId)
     val loadingStableId = loadingStableId(state, feedback)
     val loadedItem = catalogItems.firstOrNull(HarnessModelInventoryItem::loaded)
     val loadedModel = loadedItem?.let { distributionByStableId[it.stableId] }
+    val visibleItems = catalogItems.filter { item ->
+        !item.loaded && availabilityFilter.matches(item) && sizeFilter.matches(item)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModelsCatalogSummary(state, catalogItems.size)
@@ -103,7 +103,7 @@ internal fun UnifiedModelsCatalog(
         }
         if (visibleItems.isEmpty()) {
             HarnessCard {
-                Text("No models match these filters.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No other models match these filters.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         ModelsCatalogFooter(state, actions)
@@ -248,21 +248,19 @@ internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean 
 }
 
 internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
+    HarnessModelLifecycle.LOADED -> HarnessStatusTone.SUCCESS
     HarnessModelLifecycle.SELECTED,
-    HarnessModelLifecycle.LOADED,
-    HarnessModelLifecycle.INSTALLED,
-    -> HarnessStatusTone.SUCCESS
+    HarnessModelLifecycle.DOWNLOADING,
+    HarnessModelLifecycle.INSTALLING,
+    HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
+    -> HarnessStatusTone.INFO
 
     HarnessModelLifecycle.DEGRADED,
     HarnessModelLifecycle.FAILED,
     HarnessModelLifecycle.INCOMPATIBLE,
     -> HarnessStatusTone.WARNING
 
-    HarnessModelLifecycle.DOWNLOADING,
-    HarnessModelLifecycle.INSTALLING,
-    HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
-    -> HarnessStatusTone.INFO
-
+    HarnessModelLifecycle.INSTALLED,
     HarnessModelLifecycle.READY_TO_DOWNLOAD,
     HarnessModelLifecycle.CANCELLED,
     -> HarnessStatusTone.NEUTRAL
