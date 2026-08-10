@@ -49,11 +49,7 @@ data class BackendContextConfiguration(val contextSize: Int) {
     }
 }
 
-data class BackendReasoningControl(
-    val maxReasoningTokens: Int,
-    val closeMarker: String,
-    val forcedCloseText: String,
-) {
+data class BackendReasoningControl(val maxReasoningTokens: Int, val closeMarker: String, val forcedCloseText: String) {
     init {
         require(maxReasoningTokens > 0) { "Reasoning token budget must be positive" }
         require(closeMarker.isNotBlank()) { "Reasoning close marker must not be blank" }
