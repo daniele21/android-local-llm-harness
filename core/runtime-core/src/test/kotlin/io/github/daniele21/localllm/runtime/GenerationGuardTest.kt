@@ -17,7 +17,7 @@ class GenerationGuardTest {
     }
 
     @Test
-    fun `native controlled transition disables hard thinking budget only`() {
+    fun `native controlled transition owns reasoning termination`() {
         val guard = GenerationGuard(
             thinkingMode = ThinkingMode.ENABLED,
             policy = policy(thinkingBudget = 8, activation = 4),
@@ -26,7 +26,7 @@ class GenerationGuardTest {
 
         assertNull(guard.observe("still reasoning beyond the budget", 20))
         val repeated = "loop pattern with enough entropy "
-        assertEquals(StopReason.GENERATION_GUARD_REPETITION, guard.observe(repeated.repeat(4), 24))
+        assertNull(guard.observe(repeated.repeat(4), 24))
     }
 
     @Test
