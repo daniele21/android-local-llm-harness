@@ -75,6 +75,11 @@ data class GenerationGuardPolicy(
     }
 }
 
+enum class ReasoningStreamProtocol {
+    NONE,
+    QWEN35_THINK_TAGS,
+}
+
 data class GgufModelProfile(
     val id: String,
     val artifact: GgufArtifact,
@@ -106,6 +111,7 @@ data class GenerationDefaults(
     val repeatPenalty: Float = DEFAULT_REPEAT_PENALTY,
     val repeatLastN: Int = DEFAULT_REPEAT_LAST_N,
     val guardPolicy: GenerationGuardPolicy = GenerationGuardPolicy.disabled(),
+    val reasoningStreamProtocol: ReasoningStreamProtocol = ReasoningStreamProtocol.NONE,
 ) {
     init {
         require(maxOutputTokens > 0) { "Maximum output tokens must be positive" }
