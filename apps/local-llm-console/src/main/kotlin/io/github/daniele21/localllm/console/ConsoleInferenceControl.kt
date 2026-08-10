@@ -60,7 +60,6 @@ data class ConsoleInferenceMetrics(
     val queueMs: Long?,
     val modelLoadMs: Long?,
     val timeToFirstTokenMs: Long?,
-    val timeToFirstAnswerMs: Long? = null,
     val prefillMs: Long?,
     val decodeMs: Long?,
     val totalMs: Long?,
@@ -68,6 +67,7 @@ data class ConsoleInferenceMetrics(
     val outputTokens: Int?,
     val decodeTokensPerSecond: Double?,
     val modelLoadKind: String,
+    val timeToFirstAnswerMs: Long? = null,
 )
 
 data class ConsoleInferenceState(
