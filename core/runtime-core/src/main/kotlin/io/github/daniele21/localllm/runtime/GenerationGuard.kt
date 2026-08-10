@@ -4,7 +4,12 @@ import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.GenerationGuardPolicy
 
-internal class GenerationGuard(private val thinkingMode: ThinkingMode, private val policy: GenerationGuardPolicy) {
+internal class GenerationGuard(
+    private val thinkingMode: ThinkingMode,
+    private val policy: GenerationGuardPolicy,
+    private val thinkingCloseMarker: String? = DEFAULT_THINKING_CLOSE,
+    private val enforceThinkingBudget: Boolean = true,
+) {
     private val observation = StringBuilder()
     private var thinkingClosed = false
 
@@ -12,12 +17,13 @@ internal class GenerationGuard(private val thinkingMode: ThinkingMode, private v
         if (!isActive()) return null
         appendBounded(text)
         return when {
-            THINKING_CLOSE in observation -> {
+            thinkingCloseMarker?.let { it in observation } == true -> {
                 thinkingClosed = true
                 null
             }
 
-            generatedTokens >= policy.thinkingTokenBudget -> StopReason.GENERATION_GUARD_THINKING_BUDGET
+            enforceThinkingBudget && generatedTokens >= policy.thinkingTokenBudget ->
+                StopReason.GENERATION_GUARD_THINKING_BUDGET
 
             generatedTokens >= policy.repetitionActivationTokens && repeatedSuffix() ->
                 StopReason.GENERATION_GUARD_REPETITION
@@ -50,7 +56,7 @@ internal class GenerationGuard(private val thinkingMode: ThinkingMode, private v
     }
 
     private companion object {
-        const val THINKING_CLOSE = "</think>"
+        const val DEFAULT_THINKING_CLOSE = "</think>"
         const val MIN_PATTERN_DIVERSITY = 4
         val WHITESPACE = Regex("\\s+")
     }
