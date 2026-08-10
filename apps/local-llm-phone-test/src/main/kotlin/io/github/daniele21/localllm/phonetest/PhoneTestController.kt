@@ -65,13 +65,22 @@ internal class PhoneTestController(
 
     fun selectInstalledModel(model: ImportedPhoneModel) {
         runExclusive {
-            progress("Verifying installed model before Playground selection")
+            progress("Verifying installed model before loading")
             verifyStoredModelForSelection(modelStore, model.digest)
+            progress("Loading ${model.fileName} into memory")
+            try {
+                val harness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
+                val prepared = harness.runtime.prepare(harness.applicationId, harness.useCaseId)
+                check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
 
-            persist(model)
-            currentModel = model
-            post { listener.onModelChanged(model) }
-            progress("${model.fileName} selected for Playground; runtime loads on first inference")
+                persist(model)
+                currentModel = model
+                post { listener.onModelChanged(model) }
+                progress("${model.fileName} loaded and ready for Playground")
+            } catch (error: Throwable) {
+                runtimeGraph.releaseModel(model.digest)
+                throw error
+            }
         }
     }
 
