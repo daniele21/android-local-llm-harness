@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,16 +94,23 @@ internal fun ActiveModelCard(
             }
             HarnessStatusBadge("LOADED", HarnessStatusTone.SUCCESS)
         }
-        Text(
-            text = "Loaded in memory · ready for Playground",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        HarnessSecondaryButton(
-            text = "Unload model",
-            enabled = !state.busy,
-            onClick = actions.unloadLoaded,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Loaded in memory · ready for Playground",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                enabled = !state.busy,
+                onClick = actions.unloadLoaded,
+            ) {
+                Text("Unload")
+            }
+        }
     }
 }
 
