@@ -38,7 +38,7 @@ object Qwen35GenerationGuardPolicies {
 }
 
 object Qwen35GenerationProfiles {
-    const val VERSION = 2
+    const val VERSION = 3
 
     fun forTier(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> {
         val qualityTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 768
@@ -77,6 +77,7 @@ object Qwen35GenerationProfiles {
             repeatPenalty = 1f,
             repeatLastN = 64,
             guardPolicy = Qwen35GenerationGuardPolicies.forTier(tier),
+            reasoningStreamProtocol = ReasoningStreamProtocol.QWEN35_THINK_TAGS,
         ),
     )
 }
