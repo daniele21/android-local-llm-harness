@@ -37,6 +37,16 @@ class ReasoningStreamParserTest {
     }
 
     @Test
+    fun `Qwen transition newlines are removed from the final answer across chunks`() {
+        val parser = qwenParser()
+
+        val all = parser.accept("reasoning</think>\n") + parser.accept("\nfinal answer") + parser.finish()
+
+        assertEquals("reasoning", all.filter { it.contentType == GenerationContentType.REASONING }.joinToString("") { it.text })
+        assertEquals("final answer", all.filter { it.contentType == GenerationContentType.ANSWER }.joinToString("") { it.text })
+    }
+
+    @Test
     fun `closing marker can be split at every boundary`() {
         val marker = "</think>"
         for (boundary in 1 until marker.length) {
