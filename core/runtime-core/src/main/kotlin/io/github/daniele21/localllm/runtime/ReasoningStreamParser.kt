@@ -15,10 +15,7 @@ internal data class ParsedGenerationChunk(val contentType: GenerationContentType
  * split across arbitrary native streaming chunks, so a short suffix is retained until it can
  * be classified safely.
  */
-internal class ReasoningStreamParser(
-    thinkingMode: ThinkingMode,
-    private val protocol: ReasoningStreamProtocol,
-) {
+internal class ReasoningStreamParser(thinkingMode: ThinkingMode, private val protocol: ReasoningStreamProtocol) {
     private var state =
         if (thinkingMode == ThinkingMode.ENABLED && protocol == ReasoningStreamProtocol.QWEN35_THINK_TAGS) {
             GenerationContentType.REASONING
@@ -97,6 +94,7 @@ internal class ReasoningStreamParser(
         while (start < text.length && answerPrefixNewlinesToStrip > 0) {
             when (text[start]) {
                 '\r' -> start += 1
+
                 '\n' -> {
                     start += 1
                     answerPrefixNewlinesToStrip -= 1
@@ -118,6 +116,7 @@ internal class ReasoningStreamParser(
         val closingIndex = value.indexOf(CLOSE_THINK)
         return when {
             openingIndex < 0 && closingIndex < 0 -> null
+
             openingIndex >= 0 && (closingIndex < 0 || openingIndex < closingIndex) ->
                 MarkerMatch(openingIndex, OPEN_THINK)
 
