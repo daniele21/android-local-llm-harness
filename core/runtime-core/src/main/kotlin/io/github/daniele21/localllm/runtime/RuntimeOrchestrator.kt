@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ChatTemplateSource
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
 import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationInput
@@ -351,12 +352,35 @@ class RuntimeOrchestrator(
             lifecycle.emit(GenerationEvent.Prepared(request.requestId, session.model.digest, effective))
 
             val firstTokenAt = AtomicLong(0)
-            val output = StringBuilder()
+            val firstAnswerAt = AtomicLong(0)
+            val rawOutput = StringBuilder()
+            val reasoningOutput = StringBuilder()
+            val answerOutput = StringBuilder()
+            val streamProtocol = (resolved.preset?.generation ?: session.resolved.useCase.generationDefaults).reasoningStreamProtocol
+            val streamParser = ReasoningStreamParser(resolved.thinkingMode, streamProtocol)
+            var lastGeneratedTokens = 0
             state.set(RuntimeState.GENERATING)
             runtimeTelemetry.started(request.requestId)
             lifecycle.emit(GenerationEvent.Started(request.requestId, session.model.digest))
             val generationGuard = GenerationGuard(resolved.thinkingMode, resolved.guardPolicy)
             val guardStopReason = AtomicReference<StopReason?>(null)
+            val emitParsedChunk: (ParsedGenerationChunk, Int) -> Unit = { parsed, generatedTokens ->
+                when (parsed.contentType) {
+                    GenerationContentType.REASONING -> reasoningOutput.append(parsed.text)
+                    GenerationContentType.ANSWER -> {
+                        answerOutput.append(parsed.text)
+                        firstAnswerAt.compareAndSet(0, clock.nowNanos())
+                    }
+                }
+                lifecycle.emit(
+                    GenerationEvent.TextDelta(
+                        requestId = request.requestId,
+                        text = parsed.text,
+                        generatedTokens = generatedTokens,
+                        contentType = parsed.contentType,
+                    ),
+                )
+            }
             val backendRequest = BackendGenerationRequest(
                 requestId = request.requestId.value,
                 prompt = promptPlan.prompt,
@@ -379,18 +403,16 @@ class RuntimeOrchestrator(
                     false
                 } else {
                     firstTokenAt.compareAndSet(0, clock.nowNanos())
-                    output.append(text)
-                    lifecycle.emit(
-                        GenerationEvent.TextDelta(
-                            requestId = request.requestId,
-                            text = text,
-                            generatedTokens = generatedTokens,
-                        ),
-                    )
+                    lastGeneratedTokens = generatedTokens
+                    rawOutput.append(text)
+                    streamParser.accept(text).forEach { emitParsedChunk(it, generatedTokens) }
                     val guardReason = generationGuard.observe(text, generatedTokens)
                     if (guardReason != null) guardStopReason.compareAndSet(null, guardReason)
                     guardReason == null && !lifecycle.cancelRequested.get()
                 }
+            }
+            if (!lifecycle.cancelRequested.get()) {
+                streamParser.finish().forEach { emitParsedChunk(it, lastGeneratedTokens) }
             }
 
             val guardReason = guardStopReason.get()
@@ -403,11 +425,14 @@ class RuntimeOrchestrator(
                     request = request,
                     session = session,
                     lifecycle = lifecycle,
-                    output = output.toString(),
+                    output = rawOutput.toString(),
+                    reasoningOutput = reasoningOutput.toString(),
+                    answerOutput = answerOutput.toString(),
                     backendMetrics = outcome.metrics().copy(stopReason = guardReason),
                     executionStartedAt = executionStartedAt,
                     enqueuedAt = enqueuedAt,
                     firstTokenAt = firstTokenAt,
+                    firstAnswerAt = firstAnswerAt,
                     promptPlanningMs = promptPlanningMs,
                     contextCreationMs = contextResult.creationMs,
                 )
@@ -420,11 +445,14 @@ class RuntimeOrchestrator(
                     request = request,
                     session = session,
                     lifecycle = lifecycle,
-                    output = output.toString(),
+                    output = rawOutput.toString(),
+                    reasoningOutput = reasoningOutput.toString(),
+                    answerOutput = answerOutput.toString(),
                     backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics,
                     executionStartedAt = executionStartedAt,
                     enqueuedAt = enqueuedAt,
                     firstTokenAt = firstTokenAt,
+                    firstAnswerAt = firstAnswerAt,
                     promptPlanningMs = promptPlanningMs,
                     contextCreationMs = contextResult.creationMs,
                 )
@@ -769,10 +797,13 @@ class RuntimeOrchestrator(
         session: SessionDescriptor,
         lifecycle: RequestLifecycle,
         output: String,
+        reasoningOutput: String,
+        answerOutput: String,
         backendMetrics: BackendGenerationMetrics,
         executionStartedAt: Long,
         enqueuedAt: Long,
         firstTokenAt: AtomicLong,
+        firstAnswerAt: AtomicLong,
         promptPlanningMs: Long,
         contextCreationMs: Long?,
     ) {
@@ -781,6 +812,8 @@ class RuntimeOrchestrator(
             modelLoadMs = session.modelLoadDurationMs,
             modelLoadKind = session.modelLoadKind,
             timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
+                ?.let { nanosToMillis(it - executionStartedAt) },
+            timeToFirstAnswerMs = firstAnswerAt.get().takeIf { it != 0L }
                 ?.let { nanosToMillis(it - executionStartedAt) },
             totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
             promptPlanningMs = promptPlanningMs,
@@ -792,6 +825,8 @@ class RuntimeOrchestrator(
                 requestId = request.requestId,
                 output = output,
                 metrics = publicMetrics,
+                reasoningOutput = reasoningOutput,
+                answerOutput = answerOutput,
             ),
         )
     }
@@ -872,6 +907,7 @@ class RuntimeOrchestrator(
         modelLoadMs: Long?,
         modelLoadKind: ModelLoadKind,
         timeToFirstTokenMs: Long?,
+        timeToFirstAnswerMs: Long?,
         totalMs: Long,
         promptPlanningMs: Long,
         contextCreationMs: Long?,
@@ -893,6 +929,7 @@ class RuntimeOrchestrator(
         stopReason = stopReason,
         promptPlanningMs = promptPlanningMs,
         contextCreationMs = contextCreationMs,
+        timeToFirstAnswerMs = timeToFirstAnswerMs,
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
