@@ -219,14 +219,16 @@ class LocalLlmConsoleInferenceControl(
         } else {
             state.answerOutput
         }
+        val reasoningTruncated = contentType == GenerationContentType.REASONING &&
+            reasoning.length < state.reasoningOutput.length + text.length
+        val answerTruncated = contentType == GenerationContentType.ANSWER &&
+            answer.length < state.answerOutput.length + text.length
         return state.copy(
             phase = ConsoleInferencePhase.GENERATING,
             output = state.output + appended,
             reasoningOutput = reasoning,
             answerOutput = answer,
-            outputTruncated = state.outputTruncated || appended.length < text.length ||
-                reasoning.length < state.reasoningOutput.length + if (contentType == GenerationContentType.REASONING) text.length else 0 ||
-                answer.length < state.answerOutput.length + if (contentType == GenerationContentType.ANSWER) text.length else 0,
+            outputTruncated = state.outputTruncated || appended.length < text.length || reasoningTruncated || answerTruncated,
             generatedTokens = generatedTokens,
             detail = if (contentType == GenerationContentType.REASONING && state.answerOutput.isEmpty()) {
                 "Model is reasoning"
