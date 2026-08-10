@@ -69,7 +69,7 @@ class RuntimeReasoningIntegrationTest {
 
             val completed = events.last() as GenerationEvent.Completed
             assertEquals("analysis", completed.reasoningOutput)
-            assertEquals("\n\nfinal answer", completed.answerOutput)
+            assertEquals("final answer", completed.answerOutput)
             assertEquals("analysis</think>\n\nfinal answer", completed.output)
             assertEquals(4, completed.metrics.reasoningTokens)
             assertEquals(3, completed.metrics.answerTokens)
