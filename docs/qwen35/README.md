@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: qwen35
 Canonical scope: qwen35.routing
 Read when: locating the current Qwen3.5-only product status, next implementation gate or owning specification
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-10
 
 This is the single entry point for the Qwen3.5-only product work. Start here, then open only the document that owns the question.
 
@@ -49,6 +49,7 @@ The immediate gate is **Q35-6 physical Android tuning evidence**. Repository-sid
 | Closed catalog and removal of generic/import paths | [`workstreams/curated-model-baseline.md`](workstreams/curated-model-baseline.md) |
 | Exact artifact and backend compatibility | [`workstreams/model-compatibility.md`](workstreams/model-compatibility.md) |
 | Thinking, chat-template kwargs, sampling and generation guard | [`workstreams/generation-thinking.md`](workstreams/generation-thinking.md) |
+| Reasoning/answer stream separation and controlled close behavior | [`../qwen-reasoning-output-separation.md`](../qwen-reasoning-output-separation.md) |
 | Context, recurrent state, cache policy and Android tuning | [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md) |
 | Golden tests, device evidence and certification | [`workstreams/validation-certification.md`](workstreams/validation-certification.md) |
 
