@@ -50,6 +50,11 @@ data class GenerationOverrides(
     fun requestedSeedPolicy(): SeedPolicy? = seedPolicy ?: seed?.let(SeedPolicy::Fixed)
 }
 
+enum class GenerationContentType {
+    REASONING,
+    ANSWER,
+}
+
 sealed interface GenerationEvent {
     val requestId: RequestId
 
@@ -60,9 +65,20 @@ sealed interface GenerationEvent {
     data class Prepared(override val requestId: RequestId, val modelDigest: ModelDigest, val configuration: EffectiveGenerationMetadata) :
         GenerationEvent
 
-    data class TextDelta(override val requestId: RequestId, val text: String, val generatedTokens: Int) : GenerationEvent
+    data class TextDelta(
+        override val requestId: RequestId,
+        val text: String,
+        val generatedTokens: Int,
+        val contentType: GenerationContentType = GenerationContentType.ANSWER,
+    ) : GenerationEvent
 
-    data class Completed(override val requestId: RequestId, val output: String, val metrics: GenerationMetrics) : GenerationEvent
+    data class Completed(
+        override val requestId: RequestId,
+        val output: String,
+        val metrics: GenerationMetrics,
+        val reasoningOutput: String = "",
+        val answerOutput: String = output,
+    ) : GenerationEvent
 
     data class Failed(override val requestId: RequestId, val error: LocalLlmError) : GenerationEvent
 }
@@ -81,6 +97,9 @@ data class GenerationMetrics(
     val stopReason: StopReason = StopReason.UNKNOWN,
     val promptPlanningMs: Long? = null,
     val contextCreationMs: Long? = null,
+    val timeToFirstAnswerMs: Long? = null,
+    val reasoningTokens: Int? = null,
+    val answerTokens: Int? = null,
 )
 
 enum class ModelLoadKind {
