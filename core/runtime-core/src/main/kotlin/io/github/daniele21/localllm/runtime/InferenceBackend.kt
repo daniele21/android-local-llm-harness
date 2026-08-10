@@ -21,7 +21,11 @@ interface BackendContextHandle {
     val contextSize: Int
 }
 
-data class BackendModelCapabilities(val maximumContextTokens: Int, val supportsGrammar: Boolean)
+data class BackendModelCapabilities(
+    val maximumContextTokens: Int,
+    val supportsGrammar: Boolean,
+    val supportsReasoningTransition: Boolean = false,
+)
 
 data class BackendPromptPlanningRequest(
     val input: GenerationInput,
@@ -45,6 +49,19 @@ data class BackendContextConfiguration(val contextSize: Int) {
     }
 }
 
+data class BackendReasoningControl(
+    val maxReasoningTokens: Int,
+    val closeMarker: String,
+    val forcedCloseText: String,
+) {
+    init {
+        require(maxReasoningTokens > 0) { "Reasoning token budget must be positive" }
+        require(closeMarker.isNotBlank()) { "Reasoning close marker must not be blank" }
+        require(forcedCloseText.isNotBlank()) { "Forced reasoning close text must not be blank" }
+        require(closeMarker in forcedCloseText) { "Forced reasoning close text must contain the close marker" }
+    }
+}
+
 data class BackendGenerationRequest(
     val requestId: String,
     val prompt: String,
@@ -60,6 +77,7 @@ data class BackendGenerationRequest(
     val outputConstraint: OutputConstraint = OutputConstraint.Text,
     val stopTokenIds: Set<Int> = emptySet(),
     val stopSequences: List<String> = emptyList(),
+    val reasoningControl: BackendReasoningControl? = null,
 )
 
 data class BackendGenerationMetrics(
@@ -68,6 +86,8 @@ data class BackendGenerationMetrics(
     val promptDurationMs: Long,
     val generationDurationMs: Long,
     val stopReason: StopReason = StopReason.UNKNOWN,
+    val reasoningTokens: Int? = null,
+    val answerTokens: Int? = null,
 )
 
 sealed interface BackendGenerationOutcome {
