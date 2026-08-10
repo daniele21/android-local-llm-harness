@@ -4,10 +4,7 @@ import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.ReasoningStreamProtocol
 
-internal data class ParsedGenerationChunk(
-    val contentType: GenerationContentType,
-    val text: String,
-)
+internal data class ParsedGenerationChunk(val contentType: GenerationContentType, val text: String)
 
 /**
  * Splits model output into reasoning and answer channels without relying on UI-side regexes.
@@ -22,11 +19,12 @@ internal class ReasoningStreamParser(
     thinkingMode: ThinkingMode,
     private val protocol: ReasoningStreamProtocol,
 ) {
-    private var state = if (thinkingMode == ThinkingMode.ENABLED && protocol == ReasoningStreamProtocol.QWEN35_THINK_TAGS) {
-        GenerationContentType.REASONING
-    } else {
-        GenerationContentType.ANSWER
-    }
+    private var state =
+        if (thinkingMode == ThinkingMode.ENABLED && protocol == ReasoningStreamProtocol.QWEN35_THINK_TAGS) {
+            GenerationContentType.REASONING
+        } else {
+            GenerationContentType.ANSWER
+        }
     private var pending = ""
     private var reasoningClosed = state == GenerationContentType.ANSWER
     private var answerPrefixNewlinesToStrip = 0
@@ -43,11 +41,12 @@ internal class ReasoningStreamParser(
 
     fun finish(): List<ParsedGenerationChunk> {
         if (pending.isEmpty()) return emptyList()
-        val tail = if (state == GenerationContentType.ANSWER) {
-            answerChunks(pending)
-        } else {
-            listOf(ParsedGenerationChunk(state, pending))
-        }
+        val tail =
+            if (state == GenerationContentType.ANSWER) {
+                answerChunks(pending)
+            } else {
+                listOf(ParsedGenerationChunk(state, pending))
+            }
         pending = ""
         return tail
     }
@@ -60,7 +59,10 @@ internal class ReasoningStreamParser(
             val marker = nextCompleteMarker(pending)
             if (marker != null) {
                 if (marker.index > 0) {
-                    parsed += ParsedGenerationChunk(GenerationContentType.REASONING, pending.substring(0, marker.index))
+                    parsed += ParsedGenerationChunk(
+                        GenerationContentType.REASONING,
+                        pending.substring(0, marker.index),
+                    )
                 }
                 pending = pending.substring(marker.index + marker.value.length)
                 if (marker.value == CLOSE_THINK) {
@@ -78,7 +80,10 @@ internal class ReasoningStreamParser(
             val heldCharacters = longestPossibleMarkerPrefixSuffix(pending)
             val safeLength = pending.length - heldCharacters
             if (safeLength > 0) {
-                parsed += ParsedGenerationChunk(GenerationContentType.REASONING, pending.substring(0, safeLength))
+                parsed += ParsedGenerationChunk(
+                    GenerationContentType.REASONING,
+                    pending.substring(0, safeLength),
+                )
                 pending = pending.substring(safeLength)
             }
             break
@@ -96,6 +101,7 @@ internal class ReasoningStreamParser(
                     start += 1
                     answerPrefixNewlinesToStrip -= 1
                 }
+
                 else -> break
             }
         }
@@ -112,7 +118,9 @@ internal class ReasoningStreamParser(
         val closingIndex = value.indexOf(CLOSE_THINK)
         return when {
             openingIndex < 0 && closingIndex < 0 -> null
-            openingIndex >= 0 && (closingIndex < 0 || openingIndex < closingIndex) -> MarkerMatch(openingIndex, OPEN_THINK)
+            openingIndex >= 0 && (closingIndex < 0 || openingIndex < closingIndex) ->
+                MarkerMatch(openingIndex, OPEN_THINK)
+
             else -> MarkerMatch(closingIndex, CLOSE_THINK)
         }
     }
