@@ -54,9 +54,11 @@ data class GenerationGuardPolicy(
     val minPatternChars: Int = 0,
     val maxPatternChars: Int = 0,
     val repetitionOccurrences: Int = 0,
+    val answerReserveTokens: Int = 0,
 ) {
     init {
         require(version > 0) { "Generation guard version must be positive" }
+        require(answerReserveTokens >= 0) { "Answer reserve must not be negative" }
         if (enabled) {
             require(thinkingTokenBudget > 0) { "Thinking token budget must be positive" }
             require(repetitionActivationTokens > 0) { "Repetition activation threshold must be positive" }
@@ -75,9 +77,12 @@ data class GenerationGuardPolicy(
     }
 }
 
-enum class ReasoningStreamProtocol {
-    NONE,
-    QWEN35_THINK_TAGS,
+enum class ReasoningStreamProtocol(
+    val closeMarker: String?,
+    val forcedCloseText: String?,
+) {
+    NONE(null, null),
+    QWEN35_THINK_TAGS(closeMarker = "</think>", forcedCloseText = "</think>\n\n"),
 }
 
 data class GgufModelProfile(
@@ -173,7 +178,7 @@ data class ContextPreference(val preferredTokens: Int? = null, val recommendedMa
             "Preferred context tokens must not exceed the maximum"
         }
         require(recommendedMaximumTokens == null || maximumTokens == null || recommendedMaximumTokens <= maximumTokens) {
-            "Recommended maximum context tokens must not exceed the hard maximum"
+            "Recommended maximum tokens must not exceed the hard maximum"
         }
     }
 }
