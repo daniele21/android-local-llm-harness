@@ -77,10 +77,7 @@ data class GenerationGuardPolicy(
     }
 }
 
-enum class ReasoningStreamProtocol(
-    val closeMarker: String?,
-    val forcedCloseText: String?,
-) {
+enum class ReasoningStreamProtocol(val closeMarker: String?, val forcedCloseText: String?) {
     NONE(null, null),
     QWEN35_THINK_TAGS(closeMarker = "</think>", forcedCloseText = "</think>\n\n"),
 }
