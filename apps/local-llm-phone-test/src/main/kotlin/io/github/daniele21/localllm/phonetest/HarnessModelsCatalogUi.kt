@@ -249,6 +249,7 @@ internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean 
 
 internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
     HarnessModelLifecycle.LOADED -> HarnessStatusTone.SUCCESS
+
     HarnessModelLifecycle.SELECTED,
     HarnessModelLifecycle.DOWNLOADING,
     HarnessModelLifecycle.INSTALLING,
