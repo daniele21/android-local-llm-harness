@@ -213,8 +213,7 @@ private class ReasoningBackend : InferenceBackend {
         supportsReasoningTransition = true,
     )
 
-    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan =
-        fakePromptPlan(request)
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan = fakePromptPlan(request)
 
     override fun createContext(
         model: BackendModelHandle,
