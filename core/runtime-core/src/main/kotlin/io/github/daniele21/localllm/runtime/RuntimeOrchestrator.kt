@@ -869,7 +869,7 @@ class RuntimeOrchestrator(
                 ?.let { nanosToMillis(it - executionStartedAt) },
             totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
             promptPlanningMs = promptPlanningMs,
-            contextCreationMs = contextResult.creationMs,
+            contextCreationMs = contextCreationMs,
         )
         runtimeTelemetry.completed(request.requestId, publicMetrics)
         lifecycle.finish(
