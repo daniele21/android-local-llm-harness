@@ -54,38 +54,44 @@ internal class ReasoningStreamParser(thinkingMode: ThinkingMode, private val pro
         val parsed = mutableListOf<ParsedGenerationChunk>()
         while (pending.isNotEmpty() && state == GenerationContentType.REASONING) {
             val marker = nextCompleteMarker(pending)
-            if (marker != null) {
-                if (marker.index > 0) {
-                    parsed += ParsedGenerationChunk(
-                        GenerationContentType.REASONING,
-                        pending.substring(0, marker.index),
-                    )
-                }
-                pending = pending.substring(marker.index + marker.value.length)
-                if (marker.value == CLOSE_THINK) {
-                    state = GenerationContentType.ANSWER
-                    reasoningClosed = true
-                    answerPrefixNewlinesToStrip = QWEN_ANSWER_PREFIX_NEWLINES
-                    if (pending.isNotEmpty()) {
-                        parsed += answerChunks(pending)
-                        pending = ""
-                    }
-                }
-                continue
+            if (marker == null) {
+                emitSafeReasoningPrefix(parsed)
+                return parsed
             }
-
-            val heldCharacters = longestPossibleMarkerPrefixSuffix(pending)
-            val safeLength = pending.length - heldCharacters
-            if (safeLength > 0) {
-                parsed += ParsedGenerationChunk(
-                    GenerationContentType.REASONING,
-                    pending.substring(0, safeLength),
-                )
-                pending = pending.substring(safeLength)
-            }
-            break
+            if (consumeMarker(marker, parsed)) return parsed
         }
         return parsed
+    }
+
+    private fun consumeMarker(marker: MarkerMatch, parsed: MutableList<ParsedGenerationChunk>): Boolean {
+        if (marker.index > 0) {
+            parsed += ParsedGenerationChunk(
+                GenerationContentType.REASONING,
+                pending.substring(0, marker.index),
+            )
+        }
+        pending = pending.substring(marker.index + marker.value.length)
+        if (marker.value != CLOSE_THINK) return false
+
+        state = GenerationContentType.ANSWER
+        reasoningClosed = true
+        answerPrefixNewlinesToStrip = QWEN_ANSWER_PREFIX_NEWLINES
+        if (pending.isNotEmpty()) {
+            parsed += answerChunks(pending)
+            pending = ""
+        }
+        return true
+    }
+
+    private fun emitSafeReasoningPrefix(parsed: MutableList<ParsedGenerationChunk>) {
+        val heldCharacters = longestPossibleMarkerPrefixSuffix(pending)
+        val safeLength = pending.length - heldCharacters
+        if (safeLength <= 0) return
+        parsed += ParsedGenerationChunk(
+            GenerationContentType.REASONING,
+            pending.substring(0, safeLength),
+        )
+        pending = pending.substring(safeLength)
     }
 
     private fun answerChunks(text: String): List<ParsedGenerationChunk> {
