@@ -17,11 +17,37 @@ class GenerationGuardTest {
     }
 
     @Test
+    fun `native controlled transition disables hard thinking budget only`() {
+        val guard = GenerationGuard(
+            thinkingMode = ThinkingMode.ENABLED,
+            policy = policy(thinkingBudget = 8, activation = 4),
+            enforceThinkingBudget = false,
+        )
+
+        assertNull(guard.observe("still reasoning beyond the budget", 20))
+        val repeated = "loop pattern with enough entropy "
+        assertEquals(StopReason.GENERATION_GUARD_REPETITION, guard.observe(repeated.repeat(4), 24))
+    }
+
+    @Test
     fun `closing thinking disables the thinking guard`() {
         val guard = GenerationGuard(ThinkingMode.ENABLED, policy(thinkingBudget = 4))
         assertNull(guard.observe("analysis </thi", 3))
         assertNull(guard.observe("nk> final answer", 8))
         assertNull(guard.observe(" continues", 40))
+    }
+
+    @Test
+    fun `custom close marker is honored across chunks`() {
+        val guard = GenerationGuard(
+            thinkingMode = ThinkingMode.ENABLED,
+            policy = policy(thinkingBudget = 4),
+            thinkingCloseMarker = "<done>",
+        )
+
+        assertNull(guard.observe("analysis <do", 3))
+        assertNull(guard.observe("ne> answer", 12))
+        assertNull(guard.observe("more answer", 100))
     }
 
     @Test
