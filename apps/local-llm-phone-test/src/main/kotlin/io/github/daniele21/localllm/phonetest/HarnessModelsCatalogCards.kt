@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -288,7 +289,7 @@ private fun InstalledLifecycleActions(
 @Composable
 private fun ActionRow(
     menu: @Composable () -> Unit,
-    primary: @Composable Row.() -> Unit,
+    primary: @Composable RowScope.() -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
