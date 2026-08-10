@@ -124,9 +124,12 @@ data class NativeGenerationConfig(
     val outputSchema: String? = null,
     val stopTokenIds: IntArray = intArrayOf(),
     val stopSequences: List<String> = emptyList(),
+    val reasoningMaxTokens: Int? = null,
+    val reasoningCloseMarker: String? = null,
+    val reasoningForcedCloseText: String? = null,
 ) {
     internal fun validationError(prompt: String): GenerationNativeError? =
-        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError()
+        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError() ?: reasoningValidationError()
 
     private fun baseValidationError(prompt: String): GenerationNativeError? = when {
         prompt.isBlank() -> invalid("Prompt must not be blank")
@@ -154,12 +157,28 @@ data class NativeGenerationConfig(
         else -> null
     }
 
+    private fun reasoningValidationError(): GenerationNativeError? {
+        val valuesPresent = listOf(reasoningMaxTokens, reasoningCloseMarker, reasoningForcedCloseText).count { it != null }
+        return when {
+            valuesPresent == 0 -> null
+            valuesPresent != REASONING_FIELD_COUNT -> invalid("Reasoning transition configuration must be complete")
+            reasoningMaxTokens !in 1 until maxOutputTokens ->
+                invalid("Reasoning token budget must leave output capacity for the final answer")
+            reasoningCloseMarker.isNullOrBlank() -> invalid("Reasoning close marker must not be blank")
+            reasoningForcedCloseText.isNullOrBlank() -> invalid("Forced reasoning close text must not be blank")
+            reasoningCloseMarker !in reasoningForcedCloseText ->
+                invalid("Forced reasoning close text must contain the close marker")
+            else -> null
+        }
+    }
+
     private fun invalid(message: String): GenerationNativeError = GenerationNativeError(
         code = GenerationNativeErrorCode.INVALID_ARGUMENT,
         message = message,
     )
 
     private companion object {
+        const val REASONING_FIELD_COUNT = 3
         val OUTPUT_CONSTRAINT_TYPES = setOf("TEXT", "JSON", "JSON_SCHEMA")
     }
 }
