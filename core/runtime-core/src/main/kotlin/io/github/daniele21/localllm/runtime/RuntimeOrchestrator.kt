@@ -29,11 +29,11 @@ import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ContextPreference
-import io.github.daniele21.localllm.models.GenerationDefaults
 import io.github.daniele21.localllm.models.GenerationGuardPolicy
 import io.github.daniele21.localllm.models.InferencePreset
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.models.ReasoningStreamProtocol
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRepository
@@ -357,19 +357,33 @@ class RuntimeOrchestrator(
             val reasoningOutput = StringBuilder()
             val answerOutput = StringBuilder()
             val streamProtocol = (resolved.preset?.generation ?: session.resolved.useCase.generationDefaults).reasoningStreamProtocol
+            val reasoningControl = resolveReasoningControl(
+                thinkingMode = resolved.thinkingMode,
+                guardPolicy = resolved.guardPolicy,
+                streamProtocol = streamProtocol,
+                maxOutputTokens = resolved.maxOutputTokens,
+                capabilities = capabilities,
+            )
             val streamParser = ReasoningStreamParser(resolved.thinkingMode, streamProtocol)
             var lastGeneratedTokens = 0
             state.set(RuntimeState.GENERATING)
             runtimeTelemetry.started(request.requestId)
             lifecycle.emit(GenerationEvent.Started(request.requestId, session.model.digest))
-            val generationGuard = GenerationGuard(resolved.thinkingMode, resolved.guardPolicy)
+            val generationGuard = GenerationGuard(
+                thinkingMode = resolved.thinkingMode,
+                policy = resolved.guardPolicy,
+                thinkingCloseMarker = streamProtocol.closeMarker,
+                enforceThinkingBudget = reasoningControl == null,
+            )
             val guardStopReason = AtomicReference<StopReason?>(null)
             val emitParsedChunk: (ParsedGenerationChunk, Int) -> Unit = { parsed, generatedTokens ->
                 when (parsed.contentType) {
                     GenerationContentType.REASONING -> reasoningOutput.append(parsed.text)
                     GenerationContentType.ANSWER -> {
                         answerOutput.append(parsed.text)
-                        firstAnswerAt.compareAndSet(0, clock.nowNanos())
+                        if (parsed.text.isNotBlank()) {
+                            firstAnswerAt.compareAndSet(0, clock.nowNanos())
+                        }
                     }
                 }
                 lifecycle.emit(
@@ -396,6 +410,7 @@ class RuntimeOrchestrator(
                 outputConstraint = request.outputConstraint,
                 stopTokenIds = promptPlan.stopTokenIds,
                 stopSequences = promptPlan.stopSequences,
+                reasoningControl = reasoningControl,
             )
             lifecycle.ensureNotCancelled()
             val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->
@@ -589,6 +604,42 @@ class RuntimeOrchestrator(
             repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY &&
             repeatLastN in 0..MAX_REPEAT_LAST_N &&
             (repeatPenalty == MIN_REPEAT_PENALTY || repeatLastN != 0)
+
+    private fun resolveReasoningControl(
+        thinkingMode: ThinkingMode,
+        guardPolicy: GenerationGuardPolicy,
+        streamProtocol: ReasoningStreamProtocol,
+        maxOutputTokens: Int,
+        capabilities: BackendModelCapabilities,
+    ): BackendReasoningControl? {
+        if (thinkingMode != ThinkingMode.ENABLED ||
+            !guardPolicy.enabled ||
+            !capabilities.supportsReasoningTransition
+        ) {
+            return null
+        }
+        val closeMarker = streamProtocol.closeMarker ?: return null
+        val forcedCloseText = streamProtocol.forcedCloseText ?: return null
+        if (maxOutputTokens < MIN_CONTROLLED_THINKING_OUTPUT_TOKENS) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking mode requires at least $MIN_CONTROLLED_THINKING_OUTPUT_TOKENS output tokens",
+            )
+        }
+        val answerReserve = minOf(guardPolicy.answerReserveTokens, maxOutputTokens / 2).coerceAtLeast(1)
+        val reasoningBudget = minOf(guardPolicy.thinkingTokenBudget, maxOutputTokens - answerReserve)
+        if (reasoningBudget <= 0) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking budget must leave capacity for a final answer",
+            )
+        }
+        return BackendReasoningControl(
+            maxReasoningTokens = reasoningBudget,
+            closeMarker = closeMarker,
+            forcedCloseText = forcedCloseText,
+        )
+    }
 
     private fun validateOutputConstraint(
         request: GenerationRequest,
@@ -930,6 +981,8 @@ class RuntimeOrchestrator(
         promptPlanningMs = promptPlanningMs,
         contextCreationMs = contextCreationMs,
         timeToFirstAnswerMs = timeToFirstAnswerMs,
+        reasoningTokens = reasoningTokens,
+        answerTokens = answerTokens,
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
@@ -989,6 +1042,7 @@ class RuntimeOrchestrator(
         const val MIN_REPEAT_PENALTY = 1f
         const val MAX_REPEAT_PENALTY = 2f
         const val MAX_REPEAT_LAST_N = 4_096
+        const val MIN_CONTROLLED_THINKING_OUTPUT_TOKENS = 16
     }
 }
 
