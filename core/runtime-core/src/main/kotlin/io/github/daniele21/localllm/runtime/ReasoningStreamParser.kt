@@ -29,11 +29,12 @@ internal class ReasoningStreamParser(
     }
     private var pending = ""
     private var reasoningClosed = state == GenerationContentType.ANSWER
+    private var answerPrefixNewlinesToStrip = 0
 
     fun accept(text: String): List<ParsedGenerationChunk> {
         if (text.isEmpty()) return emptyList()
         if (state == GenerationContentType.ANSWER) {
-            return listOf(ParsedGenerationChunk(GenerationContentType.ANSWER, text))
+            return answerChunks(text)
         }
 
         pending += text
@@ -42,9 +43,13 @@ internal class ReasoningStreamParser(
 
     fun finish(): List<ParsedGenerationChunk> {
         if (pending.isEmpty()) return emptyList()
-        val tail = ParsedGenerationChunk(state, pending)
+        val tail = if (state == GenerationContentType.ANSWER) {
+            answerChunks(pending)
+        } else {
+            listOf(ParsedGenerationChunk(state, pending))
+        }
         pending = ""
-        return listOf(tail)
+        return tail
     }
 
     fun hasClosedReasoning(): Boolean = reasoningClosed
@@ -61,8 +66,9 @@ internal class ReasoningStreamParser(
                 if (marker.value == CLOSE_THINK) {
                     state = GenerationContentType.ANSWER
                     reasoningClosed = true
+                    answerPrefixNewlinesToStrip = QWEN_ANSWER_PREFIX_NEWLINES
                     if (pending.isNotEmpty()) {
-                        parsed += ParsedGenerationChunk(GenerationContentType.ANSWER, pending)
+                        parsed += answerChunks(pending)
                         pending = ""
                     }
                 }
@@ -78,6 +84,27 @@ internal class ReasoningStreamParser(
             break
         }
         return parsed
+    }
+
+    private fun answerChunks(text: String): List<ParsedGenerationChunk> {
+        if (text.isEmpty()) return emptyList()
+        var start = 0
+        while (start < text.length && answerPrefixNewlinesToStrip > 0) {
+            when (text[start]) {
+                '\r' -> start += 1
+                '\n' -> {
+                    start += 1
+                    answerPrefixNewlinesToStrip -= 1
+                }
+                else -> break
+            }
+        }
+        val answer = text.substring(start)
+        if (answer.isNotEmpty()) {
+            answerPrefixNewlinesToStrip = 0
+            return listOf(ParsedGenerationChunk(GenerationContentType.ANSWER, answer))
+        }
+        return emptyList()
     }
 
     private fun nextCompleteMarker(value: String): MarkerMatch? {
@@ -106,5 +133,6 @@ internal class ReasoningStreamParser(
     private companion object {
         const val OPEN_THINK = "<think>"
         const val CLOSE_THINK = "</think>"
+        const val QWEN_ANSWER_PREFIX_NEWLINES = 2
     }
 }
