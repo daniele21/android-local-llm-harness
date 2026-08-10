@@ -1,5 +1,12 @@
 # Qwen reasoning output separation
 
+Status: active
+Document type: feature-specification
+Owner: core/runtime-core
+Canonical scope: runtime.qwen-reasoning
+Read when: changing Qwen thinking profiles, reasoning streaming, native reasoning transitions, or user-facing answer separation
+Last reviewed: 2026-08-10
+
 ## Objective
 
 Qwen3.5 thinking-capable profiles must be able to use internal reasoning without mixing that reasoning with the final answer delivered to a consumer application.
