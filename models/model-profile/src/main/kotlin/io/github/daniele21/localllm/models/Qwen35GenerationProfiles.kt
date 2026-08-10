@@ -18,14 +18,14 @@ enum class Qwen35GenerationProfileId {
 data class Qwen35GenerationProfile(val id: Qwen35GenerationProfileId, val version: Int, val defaults: GenerationDefaults)
 
 object Qwen35GenerationGuardPolicies {
-    const val VERSION = 1
+    const val VERSION = 2
 
     fun forTier(tier: Qwen35ModelTier): GenerationGuardPolicy = when (tier) {
-        Qwen35ModelTier.B0_8 -> policy(thinkingBudget = 768, activationTokens = 64)
-        Qwen35ModelTier.B2 -> policy(thinkingBudget = 1_536, activationTokens = 96)
+        Qwen35ModelTier.B0_8 -> policy(thinkingBudget = 192, answerReserve = 256, activationTokens = 64)
+        Qwen35ModelTier.B2 -> policy(thinkingBudget = 384, answerReserve = 512, activationTokens = 96)
     }
 
-    private fun policy(thinkingBudget: Int, activationTokens: Int) = GenerationGuardPolicy(
+    private fun policy(thinkingBudget: Int, answerReserve: Int, activationTokens: Int) = GenerationGuardPolicy(
         version = VERSION,
         enabled = true,
         thinkingTokenBudget = thinkingBudget,
@@ -34,6 +34,7 @@ object Qwen35GenerationGuardPolicies {
         minPatternChars = 24,
         maxPatternChars = 256,
         repetitionOccurrences = 4,
+        answerReserveTokens = answerReserve,
     )
 }
 
