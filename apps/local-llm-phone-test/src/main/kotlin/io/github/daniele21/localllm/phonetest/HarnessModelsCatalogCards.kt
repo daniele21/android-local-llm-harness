@@ -107,12 +107,7 @@ internal fun ActiveModelCard(
 }
 
 @Composable
-private fun ModelCardHeader(
-    item: HarnessModelInventoryItem,
-    model: PhoneCatalogModelUi,
-    loading: Boolean,
-    onOpenDetails: () -> Unit,
-) {
+private fun ModelCardHeader(item: HarnessModelInventoryItem, model: PhoneCatalogModelUi, loading: Boolean, onOpenDetails: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetails),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -163,6 +158,7 @@ private fun ModelLifecycleActions(
 ) {
     when (model.status) {
         PhoneCatalogModelStatus.DOWNLOADING -> DownloadingActions(model, actions, onOpenModelDetails)
+
         PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL -> ActionRow(
             menu = { ModelOverflowMenu(state, item, model, actions, onOpenModelDetails) },
         ) {
@@ -221,11 +217,7 @@ private fun ModelLifecycleActions(
 }
 
 @Composable
-private fun DownloadingActions(
-    model: PhoneCatalogModelUi,
-    actions: UnifiedModelsActions,
-    onOpenModelDetails: () -> Unit,
-) {
+private fun DownloadingActions(model: PhoneCatalogModelUi, actions: UnifiedModelsActions, onOpenModelDetails: () -> Unit) {
     val expected = model.expectedBytes.coerceAtLeast(1L)
     val progress = (model.bytesDownloaded.toDouble() / expected.toDouble()).coerceIn(0.0, 1.0)
     LinearProgressIndicator(progress = { progress.toFloat() }, modifier = Modifier.fillMaxWidth())
@@ -287,10 +279,7 @@ private fun InstalledLifecycleActions(
 }
 
 @Composable
-private fun ActionRow(
-    menu: @Composable () -> Unit,
-    primary: @Composable RowScope.() -> Unit,
-) {
+private fun ActionRow(menu: @Composable () -> Unit, primary: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -348,10 +337,7 @@ private fun ModelOverflowMenu(
 }
 
 @Composable
-private fun ModelOverflowButton(
-    onOpenDetails: () -> Unit,
-    onCancelDownload: () -> Unit,
-) {
+private fun ModelOverflowButton(onOpenDetails: () -> Unit, onCancelDownload: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
