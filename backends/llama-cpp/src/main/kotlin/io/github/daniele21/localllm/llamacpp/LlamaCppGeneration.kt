@@ -159,15 +159,20 @@ data class NativeGenerationConfig(
 
     private fun reasoningValidationError(): GenerationNativeError? {
         val valuesPresent = listOf(reasoningMaxTokens, reasoningCloseMarker, reasoningForcedCloseText).count { it != null }
+        if (valuesPresent == 0) return null
+        if (valuesPresent != REASONING_FIELD_COUNT) {
+            return invalid("Reasoning transition configuration must be complete")
+        }
+
+        val maxReasoning = requireNotNull(reasoningMaxTokens)
+        val closeMarker = requireNotNull(reasoningCloseMarker)
+        val forcedClose = requireNotNull(reasoningForcedCloseText)
         return when {
-            valuesPresent == 0 -> null
-            valuesPresent != REASONING_FIELD_COUNT -> invalid("Reasoning transition configuration must be complete")
-            reasoningMaxTokens !in 1 until maxOutputTokens ->
+            maxReasoning !in 1 until maxOutputTokens ->
                 invalid("Reasoning token budget must leave output capacity for the final answer")
-            reasoningCloseMarker.isNullOrBlank() -> invalid("Reasoning close marker must not be blank")
-            reasoningForcedCloseText.isNullOrBlank() -> invalid("Forced reasoning close text must not be blank")
-            reasoningCloseMarker !in reasoningForcedCloseText ->
-                invalid("Forced reasoning close text must contain the close marker")
+            closeMarker.isBlank() -> invalid("Reasoning close marker must not be blank")
+            forcedClose.isBlank() -> invalid("Forced reasoning close text must not be blank")
+            closeMarker !in forcedClose -> invalid("Forced reasoning close text must contain the close marker")
             else -> null
         }
     }
