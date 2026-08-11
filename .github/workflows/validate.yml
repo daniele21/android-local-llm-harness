@@ -257,6 +257,7 @@ jobs:
             observability:android-resource-probe
             observability:benchmark-engine
             transports:in-process
+            transports:android-binder-contract
             apps:local-llm-console
             apps:device-test-runner
             apps:local-llm-phone-test
@@ -266,6 +267,23 @@ jobs:
             selected_modules=("${all_modules[@]}")
           else
             IFS=',' read -r -a selected_modules <<< "$GRADLE_MODULES"
+          fi
+
+          # Temporary CI-assisted formatting capture for the newly introduced
+          # Binder contract. This lets the same validation run compile/test the
+          # exact ktlint-formatted workspace while preserving a failing signal
+          # until those formatting changes are committed.
+          ./gradlew --no-configuration-cache spotlessApply
+          formatting_changed=false
+          if ! git diff --quiet -- '*.kt'; then
+            formatting_changed=true
+            mkdir -p build/spotless-formatted
+            git diff --name-only -- '*.kt' > build/spotless-formatted-files.txt
+            while IFS= read -r file; do
+              [[ -n "$file" ]] || continue
+              mkdir -p "build/spotless-formatted/$(dirname "$file")"
+              cp "$file" "build/spotless-formatted/$file"
+            done < build/spotless-formatted-files.txt
           fi
 
           tasks=(spotlessCheck detekt verifyNoModelArtifacts)
@@ -280,6 +298,8 @@ jobs:
           if [[ "$RUN_PACKAGING" == "true" ]]; then
             tasks+=(
               :backends:llama-cpp:assembleDebug
+              :transports:android-binder-contract:assembleDebug
+              :transports:android-binder-contract:assembleDebugAndroidTest
               :apps:local-llm-console:assembleInternal
               :apps:device-test-runner:assembleDebug
               :apps:device-test-runner:assembleDebugAndroidTest
@@ -299,6 +319,11 @@ jobs:
           printf 'Gradle tasks: %s\n' "${tasks[*]}"
           ./gradlew "${gradle_args[@]}" "${tasks[@]}" \
             2>&1 | tee build/android-validation.log
+
+          if [[ "$formatting_changed" == "true" ]]; then
+            echo "Spotless changed committed Kotlin sources; formatted copies are attached to the failure artifact." >&2
+            exit 1
+          fi
 
       - name: Verify Android native packaging
         if: needs.scope.outputs.packaging == 'true'
@@ -325,6 +350,8 @@ jobs:
           path: |
             **/build/reports/**
             build/android-validation.log
+            build/spotless-formatted/**
+            build/spotless-formatted-files.txt
           if-no-files-found: warn
           retention-days: 7
 
