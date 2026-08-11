@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
-    id("org.jetbrains.kotlin.plugin.parcelize")
+    id("kotlin-parcelize")
 }
 
 android {
