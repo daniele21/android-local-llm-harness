@@ -64,11 +64,82 @@ sealed interface LedgerResult<out T> {
 
 data class ClosingResources(val requestIds: List<RequestId>, val sessionIds: List<SessionId>)
 
+private class ClientConnectionState(val caller: AuthorizedCaller) {
+    private val sessions = LinkedHashMap<String, SessionId>()
+    private val requests = LinkedHashMap<String, RequestId>()
+    private var closing = false
+
+    fun matches(candidate: AuthorizedCaller): Boolean =
+        caller.uid == candidate.uid && caller.packageName == candidate.packageName
+
+    fun registerSession(
+        externalSessionId: String,
+        internalSessionId: SessionId,
+        maxSessions: Int,
+    ): LedgerResult<SessionId> =
+        when {
+            closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
+            sessions.size >= maxSessions -> LedgerResult.Failure(LedgerFailure.SESSION_LIMIT)
+            externalSessionId in sessions -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_SESSION_ID)
+            else -> {
+                sessions[externalSessionId] = internalSessionId
+                LedgerResult.Success(internalSessionId)
+            }
+        }
+
+    fun sessionId(externalSessionId: String): LedgerResult<SessionId> {
+        val sessionId = sessions[externalSessionId]
+            ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
+        return LedgerResult.Success(sessionId)
+    }
+
+    fun removeSession(externalSessionId: String): LedgerResult<SessionId> {
+        val removed = sessions.remove(externalSessionId)
+            ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
+        return LedgerResult.Success(removed)
+    }
+
+    fun allocateRequest(
+        externalRequestId: String,
+        requestId: RequestId,
+        maxRequests: Int,
+    ): LedgerResult<RequestId> =
+        when {
+            closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
+            requests.size >= maxRequests -> LedgerResult.Failure(LedgerFailure.REQUEST_LIMIT)
+            externalRequestId in requests -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_REQUEST_ID)
+            else -> {
+                requests[externalRequestId] = requestId
+                LedgerResult.Success(requestId)
+            }
+        }
+
+    fun requestId(externalRequestId: String): LedgerResult<RequestId> {
+        val requestId = requests[externalRequestId]
+            ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
+        return LedgerResult.Success(requestId)
+    }
+
+    fun removeRequest(externalRequestId: String): LedgerResult<RequestId> {
+        val removed = requests.remove(externalRequestId)
+            ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
+        return LedgerResult.Success(removed)
+    }
+
+    fun beginClose(): ClosingResources {
+        closing = true
+        return ClosingResources(
+            requestIds = requests.values.toList(),
+            sessionIds = sessions.values.toList(),
+        )
+    }
+}
+
 class ClientConnectionLedger(
     private val quotas: HostQuotas = HostQuotas(),
     private val identifiers: HostIdentifierFactory = SecureHostIdentifierFactory(),
 ) {
-    private val connections = LinkedHashMap<HostClientToken, Connection>()
+    private val connections = LinkedHashMap<HostClientToken, ClientConnectionState>()
 
     @Synchronized
     fun register(caller: AuthorizedCaller): LedgerResult<HostClientToken> {
@@ -79,7 +150,7 @@ class ClientConnectionLedger(
         repeat(MAX_TOKEN_GENERATION_ATTEMPTS) {
             val token = identifiers.newClientToken()
             if (token !in connections) {
-                connections[token] = Connection(caller = caller)
+                connections[token] = ClientConnectionState(caller = caller)
                 return LedgerResult.Success(token)
             }
         }
@@ -94,78 +165,43 @@ class ClientConnectionLedger(
         internalSessionId: SessionId,
     ): LedgerResult<SessionId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        if (connection.closing) {
-            return LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
-        }
-        if (connection.sessions.size >= quotas.maxSessionsPerConnection) {
-            return LedgerResult.Failure(LedgerFailure.SESSION_LIMIT)
-        }
-        if (externalSessionId in connection.sessions) {
-            return LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_SESSION_ID)
-        }
-        connection.sessions[externalSessionId] = internalSessionId
-        return LedgerResult.Success(internalSessionId)
+        return connection.registerSession(externalSessionId, internalSessionId, quotas.maxSessionsPerConnection)
     }
 
     @Synchronized
     fun sessionId(token: HostClientToken, caller: AuthorizedCaller, externalSessionId: String): LedgerResult<SessionId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        val sessionId = connection.sessions[externalSessionId]
-            ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
-        return LedgerResult.Success(sessionId)
+        return connection.sessionId(externalSessionId)
     }
 
     @Synchronized
     fun removeSession(token: HostClientToken, caller: AuthorizedCaller, externalSessionId: String): LedgerResult<SessionId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        val removed = connection.sessions.remove(externalSessionId)
-            ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
-        return LedgerResult.Success(removed)
+        return connection.removeSession(externalSessionId)
     }
 
     @Synchronized
     fun allocateRequest(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        if (connection.closing) {
-            return LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
-        }
-        if (connection.requests.size >= quotas.maxRequestsPerConnection) {
-            return LedgerResult.Failure(LedgerFailure.REQUEST_LIMIT)
-        }
-        if (externalRequestId in connection.requests) {
-            return LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_REQUEST_ID)
-        }
-        val requestId = identifiers.newRequestId()
-        connection.requests[externalRequestId] = requestId
-        return LedgerResult.Success(requestId)
+        return connection.allocateRequest(externalRequestId, identifiers.newRequestId(), quotas.maxRequestsPerConnection)
     }
 
     @Synchronized
     fun requestId(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        val requestId = connection.requests[externalRequestId]
-            ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
-        return LedgerResult.Success(requestId)
+        return connection.requestId(externalRequestId)
     }
 
     @Synchronized
     fun removeRequest(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        val removed = connection.requests.remove(externalRequestId)
-            ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
-        return LedgerResult.Success(removed)
+        return connection.removeRequest(externalRequestId)
     }
 
     @Synchronized
     fun beginClose(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<ClosingResources> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
-        connection.closing = true
-        return LedgerResult.Success(
-            ClosingResources(
-                requestIds = connection.requests.values.toList(),
-                sessionIds = connection.sessions.values.toList(),
-            ),
-        )
+        return LedgerResult.Success(connection.beginClose())
     }
 
     @Synchronized
@@ -175,19 +211,12 @@ class ClientConnectionLedger(
         return LedgerResult.Success(Unit)
     }
 
-    private fun activeConnection(token: HostClientToken, caller: AuthorizedCaller): Connection? =
-        connections[token]?.takeIf { it.caller.uid == caller.uid && it.caller.packageName == caller.packageName }
-
-    private fun invalidConnection(): LedgerResult.Failure = LedgerResult.Failure(LedgerFailure.CLIENT_TOKEN_INVALID)
-
-    private data class Connection(
-        val caller: AuthorizedCaller,
-        val sessions: LinkedHashMap<String, SessionId> = LinkedHashMap(),
-        val requests: LinkedHashMap<String, RequestId> = LinkedHashMap(),
-        var closing: Boolean = false,
-    )
+    private fun activeConnection(token: HostClientToken, caller: AuthorizedCaller): ClientConnectionState? =
+        connections[token]?.takeIf { it.matches(caller) }
 
     private companion object {
         const val MAX_TOKEN_GENERATION_ATTEMPTS = 8
     }
 }
+
+private fun invalidConnection(): LedgerResult.Failure = LedgerResult.Failure(LedgerFailure.CLIENT_TOKEN_INVALID)
