@@ -32,6 +32,7 @@ android {
 
 dependencies {
     api(project(":core:contracts"))
+    implementation(libs.kotlin.parcelize.runtime)
 
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.core)
