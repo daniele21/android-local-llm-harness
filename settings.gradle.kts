@@ -33,6 +33,7 @@ include(
     ":observability:benchmark-engine",
     ":transports:in-process",
     ":transports:android-binder-contract",
+    ":integrations:android-service-host",
     ":ui:design-system",
     ":apps:local-llm-console",
     ":apps:device-test-runner",
