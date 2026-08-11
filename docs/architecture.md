@@ -7,7 +7,7 @@ Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
 Last reviewed: 2026-08-08
 
-![Architecture Diagram](assets/architecture.png)
+![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, runtime and model boundaries, observability, and future shared host](assets/architecture.png)
 
 ## Data plane
 
