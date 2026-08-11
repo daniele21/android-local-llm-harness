@@ -68,6 +68,7 @@ internal fun wireError(code: String): WireErrorParcel = when (code) {
     WireErrorCodes.PROTOCOL_INCOMPATIBLE -> WireErrorParcel(code, "Protocol incompatible", false)
     WireErrorCodes.FEATURE_UNAVAILABLE -> WireErrorParcel(code, "Required feature unavailable", false)
     WireErrorCodes.PAYLOAD_TOO_LARGE -> WireErrorParcel(code, "Request payload too large", false)
+    WireErrorCodes.CLIENT_NOT_REGISTERED -> WireErrorParcel(code, "Client is not registered", false)
     WireErrorCodes.UNAUTHORIZED_USE_CASE -> WireErrorParcel(code, "Use case is not authorized", false)
     WireErrorCodes.CLIENT_TOKEN_INVALID -> WireErrorParcel(code, "Client token is invalid", false)
     WireErrorCodes.CLIENT_DISCONNECTED -> WireErrorParcel(code, "Client is disconnected", true)
