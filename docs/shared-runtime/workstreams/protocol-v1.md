@@ -152,15 +152,15 @@ Unknown safe core errors map to a generic runtime code, never a fabricated confi
 
 | ID | State | Task |
 | --- | --- | --- |
-| SR-PROTO-01 | PLANNED | Confirm module/package names and accepted protocol identity in SR-0. |
-| SR-PROTO-02 | PLANNED | Add protocol constants, feature registry and compatibility evaluator. |
-| SR-PROTO-03 | PLANNED | Add explicit parcel DTOs and structural/size validation. |
-| SR-PROTO-04 | PLANNED | Add AIDL service, lifecycle and operation callbacks. |
-| SR-PROTO-05 | PLANNED | Map supported core input, options, constraints and requests to/from wire DTOs. |
-| SR-PROTO-06 | PLANNED | Map events, metrics, stop reasons and safe errors without backend leakage. |
-| SR-PROTO-07 | PLANNED | Add ordered delta chunking and terminal reconstruction fixtures. |
-| SR-PROTO-08 | PLANNED | Add backward/minor/major compatibility fixtures and unknown-value coverage. |
-| SR-PROTO-09 | PLANNED | Add public API binary/source review and consumer keep rules if needed. |
+| SR-PROTO-01 | DONE | Confirm module/package names and accepted protocol identity in SR-0. |
+| SR-PROTO-02 | DONE | Add protocol constants, feature registry and compatibility evaluator. |
+| SR-PROTO-03 | DONE | Add explicit parcel DTOs and structural/size validation. |
+| SR-PROTO-04 | DONE | Add AIDL service, lifecycle and operation callbacks. |
+| SR-PROTO-05 | DONE | Map supported core input, options, constraints and requests to/from wire DTOs. |
+| SR-PROTO-06 | DONE | Map events, metrics, stop reasons and safe errors without backend leakage. |
+| SR-PROTO-07 | DONE | Add ordered delta chunking and terminal reconstruction fixtures. |
+| SR-PROTO-08 | DONE | Add backward/minor/major compatibility fixtures and unknown-value coverage. |
+| SR-PROTO-09 | DONE | Add public API binary/source review and consumer keep rules if needed. |
 
 ## Deterministic coverage
 
