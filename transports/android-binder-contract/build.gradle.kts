@@ -1,7 +1,33 @@
+import org.gradle.api.provider.Provider
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact
+import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
+
+class BuiltInKotlinParcelizePlugin : KotlinCompilerPluginSupportPlugin {
+    override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean =
+        kotlinCompilation.platformType == KotlinPlatformType.androidJvm
+
+    override fun applyToCompilation(
+        kotlinCompilation: KotlinCompilation<*>,
+    ): Provider<List<SubpluginOption>> =
+        kotlinCompilation.target.project.provider { emptyList() }
+
+    override fun getCompilerPluginId(): String = "org.jetbrains.kotlin.parcelize"
+
+    override fun getPluginArtifact(): SubpluginArtifact =
+        SubpluginArtifact(
+            groupId = "org.jetbrains.kotlin",
+            artifactId = "kotlin-parcelize-compiler",
+        )
+}
+
 plugins {
-    id("kotlin-parcelize")
     alias(libs.plugins.android.library)
 }
+
+apply<BuiltInKotlinParcelizePlugin>()
 
 android {
     namespace = "io.github.daniele21.localllm.transport.binder.contract"
