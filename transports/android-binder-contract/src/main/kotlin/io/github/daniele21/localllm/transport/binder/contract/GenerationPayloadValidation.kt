@@ -95,7 +95,9 @@ private fun validateSamplingOverrides(value: GenerationOverridesParcel) {
 private fun validateSeedOverride(value: GenerationOverridesParcel) {
     when (value.seedPolicyTag) {
         null -> requireWire(value.seedValue == null, "Seed value requires a seed policy")
+
         WireTags.SEED_RANDOM -> requireWire(value.seedValue == null, "RANDOM seed must not carry a value")
+
         WireTags.SEED_FIXED ->
             requireWire(
                 value.seedValue != null && value.seedValue in 0..MAX_NATIVE_SEED,

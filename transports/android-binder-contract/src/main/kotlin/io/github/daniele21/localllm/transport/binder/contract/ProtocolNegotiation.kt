@@ -1,9 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.contract
 
-fun negotiateProtocol(
-    host: ProtocolInfoParcel,
-    client: ClientHelloParcel,
-): NegotiatedProtocol {
+fun negotiateProtocol(host: ProtocolInfoParcel, client: ClientHelloParcel): NegotiatedProtocol {
     validateProtocolInfo(host)
     validateClientHello(client)
     validateProtocolMajor(host, client)
@@ -47,10 +44,7 @@ private fun validateFeatureList(features: List<String>) {
     features.forEach { validateIdentifier(it, 64, "protocol feature") }
 }
 
-private fun validateProtocolMajor(
-    host: ProtocolInfoParcel,
-    client: ClientHelloParcel,
-) {
+private fun validateProtocolMajor(host: ProtocolInfoParcel, client: ClientHelloParcel) {
     requireWire(
         host.protocolMajor == client.protocolMajor,
         "Protocol major versions are incompatible",
@@ -58,10 +52,7 @@ private fun validateProtocolMajor(
     )
 }
 
-private fun negotiateMinor(
-    host: ProtocolInfoParcel,
-    client: ClientHelloParcel,
-): Int {
+private fun negotiateMinor(host: ProtocolInfoParcel, client: ClientHelloParcel): Int {
     val lowerBound = maxOf(host.minSupportedMinor, client.minSupportedMinor)
     val upperBound = minOf(host.protocolMinor, client.protocolMinor)
     requireWire(
@@ -72,10 +63,7 @@ private fun negotiateMinor(
     return upperBound
 }
 
-private fun validateRequiredFeatures(
-    host: ProtocolInfoParcel,
-    client: ClientHelloParcel,
-) {
+private fun validateRequiredFeatures(host: ProtocolInfoParcel, client: ClientHelloParcel) {
     val supported = host.supportedFeatures.toSet()
     val unavailable = client.requiredFeatures.filterNot(supported::contains)
     requireWire(

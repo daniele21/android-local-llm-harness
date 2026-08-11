@@ -4,20 +4,19 @@ import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
 
-fun SessionOptions.toWire(): SessionOptionsParcel =
-    SessionOptionsParcel(
-        contextPolicyTag =
-            when (contextPolicy) {
-                ContextPolicy.Auto -> WireTags.CONTEXT_AUTO
-                is ContextPolicy.Manual -> WireTags.CONTEXT_MANUAL
-            },
-        manualContextTokens = (contextPolicy as? ContextPolicy.Manual)?.tokens,
-        sessionKindTag =
-            when (kind) {
-                SessionKind.STATELESS -> WireTags.SESSION_STATELESS
-                SessionKind.CONVERSATIONAL -> WireTags.SESSION_CONVERSATIONAL
-            },
-    )
+fun SessionOptions.toWire(): SessionOptionsParcel = SessionOptionsParcel(
+    contextPolicyTag =
+    when (contextPolicy) {
+        ContextPolicy.Auto -> WireTags.CONTEXT_AUTO
+        is ContextPolicy.Manual -> WireTags.CONTEXT_MANUAL
+    },
+    manualContextTokens = (contextPolicy as? ContextPolicy.Manual)?.tokens,
+    sessionKindTag =
+    when (kind) {
+        SessionKind.STATELESS -> WireTags.SESSION_STATELESS
+        SessionKind.CONVERSATIONAL -> WireTags.SESSION_CONVERSATIONAL
+    },
+)
 
 fun SessionOptionsParcel.toCore(): SessionOptions {
     val contextPolicy =

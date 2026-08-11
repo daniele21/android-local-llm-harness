@@ -13,7 +13,7 @@ import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
-import io.github.daniele21.localllm.contracts.ModelLoadKind
+import io.github.daniele21.locallm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicy
@@ -34,21 +34,21 @@ class BinderProtocolV1Test {
         val result =
             negotiateProtocol(
                 host =
-                    ProtocolInfoParcel(
-                        protocolMajor = 1,
-                        protocolMinor = 3,
-                        minSupportedMinor = 1,
-                        supportedFeatures = listOf(BinderProtocolV1.FEATURE_MESSAGE_INPUT, "future-host-feature"),
-                        hostBuildId = "host-test",
-                    ),
+                ProtocolInfoParcel(
+                    protocolMajor = 1,
+                    protocolMinor = 3,
+                    minSupportedMinor = 1,
+                    supportedFeatures = listOf(BinderProtocolV1.FEATURE_MESSAGE_INPUT, "future-host-feature"),
+                    hostBuildId = "host-test",
+                ),
                 client =
-                    ClientHelloParcel(
-                        protocolMajor = 1,
-                        protocolMinor = 2,
-                        minSupportedMinor = 0,
-                        requiredFeatures = listOf(BinderProtocolV1.FEATURE_MESSAGE_INPUT),
-                        clientBuildId = "client-test",
-                    ),
+                ClientHelloParcel(
+                    protocolMajor = 1,
+                    protocolMinor = 2,
+                    minSupportedMinor = 0,
+                    requiredFeatures = listOf(BinderProtocolV1.FEATURE_MESSAGE_INPUT),
+                    clientBuildId = "client-test",
+                ),
             )
 
         assertEquals(2, result.minor)
@@ -56,7 +56,7 @@ class BinderProtocolV1Test {
     }
 
     @Test
-    fun `major mismatch fails closed`() {
+    fun `major mismatch fails closed` () {
         val failure =
             assertThrows(WireProtocolException::class.java) {
                 negotiateProtocol(
@@ -96,25 +96,25 @@ class BinderProtocolV1Test {
                 applicationId = ApplicationId("untrusted-client-application"),
                 useCaseId = UseCaseId("summarize"),
                 input =
-                    GenerationInput.Messages(
-                        listOf(
-                            ConversationMessage(ConversationRole.USER, "Summarize this fixture"),
-                            ConversationMessage(ConversationRole.ASSISTANT, "Previous bounded answer"),
-                        ),
+                GenerationInput.Messages(
+                    listOf(
+                        ConversationMessage(ConversationRole.USER, "Summarize this fixture"),
+                        ConversationMessage(ConversationRole.ASSISTANT, "Previous bounded answer"),
                     ),
+                ),
                 overrides =
-                    GenerationOverrides(
-                        maxOutputTokens = 128,
-                        temperature = 0.2f,
-                        topP = 0.9f,
-                        topK = 20,
-                        seedPolicy = SeedPolicy.Fixed(42),
-                        repeatPenalty = 1.05f,
-                        repeatLastN = 64,
-                        thinkingMode = ThinkingMode.DISABLED,
-                        minP = 0.05f,
-                        presencePenalty = 0.1f,
-                    ),
+                GenerationOverrides(
+                    maxOutputTokens = 128,
+                    temperature = 0.2f,
+                    topP = 0.9f,
+                    topK = 20,
+                    seedPolicy = SeedPolicy.Fixed(42),
+                    repeatPenalty = 1.05f,
+                    repeatLastN = 64,
+                    thinkingMode = ThinkingMode.DISABLED,
+                    minP = 0.05f,
+                    presencePenalty = 0.1f,
+                ),
                 outputConstraint = OutputConstraint.JsonSchema("{\"type\":\"object\"}"),
             )
 
@@ -274,69 +274,66 @@ class BinderProtocolV1Test {
         assertEquals(ModelDigest("abc"), reconstructed.modelDigest)
     }
 
-    private fun minimalWireRequest(text: String = "fixture") =
-        GenerationRequestParcel(
-            clientToken = ClientTokenParcel("token"),
-            externalRequestId = "request",
-            externalSessionId = "session",
-            useCaseId = "use-case",
-            input = GenerationInputParcel(WireTags.INPUT_TEXT, text, emptyList()),
-            overrides =
-                GenerationOverridesParcel(
-                    presetId = null,
-                    presetVersion = null,
-                    maxOutputTokens = null,
-                    temperature = null,
-                    topP = null,
-                    topK = null,
-                    seedPolicyTag = null,
-                    seedValue = null,
-                    repeatPenalty = null,
-                    repeatLastN = null,
-                    thinkingModeTag = null,
-                    minP = null,
-                    presencePenalty = null,
-                ),
-            outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
-        )
+    private fun minimalWireRequest(text: String = "fixture") = GenerationRequestParcel(
+        clientToken = ClientTokenParcel("token"),
+        externalRequestId = "request",
+        externalSessionId = "session",
+        useCaseId = "use-case",
+        input = GenerationInputParcel(WireTags.INPUT_TEXT, text, emptyList()),
+        overrides =
+        GenerationOverridesParcel(
+            presetId = null,
+            presetVersion = null,
+            maxOutputTokens = null,
+            temperature = null,
+            topP = null,
+            topK = null,
+            seedPolicyTag = null,
+            seedValue = null,
+            repeatPenalty = null,
+            repeatLastN = null,
+            thinkingModeTag = null,
+            minP = null,
+            presencePenalty = null,
+        ),
+        outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
+    )
 
-    private fun metrics() =
-        GenerationMetrics(
-            queueMs = 1,
-            modelLoadMs = 2,
-            timeToFirstTokenMs = 3,
-            totalMs = 4,
-            inputTokens = 5,
-            outputTokens = 6,
-            decodeTokensPerSecond = 7.0,
-            prefillMs = 8,
-            decodeMs = 9,
-            modelLoadKind = ModelLoadKind.WARM,
-            stopReason = StopReason.END_OF_GENERATION,
-            promptPlanningMs = 10,
-            contextCreationMs = 11,
-            timeToFirstAnswerMs = 12,
-            reasoningTokens = 2,
-            answerTokens = 4,
-        )
+    private fun metrics() = GenerationMetrics(
+        queueMs = 1,
+        modelLoadMs = 2,
+        timeToFirstTokenMs = 3,
+        totalMs = 4,
+        inputTokens = 5,
+        outputTokens = 6,
+        decodeTokensPerSecond = 7.0,
+        prefillMs = 8,
+        decodeMs = 9,
+        modelLoadKind = ModelLoadKind.WARM,
+        stopReason = StopReason.END_OF_GENERATION,
+        promptPlanningMs = 10,
+        contextCreationMs = 11,
+        timeToFirstAnswerMs = 12,
+        reasoningTokens = 2,
+        answerTokens = 4,
+    )
 
-    private fun GenerationMetrics.toWireFixture() =
-        GenerationMetricsParcel(
-            queueMs = queueMs,
-            modelLoadMs = modelLoadMs,
-            timeToFirstTokenMs = timeToFirstTokenMs,
-            totalMs = totalMs,
-            inputTokens = inputTokens,
-            outputTokens = outputTokens,
-            decodeTokensPerSecond = decodeTokensPerSecond,
-            prefillMs = prefillMs,
-            decodeMs = decodeMs,
-            modelLoadKind = "WARM",
-            stopReason = "END_OF_GENERATION",
-            promptPlanningMs = promptPlanningMs,
-            contextCreationMs = contextCreationMs,
-            timeToFirstAnswerMs = timeToFirstAnswerMs,
-            reasoningTokens = reasoningTokens,
-            answerTokens = answerTokens,
-        )
+    private fun GenerationMetrics.toWireFixture() = GenerationMetricsParcel(
+        queueMs = queueMs,
+        modelLoadMs = modelLoadMs,
+        timeToFirstTokenMs = timeToFirstTokenMs,
+        totalMs = totalMs,
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        decodeTokensPerSecond = decodeTokensPerSecond,
+        prefillMs = prefillMs,
+        decodeMs = decodeMs,
+        modelLoadKind = "WARM",
+        stopReason = "END_OF_GENERATION",
+        promptPlanningMs = promptPlanningMs,
+        contextCreationMs = contextCreationMs,
+        timeToFirstAnswerMs = timeToFirstAnswerMs,
+        reasoningTokens = reasoningTokens,
+        answerTokens = answerTokens,
+    )
 }

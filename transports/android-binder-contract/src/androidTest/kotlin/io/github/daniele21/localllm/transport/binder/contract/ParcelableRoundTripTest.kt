@@ -32,31 +32,31 @@ class ParcelableRoundTripTest {
                 externalSessionId = "session-fixture",
                 useCaseId = "summarize",
                 input =
-                    GenerationInputParcel(
-                        typeTag = WireTags.INPUT_MESSAGES,
-                        text = null,
-                        messages =
-                            listOf(
-                                ConversationMessageParcel(WireTags.ROLE_USER, "fixture request"),
-                                ConversationMessageParcel(WireTags.ROLE_ASSISTANT, "fixture response"),
-                            ),
+                GenerationInputParcel(
+                    typeTag = WireTags.INPUT_MESSAGES,
+                    text = null,
+                    messages =
+                    listOf(
+                        ConversationMessageParcel(WireTags.ROLE_USER, "fixture request"),
+                        ConversationMessageParcel(WireTags.ROLE_ASSISTANT, "fixture response"),
                     ),
+                ),
                 overrides =
-                    GenerationOverridesParcel(
-                        presetId = "balanced",
-                        presetVersion = 1,
-                        maxOutputTokens = 128,
-                        temperature = 0.2f,
-                        topP = 0.9f,
-                        topK = 20,
-                        seedPolicyTag = WireTags.SEED_FIXED,
-                        seedValue = 42,
-                        repeatPenalty = 1.05f,
-                        repeatLastN = 64,
-                        thinkingModeTag = WireTags.THINKING_DISABLED,
-                        minP = 0.05f,
-                        presencePenalty = 0.1f,
-                    ),
+                GenerationOverridesParcel(
+                    presetId = "balanced",
+                    presetVersion = 1,
+                    maxOutputTokens = 128,
+                    temperature = 0.2f,
+                    topP = 0.9f,
+                    topK = 20,
+                    seedPolicyTag = WireTags.SEED_FIXED,
+                    seedValue = 42,
+                    repeatPenalty = 1.05f,
+                    repeatLastN = 64,
+                    thinkingModeTag = WireTags.THINKING_DISABLED,
+                    minP = 0.05f,
+                    presencePenalty = 0.1f,
+                ),
                 outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_JSON, null),
             )
 

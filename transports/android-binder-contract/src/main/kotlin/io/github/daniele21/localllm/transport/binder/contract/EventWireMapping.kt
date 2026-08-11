@@ -5,19 +5,13 @@ import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 
-fun GenerationEvent.toWire(
-    externalRequestId: String,
-    sequence: Long,
-): GenerationEventParcel {
+fun GenerationEvent.toWire(externalRequestId: String, sequence: Long): GenerationEventParcel {
     val result = toWireUnchecked(externalRequestId, sequence)
     validateGenerationEvent(result)
     return result
 }
 
-class GenerationEventReconstructor(
-    private val externalRequestId: String,
-    private val internalRequestId: RequestId,
-) {
+class GenerationEventReconstructor(private val externalRequestId: String, private val internalRequestId: RequestId) {
     private var nextSequence = 0L
     private var terminated = false
     private val reasoning = StringBuilder()
@@ -45,28 +39,31 @@ class GenerationEventReconstructor(
         )
     }
 
-    private fun mapEvent(event: GenerationEventParcel): GenerationEvent =
-        when (event.eventTag) {
-            WireTags.EVENT_QUEUED -> GenerationEvent.Queued(internalRequestId, requireNotNull(event.queuePosition))
-            WireTags.EVENT_PREPARED -> mapPrepared(event)
-            WireTags.EVENT_STARTED ->
-                GenerationEvent.Started(
-                    internalRequestId,
-                    ModelDigest(requireNotNull(event.modelDigestSha256)),
-                )
+    private fun mapEvent(event: GenerationEventParcel): GenerationEvent = when (event.eventTag) {
+        WireTags.EVENT_QUEUED -> GenerationEvent.Queued(internalRequestId, requireNotNull(event.queuePosition))
 
-            WireTags.EVENT_TEXT_DELTA -> mapDelta(event)
-            WireTags.EVENT_COMPLETED -> mapCompleted(event)
-            WireTags.EVENT_FAILED -> mapFailed(event)
-            else -> throw invalidWireTag("generation event", event.eventTag)
-        }
+        WireTags.EVENT_PREPARED -> mapPrepared(event)
 
-    private fun mapPrepared(event: GenerationEventParcel) =
-        GenerationEvent.Prepared(
-            internalRequestId,
-            ModelDigest(requireNotNull(event.modelDigestSha256)),
-            requireNotNull(event.preparedConfiguration).toCore(),
-        )
+        WireTags.EVENT_STARTED ->
+            GenerationEvent.Started(
+                internalRequestId,
+                ModelDigest(requireNotNull(event.modelDigestSha256)),
+            )
+
+        WireTags.EVENT_TEXT_DELTA -> mapDelta(event)
+
+        WireTags.EVENT_COMPLETED -> mapCompleted(event)
+
+        WireTags.EVENT_FAILED -> mapFailed(event)
+
+        else -> throw invalidWireTag("generation event", event.eventTag)
+    }
+
+    private fun mapPrepared(event: GenerationEventParcel) = GenerationEvent.Prepared(
+        internalRequestId,
+        ModelDigest(requireNotNull(event.modelDigestSha256)),
+        requireNotNull(event.preparedConfiguration).toCore(),
+    )
 
     private fun mapDelta(event: GenerationEventParcel): GenerationEvent.TextDelta {
         val text = requireNotNull(event.deltaText)
@@ -119,72 +116,64 @@ fun chunkDelta(text: String): List<String> {
     return chunks
 }
 
-private fun GenerationEvent.toWireUnchecked(
-    externalRequestId: String,
-    sequence: Long,
-): GenerationEventParcel =
-    when (this) {
-        is GenerationEvent.Queued ->
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_QUEUED,
-                queuePosition = position,
-            )
+private fun GenerationEvent.toWireUnchecked(externalRequestId: String, sequence: Long): GenerationEventParcel = when (this) {
+    is GenerationEvent.Queued ->
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_QUEUED,
+            queuePosition = position,
+        )
 
-        is GenerationEvent.Prepared ->
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_PREPARED,
-                modelDigestSha256 = modelDigest.sha256,
-                preparedConfiguration = configuration.toWire(),
-            )
+    is GenerationEvent.Prepared ->
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_PREPARED,
+            modelDigestSha256 = modelDigest.sha256,
+            preparedConfiguration = configuration.toWire(),
+        )
 
-        is GenerationEvent.Started ->
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_STARTED,
-                modelDigestSha256 = modelDigest.sha256,
-            )
+    is GenerationEvent.Started ->
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_STARTED,
+            modelDigestSha256 = modelDigest.sha256,
+        )
 
-        is GenerationEvent.TextDelta -> {
-            require(text.length <= BinderProtocolV1.MAX_DELTA_CHARACTERS) {
-                "Delta must be chunked before Binder mapping"
-            }
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_TEXT_DELTA,
-                deltaText = text,
-                generatedTokens = generatedTokens,
-                contentTypeTag = contentType.toWireTag(),
-            )
+    is GenerationEvent.TextDelta -> {
+        require(text.length <= BinderProtocolV1.MAX_DELTA_CHARACTERS) {
+            "Delta must be chunked before Binder mapping"
         }
-
-        is GenerationEvent.Completed ->
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_COMPLETED,
-                metrics = metrics.toWire(),
-            )
-
-        is GenerationEvent.Failed ->
-            GenerationEventParcel(
-                externalRequestId = externalRequestId,
-                sequence = sequence,
-                eventTag = WireTags.EVENT_FAILED,
-                error = error.toSafeWire(),
-            )
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_TEXT_DELTA,
+            deltaText = text,
+            generatedTokens = generatedTokens,
+            contentTypeTag = contentType.toWireTag(),
+        )
     }
 
-private fun wouldSplitSurrogatePair(
-    text: String,
-    start: Int,
-    end: Int,
-): Boolean {
+    is GenerationEvent.Completed ->
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_COMPLETED,
+            metrics = metrics.toWire(),
+        )
+
+    is GenerationEvent.Failed ->
+        GenerationEventParcel(
+            externalRequestId = externalRequestId,
+            sequence = sequence,
+            eventTag = WireTags.EVENT_FAILED,
+            error = error.toSafeWire(),
+        )
+}
+
+private fun wouldSplitSurrogatePair(text: String, start: Int, end: Int): Boolean {
     if (end >= text.length || end <= start) return false
     return Character.isHighSurrogate(text[end - 1]) && Character.isLowSurrogate(text[end])
 }

@@ -49,20 +49,19 @@ class ProtocolHardeningTest {
         assertEquals(StopReason.UNKNOWN, metrics.stopReason)
     }
 
-    private fun emptyOverrides() =
-        GenerationOverridesParcel(
-            presetId = null,
-            presetVersion = null,
-            maxOutputTokens = null,
-            temperature = null,
-            topP = null,
-            topK = null,
-            seedPolicyTag = null,
-            seedValue = null,
-            repeatPenalty = null,
-            repeatLastN = null,
-            thinkingModeTag = null,
-            minP = null,
-            presencePenalty = null,
-        )
+    private fun emptyOverrides() = GenerationOverridesParcel(
+        presetId = null,
+        presetVersion = null,
+        maxOutputTokens = null,
+        temperature = null,
+        topP = null,
+        topK = null,
+        seedPolicyTag = null,
+        seedValue = null,
+        repeatPenalty = null,
+        repeatLastN = null,
+        thinkingModeTag = null,
+        minP = null,
+        presencePenalty = null,
+    )
 }
