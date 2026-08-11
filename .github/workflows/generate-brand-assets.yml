@@ -39,7 +39,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check Pillow==11.3.0
 
       - name: Generate dark and light reference assets
-        run: python scripts/generate_brand_assets.py
+        run: |
+          cp docs/assets/brand/README.md "$RUNNER_TEMP/brand-assets-readme.md"
+          python scripts/generate_brand_assets.py
+          cp "$RUNNER_TEMP/brand-assets-readme.md" docs/assets/brand/README.md
 
       - name: Verify Android runtime assets
         run: python scripts/generate_android_brand_assets.py --check
