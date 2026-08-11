@@ -61,7 +61,9 @@ class SharedRuntimeBinderStub(
     override fun generate(request: GenerationRequestParcel, callback: IGenerationCallback) {
         val caller = authorizedCallerOrNull()
         if (caller == null) {
-            deliverRemote { callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED))) }
+            deliverRemote {
+                callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED)))
+            }
             return
         }
         delegate.generate(caller, request, remoteGenerationCallback(delegate, caller, request.clientToken, callback))
@@ -82,11 +84,10 @@ class SharedRuntimeBinderStub(
         delegate.unregisterClient(caller, clientToken.value)
     }
 
-    private fun authorizedCallerOrNull(): AuthorizedCaller? =
-        when (val result = authorizer.authorize(callingProcessSource.current())) {
-            is AuthorizationResult.Allowed -> result.caller
-            is AuthorizationResult.Denied -> null
-        }
+    private fun authorizedCallerOrNull(): AuthorizedCaller? = when (val result = authorizer.authorize(callingProcessSource.current())) {
+        is AuthorizationResult.Allowed -> result.caller
+        is AuthorizationResult.Denied -> null
+    }
 
     private fun requireAuthorizedCaller(): AuthorizedCaller =
         authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
