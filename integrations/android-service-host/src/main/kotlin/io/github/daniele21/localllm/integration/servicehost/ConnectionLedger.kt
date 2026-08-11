@@ -153,6 +153,10 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
+    fun validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
+        if (activeConnection(token, caller) != null) LedgerResult.Success(Unit) else invalidConnection()
+
+    @Synchronized
     fun registerSession(
         token: HostClientToken,
         caller: AuthorizedCaller,
