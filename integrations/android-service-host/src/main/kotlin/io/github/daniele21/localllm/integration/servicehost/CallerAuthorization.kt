@@ -89,38 +89,12 @@ class CallerAuthorizer(
         policiesByPackage = grouped.mapValues { (_, values) -> values.single() }
     }
 
-    fun authorize(callingProcess: CallingProcess): AuthorizationResult {
-        if (!environment.hasPermission(permissionName, callingProcess)) {
-            return AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
+    fun authorize(callingProcess: CallingProcess): AuthorizationResult =
+        if (environment.hasPermission(permissionName, callingProcess)) {
+            authorizePermittedCaller(callingProcess)
+        } else {
+            AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
         }
-
-        val packages = environment.packagesForUid(callingProcess.uid).distinct()
-        if (packages.isEmpty()) {
-            return AuthorizationResult.Denied(AuthorizationFailure.UNKNOWN_UID)
-        }
-        if (packages.size != 1) {
-            return AuthorizationResult.Denied(AuthorizationFailure.AMBIGUOUS_UID)
-        }
-
-        val packageName = packages.single()
-        val policy = policiesByPackage[packageName]
-            ?: return AuthorizationResult.Denied(AuthorizationFailure.PACKAGE_NOT_AUTHORIZED)
-        val signerMatches = policy.acceptedSigningCertificates.any { certificate ->
-            environment.hasSigningCertificate(packageName, certificate)
-        }
-        if (!signerMatches) {
-            return AuthorizationResult.Denied(AuthorizationFailure.SIGNATURE_MISMATCH)
-        }
-
-        return AuthorizationResult.Allowed(
-            AuthorizedCaller(
-                uid = callingProcess.uid,
-                packageName = packageName,
-                applicationId = policy.applicationId,
-                allowedUseCases = policy.allowedUseCases.toSet(),
-            ),
-        )
-    }
 
     fun authorize(callingProcess: CallingProcess, useCaseId: UseCaseId): AuthorizationResult =
         when (val result = authorize(callingProcess)) {
@@ -134,4 +108,33 @@ class CallerAuthorizer(
                 }
             }
         }
+
+    private fun authorizePermittedCaller(callingProcess: CallingProcess): AuthorizationResult {
+        val packages = environment.packagesForUid(callingProcess.uid).distinct()
+        return when {
+            packages.isEmpty() -> AuthorizationResult.Denied(AuthorizationFailure.UNKNOWN_UID)
+            packages.size != 1 -> AuthorizationResult.Denied(AuthorizationFailure.AMBIGUOUS_UID)
+            else -> authorizePackage(callingProcess.uid, packages.single())
+        }
+    }
+
+    private fun authorizePackage(uid: Int, packageName: String): AuthorizationResult {
+        val policy = policiesByPackage[packageName]
+            ?: return AuthorizationResult.Denied(AuthorizationFailure.PACKAGE_NOT_AUTHORIZED)
+        val signerMatches = policy.acceptedSigningCertificates.any { certificate ->
+            environment.hasSigningCertificate(packageName, certificate)
+        }
+        return if (signerMatches) {
+            AuthorizationResult.Allowed(
+                AuthorizedCaller(
+                    uid = uid,
+                    packageName = packageName,
+                    applicationId = policy.applicationId,
+                    allowedUseCases = policy.allowedUseCases.toSet(),
+                ),
+            )
+        } else {
+            AuthorizationResult.Denied(AuthorizationFailure.SIGNATURE_MISMATCH)
+        }
+    }
 }
