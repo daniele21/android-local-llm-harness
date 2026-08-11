@@ -69,23 +69,20 @@ private class ClientConnectionState(val caller: AuthorizedCaller) {
     private val requests = LinkedHashMap<String, RequestId>()
     private var closing = false
 
-    fun matches(candidate: AuthorizedCaller): Boolean =
-        caller.uid == candidate.uid && caller.packageName == candidate.packageName
+    fun matches(candidate: AuthorizedCaller): Boolean = caller.uid == candidate.uid && caller.packageName == candidate.packageName
 
-    fun registerSession(
-        externalSessionId: String,
-        internalSessionId: SessionId,
-        maxSessions: Int,
-    ): LedgerResult<SessionId> =
-        when {
-            closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
-            sessions.size >= maxSessions -> LedgerResult.Failure(LedgerFailure.SESSION_LIMIT)
-            externalSessionId in sessions -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_SESSION_ID)
-            else -> {
-                sessions[externalSessionId] = internalSessionId
-                LedgerResult.Success(internalSessionId)
-            }
+    fun registerSession(externalSessionId: String, internalSessionId: SessionId, maxSessions: Int): LedgerResult<SessionId> = when {
+        closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
+
+        sessions.size >= maxSessions -> LedgerResult.Failure(LedgerFailure.SESSION_LIMIT)
+
+        externalSessionId in sessions -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_SESSION_ID)
+
+        else -> {
+            sessions[externalSessionId] = internalSessionId
+            LedgerResult.Success(internalSessionId)
         }
+    }
 
     fun sessionId(externalSessionId: String): LedgerResult<SessionId> {
         val sessionId = sessions[externalSessionId]
@@ -99,20 +96,18 @@ private class ClientConnectionState(val caller: AuthorizedCaller) {
         return LedgerResult.Success(removed)
     }
 
-    fun allocateRequest(
-        externalRequestId: String,
-        requestId: RequestId,
-        maxRequests: Int,
-    ): LedgerResult<RequestId> =
-        when {
-            closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
-            requests.size >= maxRequests -> LedgerResult.Failure(LedgerFailure.REQUEST_LIMIT)
-            externalRequestId in requests -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_REQUEST_ID)
-            else -> {
-                requests[externalRequestId] = requestId
-                LedgerResult.Success(requestId)
-            }
+    fun allocateRequest(externalRequestId: String, requestId: RequestId, maxRequests: Int): LedgerResult<RequestId> = when {
+        closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
+
+        requests.size >= maxRequests -> LedgerResult.Failure(LedgerFailure.REQUEST_LIMIT)
+
+        externalRequestId in requests -> LedgerResult.Failure(LedgerFailure.DUPLICATE_EXTERNAL_REQUEST_ID)
+
+        else -> {
+            requests[externalRequestId] = requestId
+            LedgerResult.Success(requestId)
         }
+    }
 
     fun requestId(externalRequestId: String): LedgerResult<RequestId> {
         val requestId = requests[externalRequestId]
