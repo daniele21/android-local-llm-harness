@@ -94,6 +94,7 @@ GRADLE_MODULES = (
     "observability:benchmark-engine",
     "transports:in-process",
     "transports:android-binder-contract",
+    "integrations:android-service-host",
     "apps:local-llm-console",
     "apps:device-test-runner",
     "apps:local-llm-phone-test",
