@@ -28,6 +28,11 @@ internal class HostGenerationOperations(
 
     private fun runGeneration(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) {
         val token = HostClientToken(request.clientToken.value)
+        val dispatcher = resources.callbackDispatcher(token)
+        if (dispatcher == null) {
+            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
+            return
+        }
         val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull()
         if (sessionId == null) {
             callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
@@ -46,7 +51,7 @@ internal class HostGenerationOperations(
                 callback.onEvent(generationFailure(request.externalRequestId, error.toHostWireError()))
                 return
             }
-        val forwarder = generationForwarder(token, caller, request.externalRequestId, requestId, callback)
+        val forwarder = generationForwarder(token, caller, request.externalRequestId, requestId, callback, dispatcher)
         try {
             val handle = client.generate(coreRequest, forwarder::onEvent)
             resources.attachHandle(requestId, handle)
@@ -63,11 +68,14 @@ internal class HostGenerationOperations(
         externalRequestId: String,
         requestId: RequestId,
         callback: HostEventCallback,
+        dispatcher: HostCallbackDispatcher,
     ): GenerationEventForwarder = GenerationEventForwarder(
         externalRequestId = externalRequestId,
         callback = callback,
+        dispatcher = dispatcher,
         onTerminal = { submitRequestCleanup(token, caller, externalRequestId, requestId) },
         onCallbackFailure = { submitCallbackFailureCleanup(token, caller, externalRequestId, requestId) },
+        onBackpressure = { resources.handle(requestId)?.cancelSafely() },
     )
 
     private fun submitCallbackFailureCleanup(
@@ -94,8 +102,11 @@ internal class HostGenerationOperations(
         requestId: RequestId,
         forwarder: GenerationEventForwarder,
     ) {
+        if (forwarder.callbackFailed) {
+            resources.removeHandle(requestId)?.cancelSafely()
+            return
+        }
         if (ledger.requestId(token, caller, externalRequestId).successOrNull() != null) return
-        val handle = resources.removeHandle(requestId) ?: return
-        if (forwarder.callbackFailed) handle.cancelSafely()
+        resources.removeHandle(requestId)
     }
 }

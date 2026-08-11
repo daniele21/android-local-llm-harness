@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal class HostRuntimeResources {
     private val handles = ConcurrentHashMap<RequestId, GenerationHandle>()
     private val deathLinks = ConcurrentHashMap<HostClientToken, ClientDeathLink>()
+    private val callbackDispatchers = ConcurrentHashMap<HostClientToken, HostCallbackDispatcher>()
 
     fun attachHandle(requestId: RequestId, handle: GenerationHandle) {
         handles[requestId] = handle
@@ -21,6 +22,14 @@ internal class HostRuntimeResources {
     }
 
     fun removeDeathLink(token: HostClientToken): ClientDeathLink? = deathLinks.remove(token)
+
+    fun attachCallbackDispatcher(token: HostClientToken, dispatcher: HostCallbackDispatcher) {
+        callbackDispatchers[token] = dispatcher
+    }
+
+    fun callbackDispatcher(token: HostClientToken): HostCallbackDispatcher? = callbackDispatchers[token]
+
+    fun removeCallbackDispatcher(token: HostClientToken): HostCallbackDispatcher? = callbackDispatchers.remove(token)
 }
 
 internal fun GenerationHandle.cancelSafely() {
@@ -29,4 +38,8 @@ internal fun GenerationHandle.cancelSafely() {
 
 internal fun ClientDeathLink.unlinkSafely() {
     runCatching(::unlink)
+}
+
+internal fun HostCallbackDispatcher.closeSafely() {
+    runCatching(::close)
 }

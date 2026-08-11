@@ -35,9 +35,9 @@ internal fun sessionSuccess(operationId: String, externalSessionId: String) = Se
 
 internal fun sessionFailure(operationId: String, error: WireErrorParcel) = SessionResultParcel(operationId, null, error)
 
-internal fun generationFailure(externalRequestId: String, error: WireErrorParcel) = GenerationEventParcel(
+internal fun generationFailure(externalRequestId: String, error: WireErrorParcel, sequence: Long = 0) = GenerationEventParcel(
     externalRequestId = externalRequestId,
-    sequence = 0,
+    sequence = sequence,
     eventTag = WireTags.EVENT_FAILED,
     error = error,
 )
