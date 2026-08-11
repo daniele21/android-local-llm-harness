@@ -78,7 +78,3 @@ internal fun wireError(code: String): WireErrorParcel = when (code) {
     WireErrorCodes.TRANSPORT_FAILURE -> WireErrorParcel(code, "Host transport unavailable", true)
     else -> WireErrorParcel(WireErrorCodes.INVALID_WIRE_REQUEST, "Invalid request", false)
 }
-
-internal fun <T> LedgerResult<T>.successOrNull(): T? = (this as? LedgerResult.Success)?.value
-
-internal fun LedgerResult<*>.failureOrNull(): LedgerFailure? = (this as? LedgerResult.Failure)?.reason
