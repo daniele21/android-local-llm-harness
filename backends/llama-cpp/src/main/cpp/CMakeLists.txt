@@ -43,6 +43,7 @@ add_library(
     common_string_utils.cpp
     generation_output_buffer.cpp
     generation_sampler.cpp
+    reasoning_transition.cpp
     llama_jni_entry.cpp
 )
 

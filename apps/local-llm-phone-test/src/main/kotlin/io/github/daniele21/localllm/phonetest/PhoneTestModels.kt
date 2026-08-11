@@ -71,6 +71,9 @@ internal data class PlaygroundMetrics(
     val decodeTokensPerSecond: Double?,
     val modelLoadKind: String,
     val stopReason: String = "UNKNOWN",
+    val timeToFirstAnswerMs: Long? = null,
+    val reasoningTokens: Int? = null,
+    val answerTokens: Int? = null,
 ) {
     companion object {
         fun from(metrics: GenerationMetrics): PlaygroundMetrics = PlaygroundMetrics(
@@ -85,6 +88,9 @@ internal data class PlaygroundMetrics(
             decodeTokensPerSecond = metrics.decodeTokensPerSecond,
             modelLoadKind = metrics.modelLoadKind.name,
             stopReason = metrics.stopReason.name,
+            timeToFirstAnswerMs = metrics.timeToFirstAnswerMs,
+            reasoningTokens = metrics.reasoningTokens,
+            answerTokens = metrics.answerTokens,
         )
     }
 }
@@ -100,6 +106,8 @@ internal data class PlaygroundState(
     val errorCode: String? = null,
     val detail: String = "Ready",
     val effectiveConfiguration: EffectiveGenerationMetadata? = null,
+    val reasoningOutput: String = "",
+    val answerOutput: String = "",
 ) {
     val active: Boolean
         get() = phase == PlaygroundPhase.PREPARING ||

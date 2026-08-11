@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ContextPolicy
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
@@ -219,7 +220,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                     effectiveConfiguration = event.configuration,
                 )
 
-                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)
+                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens, event.contentType)
 
                 is GenerationEvent.Completed -> completedState(event)
 
@@ -234,27 +235,59 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         }
     }
 
-    private fun appendOutput(text: String, generatedTokens: Int): PlaygroundState {
-        val remaining = (MAX_OUTPUT_CHARACTERS - state.output.length).coerceAtLeast(0)
-        val appended = text.take(remaining)
+    private fun appendOutput(text: String, generatedTokens: Int, contentType: GenerationContentType): PlaygroundState {
+        val combined = appendBounded(state.output, text)
+        val reasoning = if (contentType == GenerationContentType.REASONING) {
+            appendBounded(state.reasoningOutput, text)
+        } else {
+            state.reasoningOutput
+        }
+        val answer = if (contentType == GenerationContentType.ANSWER) {
+            appendBounded(state.answerOutput, text)
+        } else {
+            state.answerOutput
+        }
+        val channelTruncated = when (contentType) {
+            GenerationContentType.REASONING -> reasoning.length < state.reasoningOutput.length + text.length
+            GenerationContentType.ANSWER -> answer.length < state.answerOutput.length + text.length
+        }
         return state.copy(
             phase = PlaygroundPhase.GENERATING,
-            output = state.output + appended,
-            outputTruncated = state.outputTruncated || appended.length < text.length,
+            output = combined,
+            reasoningOutput = reasoning,
+            answerOutput = answer,
+            outputTruncated = state.outputTruncated || combined.length < state.output.length + text.length || channelTruncated,
             generatedTokens = generatedTokens,
-            detail = "Generating locally",
+            detail = if (contentType == GenerationContentType.REASONING && state.answerOutput.isEmpty()) {
+                "Thinking locally"
+            } else {
+                "Generating answer"
+            },
         )
+    }
+
+    private fun appendBounded(current: String, text: String): String {
+        val remaining = (MAX_OUTPUT_CHARACTERS - current.length).coerceAtLeast(0)
+        return current + text.take(remaining)
     }
 
     private fun completedState(event: GenerationEvent.Completed): PlaygroundState = state.copy(
         phase = PlaygroundPhase.COMPLETED,
         output = event.output.take(MAX_OUTPUT_CHARACTERS),
-        outputTruncated = event.output.length > MAX_OUTPUT_CHARACTERS,
+        reasoningOutput = event.reasoningOutput.take(MAX_OUTPUT_CHARACTERS),
+        answerOutput = event.answerOutput.take(MAX_OUTPUT_CHARACTERS),
+        outputTruncated = event.output.length > MAX_OUTPUT_CHARACTERS ||
+            event.reasoningOutput.length > MAX_OUTPUT_CHARACTERS ||
+            event.answerOutput.length > MAX_OUTPUT_CHARACTERS,
         generatedTokens = event.metrics.outputTokens,
         cancellationAvailable = false,
         metrics = PlaygroundMetrics.from(event.metrics),
         errorCode = null,
-        detail = "Generation completed",
+        detail = if (event.answerOutput.isEmpty() && event.reasoningOutput.isNotEmpty()) {
+            "Generation ended before a final answer was produced"
+        } else {
+            "Generation completed"
+        },
     )
 
     private fun failedState(error: LocalLlmError): PlaygroundState = state.copy(

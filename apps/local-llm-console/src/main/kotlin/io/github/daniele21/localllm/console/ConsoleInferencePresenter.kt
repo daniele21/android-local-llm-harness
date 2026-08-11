@@ -23,7 +23,11 @@ class ConsoleInferencePresenter {
             else -> cards += targetsCard(inference)
         }
 
-        if (inference.output.isNotEmpty()) cards += outputCard(inference)
+        if (inference.reasoningOutput.isNotEmpty()) cards += reasoningCard(inference)
+        if (inference.answerOutput.isNotEmpty()) cards += answerCard(inference)
+        if (inference.reasoningOutput.isEmpty() && inference.answerOutput.isEmpty() && inference.output.isNotEmpty()) {
+            cards += legacyOutputCard(inference)
+        }
         inference.metrics?.let { metrics -> cards += metricsCard(metrics) }
         inference.errorCode?.let { errorCode -> cards += errorCard(errorCode, inference.detail) }
 
@@ -86,7 +90,23 @@ class ConsoleInferencePresenter {
         return "$prefix${target.label} · ${target.applicationId.value}/${target.useCaseId.value}"
     }
 
-    private fun outputCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
+    private fun reasoningCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
+        title = "Thinking",
+        lines = listOf(state.reasoningOutput),
+        emphasis = ConsoleEmphasis.NEUTRAL,
+    )
+
+    private fun answerCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
+        title = "Answer",
+        lines = listOf(
+            state.answerOutput,
+            "Generated tokens: ${state.generatedTokens ?: "Unavailable"}",
+            "Display truncated: ${state.outputTruncated}",
+        ),
+        emphasis = if (state.phase == ConsoleInferencePhase.COMPLETED) ConsoleEmphasis.POSITIVE else ConsoleEmphasis.NEUTRAL,
+    )
+
+    private fun legacyOutputCard(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
         title = "Generated output",
         lines = listOf(
             state.output,
@@ -107,6 +127,7 @@ class ConsoleInferencePresenter {
             "Queue: ${formatDuration(metrics.queueMs)}",
             "Model load: ${formatDuration(metrics.modelLoadMs)}",
             "Time to first token: ${formatDuration(metrics.timeToFirstTokenMs)}",
+            "Time to first answer: ${formatDuration(metrics.timeToFirstAnswerMs)}",
             "Prefill: ${formatDuration(metrics.prefillMs)}",
             "Decode: ${formatDuration(metrics.decodeMs)}",
             "Total: ${formatDuration(metrics.totalMs)}",
@@ -152,7 +173,8 @@ class ConsoleInferencePresenter {
         val terminal = state.phase == ConsoleInferencePhase.COMPLETED ||
             state.phase == ConsoleInferencePhase.FAILED ||
             state.phase == ConsoleInferencePhase.CANCELLED
-        return state.output.isNotEmpty() || state.metrics != null || state.errorCode != null || terminal
+        return state.output.isNotEmpty() || state.reasoningOutput.isNotEmpty() || state.answerOutput.isNotEmpty() ||
+            state.metrics != null || state.errorCode != null || terminal
     }
 
     private fun phaseEmphasis(phase: ConsoleInferencePhase): ConsoleEmphasis = when (phase) {

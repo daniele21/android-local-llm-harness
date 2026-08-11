@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.console
 
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
@@ -138,6 +139,8 @@ class LocalLlmConsoleInferenceControl(
                 phase = ConsoleInferencePhase.PREPARING,
                 activeTargetId = target.id,
                 output = "",
+                reasoningOutput = "",
+                answerOutput = "",
                 outputTruncated = false,
                 generatedTokens = null,
                 sessionActive = false,
@@ -190,9 +193,9 @@ class LocalLlmConsoleInferenceControl(
                     detail = "Prompt planned: ${event.configuration.promptTokenCount}/${event.configuration.contextSize} tokens",
                 )
 
-                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)
+                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens, event.contentType)
 
-                is GenerationEvent.Completed -> completedState(event.output, event.metrics)
+                is GenerationEvent.Completed -> completedState(event)
 
                 is GenerationEvent.Failed -> failedState(event.error)
             }
@@ -203,27 +206,60 @@ class LocalLlmConsoleInferenceControl(
         if (terminal) cleanupSessionAfterTerminal()
     }
 
-    private fun appendOutput(text: String, generatedTokens: Int): ConsoleInferenceState {
+    private fun appendOutput(text: String, generatedTokens: Int, contentType: GenerationContentType): ConsoleInferenceState {
         val remaining = (MAX_OUTPUT_CHARACTERS - state.output.length).coerceAtLeast(0)
         val appended = text.take(remaining)
+        val reasoning = if (contentType == GenerationContentType.REASONING) {
+            appendBounded(state.reasoningOutput, text)
+        } else {
+            state.reasoningOutput
+        }
+        val answer = if (contentType == GenerationContentType.ANSWER) {
+            appendBounded(state.answerOutput, text)
+        } else {
+            state.answerOutput
+        }
+        val reasoningTruncated = contentType == GenerationContentType.REASONING &&
+            reasoning.length < state.reasoningOutput.length + text.length
+        val answerTruncated = contentType == GenerationContentType.ANSWER &&
+            answer.length < state.answerOutput.length + text.length
         return state.copy(
             phase = ConsoleInferencePhase.GENERATING,
             output = state.output + appended,
-            outputTruncated = state.outputTruncated || appended.length < text.length,
+            reasoningOutput = reasoning,
+            answerOutput = answer,
+            outputTruncated = state.outputTruncated || appended.length < text.length || reasoningTruncated || answerTruncated,
             generatedTokens = generatedTokens,
-            detail = "Generation running",
+            detail = if (contentType == GenerationContentType.REASONING && state.answerOutput.isEmpty()) {
+                "Model is reasoning"
+            } else {
+                "Generating answer"
+            },
         )
     }
 
-    private fun completedState(output: String, metrics: GenerationMetrics): ConsoleInferenceState = state.copy(
+    private fun appendBounded(current: String, text: String): String {
+        val remaining = (MAX_OUTPUT_CHARACTERS - current.length).coerceAtLeast(0)
+        return current + text.take(remaining)
+    }
+
+    private fun completedState(event: GenerationEvent.Completed): ConsoleInferenceState = state.copy(
         phase = ConsoleInferencePhase.COMPLETED,
-        output = output.take(MAX_OUTPUT_CHARACTERS),
-        outputTruncated = output.length > MAX_OUTPUT_CHARACTERS,
-        generatedTokens = metrics.outputTokens,
+        output = event.output.take(MAX_OUTPUT_CHARACTERS),
+        reasoningOutput = event.reasoningOutput.take(MAX_OUTPUT_CHARACTERS),
+        answerOutput = event.answerOutput.take(MAX_OUTPUT_CHARACTERS),
+        outputTruncated = event.output.length > MAX_OUTPUT_CHARACTERS ||
+            event.reasoningOutput.length > MAX_OUTPUT_CHARACTERS ||
+            event.answerOutput.length > MAX_OUTPUT_CHARACTERS,
+        generatedTokens = event.metrics.outputTokens,
         cancellationAvailable = false,
-        metrics = metrics.toConsoleMetrics(),
+        metrics = event.metrics.toConsoleMetrics(),
         errorCode = null,
-        detail = "Generation completed",
+        detail = if (event.answerOutput.isEmpty() && event.reasoningOutput.isNotEmpty()) {
+            "Generation ended before a final answer was produced"
+        } else {
+            "Generation completed"
+        },
         sourceError = null,
     )
 
@@ -328,6 +364,7 @@ class LocalLlmConsoleInferenceControl(
         queueMs = queueMs,
         modelLoadMs = modelLoadMs,
         timeToFirstTokenMs = timeToFirstTokenMs,
+        timeToFirstAnswerMs = timeToFirstAnswerMs,
         prefillMs = prefillMs,
         decodeMs = decodeMs,
         totalMs = totalMs,

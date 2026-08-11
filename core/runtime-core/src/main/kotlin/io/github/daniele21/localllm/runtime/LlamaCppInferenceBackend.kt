@@ -72,6 +72,7 @@ class LlamaCppInferenceBackend(
             is NativeModelCapabilitiesResult.Success -> BackendModelCapabilities(
                 maximumContextTokens = result.capabilities.maximumContextTokens,
                 supportsGrammar = result.capabilities.supportsGrammar,
+                supportsReasoningTransition = true,
             )
 
             is NativeModelCapabilitiesResult.Failure -> throw result.error.asBackendException()
@@ -142,6 +143,9 @@ class LlamaCppInferenceBackend(
             outputSchema = (request.outputConstraint as? OutputConstraint.JsonSchema)?.schema,
             stopTokenIds = request.stopTokenIds.toIntArray(),
             stopSequences = request.stopSequences,
+            reasoningMaxTokens = request.reasoningControl?.maxReasoningTokens,
+            reasoningCloseMarker = request.reasoningControl?.closeMarker,
+            reasoningForcedCloseText = request.reasoningControl?.forcedCloseText,
         )
         return when (
             val result = streamingBridge.generate(
@@ -191,6 +195,8 @@ private fun io.github.daniele21.localllm.llamacpp.NativeStreamingMetrics.toBacke
         promptDurationMs = promptDurationMs,
         generationDurationMs = generationDurationMs,
         stopReason = StopReason.entries.firstOrNull { it.name == stopReason } ?: StopReason.UNKNOWN,
+        reasoningTokens = reasoningTokens,
+        answerTokens = answerTokens,
     )
 
 private val OutputConstraint.nativeType: String
