@@ -165,7 +165,12 @@ class SharedRuntimeHostDelegateTest {
             task()
             true
         },
-        callbackDispatcherFactory = HostCallbackDispatcherFactory { HostCallbackDispatcher { task -> task(); true } },
+        callbackDispatcherFactory = HostCallbackDispatcherFactory {
+            HostCallbackDispatcher { task ->
+                task()
+                true
+            }
+        },
     )
 
     private fun register(delegate: SharedRuntimeHostDelegate, lifecycle: FakeLifecycle = FakeLifecycle()): ClientTokenParcel {
