@@ -158,15 +158,14 @@ class SharedRuntimeHostDelegateTest {
         assertEquals(0, client.prepareCalls)
     }
 
-    private fun delegate(client: FakeClient) =
-        SharedRuntimeHostDelegate(
-            client = client,
-            protocolInfo = protocolInfo(),
-            controlExecutor = HostControlExecutor { task ->
-                task()
-                true
-            },
-        )
+    private fun delegate(client: FakeClient) = SharedRuntimeHostDelegate(
+        client = client,
+        protocolInfo = protocolInfo(),
+        controlExecutor = HostControlExecutor { task ->
+            task()
+            true
+        },
+    )
 
     private fun register(delegate: SharedRuntimeHostDelegate, lifecycle: FakeLifecycle = FakeLifecycle()): ClientTokenParcel {
         var result: RegistrationResultParcel? = null
@@ -188,45 +187,41 @@ class SharedRuntimeHostDelegateTest {
         )
     }
 
-    private fun generationRequest(token: ClientTokenParcel) =
-        GenerationRequestParcel(
-            clientToken = token,
-            externalRequestId = "external-request-1",
-            externalSessionId = "external-session-1",
-            useCaseId = "summarize",
-            input = GenerationInputParcel(WireTags.INPUT_TEXT, "hello", emptyList()),
-            overrides = GenerationOverridesParcel(null, null, null, null, null, null, null, null, null, null, null, null, null),
-            outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
-        )
+    private fun generationRequest(token: ClientTokenParcel) = GenerationRequestParcel(
+        clientToken = token,
+        externalRequestId = "external-request-1",
+        externalSessionId = "external-session-1",
+        useCaseId = "summarize",
+        input = GenerationInputParcel(WireTags.INPUT_TEXT, "hello", emptyList()),
+        overrides = GenerationOverridesParcel(null, null, null, null, null, null, null, null, null, null, null, null, null),
+        outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
+    )
 
-    private fun hello() =
-        ClientHelloParcel(
-            BinderProtocolV1.MAJOR,
-            BinderProtocolV1.MINOR,
-            BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            emptyList(),
-            "client-test",
-        )
+    private fun hello() = ClientHelloParcel(
+        BinderProtocolV1.MAJOR,
+        BinderProtocolV1.MINOR,
+        BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        emptyList(),
+        "client-test",
+    )
 
-    private fun protocolInfo() =
-        ProtocolInfoParcel(
-            BinderProtocolV1.MAJOR,
-            BinderProtocolV1.MINOR,
-            BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            BinderProtocolV1.KNOWN_FEATURES.sorted(),
-            "host-test",
-        )
+    private fun protocolInfo() = ProtocolInfoParcel(
+        BinderProtocolV1.MAJOR,
+        BinderProtocolV1.MINOR,
+        BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        BinderProtocolV1.KNOWN_FEATURES.sorted(),
+        "host-test",
+    )
 
-    private fun metrics() =
-        GenerationMetrics(
-            queueMs = 0,
-            modelLoadMs = 0,
-            timeToFirstTokenMs = 1,
-            totalMs = 2,
-            inputTokens = 1,
-            outputTokens = 1,
-            decodeTokensPerSecond = 1.0,
-        )
+    private fun metrics() = GenerationMetrics(
+        queueMs = 0,
+        modelLoadMs = 0,
+        timeToFirstTokenMs = 1,
+        totalMs = 2,
+        inputTokens = 1,
+        outputTokens = 1,
+        decodeTokensPerSecond = 1.0,
+    )
 
     private class FakeLifecycle : ClientLifecycleLinker {
         private var onDeath: (() -> Unit)? = null

@@ -9,9 +9,8 @@ fun interface HostControlExecutor {
     fun execute(task: () -> Unit): Boolean
 }
 
-class BoundedSerialHostControlExecutor(
-    queueCapacity: Int = DEFAULT_CONTROL_QUEUE_CAPACITY,
-) : HostControlExecutor,
+class BoundedSerialHostControlExecutor(queueCapacity: Int = DEFAULT_CONTROL_QUEUE_CAPACITY) :
+    HostControlExecutor,
     AutoCloseable {
     private val executor: ThreadPoolExecutor
 
@@ -29,13 +28,12 @@ class BoundedSerialHostControlExecutor(
             )
     }
 
-    override fun execute(task: () -> Unit): Boolean =
-        try {
-            executor.execute(task)
-            true
-        } catch (_: RejectedExecutionException) {
-            false
-        }
+    override fun execute(task: () -> Unit): Boolean = try {
+        executor.execute(task)
+        true
+    } catch (_: RejectedExecutionException) {
+        false
+    }
 
     override fun close() {
         executor.shutdownNow()

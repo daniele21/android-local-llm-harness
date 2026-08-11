@@ -30,13 +30,19 @@ internal fun validateClose(request: CloseSessionRequestParcel): WireErrorParcel?
 private fun validateWireAndUseCase(caller: AuthorizedCaller, useCase: String, validation: () -> Unit): WireErrorParcel? {
     val wireError = validateWire(validation)
     if (wireError != null) return wireError
-    return if (caller.allows(UseCaseId(useCase))) null else wireError(io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes.UNAUTHORIZED_USE_CASE)
+    return if (caller.allows(
+            UseCaseId(useCase),
+        )
+    ) {
+        null
+    } else {
+        wireError(io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes.UNAUTHORIZED_USE_CASE)
+    }
 }
 
-private fun validateWire(validation: () -> Unit): WireErrorParcel? =
-    try {
-        validation()
-        null
-    } catch (error: WireProtocolException) {
-        error.toHostWireError()
-    }
+private fun validateWire(validation: () -> Unit): WireErrorParcel? = try {
+    validation()
+    null
+} catch (error: WireProtocolException) {
+    error.toHostWireError()
+}

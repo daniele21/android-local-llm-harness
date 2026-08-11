@@ -43,23 +43,21 @@ class SharedRuntimeHostDelegate(
                 return
             }
         controlExecutor.submitOrReject(
-            onRejected = { callback.onResult(registrationFailure(wireError(io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes.TRANSPORT_FAILURE))) },
+            onRejected = {
+                callback.onResult(
+                    registrationFailure(wireError(io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes.TRANSPORT_FAILURE)),
+                )
+            },
         ) {
             completeRegistration(caller, lifecycle, callback, negotiated.minor, negotiated.enabledFeatures.sorted())
         }
     }
 
-    fun prepare(
-        caller: AuthorizedCaller,
-        request: PrepareRequestParcel,
-        callback: HostResultCallback<PrepareResultParcel>,
-    ) = runtimeOperations.prepare(caller, request, callback)
+    fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) =
+        runtimeOperations.prepare(caller, request, callback)
 
-    fun openSession(
-        caller: AuthorizedCaller,
-        request: OpenSessionRequestParcel,
-        callback: HostResultCallback<SessionResultParcel>,
-    ) = runtimeOperations.openSession(caller, request, callback)
+    fun openSession(caller: AuthorizedCaller, request: OpenSessionRequestParcel, callback: HostResultCallback<SessionResultParcel>) =
+        runtimeOperations.openSession(caller, request, callback)
 
     fun generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) =
         runtimeOperations.generate(caller, request, callback)
@@ -82,6 +80,7 @@ class SharedRuntimeHostDelegate(
     ) {
         when (val registration = ledger.register(caller)) {
             is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
+
             is LedgerResult.Success -> {
                 val token = registration.value
                 val deathLink = lifecycle.link { submitDeathCleanup(token, caller) }

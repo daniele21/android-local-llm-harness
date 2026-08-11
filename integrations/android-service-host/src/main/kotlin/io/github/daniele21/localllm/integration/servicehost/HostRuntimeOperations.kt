@@ -20,11 +20,7 @@ internal class HostRuntimeOperations(
     private val resources: HostRuntimeResources,
     private val controlExecutor: HostControlExecutor,
 ) {
-    fun prepare(
-        caller: AuthorizedCaller,
-        request: PrepareRequestParcel,
-        callback: HostResultCallback<PrepareResultParcel>,
-    ) {
+    fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) {
         val validationError = validatePrepare(caller, request)
         if (validationError != null) {
             callback.onResult(prepareFailure(request.operationId, validationError))
@@ -37,11 +33,7 @@ internal class HostRuntimeOperations(
         }
     }
 
-    fun openSession(
-        caller: AuthorizedCaller,
-        request: OpenSessionRequestParcel,
-        callback: HostResultCallback<SessionResultParcel>,
-    ) {
+    fun openSession(caller: AuthorizedCaller, request: OpenSessionRequestParcel, callback: HostResultCallback<SessionResultParcel>) {
         val validationError = validateOpenSession(caller, request)
         if (validationError != null) {
             callback.onResult(sessionFailure(request.operationId, validationError))
@@ -90,11 +82,7 @@ internal class HostRuntimeOperations(
         }
     }
 
-    private fun runPrepare(
-        caller: AuthorizedCaller,
-        request: PrepareRequestParcel,
-        callback: HostResultCallback<PrepareResultParcel>,
-    ) {
+    private fun runPrepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) {
         val token = HostClientToken(request.clientToken.value)
         val connectionError = ledger.validateConnection(token, caller).failureOrNull()?.toHostWireError()
         if (connectionError != null) {
@@ -131,6 +119,7 @@ internal class HostRuntimeOperations(
             }
         when (val registered = ledger.registerSession(token, caller, request.externalSessionId, sessionId)) {
             is LedgerResult.Success -> callback.onResult(sessionSuccess(request.operationId, request.externalSessionId))
+
             is LedgerResult.Failure -> {
                 runCatching { client.closeSession(sessionId) }
                 callback.onResult(sessionFailure(request.operationId, registered.reason.toHostWireError()))
@@ -138,11 +127,7 @@ internal class HostRuntimeOperations(
         }
     }
 
-    private fun runGeneration(
-        caller: AuthorizedCaller,
-        request: GenerationRequestParcel,
-        callback: HostEventCallback,
-    ) {
+    private fun runGeneration(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) {
         val token = HostClientToken(request.clientToken.value)
         val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull()
         if (sessionId == null) {
@@ -179,13 +164,12 @@ internal class HostRuntimeOperations(
         externalRequestId: String,
         requestId: RequestId,
         callback: HostEventCallback,
-    ): GenerationEventForwarder =
-        GenerationEventForwarder(
-            externalRequestId = externalRequestId,
-            callback = callback,
-            onTerminal = { submitRequestCleanup(token, caller, externalRequestId, requestId) },
-            onCallbackFailure = { submitCallbackFailureCleanup(token, caller, externalRequestId, requestId) },
-        )
+    ): GenerationEventForwarder = GenerationEventForwarder(
+        externalRequestId = externalRequestId,
+        callback = callback,
+        onTerminal = { submitRequestCleanup(token, caller, externalRequestId, requestId) },
+        onCallbackFailure = { submitCallbackFailureCleanup(token, caller, externalRequestId, requestId) },
+    )
 
     private fun submitCallbackFailureCleanup(
         token: HostClientToken,
@@ -197,12 +181,7 @@ internal class HostRuntimeOperations(
         submitRequestCleanup(token, caller, externalRequestId, requestId)
     }
 
-    private fun submitRequestCleanup(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalRequestId: String,
-        requestId: RequestId,
-    ) {
+    private fun submitRequestCleanup(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String, requestId: RequestId) {
         controlExecutor.submitOrReject(onRejected = { resources.removeHandle(requestId) }) {
             ledger.removeRequest(token, caller, externalRequestId)
             resources.removeHandle(requestId)
