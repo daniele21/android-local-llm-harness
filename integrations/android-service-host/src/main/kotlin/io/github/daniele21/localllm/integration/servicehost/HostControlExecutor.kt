@@ -46,3 +46,7 @@ class BoundedSerialHostControlExecutor(
         const val CONTROL_THREAD_NAME = "local-llm-host-control"
     }
 }
+
+internal fun HostControlExecutor.submitOrReject(onRejected: () -> Unit, task: () -> Unit) {
+    if (!execute(task)) onRejected()
+}

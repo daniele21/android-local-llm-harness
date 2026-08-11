@@ -16,6 +16,9 @@ internal class GenerationEventForwarder(
     private val terminalDelivered = AtomicBoolean(false)
     private val failed = AtomicBoolean(false)
 
+    val callbackFailed: Boolean
+        get() = failed.get()
+
     fun onEvent(event: GenerationEvent) {
         if (failed.get() || terminalDelivered.get()) return
         val events =
