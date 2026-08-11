@@ -12,11 +12,11 @@ This roadmap owns capability order and exit gates. Detailed behavior belongs in 
 ## Sequence
 
 ```text
-SR-0 Decision and scope                    PLANNED
+SR-0 Decision and scope                    DONE
    |
-SR-1 Binder protocol v1                    PLANNED
+SR-1 Binder protocol v1                    DONE
    |--------------------------|
-SR-2 Host service          SR-3 Client SDK PLANNED
+SR-2 Host service          SR-3 Client SDK IN PROGRESS / PLANNED
    |--------------------------|
 SR-4 Two-APK vertical slice                PLANNED
    |
@@ -31,7 +31,7 @@ SR-2 and SR-3 may proceed independently only after SR-1 freezes the v1 fixtures 
 
 ## SR-0 — Decision and scope
 
-State: **PLANNED**
+State: **DONE**
 
 Goal: convert the proposal into an accepted durable deployment decision.
 
@@ -47,7 +47,7 @@ Exit gate: all decisions listed in [`target.md`](target.md) are accepted or the 
 
 ## SR-1 — Binder protocol v1
 
-State: **PLANNED**
+State: **DONE**
 
 Goal: define and test the wire contract without connecting a production runtime.
 
@@ -63,7 +63,7 @@ Exit gate:
 
 ## SR-2 — Host service
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: expose the existing data plane through an authenticated, lifecycle-safe Android service.
 
