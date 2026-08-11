@@ -9,18 +9,15 @@ class BuiltInKotlinParcelizePlugin : KotlinCompilerPluginSupportPlugin {
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean =
         kotlinCompilation.platformType == KotlinPlatformType.androidJvm
 
-    override fun applyToCompilation(
-        kotlinCompilation: KotlinCompilation<*>,
-    ): Provider<List<SubpluginOption>> =
+    override fun applyToCompilation(kotlinCompilation: KotlinCompilation<*>): Provider<List<SubpluginOption>> =
         kotlinCompilation.target.project.provider { emptyList() }
 
     override fun getCompilerPluginId(): String = "org.jetbrains.kotlin.parcelize"
 
-    override fun getPluginArtifact(): SubpluginArtifact =
-        SubpluginArtifact(
-            groupId = "org.jetbrains.kotlin",
-            artifactId = "kotlin-parcelize-compiler",
-        )
+    override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
+        groupId = "org.jetbrains.kotlin",
+        artifactId = "kotlin-parcelize-compiler",
+    )
 }
 
 plugins {
