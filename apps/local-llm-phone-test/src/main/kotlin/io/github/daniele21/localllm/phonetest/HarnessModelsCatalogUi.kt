@@ -17,11 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
-import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
-import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
@@ -59,14 +58,27 @@ internal fun UnifiedModelsCatalog(
     var sizeFilter by rememberSaveable { mutableStateOf(ModelsSizeFilter.ALL) }
     val feedback by ModelActionFeedbackStore.state.collectAsState()
     val catalogItems = state.modelInventory.items.filter { it.origin == HarnessModelOrigin.CATALOG }
-    val visibleItems = catalogItems.filter { item ->
-        availabilityFilter.matches(item) && sizeFilter.matches(item)
-    }
     val distributionByStableId = state.modelDistribution.models.associateBy(PhoneCatalogModelUi::stableId)
+    val loadingStableId = loadingStableId(state, feedback)
+    val loadedItem = catalogItems.firstOrNull(HarnessModelInventoryItem::loaded)
+    val loadedModel = loadedItem?.let { distributionByStableId[it.stableId] }
+    val visibleItems = catalogItems.filter { item ->
+        !item.loaded && availabilityFilter.matches(item) && sizeFilter.matches(item)
+    }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModelsCatalogSummary(state, catalogItems.size)
-        ModelActionStatusCard(feedback)
+        if (loadedItem != null && loadedModel != null) {
+            ActiveModelCard(
+                state = state,
+                item = loadedItem,
+                model = loadedModel,
+                actions = actions,
+            )
+        }
+        if (feedback.history.isNotEmpty()) {
+            ModelActionStatus(feedback)
+        }
         ModelsCatalogFilters(
             availabilityFilter = availabilityFilter,
             sizeFilter = sizeFilter,
@@ -84,91 +96,71 @@ internal fun UnifiedModelsCatalog(
                         model = distributionByStableId.getValue(item.stableId),
                         actions = actions,
                         onOpenModelDetails = onOpenModelDetails,
+                        loading = loadingStableId == item.stableId,
                     )
                 }
             }
         }
         if (visibleItems.isEmpty()) {
             HarnessCard {
-                Text("No models match these filters.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No other models match these filters.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text(
-            "${state.modelDistribution.sourceLabel} · revision ${state.modelDistribution.catalogRevision ?: "unavailable"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(state.modelDistribution.message, style = MaterialTheme.typography.bodySmall)
-        HarnessSecondaryButton("Refresh model state", onClick = actions.refresh)
+        ModelsCatalogFooter(state, actions)
     }
 }
 
 @Composable
-private fun ModelActionStatusCard(feedback: ModelActionFeedbackState) {
-    HarnessCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Model activity", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    feedback.latest,
-                    color = if (feedback.tone == ModelActionFeedbackTone.ERROR) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-            HarnessStatusBadge(
-                label = when (feedback.tone) {
-                    ModelActionFeedbackTone.INFO -> "STATUS"
-                    ModelActionFeedbackTone.SUCCESS -> "OK"
-                    ModelActionFeedbackTone.ERROR -> "ERROR"
-                },
-                tone = when (feedback.tone) {
-                    ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
-                    ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
-                    ModelActionFeedbackTone.ERROR -> HarnessStatusTone.WARNING
-                },
-            )
-        }
-        val previous = feedback.history.drop(1).take(3)
-        if (previous.isNotEmpty()) {
-            Text(
-                "Recent",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            previous.forEach { message ->
-                Text(
-                    "• $message",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HarnessStatusBadge(
+            label = when (feedback.tone) {
+                ModelActionFeedbackTone.INFO -> "STATUS"
+                ModelActionFeedbackTone.SUCCESS -> "OK"
+                ModelActionFeedbackTone.ERROR -> "ERROR"
+            },
+            tone = when (feedback.tone) {
+                ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
+                ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
+                ModelActionFeedbackTone.ERROR -> HarnessStatusTone.WARNING
+            },
+        )
+        Text(
+            text = feedback.latest,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (feedback.tone == ModelActionFeedbackTone.ERROR) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 
 @Composable
 private fun ModelsCatalogSummary(state: HarnessUiState, catalogCount: Int) {
-    val selected = state.modelInventory.selectedItem
     HarnessCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
-                    "$catalogCount models · ${state.modelInventory.installedCount} installed",
+                    text = "$catalogCount models · ${state.modelInventory.installedCount} installed",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    selected?.let {
-                        "Active: ${it.displayName} · ${if (it.loaded) "Loaded" else "Selected"}"
-                    } ?: "No active model selected",
+                    text = "${formatModelBytes(state.modelInventory.installedBytes)} used in local model storage",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -180,10 +172,6 @@ private fun ModelsCatalogSummary(state: HarnessUiState, catalogCount: Int) {
                     HarnessStatusTone.WARNING
                 },
             )
-        }
-        HarnessMetricRow {
-            HarnessMetric("Storage", formatModelBytes(state.modelInventory.installedBytes), Modifier.weight(1f))
-            HarnessMetric("Loaded", if (state.modelInventory.loadedDigest == null) "No" else "Yes", Modifier.weight(1f))
         }
     }
 }
@@ -219,6 +207,34 @@ private fun ModelsCatalogFilters(
     }
 }
 
+@Composable
+private fun ModelsCatalogFooter(state: HarnessUiState, actions: UnifiedModelsActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = "${state.modelDistribution.sourceLabel} · revision ${state.modelDistribution.catalogRevision ?: "unavailable"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = state.modelDistribution.message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HarnessSecondaryButton(
+            text = "Refresh model state",
+            enabled = !state.busy,
+            onClick = actions.refresh,
+        )
+    }
+}
+
+internal fun loadingStableId(state: HarnessUiState, feedback: ModelActionFeedbackState): String? {
+    if (!state.controllerBusy) return null
+    return state.modelDistribution.models
+        .firstOrNull { feedback.latest == "Loading ${it.fileName} into memory" }
+        ?.stableId
+}
+
 internal fun ModelsAvailabilityFilter.matches(item: HarnessModelInventoryItem): Boolean = when (this) {
     ModelsAvailabilityFilter.ALL -> true
     ModelsAvailabilityFilter.INSTALLED -> item.installed
@@ -232,21 +248,20 @@ internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean 
 }
 
 internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
+    HarnessModelLifecycle.LOADED -> HarnessStatusTone.SUCCESS
+
     HarnessModelLifecycle.SELECTED,
-    HarnessModelLifecycle.LOADED,
-    HarnessModelLifecycle.INSTALLED,
-    -> HarnessStatusTone.SUCCESS
+    HarnessModelLifecycle.DOWNLOADING,
+    HarnessModelLifecycle.INSTALLING,
+    HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
+    -> HarnessStatusTone.INFO
 
     HarnessModelLifecycle.DEGRADED,
     HarnessModelLifecycle.FAILED,
     HarnessModelLifecycle.INCOMPATIBLE,
     -> HarnessStatusTone.WARNING
 
-    HarnessModelLifecycle.DOWNLOADING,
-    HarnessModelLifecycle.INSTALLING,
-    HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
-    -> HarnessStatusTone.INFO
-
+    HarnessModelLifecycle.INSTALLED,
     HarnessModelLifecycle.READY_TO_DOWNLOAD,
     HarnessModelLifecycle.CANCELLED,
     -> HarnessStatusTone.NEUTRAL
