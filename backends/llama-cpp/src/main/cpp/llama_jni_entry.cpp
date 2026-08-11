@@ -3,6 +3,7 @@
 #include "native_cancellation_registry.h"
 #include "generation_output_buffer.h"
 #include "generation_sampler.h"
+#include "reasoning_transition.h"
 
 namespace {
 
@@ -69,20 +70,46 @@ private:
     jmethodID method_ = nullptr;
 };
 
-std::vector<std::string> cancelled_response(
+std::vector<std::string> terminal_response(
+    const char* status,
     std::size_t input_tokens,
     std::int32_t output_tokens,
     std::int64_t prompt_ms,
-    std::int64_t generation_ms
+    std::int64_t generation_ms,
+    const std::string& stop_reason,
+    std::int32_t reasoning_tokens,
+    std::int32_t answer_tokens
 ) {
     return {
-        "cancelled",
+        status,
         std::to_string(input_tokens),
         std::to_string(output_tokens),
         std::to_string(prompt_ms),
         std::to_string(generation_ms),
-        "UNKNOWN",
+        stop_reason,
+        std::to_string(reasoning_tokens),
+        std::to_string(answer_tokens),
     };
+}
+
+std::vector<std::string> cancelled_response(
+    std::size_t input_tokens,
+    std::int32_t output_tokens,
+    std::int64_t prompt_ms,
+    std::int64_t generation_ms,
+    std::int32_t reasoning_tokens = -1,
+    std::int32_t answer_tokens = -1
+) {
+    return terminal_response(
+        "cancelled",
+        input_tokens,
+        output_tokens,
+        prompt_ms,
+        generation_ms,
+        "UNKNOWN",
+        reasoning_tokens,
+        answer_tokens
+    );
 }
 
 std::vector<std::string> read_java_stop_sequences(JNIEnv* env, jobjectArray values) {
@@ -105,6 +132,43 @@ std::vector<llama_token> read_java_stop_tokens(JNIEnv* env, jintArray values) {
 
 bool contains_token(const std::vector<llama_token>& values, llama_token token) {
     return std::find(values.begin(), values.end(), token) != values.end();
+}
+
+std::vector<llama_token> tokenize_generated_text(const llama_vocab* vocab, const std::string& text) {
+    if (text.empty() || text.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+        return {};
+    }
+    const std::int32_t required = llama_tokenize(
+        vocab,
+        text.c_str(),
+        static_cast<std::int32_t>(text.size()),
+        nullptr,
+        0,
+        false,
+        true
+    );
+    if (required == std::numeric_limits<std::int32_t>::min()) {
+        return {};
+    }
+    const std::int32_t token_count = required < 0 ? -required : required;
+    if (token_count <= 0) {
+        return {};
+    }
+    std::vector<llama_token> tokens(static_cast<std::size_t>(token_count));
+    const std::int32_t written = llama_tokenize(
+        vocab,
+        text.c_str(),
+        static_cast<std::int32_t>(text.size()),
+        tokens.data(),
+        token_count,
+        false,
+        true
+    );
+    if (written <= 0) {
+        return {};
+    }
+    tokens.resize(static_cast<std::size_t>(written));
+    return tokens;
 }
 
 std::string grammar_for_constraint(const std::string& type, const std::string& schema) {
@@ -138,6 +202,9 @@ std::vector<std::string> stream_text(
     const std::string& output_schema,
     const std::vector<llama_token>& stop_token_ids,
     const std::vector<std::string>& stop_sequences,
+    std::int32_t max_reasoning_tokens,
+    const std::string& reasoning_close_marker,
+    const std::string& reasoning_forced_close_text,
     JavaStreamingCallback& callback
 ) {
     const auto cancellation = cancellations.begin(request_id);
@@ -157,7 +224,28 @@ std::vector<std::string> stream_text(
         return error_response("UNSUPPORTED_MODEL", "Encoder-decoder models are not supported by this runtime path");
     }
 
+    const bool reasoning_controlled = max_reasoning_tokens > 0;
+    if (reasoning_controlled != (!reasoning_close_marker.empty() && !reasoning_forced_close_text.empty())) {
+        return error_response("INVALID_ARGUMENT", "Reasoning transition configuration is incomplete");
+    }
+    if (reasoning_controlled && reasoning_forced_close_text.find(reasoning_close_marker) == std::string::npos) {
+        return error_response("INVALID_ARGUMENT", "Forced reasoning close text must contain the close marker");
+    }
+
     const llama_vocab* vocab = llama_model_get_vocab(record.model->model);
+    std::vector<llama_token> forced_transition_tokens;
+    if (reasoning_controlled) {
+        forced_transition_tokens = tokenize_generated_text(vocab, reasoning_forced_close_text);
+        if (forced_transition_tokens.empty()) {
+            return error_response("TOKENIZATION_FAILED", "Reasoning close text tokenization returned no tokens");
+        }
+        if (max_reasoning_tokens >= max_output_tokens ||
+            static_cast<std::size_t>(max_reasoning_tokens) + forced_transition_tokens.size() >=
+                static_cast<std::size_t>(max_output_tokens)) {
+            return error_response("INVALID_ARGUMENT", "Reasoning budget must reserve tokens for the final answer");
+        }
+    }
+
     std::string grammar;
     try {
         grammar = grammar_for_constraint(output_constraint_type, output_schema);
@@ -221,9 +309,25 @@ std::vector<std::string> stream_text(
     }
     std::int32_t pending_tokens = 0;
     std::int32_t generated_tokens = 0;
+    std::int32_t reasoning_boundary_tokens = -1;
     bool cancelled = false;
     bool stopped = false;
     std::string stop_reason = "MAX_OUTPUT_TOKENS";
+    std::unique_ptr<ReasoningTransitionTracker> reasoning_tracker;
+    if (reasoning_controlled) {
+        reasoning_tracker = std::make_unique<ReasoningTransitionTracker>(reasoning_close_marker);
+    }
+
+    const auto record_reasoning_piece = [&](const std::string& piece) {
+        if (!reasoning_tracker || reasoning_tracker->closed()) {
+            return;
+        }
+        reasoning_tracker->observe(piece);
+        if (reasoning_tracker->closed()) {
+            reasoning_boundary_tokens = generated_tokens;
+        }
+    };
+
     const auto generation_started = std::chrono::steady_clock::now();
     while (generated_tokens < max_output_tokens) {
         if (cancellation->load(std::memory_order_acquire)) {
@@ -250,6 +354,7 @@ std::vector<std::string> stream_text(
         ++pending_tokens;
         ++generated_tokens;
         llama_sampler_accept(sampler.get(), token);
+        record_reasoning_piece(piece);
 
         const auto stop_position = earliest_stop_position(pending, stop_sequences);
         if (stop_position.has_value()) {
@@ -281,6 +386,32 @@ std::vector<std::string> stream_text(
         if (generated_tokens < max_output_tokens && llama_decode(record.context, token_batch) != 0) {
             return error_response("DECODE_FAILED", "llama.cpp failed while decoding a generated token");
         }
+
+        if (reasoning_tracker && !reasoning_tracker->closed() && generated_tokens >= max_reasoning_tokens) {
+            for (const llama_token forced_token : forced_transition_tokens) {
+                if (generated_tokens >= max_output_tokens) {
+                    return error_response("INTERNAL", "Reasoning transition exhausted the output budget");
+                }
+                const std::string forced_piece = token_piece(vocab, forced_token);
+                if (forced_piece.empty()) {
+                    return error_response("TOKEN_DECODE_FAILED", "Unable to decode a forced reasoning transition token");
+                }
+                pending.append(forced_piece);
+                ++pending_tokens;
+                ++generated_tokens;
+                llama_sampler_accept(sampler.get(), forced_token);
+                record_reasoning_piece(forced_piece);
+
+                llama_token forced_value = forced_token;
+                llama_batch forced_batch = llama_batch_get_one(&forced_value, 1);
+                if (llama_decode(record.context, forced_batch) != 0) {
+                    return error_response("DECODE_FAILED", "llama.cpp failed while applying the reasoning transition");
+                }
+            }
+            if (!reasoning_tracker->closed()) {
+                return error_response("INTERNAL", "Forced reasoning transition did not emit the configured close marker");
+            }
+        }
     }
 
     if (!cancelled && !pending.empty()) {
@@ -296,18 +427,30 @@ std::vector<std::string> stream_text(
     const auto generation_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - generation_started
     ).count();
+    const std::int32_t answer_tokens = reasoning_boundary_tokens >= 0
+        ? generated_tokens - reasoning_boundary_tokens
+        : -1;
 
     if (cancelled) {
-        return cancelled_response(prompt_tokens.size(), generated_tokens, prompt_ms, generation_ms);
+        return cancelled_response(
+            prompt_tokens.size(),
+            generated_tokens,
+            prompt_ms,
+            generation_ms,
+            reasoning_boundary_tokens,
+            answer_tokens
+        );
     }
-    return {
+    return terminal_response(
         "ok",
-        std::to_string(prompt_tokens.size()),
-        std::to_string(generated_tokens),
-        std::to_string(prompt_ms),
-        std::to_string(generation_ms),
+        prompt_tokens.size(),
+        generated_tokens,
+        prompt_ms,
+        generation_ms,
         stop_reason,
-    };
+        reasoning_boundary_tokens,
+        answer_tokens
+    );
 }
 
 }  // namespace
@@ -332,6 +475,9 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_generateStreamin
     jstring output_schema_value,
     jintArray stop_token_ids_value,
     jobjectArray stop_sequences_value,
+    jint reasoning_max_tokens,
+    jstring reasoning_close_marker_value,
+    jstring reasoning_forced_close_text_value,
     jobject callback_value
 ) {
     const auto context = contexts.get(static_cast<std::int64_t>(context_handle));
@@ -357,6 +503,23 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_generateStreamin
         }
         output_schema.assign(schema.get());
     }
+    std::string reasoning_close_marker;
+    if (reasoning_close_marker_value != nullptr) {
+        const UtfChars marker(env, reasoning_close_marker_value);
+        if (marker.get() == nullptr) {
+            return nullptr;
+        }
+        reasoning_close_marker.assign(marker.get());
+    }
+    std::string reasoning_forced_close_text;
+    if (reasoning_forced_close_text_value != nullptr) {
+        const UtfChars close_text(env, reasoning_forced_close_text_value);
+        if (close_text.get() == nullptr) {
+            return nullptr;
+        }
+        reasoning_forced_close_text.assign(close_text.get());
+    }
+
     const std::vector<llama_token> stop_token_ids = read_java_stop_tokens(env, stop_token_ids_value);
     const std::vector<std::string> stop_sequences = read_java_stop_sequences(env, stop_sequences_value);
     if (request_id.get()[0] == '\0') {
@@ -383,6 +546,9 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_generateStreamin
             output_schema,
             stop_token_ids,
             stop_sequences,
+            reasoning_max_tokens,
+            reasoning_close_marker,
+            reasoning_forced_close_text,
             callback
         )
     );
