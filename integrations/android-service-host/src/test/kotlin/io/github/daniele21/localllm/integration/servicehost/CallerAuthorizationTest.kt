@@ -75,12 +75,11 @@ class CallerAuthorizationTest {
         )
     }
 
-    private fun authorizer(environment: FakeCallerEnvironment) =
-        CallerAuthorizer(
-            permissionName = "io.example.permission.USE_LOCAL_LLM",
-            policies = listOf(policy),
-            environment = environment,
-        )
+    private fun authorizer(environment: FakeCallerEnvironment) = CallerAuthorizer(
+        permissionName = "io.example.permission.USE_LOCAL_LLM",
+        policies = listOf(policy),
+        environment = environment,
+    )
 
     private fun assertDenied(expected: AuthorizationFailure, result: AuthorizationResult) {
         assertTrue(result is AuthorizationResult.Denied)
@@ -102,10 +101,7 @@ class CallerAuthorizationTest {
             return packages
         }
 
-        override fun hasSigningCertificate(
-            packageName: String,
-            certificate: SigningCertificateSha256,
-        ): Boolean {
+        override fun hasSigningCertificate(packageName: String, certificate: SigningCertificateSha256): Boolean {
             signerLookupCount += 1
             return certificate == acceptedCertificate
         }

@@ -26,16 +26,12 @@ class AndroidCallerEnvironment(context: Context) : CallerEnvironment {
         }
 
     @Suppress("DEPRECATION")
-    private fun hasLegacySigningCertificate(
-        packageName: String,
-        certificate: SigningCertificateSha256,
-    ): Boolean =
-        try {
-            val signatures = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures.orEmpty()
-            signatures.any { signature ->
-                MessageDigest.getInstance("SHA-256").digest(signature.toByteArray()).contentEquals(certificate.bytes)
-            }
-        } catch (_: PackageManager.NameNotFoundException) {
-            false
+    private fun hasLegacySigningCertificate(packageName: String, certificate: SigningCertificateSha256): Boolean = try {
+        val signatures = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures.orEmpty()
+        signatures.any { signature ->
+            MessageDigest.getInstance("SHA-256").digest(signature.toByteArray()).contentEquals(certificate.bytes)
         }
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
 }

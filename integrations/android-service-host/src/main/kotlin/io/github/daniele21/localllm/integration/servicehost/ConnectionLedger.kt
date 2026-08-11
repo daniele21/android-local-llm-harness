@@ -13,11 +13,7 @@ value class HostClientToken(val value: String) {
     }
 }
 
-data class HostQuotas(
-    val maxConnections: Int = 8,
-    val maxSessionsPerConnection: Int = 8,
-    val maxRequestsPerConnection: Int = 16,
-) {
+data class HostQuotas(val maxConnections: Int = 8, val maxSessionsPerConnection: Int = 8, val maxRequestsPerConnection: Int = 16) {
     init {
         require(maxConnections > 0) { "maxConnections must be positive" }
         require(maxSessionsPerConnection > 0) { "maxSessionsPerConnection must be positive" }
@@ -66,10 +62,7 @@ sealed interface LedgerResult<out T> {
     data class Failure(val reason: LedgerFailure) : LedgerResult<Nothing>
 }
 
-data class ClosingResources(
-    val requestIds: List<RequestId>,
-    val sessionIds: List<SessionId>,
-)
+data class ClosingResources(val requestIds: List<RequestId>, val sessionIds: List<SessionId>)
 
 class ClientConnectionLedger(
     private val quotas: HostQuotas = HostQuotas(),
@@ -115,11 +108,7 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun sessionId(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalSessionId: String,
-    ): LedgerResult<SessionId> {
+    fun sessionId(token: HostClientToken, caller: AuthorizedCaller, externalSessionId: String): LedgerResult<SessionId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
         val sessionId = connection.sessions[externalSessionId]
             ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
@@ -127,11 +116,7 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun removeSession(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalSessionId: String,
-    ): LedgerResult<SessionId> {
+    fun removeSession(token: HostClientToken, caller: AuthorizedCaller, externalSessionId: String): LedgerResult<SessionId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
         val removed = connection.sessions.remove(externalSessionId)
             ?: return LedgerResult.Failure(LedgerFailure.SESSION_NOT_OWNED)
@@ -139,11 +124,7 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun allocateRequest(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalRequestId: String,
-    ): LedgerResult<RequestId> {
+    fun allocateRequest(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
         if (connection.closing) {
             return LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
@@ -160,11 +141,7 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun requestId(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalRequestId: String,
-    ): LedgerResult<RequestId> {
+    fun requestId(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
         val requestId = connection.requests[externalRequestId]
             ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
@@ -172,11 +149,7 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun removeRequest(
-        token: HostClientToken,
-        caller: AuthorizedCaller,
-        externalRequestId: String,
-    ): LedgerResult<RequestId> {
+    fun removeRequest(token: HostClientToken, caller: AuthorizedCaller, externalRequestId: String): LedgerResult<RequestId> {
         val connection = activeConnection(token, caller) ?: return invalidConnection()
         val removed = connection.requests.remove(externalRequestId)
             ?: return LedgerResult.Failure(LedgerFailure.REQUEST_NOT_OWNED)
@@ -205,8 +178,7 @@ class ClientConnectionLedger(
     private fun activeConnection(token: HostClientToken, caller: AuthorizedCaller): Connection? =
         connections[token]?.takeIf { it.caller.uid == caller.uid && it.caller.packageName == caller.packageName }
 
-    private fun invalidConnection(): LedgerResult.Failure =
-        LedgerResult.Failure(LedgerFailure.CLIENT_TOKEN_INVALID)
+    private fun invalidConnection(): LedgerResult.Failure = LedgerResult.Failure(LedgerFailure.CLIENT_TOKEN_INVALID)
 
     private data class Connection(
         val caller: AuthorizedCaller,

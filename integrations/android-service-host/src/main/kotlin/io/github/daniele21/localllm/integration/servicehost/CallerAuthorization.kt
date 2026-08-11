@@ -125,6 +125,7 @@ class CallerAuthorizer(
     fun authorize(callingProcess: CallingProcess, useCaseId: UseCaseId): AuthorizationResult =
         when (val result = authorize(callingProcess)) {
             is AuthorizationResult.Denied -> result
+
             is AuthorizationResult.Allowed -> {
                 if (result.caller.allows(useCaseId)) {
                     result

@@ -91,13 +91,12 @@ class ConnectionLedgerTest {
         assertFailure(LedgerFailure.DUPLICATE_EXTERNAL_REQUEST_ID, ledger.allocateRequest(token, caller, "request-1"))
     }
 
-    private fun caller(uid: Int, packageName: String) =
-        AuthorizedCaller(
-            uid = uid,
-            packageName = packageName,
-            applicationId = ApplicationId("app-$uid"),
-            allowedUseCases = setOf(UseCaseId("summarize")),
-        )
+    private fun caller(uid: Int, packageName: String) = AuthorizedCaller(
+        uid = uid,
+        packageName = packageName,
+        applicationId = ApplicationId("app-$uid"),
+        allowedUseCases = setOf(UseCaseId("summarize")),
+    )
 
     private fun <T> successValue(result: LedgerResult<T>): T {
         assertTrue(result is LedgerResult.Success)
