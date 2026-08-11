@@ -13,7 +13,7 @@ import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
-import io.github.daniele21.locallm.contracts.ModelLoadKind
+import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicy
@@ -56,7 +56,7 @@ class BinderProtocolV1Test {
     }
 
     @Test
-    fun `major mismatch fails closed` () {
+    fun `major mismatch fails closed`() {
         val failure =
             assertThrows(WireProtocolException::class.java) {
                 negotiateProtocol(
