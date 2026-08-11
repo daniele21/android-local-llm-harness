@@ -258,6 +258,7 @@ jobs:
             observability:benchmark-engine
             transports:in-process
             transports:android-binder-contract
+            integrations:android-service-host
             apps:local-llm-console
             apps:device-test-runner
             apps:local-llm-phone-test
@@ -283,6 +284,7 @@ jobs:
               :backends:llama-cpp:assembleDebug
               :transports:android-binder-contract:assembleDebug
               :transports:android-binder-contract:assembleDebugAndroidTest
+              :integrations:android-service-host:assembleDebug
               :apps:local-llm-console:assembleInternal
               :apps:device-test-runner:assembleDebug
               :apps:device-test-runner:assembleDebugAndroidTest
