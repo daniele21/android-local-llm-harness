@@ -49,6 +49,24 @@ class DetectCiScopeTest(unittest.TestCase):
             ),
         )
 
+    def test_binder_contract_change_selects_transport_module(self) -> None:
+        scope = classify_paths(
+            [
+                "transports/android-binder-contract/src/main/kotlin/ProtocolModels.kt",
+            ]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("transports:android-binder-contract",))
+
+    def test_binder_contract_build_change_selects_transport_and_packaging(self) -> None:
+        scope = classify_paths(["transports/android-binder-contract/build.gradle.kts"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertTrue(scope.packaging)
+        self.assertEqual(scope.modules, ("transports:android-binder-contract",))
+
     def test_app_change_selects_app_and_runs_packaging(self) -> None:
         scope = classify_paths(["apps/local-llm-phone-test/src/main/kotlin/MainActivity.kt"])
         self.assertTrue(scope.android)
