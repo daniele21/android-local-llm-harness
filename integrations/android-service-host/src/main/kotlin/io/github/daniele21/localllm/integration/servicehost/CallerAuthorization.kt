@@ -89,12 +89,11 @@ class CallerAuthorizer(
         policiesByPackage = grouped.mapValues { (_, values) -> values.single() }
     }
 
-    fun authorize(callingProcess: CallingProcess): AuthorizationResult =
-        if (environment.hasPermission(permissionName, callingProcess)) {
-            authorizePermittedCaller(callingProcess)
-        } else {
-            AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
-        }
+    fun authorize(callingProcess: CallingProcess): AuthorizationResult = if (environment.hasPermission(permissionName, callingProcess)) {
+        authorizePermittedCaller(callingProcess)
+    } else {
+        AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
+    }
 
     fun authorize(callingProcess: CallingProcess, useCaseId: UseCaseId): AuthorizationResult =
         when (val result = authorize(callingProcess)) {
