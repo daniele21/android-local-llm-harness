@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
@@ -19,6 +19,7 @@ The repository remains not production-ready until representative physical-device
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
 | Curated model distribution and installation | Implemented / device evidence pending | Real remote download/install validation on representative phones |
+| Qwen3.5-only product transition | Planned | Non-destructive support migration, compatibility, tuning, validation and certification |
 | Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
 | Model RAM residency and warm-idle eviction | Planned | Product controls, TTL implementation and tests |
 | Native Android SDK integration | Planned | Stable consumer adapter over the embedded contracts |
@@ -62,6 +63,7 @@ Implemented:
 
 Remaining:
 
+- enforce the Qwen3.5-only product envelope while preserving model-family-neutral lifecycle contracts;
 - explicit product-facing RAM load/unload controls;
 - monotonic warm-idle TTL with cancellation, rearming, pinning and unload reasons;
 - representative physical-device validation of cancellation, memory stability, latency, throughput and thermal behavior;
@@ -84,10 +86,13 @@ Implemented:
 
 Remaining:
 
+- migrate current multi-family eligibility and bindings to Qwen3.5 dense 0.8B/2B without deleting legacy installed artifacts;
 - representative physical-device remote download and installation evidence;
 - `lastUsedAt` and final restart/reconciliation UI coverage;
 - product RAM-residency actions separate from selection and storage;
 - future administrator synchronization and trust-policy wiring only after the current embedded distribution path is stable.
+
+The repository roadmap intentionally does not duplicate the Qwen milestone matrix. Sequence, states and exit gates are owned by [`qwen35/roadmap.md`](qwen35/roadmap.md).
 
 ## 4. Observability and developer controls
 

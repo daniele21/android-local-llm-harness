@@ -19,7 +19,7 @@ endif()
 # Runtime-selected Android CPU variants are emitted as shared backend libraries.
 # The backend loader and BUILD_SHARED_LIBS must therefore stay enabled together.
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON ON CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -43,8 +43,8 @@ add_library(
     common_string_utils.cpp
     generation_output_buffer.cpp
     generation_sampler.cpp
+    reasoning_transition.cpp
     llama_jni_entry.cpp
-    "${LLAMA_CPP_DIR}/common/json-schema-to-grammar.cpp"
 )
 
 target_compile_definitions(
@@ -71,6 +71,7 @@ target_link_libraries(
     local_llm_jni
     PRIVATE
     llama
+    llama-common
     ggml
     ${android_lib}
     ${log_lib}

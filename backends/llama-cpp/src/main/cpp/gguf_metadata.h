@@ -23,6 +23,9 @@ struct GgufMetadata {
     std::string architecture;
     std::string name;
     std::optional<std::int64_t> file_type;
+    std::optional<std::int64_t> context_length;
+    std::optional<std::int64_t> block_count;
+    std::optional<std::int64_t> embedding_length;
 };
 
 struct GgufInspection {

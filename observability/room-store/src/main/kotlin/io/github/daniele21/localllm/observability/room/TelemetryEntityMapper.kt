@@ -8,8 +8,10 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -51,6 +53,9 @@ internal object TelemetryEntityMapper {
         temperature = run.temperature
         topP = run.topP
         topK = run.topK
+        minP = run.minP
+        presencePenalty = run.presencePenalty
+        thinkingMode = run.thinkingMode?.name
         repeatPenalty = run.repeatPenalty
         repeatLastN = run.repeatLastN
         seedPolicy = run.seedPolicy?.name
@@ -90,6 +95,9 @@ internal object TelemetryEntityMapper {
         temperature = entity.temperature,
         topP = entity.topP,
         topK = entity.topK,
+        minP = entity.minP,
+        presencePenalty = entity.presencePenalty,
+        thinkingMode = entity.thinkingMode?.let(ThinkingMode::valueOf),
         repeatPenalty = entity.repeatPenalty,
         repeatLastN = entity.repeatLastN,
         seedPolicy = entity.seedPolicy?.let(SeedPolicyType::valueOf),
@@ -170,6 +178,7 @@ internal object TelemetryEntityMapper {
             useCaseId = baseline.key.useCaseId.value
             modelDigest = baseline.key.modelDigest.sha256
             modelLoadKind = baseline.key.modelLoadKind.name
+            executionIdentity = baseline.key.executionIdentity.fingerprint
             capturedAtEpochMs = baseline.capturedAtEpochMs
             sampleCount = baseline.sampleCount
             medianTimeToFirstTokenMs = baseline.medianTimeToFirstTokenMs
@@ -184,6 +193,7 @@ internal object TelemetryEntityMapper {
         useCaseId = entity.useCaseId,
         modelDigest = entity.modelDigest,
         modelLoadKind = entity.modelLoadKind,
+        executionIdentity = entity.executionIdentity,
         capturedAtEpochMs = entity.capturedAtEpochMs,
         sampleCount = entity.sampleCount,
         medianTimeToFirstTokenMs = entity.medianTimeToFirstTokenMs,
@@ -198,6 +208,7 @@ internal object TelemetryEntityMapper {
         useCaseId = entity.useCaseId,
         modelDigest = entity.modelDigest,
         modelLoadKind = entity.modelLoadKind,
+        executionIdentity = entity.executionIdentity,
         capturedAtEpochMs = entity.capturedAtEpochMs,
         sampleCount = entity.sampleCount,
         medianTimeToFirstTokenMs = entity.medianTimeToFirstTokenMs,
@@ -225,6 +236,7 @@ internal object TelemetryEntityMapper {
         useCaseId = baseline.key.useCaseId.value
         modelDigest = baseline.key.modelDigest.sha256
         modelLoadKind = baseline.key.modelLoadKind.name
+        executionIdentity = baseline.key.executionIdentity.fingerprint
         capturedAtEpochMs = baseline.capturedAtEpochMs
         sampleCount = baseline.sampleCount
         medianTimeToFirstTokenMs = baseline.medianTimeToFirstTokenMs
@@ -240,6 +252,7 @@ internal object TelemetryEntityMapper {
         useCaseId: String,
         modelDigest: String,
         modelLoadKind: String,
+        executionIdentity: String,
         capturedAtEpochMs: Long,
         sampleCount: Int,
         medianTimeToFirstTokenMs: Double?,
@@ -253,6 +266,7 @@ internal object TelemetryEntityMapper {
             useCaseId = UseCaseId(useCaseId),
             modelDigest = ModelDigest(modelDigest),
             modelLoadKind = ModelLoadKind.valueOf(modelLoadKind),
+            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint(executionIdentity),
         ),
         capturedAtEpochMs = capturedAtEpochMs,
         sampleCount = sampleCount,

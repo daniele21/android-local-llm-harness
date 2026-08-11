@@ -1,6 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,6 +10,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessViewModelTest {
+    @Test
+    fun defaultPlaygroundPromptAsksForEarthRadius() {
+        assertEquals("how much is the earth radius?", HarnessViewModel().uiState.value.playgroundPrompt)
+    }
+
     @Test
     fun modelSelectionClearsPendingRemovalConfirmation() {
         val viewModel = HarnessViewModel(
@@ -151,7 +156,7 @@ class HarnessViewModelTest {
         assertEquals("Explain local inference", effects.startedPrompt)
         assertEquals(64, effects.startedOptions?.maxOutputTokens)
         assertEquals(0.4f, effects.startedOptions?.temperature)
-        assertEquals(1.05f, effects.startedOptions?.repeatPenalty)
+        assertEquals(1f, effects.startedOptions?.repeatPenalty)
         assertEquals(64, effects.startedOptions?.repeatLastN)
         assertEquals(SeedPolicy.Fixed(7), effects.startedOptions?.seedPolicy)
     }
@@ -208,11 +213,11 @@ class HarnessViewModelTest {
     fun manualSamplingChangeKeepsPresetAsCustomizationBase() {
         val viewModel = HarnessViewModel()
 
-        viewModel.updatePlaygroundPreset("short-form")
+        viewModel.updatePlaygroundPreset("qwen35-text-fast")
         viewModel.updatePlaygroundTemperature("0.3")
 
         assertEquals("", viewModel.uiState.value.playgroundPreset)
-        assertEquals("short-form", viewModel.uiState.value.playgroundBasePreset)
+        assertEquals("qwen35-text-fast", viewModel.uiState.value.playgroundBasePreset)
         assertEquals("0.3", viewModel.uiState.value.playgroundTemperature)
     }
 
@@ -220,23 +225,26 @@ class HarnessViewModelTest {
     fun repetitionOverridesKeepPresetAsCustomizationBase() {
         val viewModel = HarnessViewModel()
 
-        viewModel.updatePlaygroundPreset("balanced-conversation")
+        viewModel.updatePlaygroundPreset("qwen35-text-quality")
         viewModel.updatePlaygroundRepeatPenalty("1.1")
         viewModel.updatePlaygroundRepeatLastN("96")
 
         assertEquals("", viewModel.uiState.value.playgroundPreset)
-        assertEquals("balanced-conversation", viewModel.uiState.value.playgroundBasePreset)
+        assertEquals("qwen35-text-quality", viewModel.uiState.value.playgroundBasePreset)
         assertEquals("1.1", viewModel.uiState.value.playgroundRepeatPenalty)
         assertEquals("96", viewModel.uiState.value.playgroundRepeatLastN)
     }
 
-    private fun testModel(): ImportedPhoneModel = ImportedPhoneModel(
-        digest = ModelDigest("0".repeat(64)),
-        fileName = "test.gguf",
-        sizeBytes = 1234,
-        architecture = "qwen3",
-        quantization = "Q4_K_M",
-    )
+    private fun testModel(): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases.first().artifact
+        return ImportedPhoneModel(
+            digest = artifact.digest,
+            fileName = artifact.fileName,
+            sizeBytes = artifact.sizeBytes,
+            architecture = artifact.architecture,
+            quantization = artifact.quantization,
+        )
+    }
 
     private class FakePlaygroundEffects(private val current: PlaygroundState = PlaygroundState()) : PlaygroundEffects {
         var startedModel: ImportedPhoneModel? = null

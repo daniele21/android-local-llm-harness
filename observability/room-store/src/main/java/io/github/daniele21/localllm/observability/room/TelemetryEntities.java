@@ -93,6 +93,9 @@ public final class TelemetryEntities {
         @Nullable public Float temperature;
         @Nullable @ColumnInfo(name = "top_p") public Float topP;
         @Nullable @ColumnInfo(name = "top_k") public Integer topK;
+        @Nullable @ColumnInfo(name = "min_p") public Float minP;
+        @Nullable @ColumnInfo(name = "presence_penalty") public Float presencePenalty;
+        @Nullable @ColumnInfo(name = "thinking_mode") public String thinkingMode;
         @Nullable @ColumnInfo(name = "repeat_penalty") public Float repeatPenalty;
         @Nullable @ColumnInfo(name = "repeat_last_n") public Integer repeatLastN;
         @Nullable @ColumnInfo(name = "seed_policy") public String seedPolicy;
@@ -214,6 +217,10 @@ public final class TelemetryEntities {
         @ColumnInfo(name = "model_load_kind")
         public String modelLoadKind = "";
 
+        @NonNull
+        @ColumnInfo(name = "execution_identity")
+        public String executionIdentity = "";
+
         @ColumnInfo(name = "captured_at_epoch_ms")
         public long capturedAtEpochMs;
 
@@ -272,6 +279,10 @@ public final class TelemetryEntities {
         @NonNull
         @ColumnInfo(name = "model_load_kind")
         public String modelLoadKind = "";
+
+        @NonNull
+        @ColumnInfo(name = "execution_identity")
+        public String executionIdentity = "";
 
         @ColumnInfo(name = "captured_at_epoch_ms")
         public long capturedAtEpochMs;

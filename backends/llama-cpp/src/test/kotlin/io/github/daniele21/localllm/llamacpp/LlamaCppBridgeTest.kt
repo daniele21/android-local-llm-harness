@@ -123,6 +123,9 @@ class LlamaCppBridgeTest {
                 "qwen2",
                 "fixture-model",
                 "15",
+                "262144",
+                "24",
+                "1024",
             ),
         )
 
@@ -138,6 +141,9 @@ class LlamaCppBridgeTest {
         assertEquals("qwen2", metadata.architecture)
         assertEquals("fixture-model", metadata.name)
         assertEquals(15L, metadata.fileType)
+        assertEquals(262144L, metadata.contextLength)
+        assertEquals(24L, metadata.blockCount)
+        assertEquals(1024L, metadata.embeddingLength)
         assertEquals(model.absolutePath, nativeApi.lastInspectedPath)
     }
 
@@ -145,7 +151,7 @@ class LlamaCppBridgeTest {
     fun `optional native metadata is represented as null`() {
         val model = temporaryFile()
         val nativeApi = FakeNativeLlamaApi(
-            inspection = arrayOf("ok", "3", "32", "0", "0", "0", "", "", ""),
+            inspection = arrayOf("ok", "3", "32", "0", "0", "0", "", "", "", "", "", ""),
         )
 
         val result = LlamaCppBridge(nativeApi).inspectGguf(model) as GgufInspectionResult.Success
@@ -153,6 +159,9 @@ class LlamaCppBridgeTest {
         assertEquals(null, result.metadata.architecture)
         assertEquals(null, result.metadata.name)
         assertEquals(null, result.metadata.fileType)
+        assertEquals(null, result.metadata.contextLength)
+        assertEquals(null, result.metadata.blockCount)
+        assertEquals(null, result.metadata.embeddingLength)
     }
 
     @Test

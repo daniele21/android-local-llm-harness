@@ -67,6 +67,7 @@ data class ConsoleInferenceMetrics(
     val outputTokens: Int?,
     val decodeTokensPerSecond: Double?,
     val modelLoadKind: String,
+    val timeToFirstAnswerMs: Long? = null,
 )
 
 data class ConsoleInferenceState(
@@ -76,6 +77,8 @@ data class ConsoleInferenceState(
     val phase: ConsoleInferencePhase,
     val activeTargetId: String? = null,
     val output: String = "",
+    val reasoningOutput: String = "",
+    val answerOutput: String = "",
     val outputTruncated: Boolean = false,
     val generatedTokens: Int? = null,
     val sessionActive: Boolean = false,

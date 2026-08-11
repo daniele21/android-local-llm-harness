@@ -2,13 +2,12 @@ package io.github.daniele21.localllm.phonetest
 
 import android.app.ActivityManager
 import android.content.Context
-import android.net.Uri
 import android.os.Build
 import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.provider.OpenableColumns
+import android.widget.Toast
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationMetrics
@@ -19,9 +18,6 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
-import java.io.File
-import java.security.MessageDigest
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -45,6 +41,12 @@ internal class PhoneTestController(
     private val runtimeGraph: HarnessRuntimeGraph,
     private val listener: PhoneTestListener,
 ) : AutoCloseable {
+    constructor(context: Context, listener: PhoneTestListener) : this(
+        context = context,
+        runtimeGraph = HarnessRuntimeGraph.from(context),
+        listener = listener,
+    )
+
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
@@ -61,57 +63,31 @@ internal class PhoneTestController(
 
     fun snapshotModel(): ImportedPhoneModel? = currentModel
 
-    fun importModel(uri: Uri, architecture: String, quantization: String) {
+    fun selectInstalledModel(model: ImportedPhoneModel) {
         runExclusive {
-            require(architecture.isNotBlank()) { "Model architecture must not be blank" }
-            require(quantization.isNotBlank()) { "Model quantization must not be blank" }
-            val metadata = queryDocumentMetadata(uri)
-            require(metadata.fileName.lowercase().endsWith(".gguf")) {
-                "Select a .gguf model file"
-            }
-            progress("Copying ${metadata.fileName} into a private staging area")
-            val staged = copyAndDigest(uri, metadata)
+            progress("Verifying installed model before loading")
+            verifyStoredModelForSelection(modelStore, model.digest)
+            progress("Loading ${model.fileName} into memory")
             try {
-                val model = ImportedPhoneModel(
-                    digest = staged.digest,
-                    fileName = metadata.fileName,
-                    sizeBytes = staged.sizeBytes,
-                    architecture = architecture.trim(),
-                    quantization = quantization.trim(),
-                )
-                progress("Importing and verifying SHA-256 ${model.digest.sha256.take(12)}…")
-                val stored = modelStore.import(staged.file, model.artifact())
-                check(stored.verified) { "Imported model was not verified" }
+                val harness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
+                val prepared = harness.runtime.prepare(harness.applicationId, harness.useCaseId)
+                check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
+
                 persist(model)
                 currentModel = model
                 post { listener.onModelChanged(model) }
-                progress("Model import complete (${formatBytes(model.sizeBytes)})")
-            } finally {
-                staged.file.delete()
+                progress("${model.fileName} loaded and ready for Playground")
+            } catch (error: Throwable) {
+                runtimeGraph.releaseModel(model.digest)
+                throw error
             }
-        }
-    }
-
-    fun selectInstalledModel(model: ImportedPhoneModel) {
-        runExclusive {
-            progress("Verifying installed model before selection")
-            val stored = requireNotNull(modelStore.find(model.digest)) {
-                "Installed model is no longer available"
-            }
-            check(stored.verified) { "Installed model is not marked as verified" }
-            val verification = modelStore.verify(model.digest)
-            check(verification.valid) { verification.detail }
-            persist(model)
-            currentModel = model
-            post { listener.onModelChanged(model) }
-            progress("${model.fileName} selected for local inference")
         }
     }
 
     fun removeModel() {
         runExclusive {
             val model = currentModel ?: return@runExclusive
-            progress("Removing the imported model")
+            progress("Removing the selected model")
             runtimeGraph.releaseModel(model.digest)
             modelStore.remove(model.digest)
             preferences.edit().clear().apply()
@@ -123,7 +99,7 @@ internal class PhoneTestController(
 
     fun runFullValidation() {
         runExclusive(reportFailure = true) {
-            val model = requireNotNull(currentModel) { "Import a GGUF model before running validation" }
+            val model = requireNotNull(currentModel) { "Select a Qwen3.5 catalog model before running validation" }
             val startedAt = System.currentTimeMillis()
             val startThermal = thermalStatus()
             progress("Verifying stored model integrity")
@@ -303,65 +279,6 @@ internal class PhoneTestController(
         return condition()
     }
 
-    private fun queryDocumentMetadata(uri: Uri): DocumentMetadata {
-        var fileName = "model.gguf"
-        var sizeBytes: Long? = null
-        appContext.contentResolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (nameIndex >= 0) fileName = cursor.getString(nameIndex) ?: fileName
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) sizeBytes = cursor.getLong(sizeIndex)
-            }
-        }
-        return DocumentMetadata(fileName, sizeBytes)
-    }
-
-    private fun copyAndDigest(uri: Uri, metadata: DocumentMetadata): StagedModel {
-        val directory = File(appContext.cacheDir, IMPORT_DIRECTORY).apply { mkdirs() }
-        val temporaryFile = File.createTempFile("phone-model-", ".gguf", directory)
-        val digest = MessageDigest.getInstance(SHA_256)
-        var copied = 0L
-        var nextProgress = PROGRESS_INTERVAL_BYTES
-        try {
-            val input = requireNotNull(appContext.contentResolver.openInputStream(uri)) {
-                "Unable to open the selected model"
-            }
-            input.buffered(COPY_BUFFER_BYTES).use { source ->
-                temporaryFile.outputStream().buffered(COPY_BUFFER_BYTES).use { destination ->
-                    val buffer = ByteArray(COPY_BUFFER_BYTES)
-                    var read = source.read(buffer)
-                    while (read >= 0) {
-                        if (read > 0) {
-                            digest.update(buffer, 0, read)
-                            destination.write(buffer, 0, read)
-                            copied += read
-                            if (copied >= nextProgress) {
-                                progress(copyProgress(copied, metadata.sizeBytes))
-                                nextProgress += PROGRESS_INTERVAL_BYTES
-                            }
-                        }
-                        read = source.read(buffer)
-                    }
-                }
-            }
-            return StagedModel(
-                file = temporaryFile,
-                digest = ModelDigest(digest.digest().toHex()),
-                sizeBytes = copied,
-            )
-        } catch (error: Throwable) {
-            temporaryFile.delete()
-            throw error
-        }
-    }
-
     private fun persist(model: ImportedPhoneModel) {
         preferences.edit()
             .putString(KEY_DIGEST, model.digest.sha256)
@@ -458,36 +375,19 @@ internal class PhoneTestController(
         .replace('\n', ' ')
         .take(MAX_ERROR_LENGTH)
 
-    private fun copyProgress(copied: Long, total: Long?): String = if (total != null && total > 0) {
-        val percent = (copied * 100 / total).coerceIn(0, 100)
-        "Copying model: $percent% (${formatBytes(copied)} / ${formatBytes(total)})"
-    } else {
-        "Copying model: ${formatBytes(copied)}"
-    }
-
     private fun progress(message: String) {
-        post { listener.onProgress(message) }
+        ModelActionFeedbackStore.publish(message)
+        post {
+            listener.onProgress(message)
+            if (message.startsWith("Failed:", ignoreCase = true)) {
+                Toast.makeText(appContext, message, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun post(action: () -> Unit) {
         mainHandler.post(action)
     }
-
-    private fun ByteArray.toHex(): String {
-        val result = CharArray(size * 2)
-        forEachIndexed { index, byte ->
-            val value = byte.toInt() and 0xff
-            result[index * 2] = HEX_DIGITS[value ushr 4]
-            result[index * 2 + 1] = HEX_DIGITS[value and 0x0f]
-        }
-        return String(result)
-    }
-
-    private fun formatBytes(bytes: Long): String = "%.1f MB".format(Locale.ROOT, bytes / 1_048_576.0)
-
-    private data class DocumentMetadata(val fileName: String, val sizeBytes: Long?)
-
-    private data class StagedModel(val file: File, val digest: ModelDigest, val sizeBytes: Long)
 
     private data class GenerationSummary(
         val inputTokens: String,
@@ -511,18 +411,13 @@ internal class PhoneTestController(
 
     private companion object {
         const val PREFERENCES_NAME = "phone-test-model"
-        const val IMPORT_DIRECTORY = "phone-test-import"
         const val KEY_DIGEST = "digest"
         const val KEY_FILE_NAME = "file-name"
         const val KEY_SIZE_BYTES = "size-bytes"
         const val KEY_ARCHITECTURE = "architecture"
         const val KEY_QUANTIZATION = "quantization"
-        const val DEFAULT_ARCHITECTURE = "qwen3"
+        const val DEFAULT_ARCHITECTURE = "qwen35"
         const val DEFAULT_QUANTIZATION = "Q4_K_M"
-        const val SHA_256 = "SHA-256"
-        const val HEX_DIGITS = "0123456789abcdef"
-        const val COPY_BUFFER_BYTES = 64 * 1024
-        const val PROGRESS_INTERVAL_BYTES = 8L * 1024 * 1024
         const val GENERATION_OUTPUT_TOKENS = 32
         const val CANCELLATION_OUTPUT_TOKENS = 256
         const val MEMORY_OUTPUT_TOKENS = 16

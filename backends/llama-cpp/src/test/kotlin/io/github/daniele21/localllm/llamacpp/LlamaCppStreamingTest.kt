@@ -16,7 +16,7 @@ class LlamaCppStreamingTest {
             chunks = chunks.mapIndexed { index, text ->
                 Base64.getEncoder().encodeToString(text.toByteArray(Charsets.UTF_8)) to index + 1
             },
-            terminal = arrayOf("ok", "5", "2", "10", "20", "END_OF_GENERATION"),
+            terminal = arrayOf("ok", "5", "2", "10", "20", "END_OF_GENERATION", "-1", "-1"),
         )
         val received = mutableListOf<NativeTextChunk>()
 
@@ -45,16 +45,72 @@ class LlamaCppStreamingTest {
             received,
         )
         assertEquals(
-            listOf(11L, "request-1", "Prompt", 16, 0.1f, 0.95f, 40, 1.05f, 64, 77L, "TEXT"),
+            listOf(
+                11L,
+                "request-1",
+                "Prompt",
+                16,
+                0.1f,
+                0.95f,
+                40,
+                0f,
+                0f,
+                1.05f,
+                64,
+                77L,
+                "TEXT",
+                0,
+                null,
+                null,
+            ),
             nativeApi.lastGeneration,
         )
+    }
+
+    @Test
+    fun `reasoning transition config and metrics cross JNI boundary`() {
+        val nativeApi = FakeNativeStreamingApi(
+            terminal = arrayOf("ok", "9", "12", "4", "30", "END_OF_GENERATION", "5", "7"),
+        )
+        val config = testConfig().copy(
+            maxOutputTokens = 32,
+            reasoningMaxTokens = 8,
+            reasoningCloseMarker = "</think>",
+            reasoningForcedCloseText = "</think>\n\n",
+        )
+
+        val result = LlamaCppStreamingBridge(nativeApi).generate(
+            testContext(),
+            "reasoning-request",
+            "Prompt",
+            config,
+            NativeStreamingListener { true },
+        )
+
+        assertEquals(
+            NativeStreamingResult.Completed(
+                NativeStreamingMetrics(
+                    inputTokens = 9,
+                    outputTokens = 12,
+                    promptDurationMs = 4,
+                    generationDurationMs = 30,
+                    stopReason = "END_OF_GENERATION",
+                    reasoningTokens = 5,
+                    answerTokens = 7,
+                ),
+            ),
+            result,
+        )
+        assertEquals(8, nativeApi.lastGeneration?.get(13))
+        assertEquals("</think>", nativeApi.lastGeneration?.get(14))
+        assertEquals("</think>\n\n", nativeApi.lastGeneration?.get(15))
     }
 
     @Test
     fun `listener rejection propagates cancellation`() {
         val nativeApi = FakeNativeStreamingApi(
             chunks = listOf(Base64.getEncoder().encodeToString("first".toByteArray()) to 1),
-            terminal = arrayOf("cancelled", "4", "1", "3", "5", "UNKNOWN"),
+            terminal = arrayOf("cancelled", "4", "1", "3", "5", "UNKNOWN", "-1", "-1"),
         )
 
         val result = LlamaCppStreamingBridge(nativeApi).generate(
@@ -78,7 +134,7 @@ class LlamaCppStreamingTest {
     fun `invalid base64 chunk rejects callback safely`() {
         val nativeApi = FakeNativeStreamingApi(
             chunks = listOf("invalid%%%" to 1),
-            terminal = arrayOf("cancelled", "1", "0", "1", "1", "UNKNOWN"),
+            terminal = arrayOf("cancelled", "1", "0", "1", "1", "UNKNOWN", "-1", "-1"),
         )
         var listenerCalled = false
 
@@ -161,6 +217,26 @@ class LlamaCppStreamingTest {
         assertFalse(nativeApi.generateCalled)
     }
 
+    @Test
+    fun `partial reasoning transition config is rejected before JNI`() {
+        val nativeApi = FakeNativeStreamingApi()
+
+        val result = LlamaCppStreamingBridge(nativeApi).generate(
+            testContext(),
+            "request-invalid-reasoning",
+            "Prompt",
+            testConfig().copy(reasoningMaxTokens = 4),
+            NativeStreamingListener { true },
+        )
+
+        assertTrue(result is NativeStreamingResult.Failure)
+        assertEquals(
+            StreamingNativeErrorCode.INVALID_ARGUMENT,
+            (result as NativeStreamingResult.Failure).error.code,
+        )
+        assertFalse(nativeApi.generateCalled)
+    }
+
     private fun testContext(): LoadedNativeContext = LoadedNativeContext(
         handle = NativeContextHandle(11),
         model = LoadedNativeModel(
@@ -185,11 +261,11 @@ class LlamaCppStreamingTest {
 
 private class FakeNativeStreamingApi(
     private val chunks: List<Pair<String, Int>> = emptyList(),
-    private val terminal: Array<String> = arrayOf("ok", "0", "0", "0", "0", "UNKNOWN"),
+    private val terminal: Array<String> = arrayOf("ok", "0", "0", "0", "0", "UNKNOWN", "-1", "-1"),
     private val cancel: Array<String> = arrayOf("ok", "false"),
 ) : NativeLlamaStreamingApi {
     var generateCalled: Boolean = false
-    var lastGeneration: List<Any>? = null
+    var lastGeneration: List<Any?>? = null
     var lastCallbackAccepted: Boolean = true
     var cancelledRequestId: String? = null
 
@@ -201,6 +277,8 @@ private class FakeNativeStreamingApi(
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
         seed: Long,
@@ -208,6 +286,9 @@ private class FakeNativeStreamingApi(
         outputSchema: String?,
         stopTokenIds: IntArray,
         stopSequences: Array<String>,
+        reasoningMaxTokens: Int,
+        reasoningCloseMarker: String?,
+        reasoningForcedCloseText: String?,
         callback: NativeStreamingCallback,
     ): Array<String> {
         generateCalled = true
@@ -219,10 +300,15 @@ private class FakeNativeStreamingApi(
             temperature,
             topP,
             topK,
+            minP,
+            presencePenalty,
             repeatPenalty,
             repeatLastN,
             seed,
             outputConstraintType,
+            reasoningMaxTokens,
+            reasoningCloseMarker,
+            reasoningForcedCloseText,
         )
         for ((text, generatedTokens) in chunks) {
             lastCallbackAccepted = callback.onChunk(text, generatedTokens)

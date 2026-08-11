@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ContextPolicy
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationListener
@@ -15,6 +16,24 @@ import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.Executors
+
+private fun PlaygroundRequestOptions.toGenerationOverrides(): GenerationOverrides {
+    val preset = presetId?.let { InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION) }
+    val custom = preset == null
+    return GenerationOverrides(
+        maxOutputTokens = maxOutputTokens.takeIf { custom },
+        temperature = temperature.takeIf { custom },
+        topP = topP.takeIf { custom },
+        topK = topK.takeIf { custom },
+        minP = minP.takeIf { custom },
+        presencePenalty = presencePenalty.takeIf { custom },
+        thinkingMode = thinkingMode.takeIf { custom },
+        repeatPenalty = repeatPenalty.takeIf { custom },
+        repeatLastN = repeatLastN.takeIf { custom },
+        seedPolicy = seedPolicy.takeIf { custom },
+        preset = preset,
+    )
+}
 
 @Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntimeGraph, private val listener: (PlaygroundState) -> Unit) :
@@ -125,14 +144,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     private fun startOnWorker(model: ImportedPhoneModel, requestId: RequestId, prompt: String, options: PlaygroundRequestOptions) {
         try {
             val verification = runtimeGraph.modelStore.verify(model.digest)
-            check(verification.valid) { "Model integrity verification failed" }
+            check(verification.valid) { "Model integrity verification failed: ${verification.detail}" }
             val currentHarness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
             synchronized(lock) { harness = currentHarness }
             val prepared = currentHarness.runtime.prepare(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
             )
-            check(prepared.ready) { "Model preparation failed" }
+            check(prepared.ready) { "Model preparation failed: ${prepared.detail}" }
             val session = currentHarness.runtime.createSession(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
@@ -147,26 +166,15 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 applicationId = currentHarness.applicationId,
                 useCaseId = currentHarness.useCaseId,
                 input = prompt,
-                overrides = GenerationOverrides(
-                    maxOutputTokens = options.maxOutputTokens,
-                    temperature = options.temperature,
-                    topP = options.topP,
-                    topK = options.topK,
-                    repeatPenalty = options.repeatPenalty,
-                    repeatLastN = options.repeatLastN,
-                    seedPolicy = options.seedPolicy,
-                    preset = options.presetId?.let {
-                        InferencePresetRef(InferencePresetId(it), PHONE_INFERENCE_PRESET_VERSION)
-                    },
-                ),
+                overrides = options.toGenerationOverrides(),
             )
             val handle = currentHarness.runtime.generate(
                 generationRequest,
                 GenerationListener(::onGenerationEvent),
             )
             registerHandle(requestId, handle)
-        } catch (_: Throwable) {
-            failStart(requestId)
+        } catch (error: Throwable) {
+            failStart(requestId, error)
         }
     }
 
@@ -212,7 +220,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                     effectiveConfiguration = event.configuration,
                 )
 
-                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens)
+                is GenerationEvent.TextDelta -> appendOutput(event.text, event.generatedTokens, event.contentType)
 
                 is GenerationEvent.Completed -> completedState(event)
 
@@ -227,34 +235,70 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         }
     }
 
-    private fun appendOutput(text: String, generatedTokens: Int): PlaygroundState {
-        val remaining = (MAX_OUTPUT_CHARACTERS - state.output.length).coerceAtLeast(0)
-        val appended = text.take(remaining)
+    private fun appendOutput(text: String, generatedTokens: Int, contentType: GenerationContentType): PlaygroundState {
+        val combined = appendBounded(state.output, text)
+        val reasoning = if (contentType == GenerationContentType.REASONING) {
+            appendBounded(state.reasoningOutput, text)
+        } else {
+            state.reasoningOutput
+        }
+        val answer = if (contentType == GenerationContentType.ANSWER) {
+            appendBounded(state.answerOutput, text)
+        } else {
+            state.answerOutput
+        }
+        val channelTruncated = when (contentType) {
+            GenerationContentType.REASONING -> reasoning.length < state.reasoningOutput.length + text.length
+            GenerationContentType.ANSWER -> answer.length < state.answerOutput.length + text.length
+        }
         return state.copy(
             phase = PlaygroundPhase.GENERATING,
-            output = state.output + appended,
-            outputTruncated = state.outputTruncated || appended.length < text.length,
+            output = combined,
+            reasoningOutput = reasoning,
+            answerOutput = answer,
+            outputTruncated = state.outputTruncated || combined.length < state.output.length + text.length || channelTruncated,
             generatedTokens = generatedTokens,
-            detail = "Generating locally",
+            detail = if (contentType == GenerationContentType.REASONING && state.answerOutput.isEmpty()) {
+                "Thinking locally"
+            } else {
+                "Generating answer"
+            },
         )
+    }
+
+    private fun appendBounded(current: String, text: String): String {
+        val remaining = (MAX_OUTPUT_CHARACTERS - current.length).coerceAtLeast(0)
+        return current + text.take(remaining)
     }
 
     private fun completedState(event: GenerationEvent.Completed): PlaygroundState = state.copy(
         phase = PlaygroundPhase.COMPLETED,
         output = event.output.take(MAX_OUTPUT_CHARACTERS),
-        outputTruncated = event.output.length > MAX_OUTPUT_CHARACTERS,
+        reasoningOutput = event.reasoningOutput.take(MAX_OUTPUT_CHARACTERS),
+        answerOutput = event.answerOutput.take(MAX_OUTPUT_CHARACTERS),
+        outputTruncated = event.output.length > MAX_OUTPUT_CHARACTERS ||
+            event.reasoningOutput.length > MAX_OUTPUT_CHARACTERS ||
+            event.answerOutput.length > MAX_OUTPUT_CHARACTERS,
         generatedTokens = event.metrics.outputTokens,
         cancellationAvailable = false,
         metrics = PlaygroundMetrics.from(event.metrics),
         errorCode = null,
-        detail = "Generation completed",
+        detail = if (event.answerOutput.isEmpty() && event.reasoningOutput.isNotEmpty()) {
+            "Generation ended before a final answer was produced"
+        } else {
+            "Generation completed"
+        },
     )
 
     private fun failedState(error: LocalLlmError): PlaygroundState = state.copy(
         phase = if (error is LocalLlmError.Cancelled) PlaygroundPhase.CANCELLED else PlaygroundPhase.FAILED,
         cancellationAvailable = false,
         errorCode = error.code,
-        detail = if (error is LocalLlmError.Cancelled) "Generation cancelled" else "Generation failed",
+        detail = if (error is LocalLlmError.Cancelled) {
+            "Generation cancelled"
+        } else {
+            sanitizeFailure("${error.code}: ${error.message}")
+        },
     )
 
     private fun cleanupAfterTerminal() {
@@ -278,13 +322,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
         publish(current)
     }
 
-    private fun failStart(requestId: RequestId) {
+    private fun failStart(requestId: RequestId, error: Throwable) {
         val session = synchronized(lock) {
             if (activeRequestId != requestId) return
             activeSession
         }
         val runtime = synchronized(lock) { harness?.runtime }
         val cleanupFailed = session != null && runCatching { runtime?.closeSession(session) }.isFailure
+        val failureDetail = sanitizeFailure(error.message ?: error.javaClass.simpleName)
         val current = synchronized(lock) {
             if (activeRequestId != requestId) return
             activeSession = if (cleanupFailed) session else null
@@ -295,15 +340,20 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 cancellationAvailable = false,
                 errorCode = if (cleanupFailed) "SESSION_CLEANUP_FAILED" else "INFERENCE_START_FAILED",
                 detail = if (cleanupFailed) {
-                    "Inference session cleanup failed"
+                    "Inference session cleanup failed; original failure: $failureDetail"
                 } else {
-                    "Local inference could not be started"
+                    failureDetail
                 },
             )
             state
         }
         publish(current)
     }
+
+    private fun sanitizeFailure(detail: String): String = detail
+        .replace('\n', ' ')
+        .replace('\r', ' ')
+        .take(MAX_FAILURE_DETAIL_CHARACTERS)
 
     private fun closeSessionResources(resources: RuntimeResources) {
         runCatching { resources.handle?.cancel() }
@@ -319,5 +369,6 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     private companion object {
         const val MAX_PROMPT_CHARACTERS = 32_768
         const val MAX_OUTPUT_CHARACTERS = 131_072
+        const val MAX_FAILURE_DETAIL_CHARACTERS = 1_024
     }
 }

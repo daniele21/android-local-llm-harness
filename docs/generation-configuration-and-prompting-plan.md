@@ -5,11 +5,13 @@ Document type: feature-specification
 Owner: core/runtime-core
 Canonical scope: runtime.generation-planning
 Read when: changing generation configuration, prompt planning, templates, token budgets or sampler behavior
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 ## Purpose
 
 This document defines the durable generation-configuration and prompt-planning behavior shared by the embedded runtime and connected Playground. Current release evidence belongs in [`releases/harness-0.5.md`](releases/harness-0.5.md), not in this specification.
+
+The active product supports only Qwen3.5 dense 0.8B/2B under [ADR 0011](adr/0011-qwen35-only-product-support.md). This document continues to own family-neutral resolution and execution mechanics; Qwen3.5 thinking, sampler baselines and guard thresholds are owned by [`qwen35/workstreams/generation-thinking.md`](qwen35/workstreams/generation-thinking.md).
 
 The design separates:
 
@@ -55,6 +57,8 @@ Supported request controls include:
 - repeat penalty;
 - repeat window;
 - output constraint.
+
+Qwen3.5 work will extend these neutral controls with thinking intent, min-p and presence penalty. Qwen-specific template arguments remain internal to policy/backend adaptation and do not become public lifecycle types.
 
 Supported session context policy:
 

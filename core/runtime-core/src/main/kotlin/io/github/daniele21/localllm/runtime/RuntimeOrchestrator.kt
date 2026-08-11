@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ChatTemplateSource
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
 import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationInput
@@ -24,12 +25,15 @@ import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
+import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ContextPreference
-import io.github.daniele21.localllm.models.GenerationDefaults
+import io.github.daniele21.localllm.models.GenerationGuardPolicy
 import io.github.daniele21.localllm.models.InferencePreset
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.models.ReasoningStreamProtocol
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRepository
@@ -299,6 +303,7 @@ class RuntimeOrchestrator(
                     input = request.input,
                     systemPrompt = resolved.systemPrompt,
                     chatTemplatePolicy = session.resolved.model.chatTemplatePolicy,
+                    thinkingMode = resolved.thinkingMode,
                 ),
             )
             lifecycle.ensureNotCancelled()
@@ -324,6 +329,8 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
                 repeatPenalty = resolved.repeatPenalty,
                 repeatLastN = resolved.repeatLastN,
                 requestedSeedPolicy = resolved.seedPolicy.toType(),
@@ -334,6 +341,7 @@ class RuntimeOrchestrator(
                 chatTemplateId = promptPlan.chatTemplateId,
                 chatTemplateSource = promptPlan.chatTemplateSource,
                 systemPromptVersion = resolved.systemPromptVersion,
+                thinkingMode = resolved.thinkingMode,
             )
             runtimeTelemetry.prepared(
                 requestId = request.requestId,
@@ -344,10 +352,50 @@ class RuntimeOrchestrator(
             lifecycle.emit(GenerationEvent.Prepared(request.requestId, session.model.digest, effective))
 
             val firstTokenAt = AtomicLong(0)
-            val output = StringBuilder()
+            val firstAnswerAt = AtomicLong(0)
+            val rawOutput = StringBuilder()
+            val reasoningOutput = StringBuilder()
+            val answerOutput = StringBuilder()
+            val streamProtocol = (resolved.preset?.generation ?: session.resolved.useCase.generationDefaults).reasoningStreamProtocol
+            val reasoningControl = resolveReasoningControl(
+                thinkingMode = resolved.thinkingMode,
+                guardPolicy = resolved.guardPolicy,
+                streamProtocol = streamProtocol,
+                maxOutputTokens = resolved.maxOutputTokens,
+                capabilities = capabilities,
+            )
+            val streamParser = ReasoningStreamParser(resolved.thinkingMode, streamProtocol)
+            var lastGeneratedTokens = 0
             state.set(RuntimeState.GENERATING)
             runtimeTelemetry.started(request.requestId)
             lifecycle.emit(GenerationEvent.Started(request.requestId, session.model.digest))
+            val generationGuard = GenerationGuard(
+                thinkingMode = resolved.thinkingMode,
+                policy = resolved.guardPolicy,
+                thinkingCloseMarker = streamProtocol.closeMarker,
+                enforceThinkingBudget = reasoningControl == null,
+            )
+            val guardStopReason = AtomicReference<StopReason?>(null)
+            val emitParsedChunk: (ParsedGenerationChunk, Int) -> Unit = { parsed, generatedTokens ->
+                when (parsed.contentType) {
+                    GenerationContentType.REASONING -> reasoningOutput.append(parsed.text)
+
+                    GenerationContentType.ANSWER -> {
+                        answerOutput.append(parsed.text)
+                        if (parsed.text.isNotBlank()) {
+                            firstAnswerAt.compareAndSet(0, clock.nowNanos())
+                        }
+                    }
+                }
+                lifecycle.emit(
+                    GenerationEvent.TextDelta(
+                        requestId = request.requestId,
+                        text = parsed.text,
+                        generatedTokens = generatedTokens,
+                        contentType = parsed.contentType,
+                    ),
+                )
+            }
             val backendRequest = BackendGenerationRequest(
                 requestId = request.requestId.value,
                 prompt = promptPlan.prompt,
@@ -355,12 +403,15 @@ class RuntimeOrchestrator(
                 temperature = resolved.temperature,
                 topP = resolved.topP,
                 topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
                 repeatPenalty = resolved.repeatPenalty,
                 repeatLastN = resolved.repeatLastN,
                 seed = resolved.effectiveSeed,
                 outputConstraint = request.outputConstraint,
                 stopTokenIds = promptPlan.stopTokenIds,
                 stopSequences = promptPlan.stopSequences,
+                reasoningControl = reasoningControl,
             )
             lifecycle.ensureNotCancelled()
             val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->
@@ -368,41 +419,58 @@ class RuntimeOrchestrator(
                     false
                 } else {
                     firstTokenAt.compareAndSet(0, clock.nowNanos())
-                    output.append(text)
-                    lifecycle.emit(
-                        GenerationEvent.TextDelta(
-                            requestId = request.requestId,
-                            text = text,
-                            generatedTokens = generatedTokens,
-                        ),
-                    )
-                    !lifecycle.cancelRequested.get()
+                    lastGeneratedTokens = generatedTokens
+                    rawOutput.append(text)
+                    streamParser.accept(text).forEach { emitParsedChunk(it, generatedTokens) }
+                    val guardReason = generationGuard.observe(text, generatedTokens)
+                    if (guardReason != null) guardStopReason.compareAndSet(null, guardReason)
+                    guardReason == null && !lifecycle.cancelRequested.get()
                 }
             }
+            if (!lifecycle.cancelRequested.get()) {
+                streamParser.finish().forEach { emitParsedChunk(it, lastGeneratedTokens) }
+            }
 
-            if (lifecycle.cancelRequested.get() || outcome is BackendGenerationOutcome.Cancelled) {
+            val guardReason = guardStopReason.get()
+            if (lifecycle.cancelRequested.get()) {
+                val cancellation = LocalLlmError.Cancelled()
+                runtimeTelemetry.failed(request.requestId, cancellation)
+                lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
+            } else if (guardReason != null) {
+                completeGeneration(
+                    request = request,
+                    session = session,
+                    lifecycle = lifecycle,
+                    output = rawOutput.toString(),
+                    reasoningOutput = reasoningOutput.toString(),
+                    answerOutput = answerOutput.toString(),
+                    backendMetrics = outcome.metrics().copy(stopReason = guardReason),
+                    executionStartedAt = executionStartedAt,
+                    enqueuedAt = enqueuedAt,
+                    firstTokenAt = firstTokenAt,
+                    firstAnswerAt = firstAnswerAt,
+                    promptPlanningMs = promptPlanningMs,
+                    contextCreationMs = contextResult.creationMs,
+                )
+            } else if (outcome is BackendGenerationOutcome.Cancelled) {
                 val cancellation = LocalLlmError.Cancelled()
                 runtimeTelemetry.failed(request.requestId, cancellation)
                 lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
             } else {
-                val backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics
-                val publicMetrics = backendMetrics.toPublicMetrics(
-                    queueMs = nanosToMillis(executionStartedAt - enqueuedAt),
-                    modelLoadMs = session.modelLoadDurationMs,
-                    modelLoadKind = session.modelLoadKind,
-                    timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
-                        ?.let { nanosToMillis(it - executionStartedAt) },
-                    totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
+                completeGeneration(
+                    request = request,
+                    session = session,
+                    lifecycle = lifecycle,
+                    output = rawOutput.toString(),
+                    reasoningOutput = reasoningOutput.toString(),
+                    answerOutput = answerOutput.toString(),
+                    backendMetrics = (outcome as BackendGenerationOutcome.Completed).metrics,
+                    executionStartedAt = executionStartedAt,
+                    enqueuedAt = enqueuedAt,
+                    firstTokenAt = firstTokenAt,
+                    firstAnswerAt = firstAnswerAt,
                     promptPlanningMs = promptPlanningMs,
                     contextCreationMs = contextResult.creationMs,
-                )
-                runtimeTelemetry.completed(request.requestId, publicMetrics)
-                lifecycle.finish(
-                    GenerationEvent.Completed(
-                        requestId = request.requestId,
-                        output = output.toString(),
-                        metrics = publicMetrics,
-                    ),
                 )
             }
         } catch (_: GenerationCancelledException) {
@@ -445,9 +513,21 @@ class RuntimeOrchestrator(
         val temperature = request.overrides.temperature ?: defaults.temperature
         val topP = request.overrides.topP ?: defaults.topP
         val topK = request.overrides.topK ?: defaults.topK
+        val minP = request.overrides.minP ?: defaults.minP
+        val presencePenalty = request.overrides.presencePenalty ?: defaults.presencePenalty
+        val thinkingMode = request.overrides.thinkingMode ?: defaults.thinkingMode
         val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty
         val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN
-        validateGenerationValues(maxOutputTokens, temperature, topP, topK, repeatPenalty, repeatLastN)
+        validateGenerationValues(
+            maxOutputTokens,
+            temperature,
+            topP,
+            topK,
+            minP,
+            presencePenalty,
+            repeatPenalty,
+            repeatLastN,
+        )
 
         val seedPolicy = request.overrides.requestedSeedPolicy() ?: defaults.seedPolicy
         val effectiveSeed = when (seedPolicy) {
@@ -458,6 +538,12 @@ class RuntimeOrchestrator(
             throw GenerationPlanningException(
                 ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
                 "Seed source returned a value outside the unsigned 32-bit range",
+            )
+        }
+        if (request.input is GenerationInput.RawCompletion && thinkingMode == ThinkingMode.ENABLED) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking mode requires chat-template rendering and cannot be used with raw completion",
             )
         }
         if (request.input is GenerationInput.RawCompletion && !session.resolved.model.chatTemplatePolicy.allowRawCompletion) {
@@ -472,6 +558,9 @@ class RuntimeOrchestrator(
             temperature = temperature,
             topP = topP,
             topK = topK,
+            minP = minP,
+            presencePenalty = presencePenalty,
+            thinkingMode = thinkingMode,
             repeatPenalty = repeatPenalty,
             repeatLastN = repeatLastN,
             seedPolicy = seedPolicy,
@@ -479,31 +568,78 @@ class RuntimeOrchestrator(
             systemPromptVersion = preset?.systemPromptVersion ?: useCase.systemPromptVersion,
             systemPrompt = preset?.systemPrompt ?: useCase.systemPrompt,
             contextPreference = preset?.contextPreference ?: ContextPreference(),
+            guardPolicy = defaults.guardPolicy,
         )
     }
 
-    @Suppress("ComplexCondition")
     private fun validateGenerationValues(
         maxOutputTokens: Int,
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
     ) {
-        if (maxOutputTokens !in 1..MAX_OUTPUT_TOKENS ||
-            !temperature.isFinite() || temperature !in 0f..2f ||
-            !topP.isFinite() || topP <= 0f || topP > 1f ||
-            topK !in 0..MAX_TOP_K ||
-            !repeatPenalty.isFinite() || repeatPenalty !in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY ||
-            repeatLastN !in 0..MAX_REPEAT_LAST_N ||
-            (repeatPenalty != MIN_REPEAT_PENALTY && repeatLastN == 0)
-        ) {
+        val valid = outputAndTemperatureValid(maxOutputTokens, temperature) &&
+            samplingValuesValid(topP, topK, minP) &&
+            penaltyValuesValid(presencePenalty, repeatPenalty, repeatLastN)
+        if (!valid) {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
                 "Generation settings are outside the supported bounds",
             )
         }
+    }
+
+    private fun outputAndTemperatureValid(maxOutputTokens: Int, temperature: Float): Boolean =
+        maxOutputTokens in 1..MAX_OUTPUT_TOKENS && temperature.isFinite() && temperature in 0f..2f
+
+    private fun samplingValuesValid(topP: Float, topK: Int, minP: Float): Boolean = topP.isFinite() && topP > 0f && topP <= 1f &&
+        topK in 0..MAX_TOP_K &&
+        minP.isFinite() && minP in 0f..1f
+
+    private fun penaltyValuesValid(presencePenalty: Float, repeatPenalty: Float, repeatLastN: Int): Boolean =
+        presencePenalty.isFinite() && presencePenalty in 0f..2f &&
+            repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY &&
+            repeatLastN in 0..MAX_REPEAT_LAST_N &&
+            (repeatPenalty == MIN_REPEAT_PENALTY || repeatLastN != 0)
+
+    private fun resolveReasoningControl(
+        thinkingMode: ThinkingMode,
+        guardPolicy: GenerationGuardPolicy,
+        streamProtocol: ReasoningStreamProtocol,
+        maxOutputTokens: Int,
+        capabilities: BackendModelCapabilities,
+    ): BackendReasoningControl? {
+        if (thinkingMode != ThinkingMode.ENABLED ||
+            !guardPolicy.enabled ||
+            !capabilities.supportsReasoningTransition
+        ) {
+            return null
+        }
+        val closeMarker = streamProtocol.closeMarker ?: return null
+        val forcedCloseText = streamProtocol.forcedCloseText ?: return null
+        if (maxOutputTokens < MIN_CONTROLLED_THINKING_OUTPUT_TOKENS) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking mode requires at least $MIN_CONTROLLED_THINKING_OUTPUT_TOKENS output tokens",
+            )
+        }
+        val answerReserve = minOf(guardPolicy.answerReserveTokens, maxOutputTokens / 2).coerceAtLeast(1)
+        val reasoningBudget = minOf(guardPolicy.thinkingTokenBudget, maxOutputTokens - answerReserve)
+        if (reasoningBudget <= 0) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Thinking budget must leave capacity for a final answer",
+            )
+        }
+        return BackendReasoningControl(
+            maxReasoningTokens = reasoningBudget,
+            closeMarker = closeMarker,
+            forcedCloseText = forcedCloseText,
+        )
     }
 
     private fun validateOutputConstraint(
@@ -545,15 +681,21 @@ class RuntimeOrchestrator(
                 "Prompt tokenization did not produce a valid token count",
             )
         }
+        val runtimeCapabilities = session.resolved.model.runtimeCapabilities
         val required = runCatching {
-            Math.addExact(Math.addExact(promptTokenCount, maxOutputTokens), CONTEXT_RESERVE_TOKENS)
+            Math.addExact(Math.addExact(promptTokenCount, maxOutputTokens), runtimeCapabilities.contextSafetyReserveTokens)
         }.getOrElse {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
                 "Prompt and output budget exceed the supported context capacity",
             )
         }
-        val maximum = minOf(capabilities.maximumContextTokens, preference.maximumTokens ?: Int.MAX_VALUE)
+        val approvedTiers = runtimeCapabilities.approvedContextTiers.ifEmpty { ContextSizeSelector.supportedSizes }
+        val maximum = minOf(
+            capabilities.maximumContextTokens,
+            preference.maximumTokens ?: Int.MAX_VALUE,
+            approvedTiers.maxOrNull() ?: Int.MAX_VALUE,
+        )
         if (required > maximum) {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
@@ -562,7 +704,7 @@ class RuntimeOrchestrator(
         }
         return when (val policy = session.options.contextPolicy) {
             is ContextPolicy.Manual -> {
-                if (!ContextSizeSelector.supportsManual(policy.tokens, required, maximum)) {
+                if (!ContextSizeSelector.supportsManual(policy.tokens, required, maximum, approvedTiers)) {
                     throw GenerationPlanningException(
                         ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
                         "Prompt and output require $required tokens but the manual context is ${policy.tokens}",
@@ -575,6 +717,7 @@ class RuntimeOrchestrator(
                 required = required,
                 maximum = maximum,
                 preferredMinimum = preference.preferredTokens,
+                candidateSizes = approvedTiers,
             ) ?: throw GenerationPlanningException(
                 ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
                 "No supported context size can contain the requested prompt and output",
@@ -585,7 +728,11 @@ class RuntimeOrchestrator(
     private fun materializeContext(session: SessionDescriptor, requestedContextSize: Int): ContextMaterialization =
         synchronized(resourceLock) {
             val current = session.context
-            if (current != null && current.contextSize >= requestedContextSize) {
+            val capabilities = session.resolved.model.runtimeCapabilities
+            val statelessReuse = session.resolved.useCase.cachePolicy.reuseStatelessContext &&
+                capabilities.supportsStatelessContextReuse
+            val liveReuseAllowed = session.options.kind == SessionKind.CONVERSATIONAL || statelessReuse
+            if (current != null && current.contextSize >= requestedContextSize && liveReuseAllowed) {
                 return@synchronized ContextMaterialization(current, null, created = false)
             }
             if (current != null && session.options.kind == SessionKind.CONVERSATIONAL) {
@@ -642,6 +789,7 @@ class RuntimeOrchestrator(
 
     private fun ensureModelLoaded(resolved: ResolvedUseCase): LoadedModelDescriptor {
         check(!closed.get()) { "Runtime is closed" }
+        validateRuntimeCapabilities(resolved)
         val requestedDigest = resolved.model.artifact.digest
         val current = loadedModel
         if (current != null && current.handle.digest == requestedDigest && current.profileId == resolved.model.id) {
@@ -673,6 +821,66 @@ class RuntimeOrchestrator(
         )
         loadedModel = loaded
         return loaded
+    }
+
+    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {
+        val capabilities = resolved.model.runtimeCapabilities
+        capabilities.requiredBackendId?.let { required ->
+            check(backend.id == required) { "Runtime profile requires backend $required" }
+        }
+        capabilities.requiredBackendRevision?.let { required ->
+            check(backend.revision == required) { "Runtime profile requires backend revision $required" }
+        }
+        check(!resolved.useCase.cachePolicy.enablePrefixSnapshot || capabilities.supportsPrefixSnapshot) {
+            "Runtime profile does not allow prefix snapshots"
+        }
+        check(!resolved.useCase.cachePolicy.reuseStatelessContext || capabilities.supportsStatelessContextReuse) {
+            "Runtime profile does not allow stateless context reuse"
+        }
+    }
+
+    private fun BackendGenerationOutcome.metrics(): BackendGenerationMetrics = when (this) {
+        is BackendGenerationOutcome.Completed -> metrics
+        is BackendGenerationOutcome.Cancelled -> metrics
+    }
+
+    private fun completeGeneration(
+        request: GenerationRequest,
+        session: SessionDescriptor,
+        lifecycle: RequestLifecycle,
+        output: String,
+        reasoningOutput: String,
+        answerOutput: String,
+        backendMetrics: BackendGenerationMetrics,
+        executionStartedAt: Long,
+        enqueuedAt: Long,
+        firstTokenAt: AtomicLong,
+        firstAnswerAt: AtomicLong,
+        promptPlanningMs: Long,
+        contextCreationMs: Long?,
+    ) {
+        val publicMetrics = backendMetrics.toPublicMetrics(
+            queueMs = nanosToMillis(executionStartedAt - enqueuedAt),
+            modelLoadMs = session.modelLoadDurationMs,
+            modelLoadKind = session.modelLoadKind,
+            timeToFirstTokenMs = firstTokenAt.get().takeIf { it != 0L }
+                ?.let { nanosToMillis(it - executionStartedAt) },
+            timeToFirstAnswerMs = firstAnswerAt.get().takeIf { it != 0L }
+                ?.let { nanosToMillis(it - executionStartedAt) },
+            totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt),
+            promptPlanningMs = promptPlanningMs,
+            contextCreationMs = contextCreationMs,
+        )
+        runtimeTelemetry.completed(request.requestId, publicMetrics)
+        lifecycle.finish(
+            GenerationEvent.Completed(
+                requestId = request.requestId,
+                output = output,
+                metrics = publicMetrics,
+                reasoningOutput = reasoningOutput,
+                answerOutput = answerOutput,
+            ),
+        )
     }
 
     private fun releaseSessionRequest(session: SessionDescriptor) {
@@ -751,6 +959,7 @@ class RuntimeOrchestrator(
         modelLoadMs: Long?,
         modelLoadKind: ModelLoadKind,
         timeToFirstTokenMs: Long?,
+        timeToFirstAnswerMs: Long?,
         totalMs: Long,
         promptPlanningMs: Long,
         contextCreationMs: Long?,
@@ -772,6 +981,9 @@ class RuntimeOrchestrator(
         stopReason = stopReason,
         promptPlanningMs = promptPlanningMs,
         contextCreationMs = contextCreationMs,
+        timeToFirstAnswerMs = timeToFirstAnswerMs,
+        reasoningTokens = reasoningTokens,
+        answerTokens = answerTokens,
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
@@ -807,6 +1019,9 @@ class RuntimeOrchestrator(
         val temperature: Float,
         val topP: Float,
         val topK: Int,
+        val minP: Float,
+        val presencePenalty: Float,
+        val thinkingMode: ThinkingMode,
         val repeatPenalty: Float,
         val repeatLastN: Int,
         val seedPolicy: SeedPolicy,
@@ -814,6 +1029,7 @@ class RuntimeOrchestrator(
         val systemPromptVersion: String,
         val systemPrompt: String?,
         val contextPreference: ContextPreference,
+        val guardPolicy: GenerationGuardPolicy,
     )
 
     private data class ContextMaterialization(val context: BackendContextHandle, val creationMs: Long?, val created: Boolean)
@@ -827,7 +1043,7 @@ class RuntimeOrchestrator(
         const val MIN_REPEAT_PENALTY = 1f
         const val MAX_REPEAT_PENALTY = 2f
         const val MAX_REPEAT_LAST_N = 4_096
-        const val CONTEXT_RESERVE_TOKENS = 256
+        const val MIN_CONTROLLED_THINKING_OUTPUT_TOKENS = 16
     }
 }
 

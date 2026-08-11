@@ -25,6 +25,9 @@ class LlamaCppGgufArtifactInspectorTest {
                             "qwen35",
                             "Qwen",
                             "15",
+                            "262144",
+                            "24",
+                            "1024",
                         ),
                     ),
                 ),
@@ -37,6 +40,11 @@ class LlamaCppGgufArtifactInspectorTest {
         assertEquals("qwen35", result.metadata.architecture)
         assertEquals("Qwen", result.metadata.name)
         assertEquals(15L, result.metadata.fileType)
+        assertEquals(4L, result.metadata.keyValueCount)
+        assertEquals(2L, result.metadata.tensorCount)
+        assertEquals(262144L, result.metadata.contextLength)
+        assertEquals(24L, result.metadata.blockCount)
+        assertEquals(1024L, result.metadata.embeddingLength)
     }
 
     @Test

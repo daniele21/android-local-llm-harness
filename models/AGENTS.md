@@ -43,6 +43,7 @@ rg -n 'project\(' models backends apps --glob 'build.gradle.kts'
 ## Local invariants
 
 - SHA-256 is the immutable physical identity; URLs, filenames, catalog IDs and profile IDs are not substitutes.
+- Product eligibility is limited to Qwen3.5 dense 0.8B/2B under [`ADR 0011`](../docs/adr/0011-qwen35-only-product-support.md); keep the underlying model contracts neutral, treat import labels as untrusted and retain unsupported installed bytes until explicit user removal.
 - `model-profile` describes configuration and binding; it does not own filesystem or network behavior.
 - `model-store` owns installed artifacts. Imports stream through staging, publish atomically and never expose a partial artifact as ready.
 - `model-catalog` owns validated release metadata and compatibility policy, not HTTP transfer or runtime selection.

@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SeedPolicy
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
 import io.github.daniele21.localllm.models.ArtifactSource
@@ -18,6 +19,9 @@ import io.github.daniele21.localllm.models.GgufModelProfile
 import io.github.daniele21.localllm.models.InferencePreset
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.models.Qwen35GenerationProfiles
+import io.github.daniele21.localllm.models.Qwen35ModelTier
+import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseProfile
@@ -30,14 +34,17 @@ data class ImportedPhoneModel(
     val architecture: String,
     val quantization: String,
 ) {
-    fun artifact(): GgufArtifact = GgufArtifact(
-        digest = digest,
-        fileName = fileName,
-        sizeBytes = sizeBytes,
-        architecture = architecture,
-        quantization = quantization,
-        source = ArtifactSource.Imported("storage-access-framework"),
-    )
+    fun artifact(): GgufArtifact {
+        Qwen35PhoneModelPolicy.requireCurated(this)
+        return GgufArtifact(
+            digest = digest,
+            fileName = fileName,
+            sizeBytes = sizeBytes,
+            architecture = architecture,
+            quantization = quantization,
+            source = ArtifactSource.Download("administrator-curated-catalog"),
+        )
+    }
 }
 
 internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
@@ -64,6 +71,9 @@ internal data class PlaygroundMetrics(
     val decodeTokensPerSecond: Double?,
     val modelLoadKind: String,
     val stopReason: String = "UNKNOWN",
+    val timeToFirstAnswerMs: Long? = null,
+    val reasoningTokens: Int? = null,
+    val answerTokens: Int? = null,
 ) {
     companion object {
         fun from(metrics: GenerationMetrics): PlaygroundMetrics = PlaygroundMetrics(
@@ -78,6 +88,9 @@ internal data class PlaygroundMetrics(
             decodeTokensPerSecond = metrics.decodeTokensPerSecond,
             modelLoadKind = metrics.modelLoadKind.name,
             stopReason = metrics.stopReason.name,
+            timeToFirstAnswerMs = metrics.timeToFirstAnswerMs,
+            reasoningTokens = metrics.reasoningTokens,
+            answerTokens = metrics.answerTokens,
         )
     }
 }
@@ -93,6 +106,8 @@ internal data class PlaygroundState(
     val errorCode: String? = null,
     val detail: String = "Ready",
     val effectiveConfiguration: EffectiveGenerationMetadata? = null,
+    val reasoningOutput: String = "",
+    val answerOutput: String = "",
 ) {
     val active: Boolean
         get() = phase == PlaygroundPhase.PREPARING ||
@@ -106,6 +121,9 @@ internal data class PlaygroundRequestOptions(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val minP: Float,
+    val presencePenalty: Float,
+    val thinkingMode: ThinkingMode,
     val repeatPenalty: Float,
     val repeatLastN: Int,
     val seedPolicy: SeedPolicy,
@@ -129,6 +147,14 @@ internal data class PlaygroundRequestOptions(
             require(parsedTopP > 0f && parsedTopP <= 1f) { "Top-p must be in (0, 1]" }
             val parsedTopK = requireNotNull(fields.topK.trim().toIntOrNull()) { "Top-k must be an integer" }
             require(parsedTopK in 0..1000) { "Top-k must be between 0 and 1000" }
+            val parsedMinP = requireNotNull(fields.minP.trim().toFloatOrNull()) { "Min-p must be a number" }
+            require(parsedMinP.isFinite() && parsedMinP in 0f..1f) { "Min-p must be between 0 and 1" }
+            val parsedPresencePenalty = requireNotNull(fields.presencePenalty.trim().toFloatOrNull()) {
+                "Presence penalty must be a number"
+            }
+            require(parsedPresencePenalty.isFinite() && parsedPresencePenalty in 0f..2f) {
+                "Presence penalty must be between 0 and 2"
+            }
             val parsedRepeatPenalty = requireNotNull(fields.repeatPenalty.trim().toFloatOrNull()) {
                 "Repeat penalty must be a number"
             }
@@ -153,6 +179,9 @@ internal data class PlaygroundRequestOptions(
                 temperature = parsedTemperature,
                 topP = parsedTopP,
                 topK = parsedTopK,
+                minP = parsedMinP,
+                presencePenalty = parsedPresencePenalty,
+                thinkingMode = fields.thinkingMode,
                 repeatPenalty = parsedRepeatPenalty,
                 repeatLastN = parsedRepeatLastN,
                 seedPolicy = parsedSeed,
@@ -174,6 +203,9 @@ internal data class PlaygroundRequestFields(
     val temperature: String,
     val topP: String,
     val topK: String,
+    val minP: String = "0",
+    val presencePenalty: String = "0",
+    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
     val repeatPenalty: String,
     val repeatLastN: String,
     val seed: String,
@@ -197,49 +229,48 @@ internal fun resolvedPhoneUseCase(
     maxOutputTokens: Int,
     useCaseValue: String = "physical-device-validation",
     profileSuffix: String = "validation",
-    contextSize: Int = 512,
+    contextSize: Int = 2_048,
 ): ResolvedUseCase {
+    val release = Qwen35PhoneModelPolicy.requireCurated(model)
+    val tier = if (release.id.modelId.value.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
     val applicationId = ApplicationId("play-internal-phone-test")
     val useCaseId = UseCaseId(useCaseValue)
-    val modelProfileId = "play-internal-phone-model-$profileSuffix"
+    val modelProfileId = "${release.profileKey.value}-$profileSuffix"
     val useCaseProfileId = "play-internal-phone-use-case-$profileSuffix"
-    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1).coerceAtMost(4)
+    val availableProcessors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+    val runtimeProfile = Qwen35RuntimeTuningProfiles.candidateForTier(tier)
+    val runtimeTuning = runtimeProfile.resolve(availableProcessors)
     val modelProfile = GgufModelProfile(
         id = modelProfileId,
         artifact = model.artifact(),
         contextSize = contextSize,
-        batchSize = 128,
-        microBatchSize = 64,
-        cpuThreads = availableProcessors,
-        batchThreads = availableProcessors,
+        batchSize = runtimeTuning.batchSize,
+        microBatchSize = runtimeTuning.microBatchSize,
+        cpuThreads = runtimeTuning.cpuThreads,
+        batchThreads = runtimeTuning.batchThreads,
         gpuLayers = 0,
-        chatTemplatePolicy = ChatTemplatePolicy(
-            familyFallbackId = "harness-generic-chat-v1",
-            familyFallback = "{% for message in messages %}" +
-                "{{ '<|' + message['role'] + '|>\\n' + message['content'] + '\\n' }}" +
-                "{% endfor %}{{ '<|assistant|>\\n' }}",
-            stopSequences = listOf("<|user|>", "<|system|>"),
-        ),
+        useMmap = runtimeTuning.useMmap,
+        useMlock = runtimeTuning.useMlock,
+        flashAttention = runtimeTuning.flashAttention,
+        chatTemplatePolicy = ChatTemplatePolicy(),
+        runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
+
     )
     val useCase = UseCaseProfile(
         id = useCaseProfileId,
         modelProfileId = modelProfileId,
         systemPromptVersion = "play-internal-phone-$profileSuffix-v1",
-        generationDefaults = GenerationDefaults(
+        generationDefaults = Qwen35GenerationProfiles.defaultForTier(tier).copy(
             maxOutputTokens = maxOutputTokens,
-            temperature = 0f,
-            topP = 1f,
-            topK = 0,
             seed = 42,
-            repeatPenalty = PHONE_REPEAT_PENALTY,
-            repeatLastN = PHONE_REPEAT_LAST_N,
+            seedPolicy = SeedPolicy.Fixed(42),
         ),
         outputMode = OutputMode.TEXT,
         cachePolicy = UseCaseCachePolicy(0, false, false, false),
         healthSuiteId = "play-internal-phone-$profileSuffix-health",
         systemPrompt = "You are a concise, accurate assistant running entirely on the user's device.",
-        presets = phoneInferencePresets(),
-        defaultPreset = InferencePresetRef(InferencePresetId("balanced-conversation"), PHONE_INFERENCE_PRESET_VERSION),
+        presets = phoneInferencePresets(tier),
+        defaultPreset = InferencePresetRef(InferencePresetId("qwen35-text-quality"), PHONE_INFERENCE_PRESET_VERSION),
     )
     return ResolvedUseCase(
         binding = AppModelBinding(applicationId, useCaseId, useCase.id),
@@ -256,32 +287,25 @@ internal fun resolvedPhonePlaygroundUseCase(model: ImportedPhoneModel): Resolved
     contextSize = 2048,
 )
 
-private fun phoneInferencePresets(): List<InferencePreset> = playgroundPresetOptions.map(::phonePreset)
+private fun phoneInferencePresets(tier: Qwen35ModelTier): List<InferencePreset> = playgroundPresetOptions.map { phonePreset(tier, it) }
 
-private fun phonePreset(preset: PlaygroundPresetOption): InferencePreset = InferencePreset(
-    ref = InferencePresetRef(InferencePresetId(preset.id), PHONE_INFERENCE_PRESET_VERSION),
-    generation = GenerationDefaults(
-        maxOutputTokens = preset.maxOutputTokens.toInt(),
-        temperature = preset.temperature.toFloat(),
-        topP = preset.topP.toFloat(),
-        topK = preset.topK.toInt(),
-        seedPolicy = preset.seed.toLongOrNull()?.let(SeedPolicy::Fixed) ?: SeedPolicy.Random,
-        repeatPenalty = preset.repeatPenalty.toFloat(),
-        repeatLastN = preset.repeatLastN.toInt(),
-    ),
-    systemPromptVersion = "play-internal-phone-${preset.id}-v1",
-    systemPrompt = preset.systemPrompt,
-    contextPreference = ContextPreference(
-        preferredTokens = preset.preferredContextTokens,
-        recommendedMaximumTokens = preset.recommendedMaximumContextTokens,
-    ),
-    allowedOutputModes = if (preset.id == "precise-structured") {
-        setOf(OutputMode.TEXT, OutputMode.JSON, OutputMode.JSON_SCHEMA)
-    } else {
-        setOf(OutputMode.TEXT)
-    },
-)
+private fun phonePreset(tier: Qwen35ModelTier, preset: PlaygroundPresetOption): InferencePreset {
+    val profile = Qwen35GenerationProfiles.forTier(tier).single { it.id == preset.profileId }
+    return InferencePreset(
+        ref = InferencePresetRef(InferencePresetId(preset.id), profile.version),
+        generation = profile.defaults,
+        systemPromptVersion = "play-internal-phone-${preset.id}-v1",
+        systemPrompt = preset.systemPrompt,
+        contextPreference = ContextPreference(
+            preferredTokens = preset.preferredContextTokens,
+            recommendedMaximumTokens = preset.recommendedMaximumContextTokens,
+        ),
+        allowedOutputModes = if (preset.id == "qwen35-json") {
+            setOf(OutputMode.TEXT, OutputMode.JSON, OutputMode.JSON_SCHEMA)
+        } else {
+            setOf(OutputMode.TEXT)
+        },
+    )
+}
 
-internal const val PHONE_INFERENCE_PRESET_VERSION = 2
-private const val PHONE_REPEAT_PENALTY = 1.05f
-private const val PHONE_REPEAT_LAST_N = 64
+internal const val PHONE_INFERENCE_PRESET_VERSION = Qwen35GenerationProfiles.VERSION

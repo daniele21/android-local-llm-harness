@@ -9,6 +9,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 data class GenerationRunRecord(
@@ -35,6 +36,9 @@ data class GenerationRunRecord(
     val temperature: Float? = null,
     val topP: Float? = null,
     val topK: Int? = null,
+    val minP: Float? = null,
+    val presencePenalty: Float? = null,
+    val thinkingMode: ThinkingMode? = null,
     val repeatPenalty: Float? = null,
     val repeatLastN: Int? = null,
     val seedPolicy: SeedPolicyType? = null,
@@ -115,11 +119,55 @@ fun interface ResourceSnapshotProvider {
     fun snapshot(): ResourceSnapshot
 }
 
+data class BenchmarkExecutionIdentity(val fingerprint: String) {
+    init {
+        require(FINGERPRINT_PATTERN.matches(fingerprint)) { "Benchmark execution fingerprint must be SHA-256" }
+    }
+
+    companion object {
+        private val FINGERPRINT_PATTERN = Regex("[0-9a-f]{64}")
+
+        fun fromFingerprint(fingerprint: String): BenchmarkExecutionIdentity = BenchmarkExecutionIdentity(fingerprint.lowercase())
+
+        fun fromRun(run: GenerationRunRecord): BenchmarkExecutionIdentity {
+            val canonical = listOf(
+                value(run.contextSize),
+                value(run.promptTokenCount),
+                value(run.presetId?.value),
+                value(run.presetVersion),
+                value(run.thinkingMode?.name),
+                floatValue(run.temperature),
+                floatValue(run.topP),
+                value(run.topK),
+                floatValue(run.minP),
+                floatValue(run.presencePenalty),
+                floatValue(run.repeatPenalty),
+                value(run.repeatLastN),
+                value(run.seedPolicy?.name),
+                value(run.effectiveSeed),
+                value(run.maxOutputTokens),
+                value(run.chatTemplateId),
+                value(run.chatTemplateSource?.name),
+                value(run.systemPromptVersion),
+            ).joinToString("|")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(canonical.toByteArray(Charsets.UTF_8))
+                .joinToString("") { byte -> "%02x".format(byte) }
+            return BenchmarkExecutionIdentity(digest)
+        }
+
+        private fun value(value: Any?): String = value?.toString() ?: "~"
+
+        private fun floatValue(value: Float?): String = value?.toRawBits()?.toString() ?: "~"
+    }
+}
+
 data class BenchmarkKey(
     val applicationId: ApplicationId,
     val useCaseId: UseCaseId,
     val modelDigest: ModelDigest,
     val modelLoadKind: ModelLoadKind,
+    val executionIdentity: BenchmarkExecutionIdentity,
 ) {
     init {
         require(modelLoadKind != ModelLoadKind.UNKNOWN) { "Benchmark load kind must be explicit" }
@@ -131,7 +179,24 @@ data class BenchmarkKey(
             useCaseId.value,
             modelDigest.sha256,
             modelLoadKind.name,
+            executionIdentity.fingerprint,
         ).joinToString("|")
+
+    fun matches(run: GenerationRunRecord): Boolean = run.applicationId == applicationId &&
+        run.useCaseId == useCaseId &&
+        run.modelDigest == modelDigest &&
+        run.modelLoadKind == modelLoadKind &&
+        BenchmarkExecutionIdentity.fromRun(run) == executionIdentity
+
+    companion object {
+        fun fromRun(run: GenerationRunRecord): BenchmarkKey = BenchmarkKey(
+            applicationId = run.applicationId,
+            useCaseId = run.useCaseId,
+            modelDigest = run.modelDigest,
+            modelLoadKind = run.modelLoadKind,
+            executionIdentity = BenchmarkExecutionIdentity.fromRun(run),
+        )
+    }
 }
 
 data class BenchmarkBaseline(

@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-09
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -13,128 +13,142 @@ This is the single operational ledger for what is integrated, what remains block
 
 - `dev` is the canonical base and target for ordinary feature, fix, dependency, UX/UI and documentation work.
 - `main` is the protected stable and release-oriented line.
-- PR #75 promoted the validated `dev` candidate to `main` on 2026-08-06.
-- The promoted baseline contains the work through PR #76, including repetition-protection controls.
 - New work must start from the latest green `dev` unless it is an explicit emergency hotfix based on `main`.
-
-The repository-level ruleset for `dev` remains an administrative verification item: direct push, force-push and deletion protection plus required repository validation must be confirmed before Harness 0.5 release.
 
 ## Integrated functional boundary
 
 ### Runtime and backend
 
 - pinned `llama.cpp` source and reproducible Android `arm64-v8a` packaging;
-- metadata-only GGUF inspection;
-- opaque model and context handles;
-- content-addressed import, SHA-256 verification, deduplication and integrity checks;
-- load, context creation, generation, aggregated streaming and cooperative cancellation;
-- single-decode scheduling with priorities and queue cancellation;
-- compatible warm model reuse, protected model switching and Android memory-pressure handling;
-- model-aware prompt planning, exact tokenization, lazy Auto/manual context selection, output constraints and stop handling;
-- versioned presets, per-request sampling overrides, random/fixed seed policy and repetition protection;
-- typed configuration, runtime and cancellation failures without backend-message disclosure.
+- metadata-only GGUF inspection and content-addressed SHA-256 model storage;
+- load, context creation, generation, streaming, cancellation and single-decode scheduling;
+- model-aware prompt/context planning, output constraints and stop handling;
+- versioned presets and request overrides;
+- Qwen3.5 typed thinking through Jinja `enable_thinking`, with no `/think` or `/nothink` prompt injection;
+- Qwen3.5 end-to-end `minP`, `presencePenalty`, temperature, top-p, top-k, repetition, seed and output-token configuration;
+- tier-aware Fast, Quality, Thinking, Precise and JSON Qwen3.5 generation profiles;
+- bounded Qwen3.5 generation guard with thinking budget, repetition/runaway detection and typed terminal stop reasons;
+- approved Qwen3.5 1K/2K/4K/8K mobile context tiers with a safety reserve and smallest-fitting Auto selection;
+- Qwen3.5 recurrent-state reuse capabilities fail closed against the exact pinned backend revision;
+- native packaging includes and verifies the `libllama-common.so` renderer dependency;
+- typed configuration/runtime/cancellation failures without backend-message disclosure.
 
 ### Model distribution and inventory
 
-- curated administrator-managed catalog with application/use-case and device compatibility filtering;
-- HTTPS-only verified transfer with bounded redirects, size checks, SHA-256 validation and cancellation;
-- opaque verified-download handle and explicit installation boundary;
-- durable path-free installed catalog/profile metadata;
-- explicit import, download, install, select, verify and remove operations;
-- protected removal while the runtime owns or uses a model;
-- unified immutable projection across catalog releases, installed metadata, external imports, selection and runtime-loaded ownership;
-- explicit degraded states for loaded-model absence or loaded-versus-selected mismatch;
-- model-detail presentation and deterministic recovery that never deletes a GGUF as part of runtime release.
+- executable curated catalog restricted to seven Qwen3.5 dense 0.8B/2B releases;
+- no consumer-facing arbitrary GGUF document import or generic family extension point;
+- verified HTTPS transfer with size/SHA validation, GGUF inspection and explicit installation;
+- catalog-anchored product binding and durable path-free installed metadata;
+- external-import inventory origin/projection removed;
+- out-of-catalog selections or persisted metadata are not synthesized as legacy/unsupported product state;
+- Models reconciles catalog availability, installation, selection and runtime state in one list;
+- `Unload from memory` is distinct from destructive `Remove installed model` and preserves installed/selected identity;
+- developer/device-test artifact injection remains isolated from consumer APIs.
+
+### Qwen3.5 compatibility and runtime baseline
+
+Q35-1 through Q35-5 are complete; Q35-6 is active:
+
+- closed catalog-only product surface is validated;
+- exact Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M artifacts are pinned by SHA-256, size and trusted GGUF structural fingerprints;
+- pinned llama.cpp revision is `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`;
+- final compatibility smoke passes `load -> tokenize -> minimal generate` for both reference artifacts;
+- effective thinking/sampler configuration is privacy-safe telemetry;
+- anomalous thinking/repetition is bounded with typed stop semantics;
+- recurrent-state snapshot/session/prefix reuse remains disabled until explicitly proved safe;
+- 0.8B and 2B candidate runtime profiles are separate and remain `CANDIDATE` pending physical evidence.
+
+Catalog availability still does not imply certification.
 
 ### Connected Android application
 
-`apps/local-llm-phone-test` is the connected Compose surface with:
+`apps/local-llm-phone-test` provides:
 
 - Overview, Playground, Models, Diagnostics and Settings;
-- compact bottom navigation and expanded navigation rail;
-- one process-scoped runtime graph shared by Playground and physical validation;
-- real GGUF import, inference, streaming, cancellation, cleanup and validation;
+- curated Qwen3.5 download/install/select/verify/remove plus inference, streaming and cancellation;
+- unified Models lifecycle presentation and explicit runtime unload;
+- default Playground prompt `how much is the earth radius?`;
+- Qwen3.5 profile selection plus thinking, temperature, top-p, top-k, min-p, presence penalty, repeat penalty/window, seed and context controls;
 - ViewModel/UDF ownership for Playground and Models;
-- typed Settings, request-timeline and model-detail routes;
 - real run, health, resource, benchmark, log and request-timeline data;
-- reproducible launcher identity, dark/light/system design-system foundations and baseline accessibility checks.
+- reproducible launcher identity, dark/light/system foundations and baseline accessibility checks.
 
-Overview, Diagnostics and Settings still retain Activity-owned renderable state or effects. `MainActivity` is not yet reduced to a pure composition and lifecycle root.
+Overview, Diagnostics and Settings still retain some Activity-owned renderable state/effects; `MainActivity` is not yet a pure composition/lifecycle root.
 
 ### Observability
 
 - bounded in-memory and Room-backed telemetry;
-- run lifecycle, request-correlated logs and privacy-safe timelines;
+- request-correlated logs and privacy-safe timelines;
 - queue, model-load, TTFT, prefill, decode, total, token and throughput metrics;
-- effective generation metadata including sampling, context, template source and repetition protection;
+- effective generation metadata including thinking and scalar sampling configuration;
 - model-integrity, generation-sanity and cache-health checks;
 - Android memory and thermal snapshots;
-- active benchmark baselines separated from immutable retained capture history;
-- cold/warm isolation and regression evaluation based only on matching post-baseline samples.
+- benchmark baseline/history separation and matching-sample regression evaluation;
+- strict benchmark execution identity prevents comparisons across incompatible context/preset/thinking/sampler/seed/template configurations;
+- Room schema v8 persists execution identity and drops unverifiable legacy baselines rather than inventing compatibility identity.
 
-Normal telemetry excludes prompt, generated output, system-prompt text, template text, schema, stop-sequence text, filesystem paths, document URIs and signed URLs.
+Normal telemetry excludes prompt/output/system-prompt/template/schema/stop-sequence text, filesystem paths, document URIs and signed URLs.
 
 ## Open implementation blocks
 
-### 1. Remaining phone-app UDF migration
+### 1. Q35-6 physical Android tuning evidence
 
-- move Overview, Diagnostics and Settings renderable state and user-intent coordination behind typed state/effect boundaries;
-- remove the corresponding Activity-owned mirrors;
-- keep Android launchers and native lifecycle resources scoped to the Activity only where ownership requires it;
-- complete state restoration and deterministic Back behavior without persisting sensitive content.
+Repository-side tuning infrastructure is complete. Remaining work:
 
-### 2. RAM residency controls
+- run the controlled matrix for both curated Qwen3.5 0.8B Q4_K_M and 2B Q4_K_M artifacts on representative physical Android hardware;
+- collect one cold plus at least three warm samples per case with exact device/runtime identity;
+- review TTFT, prefill/decode throughput, peak PSS, available memory and thermal evidence independently by model tier;
+- choose versioned measured defaults only from complete comparable evidence;
+- validate cancellation, model switching, memory pressure and idle unload on the selected configurations.
 
-- expose explicit `Load in memory` and `Unload from memory` actions separate from installation and selection;
-- reject or defer unload while contexts, active generation or queued work own the model;
-- implement a configurable warm-idle TTL using an injected monotonic clock and cancellable scheduler;
-- cancel or rearm eviction on reuse and recheck ownership at expiry;
-- preserve the installed GGUF, selected identity and metadata;
-- record privacy-safe unload reasons for manual action, TTL, memory pressure, switch and shutdown;
-- validate races, pinning, idempotent cleanup and reload classification.
+Specification: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
 
-### 3. UI and accessibility evidence
+### 2. Q35-7 validation suite
 
-- complete deterministic Compose state fixtures;
-- add compact, expanded, landscape and large-font coverage;
-- add screenshot regression coverage for real empty, unavailable, loading, warning, failure and success states;
-- complete TalkBack and focus-order validation;
-- verify navigation restoration and process recreation.
+After Q35-6 measured profiles exist:
 
-### 4. Physical-device and release evidence
+- execute semantic/golden validation across supported thinking/output modes;
+- validate context boundaries and cancellation during prefill/decode;
+- run repeated lifecycle, memory and thermal device evidence for both tiers;
+- prepare certification-consumable evidence without conflating catalog availability with support certification.
 
-- build and sign the exact release candidate;
-- distribute it through Google Play Internal Testing;
-- validate remote download/install, imported GGUF and real JNI inference on representative `arm64-v8a` hardware;
-- cancel during prefill and decode;
-- record repeated lifecycle memory stability, cold/warm latency, throughput, PSS and thermal evidence;
-- preserve privacy-safe evidence without committing model or signing material.
+### 3. Remaining phone-app UDF migration
+
+- move Overview, Diagnostics and Settings renderable state/intent behind typed state/effect boundaries;
+- reduce Activity-owned mirrors;
+- complete deterministic restoration and Back behavior without persisting sensitive content.
+
+### 4. RAM residency policy completion
+
+Explicit manual unload is implemented. Remaining residency work is:
+
+- configurable warm-idle TTL using an injected monotonic clock and cancellable scheduler;
+- ownership rechecks at eviction time;
+- privacy-safe automatic unload reasons for TTL, memory pressure, switch and shutdown;
+- race, pinning, idempotent cleanup and reload-classification validation.
+
+### 5. UI/accessibility and release evidence
+
+- compact/expanded/landscape/large-font and screenshot-regression coverage;
+- TalkBack/focus-order and recreation evidence;
+- signed Internal Testing candidate.
 
 ## Immediate next block
 
-Implement the remaining phone-app UDF migration as one focused vertical slice, starting with Diagnostics because it owns the broadest remaining Activity state and effect surface.
-
-The slice should:
-
-1. define immutable Diagnostics state and typed actions/effects;
-2. move section selection, refresh, health, resource, benchmark, log and timeline coordination behind the ViewModel boundary;
-3. keep repository, executor and Android-resource ownership in the Activity-scoped effect implementation;
-4. remove migrated Activity state only after deterministic JVM coverage passes;
-5. verify that navigation and refresh remain observational and do not start diagnostics work implicitly;
-6. run focused phone-test formatting, JVM tests, Lint and compilation before the repository clean-checkout gate.
+Proceed with **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh`. Do not promote candidate profiles to `MEASURED` from synthetic/emulator/CI results. Q35-4 and Q35-5 are closed.
 
 ## Blockers and deferred evidence
 
-- Representative physical-device GGUF evidence remains mandatory before production readiness or device-performance claims.
-- The standalone console remains intentionally disconnected from another application's private runtime and telemetry unless an explicit bridge is introduced later.
-- Binder/AIDL shared-runtime work and Capacitor integration remain later phases; they must not be pulled into the current phone-app or release blocks.
-- GPU/Vulkan, simultaneous decode, multimodal support and speculative decoding remain outside the current production-capable embedded scope.
+- representative physical-device performance evidence is required to close Q35-6;
+- Q35-7/Q35-8 require the measured Q35-6 profile evidence;
+- Binder/AIDL shared runtime and Capacitor remain later phases;
+- GPU/Vulkan, simultaneous decode, multimodal and speculative decoding remain outside the current production-capable embedded scope.
 
 ## Source links
 
 - Capability milestones: [`roadmap.md`](roadmap.md)
+- Qwen3.5-only product status: [`qwen35/README.md`](qwen35/README.md)
 - Target behavior: [`implementation-plan.md`](implementation-plan.md)
-- Phone application architecture: [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
-- UX/UI acceptance criteria: [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
+- Phone architecture: [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
 - Generation behavior: [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md)
 - Harness 0.5 release gates: [`releases/harness-0.5.md`](releases/harness-0.5.md)

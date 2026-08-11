@@ -32,6 +32,7 @@ class LlamaCppInferenceBackend(
     private val streamingBridge: LlamaCppStreamingBridge = LlamaCppStreamingBridge(),
 ) : InferenceBackend {
     override val id: String = "llama.cpp"
+    override val revision: String = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 
     override fun initialize() {
         when (val result = lifecycleBridge.initializeRuntime(nativeLibraryDir)) {
@@ -71,6 +72,7 @@ class LlamaCppInferenceBackend(
             is NativeModelCapabilitiesResult.Success -> BackendModelCapabilities(
                 maximumContextTokens = result.capabilities.maximumContextTokens,
                 supportsGrammar = result.capabilities.supportsGrammar,
+                supportsReasoningTransition = true,
             )
 
             is NativeModelCapabilitiesResult.Failure -> throw result.error.asBackendException()
@@ -85,6 +87,7 @@ class LlamaCppInferenceBackend(
                 input = request.input,
                 systemPrompt = request.systemPrompt,
                 policy = request.chatTemplatePolicy,
+                thinkingMode = request.thinkingMode,
             )
         ) {
             is NativePromptPlanningResult.Success -> BackendPromptPlan(
@@ -131,6 +134,8 @@ class LlamaCppInferenceBackend(
             temperature = request.temperature,
             topP = request.topP,
             topK = request.topK,
+            minP = request.minP,
+            presencePenalty = request.presencePenalty,
             repeatPenalty = request.repeatPenalty,
             repeatLastN = request.repeatLastN,
             seed = request.seed,
@@ -138,6 +143,9 @@ class LlamaCppInferenceBackend(
             outputSchema = (request.outputConstraint as? OutputConstraint.JsonSchema)?.schema,
             stopTokenIds = request.stopTokenIds.toIntArray(),
             stopSequences = request.stopSequences,
+            reasoningMaxTokens = request.reasoningControl?.maxReasoningTokens,
+            reasoningCloseMarker = request.reasoningControl?.closeMarker,
+            reasoningForcedCloseText = request.reasoningControl?.forcedCloseText,
         )
         return when (
             val result = streamingBridge.generate(
@@ -187,6 +195,8 @@ private fun io.github.daniele21.localllm.llamacpp.NativeStreamingMetrics.toBacke
         promptDurationMs = promptDurationMs,
         generationDurationMs = generationDurationMs,
         stopReason = StopReason.entries.firstOrNull { it.name == stopReason } ?: StopReason.UNKNOWN,
+        reasoningTokens = reasoningTokens,
+        answerTokens = answerTokens,
     )
 
 private val OutputConstraint.nativeType: String

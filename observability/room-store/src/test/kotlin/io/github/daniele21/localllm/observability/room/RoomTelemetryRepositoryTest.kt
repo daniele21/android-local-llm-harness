@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
@@ -138,6 +139,7 @@ class RoomTelemetryRepositoryTest {
             UseCaseId("assistant"),
             ModelDigest("a".repeat(64)),
             ModelLoadKind.WARM,
+            BenchmarkExecutionIdentity.fromFingerprint("b".repeat(64)),
         ),
         capturedAtEpochMs = capturedAtEpochMs,
         sampleCount = 5,

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.daniele21.localllm.install.Qwen35CompatibilityTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-08T16:27:32.377Z" hostname="runnervmvrwv9" time="0.067">
+  <properties/>
+  <testcase name="referenceDescriptorsMatchCuratedCatalogAndPinnedBackend" classname="io.github.daniele21.localllm.install.Qwen35CompatibilityTest" time="0.052"/>
+  <testcase name="structuralMismatchIsRejected" classname="io.github.daniele21.localllm.install.Qwen35CompatibilityTest" time="0.009"/>
+  <testcase name="exactInspectedFingerprintsAreAccepted" classname="io.github.daniele21.localllm.install.Qwen35CompatibilityTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

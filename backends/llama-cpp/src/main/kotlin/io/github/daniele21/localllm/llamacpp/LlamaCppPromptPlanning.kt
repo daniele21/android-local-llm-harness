@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.llamacpp
 import io.github.daniele21.localllm.contracts.ChatTemplateSource
 import io.github.daniele21.localllm.contracts.ConversationRole
 import io.github.daniele21.localllm.contracts.GenerationInput
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.ChatTemplatePolicy
 import java.util.Base64
 
@@ -20,6 +21,7 @@ interface NativeLlamaPromptApi {
         familyTemplateId: String?,
         familyTemplate: String?,
         rawCompletion: String?,
+        enableThinking: Boolean,
     ): Array<String>
 }
 
@@ -41,6 +43,7 @@ class JniLlamaPromptApi : NativeLlamaPromptApi {
         familyTemplateId: String?,
         familyTemplate: String?,
         rawCompletion: String?,
+        enableThinking: Boolean,
     ): Array<String>
 }
 
@@ -54,6 +57,7 @@ class LlamaCppPromptPlanningBridge(private val nativeApi: NativeLlamaPromptApi =
         input: GenerationInput,
         systemPrompt: String?,
         policy: ChatTemplatePolicy,
+        thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
     ): NativePromptPlanningResult {
         val messages = input.messages()
         val response = nativeApi.planPrompt(
@@ -66,6 +70,7 @@ class LlamaCppPromptPlanningBridge(private val nativeApi: NativeLlamaPromptApi =
             familyTemplateId = policy.familyFallbackId,
             familyTemplate = policy.familyFallback,
             rawCompletion = (input as? GenerationInput.RawCompletion)?.value,
+            enableThinking = thinkingMode == ThinkingMode.ENABLED,
         )
         if (response.size == PROMPT_FIELD_COUNT && response[0] == OK) {
             return try {

@@ -115,7 +115,7 @@ class HarnessModelInventoryReducerTest {
         useCaseId = "manual-inference-playground",
         fileName = "model.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen2",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         installedAtEpochMs = 1L,
     )
@@ -124,7 +124,7 @@ class HarnessModelInventoryReducerTest {
         digest = digest,
         fileName = "external.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen2",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
     )
 }

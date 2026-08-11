@@ -15,6 +15,11 @@ class LlamaCppGgufArtifactInspector(private val bridge: LlamaCppBridge = LlamaCp
                     architecture = result.metadata.architecture,
                     name = result.metadata.name,
                     fileType = result.metadata.fileType,
+                    keyValueCount = result.metadata.keyValueCount,
+                    tensorCount = result.metadata.tensorCount,
+                    contextLength = result.metadata.contextLength,
+                    blockCount = result.metadata.blockCount,
+                    embeddingLength = result.metadata.embeddingLength,
                 ),
             )
 

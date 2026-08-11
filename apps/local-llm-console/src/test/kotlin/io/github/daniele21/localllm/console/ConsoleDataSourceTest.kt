@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
+import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
 import io.github.daniele21.localllm.observability.CacheHealthSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
@@ -219,6 +220,7 @@ class ConsoleDataSourceTest {
             useCaseId = UseCaseId("chat"),
             modelDigest = ModelDigest("b".repeat(64)),
             modelLoadKind = ModelLoadKind.COLD,
+            executionIdentity = BenchmarkExecutionIdentity.fromFingerprint("e".repeat(64)),
         ),
         capturedAtEpochMs = 1,
         sampleCount = 3,

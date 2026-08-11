@@ -58,6 +58,11 @@ data class GgufArtifactMetadata(
     val name: String?,
     val fileType: Long?,
     val quantization: String? = null,
+    val keyValueCount: Long? = null,
+    val tensorCount: Long? = null,
+    val contextLength: Long? = null,
+    val blockCount: Long? = null,
+    val embeddingLength: Long? = null,
 )
 
 sealed interface GgufArtifactInspectionResult {
@@ -111,6 +116,7 @@ enum class ModelInstallationFailureCode {
     GGUF_INSPECTION_FAILED,
     ARCHITECTURE_MISMATCH,
     QUANTIZATION_MISMATCH,
+    GGUF_MANIFEST_MISMATCH,
     MODEL_STORE_IMPORT_FAILED,
     POST_IMPORT_VERIFICATION_FAILED,
     INTERNAL_FAILURE,
@@ -164,6 +170,16 @@ class VerifiedModelInstaller(
             validateInspectedMetadata(request, metadata)?.let {
                 return fail(observer, installationId, it.code, it.detail)
             }
+            Qwen35CompatibilityManifest.forRelease(request.release.id)
+                ?.mismatch(request.release, metadata)
+                ?.let { mismatch ->
+                    return fail(
+                        observer,
+                        installationId,
+                        ModelInstallationFailureCode.GGUF_MANIFEST_MISMATCH,
+                        "Reference GGUF metadata mismatch: $mismatch",
+                    )
+                }
 
             emit(observer, installationId, ModelInstallationStage.IMPORTING)
             val stored = try {

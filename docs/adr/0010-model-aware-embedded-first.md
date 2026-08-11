@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-01
 
+Support-envelope amendment: [ADR 0011](0011-qwen35-only-product-support.md) narrows “multi-model” product support to explicitly selected Qwen3.5 dense 0.8B/2B artifacts and profiles. The binding and embedded-first decisions below remain in force.
+
 ## Context
 
 Applications may require different GGUF models, quantizations, prompts and context configurations. The first implementation must be embedded in each Android application, while a later shared host should deduplicate artifacts and coordinate memory.

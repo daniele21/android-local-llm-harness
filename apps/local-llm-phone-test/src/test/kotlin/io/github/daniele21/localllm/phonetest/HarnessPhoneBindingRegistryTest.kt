@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -8,16 +9,10 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class HarnessPhoneBindingRegistryTest {
-    private val model = ImportedPhoneModel(
-        digest = ModelDigest("a".repeat(64)),
-        fileName = "model.gguf",
-        sizeBytes = 1_024,
-        architecture = "qwen3",
-        quantization = "Q4_K_M",
-    )
+    private val model = curatedModel(0)
 
     @Test
-    fun `resolves playground and validation from the selected model`() {
+    fun `resolves playground and validation from the selected curated Qwen35 model`() {
         val registry = HarnessPhoneBindingRegistry()
         registry.select(model)
 
@@ -26,17 +21,15 @@ class HarnessPhoneBindingRegistryTest {
 
         assertEquals(model.digest, playground.model.artifact.digest)
         assertEquals(model.digest, validation.model.artifact.digest)
+        assertEquals("qwen35", playground.model.artifact.architecture)
         assertEquals("manual-inference-playground", playground.binding.useCaseId.value)
         assertEquals("physical-device-validation", validation.binding.useCaseId.value)
     }
 
     @Test
-    fun `uses the latest selected model for both purposes`() {
+    fun `uses the latest selected curated model for both purposes`() {
         val registry = HarnessPhoneBindingRegistry()
-        val replacement = model.copy(
-            digest = ModelDigest("b".repeat(64)),
-            fileName = "replacement.gguf",
-        )
+        val replacement = curatedModel(1)
 
         registry.select(model)
         registry.select(replacement)
@@ -46,6 +39,19 @@ class HarnessPhoneBindingRegistryTest {
 
         assertEquals(replacement.digest, playground.model.artifact.digest)
         assertEquals(replacement.digest, validation.model.artifact.digest)
+    }
+
+    @Test
+    fun `rejects a model that is not an exact curated artifact`() {
+        val registry = HarnessPhoneBindingRegistry()
+        val unsupported = model.copy(
+            digest = ModelDigest("f".repeat(64)),
+            fileName = "arbitrary.gguf",
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            registry.select(unsupported)
+        }
     }
 
     @Test
@@ -80,6 +86,17 @@ class HarnessPhoneBindingRegistryTest {
         assertThrows(IllegalStateException::class.java) {
             registry.resolve(APPLICATION_ID, UseCaseId("unknown"))
         }
+    }
+
+    private fun curatedModel(index: Int): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases[index].artifact
+        return ImportedPhoneModel(
+            digest = artifact.digest,
+            fileName = artifact.fileName,
+            sizeBytes = artifact.sizeBytes,
+            architecture = artifact.architecture,
+            quantization = artifact.quantization,
+        )
     }
 
     private companion object {

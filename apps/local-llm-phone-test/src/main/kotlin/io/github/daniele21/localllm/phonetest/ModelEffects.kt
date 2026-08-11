@@ -31,15 +31,13 @@ internal sealed interface ModelCatalogCommand {
 }
 
 /**
- * Activity-scoped boundary around model import, catalog and model-management effects.
+ * Activity-scoped boundary around catalog and model-management effects.
  *
- * Android launchers, controllers, executors and the process-scoped runtime graph remain owned by
- * the Activity. The ViewModel-side coordinator retains only this interface.
+ * Controllers, executors and the process-scoped runtime graph remain owned by the Activity. The
+ * ViewModel-side coordinator retains only this interface.
  */
 internal interface ModelEffects {
     fun snapshot(): ModelEffectsSnapshot
-
-    fun requestImport(): Boolean
 
     fun executeCatalog(command: ModelCatalogCommand): Boolean
 

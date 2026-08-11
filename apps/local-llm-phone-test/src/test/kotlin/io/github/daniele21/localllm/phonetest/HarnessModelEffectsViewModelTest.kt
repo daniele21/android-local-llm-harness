@@ -52,7 +52,7 @@ class HarnessModelEffectsViewModelTest {
     }
 
     @Test
-    fun importAndSelectedModelCommandsRespectBusyState() {
+    fun selectedModelCommandsRespectBusyState() {
         val selected = testModel("2")
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel(
@@ -60,7 +60,6 @@ class HarnessModelEffectsViewModelTest {
         )
         viewModel.models.attach(effects)
 
-        assertFalse(viewModel.models.requestImport())
         assertFalse(viewModel.models.verifySelected())
         assertFalse(viewModel.models.requestSelectedRemoval())
         assertTrue(effects.commands.isEmpty())
@@ -107,40 +106,50 @@ class HarnessModelEffectsViewModelTest {
     }
 
     @Test
-    fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
-        val metadata = testMetadata("6")
-        val loaded = HarnessModelInventoryItem(
-            stableId = "release",
-            displayName = metadata.displayName,
-            origin = HarnessModelOrigin.CATALOG,
-            digest = metadata.digest.sha256,
-            lifecycle = HarnessModelLifecycle.DEGRADED,
-            installed = true,
-            loaded = true,
-            degradation = HarnessModelDegradation.LOADED_MODEL_DIFFERS_FROM_SELECTION,
+    fun loadedModelCanBeUnloadedWithoutRemovalConfirmation() {
+        val digest = "9".repeat(64)
+        val effects = FakeModelEffects(
+            current = ModelEffectsSnapshot(
+                distribution = PhoneModelDistributionState(),
+                selectedModel = null,
+                loadedDigest = digest,
+            ),
         )
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+
+        assertTrue(viewModel.models.unloadLoaded())
+        assertEquals(listOf(ModelRecoveryCommand.ReleaseRuntime), effects.recoveryCommands)
+        assertFalse(viewModel.uiState.value.removalConfirmationPending)
+        assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
+    }
+
+    @Test
+    fun unloadRejectsWhenNoRuntimeModelIsLoaded() {
+        val effects = FakeModelEffects()
+        val viewModel = HarnessViewModel()
+        viewModel.models.attach(effects)
+
+        assertFalse(viewModel.models.unloadLoaded())
+        assertTrue(effects.recoveryCommands.isEmpty())
+    }
+
+    @Test
+    fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
+        val loadedMetadata = testMetadata("6")
+        val selectedMetadata = testMetadata("8")
         val distribution = PhoneModelDistributionState(
             models = listOf(
-                PhoneCatalogModelUi(
-                    stableId = "release",
-                    displayName = metadata.displayName,
-                    description = "test",
-                    fileName = metadata.fileName,
-                    sizeBytes = metadata.sizeBytes,
-                    architecture = metadata.architecture,
-                    quantization = metadata.quantization,
-                    profileKey = metadata.profileKey,
-                    licenseName = "Apache-2.0",
-                    status = PhoneCatalogModelStatus.INSTALLED,
-                    compatible = true,
-                    compatibilityReasons = emptyList(),
-                    compatibilityWarnings = emptyList(),
-                    installedModel = metadata,
-                ),
+                catalogModel("loaded-release", loadedMetadata),
+                catalogModel("selected-release", selectedMetadata),
             ),
         )
         val effects = FakeModelEffects(
-            current = ModelEffectsSnapshot(distribution, testModel("8"), metadata.digest.sha256),
+            current = ModelEffectsSnapshot(
+                distribution = distribution,
+                selectedModel = testModel("8"),
+                loadedDigest = loadedMetadata.digest.sha256,
+            ),
         )
         val viewModel = HarnessViewModel()
         viewModel.models.attach(effects)
@@ -155,7 +164,7 @@ class HarnessModelEffectsViewModelTest {
             ),
         )
         assertEquals(
-            ModelRecoveryCommand.AdoptLoadedSelection(metadata),
+            ModelRecoveryCommand.AdoptLoadedSelection(loadedMetadata),
             effects.recoveryCommands.single(),
         )
         assertEquals(null, viewModel.uiState.value.modelRecoveryConfirmation)
@@ -202,7 +211,7 @@ class HarnessModelEffectsViewModelTest {
         digest = ModelDigest(seed.repeat(64)),
         fileName = "model-$seed.gguf",
         sizeBytes = 1_024L,
-        architecture = "qwen3",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
     )
 
@@ -216,9 +225,26 @@ class HarnessModelEffectsViewModelTest {
         useCaseId = "manual-inference-playground",
         fileName = "model-$seed.gguf",
         sizeBytes = 2_048L,
-        architecture = "qwen3",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         installedAtEpochMs = 1L,
+    )
+
+    private fun catalogModel(stableId: String, metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi = PhoneCatalogModelUi(
+        stableId = stableId,
+        displayName = metadata.displayName,
+        description = "test",
+        fileName = metadata.fileName,
+        sizeBytes = metadata.sizeBytes,
+        architecture = metadata.architecture,
+        quantization = metadata.quantization,
+        profileKey = metadata.profileKey,
+        licenseName = "Apache-2.0",
+        status = PhoneCatalogModelStatus.INSTALLED,
+        compatible = true,
+        compatibilityReasons = emptyList(),
+        compatibilityWarnings = emptyList(),
+        installedModel = metadata,
     )
 
     private class FakeModelEffects(
@@ -234,8 +260,6 @@ class HarnessModelEffectsViewModelTest {
         val recoveryCommands = mutableListOf<ModelRecoveryCommand>()
 
         override fun snapshot(): ModelEffectsSnapshot = current
-
-        override fun requestImport(): Boolean = record("request-import")
 
         override fun executeCatalog(command: ModelCatalogCommand): Boolean {
             catalogCommands += command

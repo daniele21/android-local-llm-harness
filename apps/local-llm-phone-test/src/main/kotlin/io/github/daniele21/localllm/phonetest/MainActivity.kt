@@ -6,15 +6,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -79,6 +76,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -383,12 +381,7 @@ class MainActivity :
         val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
         val destination = shellState.destination
         val expanded = LocalConfiguration.current.screenWidthDp >= 720
-        val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) importModelDocument(uri)
-        }
-        val modelEffects = remember(modelPicker) {
-            createModelEffects { modelPicker.launch(MODEL_MIME_TYPES) }
-        }
+        val modelEffects = remember { createModelEffects() }
         DisposableEffect(modelEffects) {
             harnessViewModel.models.attach(modelEffects)
             onDispose { harnessViewModel.models.detach(modelEffects) }
@@ -471,7 +464,6 @@ class MainActivity :
                             onOpenPlayground = { navigate(HarnessDestination.PLAYGROUND) },
                             onOpenModels = { navigate(HarnessDestination.MODELS) },
                             onOpenDiagnostics = { navigate(HarnessDestination.DIAGNOSTICS) },
-                            onImport = { modelPicker.launch(MODEL_MIME_TYPES) },
                         )
                     }
                     composable(HarnessDestination.PLAYGROUND.route) {
@@ -610,7 +602,6 @@ class MainActivity :
         onOpenPlayground: () -> Unit,
         onOpenModels: () -> Unit,
         onOpenDiagnostics: () -> Unit,
-        onImport: () -> Unit,
     ) {
         ScreenList(title = null) {
             item {
@@ -633,12 +624,12 @@ class MainActivity :
                                 color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
                             )
                             Text(
-                                if (model == null) "Add a model to begin" else "Your local runtime is ready",
+                                if (model == null) "Choose a model to begin" else "Your local runtime is ready",
                                 style = MaterialTheme.typography.headlineMedium,
                             )
                             Text(
                                 if (model == null) {
-                                    "Import a GGUF or choose one from the catalog"
+                                    "Choose a reviewed Qwen3.5 model from the catalog"
                                 } else {
                                     "All systems operational · ready for inference"
                                 },
@@ -694,10 +685,10 @@ class MainActivity :
                     )
                     CompactActionTile(
                         destination = HarnessDestination.MODELS,
-                        label = "Import model",
-                        supporting = "GGUF · on-device",
+                        label = "Models",
+                        supporting = "Qwen3.5 catalog",
                         enabled = !isBusy(),
-                        onClick = onImport,
+                        onClick = onOpenModels,
                     )
                     CompactActionTile(
                         destination = HarnessDestination.DIAGNOSTICS,
@@ -862,7 +853,7 @@ class MainActivity :
                     onToggleAdvanced = { advancedVisible = !advancedVisible },
                 )
             }
-            item { PlaygroundResponseCard(presentation) }
+            item { ModernPlaygroundResponseCard(presentation) }
         }
     }
 
@@ -886,7 +877,7 @@ class MainActivity :
                         style = MaterialTheme.typography.labelLarge,
                         color = if (model == null) HarnessColors.Warning else HarnessColors.Secondary,
                     )
-                    Text(model?.fileName ?: "Choose a local GGUF model", style = MaterialTheme.typography.bodyMedium)
+                    Text(model?.fileName ?: "Choose a Qwen3.5 catalog model", style = MaterialTheme.typography.bodyMedium)
                 }
                 Text("Change  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
@@ -938,6 +929,22 @@ class MainActivity :
     private fun PlaygroundGenerationSettings(state: HarnessUiState, presentation: PlaygroundPresentation) {
         val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
         val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
+        PlaygroundPresetControls(state, presentation, selectedPreset, basePreset)
+        PlaygroundThinkingControls(state, presentation)
+        val temperature = playgroundTemperature(state)
+        PlaygroundPrimarySamplingControls(state, presentation, temperature)
+        PlaygroundSamplingFields(state, presentation)
+        PlaygroundPenaltyControls(state, presentation, temperature)
+        PlaygroundSeedAndContextControls(state, presentation, temperature)
+    }
+
+    @Composable
+    private fun PlaygroundPresetControls(
+        state: HarnessUiState,
+        presentation: PlaygroundPresentation,
+        selectedPreset: PlaygroundPresetOption?,
+        basePreset: PlaygroundPresetOption?,
+    ) {
         Text(
             text = selectedPreset?.let { "Preset · ${it.label}" }
                 ?: "Preset · Personalizzato${basePreset?.let { " · Basato su ${it.label}" }.orEmpty()}",
@@ -958,7 +965,32 @@ class MainActivity :
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        val temperature = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+    }
+
+    @Composable
+    private fun PlaygroundThinkingControls(state: HarnessUiState, presentation: PlaygroundPresentation) {
+        Text("Thinking", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = state.playgroundThinkingMode == ThinkingMode.DISABLED,
+                onClick = { harnessViewModel.updatePlaygroundThinkingMode(ThinkingMode.DISABLED) },
+                label = { Text("Off") },
+                enabled = presentation.inputsEnabled,
+            )
+            FilterChip(
+                selected = state.playgroundThinkingMode == ThinkingMode.ENABLED,
+                onClick = { harnessViewModel.updatePlaygroundThinkingMode(ThinkingMode.ENABLED) },
+                label = { Text("On") },
+                enabled = presentation.inputsEnabled,
+                modifier = Modifier.testTag("playground-thinking-on"),
+            )
+        }
+    }
+
+    private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+
+    @Composable
+    private fun PlaygroundPrimarySamplingControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
         Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
         Slider(
             value = temperature,
@@ -976,6 +1008,10 @@ class MainActivity :
             enabled = presentation.inputsEnabled && temperature != 0f,
             modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
         )
+    }
+
+    @Composable
+    private fun PlaygroundSamplingFields(state: HarnessUiState, presentation: PlaygroundPresentation) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundMaxTokens,
@@ -992,27 +1028,48 @@ class MainActivity :
                 enabled = presentation.inputsEnabled,
             )
         }
+        val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.playgroundTopP,
                 onValueChange = harnessViewModel::updatePlaygroundTopP,
                 modifier = Modifier.weight(1f),
                 label = { Text("Top-p") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundTopK,
                 onValueChange = harnessViewModel::updatePlaygroundTopK,
                 modifier = Modifier.weight(1f),
                 label = { Text("Top-k") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
             )
             OutlinedTextField(
                 value = state.playgroundSeed,
                 onValueChange = harnessViewModel::updatePlaygroundSeed,
                 modifier = Modifier.weight(1f),
                 label = { Text("Seed · blank = random") },
-                enabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f,
+                enabled = samplingEnabled,
+            )
+        }
+    }
+
+    @Composable
+    private fun PlaygroundPenaltyControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.playgroundMinP,
+                onValueChange = harnessViewModel::updatePlaygroundMinP,
+                modifier = Modifier.weight(1f).testTag("playground-min-p"),
+                label = { Text("Min-p") },
+                enabled = presentation.inputsEnabled && temperature != 0f,
+            )
+            OutlinedTextField(
+                value = state.playgroundPresencePenalty,
+                onValueChange = harnessViewModel::updatePlaygroundPresencePenalty,
+                modifier = Modifier.weight(1f).testTag("playground-presence-penalty"),
+                label = { Text("Presence penalty") },
+                enabled = presentation.inputsEnabled,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1033,19 +1090,24 @@ class MainActivity :
                 enabled = presentation.inputsEnabled,
             )
         }
+    }
+
+    @Composable
+    private fun PlaygroundSeedAndContextControls(state: HarnessUiState, presentation: PlaygroundPresentation, temperature: Float) {
+        val samplingEnabled = presentation.inputsEnabled && temperature != 0f
         Text("Seed policy", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = state.playgroundSeed.isBlank(),
                 onClick = { harnessViewModel.updatePlaygroundSeed("") },
                 label = { Text("Random each run") },
-                enabled = presentation.inputsEnabled && temperature != 0f,
+                enabled = samplingEnabled,
             )
             FilterChip(
                 selected = state.playgroundSeed.isNotBlank(),
                 onClick = { if (state.playgroundSeed.isBlank()) harnessViewModel.updatePlaygroundSeed("42") },
                 label = { Text("Fixed") },
-                enabled = presentation.inputsEnabled && temperature != 0f,
+                enabled = samplingEnabled,
             )
         }
         Text("Context policy", style = MaterialTheme.typography.labelLarge)
@@ -1089,115 +1151,49 @@ class MainActivity :
     }
 
     @Composable
-    private fun PlaygroundResponseCard(presentation: PlaygroundPresentation) {
-        HarnessCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Response", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    presentation.statusLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = when (presentation.statusTone) {
-                        PlaygroundPresentationTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-
-                        PlaygroundPresentationTone.ACTIVE,
-                        PlaygroundPresentationTone.SUCCESS,
-                        -> HarnessColors.Secondary
-
-                        PlaygroundPresentationTone.ERROR -> MaterialTheme.colorScheme.error
-
-                        PlaygroundPresentationTone.WARNING -> HarnessColors.Warning
-                    },
-                )
-            }
-            Text(presentation.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SelectionContainer {
-                Text(
-                    presentation.responseText,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            HarnessMetricRow {
-                HarnessMetric("TTFT", presentation.ttft, Modifier.weight(1f))
-                HarnessMetric("Total", presentation.total, Modifier.weight(1f))
-                HarnessMetric("Decode", presentation.decode, Modifier.weight(1f))
-            }
-            Text("Stop reason · ${presentation.stopReason}", style = MaterialTheme.typography.bodySmall)
-            presentation.effectiveConfiguration?.let { configuration ->
-                Text(
-                    "Context ${configuration.contextSize} · Prompt ${configuration.promptTokenCount} · " +
-                        "Seed ${configuration.effectiveSeed} · Repeat ${configuration.repeatPenalty}/${configuration.repeatLastN}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "Template ${configuration.chatTemplateId} (${configuration.chatTemplateSource.name}) · " +
-                        "System ${configuration.systemPromptVersion ?: "none"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-
-    @Composable
     private fun ModelsScreen(state: HarnessUiState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
         val inventory = state.modelInventory
         ScreenList(title = null) {
-            item { ModelsHeader(state.busy) }
-            item { ModelsSummaryCard(inventory) }
+            item { ModelsHeader() }
             if (inventory.degradedCount > 0) {
                 item { ModelsRecoveryCard(inventory, onOpenModelDetails) }
             }
-            item { SelectedModelCard(state, inventory.selectedItem, onOpenModelDetails) }
-            item { ModelInventoryDetailCards(inventory, onOpenModelDetails) }
-            item { ModelCatalogHeader(state.modelDistribution) }
-            item { ModelCatalogContent(state.modelDistribution) }
+            item {
+                UnifiedModelsCatalog(
+                    state = state,
+                    actions = UnifiedModelsActions(
+                        catalog = PhoneModelDistributionActions(
+                            download = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Download(it)) },
+                            cancelDownload = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelDownload(it)) },
+                            install = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Install(it)) },
+                            verifyInstalled = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.VerifyInstalled(it)) },
+                            requestRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.RequestRemoval(it)) },
+                            cancelRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelRemoval(it)) },
+                            confirmRemove = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.ConfirmRemoval(it)) },
+                            selectInstalled = { harnessViewModel.models.selectInstalled(it) },
+                        ),
+                        verifySelected = { harnessViewModel.models.verifySelected() },
+                        unloadLoaded = { harnessViewModel.models.unloadLoaded() },
+                        requestSelectedRemoval = { harnessViewModel.models.requestSelectedRemoval() },
+                        cancelSelectedRemoval = harnessViewModel.models::cancelSelectedRemoval,
+                        confirmSelectedRemoval = { harnessViewModel.models.confirmSelectedRemoval() },
+                        refresh = { harnessViewModel.models.executeCatalog(ModelCatalogCommand.Refresh) },
+                    ),
+                    onOpenModelDetails = onOpenModelDetails,
+                )
+            }
         }
     }
 
     @Composable
-    private fun ModelsHeader(busy: Boolean) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Models", style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    "Manage your locally installed models",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            HarnessPrimaryButton(
-                text = "+  Import model",
-                enabled = !busy,
-                modifier = Modifier,
-                onClick = { harnessViewModel.models.requestImport() },
+    private fun ModelsHeader() {
+        Column {
+            Text("Models", style = MaterialTheme.typography.headlineLarge)
+            Text(
+                "Manage reviewed Qwen3.5 models from the catalog",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-
-    @Composable
-    private fun ModelsSummaryCard(inventory: HarnessModelInventoryState) {
-        HarnessCard {
-            HarnessMetricRow {
-                HarnessMetric(
-                    "Storage",
-                    formatBytes(inventory.installedBytes),
-                    Modifier.weight(1f),
-                )
-                HarnessMetric(
-                    "Installed models",
-                    inventory.installedCount.toString(),
-                    Modifier.weight(1f),
-                )
-            }
         }
     }
 
@@ -1221,255 +1217,6 @@ class MainActivity :
                 harnessViewModel.models.executeCatalog(ModelCatalogCommand.Refresh)
             }
         }
-    }
-
-    @Composable
-    private fun SelectedModelCard(
-        state: HarnessUiState,
-        selected: HarnessModelInventoryItem?,
-        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
-    ) {
-        if (selected == null) {
-            EmptySelectedModelCard()
-        } else {
-            ActiveSelectedModelCard(state, selected, onOpenModelDetails)
-        }
-    }
-
-    @Composable
-    private fun EmptySelectedModelCard() {
-        HarnessCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                HarnessDestinationIcon(
-                    HarnessDestination.MODELS,
-                    selected = true,
-                    modifier = Modifier.size(18.dp),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("No active model", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Import a GGUF or download a compatible catalog model",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    "Not loaded",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = HarnessColors.Warning,
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun ActiveSelectedModelCard(
-        state: HarnessUiState,
-        selected: HarnessModelInventoryItem,
-        onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
-    ) {
-        HarnessCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("ACTIVE MODEL", style = MaterialTheme.typography.labelLarge)
-                HarnessStatusBadge(
-                    selected.lifecycle.name.replace('_', ' '),
-                    selected.lifecycle.statusTone(),
-                )
-            }
-            Text(selected.displayName, style = MaterialTheme.typography.titleLarge)
-            HarnessMetricRow {
-                HarnessMetric(
-                    "Architecture",
-                    selected.architecture ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
-                HarnessMetric(
-                    "Quantization",
-                    selected.quantization ?: "Unavailable",
-                    Modifier.weight(1f),
-                )
-            }
-            Text(
-                "${selected.sizeBytes?.let(::formatBytes) ?: "Unavailable"} · " +
-                    (selected.digest?.take(12)?.plus("…") ?: "Digest unavailable"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HarnessSecondaryButton("View model details") {
-                onOpenModelDetails(selected)
-            }
-            SelectedModelActions(state)
-            SelectedModelRemoval(state)
-        }
-    }
-
-    @Composable
-    private fun SelectedModelActions(state: HarnessUiState) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            HarnessSecondaryButton(
-                text = "Verify",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-                onClick = { harnessViewModel.models.verifySelected() },
-            )
-            HarnessSecondaryButton(
-                text = "Import another",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-                onClick = { harnessViewModel.models.requestImport() },
-            )
-        }
-    }
-
-    @Composable
-    private fun SelectedModelRemoval(state: HarnessUiState) {
-        if (state.removalConfirmationPending) {
-            Text(
-                "Removal permanently deletes the app-private model copy.",
-                color = MaterialTheme.colorScheme.error,
-            )
-            HarnessPrimaryButton(
-                "Confirm removal",
-                enabled = !state.busy,
-            ) {
-                harnessViewModel.models.confirmSelectedRemoval()
-            }
-            HarnessSecondaryButton("Cancel removal") {
-                harnessViewModel.models.cancelSelectedRemoval()
-            }
-        } else {
-            HarnessSecondaryButton("Remove active model", enabled = !state.busy) {
-                harnessViewModel.models.requestSelectedRemoval()
-            }
-        }
-    }
-
-    @Composable
-    private fun ModelCatalogHeader(distribution: PhoneModelDistributionState) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Model catalog", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "Compatible with this device",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            HarnessStatusBadge(
-                label = distribution.catalogStatus.name.replace('_', ' '),
-                tone = distribution.catalogStatus.statusTone(),
-            )
-        }
-    }
-
-    @Composable
-    private fun ModelCatalogContent(distribution: PhoneModelDistributionState) {
-        PhoneModelDistributionCatalog(
-            state = distribution,
-            actions = PhoneModelDistributionActions(
-                download = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.Download(it))
-                },
-                cancelDownload = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelDownload(it))
-                },
-                install = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.Install(it))
-                },
-                verifyInstalled = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.VerifyInstalled(it))
-                },
-                requestRemove = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.RequestRemoval(it))
-                },
-                cancelRemove = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.CancelRemoval(it))
-                },
-                confirmRemove = {
-                    harnessViewModel.models.executeCatalog(ModelCatalogCommand.ConfirmRemoval(it))
-                },
-                selectInstalled = { harnessViewModel.models.selectInstalled(it) },
-            ),
-        )
-    }
-
-    @Composable
-    private fun ModelInventoryDetailCards(inventory: HarnessModelInventoryState, onOpenModelDetails: (HarnessModelInventoryItem) -> Unit) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Inventory", style = MaterialTheme.typography.titleLarge)
-            if (inventory.items.isEmpty()) {
-                Text(
-                    "No catalog, imported or runtime-owned models are available.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            inventory.items.forEach { item ->
-                HarnessCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(item.displayName, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "${item.origin.name.lowercase()} · ${item.lifecycle.name.lowercase().replace('_', ' ')}",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        HarnessStatusBadge(
-                            item.lifecycle.name.replace('_', ' '),
-                            item.lifecycle.statusTone(),
-                        )
-                    }
-                    HarnessSecondaryButton("View details") {
-                        onOpenModelDetails(item)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
-        HarnessModelLifecycle.SELECTED,
-        HarnessModelLifecycle.LOADED,
-        HarnessModelLifecycle.INSTALLED,
-        -> HarnessStatusTone.SUCCESS
-
-        HarnessModelLifecycle.DEGRADED,
-        HarnessModelLifecycle.FAILED,
-        HarnessModelLifecycle.INCOMPATIBLE,
-        -> HarnessStatusTone.WARNING
-
-        HarnessModelLifecycle.DOWNLOADING,
-        HarnessModelLifecycle.INSTALLING,
-        HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
-        -> HarnessStatusTone.INFO
-
-        HarnessModelLifecycle.READY_TO_DOWNLOAD,
-        HarnessModelLifecycle.CANCELLED,
-        -> HarnessStatusTone.NEUTRAL
-    }
-
-    private fun PhoneCatalogLoadStatus.statusTone(): HarnessStatusTone = if (this == PhoneCatalogLoadStatus.READY) {
-        HarnessStatusTone.SUCCESS
-    } else {
-        HarnessStatusTone.WARNING
     }
 
     @Composable
@@ -2080,14 +1827,12 @@ class MainActivity :
         }
     }
 
-    private fun createModelEffects(onImport: () -> Unit): ModelEffects = object : ModelEffects {
+    private fun createModelEffects(): ModelEffects = object : ModelEffects {
         override fun snapshot(): ModelEffectsSnapshot = ModelEffectsSnapshot(
             distribution = modelDistributionController.snapshot(),
             selectedModel = controller.snapshotModel(),
             loadedDigest = runtimeGraph.loadedModelDigest?.sha256,
         )
-
-        override fun requestImport(): Boolean = modelEffect(onImport)
 
         override fun executeCatalog(command: ModelCatalogCommand): Boolean = modelEffect {
             when (command) {
@@ -2122,16 +1867,6 @@ class MainActivity :
             }
 
             ModelRecoveryCommand.ReleaseRuntime -> afterPlaygroundRuntimeReleased(::syncLoadedModelOwnership)
-        }
-    }
-
-    private fun importModelDocument(uri: Uri) {
-        afterPlaygroundRuntimeReleased {
-            controller.importModel(
-                uri = uri,
-                architecture = DEFAULT_ARCHITECTURE,
-                quantization = DEFAULT_QUANTIZATION,
-            )
         }
     }
 
@@ -2248,8 +1983,5 @@ class MainActivity :
     private companion object {
         const val STATE_REPORT = "report"
         const val RESOURCE_HISTORY_VISIBLE_LIMIT = 10
-        const val DEFAULT_ARCHITECTURE = "qwen3"
-        const val DEFAULT_QUANTIZATION = "Q4_K_M"
-        val MODEL_MIME_TYPES = arrayOf("application/octet-stream", "application/gguf", "application/x-gguf")
     }
 }

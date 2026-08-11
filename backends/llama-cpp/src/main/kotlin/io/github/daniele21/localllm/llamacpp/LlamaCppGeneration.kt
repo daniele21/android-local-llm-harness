@@ -115,6 +115,8 @@ data class NativeGenerationConfig(
     val temperature: Float,
     val topP: Float,
     val topK: Int,
+    val minP: Float = 0f,
+    val presencePenalty: Float = 0f,
     val repeatPenalty: Float,
     val repeatLastN: Int,
     val seed: Long,
@@ -122,9 +124,12 @@ data class NativeGenerationConfig(
     val outputSchema: String? = null,
     val stopTokenIds: IntArray = intArrayOf(),
     val stopSequences: List<String> = emptyList(),
+    val reasoningMaxTokens: Int? = null,
+    val reasoningCloseMarker: String? = null,
+    val reasoningForcedCloseText: String? = null,
 ) {
     internal fun validationError(prompt: String): GenerationNativeError? =
-        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError()
+        baseValidationError(prompt) ?: repeatValidationError() ?: constraintValidationError() ?: reasoningValidationError()
 
     private fun baseValidationError(prompt: String): GenerationNativeError? = when {
         prompt.isBlank() -> invalid("Prompt must not be blank")
@@ -132,6 +137,8 @@ data class NativeGenerationConfig(
         temperature < 0F -> invalid("Temperature must not be negative")
         topP <= 0F || topP > 1F -> invalid("Top-p must be in (0, 1]")
         topK < 0 -> invalid("Top-k must not be negative")
+        !minP.isFinite() || minP !in 0f..1f -> invalid("Min-p must be in [0, 1]")
+        !presencePenalty.isFinite() || presencePenalty !in 0f..2f -> invalid("Presence penalty must be in [0, 2]")
         seed < 0 -> invalid("Seed must not be negative")
         else -> null
     }
@@ -150,12 +157,37 @@ data class NativeGenerationConfig(
         else -> null
     }
 
+    private fun reasoningValidationError(): GenerationNativeError? {
+        val valuesPresent = listOf(reasoningMaxTokens, reasoningCloseMarker, reasoningForcedCloseText).count { it != null }
+        if (valuesPresent == 0) return null
+        if (valuesPresent != REASONING_FIELD_COUNT) {
+            return invalid("Reasoning transition configuration must be complete")
+        }
+
+        val maxReasoning = requireNotNull(reasoningMaxTokens)
+        val closeMarker = requireNotNull(reasoningCloseMarker)
+        val forcedClose = requireNotNull(reasoningForcedCloseText)
+        return when {
+            maxReasoning !in 1 until maxOutputTokens ->
+                invalid("Reasoning token budget must leave output capacity for the final answer")
+
+            closeMarker.isBlank() -> invalid("Reasoning close marker must not be blank")
+
+            forcedClose.isBlank() -> invalid("Forced reasoning close text must not be blank")
+
+            closeMarker !in forcedClose -> invalid("Forced reasoning close text must contain the close marker")
+
+            else -> null
+        }
+    }
+
     private fun invalid(message: String): GenerationNativeError = GenerationNativeError(
         code = GenerationNativeErrorCode.INVALID_ARGUMENT,
         message = message,
     )
 
     private companion object {
+        const val REASONING_FIELD_COUNT = 3
         val OUTPUT_CONSTRAINT_TYPES = setOf("TEXT", "JSON", "JSON_SCHEMA")
     }
 }

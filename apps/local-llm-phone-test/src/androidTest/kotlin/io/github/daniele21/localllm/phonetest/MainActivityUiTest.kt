@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,7 +20,7 @@ class MainActivityUiTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun compactShellKeepsBrandAndPrimaryActionVisible() {
+    fun compactShellKeepsBrandAndCuratedModelEntryPointVisible() {
         val topBarHeight = composeRule.onNodeWithTag("harnessTopBar").fetchSemanticsNode().boundsInRoot.height
         val topBarHeightDp = with(composeRule.density) { topBarHeight.toDp() }
         val maximumHeight = 120.dp
@@ -30,7 +31,9 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Harness").assertIsDisplayed()
         composeRule.onNodeWithText("Local AI Console").assertIsDisplayed()
         composeRule.onNodeWithTag("nav-overview").assertIsDisplayed()
-        composeRule.onNodeWithText("Import model").assertIsDisplayed()
+        composeRule.onNodeWithText("Models").assertIsDisplayed()
+        composeRule.onNodeWithText("Qwen3.5 catalog").assertIsDisplayed()
+        assertTextAbsent("Import model")
         composeRule.onNodeWithText("Device resources").assertIsDisplayed()
     }
 
@@ -38,9 +41,17 @@ class MainActivityUiTest {
     fun primaryDestinationsAndSettingsRemainReachable() {
         composeRule.onNodeWithTag("nav-playground").performClick()
         composeRule.onNodeWithText("Runs entirely on this device").assertIsDisplayed()
+        composeRule.onNodeWithText("how much is the earth radius?").assertIsDisplayed()
 
         composeRule.onNodeWithTag("nav-models").performClick()
-        composeRule.onNodeWithText("Model catalog").assertIsDisplayed()
+        composeRule.onNodeWithText("Status").assertIsDisplayed()
+        composeRule.onNodeWithText("Model size").assertIsDisplayed()
+        composeRule.onNodeWithText("All sizes").assertIsDisplayed()
+        composeRule.onNodeWithText("0.8B").assertIsDisplayed()
+        composeRule.onNodeWithText("2B").assertIsDisplayed()
+        assertTextAbsent("Inventory")
+        assertTextAbsent("Model catalog")
+        assertTextAbsent("Import model")
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
         composeRule.onNodeWithText("Overall health").assertIsDisplayed()
@@ -55,8 +66,11 @@ class MainActivityUiTest {
         composeRule.onNodeWithTag("nav-playground").performClick()
         composeRule.onNodeWithText("Generation settings  ·  Show").performClick()
 
+        composeRule.onNodeWithTag("playground-thinking-on").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-temperature-slider").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-top-p-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-min-p").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-presence-penalty").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-repeat-penalty").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-repeat-last-n").assertIsDisplayed()
         composeRule.onNodeWithText("Seed policy").assertIsDisplayed()
@@ -64,5 +78,12 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Fixed").assertIsDisplayed()
         composeRule.onNodeWithText("Context policy").assertIsDisplayed()
         composeRule.onNodeWithText("Auto").assertIsDisplayed()
+    }
+
+    private fun assertTextAbsent(text: String) {
+        assertTrue(
+            "$text must not be present in the UI",
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty(),
+        )
     }
 }

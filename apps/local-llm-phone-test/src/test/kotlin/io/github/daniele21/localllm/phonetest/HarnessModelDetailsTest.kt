@@ -108,7 +108,7 @@ class HarnessModelDetailsTest {
         origin = origin,
         digest = digest,
         sizeBytes = 1_048_576L,
-        architecture = "qwen3",
+        architecture = "qwen35",
         quantization = "Q4_K_M",
         lifecycle = lifecycle,
         installed = installed,

@@ -16,6 +16,8 @@ interface NativeLlamaStreamingApi {
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
         seed: Long,
@@ -23,6 +25,9 @@ interface NativeLlamaStreamingApi {
         outputSchema: String?,
         stopTokenIds: IntArray,
         stopSequences: Array<String>,
+        reasoningMaxTokens: Int,
+        reasoningCloseMarker: String?,
+        reasoningForcedCloseText: String?,
         callback: NativeStreamingCallback,
     ): Array<String>
 
@@ -43,6 +48,8 @@ class JniLlamaStreamingApi : NativeLlamaStreamingApi {
         temperature: Float,
         topP: Float,
         topK: Int,
+        minP: Float,
+        presencePenalty: Float,
         repeatPenalty: Float,
         repeatLastN: Int,
         seed: Long,
@@ -50,6 +57,9 @@ class JniLlamaStreamingApi : NativeLlamaStreamingApi {
         outputSchema: String?,
         stopTokenIds: IntArray,
         stopSequences: Array<String>,
+        reasoningMaxTokens: Int,
+        reasoningCloseMarker: String?,
+        reasoningForcedCloseText: String?,
         callback: NativeStreamingCallback,
     ): Array<String>
 
@@ -87,6 +97,8 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
                 temperature = config.temperature,
                 topP = config.topP,
                 topK = config.topK,
+                minP = config.minP,
+                presencePenalty = config.presencePenalty,
                 repeatPenalty = config.repeatPenalty,
                 repeatLastN = config.repeatLastN,
                 seed = config.seed,
@@ -94,6 +106,9 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
                 outputSchema = config.outputSchema,
                 stopTokenIds = config.stopTokenIds,
                 stopSequences = config.stopSequences.toTypedArray(),
+                reasoningMaxTokens = config.reasoningMaxTokens ?: 0,
+                reasoningCloseMarker = config.reasoningCloseMarker,
+                reasoningForcedCloseText = config.reasoningForcedCloseText,
                 callback = callback,
             ),
         )
@@ -136,12 +151,16 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
     private fun decodeTerminal(response: Array<String>): NativeStreamingResult {
         if (response.size == TERMINAL_FIELD_COUNT && (response[0] == OK || response[0] == CANCELLED)) {
             return try {
+                val reasoningTokens = response[6].toInt().takeIf { it >= 0 }
+                val answerTokens = response[7].toInt().takeIf { it >= 0 }
                 val metrics = NativeStreamingMetrics(
                     inputTokens = response[1].toInt(),
                     outputTokens = response[2].toInt(),
                     promptDurationMs = response[3].toLong(),
                     generationDurationMs = response[4].toLong(),
                     stopReason = response[5],
+                    reasoningTokens = reasoningTokens,
+                    answerTokens = answerTokens,
                 )
                 if (response[0] == OK) {
                     NativeStreamingResult.Completed(metrics)
@@ -175,7 +194,7 @@ class LlamaCppStreamingBridge(private val nativeApi: NativeLlamaStreamingApi = J
         const val OK = "ok"
         const val CANCELLED = "cancelled"
         const val ERROR = "error"
-        const val TERMINAL_FIELD_COUNT = 6
+        const val TERMINAL_FIELD_COUNT = 8
         const val CANCEL_FIELD_COUNT = 2
         const val ERROR_FIELD_COUNT = 3
     }
@@ -193,6 +212,8 @@ data class NativeStreamingMetrics(
     val promptDurationMs: Long,
     val generationDurationMs: Long,
     val stopReason: String,
+    val reasoningTokens: Int? = null,
+    val answerTokens: Int? = null,
 )
 
 sealed interface NativeStreamingResult {

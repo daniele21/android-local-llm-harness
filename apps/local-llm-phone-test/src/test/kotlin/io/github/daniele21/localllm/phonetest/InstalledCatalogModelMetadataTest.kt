@@ -1,6 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,7 +9,7 @@ import java.nio.file.Files
 
 class InstalledCatalogModelMetadataTest {
     @Test
-    fun roundTripsPathFreeCatalogAndProfileMetadata() {
+    fun roundTripsPathFreeCuratedCatalogAndProfileMetadata() {
         val root = Files.createTempDirectory("installed-catalog-metadata").toFile()
         val repository = FileInstalledCatalogMetadataRepository(root)
         val metadata = metadata()
@@ -51,18 +51,22 @@ class InstalledCatalogModelMetadataTest {
         assertTrue(repository.loadAll().isEmpty())
     }
 
-    private fun metadata(): InstalledCatalogModelMetadata = InstalledCatalogModelMetadata(
-        digest = ModelDigest("a".repeat(64)),
-        modelId = "test-model",
-        version = "1.0.0",
-        displayName = "Test model",
-        profileKey = "test-profile",
-        applicationId = "play-internal-phone-test",
-        useCaseId = "manual-inference-playground",
-        fileName = "test-model.gguf",
-        sizeBytes = 128L,
-        architecture = "qwen35",
-        quantization = "Q4_K_M",
-        installedAtEpochMs = 1234L,
-    )
+    @Test
+    fun rejectsMetadataThatDoesNotMatchTheCurrentCuratedRelease() {
+        val root = Files.createTempDirectory("installed-catalog-metadata").toFile()
+        val repository = FileInstalledCatalogMetadataRepository(root)
+
+        assertFalse(repository.save(metadata().copy(modelId = "retired-model")))
+        assertTrue(repository.loadAll().isEmpty())
+    }
+
+    private fun metadata(): InstalledCatalogModelMetadata {
+        val release = CuratedModelCatalog.releases.first()
+        val target = release.allowedTargets.first()
+        return InstalledCatalogModelMetadata.from(
+            release = release,
+            target = target,
+            installedAtEpochMs = 1_234L,
+        )
+    }
 }

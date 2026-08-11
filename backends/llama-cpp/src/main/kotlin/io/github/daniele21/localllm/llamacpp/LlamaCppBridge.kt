@@ -178,6 +178,9 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
                     architecture = response[6].ifBlank { null },
                     name = response[7].ifBlank { null },
                     fileType = response[8].ifBlank { null }?.toLong(),
+                    contextLength = response[9].ifBlank { null }?.toLong(),
+                    blockCount = response[10].ifBlank { null }?.toLong(),
+                    embeddingLength = response[11].ifBlank { null }?.toLong(),
                 ),
             )
         } catch (error: NumberFormatException) {
@@ -223,7 +226,7 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
         const val MODEL_LOAD_FIELD_COUNT = 3
         const val OPERATION_FIELD_COUNT = 1
         const val ERROR_FIELD_COUNT = 3
-        const val INSPECTION_SUCCESS_FIELD_COUNT = 9
+        const val INSPECTION_SUCCESS_FIELD_COUNT = 12
     }
 }
 
@@ -289,6 +292,9 @@ data class GgufMetadata(
     val architecture: String?,
     val name: String?,
     val fileType: Long?,
+    val contextLength: Long?,
+    val blockCount: Long?,
+    val embeddingLength: Long?,
 )
 
 sealed interface GgufInspectionResult {

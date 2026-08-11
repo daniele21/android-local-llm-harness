@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-06
 
+Support-envelope amendment: [ADR 0011](0011-qwen35-only-product-support.md) makes Qwen3.5 the only active family policy. The neutral planning mechanics below remain in force; a family fallback does not authorize an unsupported model.
+
 ## Context
 
 The runtime currently creates a native context from the fixed `contextSize` in the resolved

@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: apps/local-llm-phone-test
 Canonical scope: state.phone-ux
 Read when: determining the remaining connected-phone UX/UI migration and evidence work
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-08
 
 Canonical target specification: [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
 
@@ -30,7 +30,7 @@ This tracker records concise workstream status only. Detailed repository state a
 | Diagnostics container | PARTIAL | Runs, Health, Resources, Benchmarks, Logs and Validation sections with real sources | Move state/actions behind ViewModel/effects and complete state matrix |
 | Settings and developer tools | PARTIAL | Privacy, Storage, Build, Developer tools and Physical validation details | ViewModel/effect migration, theme persistence and cleanup controls |
 | Request timeline and detail navigation | PARTIAL | Typed Settings, request-timeline and model-detail routes with opaque arguments | Back-stack restoration, process recreation and emulator matrix |
-| Durable multi-model state | PARTIAL | Catalog/import/selection/runtime projection and explicit degraded states | `lastUsedAt`, restart tests and physical reconciliation evidence |
+| Durable model-identity state | PARTIAL | Catalog/import/selection/runtime projection and explicit degraded states | Qwen3.5-only migration, `lastUsedAt`, restart tests and physical reconciliation evidence |
 | RAM residency controls | PENDING | Runtime supports opaque load/unload and safe idle release | Product load/unload actions and monotonic warm-idle TTL |
 | Compose state and screenshot tests | PARTIAL | Initial shell/destination instrumentation and pure presentation coverage | Full semantics, golden, large-font, landscape and expanded matrix |
 | Accessibility | PARTIAL | Design-system contrast and 48 dp foundations | TalkBack, focus order and complete connected-state evidence |

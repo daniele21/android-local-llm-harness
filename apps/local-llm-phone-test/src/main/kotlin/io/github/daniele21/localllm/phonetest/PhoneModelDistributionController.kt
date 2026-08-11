@@ -118,7 +118,6 @@ internal data class PhoneModelDistributionServices(
     val installer: PhoneModelInstallGateway,
     val discardVerifiedDownload: (VerifiedDownloadHandle) -> Boolean,
     val metadataRepository: InstalledCatalogMetadataRepository,
-    val modelExists: (ModelDigest) -> Boolean,
     val management: PhoneModelManagementGateway,
     val clock: () -> Long,
 )
@@ -137,7 +136,6 @@ internal class PhoneModelDistributionController(
     private val installer = services.installer
     private val discardVerifiedDownload = services.discardVerifiedDownload
     private val metadataRepository = services.metadataRepository
-    private val modelExists = services.modelExists
     private val management = services.management
     private val clock = services.clock
     private val lock = Any()
@@ -440,17 +438,8 @@ internal class PhoneModelDistributionController(
         }
     }
 
-    private fun reconcileInstalledMetadata(): MutableMap<ModelDigest, InstalledCatalogModelMetadata> {
-        val valid = linkedMapOf<ModelDigest, InstalledCatalogModelMetadata>()
-        metadataRepository.loadAll().forEach { metadata ->
-            if (modelExists(metadata.digest)) {
-                valid[metadata.digest] = metadata
-            } else {
-                metadataRepository.remove(metadata.digest)
-            }
-        }
-        return valid
-    }
+    private fun reconcileInstalledMetadata(): MutableMap<ModelDigest, InstalledCatalogModelMetadata> =
+        metadataRepository.loadAll().associateByTo(linkedMapOf(), InstalledCatalogModelMetadata::digest)
 
     private fun buildState(message: String): PhoneModelDistributionState {
         val models = releases.map { (id, release) -> modelUi(id, release) }
@@ -597,7 +586,6 @@ internal class PhoneModelDistributionController(
                     },
                     discardVerifiedDownload = verifiedAccess::discard,
                     metadataRepository = metadataRepository,
-                    modelExists = { digest -> runtimeGraph.modelStore.find(digest)?.verified == true },
                     management = management,
                     clock = System::currentTimeMillis,
                 ),

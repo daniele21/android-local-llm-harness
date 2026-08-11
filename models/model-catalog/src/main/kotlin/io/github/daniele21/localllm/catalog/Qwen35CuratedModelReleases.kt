@@ -10,9 +10,6 @@ internal object Qwen35CuratedModelReleases {
             qwenThreePointFiveTwoBQFourKM(),
             qwenThreePointFiveTwoBQFiveKM(),
             qwenThreePointFiveTwoBUdIqTwoXxs(),
-            qwenThreePointFiveFourBQFourKM(),
-            qwenThreePointFiveFourBQFiveKM(),
-            qwenThreePointFiveFourBUdIqTwoXxs(),
         )
 
     private fun qwenThreePointFiveZeroPointEightBQFourKM(): CatalogModelRelease = CuratedModelReleaseFactory.release(
@@ -199,91 +196,6 @@ internal object Qwen35CuratedModelReleases {
             "lightweight-inference",
             "structured-extraction-test",
             "classification-test",
-            "quantization-benchmark",
-        ),
-    )
-
-    private fun qwenThreePointFiveFourBQFourKM(): CatalogModelRelease = CuratedModelReleaseFactory.release(
-        modelId = "qwen35-4b-q4-k-m",
-        displayName = "Qwen 3.5 4B Q4_K_M",
-        description =
-        "Modello Qwen ad alta capacità per dispositivi Android high-end, destinato a estrazioni complesse, assistenti locali e piccoli workflow agentici.",
-        downloadUrl =
-        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/720bb031aae5488eae5d6a78768e6d826662b2ae/Qwen3.5-4B-Q4_K_M.gguf?download=true",
-        sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-        sizeBytes = 2_740_937_888,
-        fileName = "Qwen3.5-4B-Q4_K_M.gguf",
-        architecture = "qwen35",
-        quantization = "Q4_K_M",
-        minRamBytes = 8_000_000_000,
-        recommendedRamBytes = 12_000_000_000,
-        profileKey = "qwen35-4b-q4-k-m-ctx4096",
-        licenseId = "Apache-2.0",
-        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF",
-        useCases =
-        setOf(
-            "complex-classification",
-            "structured-extraction",
-            "summarization",
-            "local-assistant",
-            "local-rag",
-            "tool-calling",
-        ),
-    )
-
-    private fun qwenThreePointFiveFourBQFiveKM(): CatalogModelRelease = CuratedModelReleaseFactory.release(
-        modelId = "qwen35-4b-q5-k-m",
-        displayName = "Qwen 3.5 4B Q5_K_M",
-        description =
-        "Versione ad alta precisione del modello Qwen 4B, destinata ai dispositivi Android più potenti e ai benchmark di qualità.",
-        downloadUrl =
-        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/c0a86ba65c426cbe870bf26c2a963ac53cb083ba/Qwen3.5-4B-Q5_K_M.gguf?download=true",
-        sha256 = "8814232b85594dcd46c50e5b8b29324a7efe9e746edbe8a3d1df3d3fce7aad39",
-        sizeBytes = 3_143_656_608,
-        fileName = "Qwen3.5-4B-Q5_K_M.gguf",
-        architecture = "qwen35",
-        quantization = "Q5_K_M",
-        minRamBytes = 12_000_000_000,
-        recommendedRamBytes = 16_000_000_000,
-        profileKey = "qwen35-4b-q5-k-m-ctx4096",
-        licenseId = "Apache-2.0",
-        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF",
-        useCases =
-        setOf(
-            "complex-classification",
-            "structured-extraction",
-            "summarization",
-            "local-assistant",
-            "local-rag",
-            "tool-calling",
-            "quantization-benchmark",
-        ),
-    )
-
-    private fun qwenThreePointFiveFourBUdIqTwoXxs(): CatalogModelRelease = CuratedModelReleaseFactory.release(
-        modelId = "qwen35-4b-ud-iq2-xxs",
-        displayName = "Qwen 3.5 4B UD-IQ2_XXS",
-        description =
-        "Quantizzazione minima di Qwen 3.5 4B, pensata per testare una capacità superiore senza utilizzare le più pesanti quantizzazioni Q4 o Q5.",
-        downloadUrl =
-        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/951946068e7924e25f038e1eab76cd0f976c2619/Qwen3.5-4B-UD-IQ2_XXS.gguf?download=true",
-        sha256 = "4c1ba794e8d6098f4fb6482b4db6e880c80b5ee0b4c64d8668afaf9541163677",
-        sizeBytes = 1_520_217_248,
-        fileName = "Qwen3.5-4B-UD-IQ2_XXS.gguf",
-        architecture = "qwen35",
-        quantization = "UD-IQ2_XXS",
-        minRamBytes = 6_000_000_000,
-        recommendedRamBytes = 8_000_000_000,
-        profileKey = "qwen35-4b-ud-iq2-xxs-ctx2048",
-        licenseId = "Apache-2.0",
-        sourceUrl = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF",
-        useCases =
-        setOf(
-            "runtime-stress-test",
-            "memory-pressure-test",
-            "quality-scaling-test",
-            "structured-extraction-test",
-            "local-assistant-test",
             "quantization-benchmark",
         ),
     )
