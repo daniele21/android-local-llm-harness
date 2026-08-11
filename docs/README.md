@@ -35,6 +35,7 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`architecture.md`](architecture.md) — current dependency and ownership boundaries
 - [`adr/README.md`](adr/README.md) — accepted durable decisions
 - [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
+- [`shared-runtime/README.md`](shared-runtime/README.md) — planned cross-application Binder runtime routing and workstreams
 - [`definition-of-done.md`](definition-of-done.md) — merge and production completion policy
 - [`versioning.md`](versioning.md) — version and release policy
 - [`releases/harness-0.5.md`](releases/harness-0.5.md) — Harness 0.5.0 release gates

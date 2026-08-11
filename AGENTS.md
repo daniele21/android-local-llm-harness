@@ -27,6 +27,7 @@ Use additional sources only when they answer a question required by the task:
 | Harness 0.5 release gates | [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) |
 | Documentation ownership and lifecycle | [`docs/README.md`](docs/README.md) |
 | Public embedded API | [`docs/api-usage.md`](docs/api-usage.md) |
+| Cross-application Binder runtime target and workstreams | [`docs/shared-runtime/README.md`](docs/shared-runtime/README.md) |
 | Physical-device execution | [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) |
 
 Do not load every plan for a local change. README, BRANCHING, current state and Definition of Done are conditional references, not mandatory context for every edit.
@@ -66,6 +67,7 @@ Start from the domain owner, then inspect direct consumers and tests before edit
 | Persistence or migration | matching observability store | contracts, engines, migration tests and UI queries |
 | Health, resources or benchmarks | matching observability engine | contracts, stores and Diagnostics UI |
 | Embedded transport | `transports/in-process` | public contracts and runtime orchestrator |
+| Shared Binder/AIDL transport | `docs/shared-runtime/README.md` until its modules exist | core contracts, runtime, host/client apps and security boundary |
 | Shared Compose components | `ui/design-system` | both Android apps and accessibility tests |
 | Connected phone behavior | `apps/local-llm-phone-test` | owning domain contracts; keep policy out of the app |
 | Standalone console | `apps/local-llm-console` | observability and model-store contracts |

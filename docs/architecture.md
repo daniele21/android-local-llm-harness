@@ -29,7 +29,7 @@ Native app / Capacitor plugin
       +--- llama.cpp JNI ---> GGUF
 ```
 
-The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change.
+The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change. The future deployment and workstream routing are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
 
 Runtime orchestration depends only on `observability/contracts`. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
 
