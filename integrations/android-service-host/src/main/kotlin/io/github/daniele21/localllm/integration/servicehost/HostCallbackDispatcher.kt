@@ -15,9 +15,7 @@ fun interface HostCallbackDispatcherFactory {
     fun create(): HostCallbackDispatcher
 }
 
-class BoundedSerialHostCallbackDispatcher(
-    queueCapacity: Int = DEFAULT_CALLBACK_QUEUE_CAPACITY,
-) : HostCallbackDispatcher {
+class BoundedSerialHostCallbackDispatcher(queueCapacity: Int = DEFAULT_CALLBACK_QUEUE_CAPACITY) : HostCallbackDispatcher {
     private val executor: ThreadPoolExecutor
 
     init {
