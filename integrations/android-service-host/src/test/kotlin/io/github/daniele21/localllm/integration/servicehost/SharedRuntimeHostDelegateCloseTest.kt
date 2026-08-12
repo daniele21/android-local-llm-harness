@@ -134,7 +134,9 @@ class SharedRuntimeHostDelegateCloseTest {
         "host-test",
     )
 
-    private class RecordingExecutor : HostControlExecutor, AutoCloseable {
+    private class RecordingExecutor :
+        HostControlExecutor,
+        AutoCloseable {
         var closed = false
 
         override fun execute(task: () -> Unit): Boolean {
