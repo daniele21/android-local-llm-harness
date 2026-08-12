@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
@@ -25,6 +26,7 @@ internal class FakeSharedRuntimeRemoteService(
     var cancelCalls = 0
     var lastGenerationRequest: GenerationRequestParcel? = null
     var lastCancelRequest: CancelRequestParcel? = null
+    var cancelFailure: RemoteException? = null
     var registrationHandler: ((ClientHelloParcel, (RegistrationResultParcel) -> Unit) -> Unit)? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
     var openSessionHandler: ((OpenSessionRequestParcel, (SessionResultParcel) -> Unit) -> Unit)? = null
@@ -69,6 +71,7 @@ internal class FakeSharedRuntimeRemoteService(
     override fun cancel(request: CancelRequestParcel) {
         cancelCalls += 1
         lastCancelRequest = request
+        cancelFailure?.let { throw it }
     }
 
     override fun unregisterClient(clientToken: ClientTokenParcel) {
