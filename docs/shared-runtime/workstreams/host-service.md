@@ -1,6 +1,6 @@
 # Shared runtime host service
 
-Status: complete
+Status: active
 Document type: feature-specification
 Owner: shared-runtime-host
 Canonical scope: shared-runtime.host-service
