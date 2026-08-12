@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import android.os.RemoteException
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationMetrics
@@ -224,6 +225,35 @@ class BinderGenerationAdapterTest {
 
         assertEquals(1, service.cancelCalls)
         assertEquals(service.lastGenerationRequest?.externalRequestId, service.lastCancelRequest?.externalRequestId)
+        adapter.close()
+    }
+
+    @Test
+    fun `cancel transport failure emits one asynchronous disconnect terminal`() {
+        val service = FakeSharedRuntimeRemoteService().apply {
+            generationHandler = { _, _ -> }
+            cancelFailure = RemoteException("binder gone")
+        }
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val listenerThreads = Collections.synchronizedList(mutableListOf<Thread>())
+        val terminal = CountDownLatch(1)
+        val callerThread = Thread.currentThread()
+        val adapter = adapter(service)
+        val handle = adapter.generate(request("cancel-death-request")) { event ->
+            events += event
+            listenerThreads += Thread.currentThread()
+            if (event is GenerationEvent.Failed) terminal.countDown()
+        }
+
+        handle.cancel()
+        handle.cancel()
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(1, service.cancelCalls)
+        assertEquals(1, events.size)
+        val failure = events.single() as GenerationEvent.Failed
+        assertTrue(failure.error.message.contains("SERVICE_DISCONNECTED"))
+        assertTrue(listenerThreads.none { it === callerThread })
         adapter.close()
     }
 
