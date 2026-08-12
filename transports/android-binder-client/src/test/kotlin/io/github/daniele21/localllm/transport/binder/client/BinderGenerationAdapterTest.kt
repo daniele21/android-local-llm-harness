@@ -104,14 +104,12 @@ class BinderGenerationAdapterTest {
         adapter.close()
     }
 
-    private fun adapter(
-        service: FakeSharedRuntimeRemoteService,
-        maxAggregateCharacters: Int = 1_048_576,
-    ): BinderGenerationAdapter = BinderGenerationAdapter(
-        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, ClientTokenParcel("client-token")) },
-        externalRequestIds = CorrelationIdSource { "remote-${remoteCounter++}" },
-        maxAggregateCharacters = maxAggregateCharacters,
-    )
+    private fun adapter(service: FakeSharedRuntimeRemoteService, maxAggregateCharacters: Int = 1_048_576): BinderGenerationAdapter =
+        BinderGenerationAdapter(
+            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, ClientTokenParcel("client-token")) },
+            externalRequestIds = CorrelationIdSource { "remote-${remoteCounter++}" },
+            maxAggregateCharacters = maxAggregateCharacters,
+        )
 
     private fun request(requestId: String): GenerationRequest = GenerationRequest(
         requestId = RequestId(requestId),
