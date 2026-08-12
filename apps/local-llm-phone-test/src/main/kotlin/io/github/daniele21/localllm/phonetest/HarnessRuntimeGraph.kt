@@ -53,6 +53,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         synchronized(lock) { runtimeClient }
     }
 
+    /**
+     * Stable service-facing facade over the same in-process client used by the host graph.
+     * Merely obtaining or querying it does not create a runtime or select/load a model.
+     */
+    val sharedRuntimeClient: LocalLlmClient
+        get() = sharedRuntimeClientFacade
+
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
         ensureRuntimeFor(model)
@@ -64,13 +71,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             useCaseId = resolved.binding.useCaseId,
         )
     }
-
-    /**
-     * Stable service-facing facade over the same in-process client used by the host graph.
-     *
-     * Merely obtaining or querying this facade does not create a runtime or select/load a model.
-     */
-    fun sharedRuntimeClient(): LocalLlmClient = sharedRuntimeClientFacade
 
     fun recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> = telemetryRepository.recentRuns(limit)
 
