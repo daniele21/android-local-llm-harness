@@ -25,7 +25,7 @@ class HarnessSharedRuntimeService : Service() {
         )
         memoryPressureCallbacks = AndroidMemoryPressureCallbacks(
             lowMemoryProbe = ActivityManagerLowMemoryProbe(this),
-            onPressure = runtimeGraph::handleMemoryPressure,
+            onPressure = { pressure -> runtimeGraph.handleMemoryPressure(pressure) },
         )
     }
 
