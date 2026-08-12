@@ -56,6 +56,17 @@ enum class ConsoleInferencePhase {
     CANCELLED,
 }
 
+enum class ConsoleInferenceConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED,
+    HOST_NOT_INSTALLED,
+    PERMISSION_DENIED,
+    INCOMPATIBLE,
+    CONNECTION_LOST,
+    CLOSED,
+}
+
 data class ConsoleInferenceMetrics(
     val queueMs: Long?,
     val modelLoadMs: Long?,
@@ -75,6 +86,7 @@ data class ConsoleInferenceState(
     val source: String,
     val targets: List<ConsoleInferenceTarget>,
     val phase: ConsoleInferencePhase,
+    val connectionState: ConsoleInferenceConnectionState = ConsoleInferenceConnectionState.DISCONNECTED,
     val activeTargetId: String? = null,
     val output: String = "",
     val reasoningOutput: String = "",
