@@ -40,4 +40,16 @@ internal interface SharedRuntimeRemoteService {
     fun unregisterClient(clientToken: ClientTokenParcel)
 }
 
-internal data class RegisteredSharedRuntimeEndpoint(val service: SharedRuntimeRemoteService, val clientToken: ClientTokenParcel)
+internal data class RegisteredSharedRuntimeEndpoint(
+    val service: SharedRuntimeRemoteService,
+    val clientToken: ClientTokenParcel,
+    val connectionEpoch: Long = 0L,
+)
+
+internal fun interface SharedRuntimeEndpointInvalidationListener {
+    fun onEndpointInvalidated(connectionEpoch: Long, detail: String)
+}
+
+internal fun interface SharedRuntimeEndpointInvalidationSource {
+    fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable
+}
