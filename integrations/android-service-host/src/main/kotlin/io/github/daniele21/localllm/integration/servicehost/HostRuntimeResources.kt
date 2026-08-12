@@ -30,6 +30,15 @@ internal class HostRuntimeResources {
     fun callbackDispatcher(token: HostClientToken): HostCallbackDispatcher? = callbackDispatchers[token]
 
     fun removeCallbackDispatcher(token: HostClientToken): HostCallbackDispatcher? = callbackDispatchers.remove(token)
+
+    fun closeAll() {
+        handles.values.forEach(GenerationHandle::cancelSafely)
+        handles.clear()
+        deathLinks.values.forEach(ClientDeathLink::unlinkSafely)
+        deathLinks.clear()
+        callbackDispatchers.values.forEach(HostCallbackDispatcher::closeSafely)
+        callbackDispatchers.clear()
+    }
 }
 
 internal fun GenerationHandle.cancelSafely() {
