@@ -18,9 +18,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
  * Observing or preparing an idle proof host never creates a runtime. Operations that require an
  * active runtime fail explicitly until the host graph has prepared one through its normal owner.
  */
-internal class HarnessSharedRuntimeClient(
-    private val activeClient: () -> LocalLlmClient?,
-) : LocalLlmClient {
+internal class HarnessSharedRuntimeClient(private val activeClient: () -> LocalLlmClient?) : LocalLlmClient {
     override fun runtimeSnapshot(): RuntimeSnapshot = activeClient()?.runtimeSnapshot()
         ?: RuntimeSnapshot(
             state = RuntimeState.IDLE,
