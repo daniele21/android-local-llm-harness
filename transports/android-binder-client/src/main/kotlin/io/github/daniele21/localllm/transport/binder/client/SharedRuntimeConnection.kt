@@ -124,7 +124,7 @@ class SharedRuntimeConnection internal constructor(
         try {
             service.registerClient(
                 hello = clientHello,
-                onHostDisconnecting = { connectionLost("Host is disconnecting") },
+                hostDisconnectingCallback = { connectionLost("Host is disconnecting") },
                 callback = { result -> handleRegistration(service, negotiated, result) },
             )
         } catch (error: SecurityException) {
