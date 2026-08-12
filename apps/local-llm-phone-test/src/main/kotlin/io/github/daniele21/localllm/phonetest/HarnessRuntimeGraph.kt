@@ -2,7 +2,16 @@ package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.GenerationHandle
+import io.github.daniele21.localllm.contracts.GenerationListener
+import io.github.daniele21.localllm.contracts.GenerationRequest
+import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.PrepareResult
+import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.contracts.RuntimeState
+import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
@@ -15,6 +24,7 @@ import io.github.daniele21.localllm.observability.store.InMemoryTelemetryReposit
 import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.store.FileSystemModelStore
+import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
 import java.io.File
 
 /**
@@ -45,7 +55,42 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
 
     private var runtime: RuntimeOrchestrator? = null
+    private var runtimeClient: LocalLlmClient? = null
     private var runtimeModelDigest: ModelDigest? = null
+
+    private val sharedRuntimeClientFacade = object : LocalLlmClient {
+        override fun runtimeSnapshot(): RuntimeSnapshot = currentRuntimeClient()?.runtimeSnapshot()
+            ?: RuntimeSnapshot(
+                state = RuntimeState.IDLE,
+                loadedModel = null,
+                activeSessions = 0,
+                queuedRequests = 0,
+            )
+
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
+            currentRuntimeClient()?.prepare(applicationId, useCaseId)
+                ?: PrepareResult(
+                    ready = false,
+                    modelDigest = null,
+                    detail = "Host runtime is not prepared",
+                )
+
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
+            requireRuntimeClient().createSession(applicationId, useCaseId)
+
+        override fun createSession(
+            applicationId: ApplicationId,
+            useCaseId: UseCaseId,
+            options: SessionOptions,
+        ): SessionId = requireRuntimeClient().createSession(applicationId, useCaseId, options)
+
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
+            requireRuntimeClient().generate(request, listener)
+
+        override fun closeSession(sessionId: SessionId) {
+            requireRuntimeClient().closeSession(sessionId)
+        }
+    }
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
@@ -58,6 +103,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             useCaseId = resolved.binding.useCaseId,
         )
     }
+
+    /**
+     * Stable service-facing facade over the same in-process client used by the host graph.
+     *
+     * Merely obtaining or querying this facade does not create a runtime or select/load a model.
+     */
+    fun sharedRuntimeClient(): LocalLlmClient = sharedRuntimeClientFacade
 
     fun recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> = telemetryRepository.recentRuns(limit)
 
@@ -86,6 +138,11 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         synchronized(lock) { closeRuntimeLocked() }
     }
 
+    private fun currentRuntimeClient(): LocalLlmClient? = synchronized(lock) { runtimeClient }
+
+    private fun requireRuntimeClient(): LocalLlmClient =
+        currentRuntimeClient() ?: error("Host runtime is not prepared")
+
     private fun ensureRuntimeFor(model: ImportedPhoneModel) {
         if (runtime != null && runtimeModelDigest == model.digest) return
 
@@ -94,18 +151,21 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         require(nativeLibraryDirectory.isDirectory) {
             "Native library directory is unavailable"
         }
-        runtime = RuntimeOrchestrator(
+        val orchestrator = RuntimeOrchestrator(
             registry = registry,
             modelStore = modelStore,
             backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
             telemetryRepository = telemetryRepository,
         )
+        runtime = orchestrator
+        runtimeClient = InProcessLocalLlmClient(orchestrator)
         runtimeModelDigest = model.digest
     }
 
     private fun closeRuntimeLocked() {
         runtime?.close()
         runtime = null
+        runtimeClient = null
         runtimeModelDigest = null
         registry.clear()
     }
@@ -117,7 +177,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
         private const val DEFAULT_RUN_LIMIT = 50
         private const val DEFAULT_LOG_LIMIT = 200
-        private val APPLICATION_ID = ApplicationId("play-internal-phone-test")
+        internal val APPLICATION_ID = ApplicationId("play-internal-phone-test")
 
         @Volatile
         private var instance: HarnessRuntimeGraph? = null
@@ -147,7 +207,7 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
     }
 
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        require(applicationId == ApplicationId("play-internal-phone-test")) {
+        require(applicationId == HarnessRuntimeGraph.APPLICATION_ID) {
             "Unknown applicationId ${applicationId.value}"
         }
         val model = synchronized(lock) {
