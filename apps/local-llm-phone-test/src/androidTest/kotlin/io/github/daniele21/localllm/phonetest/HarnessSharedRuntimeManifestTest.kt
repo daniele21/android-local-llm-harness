@@ -43,7 +43,7 @@ class HarnessSharedRuntimeManifestTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val graph = HarnessRuntimeGraph.from(context)
         graph.close()
-        assertNull(graph.runtimeSnapshot())
+        assertNull(graph.runtimeSnapshot)
 
         val connected = CountDownLatch(1)
         val connection = object : ServiceConnection {
@@ -58,7 +58,7 @@ class HarnessSharedRuntimeManifestTest {
         assertTrue(context.bindService(intent, connection, Context.BIND_AUTO_CREATE))
         try {
             assertTrue(connected.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-            assertNull(graph.runtimeSnapshot())
+            assertNull(graph.runtimeSnapshot)
         } finally {
             context.unbindService(connection)
         }
