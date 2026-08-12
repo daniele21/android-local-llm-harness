@@ -187,10 +187,7 @@ private class ActiveGeneration(
     }
 }
 
-private class BinderGenerationHandle(
-    override val requestId: RequestId,
-    private val cancelAction: () -> Unit,
-) : GenerationHandle {
+private class BinderGenerationHandle(override val requestId: RequestId, private val cancelAction: () -> Unit) : GenerationHandle {
     private val cancelled = AtomicBoolean(false)
 
     override fun cancel() {
