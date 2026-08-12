@@ -26,6 +26,7 @@ class SharedRuntimeHostDelegate(
 ) : AutoCloseable {
     private val resources = HostRuntimeResources()
     private val closed = AtomicBoolean(false)
+    private val lifecycleLock = Any()
     private val runtimeOperations =
         HostRuntimeOperations(
             client = client,
@@ -84,10 +85,12 @@ class SharedRuntimeHostDelegate(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         controlExecutor.closeSafely()
-        ledger.activeConnections.forEach { connection ->
-            cleanupConnection(connection.token, connection.caller)
+        synchronized(lifecycleLock) {
+            ledger.activeConnections.forEach { connection ->
+                cleanupConnection(connection.token, connection.caller)
+            }
+            resources.closeAll()
         }
-        resources.closeAll()
     }
 
     private fun completeRegistration(
@@ -96,10 +99,10 @@ class SharedRuntimeHostDelegate(
         callback: HostResultCallback<RegistrationResultParcel>,
         negotiatedMinor: Int,
         enabledFeatures: List<String>,
-    ) {
+    ) = synchronized(lifecycleLock) {
         if (closed.get()) {
             callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
-            return
+            return@synchronized
         }
         when (val registration = ledger.register(caller)) {
             is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
@@ -110,7 +113,7 @@ class SharedRuntimeHostDelegate(
                 if (dispatcher == null) {
                     cleanupConnection(token, caller)
                     callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
-                    return
+                    return@synchronized
                 }
                 resources.attachCallbackDispatcher(token, dispatcher)
                 val deathLink = lifecycle.link {
