@@ -48,10 +48,7 @@ class SharedRuntimeConsoleInferenceControl(
         }
     }
 
-    override fun start(
-        request: ConsoleInferenceRequest,
-        listener: ConsoleInferenceListener,
-    ): ConsoleInferenceOperationOutcome {
+    override fun start(request: ConsoleInferenceRequest, listener: ConsoleInferenceListener): ConsoleInferenceOperationOutcome {
         if (client.connectionSnapshot.state != SharedRuntimeConnectionState.CONNECTED) {
             return unavailable(CONNECTION_REQUIRED)
         }
@@ -157,15 +154,21 @@ class SharedRuntimeConsoleInferenceControl(
 
 private fun SharedRuntimeConnectionState.toConsoleConnectionState(): ConsoleInferenceConnectionState = when (this) {
     SharedRuntimeConnectionState.DISCONNECTED -> ConsoleInferenceConnectionState.DISCONNECTED
+
     SharedRuntimeConnectionState.BINDING,
     SharedRuntimeConnectionState.NEGOTIATING,
     -> ConsoleInferenceConnectionState.CONNECTING
 
     SharedRuntimeConnectionState.CONNECTED -> ConsoleInferenceConnectionState.CONNECTED
+
     SharedRuntimeConnectionState.HOST_NOT_INSTALLED -> ConsoleInferenceConnectionState.HOST_NOT_INSTALLED
+
     SharedRuntimeConnectionState.PERMISSION_DENIED -> ConsoleInferenceConnectionState.PERMISSION_DENIED
+
     SharedRuntimeConnectionState.INCOMPATIBLE -> ConsoleInferenceConnectionState.INCOMPATIBLE
+
     SharedRuntimeConnectionState.CONNECTION_LOST -> ConsoleInferenceConnectionState.CONNECTION_LOST
+
     SharedRuntimeConnectionState.CLOSED -> ConsoleInferenceConnectionState.CLOSED
 }
 
