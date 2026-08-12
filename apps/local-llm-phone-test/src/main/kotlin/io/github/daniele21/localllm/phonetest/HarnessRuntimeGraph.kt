@@ -188,7 +188,7 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
                 HarnessSharedRuntimeBindings.resolveConsole(selected)
             }
 
-            else -> error("Unknown applicationId ${applicationId.value}")
+            else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
         }
     }
 
