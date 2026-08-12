@@ -1,9 +1,12 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import android.os.RemoteException
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.PrepareRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParcel
@@ -26,6 +29,12 @@ internal interface SharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun closeSession(request: CloseSessionRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun generate(request: GenerationRequestParcel, callback: (GenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun cancel(request: CancelRequestParcel)
 
     @Throws(RemoteException::class)
     fun unregisterClient(clientToken: ClientTokenParcel)
