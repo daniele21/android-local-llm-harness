@@ -10,7 +10,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
  * Reusable Android composition root for the shared-runtime host Binder boundary.
  *
  * The caller supplies the host-owned [LocalLlmClient] and authorization policy. This class does
- * not create a runtime, select a model or perform model preparation while the service is bound.
+ * not create or own the runtime; closing it releases only Binder/service adapter resources.
  */
 class SharedRuntimeHostComposition(
     context: Context,
@@ -18,21 +18,26 @@ class SharedRuntimeHostComposition(
     permissionName: String,
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
-) {
+) : AutoCloseable {
+    private val delegate = SharedRuntimeHostDelegate(
+        client = client,
+        protocolInfo = hostProtocolInfo(hostBuildId),
+    )
     private val binderStub = SharedRuntimeBinderStub(
         authorizer = CallerAuthorizer(
             permissionName = permissionName,
             policies = policies,
             environment = AndroidCallerEnvironment(context.applicationContext),
         ),
-        delegate = SharedRuntimeHostDelegate(
-            client = client,
-            protocolInfo = hostProtocolInfo(hostBuildId),
-        ),
+        delegate = delegate,
     )
 
     val binder: IBinder
         get() = binderStub
+
+    override fun close() {
+        delegate.close()
+    }
 }
 
 internal fun hostProtocolInfo(hostBuildId: String): ProtocolInfoParcel {
