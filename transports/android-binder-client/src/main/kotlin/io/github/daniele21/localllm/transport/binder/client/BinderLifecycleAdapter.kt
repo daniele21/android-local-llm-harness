@@ -134,6 +134,5 @@ private class CallbackWaiter<T : Any> {
         }
     }
 
-    fun await(timeoutMillis: Long): T? =
-        if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) result.get() else null
+    fun await(timeoutMillis: Long): T? = if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) result.get() else null
 }
