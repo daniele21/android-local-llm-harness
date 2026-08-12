@@ -19,6 +19,8 @@ val phoneTestUploadSigningPartiallyConfigured =
     phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
 val allowUnsignedRelease =
     System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
+val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
+val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM"
 
 gradle.taskGraph.whenReady {
     val packagesPhoneTestRelease =
@@ -62,6 +64,8 @@ android {
         versionCode = currentVersionCode
         versionName = currentVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
+        buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -84,10 +88,14 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeDebugPermission
+            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeDebugPermission\"")
         }
         release {
             isDebuggable = false
             isMinifyEnabled = false
+            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
+            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
             if (phoneTestUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
             }
@@ -96,6 +104,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -141,6 +150,7 @@ dependencies {
     implementation(project(":observability:android-resource-probe"))
     implementation(project(":observability:benchmark-engine"))
     implementation(project(":transports:in-process"))
+    implementation(project(":integrations:android-service-host"))
     implementation(project(":ui:design-system"))
 
     implementation(libs.androidx.activity.compose)
