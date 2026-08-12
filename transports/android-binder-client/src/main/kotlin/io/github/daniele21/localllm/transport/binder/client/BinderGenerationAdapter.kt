@@ -101,18 +101,24 @@ internal class BinderGenerationAdapter(
         }
         when {
             generation.terminal -> Unit
+
             disconnected != null -> failDisconnected(generation, disconnected)
+
             outcome is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
+
             outcome is GenerationProcessingOutcome.Ready -> {
                 val listenerAccepted = outcome.deliveries.all(generation::deliver)
                 when {
                     !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+
                     generation.disconnectionDetail != null -> {
                         failDisconnected(generation, requireNotNull(generation.disconnectionDetail))
                     }
+
                     generation.overflowDetail != null -> {
                         failProtocol(generation, requireNotNull(generation.overflowDetail))
                     }
+
                     outcome.event.isTerminal() -> finish(generation)
                 }
             }
