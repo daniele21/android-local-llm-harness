@@ -79,7 +79,9 @@ class ConsoleInferencePresenter {
         )
 
         ConsoleInferenceConnectionState.CLOSED -> emptyList()
+
         ConsoleInferenceConnectionState.CONNECTED -> emptyList()
+
         ConsoleInferenceConnectionState.DISCONNECTED -> listOf(
             ConsoleAction(
                 type = ConsoleActionType.CONNECT_SHARED_RUNTIME,
