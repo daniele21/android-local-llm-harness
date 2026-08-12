@@ -16,11 +16,7 @@ internal interface SharedRuntimeRemoteService {
     fun protocolInfo(): ProtocolInfoParcel
 
     @Throws(RemoteException::class)
-    fun registerClient(
-        hello: ClientHelloParcel,
-        hostDisconnectingCallback: () -> Unit,
-        callback: (RegistrationResultParcel) -> Unit,
-    )
+    fun registerClient(hello: ClientHelloParcel, hostDisconnectingCallback: () -> Unit, callback: (RegistrationResultParcel) -> Unit)
 
     @Throws(RemoteException::class)
     fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit)
@@ -35,7 +31,4 @@ internal interface SharedRuntimeRemoteService {
     fun unregisterClient(clientToken: ClientTokenParcel)
 }
 
-internal data class RegisteredSharedRuntimeEndpoint(
-    val service: SharedRuntimeRemoteService,
-    val clientToken: ClientTokenParcel,
-)
+internal data class RegisteredSharedRuntimeEndpoint(val service: SharedRuntimeRemoteService, val clientToken: ClientTokenParcel)
