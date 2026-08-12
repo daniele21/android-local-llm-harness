@@ -14,7 +14,7 @@ class HarnessSharedRuntimeService : Service() {
         val graph = HarnessRuntimeGraph.from(this)
         hostComposition = SharedRuntimeHostComposition(
             context = this,
-            client = graph.sharedRuntimeClient(),
+            client = graph.sharedRuntimeClient,
             permissionName = BuildConfig.SHARED_RUNTIME_PERMISSION,
             policies = HarnessSharedRuntimePolicy.authorizedClients(this),
             hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
