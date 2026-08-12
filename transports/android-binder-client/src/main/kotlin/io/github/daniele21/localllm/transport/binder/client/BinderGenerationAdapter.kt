@@ -93,30 +93,27 @@ internal class BinderGenerationAdapter(
     }
 
     private fun process(generation: ActiveGeneration, wireEvent: GenerationEventParcel) {
-        if (!generation.terminal) {
-            val disconnected = generation.disconnectionDetail
-            if (disconnected != null) {
-                failDisconnected(generation, disconnected)
-            } else {
-                when (val outcome = generation.accept(wireEvent, maxAggregateCharacters, deliveryChunkCharacters)) {
-                    is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
-
-                    is GenerationProcessingOutcome.Ready -> {
-                        val listenerAccepted = outcome.deliveries.all(generation::deliver)
-                        when {
-                            !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
-
-                            generation.disconnectionDetail != null -> {
-                                failDisconnected(generation, requireNotNull(generation.disconnectionDetail))
-                            }
-
-                            generation.overflowDetail != null -> {
-                                failProtocol(generation, requireNotNull(generation.overflowDetail))
-                            }
-
-                            outcome.event.isTerminal() -> finish(generation)
-                        }
+        val disconnected = generation.disconnectionDetail
+        val outcome = if (!generation.terminal && disconnected == null) {
+            generation.accept(wireEvent, maxAggregateCharacters, deliveryChunkCharacters)
+        } else {
+            null
+        }
+        when {
+            generation.terminal -> Unit
+            disconnected != null -> failDisconnected(generation, disconnected)
+            outcome is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
+            outcome is GenerationProcessingOutcome.Ready -> {
+                val listenerAccepted = outcome.deliveries.all(generation::deliver)
+                when {
+                    !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+                    generation.disconnectionDetail != null -> {
+                        failDisconnected(generation, requireNotNull(generation.disconnectionDetail))
                     }
+                    generation.overflowDetail != null -> {
+                        failProtocol(generation, requireNotNull(generation.overflowDetail))
+                    }
+                    outcome.event.isTerminal() -> finish(generation)
                 }
             }
         }
