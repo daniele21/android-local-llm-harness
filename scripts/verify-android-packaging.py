@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Validate native libraries and runtime brand resources in Android packages."""
+"""Validate native libraries, shared-runtime AARs and runtime brand resources in Android packages."""
 
 from __future__ import annotations
 
 import struct
 import sys
+from io import BytesIO
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
@@ -33,6 +34,14 @@ EXPECTED_BRAND_RESOURCES = {
     "ic_launcher",
     "ic_launcher_round",
 }
+EXPECTED_BINDER_CLIENT_CLASSES = {
+    "io/github/daniele21/localllm/transport/binder/client/BinderLocalLlmClient.class",
+    "io/github/daniele21/localllm/transport/binder/client/SharedRuntimeHostConfig.class",
+    "io/github/daniele21/localllm/transport/binder/client/SharedRuntimeConnectionState.class",
+    "io/github/daniele21/localllm/transport/binder/client/SharedRuntimeConnectionSnapshot.class",
+    "io/github/daniele21/localllm/transport/binder/client/SharedRuntimeConnectionObserver.class",
+}
+FORBIDDEN_CLIENT_ARTIFACT_SUFFIXES = (".so", ".gguf", ".ggml")
 EXPECTED_ABI = "arm64-v8a"
 EM_AARCH64 = 183
 ELF_HEADER_BYTES = 20
@@ -121,6 +130,44 @@ def verify_native_archive(
     print(f"  native libraries: {len(expected_libraries)}")
 
 
+def verify_binder_client_aar(path: Path) -> None:
+    label = "shared-runtime Binder client debug AAR"
+    try:
+        with ZipFile(path) as archive:
+            entries = set(archive.namelist())
+            forbidden = sorted(
+                name
+                for name in entries
+                if name.lower().endswith(FORBIDDEN_CLIENT_ARTIFACT_SUFFIXES)
+            )
+            if forbidden:
+                raise PackagingError(
+                    f"{label} contains forbidden runtime/model artifacts: {forbidden}"
+                )
+
+            if "proguard.txt" not in entries:
+                raise PackagingError(f"{label} does not contain consumer shrinker rules")
+            proguard = archive.read("proguard.txt").decode("utf-8")
+            if "io.github.daniele21.localllm.transport.binder.contract" not in proguard:
+                raise PackagingError(f"{label} consumer rules do not preserve the Binder contract")
+
+            if "classes.jar" not in entries:
+                raise PackagingError(f"{label} does not contain classes.jar")
+            with ZipFile(BytesIO(archive.read("classes.jar"))) as classes:
+                class_entries = set(classes.namelist())
+    except BadZipFile as error:
+        raise PackagingError(f"{label} is not a valid ZIP archive: {path}") from error
+
+    missing = sorted(EXPECTED_BINDER_CLIENT_CLASSES - class_entries)
+    if missing:
+        raise PackagingError(f"{label} is missing reviewed public client classes: {missing}")
+
+    print(f"Verified {label}: {path}")
+    print(f"  reviewed public classes: {len(EXPECTED_BINDER_CLIENT_CLASSES)}")
+    print("  consumer shrinker rules: present")
+    print("  native/model artifacts: none")
+
+
 def resource_name_present(resource_table: bytes, name: str) -> bool:
     return name.encode("utf-8") in resource_table or name.encode("utf-16le") in resource_table
 
@@ -187,6 +234,11 @@ def main() -> int:
         "backends/llama-cpp/build/outputs/aar/llama-cpp-debug.aar",
         "llama.cpp debug AAR",
     )
+    binder_client_aar = find_single(
+        repository,
+        "transports/android-binder-client/build/outputs/aar/android-binder-client-debug.aar",
+        "shared-runtime Binder client debug AAR",
+    )
 
     verify_native_archive(device_application_apk, "lib/", "device-test application APK")
     verify_native_archive(
@@ -211,6 +263,7 @@ def main() -> int:
 
     verify_instrumentation_apk(instrumentation_apk)
     verify_native_archive(backend_aar, "jni/", "llama.cpp debug AAR")
+    verify_binder_client_aar(binder_client_aar)
     print("Android packaging verification completed successfully")
     return 0
 
