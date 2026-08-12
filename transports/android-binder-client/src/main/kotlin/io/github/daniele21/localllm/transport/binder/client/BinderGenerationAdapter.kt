@@ -100,10 +100,12 @@ internal class BinderGenerationAdapter(
             } else {
                 when (val outcome = generation.accept(wireEvent, maxAggregateCharacters, deliveryChunkCharacters)) {
                     is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
+
                     is GenerationProcessingOutcome.Ready -> {
                         val listenerAccepted = outcome.deliveries.all(generation::deliver)
                         when {
                             !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+
                             generation.disconnectionDetail != null -> {
                                 failDisconnected(generation, requireNotNull(generation.disconnectionDetail))
                             }
@@ -261,11 +263,7 @@ private class ActiveGeneration(
         runCatching { eventSink(event) }
     }
 
-    fun accept(
-        wireEvent: GenerationEventParcel,
-        maxAggregateCharacters: Int,
-        deliveryChunkCharacters: Int,
-    ): GenerationProcessingOutcome {
+    fun accept(wireEvent: GenerationEventParcel, maxAggregateCharacters: Int, deliveryChunkCharacters: Int): GenerationProcessingOutcome {
         val overflowFailure = overflowDetail
         if (overflowFailure != null) return GenerationProcessingOutcome.Failure(overflowFailure)
         val mapped = runCatching { reconstructor.accept(wireEvent) }
@@ -279,11 +277,7 @@ private class ActiveGeneration(
         return GenerationProcessingOutcome.Ready(mapped, deliveries)
     }
 
-    private fun coalesce(
-        event: GenerationEvent,
-        maxAggregateCharacters: Int,
-        deliveryChunkCharacters: Int,
-    ): List<GenerationEvent>? {
+    private fun coalesce(event: GenerationEvent, maxAggregateCharacters: Int, deliveryChunkCharacters: Int): List<GenerationEvent>? {
         if (event !is GenerationEvent.TextDelta) {
             return buildList {
                 flushPending()?.let(::add)
