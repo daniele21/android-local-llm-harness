@@ -1,9 +1,12 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.PrepareRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParcel
@@ -18,8 +21,13 @@ internal class FakeSharedRuntimeRemoteService(
     var registerCalls = 0
     var unregisterCalls = 0
     var closeSessionCalls = 0
+    var generateCalls = 0
+    var cancelCalls = 0
+    var lastGenerationRequest: GenerationRequestParcel? = null
+    var lastCancelRequest: CancelRequestParcel? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
     var openSessionHandler: ((OpenSessionRequestParcel, (SessionResultParcel) -> Unit) -> Unit)? = null
+    var generationHandler: ((GenerationRequestParcel, (GenerationEventParcel) -> Unit) -> Unit)? = null
     private var hostDisconnecting: (() -> Unit)? = null
 
     override fun protocolInfo(): ProtocolInfoParcel = protocol
@@ -44,6 +52,17 @@ internal class FakeSharedRuntimeRemoteService(
 
     override fun closeSession(request: CloseSessionRequestParcel) {
         closeSessionCalls += 1
+    }
+
+    override fun generate(request: GenerationRequestParcel, callback: (GenerationEventParcel) -> Unit) {
+        generateCalls += 1
+        lastGenerationRequest = request
+        requireNotNull(generationHandler) { "Generation handler not configured" }(request, callback)
+    }
+
+    override fun cancel(request: CancelRequestParcel) {
+        cancelCalls += 1
+        lastCancelRequest = request
     }
 
     override fun unregisterClient(clientToken: ClientTokenParcel) {
