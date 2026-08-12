@@ -110,10 +110,7 @@ internal class BinderLifecycleAdapter(
         }
     }
 
-    private fun awaitPrepare(
-        endpoint: RegisteredSharedRuntimeEndpoint,
-        request: PrepareRequestParcel,
-    ): PrepareCallbackOutcome {
+    private fun awaitPrepare(endpoint: RegisteredSharedRuntimeEndpoint, request: PrepareRequestParcel): PrepareCallbackOutcome {
         val waiter = CallbackWaiter<PrepareResultParcel>()
         return try {
             endpoint.service.prepare(request, waiter::complete)
@@ -126,7 +123,9 @@ internal class BinderLifecycleAdapter(
 
     private fun mapPrepareResult(operationId: String, result: PrepareResultParcel): PrepareResult = when {
         result.operationId != operationId -> prepareFailure("Shared runtime prepare correlation mismatch")
+
         result.error != null -> prepareFailure(result.error.safeMessage)
+
         else -> PrepareResult(
             ready = result.ready,
             modelDigest = result.modelDigestSha256?.let(::ModelDigest),
