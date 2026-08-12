@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
+import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.NegotiatedProtocol
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
@@ -152,21 +153,12 @@ class SharedRuntimeConnection internal constructor(
             return
         }
 
-        val token = result.clientToken
-        val resultMinor = result.negotiatedMinor
-        val resultFeatures = result.enabledFeatures.toSet()
-        if (
-            token == null ||
-            token.value.isBlank() ||
-            token.value.length > BinderProtocolV1.MAX_IDENTIFIER_CHARACTERS ||
-            resultMinor != negotiated.minor ||
-            resultFeatures.size != result.enabledFeatures.size ||
-            resultFeatures != negotiated.enabledFeatures
-        ) {
+        if (!isValidRegistration(result, negotiated)) {
             incompatible("Host returned an invalid registration result")
             return
         }
 
+        val token = requireNotNull(result.clientToken)
         synchronized(lock) {
             if (current.state != SharedRuntimeConnectionState.NEGOTIATING) return
             registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, token)
@@ -317,6 +309,22 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
         } ?: return
         runCatching { context.unbindService(active) }
     }
+}
+
+private fun isValidRegistration(result: RegistrationResultParcel, negotiated: NegotiatedProtocol): Boolean {
+    val token = result.clientToken ?: return false
+    return isValidClientToken(token) && isValidNegotiationEcho(result, negotiated)
+}
+
+private fun isValidClientToken(token: ClientTokenParcel): Boolean =
+    token.value.isNotBlank() && token.value.length <= BinderProtocolV1.MAX_IDENTIFIER_CHARACTERS
+
+private fun isValidNegotiationEcho(result: RegistrationResultParcel, negotiated: NegotiatedProtocol): Boolean {
+    val features = result.enabledFeatures.toSet()
+    val uniqueFeatures = features.size == result.enabledFeatures.size
+    val minorMatches = result.negotiatedMinor == negotiated.minor
+    val featuresMatch = features == negotiated.enabledFeatures
+    return uniqueFeatures && minorMatches && featuresMatch
 }
 
 internal fun SharedRuntimeHostConfig.componentName(): ComponentName = ComponentName(packageName, serviceClassName)
