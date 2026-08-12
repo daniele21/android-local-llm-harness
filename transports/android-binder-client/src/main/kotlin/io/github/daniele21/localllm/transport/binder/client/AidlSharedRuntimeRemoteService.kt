@@ -1,9 +1,13 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
+import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IPrepareCallback
 import io.github.daniele21.localllm.transport.binder.contract.IRegistrationCallback
@@ -53,6 +57,17 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     }
 
     override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
+
+    override fun generate(request: GenerationRequestParcel, callback: (GenerationEventParcel) -> Unit) {
+        delegate.generate(
+            request,
+            object : IGenerationCallback.Stub() {
+                override fun onEvent(event: GenerationEventParcel) = callback(event)
+            },
+        )
+    }
+
+    override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
 
     override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
 }
