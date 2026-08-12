@@ -37,6 +37,7 @@ include(
     ":integrations:android-service-host",
     ":ui:design-system",
     ":apps:local-llm-console",
+    ":apps:shared-runtime-client-consumer-fixture",
     ":apps:device-test-runner",
     ":apps:local-llm-phone-test",
 )
