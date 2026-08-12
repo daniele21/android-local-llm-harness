@@ -80,7 +80,7 @@ internal class BinderGenerationAdapter(
     private fun enqueue(generation: ActiveGeneration, event: GenerationEventParcel) {
         if (closed.get() || generation.terminal || generation.overflowDetail != null) return
         if (endpointProvider()?.connectionEpoch != generation.endpoint.connectionEpoch) {
-            disconnects.markStale(generation, STALE_CONNECTION_DETAIL)
+            disconnects.markDisconnected(generation, STALE_CONNECTION_DETAIL)
             return
         }
         try {
@@ -133,7 +133,7 @@ internal class BinderGenerationAdapter(
                 CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
             )
         } catch (_: RemoteException) {
-            finish(generation)
+            disconnects.markDisconnected(generation, CANCEL_TRANSPORT_FAILURE_DETAIL)
         }
     }
 
@@ -183,6 +183,7 @@ internal class BinderGenerationAdapter(
         const val DEFAULT_DELIVERY_CHUNK_CHARACTERS = 256
         const val CALLBACK_QUEUE_OVERFLOW_DETAIL = "Client callback queue capacity exceeded"
         const val STALE_CONNECTION_DETAIL = "Callback arrived from a stale shared-runtime registration"
+        const val CANCEL_TRANSPORT_FAILURE_DETAIL = "Host Binder connection failed during cancellation"
     }
 }
 
@@ -192,7 +193,7 @@ private class GenerationDisconnectCoordinator(
     private val closed: AtomicBoolean,
     private val failureSink: (ActiveGeneration, String) -> Unit,
 ) {
-    fun markStale(generation: ActiveGeneration, detail: String) {
+    fun markDisconnected(generation: ActiveGeneration, detail: String) {
         if (generation.markDisconnected(detail)) scheduleDrain()
     }
 
