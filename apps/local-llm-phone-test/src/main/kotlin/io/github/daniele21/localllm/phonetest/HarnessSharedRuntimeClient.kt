@@ -15,12 +15,12 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 /**
  * Stable service-facing client over the host graph's process-scoped in-process runtime client.
  *
- * Snapshot observation never creates a runtime. Explicit prepare may lazily create the runtime and
- * lets the host registry resolve the already-selected model; bind and handshake remain side-effect free.
+ * Snapshot observation never creates a runtime. Explicit prepare may lazily create the runtime only
+ * after the host has selected a model; bind and handshake remain side-effect free.
  */
 internal class HarnessSharedRuntimeClient(
     private val activeClient: () -> LocalLlmClient?,
-    private val prepareClient: () -> LocalLlmClient,
+    private val prepareClient: () -> LocalLlmClient?,
 ) : LocalLlmClient {
     override fun runtimeSnapshot(): RuntimeSnapshot = activeClient()?.runtimeSnapshot()
         ?: RuntimeSnapshot(
@@ -31,7 +31,12 @@ internal class HarnessSharedRuntimeClient(
         )
 
     override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-        prepareClient().prepare(applicationId, useCaseId)
+        prepareClient()?.prepare(applicationId, useCaseId)
+            ?: PrepareResult(
+                ready = false,
+                modelDigest = null,
+                detail = "Host model is not selected",
+            )
 
     override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
         requireActiveClient().createSession(applicationId, useCaseId)
