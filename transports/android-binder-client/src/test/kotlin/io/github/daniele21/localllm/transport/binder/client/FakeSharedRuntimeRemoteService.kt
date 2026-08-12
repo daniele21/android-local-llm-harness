@@ -25,6 +25,7 @@ internal class FakeSharedRuntimeRemoteService(
     var cancelCalls = 0
     var lastGenerationRequest: GenerationRequestParcel? = null
     var lastCancelRequest: CancelRequestParcel? = null
+    var registrationHandler: ((ClientHelloParcel, (RegistrationResultParcel) -> Unit) -> Unit)? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
     var openSessionHandler: ((OpenSessionRequestParcel, (SessionResultParcel) -> Unit) -> Unit)? = null
     var generationHandler: ((GenerationRequestParcel, (GenerationEventParcel) -> Unit) -> Unit)? = null
@@ -39,7 +40,12 @@ internal class FakeSharedRuntimeRemoteService(
     ) {
         registerCalls += 1
         hostDisconnecting = hostDisconnectingCallback
-        callback(registration)
+        val handler = registrationHandler
+        if (handler == null) {
+            callback(registration)
+        } else {
+            handler(hello, callback)
+        }
     }
 
     override fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit) {
