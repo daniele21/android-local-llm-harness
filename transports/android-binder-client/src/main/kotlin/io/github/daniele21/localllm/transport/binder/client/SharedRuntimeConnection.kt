@@ -107,9 +107,6 @@ class SharedRuntimeConnection internal constructor(
         } catch (error: RemoteException) {
             connectionLost(error.message ?: "Host Binder call failed")
             return
-        } catch (error: RuntimeException) {
-            connectionLost(error.message ?: "Host protocol negotiation failed")
-            return
         }
         connected(negotiated)
     }
