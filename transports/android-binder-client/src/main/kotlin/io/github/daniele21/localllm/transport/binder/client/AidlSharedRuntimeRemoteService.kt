@@ -20,13 +20,13 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
 
     override fun registerClient(
         hello: ClientHelloParcel,
-        onHostDisconnecting: () -> Unit,
+        hostDisconnectingCallback: () -> Unit,
         callback: (RegistrationResultParcel) -> Unit,
     ) {
         delegate.registerClient(
             hello,
             object : IClientLifecycle.Stub() {
-                override fun onHostDisconnecting() = onHostDisconnecting()
+                override fun onHostDisconnecting() = hostDisconnectingCallback()
             },
             object : IRegistrationCallback.Stub() {
                 override fun onResult(result: RegistrationResultParcel) = callback(result)
