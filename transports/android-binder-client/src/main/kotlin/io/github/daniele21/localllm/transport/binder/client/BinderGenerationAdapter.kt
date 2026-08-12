@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 internal class BinderGenerationAdapter(
     private val endpointProvider: () -> RegisteredSharedRuntimeEndpoint?,
+    endpointInvalidations: SharedRuntimeEndpointInvalidationSource? = null,
     callbackQueueCapacity: Int = DEFAULT_CALLBACK_QUEUE_CAPACITY,
     private val callbackExecutor: ExecutorService = boundedSerialExecutor(callbackQueueCapacity),
     private val externalRequestIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
@@ -32,6 +33,9 @@ internal class BinderGenerationAdapter(
 ) : AutoCloseable {
     private val active = ConcurrentHashMap<String, ActiveGeneration>()
     private val closed = AtomicBoolean(false)
+    private val invalidationSubscription = endpointInvalidations?.addListener(
+        SharedRuntimeEndpointInvalidationListener(::onEndpointInvalidated),
+    )
 
     init {
         require(callbackQueueCapacity > 0) { "callbackQueueCapacity must be positive" }
@@ -66,6 +70,7 @@ internal class BinderGenerationAdapter(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        invalidationSubscription?.close()
         active.values.toList().forEach(::cancel)
         active.clear()
         callbackExecutor.shutdownNow()
@@ -73,6 +78,12 @@ internal class BinderGenerationAdapter(
 
     private fun enqueue(generation: ActiveGeneration, event: GenerationEventParcel) {
         if (closed.get() || generation.isTerminal() || generation.overflowDetail() != null) return
+        if (!isCurrentConnection(generation)) {
+            if (generation.markDisconnected(STALE_CONNECTION_DETAIL)) {
+                scheduleDisconnectDrain()
+            }
+            return
+        }
         try {
             callbackExecutor.execute { process(generation, event) }
         } catch (_: RejectedExecutionException) {
@@ -83,11 +94,18 @@ internal class BinderGenerationAdapter(
     }
 
     private fun process(generation: ActiveGeneration, wireEvent: GenerationEventParcel) {
-        if (generation.isTerminal()) return
-        when (val outcome = mapEvent(generation, wireEvent)) {
-            is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
-            is GenerationProcessingOutcome.Ready -> deliver(generation, outcome)
+        if (!generation.isTerminal()) {
+            val disconnected = generation.disconnectionDetail()
+            if (disconnected != null) {
+                failDisconnected(generation, disconnected)
+            } else {
+                when (val outcome = mapEvent(generation, wireEvent)) {
+                    is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
+                    is GenerationProcessingOutcome.Ready -> deliver(generation, outcome)
+                }
+            }
         }
+        drainDisconnected()
     }
 
     private fun mapEvent(generation: ActiveGeneration, wireEvent: GenerationEventParcel): GenerationProcessingOutcome {
@@ -111,16 +129,23 @@ internal class BinderGenerationAdapter(
 
     private fun deliver(generation: ActiveGeneration, outcome: GenerationProcessingOutcome.Ready) {
         val listenerAccepted = outcome.deliveries.all(generation::deliver)
+        val disconnected = generation.disconnectionDetail()
         val overflow = generation.overflowDetail()
         when {
             !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+            disconnected != null -> failDisconnected(generation, disconnected)
             overflow != null -> failProtocol(generation, overflow)
             outcome.event.isTerminal() -> finish(generation)
         }
     }
 
     private fun cancel(generation: ActiveGeneration) {
-        if (generation.isTerminal() || !generation.markCancelSent()) return
+        if (generation.isTerminal()) return
+        if (generation.disconnectionDetail() != null) {
+            scheduleDisconnectDrain()
+            return
+        }
+        if (!generation.markCancelSent()) return
         try {
             generation.endpoint.service.cancel(
                 CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
@@ -139,6 +164,45 @@ internal class BinderGenerationAdapter(
         } catch (_: RemoteException) {
             // The queued worker still emits the local terminal failure for this request.
         }
+    }
+
+    private fun onEndpointInvalidated(connectionEpoch: Long, detail: String) {
+        if (closed.get()) return
+        active.values.forEach { generation ->
+            if (generation.endpoint.connectionEpoch == connectionEpoch) {
+                generation.markDisconnected(detail)
+            }
+        }
+        scheduleDisconnectDrain()
+    }
+
+    private fun scheduleDisconnectDrain() {
+        if (closed.get()) return
+        try {
+            callbackExecutor.execute(::drainDisconnected)
+        } catch (_: RejectedExecutionException) {
+            // An already-running or queued callback will drain invalidations after it completes.
+        }
+    }
+
+    private fun drainDisconnected() {
+        active.values.toList().forEach { generation ->
+            generation.disconnectionDetail()?.let { detail -> failDisconnected(generation, detail) }
+        }
+    }
+
+    private fun isCurrentConnection(generation: ActiveGeneration): Boolean =
+        endpointProvider()?.connectionEpoch == generation.endpoint.connectionEpoch
+
+    private fun failDisconnected(generation: ActiveGeneration, detail: String) {
+        if (!generation.finish()) return
+        active.remove(generation.requestId.value, generation)
+        generation.deliverTerminal(
+            GenerationEvent.Failed(
+                generation.requestId,
+                LocalLlmError.NativeRuntime("SERVICE_DISCONNECTED: $detail"),
+            ),
+        )
     }
 
     private fun failProtocol(generation: ActiveGeneration, detail: String) {
@@ -164,6 +228,7 @@ internal class BinderGenerationAdapter(
         const val DEFAULT_MAX_AGGREGATE_CHARACTERS = 1_048_576
         const val DEFAULT_DELIVERY_CHUNK_CHARACTERS = 256
         const val CALLBACK_QUEUE_OVERFLOW_DETAIL = "Client callback queue capacity exceeded"
+        const val STALE_CONNECTION_DETAIL = "Callback arrived from a stale shared-runtime registration"
     }
 }
 
@@ -182,6 +247,7 @@ private class ActiveGeneration(
     private val terminal = AtomicBoolean(false)
     private val cancelSent = AtomicBoolean(false)
     private val overflow = AtomicReference<String?>(null)
+    private val disconnected = AtomicReference<String?>(null)
     private val pendingText = StringBuilder()
     private var pendingContentType = GenerationContentType.ANSWER
     private var pendingGeneratedTokens = 0
@@ -196,6 +262,10 @@ private class ActiveGeneration(
     fun markOverflow(detail: String): Boolean = overflow.compareAndSet(null, detail)
 
     fun overflowDetail(): String? = overflow.get()
+
+    fun markDisconnected(detail: String): Boolean = disconnected.compareAndSet(null, detail)
+
+    fun disconnectionDetail(): String? = disconnected.get()
 
     fun deliver(event: GenerationEvent): Boolean = runCatching { eventSink(event) }.isSuccess
 
