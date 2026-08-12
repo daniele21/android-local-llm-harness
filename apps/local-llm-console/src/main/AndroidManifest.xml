@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="${sharedRuntimePermission}" />
+
+    <queries>
+        <package android:name="${sharedRuntimeHostPackage}" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:label="Local LLM Console"
