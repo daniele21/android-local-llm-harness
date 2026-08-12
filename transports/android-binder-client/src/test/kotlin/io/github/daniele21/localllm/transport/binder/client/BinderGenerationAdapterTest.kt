@@ -12,11 +12,10 @@ import io.github.daniele21.localllm.transport.binder.contract.toWire
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class BinderGenerationAdapterTest {
     @Test
@@ -40,8 +39,10 @@ class BinderGenerationAdapterTest {
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
         assertEquals(3, events.size)
         assertTrue(events.all { it.requestId == RequestId("caller-request") })
-        assertEquals("hello world", assertIs<GenerationEvent.TextDelta>(events[1]).text)
-        assertEquals("hello world", assertIs<GenerationEvent.Completed>(events.last()).output)
+        assertTrue(events[1] is GenerationEvent.TextDelta)
+        assertEquals("hello world", (events[1] as GenerationEvent.TextDelta).text)
+        assertTrue(events.last() is GenerationEvent.Completed)
+        assertEquals("hello world", (events.last() as GenerationEvent.Completed).output)
         assertNotEquals("caller-request", service.lastGenerationRequest?.externalRequestId)
         adapter.close()
     }
@@ -63,7 +64,8 @@ class BinderGenerationAdapterTest {
 
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
         assertEquals(1, events.size)
-        val failure = assertIs<GenerationEvent.Failed>(events.single())
+        assertTrue(events.single() is GenerationEvent.Failed)
+        val failure = events.single() as GenerationEvent.Failed
         assertTrue(failure.error.message.contains("Binder protocol failure"))
         adapter.close()
     }
@@ -85,7 +87,9 @@ class BinderGenerationAdapterTest {
 
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
         assertEquals(1, events.size)
-        assertTrue(assertIs<GenerationEvent.Failed>(events.single()).error.message.contains("aggregate bound"))
+        assertTrue(events.single() is GenerationEvent.Failed)
+        val failure = events.single() as GenerationEvent.Failed
+        assertTrue(failure.error.message.contains("aggregate bound"))
         adapter.close()
     }
 
