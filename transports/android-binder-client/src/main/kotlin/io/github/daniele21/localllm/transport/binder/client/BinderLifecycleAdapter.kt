@@ -45,9 +45,8 @@ internal class BinderLifecycleAdapter(
     private val timeouts: BinderLifecycleTimeouts = BinderLifecycleTimeouts(),
     private val correlationIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
 ) : AutoCloseable {
-    private val closedSessions = ConcurrentHashMap.newKeySet<String>()
-    private val openSessions = ConcurrentHashMap<String, RegisteredSharedRuntimeEndpoint>()
-    private val invalidationSubscription = endpointInvalidations?.addListener { epoch, _ -> invalidateSessions(epoch) }
+    private val sessions = BinderSessionRegistry()
+    private val invalidationSubscription = endpointInvalidations?.addListener { epoch, _ -> sessions.invalidate(epoch) }
 
     fun prepare(useCaseId: UseCaseId): PrepareResult {
         blockingCallGuard.requireAllowed()
@@ -76,32 +75,28 @@ internal class BinderLifecycleAdapter(
                 endpoint.service.openSession(request, callback)
             }
         ) {
-            RemoteCallbackOutcome.TransportFailure -> throw IllegalStateException("Shared runtime transport failed")
+            RemoteCallbackOutcome.TransportFailure -> error("Shared runtime transport failed")
 
             RemoteCallbackOutcome.Timeout -> {
                 closeRemoteSession(endpoint, externalSessionId)
-                throw IllegalStateException("Shared runtime open-session timed out")
+                error("Shared runtime open-session timed out")
             }
 
-            is RemoteCallbackOutcome.Disconnected -> {
-                throw IllegalStateException("SERVICE_DISCONNECTED: ${outcome.detail}")
-            }
+            is RemoteCallbackOutcome.Disconnected -> error("SERVICE_DISCONNECTED: ${outcome.detail}")
 
             is RemoteCallbackOutcome.Received -> mapOpenSession(endpoint, operationId, externalSessionId, outcome.result)
         }
     }
 
     fun closeSession(sessionId: SessionId) {
-        if (!closedSessions.add(sessionId.value)) return
-        val endpoint = openSessions.remove(sessionId.value) ?: return
+        val endpoint = sessions.takeForClose(sessionId.value) ?: return
         closeRemoteSession(endpoint, sessionId.value)
     }
 
     override fun close() {
-        openSessions.keys.toList().forEach { sessionId -> closeSession(SessionId(sessionId)) }
+        sessions.drain().forEach { (sessionId, endpoint) -> closeRemoteSession(endpoint, sessionId) }
         invalidationSubscription?.close()
-        openSessions.clear()
-        closedSessions.clear()
+        sessions.clearClosed()
     }
 
     private fun performPrepare(endpoint: RegisteredSharedRuntimeEndpoint, useCaseId: UseCaseId): PrepareResult {
@@ -140,10 +135,9 @@ internal class BinderLifecycleAdapter(
     ): SessionId {
         check(isCurrentEndpoint(endpoint)) { "SERVICE_DISCONNECTED: Shared-runtime registration changed" }
         check(result.operationId == operationId) { "Shared runtime session correlation mismatch" }
-        result.error?.let { throw IllegalStateException(it.safeMessage) }
+        result.error?.let { error(it.safeMessage) }
         check(result.externalSessionId == externalSessionId) { "Shared runtime session identity mismatch" }
-        closedSessions.remove(externalSessionId)
-        openSessions[externalSessionId] = endpoint
+        sessions.register(externalSessionId, endpoint)
         return SessionId(externalSessionId)
     }
 
@@ -180,14 +174,6 @@ internal class BinderLifecycleAdapter(
         }
     }
 
-    private fun invalidateSessions(epoch: Long) {
-        openSessions.forEach { (sessionId, endpoint) ->
-            if (endpoint.connectionEpoch == epoch) {
-                openSessions.remove(sessionId, endpoint)
-            }
-        }
-    }
-
     private fun isCurrentEndpoint(endpoint: RegisteredSharedRuntimeEndpoint): Boolean =
         endpointProvider()?.connectionEpoch == endpoint.connectionEpoch
 
@@ -204,6 +190,41 @@ internal class BinderLifecycleAdapter(
                 detail = result.detail,
             )
         }
+    }
+}
+
+private class BinderSessionRegistry {
+    private val closed = ConcurrentHashMap.newKeySet<String>()
+    private val open = ConcurrentHashMap<String, RegisteredSharedRuntimeEndpoint>()
+
+    fun register(sessionId: String, endpoint: RegisteredSharedRuntimeEndpoint) {
+        closed.remove(sessionId)
+        open[sessionId] = endpoint
+    }
+
+    fun takeForClose(sessionId: String): RegisteredSharedRuntimeEndpoint? {
+        if (!closed.add(sessionId)) return null
+        return open.remove(sessionId)
+    }
+
+    fun invalidate(connectionEpoch: Long) {
+        open.forEach { (sessionId, endpoint) ->
+            if (endpoint.connectionEpoch == connectionEpoch) {
+                open.remove(sessionId, endpoint)
+            }
+        }
+    }
+
+    fun drain(): List<Pair<String, RegisteredSharedRuntimeEndpoint>> {
+        val snapshot = open.entries.map { it.key to it.value }
+        snapshot.forEach { (sessionId, endpoint) ->
+            if (open.remove(sessionId, endpoint)) closed.add(sessionId)
+        }
+        return snapshot
+    }
+
+    fun clearClosed() {
+        closed.clear()
     }
 }
 
