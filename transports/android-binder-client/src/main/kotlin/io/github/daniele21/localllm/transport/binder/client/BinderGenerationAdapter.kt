@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import android.os.RemoteException
+import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationRequest
@@ -20,9 +21,16 @@ internal class BinderGenerationAdapter(
     private val endpointProvider: () -> RegisteredSharedRuntimeEndpoint?,
     private val callbackExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val externalRequestIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
+    private val maxAggregateCharacters: Int = DEFAULT_MAX_AGGREGATE_CHARACTERS,
+    private val deliveryChunkCharacters: Int = DEFAULT_DELIVERY_CHUNK_CHARACTERS,
 ) : AutoCloseable {
     private val active = ConcurrentHashMap<String, ActiveGeneration>()
     private val closed = AtomicBoolean(false)
+
+    init {
+        require(maxAggregateCharacters > 0) { "maxAggregateCharacters must be positive" }
+        require(deliveryChunkCharacters > 0) { "deliveryChunkCharacters must be positive" }
+    }
 
     fun generate(request: GenerationRequest, eventSink: (GenerationEvent) -> Unit): GenerationHandle {
         check(!closed.get()) { "Shared-runtime generation adapter is closed" }
@@ -68,7 +76,12 @@ internal class BinderGenerationAdapter(
                 failProtocol(generation, error.message ?: "Invalid shared-runtime generation event")
                 return
             }
-        if (!generation.deliver(mapped)) {
+        val deliveries = generation.coalesce(mapped, maxAggregateCharacters, deliveryChunkCharacters)
+        if (deliveries == null) {
+            failProtocol(generation, "Reconstructed generation output exceeded the client aggregate bound")
+            return
+        }
+        if (!deliveries.all(generation::deliver)) {
             cancel(generation)
             return
         }
@@ -104,6 +117,11 @@ internal class BinderGenerationAdapter(
             active.remove(generation.requestId.value, generation)
         }
     }
+
+    private companion object {
+        const val DEFAULT_MAX_AGGREGATE_CHARACTERS = 1_048_576
+        const val DEFAULT_DELIVERY_CHUNK_CHARACTERS = 256
+    }
 }
 
 private class ActiveGeneration(
@@ -115,6 +133,10 @@ private class ActiveGeneration(
 ) {
     private val terminal = AtomicBoolean(false)
     private val cancelSent = AtomicBoolean(false)
+    private val pendingText = StringBuilder()
+    private var pendingContentType = GenerationContentType.ANSWER
+    private var pendingGeneratedTokens = 0
+    private var aggregateCharacters = 0
 
     fun isTerminal(): Boolean = terminal.get()
 
@@ -126,6 +148,42 @@ private class ActiveGeneration(
 
     fun deliverTerminal(event: GenerationEvent) {
         runCatching { eventSink(event) }
+    }
+
+    fun coalesce(event: GenerationEvent, maxAggregateCharacters: Int, deliveryChunkCharacters: Int): List<GenerationEvent>? {
+        if (event !is GenerationEvent.TextDelta) {
+            return buildList {
+                flushPending()?.let(::add)
+                add(event)
+            }
+        }
+        aggregateCharacters += event.text.length
+        if (aggregateCharacters > maxAggregateCharacters) return null
+        return buildList {
+            if (pendingText.isNotEmpty() && pendingContentType != event.contentType) {
+                flushPending()?.let(::add)
+            }
+            if (pendingText.isEmpty()) {
+                pendingContentType = event.contentType
+            }
+            pendingText.append(event.text)
+            pendingGeneratedTokens = event.generatedTokens
+            if (pendingText.length >= deliveryChunkCharacters) {
+                flushPending()?.let(::add)
+            }
+        }
+    }
+
+    private fun flushPending(): GenerationEvent.TextDelta? {
+        if (pendingText.isEmpty()) return null
+        val result = GenerationEvent.TextDelta(
+            requestId = requestId,
+            text = pendingText.toString(),
+            generatedTokens = pendingGeneratedTokens,
+            contentType = pendingContentType,
+        )
+        pendingText.clear()
+        return result
     }
 }
 
