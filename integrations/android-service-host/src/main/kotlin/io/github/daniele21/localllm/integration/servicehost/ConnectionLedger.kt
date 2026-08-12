@@ -64,6 +64,8 @@ sealed interface LedgerResult<out T> {
 
 data class ClosingResources(val requestIds: List<RequestId>, val sessionIds: List<SessionId>)
 
+data class HostConnectionRef(val token: HostClientToken, val caller: AuthorizedCaller)
+
 private class ClientConnectionState(val caller: AuthorizedCaller) {
     private val sessions = LinkedHashMap<String, SessionId>()
     private val requests = LinkedHashMap<String, RequestId>()
@@ -135,6 +137,9 @@ class ClientConnectionLedger(
     private val identifiers: HostIdentifierFactory = SecureHostIdentifierFactory(),
 ) {
     private val connections = LinkedHashMap<HostClientToken, ClientConnectionState>()
+
+    val activeConnections: List<HostConnectionRef>
+        @Synchronized get() = connections.map { (token, state) -> HostConnectionRef(token, state.caller) }
 
     @Synchronized
     fun register(caller: AuthorizedCaller): LedgerResult<HostClientToken> {
