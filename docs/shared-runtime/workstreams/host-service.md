@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-host
 Canonical scope: shared-runtime.host-service
 Read when: implementing the exported service, caller authorization, runtime delegation or caller-owned cleanup
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-12
 
 ## Goal
 
@@ -19,7 +19,7 @@ Expose one existing host-owned `LocalLlmClient` data plane through a signature-p
 
 ## Inspect before editing
 
-- [`../../architecture.md`](../../architecture.md) and ADR 0010/0011
+- [`../../architecture.md`](../../architecture.md) and ADR 0010/0011/0012
 - `core/contracts` and `core/runtime-core` public lifecycle/tests
 - `models/model-profile` binding contracts
 - `apps/local-llm-phone-test/AGENTS.md`
@@ -29,28 +29,27 @@ Expose one existing host-owned `LocalLlmClient` data plane through a signature-p
 
 Read the model scoped guide only if selection/binding behavior changes. Read the backend guide only if service composition changes native packaging.
 
-## Planned owner
+## Owner and composition
 
-`integrations/android-service-host` owns reusable Android service delegation, caller context, connection/resource ledgers and core/wire mapping. It depends on a supplied `LocalLlmClient`/host capability and does not instantiate `RuntimeOrchestrator`, select models or access Compose.
+`integrations/android-service-host` owns reusable Android service delegation, caller context, connection/resource ledgers and core/wire mapping. `SharedRuntimeHostComposition` wires the caller authorizer, protocol information, delegate and Binder stub around a supplied `LocalLlmClient`; it does not instantiate `RuntimeOrchestrator`, select models or access Compose.
 
-`apps/local-llm-phone-test` owns the concrete `Service` entry point and supplies its process-scoped graph plus an explicit authorized-client/use-case configuration.
+`apps/local-llm-phone-test` owns the concrete `HarnessSharedRuntimeService` entry point and supplies the process-scoped `HarnessRuntimeGraph`. `HarnessSharedRuntimeClient` is a stable facade over the graph's currently active in-process client. Binding, handshake, snapshot and obtaining the facade do not create a runtime, select a model or load a GGUF. The proof policy currently authorizes only the exact installed phone-test package and its real signing lineage. External authorized package/use-case registration is intentionally deferred to SR-HOST-08.
 
 ## Manifest boundary
 
-The proof host declares:
+The proof host declares an exported bound service behind a variant-specific signature permission. Release uses:
 
-```xml
-<permission
-    android:name="io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
-    android:protectionLevel="signature" />
-
-<service
-    android:name=".HarnessSharedRuntimeService"
-    android:exported="true"
-    android:permission="io.github.daniele21.localllm.permission.USE_LOCAL_LLM" />
+```text
+io.github.daniele21.localllm.permission.USE_LOCAL_LLM
 ```
 
-Final names follow SR-0. The service has no intent filter and clients bind with an explicit component. Release and debug package/permission names must be deterministic and documented; debug variants cannot accidentally authorize a release package through suffix stripping.
+Debug uses:
+
+```text
+io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM
+```
+
+The application requests its own variant permission so the SR-HOST-07 self-bind proof passes the same manifest permission boundary used by external callers. The service has no intent filter and clients bind with an explicit component. Debug variants do not authorize release packages through suffix stripping.
 
 ## Caller authorization
 
@@ -69,7 +68,7 @@ The service records only a safe client registration key in telemetry. Raw certif
 
 ## Host binding registry
 
-The proof host currently resolves only its internal phone application identity. Add one coherent host binding abstraction rather than parallel registries that can disagree.
+The SR-HOST-07 proof host resolves only its internal phone application identity. SR-HOST-08 extends one coherent host binding abstraction for authorized external clients rather than creating parallel registries that can disagree.
 
 The target resolution is:
 
@@ -135,7 +134,7 @@ mark client closing
   -> remove callbacks and token
 ```
 
-Service destruction rejects new submissions, closes all client ledgers, then releases only the service-owned adapter/executor. Runtime graph lifetime remains owned by the host application composition.
+SR-HOST-09 wires service destruction and Android memory-pressure callbacks. Until then the proof service deliberately does not take ownership of runtime destruction: runtime graph lifetime remains owned by the host application composition.
 
 ## Lifecycle behavior
 
@@ -181,13 +180,13 @@ Safe telemetry may include internal application/use-case identity, host/protocol
 
 | ID | State | Task |
 | --- | --- | --- |
-| SR-HOST-01 | PLANNED | Create host integration module with fake-client/fake-runtime composition. |
-| SR-HOST-02 | PLANNED | Implement immutable caller context and same-signer/package authorization. |
-| SR-HOST-03 | PLANNED | Implement bounded client/session/request ownership ledger and quotas. |
-| SR-HOST-04 | PLANNED | Implement asynchronous prepare/session/generate/cancel/close delegation. |
-| SR-HOST-05 | PLANNED | Implement lifecycle token death monitoring and idempotent cleanup. |
-| SR-HOST-06 | PLANNED | Implement serial chunked callback delivery and backpressure failure. |
-| SR-HOST-07 | PLANNED | Add proof host service manifest and app composition. |
+| SR-HOST-01 | DONE | Create host integration module with fake-client/fake-runtime composition. |
+| SR-HOST-02 | DONE | Implement immutable caller context and same-signer/package authorization. |
+| SR-HOST-03 | DONE | Implement bounded client/session/request ownership ledger and quotas. |
+| SR-HOST-04 | DONE | Implement asynchronous prepare/session/generate/cancel/close delegation. |
+| SR-HOST-05 | DONE | Implement lifecycle token death monitoring and idempotent cleanup. |
+| SR-HOST-06 | DONE | Implement serial chunked callback delivery and backpressure failure. |
+| SR-HOST-07 | DONE | Add proof host service manifest and app composition. |
 | SR-HOST-08 | PLANNED | Extend one host binding registry for authorized external use cases. |
 | SR-HOST-09 | PLANNED | Add memory-pressure/service-destroy integration without duplicate runtime ownership. |
 
@@ -206,7 +205,10 @@ Tests cover:
 - callback exception, queue overflow and service destruction;
 - two clients sharing the runtime scheduler without cross-control;
 - error redaction and prompt/output sentinel exclusion;
-- exact cleanup order and no leaked death recipients/executors/sessions.
+- exact cleanup order and no leaked death recipients/executors/sessions;
+- SR-HOST-07 protocol composition uses the frozen V1 contract deterministically;
+- the phone-test manifest exposes the proof service only behind the variant signature permission;
+- explicit proof self-bind leaves the process-scoped runtime uncreated.
 
 ## Acceptance criteria
 
@@ -221,4 +223,4 @@ Tests cover:
 
 ## Focused validation
 
-When modules exist, run their unit, compile, lint and app manifest/assembly checks plus phone-app tests. Because this slice changes an exported component, security boundary, Gradle graph and application packaging, it also requires repository-wide validation and Android packaging verification.
+Run `spotlessCheck`, `detekt`, host integration unit/lint/assembly, phone-test compile/unit/lint/assembly and Android packaging verification. The instrumentation suite includes the manifest boundary and pure-bind/no-runtime-side-effect proof; compiling/assembling that suite is not equivalent to executing it on an emulator or physical device.
