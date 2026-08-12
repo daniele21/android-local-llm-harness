@@ -82,7 +82,12 @@ class SharedRuntimeConsoleInferenceControl(
     }
 
     override fun clear(): ConsoleInferenceOperationOutcome = synchronized(lock) {
-        connected(delegate.clear())
+        val outcome = delegate.clear()
+        if (client.connectionSnapshot.state == SharedRuntimeConnectionState.CONNECTED) {
+            connected(outcome)
+        } else {
+            outcome.copy(state = snapshot())
+        }
     }
 
     override fun close() {
