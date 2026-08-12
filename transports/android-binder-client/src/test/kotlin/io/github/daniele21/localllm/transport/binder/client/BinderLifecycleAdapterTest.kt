@@ -104,7 +104,10 @@ class BinderLifecycleAdapterTest {
 
         val sessionId = adapter.openSession(
             useCaseId,
-            SessionOptions(contextPolicy = ContextPolicy.Manual(2048), kind = SessionKind.CONVERSATIONAL),
+            SessionOptions(
+                contextPolicy = ContextPolicy.Manual(2048),
+                kind = SessionKind.CONVERSATIONAL,
+            ),
         )
 
         assertEquals("id-2", sessionId.value)
