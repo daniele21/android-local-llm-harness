@@ -13,12 +13,15 @@ import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 /**
- * Stable service-facing client over the host graph's currently active in-process runtime client.
+ * Stable service-facing client over the host graph's process-scoped in-process runtime client.
  *
- * Observing or preparing an idle proof host never creates a runtime. Operations that require an
- * active runtime fail explicitly until the host graph has prepared one through its normal owner.
+ * Snapshot observation never creates a runtime. Explicit prepare may lazily create the runtime and
+ * lets the host registry resolve the already-selected model; bind and handshake remain side-effect free.
  */
-internal class HarnessSharedRuntimeClient(private val activeClient: () -> LocalLlmClient?) : LocalLlmClient {
+internal class HarnessSharedRuntimeClient(
+    private val activeClient: () -> LocalLlmClient?,
+    private val prepareClient: () -> LocalLlmClient,
+) : LocalLlmClient {
     override fun runtimeSnapshot(): RuntimeSnapshot = activeClient()?.runtimeSnapshot()
         ?: RuntimeSnapshot(
             state = RuntimeState.IDLE,
@@ -28,12 +31,7 @@ internal class HarnessSharedRuntimeClient(private val activeClient: () -> LocalL
         )
 
     override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-        activeClient()?.prepare(applicationId, useCaseId)
-            ?: PrepareResult(
-                ready = false,
-                modelDigest = null,
-                detail = "Host runtime is not prepared",
-            )
+        prepareClient().prepare(applicationId, useCaseId)
 
     override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
         requireActiveClient().createSession(applicationId, useCaseId)
