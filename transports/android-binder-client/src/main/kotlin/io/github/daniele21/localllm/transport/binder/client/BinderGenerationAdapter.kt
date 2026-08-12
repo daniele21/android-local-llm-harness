@@ -31,6 +31,7 @@ internal class BinderGenerationAdapter(
     private val maxAggregateCharacters: Int = DEFAULT_MAX_AGGREGATE_CHARACTERS,
     private val deliveryChunkCharacters: Int = DEFAULT_DELIVERY_CHUNK_CHARACTERS,
 ) : AutoCloseable {
+    private val lifecycleLock = Any()
     private val active = ConcurrentHashMap<String, ActiveGeneration>()
     private val closed = AtomicBoolean(false)
     private val disconnects = GenerationDisconnectCoordinator(active, callbackExecutor, closed, ::failDisconnected)
@@ -45,7 +46,6 @@ internal class BinderGenerationAdapter(
     }
 
     fun generate(request: GenerationRequest, eventSink: (GenerationEvent) -> Unit): GenerationHandle {
-        check(!closed.get()) { "Shared-runtime generation adapter is closed" }
         val endpoint = requireNotNull(endpointProvider()) { "Shared runtime is not connected" }
         val externalRequestId = externalRequestIds.nextId()
         val generation = ActiveGeneration(
@@ -55,26 +55,31 @@ internal class BinderGenerationAdapter(
             eventSink = eventSink,
             reconstructor = GenerationEventReconstructor(externalRequestId, request.requestId),
         )
-        check(active.putIfAbsent(request.requestId.value, generation) == null) {
-            "Request ${request.requestId.value} is already active"
-        }
-        val wireRequest = request.toWire(endpoint.clientToken).copy(externalRequestId = externalRequestId)
-        try {
-            endpoint.service.generate(wireRequest) { event -> enqueue(generation, event) }
-        } catch (error: RemoteException) {
-            active.remove(request.requestId.value, generation)
-            generation.finish()
-            throw IllegalStateException("Shared runtime transport failed", error)
+        synchronized(lifecycleLock) {
+            check(!closed.get()) { "Shared-runtime generation adapter is closed" }
+            check(active.putIfAbsent(request.requestId.value, generation) == null) {
+                "Request ${request.requestId.value} is already active"
+            }
+            val wireRequest = request.toWire(endpoint.clientToken).copy(externalRequestId = externalRequestId)
+            try {
+                endpoint.service.generate(wireRequest) { event -> enqueue(generation, event) }
+            } catch (error: RemoteException) {
+                active.remove(request.requestId.value, generation)
+                generation.finish()
+                throw IllegalStateException("Shared runtime transport failed", error)
+            }
         }
         return BinderGenerationHandle(request.requestId) { cancel(generation) }
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        invalidationSubscription?.close()
-        active.values.toList().forEach(::cancel)
-        active.clear()
-        callbackExecutor.shutdownNow()
+        synchronized(lifecycleLock) {
+            invalidationSubscription?.close()
+            active.forEach { _, generation -> cancel(generation) }
+            active.clear()
+            callbackExecutor.shutdownNow()
+        }
     }
 
     private fun enqueue(generation: ActiveGeneration, event: GenerationEventParcel) {
@@ -199,7 +204,7 @@ private class GenerationDisconnectCoordinator(
 
     fun onEndpointInvalidated(connectionEpoch: Long, detail: String) {
         if (closed.get()) return
-        active.values.forEach { generation ->
+        active.forEach { _, generation ->
             if (generation.endpoint.connectionEpoch == connectionEpoch) {
                 generation.markDisconnected(detail)
             }
@@ -208,7 +213,7 @@ private class GenerationDisconnectCoordinator(
     }
 
     fun drain() {
-        active.values.toList().forEach { generation ->
+        active.forEach { _, generation ->
             generation.disconnectionDetail?.let { detail -> failureSink(generation, detail) }
         }
     }
