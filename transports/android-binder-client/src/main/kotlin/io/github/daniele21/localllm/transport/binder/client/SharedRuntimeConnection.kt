@@ -72,9 +72,11 @@ class SharedRuntimeConnection internal constructor(
             )
         ) {
             SharedRuntimeBindResult.STARTED -> Unit
+
             SharedRuntimeBindResult.PERMISSION_DENIED -> {
                 transition(SharedRuntimeConnectionState.PERMISSION_DENIED, detail = "Host rejected the configured caller")
             }
+
             SharedRuntimeBindResult.REJECTED -> connectionLost("Android rejected the explicit host bind")
         }
     }
@@ -206,10 +208,7 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
         false
     }
 
-    override fun bind(
-        hostConfig: SharedRuntimeHostConfig,
-        callbacks: SharedRuntimeBindingCallbacks,
-    ): SharedRuntimeBindResult {
+    override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
         val serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 val proxy = service?.let(ILocalLlmService.Stub::asInterface)
