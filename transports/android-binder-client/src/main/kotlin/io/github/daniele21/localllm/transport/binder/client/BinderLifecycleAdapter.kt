@@ -71,10 +71,13 @@ internal class BinderLifecycleAdapter(
             useCaseId = useCaseId.value,
             options = options.toWire(),
         )
-        return when (val outcome = awaitRemoteCallback<SessionResultParcel>(endpoint) { callback ->
-            endpoint.service.openSession(request, callback)
-        }) {
+        return when (
+            val outcome = awaitRemoteCallback<SessionResultParcel>(endpoint) { callback ->
+                endpoint.service.openSession(request, callback)
+            }
+        ) {
             RemoteCallbackOutcome.TransportFailure -> throw IllegalStateException("Shared runtime transport failed")
+
             RemoteCallbackOutcome.Timeout -> {
                 closeRemoteSession(endpoint, externalSessionId)
                 throw IllegalStateException("Shared runtime open-session timed out")
@@ -108,12 +111,17 @@ internal class BinderLifecycleAdapter(
             operationId = operationId,
             useCaseId = useCaseId.value,
         )
-        return when (val outcome = awaitRemoteCallback<PrepareResultParcel>(endpoint) { callback ->
-            endpoint.service.prepare(request, callback)
-        }) {
+        return when (
+            val outcome = awaitRemoteCallback<PrepareResultParcel>(endpoint) { callback ->
+                endpoint.service.prepare(request, callback)
+            }
+        ) {
             RemoteCallbackOutcome.TransportFailure -> prepareFailure("Shared runtime transport failed")
+
             RemoteCallbackOutcome.Timeout -> prepareFailure("Shared runtime prepare timed out")
+
             is RemoteCallbackOutcome.Disconnected -> prepareFailure("SERVICE_DISCONNECTED: ${outcome.detail}")
+
             is RemoteCallbackOutcome.Received -> {
                 if (isCurrentEndpoint(endpoint)) {
                     mapPrepareResult(operationId, outcome.result)
@@ -201,8 +209,11 @@ internal class BinderLifecycleAdapter(
 
 private sealed interface RemoteCallbackOutcome<out T : Any> {
     data object TransportFailure : RemoteCallbackOutcome<Nothing>
+
     data object Timeout : RemoteCallbackOutcome<Nothing>
+
     data class Disconnected(val detail: String) : RemoteCallbackOutcome<Nothing>
+
     data class Received<T : Any>(val result: T) : RemoteCallbackOutcome<T>
 }
 
@@ -228,12 +239,11 @@ private class CallbackWaiter<T : Any> {
         complete(RemoteCallbackOutcome.Disconnected(detail))
     }
 
-    fun await(timeoutMillis: Long): RemoteCallbackOutcome<T> =
-        if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
-            requireNotNull(outcome.get())
-        } else {
-            RemoteCallbackOutcome.Timeout
-        }
+    fun await(timeoutMillis: Long): RemoteCallbackOutcome<T> = if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
+        requireNotNull(outcome.get())
+    } else {
+        RemoteCallbackOutcome.Timeout
+    }
 
     private fun complete(value: RemoteCallbackOutcome<T>) {
         if (outcome.compareAndSet(null, value)) {
