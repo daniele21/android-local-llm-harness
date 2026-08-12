@@ -48,30 +48,11 @@ internal class BinderLifecycleAdapter(
     fun prepare(useCaseId: UseCaseId): PrepareResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider()
-            ?: return PrepareResult(false, null, "Shared runtime is not connected")
-        val operationId = correlationIds.nextId()
-        val request = PrepareRequestParcel(
-            clientToken = endpoint.clientToken,
-            operationId = operationId,
-            useCaseId = useCaseId.value,
-        )
-        val waiter = CallbackWaiter<PrepareResultParcel>()
-        try {
-            endpoint.service.prepare(request, waiter::complete)
-        } catch (_: RemoteException) {
-            return PrepareResult(false, null, "Shared runtime transport failed")
+        return if (endpoint == null) {
+            prepareFailure("Shared runtime is not connected")
+        } else {
+            performPrepare(endpoint, useCaseId)
         }
-        val result = waiter.await(timeouts.operationTimeoutMillis)
-            ?: return PrepareResult(false, null, "Shared runtime prepare timed out")
-        if (result.operationId != operationId) {
-            return PrepareResult(false, null, "Shared runtime prepare correlation mismatch")
-        }
-        result.error?.let { return PrepareResult(false, null, it.safeMessage) }
-        return PrepareResult(
-            ready = result.ready,
-            modelDigest = result.modelDigestSha256?.let(::ModelDigest),
-            detail = result.detail,
-        )
     }
 
     fun openSession(useCaseId: UseCaseId, options: SessionOptions): SessionId {
@@ -114,7 +95,53 @@ internal class BinderLifecycleAdapter(
             // Oneway close is best effort. Disconnect cleanup remains host-owned.
         }
     }
+
+    private fun performPrepare(endpoint: RegisteredSharedRuntimeEndpoint, useCaseId: UseCaseId): PrepareResult {
+        val operationId = correlationIds.nextId()
+        val request = PrepareRequestParcel(
+            clientToken = endpoint.clientToken,
+            operationId = operationId,
+            useCaseId = useCaseId.value,
+        )
+        return when (val outcome = awaitPrepare(endpoint, request)) {
+            PrepareCallbackOutcome.TransportFailure -> prepareFailure("Shared runtime transport failed")
+            PrepareCallbackOutcome.Timeout -> prepareFailure("Shared runtime prepare timed out")
+            is PrepareCallbackOutcome.Received -> mapPrepareResult(operationId, outcome.result)
+        }
+    }
+
+    private fun awaitPrepare(
+        endpoint: RegisteredSharedRuntimeEndpoint,
+        request: PrepareRequestParcel,
+    ): PrepareCallbackOutcome {
+        val waiter = CallbackWaiter<PrepareResultParcel>()
+        return try {
+            endpoint.service.prepare(request, waiter::complete)
+            waiter.await(timeouts.operationTimeoutMillis)?.let(PrepareCallbackOutcome::Received)
+                ?: PrepareCallbackOutcome.Timeout
+        } catch (_: RemoteException) {
+            PrepareCallbackOutcome.TransportFailure
+        }
+    }
+
+    private fun mapPrepareResult(operationId: String, result: PrepareResultParcel): PrepareResult = when {
+        result.operationId != operationId -> prepareFailure("Shared runtime prepare correlation mismatch")
+        result.error != null -> prepareFailure(result.error.safeMessage)
+        else -> PrepareResult(
+            ready = result.ready,
+            modelDigest = result.modelDigestSha256?.let(::ModelDigest),
+            detail = result.detail,
+        )
+    }
 }
+
+private sealed interface PrepareCallbackOutcome {
+    data object TransportFailure : PrepareCallbackOutcome
+    data object Timeout : PrepareCallbackOutcome
+    data class Received(val result: PrepareResultParcel) : PrepareCallbackOutcome
+}
+
+private fun prepareFailure(detail: String): PrepareResult = PrepareResult(false, null, detail)
 
 private object AndroidMainThreadBlockingCallGuard : BlockingCallGuard {
     override fun requireAllowed() {
