@@ -49,10 +49,10 @@ class SharedRuntimeConnection internal constructor(
     private val observer: SharedRuntimeConnectionObserver = SharedRuntimeConnectionObserver {},
 ) : AutoCloseable {
     private val lock = Any()
+    private val invalidations = EndpointInvalidationRegistry()
     private var current = SharedRuntimeConnectionSnapshot(SharedRuntimeConnectionState.DISCONNECTED)
     private var registeredEndpoint: RegisteredSharedRuntimeEndpoint? = null
     private var connectionEpoch = 0L
-    private val invalidationListeners = mutableSetOf<SharedRuntimeEndpointInvalidationListener>()
 
     val snapshot: SharedRuntimeConnectionSnapshot
         get() = synchronized(lock) { current }
@@ -60,14 +60,7 @@ class SharedRuntimeConnection internal constructor(
     internal val endpoint: RegisteredSharedRuntimeEndpoint?
         get() = synchronized(lock) { registeredEndpoint }
 
-    internal val endpointInvalidations = SharedRuntimeEndpointInvalidationSource { listener ->
-        synchronized(lock) { invalidationListeners += listener }
-        object : AutoCloseable {
-            override fun close() {
-                synchronized(lock) { invalidationListeners -= listener }
-            }
-        }
-    }
+    internal val endpointInvalidations: SharedRuntimeEndpointInvalidationSource = invalidations.source
 
     fun connect() {
         synchronized(lock) {
@@ -114,7 +107,7 @@ class SharedRuntimeConnection internal constructor(
         }
         registered?.let { endpoint ->
             runCatching { endpoint.service.unregisterClient(endpoint.clientToken) }
-            notifyEndpointInvalidated(endpoint.connectionEpoch, "Shared-runtime client connection closed")
+            invalidations.notify(endpoint.connectionEpoch, "Shared-runtime client connection closed")
         }
         binding.unbind()
         transition(SharedRuntimeConnectionState.CLOSED)
@@ -126,10 +119,10 @@ class SharedRuntimeConnection internal constructor(
         val negotiated = try {
             negotiateProtocol(service.protocolInfo(), clientHello)
         } catch (error: SecurityException) {
-            permissionDenied(error.message, epoch)
+            failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.message)
             return
         } catch (error: WireProtocolException) {
-            incompatible(error.message, epoch)
+            failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, error.message)
             return
         } catch (error: RemoteException) {
             connectionLost(error.message ?: "Host Binder call failed", epoch)
@@ -147,7 +140,7 @@ class SharedRuntimeConnection internal constructor(
                 callback = { result -> handleRegistration(service, negotiated, result, epoch) },
             )
         } catch (error: SecurityException) {
-            permissionDenied(error.message, epoch)
+            failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.message)
         } catch (error: RemoteException) {
             connectionLost(error.message ?: "Client registration failed", epoch)
         }
@@ -166,9 +159,11 @@ class SharedRuntimeConnection internal constructor(
             when (error.code) {
                 WireErrorCodes.PROTOCOL_INCOMPATIBLE,
                 WireErrorCodes.FEATURE_UNAVAILABLE,
-                -> incompatible(error.safeMessage, epoch)
+                -> failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, error.safeMessage)
 
-                WireErrorCodes.CLIENT_NOT_REGISTERED -> permissionDenied(error.safeMessage, epoch)
+                WireErrorCodes.CLIENT_NOT_REGISTERED -> {
+                    failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.safeMessage)
+                }
 
                 else -> connectionLost(error.safeMessage, epoch)
             }
@@ -176,7 +171,7 @@ class SharedRuntimeConnection internal constructor(
         }
 
         if (!isValidRegistration(result, negotiated)) {
-            incompatible("Host returned an invalid registration result", epoch)
+            failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, "Host returned an invalid registration result")
             return
         }
 
@@ -185,10 +180,6 @@ class SharedRuntimeConnection internal constructor(
             if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) return
             registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, token, epoch)
         }
-        connected(negotiated, epoch)
-    }
-
-    private fun connected(negotiated: NegotiatedProtocol, epoch: Long) {
         transitionForEpoch(
             epoch = epoch,
             state = SharedRuntimeConnectionState.CONNECTED,
@@ -197,16 +188,10 @@ class SharedRuntimeConnection internal constructor(
         )
     }
 
-    private fun permissionDenied(detail: String?, epoch: Long) {
+    private fun failConnection(epoch: Long, state: SharedRuntimeConnectionState, detail: String?) {
         if (!isCurrentEpoch(epoch)) return
         binding.unbind()
-        transitionForEpoch(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, detail = detail)
-    }
-
-    private fun incompatible(detail: String?, epoch: Long) {
-        if (!isCurrentEpoch(epoch)) return
-        binding.unbind()
-        transitionForEpoch(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, detail = detail)
+        transitionForEpoch(epoch, state, detail = detail)
     }
 
     private fun connectionLost(detail: String, epoch: Long) {
@@ -216,16 +201,11 @@ class SharedRuntimeConnection internal constructor(
         }
         binding.unbind()
         transitionForEpoch(epoch, SharedRuntimeConnectionState.CONNECTION_LOST, detail = detail)
-        invalidated?.let { endpoint -> notifyEndpointInvalidated(endpoint.connectionEpoch, detail) }
+        invalidated?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
     }
 
     private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
         epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
-    }
-
-    private fun notifyEndpointInvalidated(epoch: Long, detail: String) {
-        val listeners = synchronized(lock) { invalidationListeners.toList() }
-        listeners.forEach { listener -> runCatching { listener.onEndpointInvalidated(epoch, detail) } }
     }
 
     private fun transitionForEpoch(
