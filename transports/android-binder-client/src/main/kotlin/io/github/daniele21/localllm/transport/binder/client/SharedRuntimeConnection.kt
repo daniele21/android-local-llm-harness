@@ -189,11 +189,7 @@ internal class SharedRuntimeConnection(
         failBinding(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, failure.safeMessage)
     }
 
-    private fun failBinding(
-        epoch: Long,
-        state: SharedRuntimeConnectionState,
-        detail: String? = null,
-    ) {
+    private fun failBinding(epoch: Long, state: SharedRuntimeConnectionState, detail: String? = null) {
         val shouldNotify = synchronized(lock) {
             if (connectionEpoch != epoch || current.state == SharedRuntimeConnectionState.CLOSED) {
                 false
@@ -343,10 +339,7 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
         false
     }
 
-    override fun bind(
-        hostConfig: SharedRuntimeHostConfig,
-        callbacks: SharedRuntimeBindingCallbacks,
-    ): SharedRuntimeBindResult {
+    override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
         val serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 val aidl = ILocalLlmService.Stub.asInterface(service) ?: run {
