@@ -79,245 +79,209 @@ internal class SharedRuntimeConnection(
         when (
             binding.bind(
                 hostConfig,
-                SharedRuntimeBindingCallbacks(
-                    onConnected = { service -> onServiceConnected(epoch, service) },
-                    onDisconnected = { onConnectionLost(epoch, "Host service disconnected") },
-                ),
+                object : SharedRuntimeBindingCallbacks {
+                    override fun onConnected(service: SharedRuntimeRemoteService) = negotiate(service, epoch)
+                    override fun onDisconnected() = connectionLost("Host Binder connection was lost", epoch)
+                },
             )
         ) {
             SharedRuntimeBindResult.STARTED -> Unit
-            SharedRuntimeBindResult.HOST_NOT_FOUND -> failBinding(epoch, SharedRuntimeConnectionState.HOST_NOT_INSTALLED)
-            SharedRuntimeBindResult.PERMISSION_DENIED -> failBinding(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED)
-            SharedRuntimeBindResult.FAILED -> failBinding(epoch, SharedRuntimeConnectionState.CONNECTION_LOST)
+
+            SharedRuntimeBindResult.PERMISSION_DENIED -> {
+                transitionForEpoch(
+                    epoch,
+                    SharedRuntimeConnectionState.PERMISSION_DENIED,
+                    detail = "Host rejected the configured caller",
+                )
+            }
+
+            SharedRuntimeBindResult.REJECTED -> connectionLost("Android rejected the explicit host bind", epoch)
         }
     }
 
     override fun close() {
-        val endpoint = synchronized(lock) {
+        val registered = synchronized(lock) {
             if (current.state == SharedRuntimeConnectionState.CLOSED) return
-            val existing = registeredEndpoint
-            registeredEndpoint = null
-            current = SharedRuntimeConnectionSnapshot(SharedRuntimeConnectionState.CLOSED)
-            existing
+            connectionEpoch += 1
+            registeredEndpoint.also { registeredEndpoint = null }
         }
-        endpoint?.let { invalidations.invalidate(it.connectionEpoch, ENDPOINT_INVALIDATED_DETAIL) }
-        endpoint?.let { safeUnregister(it.service, it.clientToken) }
+        registered?.let { endpoint ->
+            runCatching { endpoint.service.unregisterClient(endpoint.clientToken) }
+            invalidations.notify(endpoint.connectionEpoch, "Shared-runtime client connection closed")
+        }
         binding.unbind()
-        invalidations.close()
-        observer.onStateChanged(snapshot)
+        transition(SharedRuntimeConnectionState.CLOSED)
     }
 
-    private fun onServiceConnected(epoch: Long, service: SharedRuntimeRemoteService) {
+    private fun negotiate(service: SharedRuntimeRemoteService, epoch: Long) {
         if (!isCurrentEpoch(epoch)) return
         transitionForEpoch(epoch, SharedRuntimeConnectionState.NEGOTIATING)
         val negotiated = try {
-            val hostInfo = service.protocolInfo()
-            validateClientHello(clientHello)
-            negotiateProtocol(hostInfo, clientHello)
-        } catch (_: RemoteException) {
-            onConnectionLost(epoch, "Host protocol negotiation failed")
+            negotiateProtocol(service.protocolInfo(), clientHello)
+        } catch (error: SecurityException) {
+            failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.message)
             return
-        } catch (failure: WireProtocolException) {
-            failBinding(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, failure.safeMessage)
+        } catch (error: WireProtocolException) {
+            failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, error.message)
+            return
+        } catch (error: RemoteException) {
+            connectionLost(error.message ?: "Host Binder call failed", epoch)
             return
         }
-        register(epoch, service, negotiated)
+        register(service, negotiated, epoch)
     }
 
-    private fun register(epoch: Long, service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol) {
+    private fun register(service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol, epoch: Long) {
+        if (!isCurrentEpoch(epoch)) return
         try {
             service.registerClient(
-                clientHello,
-                hostDisconnectingCallback = { onConnectionLost(epoch, "Host process is disconnecting") },
-            ) { result -> onRegistered(epoch, service, negotiated, result) }
-        } catch (_: RemoteException) {
-            onConnectionLost(epoch, "Host registration failed")
+                hello = clientHello,
+                hostDisconnectingCallback = { connectionLost("Host is disconnecting", epoch) },
+                callback = { result -> handleRegistration(service, negotiated, result, epoch) },
+            )
+        } catch (error: SecurityException) {
+            failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.message)
+        } catch (error: RemoteException) {
+            connectionLost(error.message ?: "Client registration failed", epoch)
         }
     }
 
-    private fun onRegistered(
-        epoch: Long,
+    private fun handleRegistration(
         service: SharedRuntimeRemoteService,
         negotiated: NegotiatedProtocol,
         result: RegistrationResultParcel,
+        epoch: Long,
     ) {
-        if (!isCurrentEpoch(epoch)) return
-        val registrationError = result.error
-        val token = result.clientToken
-        val negotiatedMinor = result.negotiatedMinor
-        if (registrationError != null || token == null || negotiatedMinor == null) {
-            val state = when (registrationError?.code) {
+        synchronized(lock) {
+            if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) return
+        }
+        result.error?.let { error ->
+            when (error.code) {
                 WireErrorCodes.PROTOCOL_INCOMPATIBLE,
                 WireErrorCodes.FEATURE_UNAVAILABLE,
-                -> SharedRuntimeConnectionState.INCOMPATIBLE
+                -> failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, error.safeMessage)
 
-                else -> SharedRuntimeConnectionState.PERMISSION_DENIED
+                WireErrorCodes.CLIENT_NOT_REGISTERED -> {
+                    failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, error.safeMessage)
+                }
+
+                else -> connectionLost(error.safeMessage, epoch)
             }
-            failBinding(epoch, state, registrationError?.safeMessage ?: "Host registration rejected")
             return
         }
-        if (negotiatedMinor != negotiated.minor) {
-            failBinding(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, "Host registration changed negotiated protocol")
+
+        if (!isValidRegistration(result, negotiated)) {
+            failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, "Host returned an invalid registration result")
             return
         }
-        val endpoint = RegisteredSharedRuntimeEndpoint(
-            service = service,
-            clientToken = token,
-            connectionEpoch = epoch,
-        )
-        val accepted = synchronized(lock) {
-            if (connectionEpoch != epoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) {
-                false
-            } else {
-                registeredEndpoint = endpoint
-                current = SharedRuntimeConnectionSnapshot(
-                    state = SharedRuntimeConnectionState.CONNECTED,
-                    negotiatedMinor = negotiated.minor,
-                    enabledFeatures = negotiated.enabledFeatures,
-                )
-                true
-            }
-        }
-        if (accepted) {
-            observer.onStateChanged(snapshot)
-        } else {
-            safeUnregister(service, token)
-        }
-    }
 
-    private fun failBinding(epoch: Long, state: SharedRuntimeConnectionState, detail: String? = null) {
-        val shouldNotify = synchronized(lock) {
-            if (connectionEpoch != epoch || current.state == SharedRuntimeConnectionState.CLOSED) {
-                false
-            } else {
-                registeredEndpoint = null
-                current = SharedRuntimeConnectionSnapshot(state, detail = detail)
-                true
-            }
-        }
-        if (shouldNotify) {
-            binding.unbind()
-            observer.onStateChanged(snapshot)
-        }
-    }
-
-    private fun onConnectionLost(epoch: Long, detail: String) {
-        val endpoint = synchronized(lock) {
-            if (connectionEpoch != epoch || current.state == SharedRuntimeConnectionState.CLOSED) return
-            val existing = registeredEndpoint
-            registeredEndpoint = null
-            current = SharedRuntimeConnectionSnapshot(
-                state = SharedRuntimeConnectionState.CONNECTION_LOST,
-                detail = detail,
-            )
-            existing
-        }
-        endpoint?.let { invalidations.invalidate(it.connectionEpoch, ENDPOINT_INVALIDATED_DETAIL) }
-        binding.unbind()
-        observer.onStateChanged(snapshot)
-    }
-
-    private fun transition(state: SharedRuntimeConnectionState, detail: String? = null) {
+        val token = requireNotNull(result.clientToken)
         synchronized(lock) {
-            if (current.state == SharedRuntimeConnectionState.CLOSED) return
-            current = SharedRuntimeConnectionSnapshot(state, detail = detail)
+            if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) return
+            registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, token, epoch)
         }
-        observer.onStateChanged(snapshot)
+        transitionForEpoch(
+            epoch = epoch,
+            state = SharedRuntimeConnectionState.CONNECTED,
+            negotiatedMinor = negotiated.minor,
+            enabledFeatures = negotiated.enabledFeatures,
+        )
     }
 
-    private fun transitionForEpoch(epoch: Long, state: SharedRuntimeConnectionState) {
-        val shouldNotify = synchronized(lock) {
-            if (connectionEpoch != epoch || current.state == SharedRuntimeConnectionState.CLOSED) {
-                false
-            } else {
-                current = SharedRuntimeConnectionSnapshot(state)
-                true
-            }
+    private fun failConnection(epoch: Long, state: SharedRuntimeConnectionState, detail: String?) {
+        if (!isCurrentEpoch(epoch)) return
+        binding.unbind()
+        transitionForEpoch(epoch, state, detail = detail)
+    }
+
+    private fun connectionLost(detail: String, epoch: Long) {
+        val invalidated = synchronized(lock) {
+            if (epoch != connectionEpoch || current.state == SharedRuntimeConnectionState.CLOSED) return
+            registeredEndpoint.also { registeredEndpoint = null }
         }
-        if (shouldNotify) observer.onStateChanged(snapshot)
+        binding.unbind()
+        transitionForEpoch(epoch, SharedRuntimeConnectionState.CONNECTION_LOST, detail = detail)
+        invalidated?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
     }
 
     private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
-        connectionEpoch == epoch && current.state != SharedRuntimeConnectionState.CLOSED
+        epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+    }
+
+    private fun transitionForEpoch(
+        epoch: Long,
+        state: SharedRuntimeConnectionState,
+        negotiatedMinor: Int? = null,
+        enabledFeatures: Set<String> = emptySet(),
+        detail: String? = null,
+    ) {
+        val snapshot = synchronized(lock) {
+            if (epoch != connectionEpoch || current.state == SharedRuntimeConnectionState.CLOSED) return
+            SharedRuntimeConnectionSnapshot(state, negotiatedMinor, enabledFeatures, detail).also { current = it }
+        }
+        runCatching { observer.onStateChanged(snapshot) }
+    }
+
+    private fun transition(
+        state: SharedRuntimeConnectionState,
+        negotiatedMinor: Int? = null,
+        enabledFeatures: Set<String> = emptySet(),
+        detail: String? = null,
+    ) {
+        val snapshot = synchronized(lock) {
+            if (current.state == SharedRuntimeConnectionState.CLOSED && state != SharedRuntimeConnectionState.CLOSED) return
+            SharedRuntimeConnectionSnapshot(state, negotiatedMinor, enabledFeatures, detail).also { current = it }
+        }
+        runCatching { observer.onStateChanged(snapshot) }
     }
 
     companion object {
-        private const val ENDPOINT_INVALIDATED_DETAIL = "Shared-runtime connection is no longer valid"
-        private val ACTIVE_STATES = setOf(
-            SharedRuntimeConnectionState.BINDING,
-            SharedRuntimeConnectionState.NEGOTIATING,
-            SharedRuntimeConnectionState.CONNECTED,
-        )
-
         fun create(
             context: Context,
             hostConfig: SharedRuntimeHostConfig,
             clientBuildId: String,
             requiredFeatures: Set<String> = emptySet(),
             observer: SharedRuntimeConnectionObserver = SharedRuntimeConnectionObserver {},
-        ): SharedRuntimeConnection = SharedRuntimeConnection(
-            hostConfig = hostConfig,
-            clientHello = ClientHelloParcel(
+        ): SharedRuntimeConnection {
+            val hello = ClientHelloParcel(
                 protocolMajor = BinderProtocolV1.MAJOR,
                 protocolMinor = BinderProtocolV1.MINOR,
                 minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
                 requiredFeatures = requiredFeatures.sorted(),
                 clientBuildId = clientBuildId,
-            ),
-            binding = AndroidSharedRuntimeBinding(context.applicationContext),
-            observer = observer,
+            )
+            validateClientHello(hello)
+            return SharedRuntimeConnection(
+                hostConfig = hostConfig,
+                clientHello = hello,
+                binding = AndroidSharedRuntimeBinding(context.applicationContext),
+                observer = observer,
+            )
+        }
+
+        private val ACTIVE_STATES = setOf(
+            SharedRuntimeConnectionState.BINDING,
+            SharedRuntimeConnectionState.NEGOTIATING,
+            SharedRuntimeConnectionState.CONNECTED,
         )
     }
 }
 
-internal data class RegisteredSharedRuntimeEndpoint(
-    val service: SharedRuntimeRemoteService,
-    val clientToken: ClientTokenParcel,
-    val connectionEpoch: Long = 0L,
-)
-
-internal fun interface SharedRuntimeEndpointInvalidationListener {
-    fun onEndpointInvalidated(connectionEpoch: Long, detail: String)
+internal interface SharedRuntimeBindingCallbacks {
+    fun onConnected(service: SharedRuntimeRemoteService)
+    fun onDisconnected()
 }
 
-internal interface SharedRuntimeEndpointInvalidationSource {
-    fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable
+internal enum class SharedRuntimeBindResult {
+    STARTED,
+    PERMISSION_DENIED,
+    REJECTED,
 }
 
-private fun safeUnregister(service: SharedRuntimeRemoteService, token: ClientTokenParcel) {
-    try {
-        service.unregisterClient(token)
-    } catch (_: RemoteException) {
-        // Best-effort cleanup. The host also owns Binder-death cleanup.
-    }
-}
-
-private class EndpointInvalidationRegistry : AutoCloseable {
-    private val lock = Any()
-    private var closed = false
-    private val listeners = LinkedHashSet<SharedRuntimeEndpointInvalidationListener>()
-
-    val source = object : SharedRuntimeEndpointInvalidationSource {
-        override fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable {
-            synchronized(lock) {
-                if (closed) return AutoCloseable {}
-                listeners += listener
-            }
-            return AutoCloseable { synchronized(lock) { listeners -= listener } }
-        }
-    }
-
-    fun invalidate(connectionEpoch: Long, detail: String) {
-        val snapshot = synchronized(lock) { listeners.toList() }
-        snapshot.forEach { it.onEndpointInvalidated(connectionEpoch, detail) }
-    }
-
-    override fun close() {
-        synchronized(lock) {
-            closed = true
-            listeners.clear()
-        }
-    }
+internal interface SharedRuntimeBinding {
+    fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean
+    fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult
+    fun unbind()
 }
 
 private class AndroidSharedRuntimeBinding(private val context: Context) : SharedRuntimeBinding {
@@ -326,7 +290,7 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
 
     override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = try {
         @Suppress("DEPRECATION")
-        context.packageManager.getServiceInfo(hostConfig.componentName, PackageManager.GET_META_DATA)
+        context.packageManager.getServiceInfo(hostConfig.componentName(), 0)
         true
     } catch (_: PackageManager.NameNotFoundException) {
         false
@@ -335,59 +299,62 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
     override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
         val serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                val aidl = ILocalLlmService.Stub.asInterface(service) ?: run {
+                val proxy = service?.let(ILocalLlmService.Stub::asInterface)
+                if (proxy == null) {
                     callbacks.onDisconnected()
-                    return
+                } else {
+                    callbacks.onConnected(AidlSharedRuntimeRemoteService(proxy))
                 }
-                callbacks.onConnected(AidlSharedRuntimeRemoteService(aidl))
             }
 
-            override fun onServiceDisconnected(name: ComponentName?) {
-                callbacks.onDisconnected()
-            }
-
-            override fun onBindingDied(name: ComponentName?) {
-                callbacks.onDisconnected()
-            }
-
-            override fun onNullBinding(name: ComponentName?) {
-                callbacks.onDisconnected()
-            }
+            override fun onServiceDisconnected(name: ComponentName?) = callbacks.onDisconnected()
+            override fun onBindingDied(name: ComponentName?) = callbacks.onDisconnected()
+            override fun onNullBinding(name: ComponentName?) = callbacks.onDisconnected()
         }
         synchronized(lock) {
-            if (connection != null) return SharedRuntimeBindResult.FAILED
+            if (connection != null) return SharedRuntimeBindResult.STARTED
             connection = serviceConnection
         }
-        val intent = Intent().setComponent(hostConfig.componentName)
         return try {
-            if (context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)) {
+            val started = context.bindService(
+                Intent().setComponent(hostConfig.componentName()),
+                serviceConnection,
+                Context.BIND_AUTO_CREATE,
+            )
+            if (started) {
                 SharedRuntimeBindResult.STARTED
             } else {
-                clearConnection(serviceConnection)
-                SharedRuntimeBindResult.FAILED
+                synchronized(lock) { connection = null }
+                SharedRuntimeBindResult.REJECTED
             }
         } catch (_: SecurityException) {
-            clearConnection(serviceConnection)
+            synchronized(lock) { connection = null }
             SharedRuntimeBindResult.PERMISSION_DENIED
         }
     }
 
     override fun unbind() {
         val active = synchronized(lock) {
-            val existing = connection
-            connection = null
-            existing
+            connection.also { connection = null }
         } ?: return
-        try {
-            context.unbindService(active)
-        } catch (_: IllegalArgumentException) {
-            // Best-effort idempotent teardown.
-        }
-    }
-
-    private fun clearConnection(expected: ServiceConnection) {
-        synchronized(lock) {
-            if (connection === expected) connection = null
-        }
+        runCatching { context.unbindService(active) }
     }
 }
+
+private fun isValidRegistration(result: RegistrationResultParcel, negotiated: NegotiatedProtocol): Boolean {
+    val token = result.clientToken ?: return false
+    return isValidClientToken(token) && isValidNegotiationEcho(result, negotiated)
+}
+
+private fun isValidClientToken(token: ClientTokenParcel): Boolean =
+    token.value.isNotBlank() && token.value.length <= BinderProtocolV1.MAX_IDENTIFIER_CHARACTERS
+
+private fun isValidNegotiationEcho(result: RegistrationResultParcel, negotiated: NegotiatedProtocol): Boolean {
+    val features = result.enabledFeatures.toSet()
+    val uniqueFeatures = features.size == result.enabledFeatures.size
+    val minorMatches = result.negotiatedMinor == negotiated.minor
+    val featuresMatch = features == negotiated.enabledFeatures
+    return uniqueFeatures && minorMatches && featuresMatch
+}
+
+internal fun SharedRuntimeHostConfig.componentName(): ComponentName = ComponentName(packageName, serviceClassName)
