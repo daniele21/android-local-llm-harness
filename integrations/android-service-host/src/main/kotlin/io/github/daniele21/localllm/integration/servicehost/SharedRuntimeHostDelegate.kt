@@ -14,6 +14,7 @@ import io.github.daniele21.localllm.transport.binder.contract.SessionResultParce
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SharedRuntimeHostDelegate(
     private val client: LocalLlmClient,
@@ -22,8 +23,9 @@ class SharedRuntimeHostDelegate(
     private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
         HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
-) {
+) : AutoCloseable {
     private val resources = HostRuntimeResources()
+    private val closed = AtomicBoolean(false)
     private val runtimeOperations =
         HostRuntimeOperations(
             client = client,
@@ -38,6 +40,10 @@ class SharedRuntimeHostDelegate(
         lifecycle: ClientLifecycleLinker,
         callback: HostResultCallback<RegistrationResultParcel>,
     ) {
+        if (closed.get()) {
+            callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
+            return
+        }
         val negotiated =
             try {
                 negotiateProtocol(protocolInfo, hello)
@@ -70,8 +76,18 @@ class SharedRuntimeHostDelegate(
     fun closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) = runtimeOperations.closeSession(caller, request)
 
     fun unregisterClient(caller: AuthorizedCaller, clientToken: String) {
+        if (closed.get()) return
         val token = runCatching { HostClientToken(clientToken) }.getOrNull() ?: return
         controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
+    }
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        controlExecutor.closeSafely()
+        ledger.activeConnections.forEach { connection ->
+            cleanupConnection(connection.token, connection.caller)
+        }
+        resources.closeAll()
     }
 
     private fun completeRegistration(
@@ -81,6 +97,10 @@ class SharedRuntimeHostDelegate(
         negotiatedMinor: Int,
         enabledFeatures: List<String>,
     ) {
+        if (closed.get()) {
+            callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
+            return
+        }
         when (val registration = ledger.register(caller)) {
             is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
 
@@ -93,7 +113,9 @@ class SharedRuntimeHostDelegate(
                     return
                 }
                 resources.attachCallbackDispatcher(token, dispatcher)
-                val deathLink = lifecycle.link { submitDeathCleanup(token, caller) }
+                val deathLink = lifecycle.link {
+                    controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
+                }
                 if (deathLink == null) {
                     cleanupConnection(token, caller)
                     callback.onResult(
@@ -107,10 +129,6 @@ class SharedRuntimeHostDelegate(
                 }
             }
         }
-    }
-
-    private fun submitDeathCleanup(token: HostClientToken, caller: AuthorizedCaller) {
-        controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
     }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
