@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import io.github.daniele21.localllm.contracts.ContextPolicy
+import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -136,15 +137,15 @@ class BinderLifecycleAdapterTest {
     }
 
     @Test
-    fun `close session is best effort and non-blocking`() {
+    fun `close session is best effort and idempotent`() {
         val service = FakeSharedRuntimeRemoteService()
         val adapter = adapter(service)
-        val sessionId = io.github.daniele21.localllm.contracts.SessionId("session-1")
+        val sessionId = SessionId("session-1")
 
         adapter.closeSession(sessionId)
         adapter.closeSession(sessionId)
 
-        assertEquals(2, service.closeSessionCalls)
+        assertEquals(1, service.closeSessionCalls)
     }
 
     private fun adapter(
