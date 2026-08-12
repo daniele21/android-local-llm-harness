@@ -151,15 +151,13 @@ class BinderLifecycleAdapterTest {
         assertEquals(1, service.closeSessionCalls)
     }
 
-    private fun adapter(
-        service: FakeSharedRuntimeRemoteService,
-        timeoutMillis: Long = 100,
-    ): BinderLifecycleAdapter = BinderLifecycleAdapter(
-        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
-        blockingCallGuard = BlockingCallGuard {},
-        timeouts = BinderLifecycleTimeouts(timeoutMillis),
-        correlationIds = deterministicIds(),
-    )
+    private fun adapter(service: FakeSharedRuntimeRemoteService, timeoutMillis: Long = 100): BinderLifecycleAdapter =
+        BinderLifecycleAdapter(
+            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
+            blockingCallGuard = BlockingCallGuard {},
+            timeouts = BinderLifecycleTimeouts(timeoutMillis),
+            correlationIds = deterministicIds(),
+        )
 
     private fun deterministicIds(): CorrelationIdSource {
         var next = 0
