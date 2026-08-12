@@ -76,6 +76,9 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
+    val runtimeSnapshot
+        get() = synchronized(lock) { runtime?.runtimeSnapshot() }
+
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
         registry.selectedModel = model
@@ -103,12 +106,12 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         }
     }
 
-    fun handleMemoryPressure(pressure: RuntimeMemoryPressure) = synchronized(lock) {
-        runtime?.handleMemoryPressure(pressure)
+    fun unloadIdleModel(): Boolean = synchronized(lock) {
+        runtime?.unloadIdleModel() ?: false
     }
 
-    fun runtimeSnapshot() = synchronized(lock) {
-        runtime?.runtimeSnapshot()
+    fun handleMemoryPressure(pressure: RuntimeMemoryPressure) = synchronized(lock) {
+        runtime?.handleMemoryPressure(pressure)
     }
 
     override fun close() {
