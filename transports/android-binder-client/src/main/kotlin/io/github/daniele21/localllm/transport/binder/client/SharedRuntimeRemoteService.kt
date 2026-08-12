@@ -18,7 +18,7 @@ internal interface SharedRuntimeRemoteService {
     @Throws(RemoteException::class)
     fun registerClient(
         hello: ClientHelloParcel,
-        onHostDisconnecting: () -> Unit,
+        hostDisconnectingCallback: () -> Unit,
         callback: (RegistrationResultParcel) -> Unit,
     )
 
