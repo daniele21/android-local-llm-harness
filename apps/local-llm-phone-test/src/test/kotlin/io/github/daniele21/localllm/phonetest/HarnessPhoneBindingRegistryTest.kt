@@ -14,7 +14,7 @@ class HarnessPhoneBindingRegistryTest {
     @Test
     fun `resolves playground and validation from the selected curated Qwen35 model`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
         val playground = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         val validation = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId)
@@ -31,8 +31,8 @@ class HarnessPhoneBindingRegistryTest {
         val registry = HarnessPhoneBindingRegistry()
         val replacement = curatedModel(1)
 
-        registry.select(model)
-        registry.select(replacement)
+        registry.selectedModel = model
+        registry.selectedModel = replacement
 
         val playground = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         val validation = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId)
@@ -50,7 +50,7 @@ class HarnessPhoneBindingRegistryTest {
         )
 
         assertThrows(IllegalArgumentException::class.java) {
-            registry.select(unsupported)
+            registry.selectedModel = unsupported
         }
     }
 
@@ -64,11 +64,11 @@ class HarnessPhoneBindingRegistryTest {
     }
 
     @Test
-    fun `clear removes the selected model`() {
+    fun `clearing selected model removes the binding`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
-        registry.clear()
+        registry.selectedModel = null
 
         assertThrows(IllegalArgumentException::class.java) {
             registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
@@ -78,7 +78,7 @@ class HarnessPhoneBindingRegistryTest {
     @Test
     fun `rejects unknown application and use case ids`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
         assertThrows(IllegalArgumentException::class.java) {
             registry.resolve(ApplicationId("other-app"), HarnessRuntimePurpose.PLAYGROUND.useCaseId)

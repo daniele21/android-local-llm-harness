@@ -2,27 +2,29 @@ package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
-import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
+import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.store.FileSystemModelStore
+import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
 import java.io.File
 
 /**
  * Process-scoped owner of the embedded Harness runtime and observability sources.
  *
- * Constructing the graph never loads a GGUF model. A runtime is created only when [harnessFor]
- * is called by an operation that needs inference. Telemetry is process-scoped and in-memory for
- * the first connected iteration; prompts and generated output are never stored.
+ * Constructing the graph never loads a GGUF model. The host-selected model lives in the single
+ * binding registry; a runtime is created only by an explicit prepare/inference action. Telemetry
+ * is process-scoped and in-memory; prompts and generated output are never stored.
  */
 internal class HarnessRuntimeGraph private constructor(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
@@ -44,13 +46,39 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val loadedModelDigest: ModelDigest?
         get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
 
+    var selectedModel: ImportedPhoneModel?
+        get() = registry.selectedModel
+        set(value) {
+            registry.selectedModel = value
+        }
+
     private var runtime: RuntimeOrchestrator? = null
-    private var runtimeModelDigest: ModelDigest? = null
+    private var runtimeClient: LocalLlmClient? = null
+    private val sharedRuntimeClientFacade = HarnessSharedRuntimeClient(
+        activeClient = { synchronized(lock) { runtimeClient } },
+        prepareClient = {
+            synchronized(lock) {
+                if (registry.selectedModel == null) {
+                    null
+                } else {
+                    ensureRuntime()
+                    runtimeClient
+                }
+            }
+        },
+    )
+
+    /**
+     * Stable service-facing facade over the same in-process client used by the host graph.
+     * Obtaining or observing it does not create a runtime or select/load a model.
+     */
+    val sharedRuntimeClient: LocalLlmClient
+        get() = sharedRuntimeClientFacade
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
-        ensureRuntimeFor(model)
-        registry.select(model)
+        registry.selectedModel = model
+        ensureRuntime()
         val resolved = registry.resolve(APPLICATION_ID, purpose.useCaseId)
         PhoneHarness(
             runtime = requireNotNull(runtime),
@@ -63,19 +91,19 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     fun recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> = telemetryRepository.recentLogs(limit)
 
-    fun dashboardSnapshot(): DeveloperDashboardSnapshot? = synchronized(lock) {
-        runtime?.runtimeSnapshot()?.let(telemetryRepository::dashboard)
-    }
-
     fun releaseModel(digest: ModelDigest) {
         synchronized(lock) {
-            if (runtimeModelDigest != digest) return
+            if (runtime?.runtimeSnapshot()?.loadedModel != digest) return
             closeRuntimeLocked()
         }
     }
 
     fun unloadIdleModel(): Boolean = synchronized(lock) {
-        runtime?.unloadIdleModel() ?: true
+        runtime?.unloadIdleModel() ?: false
+    }
+
+    fun handleMemoryPressure(pressure: RuntimeMemoryPressure) = synchronized(lock) {
+        runtime?.handleMemoryPressure(pressure)
     }
 
     fun runtimeSnapshot() = synchronized(lock) {
@@ -83,31 +111,33 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     }
 
     override fun close() {
-        synchronized(lock) { closeRuntimeLocked() }
+        synchronized(lock) {
+            closeRuntimeLocked()
+            registry.selectedModel = null
+        }
     }
 
-    private fun ensureRuntimeFor(model: ImportedPhoneModel) {
-        if (runtime != null && runtimeModelDigest == model.digest) return
+    private fun ensureRuntime() {
+        if (runtime != null) return
 
-        closeRuntimeLocked()
         val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
         require(nativeLibraryDirectory.isDirectory) {
             "Native library directory is unavailable"
         }
-        runtime = RuntimeOrchestrator(
+        val orchestrator = RuntimeOrchestrator(
             registry = registry,
             modelStore = modelStore,
             backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
             telemetryRepository = telemetryRepository,
         )
-        runtimeModelDigest = model.digest
+        runtime = orchestrator
+        runtimeClient = InProcessLocalLlmClient(orchestrator)
     }
 
     private fun closeRuntimeLocked() {
         runtime?.close()
         runtime = null
-        runtimeModelDigest = null
-        registry.clear()
+        runtimeClient = null
     }
 
     companion object {
@@ -117,7 +147,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
         private const val DEFAULT_RUN_LIMIT = 50
         private const val DEFAULT_LOG_LIMIT = 200
-        private val APPLICATION_ID = ApplicationId("play-internal-phone-test")
+        internal val APPLICATION_ID = ApplicationId("play-internal-phone-test")
 
         @Volatile
         private var instance: HarnessRuntimeGraph? = null
@@ -135,34 +165,42 @@ internal enum class HarnessRuntimePurpose(val useCaseId: UseCaseId) {
 
 internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
     private val lock = Any()
-    private var selectedModel: ImportedPhoneModel? = null
+    private var model: ImportedPhoneModel? = null
 
-    fun select(model: ImportedPhoneModel) {
-        Qwen35PhoneModelPolicy.requireCurated(model)
-        synchronized(lock) { selectedModel = model }
-    }
-
-    fun clear() {
-        synchronized(lock) { selectedModel = null }
-    }
+    var selectedModel: ImportedPhoneModel?
+        get() = synchronized(lock) { model }
+        set(value) {
+            value?.let(Qwen35PhoneModelPolicy::requireCurated)
+            synchronized(lock) { model = value }
+        }
 
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        require(applicationId == ApplicationId("play-internal-phone-test")) {
-            "Unknown applicationId ${applicationId.value}"
+        val selected = synchronized(lock) {
+            requireNotNull(model) { "No model selected" }
         }
-        val model = synchronized(lock) {
-            requireNotNull(selectedModel) { "No model selected" }
-        }
-        return when (useCaseId) {
-            HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
+        return when (applicationId) {
+            HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
 
-            HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId -> resolvedPhoneUseCase(
-                model = model,
-                maxOutputTokens = VALIDATION_MAX_OUTPUT_TOKENS,
-            )
+            HarnessSharedRuntimeBindings.consoleApplicationId -> {
+                require(useCaseId == HarnessSharedRuntimeBindings.consoleUseCaseId) {
+                    "Unknown useCaseId ${useCaseId.value}"
+                }
+                HarnessSharedRuntimeBindings.resolveConsole(selected)
+            }
 
-            else -> error("Unknown useCaseId ${useCaseId.value}")
+            else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
         }
+    }
+
+    private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
+        HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
+
+        HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId -> resolvedPhoneUseCase(
+            model = model,
+            maxOutputTokens = VALIDATION_MAX_OUTPUT_TOKENS,
+        )
+
+        else -> error("Unknown useCaseId ${useCaseId.value}")
     }
 
     private companion object {

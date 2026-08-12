@@ -110,7 +110,7 @@ Every coherent implementation slice must satisfy the applicable criteria below.
 
 ## Delivery direction
 
-The current embedded Android boundary is the only active runtime path. Native Android SDK and Capacitor adapters may build on it after the embedded API and release gates are stable. A shared Android service remains deferred until measurements demonstrate that cross-application artifact or RAM deduplication justifies Binder lifecycle complexity.
+The current embedded Android boundary is the only active runtime path. Native Android SDK and Capacitor adapters may build on it after the embedded API and release gates are stable. A shared Android service remains deferred until measurements demonstrate that cross-application artifact or RAM deduplication justifies Binder lifecycle complexity. Its progressive-disclosure execution plan is [`shared-runtime/README.md`](shared-runtime/README.md); that plan does not make the deployment active or release-ready.
 
 Current integration status belongs only in [`current-state.md`](current-state.md). Capability sequencing belongs in [`roadmap.md`](roadmap.md). Harness 0.5.0 release evidence belongs in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 

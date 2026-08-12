@@ -166,6 +166,8 @@ Future work after the embedded path is release-ready:
 
 The shared service is not part of Harness 0.5.0.
 
+The progressive-disclosure target, architecture, milestone order and focused workstreams are defined in [`shared-runtime/README.md`](shared-runtime/README.md). That plan does not remove the embedded physical-evidence gate or make the service application-consumable today.
+
 ## 8. Deferred capabilities
 
 Deferred until the CPU embedded path and release evidence are stable:
