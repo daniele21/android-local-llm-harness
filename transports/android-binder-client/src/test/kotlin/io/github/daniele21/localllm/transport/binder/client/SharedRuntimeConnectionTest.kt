@@ -2,8 +2,10 @@ package io.github.daniele21.localllm.transport.binder.client
 
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
-import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
+import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
+import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,39 +41,70 @@ class SharedRuntimeConnectionTest {
     }
 
     @Test
-    fun `compatible host negotiates and connects`() {
+    fun `compatible host registers before connected`() {
         val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService()
         val connection = SharedRuntimeConnection(host, hello, binding)
 
         connection.connect()
-        binding.connectHost(protocolInfo())
+        binding.connectHost(service)
 
+        assertEquals(1, service.registerCalls)
         assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
         assertEquals(BinderProtocolV1.MINOR, connection.snapshot.negotiatedMinor)
+        assertEquals("test-client-token", connection.endpoint?.clientToken?.value)
     }
 
     @Test
-    fun `major mismatch becomes incompatible and unbinds`() {
+    fun `registration failure never exposes a usable endpoint`() {
+        val service = FakeSharedRuntimeRemoteService(
+            registration = successfulRegistration().copy(
+                clientToken = null,
+                negotiatedMinor = null,
+                enabledFeatures = emptyList(),
+                error = WireErrorParcel(
+                    code = WireErrorCodes.CLIENT_NOT_REGISTERED,
+                    safeMessage = "Client is not registered",
+                    retryable = false,
+                ),
+            ),
+        )
         val binding = FakeBinding()
         val connection = SharedRuntimeConnection(host, hello, binding)
 
         connection.connect()
-        binding.connectHost(protocolInfo(protocolMajor = BinderProtocolV1.MAJOR + 1))
+        binding.connectHost(service)
+
+        assertEquals(SharedRuntimeConnectionState.PERMISSION_DENIED, connection.snapshot.state)
+        assertNull(connection.endpoint)
+    }
+
+    @Test
+    fun `major mismatch becomes incompatible and unbinds without registration`() {
+        val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService(protocol = compatibleProtocolInfo(BinderProtocolV1.MAJOR + 1))
+        val connection = SharedRuntimeConnection(host, hello, binding)
+
+        connection.connect()
+        binding.connectHost(service)
 
         assertEquals(SharedRuntimeConnectionState.INCOMPATIBLE, connection.snapshot.state)
+        assertEquals(0, service.registerCalls)
         assertEquals(1, binding.unbindCalls)
     }
 
     @Test
-    fun `disconnect after connect becomes connection lost and requires explicit reconnect`() {
+    fun `disconnect after registration becomes connection lost and requires explicit reconnect`() {
         val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService()
         val connection = SharedRuntimeConnection(host, hello, binding)
 
         connection.connect()
-        binding.connectHost(protocolInfo())
+        binding.connectHost(service)
         binding.disconnectHost()
 
         assertEquals(SharedRuntimeConnectionState.CONNECTION_LOST, connection.snapshot.state)
+        assertNull(connection.endpoint)
         assertEquals(1, binding.unbindCalls)
 
         connection.connect()
@@ -79,7 +112,23 @@ class SharedRuntimeConnectionTest {
     }
 
     @Test
-    fun `connect and close are idempotent`() {
+    fun `close unregisters an established client exactly once`() {
+        val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService()
+        val connection = SharedRuntimeConnection(host, hello, binding)
+
+        connection.connect()
+        binding.connectHost(service)
+        connection.close()
+        connection.close()
+
+        assertEquals(1, service.unregisterCalls)
+        assertEquals(1, binding.unbindCalls)
+        assertEquals(SharedRuntimeConnectionState.CLOSED, connection.snapshot.state)
+    }
+
+    @Test
+    fun `connect and close are idempotent while binding`() {
         val binding = FakeBinding()
         val observed = mutableListOf<SharedRuntimeConnectionState>()
         val connection = SharedRuntimeConnection(
@@ -101,14 +150,6 @@ class SharedRuntimeConnectionTest {
         assertTrue(observed.contains(SharedRuntimeConnectionState.BINDING))
         assertEquals(SharedRuntimeConnectionState.CLOSED, observed.last())
     }
-
-    private fun protocolInfo(protocolMajor: Int = BinderProtocolV1.MAJOR): ProtocolInfoParcel = ProtocolInfoParcel(
-        protocolMajor = protocolMajor,
-        protocolMinor = BinderProtocolV1.MINOR,
-        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-        supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-        hostBuildId = "test-host",
-    )
 
     private class FakeBinding(
         private val hostExists: Boolean = true,
@@ -133,8 +174,8 @@ class SharedRuntimeConnectionTest {
             callbacks = null
         }
 
-        fun connectHost(info: ProtocolInfoParcel) {
-            callbacks?.onConnected(SharedRuntimeProtocolService { info })
+        fun connectHost(service: SharedRuntimeRemoteService) {
+            callbacks?.onConnected(service)
         }
 
         fun disconnectHost() {
