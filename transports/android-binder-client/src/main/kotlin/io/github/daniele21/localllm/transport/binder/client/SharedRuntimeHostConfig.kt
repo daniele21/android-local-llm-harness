@@ -6,10 +6,7 @@ package io.github.daniele21.localllm.transport.binder.client
  * The client never scans installed packages or resolves an implicit intent. Consumers supply the
  * exact package and service class that are allowed to host the shared runtime.
  */
-class SharedRuntimeHostConfig private constructor(
-    val packageName: String,
-    val serviceClassName: String,
-) {
+class SharedRuntimeHostConfig private constructor(val packageName: String, val serviceClassName: String) {
     companion object {
         fun create(packageName: String, serviceClassName: String): SharedRuntimeHostConfig {
             val normalizedPackage = packageName.requireCanonical("packageName")
@@ -33,10 +30,9 @@ class SharedRuntimeHostConfig private constructor(
         }
     }
 
-    override fun equals(other: Any?): Boolean =
-        other is SharedRuntimeHostConfig &&
-            packageName == other.packageName &&
-            serviceClassName == other.serviceClassName
+    override fun equals(other: Any?): Boolean = other is SharedRuntimeHostConfig &&
+        packageName == other.packageName &&
+        serviceClassName == other.serviceClassName
 
     override fun hashCode(): Int = 31 * packageName.hashCode() + serviceClassName.hashCode()
 
