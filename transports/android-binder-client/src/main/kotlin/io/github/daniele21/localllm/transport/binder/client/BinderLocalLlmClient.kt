@@ -48,11 +48,7 @@ internal constructor(
     override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
         createSession(applicationId, useCaseId, SessionOptions())
 
-    override fun createSession(
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-        options: SessionOptions,
-    ): SessionId {
+    override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId {
         requireApplication(applicationId)
         checkOpen()
         return lifecycle.openSession(useCaseId, options)
