@@ -7,7 +7,6 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
-import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
@@ -76,9 +75,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
-    val runtimeSnapshot
-        get() = synchronized(lock) { runtime?.runtimeSnapshot() }
-
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
         registry.selectedModel = model
@@ -95,10 +91,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     fun recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> = telemetryRepository.recentLogs(limit)
 
-    fun dashboardSnapshot(): DeveloperDashboardSnapshot? = synchronized(lock) {
-        runtime?.runtimeSnapshot()?.let(telemetryRepository::dashboard)
-    }
-
     fun releaseModel(digest: ModelDigest) {
         synchronized(lock) {
             if (runtime?.runtimeSnapshot()?.loadedModel != digest) return
@@ -112,6 +104,10 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     fun handleMemoryPressure(pressure: RuntimeMemoryPressure) = synchronized(lock) {
         runtime?.handleMemoryPressure(pressure)
+    }
+
+    fun runtimeSnapshot() = synchronized(lock) {
+        runtime?.runtimeSnapshot()
     }
 
     override fun close() {
