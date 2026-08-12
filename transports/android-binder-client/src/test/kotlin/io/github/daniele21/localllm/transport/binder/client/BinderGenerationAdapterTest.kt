@@ -260,23 +260,6 @@ class BinderGenerationAdapterTest {
         ),
     )
 
-    private class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSource {
-        private val listeners = mutableSetOf<SharedRuntimeEndpointInvalidationListener>()
-
-        override fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable {
-            listeners += listener
-            return object : AutoCloseable {
-                override fun close() {
-                    listeners -= listener
-                }
-            }
-        }
-
-        fun invalidate(epoch: Long, detail: String) {
-            listeners.toList().forEach { it.onEndpointInvalidated(epoch, detail) }
-        }
-    }
-
     private companion object {
         var remoteCounter = 0
     }
