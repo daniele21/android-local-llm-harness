@@ -1,10 +1,10 @@
 # Shared runtime host service
 
-Status: active
+Status: complete
 Document type: feature-specification
 Owner: shared-runtime-host
 Canonical scope: shared-runtime.host-service
-Read when: implementing the exported service, caller authorization, runtime delegation or caller-owned cleanup
+Read when: implementing or reviewing the exported service, caller authorization, runtime delegation or caller-owned cleanup
 Last reviewed: 2026-08-12
 
 ## Goal
@@ -17,60 +17,31 @@ Expose one existing host-owned `LocalLlmClient` data plane through a signature-p
 - SR-1 frozen protocol fixtures and wire mappers.
 - Existing runtime lifecycle, model binding and phone host composition.
 
-## Inspect before editing
-
-- [`../../architecture.md`](../../architecture.md) and ADR 0010/0011/0012
-- `core/contracts` and `core/runtime-core` public lifecycle/tests
-- `models/model-profile` binding contracts
-- `apps/local-llm-phone-test/AGENTS.md`
-- `apps/local-llm-phone-test/.../HarnessRuntimeGraph.kt`
-- phone model selection/management controls and direct tests
-- Android manifests and build variants for both proof apps
-
-Read the model scoped guide only if selection/binding behavior changes. Read the backend guide only if service composition changes native packaging.
-
 ## Owner and composition
 
-`integrations/android-service-host` owns reusable Android service delegation, caller context, connection/resource ledgers and core/wire mapping. `SharedRuntimeHostComposition` wires the caller authorizer, protocol information, delegate and Binder stub around a supplied `LocalLlmClient`; it does not instantiate `RuntimeOrchestrator`, select models or access Compose.
+`integrations/android-service-host` owns reusable Android service delegation, caller context, connection/resource ledgers, Binder composition and core/wire mapping. `SharedRuntimeHostComposition` wires caller authorization, protocol information, the delegate and Binder stub around a supplied `LocalLlmClient`. Closing the composition releases only service-owned Binder resources; it never closes the host runtime.
 
-`apps/local-llm-phone-test` owns the concrete `HarnessSharedRuntimeService` entry point and supplies the process-scoped `HarnessRuntimeGraph`. `HarnessSharedRuntimeClient` is a stable facade over the graph's currently active in-process client. Binding, handshake, snapshot and obtaining the facade do not create a runtime, select a model or load a GGUF. The proof policy currently authorizes only the exact installed phone-test package and its real signing lineage. External authorized package/use-case registration is intentionally deferred to SR-HOST-08.
+`apps/local-llm-phone-test` owns the concrete `HarnessSharedRuntimeService`, the process-scoped `HarnessRuntimeGraph`, the host-selected model and the proof client/use-case configuration. UI and service resolve through the same `HarnessPhoneBindingRegistry`; there is no second runtime or second model registry.
 
-## Manifest boundary
+## Manifest and caller boundary
 
-The proof host declares an exported bound service behind a variant-specific signature permission. Release uses:
+The proof host is exported only behind a variant-specific `signature` permission:
 
-```text
-io.github.daniele21.localllm.permission.USE_LOCAL_LLM
-```
+- release: `io.github.daniele21.localllm.permission.USE_LOCAL_LLM`;
+- debug: `io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM`.
 
-Debug uses:
+The service has no intent filter and clients bind with an explicit component. Authorization revalidates UID, exact package name, signing lineage and the use-case allowlist inside the Binder boundary. Caller-supplied package, application ID, certificate digest or UID never determines authorization.
 
-```text
-io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM
-```
+The first external proof client is `apps/local-llm-console`. Exact package registration is variant-scoped:
 
-The application requests its own variant permission so the SR-HOST-07 self-bind proof passes the same manifest permission boundary used by external callers. The service has no intent filter and clients bind with an explicit component. Debug variants do not authorize release packages through suffix stripping.
+- release host: `io.github.daniele21.localllm.console`;
+- debug host: `io.github.daniele21.localllm.console.debug` and `io.github.daniele21.localllm.console.internal`.
 
-## Caller authorization
-
-For every Binder entry point:
-
-1. capture calling UID before switching threads;
-2. resolve packages for that UID;
-3. verify the expected signing lineage and manifest permission;
-4. map exactly one authorized package/configuration to an internal `ApplicationId`;
-5. verify requested `UseCaseId` against that client's allowlist;
-6. attach immutable caller context to queued work.
-
-Ambiguous packages, missing registration, changed signing identity or an unauthorized use case fail before model/runtime access. Caller-supplied package, application ID, certificate digest or UID fields are ignored/rejected.
-
-The service records only a safe client registration key in telemetry. Raw certificate data, Binder tokens and complete package/signature inspection results are not logged.
+No prefix/suffix stripping or wildcard package matching is used. Every registered console package must present the accepted host signing lineage.
 
 ## Host binding registry
 
-The SR-HOST-07 proof host resolves only its internal phone application identity. SR-HOST-08 extends one coherent host binding abstraction for authorized external clients rather than creating parallel registries that can disagree.
-
-The target resolution is:
+The host registry resolves:
 
 ```text
 AuthorizedCaller(ApplicationId, allowed UseCaseIds)
@@ -79,102 +50,83 @@ AuthorizedCaller(ApplicationId, allowed UseCaseIds)
     -> ResolvedUseCase with exact artifact digest
 ```
 
-Registration must not:
+The external proof binding is host-owned:
 
-- let a client choose an artifact/profile;
-- synthesize a binding when no host model is selected;
-- download/install/select during prepare;
-- bypass catalog/Qwen3.5 product admission;
-- alter the phone application's own playground/validation bindings.
+```text
+ApplicationId = local-llm-console
+UseCaseId     = console-inference-playground
+profile       = fixed shared-console Qwen3.5 profile
+context       = 4096 tokens
+max output    = 512 tokens
+```
 
-If no exact binding is available, preparation returns a typed model/configuration result and leaves host state unchanged.
+The client never supplies the model digest, artifact, profile or runtime tuning. `HarnessPhoneBindingRegistry` accepts only the internal phone-test bindings and the registered console binding. The selected model is validated against the exact curated Qwen3.5 catalog artifact and is restored into the same registry after process restart from the host's persisted selection.
+
+If no host model is selected, external `prepare()` returns a not-ready result without creating a runtime, selecting a model or loading GGUF bytes. A valid explicit prepare may lazily create the process-scoped runtime and then lets the existing `RuntimeOrchestrator` resolve and load the exact host-selected artifact.
 
 ## Connection and resource ownership
 
-Maintain a bounded ledger:
+Every authenticated connection owns its sessions, request mappings, generation handles, death link and callback dispatcher. The ledger is bounded by explicit connection/session/request quotas and maps external correlation IDs to host-generated internal IDs.
 
-```text
-ClientConnection
-  authenticated caller context
-  opaque client token
-  lifecycle Binder/death recipient
-  active sessions
-  active/queued request mappings
-  callback dispatchers
-  closing flag
-```
-
-Every session and request is scoped to one connection. External client IDs map to host-generated runtime IDs so separate clients may safely reuse the same correlation value.
-
-Ledger operations are serialized. Registration, close and death cleanup are idempotent. Limits for connections, sessions and outstanding requests are explicit constants with typed rejection; they are not inferred from memory exhaustion.
-
-## Threading model
-
-The AIDL stub performs only bounded parsing, authorization lookup and task submission. It never calls model load or blocking runtime work inline.
-
-Use one bounded control executor owned by the service delegate for:
-
-- registration/unregistration;
-- preparation;
-- session open/close;
-- request mapping and terminal cleanup;
-- client death cleanup.
-
-Generation remains owned by the existing single-decode scheduler. Core events enter a bounded serial callback dispatcher so the native generation callback is not indefinitely blocked by remote IPC.
-
-Close order:
+Connection cleanup order remains:
 
 ```text
 mark client closing
   -> reject new work
   -> cancel mapped requests
-  -> await/observe terminal cleanup within bound
   -> close mapped sessions
   -> unlink death recipient
-  -> remove callbacks and token
+  -> close callback dispatcher
+  -> remove connection token
 ```
 
-SR-HOST-09 wires service destruction and Android memory-pressure callbacks. Until then the proof service deliberately does not take ownership of runtime destruction: runtime graph lifetime remains owned by the host application composition.
+Registration is serialized against global service teardown so a new connection cannot be published after destruction has begun.
+
+## Service destruction
+
+`SharedRuntimeHostDelegate` and `SharedRuntimeHostComposition` are closeable and idempotently release only service-owned resources:
+
+- reject/stop new control submissions;
+- close the bounded control executor;
+- cancel remaining service-mapped generation handles;
+- close caller-owned sessions;
+- unlink death recipients;
+- close callback dispatchers;
+- remove ledger ownership.
+
+`HarnessSharedRuntimeService.onDestroy()` closes the host composition only. It does **not** call `HarnessRuntimeGraph.close()` and therefore does not take ownership of the process-scoped runtime, installed model bytes or host selection.
+
+## Memory pressure
+
+The service reuses the existing `runtime-core` Android adapter and policy instead of duplicating Android thresholds:
+
+```text
+Android onTrimMemory/onLowMemory
+  -> AndroidMemoryPressureCallbacks
+  -> RuntimeMemoryPressure
+  -> HarnessRuntimeGraph.handleMemoryPressure
+  -> RuntimeOrchestrator.handleMemoryPressure
+  -> RuntimeMemoryPolicy
+```
+
+`UI_HIDDEN` and `BACKGROUND` may unload only an idle resident model. `LOW_MEMORY` may unload an idle model or cancel/release active runtime resources according to `RuntimeMemoryPolicy`. Binder reference counts do not independently decide model residency.
 
 ## Lifecycle behavior
 
-- A pure bind creates the service as required and does not prepare a model.
-- Registration and handshake have no model side effects.
-- Client unbind or Binder death cancels that client's work and closes its sessions.
-- Host UI recreation does not recreate the process graph or service-owned ledgers.
-- Host process death may lose all sessions; the client reconnects from a clean state.
-- No request is replayed because the client cannot know whether a terminal output was partially delivered.
-- Last-client disconnect does not remove installed bytes or change selected model.
-- Idle model unload follows runtime policy, not Binder ref-count alone.
+- Pure bind, registration, handshake and snapshot do not create a runtime or load a model.
+- Explicit prepare remains inert while no host model is selected.
+- Client death/disconnect releases only that client's work.
+- Host UI recreation does not recreate the process graph.
+- Service destruction drains service adapter resources without destroying the graph.
+- Host process death loses sessions and clients reconnect from a clean state; requests are never replayed.
+- Last-client disconnect does not remove installed bytes or mutate model selection.
+- Memory-pressure behavior remains owned by `runtime-core` policy.
 
-V1 does not start a foreground service. If product requirements demand generation after the client leaves the foreground or unbinds, stop and design an Android background/notification policy under a new ADR.
-
-## Callback delivery and backpressure
-
-For each request:
-
-- map the internal runtime ID back to the caller's correlation ID;
-- assign monotonic wire sequence numbers;
-- chunk/coalesce adjacent deltas within protocol limits;
-- preserve reasoning/answer content type;
-- deliver exactly one terminal event;
-- terminate and cancel when the bounded callback queue overflows or Binder dies;
-- remove request ownership only after terminal processing is committed.
-
-One slow client must not block another client's callbacks or the scheduler control path. Callback exceptions are treated as connection failure and never propagated into runtime generation.
+V1 remains bound-only and does not start a foreground service.
 
 ## Error and privacy behavior
 
-The host maps errors at the integration boundary. It must not expose:
-
-- exception class, stack or backend-owned text;
-- native/library/file paths;
-- model-store root or verified download location;
-- packages/signing metadata of any caller;
-- other clients' state, IDs or queue contents;
-- prompt, reasoning, answer, schema text or system prompt.
-
-Safe telemetry may include internal application/use-case identity, host/protocol version, request lifecycle, queue/load/timing/token metrics, exact model digest and typed outcome.
+The host never exposes exception classes/stacks, native or model-store paths, signing metadata, another client's state, prompt/reasoning/answer text through normal telemetry, or client control over model acquisition/selection. Safe transport outcomes use the frozen protocol error mapping and privacy-safe runtime metadata.
 
 ## Task ledger
 
@@ -187,40 +139,39 @@ Safe telemetry may include internal application/use-case identity, host/protocol
 | SR-HOST-05 | DONE | Implement lifecycle token death monitoring and idempotent cleanup. |
 | SR-HOST-06 | DONE | Implement serial chunked callback delivery and backpressure failure. |
 | SR-HOST-07 | DONE | Add proof host service manifest and app composition. |
-| SR-HOST-08 | PLANNED | Extend one host binding registry for authorized external use cases. |
-| SR-HOST-09 | PLANNED | Add memory-pressure/service-destroy integration without duplicate runtime ownership. |
+| SR-HOST-08 | DONE | Extend one host binding registry for authorized external use cases. |
+| SR-HOST-09 | DONE | Add memory-pressure/service-destroy integration without duplicate runtime ownership. |
 
 ## Deterministic coverage
 
-Tests cover:
+Coverage includes:
 
 - authorized caller, unknown package, invalid signature and ambiguous UID mapping;
-- unregistered, expired and cross-UID client tokens;
-- allowed/denied use cases and no selected/installed model;
-- no model load during bind/registration/snapshot operations;
-- prepare success/failure and executor rejection;
-- session/request ownership and external ID collision across clients;
-- queued/running cancellation and idempotent close;
-- client death during prepare, queued generation, decode and terminal callback;
-- callback exception, queue overflow and service destruction;
-- two clients sharing the runtime scheduler without cross-control;
-- error redaction and prompt/output sentinel exclusion;
-- exact cleanup order and no leaked death recipients/executors/sessions;
-- SR-HOST-07 protocol composition uses the frozen V1 contract deterministically;
-- the phone-test manifest exposes the proof service only behind the variant signature permission;
-- explicit proof self-bind leaves the process-scoped runtime uncreated.
+- exact debug/internal/release console package registration;
+- allowed/denied use cases and cross-UID token isolation;
+- external binding failure without a selected model;
+- exact external resolution to the host-selected curated model digest;
+- no runtime creation during bind/registration/snapshot or prepare-without-selection;
+- prepare/session/generation delegation and external/internal ID mapping;
+- cancellation, client death and idempotent connection cleanup;
+- callback backpressure/failure and privacy-safe error mapping;
+- service close cancelling handles, closing sessions, unlinking lifecycle resources and closing service-owned executors;
+- registration rejection after service close;
+- manifest signature-permission boundary and proof self-bind with no runtime side effect;
+- runtime-core memory-pressure policy and integration coverage.
 
 ## Acceptance criteria
 
-- Unauthorized callers cannot obtain a service interface or runtime information.
-- Authorized callers can access only registered use cases.
-- The service invokes the same `LocalLlmClient` data plane used in-process.
+- Unauthorized callers cannot obtain runtime access.
+- Authorized callers can access only exact registered use cases.
+- Client input cannot select or mutate model acquisition, installation or artifact identity.
+- The service invokes the same process-scoped `LocalLlmClient` data plane used in-process.
 - Binder threads perform no model load or generation.
-- Every resource is owned by one authenticated client and cleaned after death/disconnect.
-- Client input cannot mutate host model acquisition, installation or selection.
-- Callback and control queues are bounded and failure leaves the runtime reusable.
-- Host UI and service share one runtime graph without introducing screen-owned policy.
+- Every caller-owned resource is isolated and cleanable after death/disconnect/destruction.
+- Service destruction releases adapter resources without taking runtime ownership.
+- Android memory pressure delegates to the existing runtime policy.
+- Host UI and service share one runtime graph and one host-owned binding registry.
 
 ## Focused validation
 
-Run `spotlessCheck`, `detekt`, host integration unit/lint/assembly, phone-test compile/unit/lint/assembly and Android packaging verification. The instrumentation suite includes the manifest boundary and pure-bind/no-runtime-side-effect proof; compiling/assembling that suite is not equivalent to executing it on an emulator or physical device.
+Run `spotlessCheck`, `detekt`, host integration unit/lint/assembly, phone-test compile/unit/lint/assembly and Android packaging verification. The instrumentation suite covers the manifest boundary and pure-bind/no-runtime-side-effect proof; execution on an emulator or physical device remains a later evidence gate and is not inferred from assembly alone.
