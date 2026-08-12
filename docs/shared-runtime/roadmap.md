@@ -91,7 +91,7 @@ Owner: [`workstreams/client-sdk.md`](workstreams/client-sdk.md)
 
 Dependencies: SR-0 and SR-1. SR-2 is complete for the proof host.
 
-Progress: **SR-CLIENT-01 and SR-CLIENT-02 are implemented on the active client-SDK branch: the new `transports/android-binder-client` module owns exact host configuration plus explicit bind/protocol-negotiation/disconnect state. Registration and `LocalLlmClient` adaptation are next.**
+Progress: **SR-CLIENT-01 through SR-CLIENT-06 are implemented on the active client-SDK branch. The client now owns explicit binding and v1 negotiation, registered-client lifecycle, non-main prepare/session adaptation, ordered bounded streaming reconstruction, idempotent cancellation and connection-epoch/dead-object/timeout handling without automatic replay. Console composition (`SR-CLIENT-07`) and packaged-AAR/API hardening (`SR-CLIENT-08`) remain.**
 
 Exit gate:
 
