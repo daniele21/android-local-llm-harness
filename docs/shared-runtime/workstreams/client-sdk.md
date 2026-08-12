@@ -46,9 +46,13 @@ Current implementation status:
 
 - the Android library module exists and exposes an explicit `SharedRuntimeHostConfig` using exact package/service identity;
 - no package scanning or implicit service discovery is present;
-- `SharedRuntimeConnection` performs explicit bind, v1 protocol negotiation, typed connection-state transitions and idempotent close;
+- `SharedRuntimeConnection` performs explicit bind, v1 protocol negotiation, registered-client lifecycle, typed connection-state transitions, monotonic connection epochs and idempotent close;
 - Android binding details stay behind an internal environment boundary so connection behavior is deterministic under JVM tests;
-- registration, lifecycle adaptation, streaming reconstruction and console consumption remain subsequent SR-3 tasks.
+- `BinderLifecycleAdapter` maps prepare/session lifecycle with main-thread rejection, bounded callback waits, opaque session IDs, epoch-owned session cleanup and deterministic timeout/dead-object/disconnect handling;
+- `BinderGenerationAdapter` reconstructs ordered SR-1 events on a bounded serial executor, coalesces small deltas, enforces an aggregate-output bound and isolates consumer listener failures from Binder threads;
+- Binder generation handles preserve caller request identity, cancel at most once, remain safe after terminal/disconnect and convert cancellation transport death into one asynchronous `SERVICE_DISCONNECTED` outcome;
+- callbacks and resources from superseded connection epochs are rejected without replay against a replacement registration;
+- console composition remains `SR-CLIENT-07`; packaged-AAR/API hardening remains `SR-CLIENT-08`.
 
 ## Connection API
 
@@ -168,10 +172,10 @@ Before publication, validate source/binary API and one consumer project using th
 | --- | --- | --- |
 | SR-CLIENT-01 | DONE | Create client module and explicit host-component configuration. |
 | SR-CLIENT-02 | DONE | Implement typed bind/negotiate/disconnect state machine. |
-| SR-CLIENT-03 | PLANNED | Implement registration and non-main blocking adapter for lifecycle calls. |
-| SR-CLIENT-04 | PLANNED | Implement ordered callback mapper and bounded terminal reconstruction. |
-| SR-CLIENT-05 | PLANNED | Implement idempotent generation handle, cancellation and close. |
-| SR-CLIENT-06 | PLANNED | Implement timeout, dead-object and old-connection callback handling. |
+| SR-CLIENT-03 | DONE | Implement registration and non-main blocking adapter for lifecycle calls. |
+| SR-CLIENT-04 | DONE | Implement ordered callback mapper and bounded terminal reconstruction. |
+| SR-CLIENT-05 | DONE | Implement idempotent generation handle, cancellation and close. |
+| SR-CLIENT-06 | DONE | Implement timeout, dead-object and old-connection callback handling. |
 | SR-CLIENT-07 | PLANNED | Connect the console composition and remote target states. |
 | SR-CLIENT-08 | PLANNED | Add AAR consumer rules, API review and packaged-consumer test. |
 
