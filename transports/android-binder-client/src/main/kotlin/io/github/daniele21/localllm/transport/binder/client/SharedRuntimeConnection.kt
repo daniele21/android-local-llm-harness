@@ -100,7 +100,7 @@ internal class SharedRuntimeConnection(
             current = SharedRuntimeConnectionSnapshot(SharedRuntimeConnectionState.CLOSED)
             existing
         }
-        endpoint?.let(::invalidateEndpoint)
+        endpoint?.let { invalidations.invalidate(it.connectionEpoch, ENDPOINT_INVALIDATED_DETAIL) }
         endpoint?.let { safeUnregister(it.service, it.clientToken) }
         binding.unbind()
         invalidations.close()
@@ -118,7 +118,7 @@ internal class SharedRuntimeConnection(
             onConnectionLost(epoch, "Host protocol negotiation failed")
             return
         } catch (failure: WireProtocolException) {
-            failIncompatible(epoch, failure)
+            failBinding(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, failure.safeMessage)
             return
         }
         register(epoch, service, negotiated)
@@ -185,10 +185,6 @@ internal class SharedRuntimeConnection(
         }
     }
 
-    private fun failIncompatible(epoch: Long, failure: WireProtocolException) {
-        failBinding(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, failure.safeMessage)
-    }
-
     private fun failBinding(epoch: Long, state: SharedRuntimeConnectionState, detail: String? = null) {
         val shouldNotify = synchronized(lock) {
             if (connectionEpoch != epoch || current.state == SharedRuntimeConnectionState.CLOSED) {
@@ -216,13 +212,9 @@ internal class SharedRuntimeConnection(
             )
             existing
         }
-        endpoint?.let(::invalidateEndpoint)
+        endpoint?.let { invalidations.invalidate(it.connectionEpoch, ENDPOINT_INVALIDATED_DETAIL) }
         binding.unbind()
         observer.onStateChanged(snapshot)
-    }
-
-    private fun invalidateEndpoint(endpoint: RegisteredSharedRuntimeEndpoint) {
-        invalidations.invalidate(endpoint.connectionEpoch, "Shared-runtime connection is no longer valid")
     }
 
     private fun transition(state: SharedRuntimeConnectionState, detail: String? = null) {
@@ -249,15 +241,8 @@ internal class SharedRuntimeConnection(
         connectionEpoch == epoch && current.state != SharedRuntimeConnectionState.CLOSED
     }
 
-    private fun safeUnregister(service: SharedRuntimeRemoteService, token: ClientTokenParcel) {
-        try {
-            service.unregisterClient(token)
-        } catch (_: RemoteException) {
-            // Best-effort cleanup. The host also owns Binder-death cleanup.
-        }
-    }
-
     companion object {
+        private const val ENDPOINT_INVALIDATED_DETAIL = "Shared-runtime connection is no longer valid"
         private val ACTIVE_STATES = setOf(
             SharedRuntimeConnectionState.BINDING,
             SharedRuntimeConnectionState.NEGOTIATING,
@@ -297,6 +282,14 @@ internal fun interface SharedRuntimeEndpointInvalidationListener {
 
 internal interface SharedRuntimeEndpointInvalidationSource {
     fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable
+}
+
+private fun safeUnregister(service: SharedRuntimeRemoteService, token: ClientTokenParcel) {
+    try {
+        service.unregisterClient(token)
+    } catch (_: RemoteException) {
+        // Best-effort cleanup. The host also owns Binder-death cleanup.
+    }
 }
 
 private class EndpointInvalidationRegistry : AutoCloseable {
