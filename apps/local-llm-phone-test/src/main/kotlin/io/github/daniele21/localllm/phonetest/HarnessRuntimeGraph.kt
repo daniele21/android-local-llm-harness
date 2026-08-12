@@ -59,8 +59,12 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         activeClient = { synchronized(lock) { runtimeClient } },
         prepareClient = {
             synchronized(lock) {
-                ensureRuntime()
-                requireNotNull(runtimeClient)
+                if (registry.selectedModel == null) {
+                    null
+                } else {
+                    ensureRuntime()
+                    runtimeClient
+                }
             }
         },
     )
