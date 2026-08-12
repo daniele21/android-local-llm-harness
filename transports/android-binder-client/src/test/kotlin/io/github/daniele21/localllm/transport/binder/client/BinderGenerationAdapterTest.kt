@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class BinderGenerationAdapterTest {
     @Test
-    fun `callbacks are reconstructed in order and keep caller request id`() {
+    fun `callbacks are reconstructed in order and small deltas are coalesced`() {
         val service = FakeSharedRuntimeRemoteService()
         val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
         val terminal = CountDownLatch(1)
@@ -38,8 +38,9 @@ class BinderGenerationAdapterTest {
         }
 
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
-        assertEquals(4, events.size)
+        assertEquals(3, events.size)
         assertTrue(events.all { it.requestId == RequestId("caller-request") })
+        assertEquals("hello world", assertIs<GenerationEvent.TextDelta>(events[1]).text)
         assertEquals("hello world", assertIs<GenerationEvent.Completed>(events.last()).output)
         assertNotEquals("caller-request", service.lastGenerationRequest?.externalRequestId)
         adapter.close()
@@ -68,6 +69,27 @@ class BinderGenerationAdapterTest {
     }
 
     @Test
+    fun `aggregate output bound terminates the affected request`() {
+        val service = FakeSharedRuntimeRemoteService()
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val terminal = CountDownLatch(1)
+        service.generationHandler = { request, callback ->
+            callback(GenerationEvent.TextDelta(RequestId("host"), "12345", 1).toWire(request.externalRequestId, 0))
+        }
+        val adapter = adapter(service, maxAggregateCharacters = 4)
+
+        adapter.generate(request("bounded-request")) { event ->
+            events += event
+            if (event is GenerationEvent.Failed) terminal.countDown()
+        }
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(1, events.size)
+        assertTrue(assertIs<GenerationEvent.Failed>(events.single()).error.message.contains("aggregate bound"))
+        adapter.close()
+    }
+
+    @Test
     fun `generation handle sends cancel at most once while active`() {
         val service = FakeSharedRuntimeRemoteService()
         service.generationHandler = { _, _ -> }
@@ -82,9 +104,13 @@ class BinderGenerationAdapterTest {
         adapter.close()
     }
 
-    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderGenerationAdapter = BinderGenerationAdapter(
+    private fun adapter(
+        service: FakeSharedRuntimeRemoteService,
+        maxAggregateCharacters: Int = 1_048_576,
+    ): BinderGenerationAdapter = BinderGenerationAdapter(
         endpointProvider = { RegisteredSharedRuntimeEndpoint(service, ClientTokenParcel("client-token")) },
         externalRequestIds = CorrelationIdSource { "remote-${remoteCounter++}" },
+        maxAggregateCharacters = maxAggregateCharacters,
     )
 
     private fun request(requestId: String): GenerationRequest = GenerationRequest(
