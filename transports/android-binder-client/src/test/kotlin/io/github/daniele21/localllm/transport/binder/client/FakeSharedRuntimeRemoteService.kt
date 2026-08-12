@@ -26,11 +26,11 @@ internal class FakeSharedRuntimeRemoteService(
 
     override fun registerClient(
         hello: ClientHelloParcel,
-        onHostDisconnecting: () -> Unit,
+        hostDisconnectingCallback: () -> Unit,
         callback: (RegistrationResultParcel) -> Unit,
     ) {
         registerCalls += 1
-        hostDisconnecting = onHostDisconnecting
+        hostDisconnecting = hostDisconnectingCallback
         callback(registration)
     }
 
