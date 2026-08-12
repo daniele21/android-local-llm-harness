@@ -11,7 +11,8 @@ import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.NegotiatedProtocol
-import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
+import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
 import io.github.daniele21.localllm.transport.binder.contract.validateClientHello
@@ -48,9 +49,13 @@ class SharedRuntimeConnection internal constructor(
 ) : AutoCloseable {
     private val lock = Any()
     private var current = SharedRuntimeConnectionSnapshot(SharedRuntimeConnectionState.DISCONNECTED)
+    private var registeredEndpoint: RegisteredSharedRuntimeEndpoint? = null
 
     val snapshot: SharedRuntimeConnectionSnapshot
         get() = synchronized(lock) { current }
+
+    internal val endpoint: RegisteredSharedRuntimeEndpoint?
+        get() = synchronized(lock) { registeredEndpoint }
 
     fun connect() {
         synchronized(lock) {
@@ -66,7 +71,7 @@ class SharedRuntimeConnection internal constructor(
             binding.bind(
                 hostConfig,
                 object : SharedRuntimeBindingCallbacks {
-                    override fun onConnected(service: SharedRuntimeProtocolService) = negotiate(service)
+                    override fun onConnected(service: SharedRuntimeRemoteService) = negotiate(service)
                     override fun onDisconnected() = connectionLost("Host Binder connection was lost")
                 },
             )
@@ -82,14 +87,18 @@ class SharedRuntimeConnection internal constructor(
     }
 
     override fun close() {
-        synchronized(lock) {
+        val registered = synchronized(lock) {
             if (current.state == SharedRuntimeConnectionState.CLOSED) return
+            registeredEndpoint.also { registeredEndpoint = null }
+        }
+        registered?.let { endpoint ->
+            runCatching { endpoint.service.unregisterClient(endpoint.clientToken) }
         }
         binding.unbind()
         transition(SharedRuntimeConnectionState.CLOSED)
     }
 
-    private fun negotiate(service: SharedRuntimeProtocolService) {
+    private fun negotiate(service: SharedRuntimeRemoteService) {
         synchronized(lock) {
             if (current.state == SharedRuntimeConnectionState.CLOSED) return
         }
@@ -108,6 +117,63 @@ class SharedRuntimeConnection internal constructor(
             connectionLost(error.message ?: "Host Binder call failed")
             return
         }
+        register(service, negotiated)
+    }
+
+    private fun register(service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol) {
+        try {
+            service.registerClient(
+                hello = clientHello,
+                onHostDisconnecting = { connectionLost("Host is disconnecting") },
+                callback = { result -> handleRegistration(service, negotiated, result) },
+            )
+        } catch (error: SecurityException) {
+            binding.unbind()
+            transition(SharedRuntimeConnectionState.PERMISSION_DENIED, detail = error.message)
+        } catch (error: RemoteException) {
+            connectionLost(error.message ?: "Client registration failed")
+        }
+    }
+
+    private fun handleRegistration(
+        service: SharedRuntimeRemoteService,
+        negotiated: NegotiatedProtocol,
+        result: RegistrationResultParcel,
+    ) {
+        synchronized(lock) {
+            if (current.state != SharedRuntimeConnectionState.NEGOTIATING) return
+        }
+        result.error?.let { error ->
+            when (error.code) {
+                WireErrorCodes.PROTOCOL_INCOMPATIBLE,
+                WireErrorCodes.FEATURE_UNAVAILABLE,
+                -> incompatible(error.safeMessage)
+
+                WireErrorCodes.CLIENT_NOT_REGISTERED -> permissionDenied(error.safeMessage)
+                else -> connectionLost(error.safeMessage)
+            }
+            return
+        }
+
+        val token = result.clientToken
+        val resultMinor = result.negotiatedMinor
+        val resultFeatures = result.enabledFeatures.toSet()
+        if (
+            token == null ||
+            token.value.isBlank() ||
+            token.value.length > BinderProtocolV1.MAX_IDENTIFIER_CHARACTERS ||
+            resultMinor != negotiated.minor ||
+            resultFeatures.size != result.enabledFeatures.size ||
+            resultFeatures != negotiated.enabledFeatures
+        ) {
+            incompatible("Host returned an invalid registration result")
+            return
+        }
+
+        synchronized(lock) {
+            if (current.state != SharedRuntimeConnectionState.NEGOTIATING) return
+            registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, token)
+        }
         connected(negotiated)
     }
 
@@ -119,7 +185,18 @@ class SharedRuntimeConnection internal constructor(
         )
     }
 
+    private fun permissionDenied(detail: String) {
+        binding.unbind()
+        transition(SharedRuntimeConnectionState.PERMISSION_DENIED, detail = detail)
+    }
+
+    private fun incompatible(detail: String) {
+        binding.unbind()
+        transition(SharedRuntimeConnectionState.INCOMPATIBLE, detail = detail)
+    }
+
     private fun connectionLost(detail: String) {
+        synchronized(lock) { registeredEndpoint = null }
         binding.unbind()
         transition(SharedRuntimeConnectionState.CONNECTION_LOST, detail = detail)
     }
@@ -171,13 +248,8 @@ class SharedRuntimeConnection internal constructor(
     }
 }
 
-internal fun interface SharedRuntimeProtocolService {
-    @Throws(RemoteException::class)
-    fun protocolInfo(): ProtocolInfoParcel
-}
-
 internal interface SharedRuntimeBindingCallbacks {
-    fun onConnected(service: SharedRuntimeProtocolService)
+    fun onConnected(service: SharedRuntimeRemoteService)
     fun onDisconnected()
 }
 
@@ -212,7 +284,7 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
                 if (proxy == null) {
                     callbacks.onDisconnected()
                 } else {
-                    callbacks.onConnected(SharedRuntimeProtocolService(proxy::getProtocolInfo))
+                    callbacks.onConnected(AidlSharedRuntimeRemoteService(proxy))
                 }
             }
 
