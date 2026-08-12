@@ -94,6 +94,44 @@ class BinderGenerationAdapterTest {
     }
 
     @Test
+    fun `bounded callback queue cancels overflow without invoking listener on callback thread`() {
+        val service = FakeSharedRuntimeRemoteService()
+        val listenerEntered = CountDownLatch(1)
+        val releaseListener = CountDownLatch(1)
+        val terminal = CountDownLatch(1)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+        val listenerThreads = Collections.synchronizedList(mutableListOf<Thread>())
+        val callbackThread = Thread.currentThread()
+        service.generationHandler = { request, callback ->
+            callback(GenerationEvent.Queued(RequestId("host"), 1).toWire(request.externalRequestId, 0))
+            assertTrue(listenerEntered.await(2, TimeUnit.SECONDS))
+            callback(GenerationEvent.TextDelta(RequestId("host"), "a", 1).toWire(request.externalRequestId, 1))
+            callback(GenerationEvent.TextDelta(RequestId("host"), "b", 2).toWire(request.externalRequestId, 2))
+            releaseListener.countDown()
+        }
+        val adapter = adapter(service, callbackQueueCapacity = 1)
+
+        adapter.generate(request("overflow-request")) { event ->
+            events += event
+            listenerThreads += Thread.currentThread()
+            if (event is GenerationEvent.Queued) {
+                listenerEntered.countDown()
+                assertTrue(releaseListener.await(2, TimeUnit.SECONDS))
+            }
+            if (event is GenerationEvent.Failed) terminal.countDown()
+        }
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(1, service.cancelCalls)
+        assertEquals(2, events.size)
+        assertTrue(events.last() is GenerationEvent.Failed)
+        val failure = events.last() as GenerationEvent.Failed
+        assertTrue(failure.error.message.contains("queue capacity"))
+        assertTrue(listenerThreads.none { it === callbackThread })
+        adapter.close()
+    }
+
+    @Test
     fun `generation handle sends cancel at most once while active`() {
         val service = FakeSharedRuntimeRemoteService()
         service.generationHandler = { _, _ -> }
@@ -108,12 +146,16 @@ class BinderGenerationAdapterTest {
         adapter.close()
     }
 
-    private fun adapter(service: FakeSharedRuntimeRemoteService, maxAggregateCharacters: Int = 1_048_576): BinderGenerationAdapter =
-        BinderGenerationAdapter(
-            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, ClientTokenParcel("client-token")) },
-            externalRequestIds = CorrelationIdSource { "remote-${remoteCounter++}" },
-            maxAggregateCharacters = maxAggregateCharacters,
-        )
+    private fun adapter(
+        service: FakeSharedRuntimeRemoteService,
+        maxAggregateCharacters: Int = 1_048_576,
+        callbackQueueCapacity: Int = 256,
+    ): BinderGenerationAdapter = BinderGenerationAdapter(
+        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, ClientTokenParcel("client-token")) },
+        callbackQueueCapacity = callbackQueueCapacity,
+        externalRequestIds = CorrelationIdSource { "remote-${remoteCounter++}" },
+        maxAggregateCharacters = maxAggregateCharacters,
+    )
 
     private fun request(requestId: String): GenerationRequest = GenerationRequest(
         requestId = RequestId(requestId),
