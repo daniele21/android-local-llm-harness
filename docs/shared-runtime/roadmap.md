@@ -16,7 +16,7 @@ SR-0 Decision and scope                    DONE
    |
 SR-1 Binder protocol v1                    DONE
    |--------------------------|
-SR-2 Host service          SR-3 Client SDK IN PROGRESS / PLANNED
+SR-2 Host service          SR-3 Client SDK DONE / PLANNED
    |--------------------------|
 SR-4 Two-APK vertical slice                PLANNED
    |
@@ -63,7 +63,7 @@ Exit gate:
 
 ## SR-2 — Host service
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Goal: expose the existing data plane through an authenticated, lifecycle-safe Android service.
 
@@ -71,7 +71,7 @@ Owner: [`workstreams/host-service.md`](workstreams/host-service.md)
 
 Dependencies: SR-0 and SR-1.
 
-Progress: **SR-HOST-01 through SR-HOST-07 are implemented. SR-HOST-08 and SR-HOST-09 remain before the SR-2 exit gate can be declared complete.**
+Progress: **SR-HOST-01 through SR-HOST-09 are implemented. The host now exposes the shared process-scoped runtime through the signature-protected proof service, resolves the external console only through exact host-owned bindings, and delegates Android memory/service lifecycle without duplicate runtime ownership.**
 
 Exit gate:
 
@@ -79,7 +79,7 @@ Exit gate:
 - Binder threads do no heavy runtime work;
 - client/session/request ownership is isolated and death-aware;
 - host resolves exact application/use-case/model binding without client model control;
-- service delegate tests cover denial, cancellation, death and idempotent cleanup.
+- service delegate tests cover denial, cancellation, death, teardown and idempotent cleanup.
 
 ## SR-3 — Client SDK
 
@@ -89,7 +89,7 @@ Goal: hide AIDL plumbing behind a lifecycle-safe client artifact.
 
 Owner: [`workstreams/client-sdk.md`](workstreams/client-sdk.md)
 
-Dependencies: SR-0 and SR-1.
+Dependencies: SR-0 and SR-1. SR-2 is now complete for the proof host, so client SDK implementation is the next shared-runtime workstream.
 
 Exit gate:
 
@@ -109,9 +109,9 @@ Dependencies: SR-2 and SR-3.
 
 Planned slice:
 
-- `apps/local-llm-phone-test` registers the proof host service and same-signer client binding;
+- `apps/local-llm-phone-test` exposes the completed proof host service and exact same-signer console binding;
 - the host user explicitly installs/selects a curated Qwen3.5 model;
-- `apps/local-llm-console` connects through the client adapter and uses its existing inference control;
+- `apps/local-llm-console` connects through the SR-3 client adapter and uses its existing inference control;
 - prepare, open session, stream, cancel, complete and close cross the real process boundary;
 - disconnected, unavailable and incompatible states remain distinct in the console.
 
