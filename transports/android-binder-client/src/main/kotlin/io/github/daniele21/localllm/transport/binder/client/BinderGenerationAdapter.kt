@@ -84,30 +84,38 @@ internal class BinderGenerationAdapter(
 
     private fun process(generation: ActiveGeneration, wireEvent: GenerationEventParcel) {
         if (generation.isTerminal()) return
-        generation.overflowDetail()?.let { detail ->
-            failProtocol(generation, detail)
-            return
+        when (val outcome = mapEvent(generation, wireEvent)) {
+            is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
+            is GenerationProcessingOutcome.Ready -> deliver(generation, outcome)
         }
-        val mapped = runCatching { generation.reconstructor.accept(wireEvent) }
-            .getOrElse { error ->
-                failProtocol(generation, error.message ?: "Invalid shared-runtime generation event")
-                return
-            }
-        val deliveries = generation.coalesce(mapped, maxAggregateCharacters, deliveryChunkCharacters)
-        if (deliveries == null) {
-            failProtocol(generation, "Reconstructed generation output exceeded the client aggregate bound")
-            return
+    }
+
+    private fun mapEvent(generation: ActiveGeneration, wireEvent: GenerationEventParcel): GenerationProcessingOutcome {
+        val overflow = generation.overflowDetail()
+        return if (overflow != null) {
+            GenerationProcessingOutcome.Failure(overflow)
+        } else {
+            val mapped = runCatching { generation.reconstructor.accept(wireEvent) }
+                .getOrElse { error ->
+                    return GenerationProcessingOutcome.Failure(
+                        error.message ?: "Invalid shared-runtime generation event",
+                    )
+                }
+            val deliveries = generation.coalesce(mapped, maxAggregateCharacters, deliveryChunkCharacters)
+                ?: return GenerationProcessingOutcome.Failure(
+                    "Reconstructed generation output exceeded the client aggregate bound",
+                )
+            GenerationProcessingOutcome.Ready(mapped, deliveries)
         }
-        if (!deliveries.all(generation::deliver)) {
-            failProtocol(generation, "Client generation listener failed")
-            return
-        }
-        generation.overflowDetail()?.let { detail ->
-            failProtocol(generation, detail)
-            return
-        }
-        if (mapped.isTerminal()) {
-            finish(generation)
+    }
+
+    private fun deliver(generation: ActiveGeneration, outcome: GenerationProcessingOutcome.Ready) {
+        val listenerAccepted = outcome.deliveries.all(generation::deliver)
+        val overflow = generation.overflowDetail()
+        when {
+            !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+            overflow != null -> failProtocol(generation, overflow)
+            outcome.event.isTerminal() -> finish(generation)
         }
     }
 
@@ -157,6 +165,11 @@ internal class BinderGenerationAdapter(
         const val DEFAULT_DELIVERY_CHUNK_CHARACTERS = 256
         const val CALLBACK_QUEUE_OVERFLOW_DETAIL = "Client callback queue capacity exceeded"
     }
+}
+
+private sealed interface GenerationProcessingOutcome {
+    data class Failure(val detail: String) : GenerationProcessingOutcome
+    data class Ready(val event: GenerationEvent, val deliveries: List<GenerationEvent>) : GenerationProcessingOutcome
 }
 
 private class ActiveGeneration(
