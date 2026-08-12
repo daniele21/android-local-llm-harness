@@ -8,19 +8,26 @@ import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPoli
 import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSha256
 import java.security.MessageDigest
 
-/**
- * Proof-host authorization only. SR-HOST-08 replaces this internal-only policy with the external
- * authorized-client/use-case binding registry; callers never supply these identities themselves.
- */
+/** Exact package/use-case policy for the proof host and first external same-signer client. */
 internal object HarnessSharedRuntimePolicy {
-    fun authorizedClients(context: Context): List<AuthorizedClientPolicy> = listOf(
-        AuthorizedClientPolicy(
+    fun authorizedClients(context: Context): List<AuthorizedClientPolicy> {
+        val acceptedSigningCertificates = currentPackageSigningCertificates(context)
+        val internal = AuthorizedClientPolicy(
             packageName = context.packageName,
             applicationId = HarnessRuntimeGraph.APPLICATION_ID,
             allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
-            acceptedSigningCertificates = currentPackageSigningCertificates(context),
-        ),
-    )
+            acceptedSigningCertificates = acceptedSigningCertificates,
+        )
+        val console = HarnessSharedRuntimeBindings.consolePackages(BuildConfig.DEBUG).map { packageName ->
+            AuthorizedClientPolicy(
+                packageName = packageName,
+                applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+                allowedUseCases = setOf(HarnessSharedRuntimeBindings.consoleUseCaseId),
+                acceptedSigningCertificates = acceptedSigningCertificates,
+            )
+        }
+        return listOf(internal) + console
+    }
 
     @Suppress("DEPRECATION")
     private fun currentPackageSigningCertificates(context: Context): Set<SigningCertificateSha256> {
