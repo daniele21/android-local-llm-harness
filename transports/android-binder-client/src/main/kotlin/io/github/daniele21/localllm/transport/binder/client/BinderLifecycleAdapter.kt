@@ -121,16 +121,19 @@ internal class BinderLifecycleAdapter(
         }
     }
 
-    private fun mapPrepareResult(operationId: String, result: PrepareResultParcel): PrepareResult = when {
-        result.operationId != operationId -> prepareFailure("Shared runtime prepare correlation mismatch")
+    private fun mapPrepareResult(operationId: String, result: PrepareResultParcel): PrepareResult {
+        val error = result.error
+        return when {
+            result.operationId != operationId -> prepareFailure("Shared runtime prepare correlation mismatch")
 
-        result.error != null -> prepareFailure(result.error.safeMessage)
+            error != null -> prepareFailure(error.safeMessage)
 
-        else -> PrepareResult(
-            ready = result.ready,
-            modelDigest = result.modelDigestSha256?.let(::ModelDigest),
-            detail = result.detail,
-        )
+            else -> PrepareResult(
+                ready = result.ready,
+                modelDigest = result.modelDigestSha256?.let(::ModelDigest),
+                detail = result.detail,
+            )
+        }
     }
 }
 
