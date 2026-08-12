@@ -48,3 +48,7 @@ class BoundedSerialHostControlExecutor(queueCapacity: Int = DEFAULT_CONTROL_QUEU
 internal fun HostControlExecutor.submitOrReject(onRejected: () -> Unit, task: () -> Unit) {
     if (!execute(task)) onRejected()
 }
+
+internal fun HostControlExecutor.closeSafely() {
+    runCatching { (this as? AutoCloseable)?.close() }
+}
