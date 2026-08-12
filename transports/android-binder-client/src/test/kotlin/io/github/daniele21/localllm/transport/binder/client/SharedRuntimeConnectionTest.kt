@@ -2,6 +2,8 @@ package io.github.daniele21.localllm.transport.binder.client
 
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
+import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
+import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 import org.junit.Assert.assertEquals
@@ -53,6 +55,7 @@ class SharedRuntimeConnectionTest {
         assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
         assertEquals(BinderProtocolV1.MINOR, connection.snapshot.negotiatedMinor)
         assertEquals("test-client-token", connection.endpoint?.clientToken?.value)
+        assertTrue(requireNotNull(connection.endpoint).connectionEpoch > 0L)
     }
 
     @Test
@@ -112,6 +115,79 @@ class SharedRuntimeConnectionTest {
     }
 
     @Test
+    fun `late registration from old connection cannot replace reconnected endpoint`() {
+        val binding = FakeBinding()
+        var delayedRegistration: ((RegistrationResultParcel) -> Unit)? = null
+        val oldService = FakeSharedRuntimeRemoteService().apply {
+            registrationHandler = { _, callback -> delayedRegistration = callback }
+        }
+        val newService = FakeSharedRuntimeRemoteService(
+            registration = successfulRegistration().copy(clientToken = ClientTokenParcel("new-token")),
+        )
+        val connection = SharedRuntimeConnection(host, hello, binding)
+
+        connection.connect()
+        binding.connectHost(oldService)
+        assertEquals(SharedRuntimeConnectionState.NEGOTIATING, connection.snapshot.state)
+        binding.disconnectHost()
+
+        connection.connect()
+        binding.connectHost(newService)
+        assertEquals("new-token", connection.endpoint?.clientToken?.value)
+        val newEpoch = connection.endpoint?.connectionEpoch
+
+        requireNotNull(delayedRegistration).invoke(
+            successfulRegistration().copy(clientToken = ClientTokenParcel("old-token")),
+        )
+
+        assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
+        assertEquals("new-token", connection.endpoint?.clientToken?.value)
+        assertEquals(newEpoch, connection.endpoint?.connectionEpoch)
+    }
+
+    @Test
+    fun `late host disconnect from old epoch cannot tear down reconnect`() {
+        val binding = FakeBinding()
+        val oldService = FakeSharedRuntimeRemoteService(
+            registration = successfulRegistration().copy(clientToken = ClientTokenParcel("old-token")),
+        )
+        val newService = FakeSharedRuntimeRemoteService(
+            registration = successfulRegistration().copy(clientToken = ClientTokenParcel("new-token")),
+        )
+        val connection = SharedRuntimeConnection(host, hello, binding)
+
+        connection.connect()
+        binding.connectHost(oldService)
+        binding.disconnectHost()
+        connection.connect()
+        binding.connectHost(newService)
+
+        oldService.disconnectFromHost()
+
+        assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
+        assertEquals("new-token", connection.endpoint?.clientToken?.value)
+        assertEquals(2, binding.bindCalls)
+        assertEquals(1, binding.unbindCalls)
+    }
+
+    @Test
+    fun `disconnect invalidates the registered endpoint epoch once`() {
+        val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService()
+        val connection = SharedRuntimeConnection(host, hello, binding)
+        val invalidated = mutableListOf<Long>()
+        val subscription = connection.endpointInvalidations.addListener { epoch, _ -> invalidated += epoch }
+
+        connection.connect()
+        binding.connectHost(service)
+        val epoch = requireNotNull(connection.endpoint).connectionEpoch
+        binding.disconnectHost()
+
+        assertEquals(listOf(epoch), invalidated)
+        subscription.close()
+    }
+
+    @Test
     fun `close unregisters an established client exactly once`() {
         val binding = FakeBinding()
         val service = FakeSharedRuntimeRemoteService()
@@ -157,29 +233,31 @@ class SharedRuntimeConnectionTest {
     ) : SharedRuntimeBinding {
         var bindCalls = 0
         var unbindCalls = 0
-        private var callbacks: SharedRuntimeBindingCallbacks? = null
+        private var activeCallbacks: SharedRuntimeBindingCallbacks? = null
+        private val callbackHistory = mutableListOf<SharedRuntimeBindingCallbacks>()
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = hostExists
 
         override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
             bindCalls += 1
             if (bindResult == SharedRuntimeBindResult.STARTED) {
-                this.callbacks = callbacks
+                activeCallbacks = callbacks
+                callbackHistory += callbacks
             }
             return bindResult
         }
 
         override fun unbind() {
             unbindCalls += 1
-            callbacks = null
+            activeCallbacks = null
         }
 
         fun connectHost(service: SharedRuntimeRemoteService) {
-            callbacks?.onConnected(service)
+            requireNotNull(activeCallbacks).onConnected(service)
         }
 
         fun disconnectHost() {
-            callbacks?.onDisconnected()
+            requireNotNull(activeCallbacks).onDisconnected()
         }
     }
 }
