@@ -261,6 +261,7 @@ jobs:
             transports:android-binder-client
             integrations:android-service-host
             apps:local-llm-console
+            apps:shared-runtime-client-consumer-fixture
             apps:device-test-runner
             apps:local-llm-phone-test
           )
@@ -288,6 +289,7 @@ jobs:
               :transports:android-binder-client:assembleDebug
               :integrations:android-service-host:assembleDebug
               :apps:local-llm-console:assembleInternal
+              :apps:shared-runtime-client-consumer-fixture:assembleDebug
               :apps:device-test-runner:assembleDebug
               :apps:device-test-runner:assembleDebugAndroidTest
               :apps:local-llm-phone-test:assembleDebug
@@ -297,6 +299,7 @@ jobs:
             # breakages without constructing APKs or native packages.
             tasks+=(
               :apps:local-llm-console:compileInternalKotlin
+              :apps:shared-runtime-client-consumer-fixture:compileDebugKotlin
               :apps:device-test-runner:compileDebugKotlin
               :apps:local-llm-phone-test:compileDebugKotlin
             )
