@@ -33,9 +33,10 @@ internal class BinderGenerationAdapter(
 ) : AutoCloseable {
     private val active = ConcurrentHashMap<String, ActiveGeneration>()
     private val closed = AtomicBoolean(false)
-    private val invalidationSubscription = endpointInvalidations?.addListener(
-        SharedRuntimeEndpointInvalidationListener(::onEndpointInvalidated),
-    )
+    private val disconnects = GenerationDisconnectCoordinator(active, callbackExecutor, closed, ::failDisconnected)
+    private val invalidationSubscription = endpointInvalidations?.addListener { epoch, detail ->
+        disconnects.onEndpointInvalidated(epoch, detail)
+    }
 
     init {
         require(callbackQueueCapacity > 0) { "callbackQueueCapacity must be positive" }
@@ -77,11 +78,9 @@ internal class BinderGenerationAdapter(
     }
 
     private fun enqueue(generation: ActiveGeneration, event: GenerationEventParcel) {
-        if (closed.get() || generation.isTerminal() || generation.overflowDetail() != null) return
-        if (!isCurrentConnection(generation)) {
-            if (generation.markDisconnected(STALE_CONNECTION_DETAIL)) {
-                scheduleDisconnectDrain()
-            }
+        if (closed.get() || generation.terminal || generation.overflowDetail != null) return
+        if (endpointProvider()?.connectionEpoch != generation.endpoint.connectionEpoch) {
+            disconnects.markStale(generation, STALE_CONNECTION_DETAIL)
             return
         }
         try {
@@ -94,58 +93,36 @@ internal class BinderGenerationAdapter(
     }
 
     private fun process(generation: ActiveGeneration, wireEvent: GenerationEventParcel) {
-        if (!generation.isTerminal()) {
-            val disconnected = generation.disconnectionDetail()
+        if (!generation.terminal) {
+            val disconnected = generation.disconnectionDetail
             if (disconnected != null) {
                 failDisconnected(generation, disconnected)
             } else {
-                when (val outcome = mapEvent(generation, wireEvent)) {
+                when (val outcome = generation.accept(wireEvent, maxAggregateCharacters, deliveryChunkCharacters)) {
                     is GenerationProcessingOutcome.Failure -> failProtocol(generation, outcome.detail)
-                    is GenerationProcessingOutcome.Ready -> deliver(generation, outcome)
+                    is GenerationProcessingOutcome.Ready -> {
+                        val listenerAccepted = outcome.deliveries.all(generation::deliver)
+                        when {
+                            !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
+                            generation.disconnectionDetail != null -> {
+                                failDisconnected(generation, requireNotNull(generation.disconnectionDetail))
+                            }
+
+                            generation.overflowDetail != null -> {
+                                failProtocol(generation, requireNotNull(generation.overflowDetail))
+                            }
+
+                            outcome.event.isTerminal() -> finish(generation)
+                        }
+                    }
                 }
             }
         }
-        drainDisconnected()
-    }
-
-    private fun mapEvent(generation: ActiveGeneration, wireEvent: GenerationEventParcel): GenerationProcessingOutcome {
-        val overflow = generation.overflowDetail()
-        return if (overflow != null) {
-            GenerationProcessingOutcome.Failure(overflow)
-        } else {
-            val mapped = runCatching { generation.reconstructor.accept(wireEvent) }
-                .getOrElse { error ->
-                    return GenerationProcessingOutcome.Failure(
-                        error.message ?: "Invalid shared-runtime generation event",
-                    )
-                }
-            val deliveries = generation.coalesce(mapped, maxAggregateCharacters, deliveryChunkCharacters)
-                ?: return GenerationProcessingOutcome.Failure(
-                    "Reconstructed generation output exceeded the client aggregate bound",
-                )
-            GenerationProcessingOutcome.Ready(mapped, deliveries)
-        }
-    }
-
-    private fun deliver(generation: ActiveGeneration, outcome: GenerationProcessingOutcome.Ready) {
-        val listenerAccepted = outcome.deliveries.all(generation::deliver)
-        val disconnected = generation.disconnectionDetail()
-        val overflow = generation.overflowDetail()
-        when {
-            !listenerAccepted -> failProtocol(generation, "Client generation listener failed")
-            disconnected != null -> failDisconnected(generation, disconnected)
-            overflow != null -> failProtocol(generation, overflow)
-            outcome.event.isTerminal() -> finish(generation)
-        }
+        disconnects.drain()
     }
 
     private fun cancel(generation: ActiveGeneration) {
-        if (generation.isTerminal()) return
-        if (generation.disconnectionDetail() != null) {
-            scheduleDisconnectDrain()
-            return
-        }
-        if (!generation.markCancelSent()) return
+        if (generation.terminal || generation.disconnectionDetail != null || !generation.markCancelSent()) return
         try {
             generation.endpoint.service.cancel(
                 CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
@@ -165,34 +142,6 @@ internal class BinderGenerationAdapter(
             // The queued worker still emits the local terminal failure for this request.
         }
     }
-
-    private fun onEndpointInvalidated(connectionEpoch: Long, detail: String) {
-        if (closed.get()) return
-        active.values.forEach { generation ->
-            if (generation.endpoint.connectionEpoch == connectionEpoch) {
-                generation.markDisconnected(detail)
-            }
-        }
-        scheduleDisconnectDrain()
-    }
-
-    private fun scheduleDisconnectDrain() {
-        if (closed.get()) return
-        try {
-            callbackExecutor.execute(::drainDisconnected)
-        } catch (_: RejectedExecutionException) {
-            // An already-running or queued callback will drain invalidations after it completes.
-        }
-    }
-
-    private fun drainDisconnected() {
-        active.values.toList().forEach { generation ->
-            generation.disconnectionDetail()?.let { detail -> failDisconnected(generation, detail) }
-        }
-    }
-
-    private fun isCurrentConnection(generation: ActiveGeneration): Boolean =
-        endpointProvider()?.connectionEpoch == generation.endpoint.connectionEpoch
 
     private fun failDisconnected(generation: ActiveGeneration, detail: String) {
         if (!generation.finish()) return
@@ -232,6 +181,42 @@ internal class BinderGenerationAdapter(
     }
 }
 
+private class GenerationDisconnectCoordinator(
+    private val active: ConcurrentHashMap<String, ActiveGeneration>,
+    private val callbackExecutor: ExecutorService,
+    private val closed: AtomicBoolean,
+    private val failureSink: (ActiveGeneration, String) -> Unit,
+) {
+    fun markStale(generation: ActiveGeneration, detail: String) {
+        if (generation.markDisconnected(detail)) scheduleDrain()
+    }
+
+    fun onEndpointInvalidated(connectionEpoch: Long, detail: String) {
+        if (closed.get()) return
+        active.values.forEach { generation ->
+            if (generation.endpoint.connectionEpoch == connectionEpoch) {
+                generation.markDisconnected(detail)
+            }
+        }
+        scheduleDrain()
+    }
+
+    fun drain() {
+        active.values.toList().forEach { generation ->
+            generation.disconnectionDetail?.let { detail -> failureSink(generation, detail) }
+        }
+    }
+
+    private fun scheduleDrain() {
+        if (closed.get()) return
+        try {
+            callbackExecutor.execute(::drain)
+        } catch (_: RejectedExecutionException) {
+            // An already-running or queued callback drains invalidations after it completes.
+        }
+    }
+}
+
 private sealed interface GenerationProcessingOutcome {
     data class Failure(val detail: String) : GenerationProcessingOutcome
     data class Ready(val event: GenerationEvent, val deliveries: List<GenerationEvent>) : GenerationProcessingOutcome
@@ -244,7 +229,7 @@ private class ActiveGeneration(
     val eventSink: (GenerationEvent) -> Unit,
     val reconstructor: GenerationEventReconstructor,
 ) {
-    private val terminal = AtomicBoolean(false)
+    private val terminalFlag = AtomicBoolean(false)
     private val cancelSent = AtomicBoolean(false)
     private val overflow = AtomicReference<String?>(null)
     private val disconnected = AtomicReference<String?>(null)
@@ -253,19 +238,22 @@ private class ActiveGeneration(
     private var pendingGeneratedTokens = 0
     private var aggregateCharacters = 0
 
-    fun isTerminal(): Boolean = terminal.get()
+    val terminal: Boolean
+        get() = terminalFlag.get()
 
-    fun finish(): Boolean = terminal.compareAndSet(false, true)
+    val overflowDetail: String?
+        get() = overflow.get()
+
+    val disconnectionDetail: String?
+        get() = disconnected.get()
+
+    fun finish(): Boolean = terminalFlag.compareAndSet(false, true)
 
     fun markCancelSent(): Boolean = cancelSent.compareAndSet(false, true)
 
     fun markOverflow(detail: String): Boolean = overflow.compareAndSet(null, detail)
 
-    fun overflowDetail(): String? = overflow.get()
-
     fun markDisconnected(detail: String): Boolean = disconnected.compareAndSet(null, detail)
-
-    fun disconnectionDetail(): String? = disconnected.get()
 
     fun deliver(event: GenerationEvent): Boolean = runCatching { eventSink(event) }.isSuccess
 
@@ -273,7 +261,29 @@ private class ActiveGeneration(
         runCatching { eventSink(event) }
     }
 
-    fun coalesce(event: GenerationEvent, maxAggregateCharacters: Int, deliveryChunkCharacters: Int): List<GenerationEvent>? {
+    fun accept(
+        wireEvent: GenerationEventParcel,
+        maxAggregateCharacters: Int,
+        deliveryChunkCharacters: Int,
+    ): GenerationProcessingOutcome {
+        val overflowFailure = overflowDetail
+        if (overflowFailure != null) return GenerationProcessingOutcome.Failure(overflowFailure)
+        val mapped = runCatching { reconstructor.accept(wireEvent) }
+            .getOrElse { error ->
+                return GenerationProcessingOutcome.Failure(error.message ?: "Invalid shared-runtime generation event")
+            }
+        val deliveries = coalesce(mapped, maxAggregateCharacters, deliveryChunkCharacters)
+            ?: return GenerationProcessingOutcome.Failure(
+                "Reconstructed generation output exceeded the client aggregate bound",
+            )
+        return GenerationProcessingOutcome.Ready(mapped, deliveries)
+    }
+
+    private fun coalesce(
+        event: GenerationEvent,
+        maxAggregateCharacters: Int,
+        deliveryChunkCharacters: Int,
+    ): List<GenerationEvent>? {
         if (event !is GenerationEvent.TextDelta) {
             return buildList {
                 flushPending()?.let(::add)
