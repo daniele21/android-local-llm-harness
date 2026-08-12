@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import android.os.DeadObjectException
 import android.os.Looper
 import android.os.RemoteException
 import io.github.daniele21.localllm.contracts.ModelDigest
@@ -39,11 +40,14 @@ internal data class BinderLifecycleTimeouts(val operationTimeoutMillis: Long = D
 
 internal class BinderLifecycleAdapter(
     private val endpointProvider: () -> RegisteredSharedRuntimeEndpoint?,
+    private val endpointInvalidations: SharedRuntimeEndpointInvalidationSource? = null,
     private val blockingCallGuard: BlockingCallGuard = AndroidMainThreadBlockingCallGuard,
     private val timeouts: BinderLifecycleTimeouts = BinderLifecycleTimeouts(),
     private val correlationIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
-) {
+) : AutoCloseable {
     private val closedSessions = ConcurrentHashMap.newKeySet<String>()
+    private val openSessions = ConcurrentHashMap<String, RegisteredSharedRuntimeEndpoint>()
+    private val invalidationSubscription = endpointInvalidations?.addListener { epoch, _ -> invalidateSessions(epoch) }
 
     fun prepare(useCaseId: UseCaseId): PrepareResult {
         blockingCallGuard.requireAllowed()
@@ -67,33 +71,34 @@ internal class BinderLifecycleAdapter(
             useCaseId = useCaseId.value,
             options = options.toWire(),
         )
-        val waiter = CallbackWaiter<SessionResultParcel>()
-        try {
-            endpoint.service.openSession(request, waiter::complete)
-        } catch (error: RemoteException) {
-            throw IllegalStateException("Shared runtime transport failed", error)
+        return when (val outcome = awaitRemoteCallback<SessionResultParcel>(endpoint) { callback ->
+            endpoint.service.openSession(request, callback)
+        }) {
+            RemoteCallbackOutcome.TransportFailure -> throw IllegalStateException("Shared runtime transport failed")
+            RemoteCallbackOutcome.Timeout -> {
+                closeRemoteSession(endpoint, externalSessionId)
+                throw IllegalStateException("Shared runtime open-session timed out")
+            }
+
+            is RemoteCallbackOutcome.Disconnected -> {
+                throw IllegalStateException("SERVICE_DISCONNECTED: ${outcome.detail}")
+            }
+
+            is RemoteCallbackOutcome.Received -> mapOpenSession(endpoint, operationId, externalSessionId, outcome.result)
         }
-        val result = requireNotNull(waiter.await(timeouts.operationTimeoutMillis)) {
-            "Shared runtime open-session timed out"
-        }
-        check(result.operationId == operationId) { "Shared runtime session correlation mismatch" }
-        result.error?.let { throw IllegalStateException(it.safeMessage) }
-        check(result.externalSessionId == externalSessionId) { "Shared runtime session identity mismatch" }
-        return SessionId(externalSessionId)
     }
 
     fun closeSession(sessionId: SessionId) {
         if (!closedSessions.add(sessionId.value)) return
-        val endpoint = endpointProvider() ?: return
-        val request = CloseSessionRequestParcel(
-            clientToken = endpoint.clientToken,
-            externalSessionId = sessionId.value,
-        )
-        try {
-            endpoint.service.closeSession(request)
-        } catch (_: RemoteException) {
-            // Oneway close is best effort. Disconnect cleanup remains host-owned.
-        }
+        val endpoint = openSessions.remove(sessionId.value) ?: return
+        closeRemoteSession(endpoint, sessionId.value)
+    }
+
+    override fun close() {
+        openSessions.keys.toList().forEach { sessionId -> closeSession(SessionId(sessionId)) }
+        invalidationSubscription?.close()
+        openSessions.clear()
+        closedSessions.clear()
     }
 
     private fun performPrepare(endpoint: RegisteredSharedRuntimeEndpoint, useCaseId: UseCaseId): PrepareResult {
@@ -103,23 +108,80 @@ internal class BinderLifecycleAdapter(
             operationId = operationId,
             useCaseId = useCaseId.value,
         )
-        return when (val outcome = awaitPrepare(endpoint, request)) {
-            PrepareCallbackOutcome.TransportFailure -> prepareFailure("Shared runtime transport failed")
-            PrepareCallbackOutcome.Timeout -> prepareFailure("Shared runtime prepare timed out")
-            is PrepareCallbackOutcome.Received -> mapPrepareResult(operationId, outcome.result)
+        return when (val outcome = awaitRemoteCallback<PrepareResultParcel>(endpoint) { callback ->
+            endpoint.service.prepare(request, callback)
+        }) {
+            RemoteCallbackOutcome.TransportFailure -> prepareFailure("Shared runtime transport failed")
+            RemoteCallbackOutcome.Timeout -> prepareFailure("Shared runtime prepare timed out")
+            is RemoteCallbackOutcome.Disconnected -> prepareFailure("SERVICE_DISCONNECTED: ${outcome.detail}")
+            is RemoteCallbackOutcome.Received -> {
+                if (isCurrentEndpoint(endpoint)) {
+                    mapPrepareResult(operationId, outcome.result)
+                } else {
+                    prepareFailure("SERVICE_DISCONNECTED: Shared-runtime registration changed")
+                }
+            }
         }
     }
 
-    private fun awaitPrepare(endpoint: RegisteredSharedRuntimeEndpoint, request: PrepareRequestParcel): PrepareCallbackOutcome {
-        val waiter = CallbackWaiter<PrepareResultParcel>()
+    private fun mapOpenSession(
+        endpoint: RegisteredSharedRuntimeEndpoint,
+        operationId: String,
+        externalSessionId: String,
+        result: SessionResultParcel,
+    ): SessionId {
+        check(isCurrentEndpoint(endpoint)) { "SERVICE_DISCONNECTED: Shared-runtime registration changed" }
+        check(result.operationId == operationId) { "Shared runtime session correlation mismatch" }
+        result.error?.let { throw IllegalStateException(it.safeMessage) }
+        check(result.externalSessionId == externalSessionId) { "Shared runtime session identity mismatch" }
+        closedSessions.remove(externalSessionId)
+        openSessions[externalSessionId] = endpoint
+        return SessionId(externalSessionId)
+    }
+
+    private fun <T : Any> awaitRemoteCallback(
+        endpoint: RegisteredSharedRuntimeEndpoint,
+        call: ((T) -> Unit) -> Unit,
+    ): RemoteCallbackOutcome<T> {
+        val waiter = CallbackWaiter<T>()
+        val operationInvalidation = endpointInvalidations?.addListener { epoch, detail ->
+            if (epoch == endpoint.connectionEpoch) waiter.disconnect(detail)
+        }
         return try {
-            endpoint.service.prepare(request, waiter::complete)
-            waiter.await(timeouts.operationTimeoutMillis)?.let(PrepareCallbackOutcome::Received)
-                ?: PrepareCallbackOutcome.Timeout
+            call(waiter::complete)
+            waiter.await(timeouts.operationTimeoutMillis)
+        } catch (_: DeadObjectException) {
+            RemoteCallbackOutcome.Disconnected("Host Binder object died")
         } catch (_: RemoteException) {
-            PrepareCallbackOutcome.TransportFailure
+            RemoteCallbackOutcome.TransportFailure
+        } finally {
+            operationInvalidation?.close()
         }
     }
+
+    private fun closeRemoteSession(endpoint: RegisteredSharedRuntimeEndpoint, externalSessionId: String) {
+        if (!isCurrentEndpoint(endpoint)) return
+        val request = CloseSessionRequestParcel(
+            clientToken = endpoint.clientToken,
+            externalSessionId = externalSessionId,
+        )
+        try {
+            endpoint.service.closeSession(request)
+        } catch (_: RemoteException) {
+            // Oneway close is best effort. Disconnect cleanup remains host-owned.
+        }
+    }
+
+    private fun invalidateSessions(epoch: Long) {
+        openSessions.forEach { (sessionId, endpoint) ->
+            if (endpoint.connectionEpoch == epoch) {
+                openSessions.remove(sessionId, endpoint)
+            }
+        }
+    }
+
+    private fun isCurrentEndpoint(endpoint: RegisteredSharedRuntimeEndpoint): Boolean =
+        endpointProvider()?.connectionEpoch == endpoint.connectionEpoch
 
     private fun mapPrepareResult(operationId: String, result: PrepareResultParcel): PrepareResult {
         val error = result.error
@@ -137,10 +199,11 @@ internal class BinderLifecycleAdapter(
     }
 }
 
-private sealed interface PrepareCallbackOutcome {
-    data object TransportFailure : PrepareCallbackOutcome
-    data object Timeout : PrepareCallbackOutcome
-    data class Received(val result: PrepareResultParcel) : PrepareCallbackOutcome
+private sealed interface RemoteCallbackOutcome<out T : Any> {
+    data object TransportFailure : RemoteCallbackOutcome<Nothing>
+    data object Timeout : RemoteCallbackOutcome<Nothing>
+    data class Disconnected(val detail: String) : RemoteCallbackOutcome<Nothing>
+    data class Received<T : Any>(val result: T) : RemoteCallbackOutcome<T>
 }
 
 private fun prepareFailure(detail: String): PrepareResult = PrepareResult(false, null, detail)
@@ -155,13 +218,26 @@ private object AndroidMainThreadBlockingCallGuard : BlockingCallGuard {
 
 private class CallbackWaiter<T : Any> {
     private val latch = CountDownLatch(1)
-    private val result = AtomicReference<T?>(null)
+    private val outcome = AtomicReference<RemoteCallbackOutcome<T>?>(null)
 
     fun complete(value: T) {
-        if (result.compareAndSet(null, value)) {
+        complete(RemoteCallbackOutcome.Received(value))
+    }
+
+    fun disconnect(detail: String) {
+        complete(RemoteCallbackOutcome.Disconnected(detail))
+    }
+
+    fun await(timeoutMillis: Long): RemoteCallbackOutcome<T> =
+        if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
+            requireNotNull(outcome.get())
+        } else {
+            RemoteCallbackOutcome.Timeout
+        }
+
+    private fun complete(value: RemoteCallbackOutcome<T>) {
+        if (outcome.compareAndSet(null, value)) {
             latch.countDown()
         }
     }
-
-    fun await(timeoutMillis: Long): T? = if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) result.get() else null
 }
