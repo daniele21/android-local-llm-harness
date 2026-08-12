@@ -53,3 +53,22 @@ internal fun interface SharedRuntimeEndpointInvalidationListener {
 internal fun interface SharedRuntimeEndpointInvalidationSource {
     fun addListener(listener: SharedRuntimeEndpointInvalidationListener): AutoCloseable
 }
+
+internal class EndpointInvalidationRegistry {
+    private val lock = Any()
+    private val listeners = mutableSetOf<SharedRuntimeEndpointInvalidationListener>()
+
+    val source = SharedRuntimeEndpointInvalidationSource { listener ->
+        synchronized(lock) { listeners += listener }
+        object : AutoCloseable {
+            override fun close() {
+                synchronized(lock) { listeners -= listener }
+            }
+        }
+    }
+
+    fun notify(connectionEpoch: Long, detail: String) {
+        val snapshot = synchronized(lock) { listeners.toList() }
+        snapshot.forEach { listener -> runCatching { listener.onEndpointInvalidated(connectionEpoch, detail) } }
+    }
+}
