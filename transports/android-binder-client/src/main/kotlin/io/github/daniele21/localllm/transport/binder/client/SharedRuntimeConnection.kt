@@ -135,11 +135,7 @@ class SharedRuntimeConnection internal constructor(
         }
     }
 
-    private fun handleRegistration(
-        service: SharedRuntimeRemoteService,
-        negotiated: NegotiatedProtocol,
-        result: RegistrationResultParcel,
-    ) {
+    private fun handleRegistration(service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol, result: RegistrationResultParcel) {
         synchronized(lock) {
             if (current.state != SharedRuntimeConnectionState.NEGOTIATING) return
         }
@@ -150,6 +146,7 @@ class SharedRuntimeConnection internal constructor(
                 -> incompatible(error.safeMessage)
 
                 WireErrorCodes.CLIENT_NOT_REGISTERED -> permissionDenied(error.safeMessage)
+
                 else -> connectionLost(error.safeMessage)
             }
             return
