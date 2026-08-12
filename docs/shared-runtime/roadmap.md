@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime
 Canonical scope: shared-runtime.roadmap
 Read when: selecting a shared-runtime milestone, checking dependencies or defining a focused pull request
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-12
 
 This roadmap owns capability order and exit gates. Detailed behavior belongs in the linked workstreams; integrated repository priority and blockers remain in [`../current-state.md`](../current-state.md).
 
@@ -70,6 +70,8 @@ Goal: expose the existing data plane through an authenticated, lifecycle-safe An
 Owner: [`workstreams/host-service.md`](workstreams/host-service.md)
 
 Dependencies: SR-0 and SR-1.
+
+Progress: **SR-HOST-01 through SR-HOST-07 are implemented. SR-HOST-08 and SR-HOST-09 remain before the SR-2 exit gate can be declared complete.**
 
 Exit gate:
 
