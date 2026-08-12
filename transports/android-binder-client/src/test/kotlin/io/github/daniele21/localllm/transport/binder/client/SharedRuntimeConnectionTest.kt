@@ -120,10 +120,7 @@ class SharedRuntimeConnectionTest {
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = hostExists
 
-        override fun bind(
-            hostConfig: SharedRuntimeHostConfig,
-            callbacks: SharedRuntimeBindingCallbacks,
-        ): SharedRuntimeBindResult {
+        override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
             bindCalls += 1
             if (bindResult == SharedRuntimeBindResult.STARTED) {
                 this.callbacks = callbacks
