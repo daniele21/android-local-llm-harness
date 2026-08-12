@@ -88,18 +88,31 @@ class BinderLifecycleAdapterTest {
     }
 
     @Test
+    fun `prepare wakes immediately when its endpoint epoch is invalidated`() {
+        val invalidations = FakeEndpointInvalidations()
+        val endpoint = RegisteredSharedRuntimeEndpoint(
+            FakeSharedRuntimeRemoteService(),
+            token,
+            connectionEpoch = 3L,
+        )
+        endpoint.service.prepareHandler = { _, _ -> invalidations.invalidate(3L, "host died") }
+        val adapter = BinderLifecycleAdapter(
+            endpointProvider = { endpoint },
+            endpointInvalidations = invalidations,
+            blockingCallGuard = BlockingCallGuard {},
+            timeouts = BinderLifecycleTimeouts(5_000),
+            correlationIds = deterministicIds(),
+        )
+
+        val result = adapter.prepare(useCaseId)
+
+        assertFalse(result.ready)
+        assertEquals("SERVICE_DISCONNECTED: host died", result.detail)
+    }
+
+    @Test
     fun `open session maps opaque external session id`() {
-        val service = FakeSharedRuntimeRemoteService().apply {
-            openSessionHandler = { request, callback ->
-                callback(
-                    SessionResultParcel(
-                        operationId = request.operationId,
-                        externalSessionId = request.externalSessionId,
-                        error = null,
-                    ),
-                )
-            }
-        }
+        val service = successfulSessionService()
         val adapter = adapter(service)
 
         val sessionId = adapter.openSession(
@@ -140,15 +153,78 @@ class BinderLifecycleAdapterTest {
     }
 
     @Test
-    fun `close session is best effort and idempotent`() {
+    fun `open session timeout closes the known external id best effort`() {
+        val service = FakeSharedRuntimeRemoteService().apply {
+            openSessionHandler = { _, _ -> Unit }
+        }
+        val adapter = adapter(service, timeoutMillis = 1)
+
+        val failure = assertThrows(IllegalStateException::class.java) {
+            adapter.openSession(useCaseId, SessionOptions())
+        }
+
+        assertEquals("Shared runtime open-session timed out", failure.message)
+        assertEquals(1, service.closeSessionCalls)
+    }
+
+    @Test
+    fun `open session endpoint invalidation becomes service disconnected`() {
+        val invalidations = FakeEndpointInvalidations()
         val service = FakeSharedRuntimeRemoteService()
+        val endpoint = RegisteredSharedRuntimeEndpoint(service, token, connectionEpoch = 5L)
+        service.openSessionHandler = { _, _ -> invalidations.invalidate(5L, "binder died") }
+        val adapter = BinderLifecycleAdapter(
+            endpointProvider = { endpoint },
+            endpointInvalidations = invalidations,
+            blockingCallGuard = BlockingCallGuard {},
+            timeouts = BinderLifecycleTimeouts(5_000),
+            correlationIds = deterministicIds(),
+        )
+
+        val failure = assertThrows(IllegalStateException::class.java) {
+            adapter.openSession(useCaseId, SessionOptions())
+        }
+
+        assertEquals("SERVICE_DISCONNECTED: binder died", failure.message)
+    }
+
+    @Test
+    fun `close session is best effort and idempotent for its owning epoch`() {
+        val service = successfulSessionService()
         val adapter = adapter(service)
-        val sessionId = SessionId("session-1")
+        val sessionId = adapter.openSession(useCaseId, SessionOptions())
 
         adapter.closeSession(sessionId)
         adapter.closeSession(sessionId)
 
         assertEquals(1, service.closeSessionCalls)
+    }
+
+    @Test
+    fun `old session is never closed against a replacement registration`() {
+        val oldService = successfulSessionService()
+        val newService = FakeSharedRuntimeRemoteService()
+        var endpoint: RegisteredSharedRuntimeEndpoint? = RegisteredSharedRuntimeEndpoint(
+            oldService,
+            token,
+            connectionEpoch = 1L,
+        )
+        val adapter = BinderLifecycleAdapter(
+            endpointProvider = { endpoint },
+            blockingCallGuard = BlockingCallGuard {},
+            correlationIds = deterministicIds(),
+        )
+        val sessionId = adapter.openSession(useCaseId, SessionOptions())
+
+        endpoint = RegisteredSharedRuntimeEndpoint(
+            newService,
+            successfulRegistration().clientToken!!,
+            connectionEpoch = 2L,
+        )
+        adapter.closeSession(sessionId)
+
+        assertEquals(0, oldService.closeSessionCalls)
+        assertEquals(0, newService.closeSessionCalls)
     }
 
     private fun adapter(service: FakeSharedRuntimeRemoteService, timeoutMillis: Long = 100): BinderLifecycleAdapter =
@@ -158,6 +234,18 @@ class BinderLifecycleAdapterTest {
             timeouts = BinderLifecycleTimeouts(timeoutMillis),
             correlationIds = deterministicIds(),
         )
+
+    private fun successfulSessionService(): FakeSharedRuntimeRemoteService = FakeSharedRuntimeRemoteService().apply {
+        openSessionHandler = { request, callback ->
+            callback(
+                SessionResultParcel(
+                    operationId = request.operationId,
+                    externalSessionId = request.externalSessionId,
+                    error = null,
+                ),
+            )
+        }
+    }
 
     private fun deterministicIds(): CorrelationIdSource {
         var next = 0
