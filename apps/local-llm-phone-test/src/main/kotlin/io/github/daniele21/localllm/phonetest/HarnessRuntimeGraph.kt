@@ -2,16 +2,8 @@ package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
 import io.github.daniele21.localllm.contracts.ApplicationId
-import io.github.daniele21.localllm.contracts.GenerationHandle
-import io.github.daniele21.localllm.contracts.GenerationListener
-import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
-import io.github.daniele21.localllm.contracts.PrepareResult
-import io.github.daniele21.localllm.contracts.RuntimeSnapshot
-import io.github.daniele21.localllm.contracts.RuntimeState
-import io.github.daniele21.localllm.contracts.SessionId
-import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
@@ -57,36 +49,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private var runtime: RuntimeOrchestrator? = null
     private var runtimeClient: LocalLlmClient? = null
     private var runtimeModelDigest: ModelDigest? = null
-
-    private val sharedRuntimeClientFacade = object : LocalLlmClient {
-        override fun runtimeSnapshot(): RuntimeSnapshot = currentRuntimeClient()?.runtimeSnapshot()
-            ?: RuntimeSnapshot(
-                state = RuntimeState.IDLE,
-                loadedModel = null,
-                activeSessions = 0,
-                queuedRequests = 0,
-            )
-
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-            currentRuntimeClient()?.prepare(applicationId, useCaseId)
-                ?: PrepareResult(
-                    ready = false,
-                    modelDigest = null,
-                    detail = "Host runtime is not prepared",
-                )
-
-        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
-            requireRuntimeClient().createSession(applicationId, useCaseId)
-
-        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId =
-            requireRuntimeClient().createSession(applicationId, useCaseId, options)
-
-        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
-            requireRuntimeClient().generate(request, listener)
-
-        override fun closeSession(sessionId: SessionId) {
-            requireRuntimeClient().closeSession(sessionId)
-        }
+    private val sharedRuntimeClientFacade = HarnessSharedRuntimeClient {
+        synchronized(lock) { runtimeClient }
     }
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
@@ -134,10 +98,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     override fun close() {
         synchronized(lock) { closeRuntimeLocked() }
     }
-
-    private fun currentRuntimeClient(): LocalLlmClient? = synchronized(lock) { runtimeClient }
-
-    private fun requireRuntimeClient(): LocalLlmClient = currentRuntimeClient() ?: error("Host runtime is not prepared")
 
     private fun ensureRuntimeFor(model: ImportedPhoneModel) {
         if (runtime != null && runtimeModelDigest == model.digest) return
