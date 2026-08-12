@@ -65,26 +65,21 @@ class SharedRuntimeConsoleInferenceControl(
                 },
             )
         }
-        return outcome.copy(
-            state = outcome.state.copy(
-                connectionState = ConsoleInferenceConnectionState.CONNECTED,
-                source = source,
-            ),
-        )
+        return outcome.withConnectedSource(source)
     }
 
     override fun cancel(): ConsoleInferenceOperationOutcome = synchronized(lock) {
         if (client.connectionSnapshot.state != SharedRuntimeConnectionState.CONNECTED) {
             unavailable(CONNECTION_REQUIRED)
         } else {
-            connected(delegate.cancel())
+            delegate.cancel().withConnectedSource(source)
         }
     }
 
     override fun clear(): ConsoleInferenceOperationOutcome = synchronized(lock) {
         val outcome = delegate.clear()
         if (client.connectionSnapshot.state == SharedRuntimeConnectionState.CONNECTED) {
-            connected(outcome)
+            outcome.withConnectedSource(source)
         } else {
             outcome.copy(state = snapshot())
         }
@@ -95,13 +90,6 @@ class SharedRuntimeConsoleInferenceControl(
         current.close()
         client.close()
     }
-
-    private fun connected(outcome: ConsoleInferenceOperationOutcome): ConsoleInferenceOperationOutcome = outcome.copy(
-        state = outcome.state.copy(
-            connectionState = ConsoleInferenceConnectionState.CONNECTED,
-            source = source,
-        ),
-    )
 
     private fun unavailable(detail: String): ConsoleInferenceOperationOutcome {
         val current = snapshot().copy(sourceError = detail)
@@ -156,6 +144,13 @@ class SharedRuntimeConsoleInferenceControl(
         )
     }
 }
+
+private fun ConsoleInferenceOperationOutcome.withConnectedSource(source: String): ConsoleInferenceOperationOutcome = copy(
+    state = state.copy(
+        connectionState = ConsoleInferenceConnectionState.CONNECTED,
+        source = source,
+    ),
+)
 
 private fun SharedRuntimeConnectionState.toConsoleConnectionState(): ConsoleInferenceConnectionState = when (this) {
     SharedRuntimeConnectionState.DISCONNECTED -> ConsoleInferenceConnectionState.DISCONNECTED
