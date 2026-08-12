@@ -78,11 +78,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
             requireRuntimeClient().createSession(applicationId, useCaseId)
 
-        override fun createSession(
-            applicationId: ApplicationId,
-            useCaseId: UseCaseId,
-            options: SessionOptions,
-        ): SessionId = requireRuntimeClient().createSession(applicationId, useCaseId, options)
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId =
+            requireRuntimeClient().createSession(applicationId, useCaseId, options)
 
         override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
             requireRuntimeClient().generate(request, listener)
@@ -140,8 +137,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     private fun currentRuntimeClient(): LocalLlmClient? = synchronized(lock) { runtimeClient }
 
-    private fun requireRuntimeClient(): LocalLlmClient =
-        currentRuntimeClient() ?: error("Host runtime is not prepared")
+    private fun requireRuntimeClient(): LocalLlmClient = currentRuntimeClient() ?: error("Host runtime is not prepared")
 
     private fun ensureRuntimeFor(model: ImportedPhoneModel) {
         if (runtime != null && runtimeModelDigest == model.digest) return
