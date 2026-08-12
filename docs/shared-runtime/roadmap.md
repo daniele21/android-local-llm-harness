@@ -16,7 +16,7 @@ SR-0 Decision and scope                    DONE
    |
 SR-1 Binder protocol v1                    DONE
    |--------------------------|
-SR-2 Host service          SR-3 Client SDK DONE / PLANNED
+SR-2 Host service          SR-3 Client SDK DONE / IN PROGRESS
    |--------------------------|
 SR-4 Two-APK vertical slice                PLANNED
    |
@@ -83,13 +83,15 @@ Exit gate:
 
 ## SR-3 — Client SDK
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: hide AIDL plumbing behind a lifecycle-safe client artifact.
 
 Owner: [`workstreams/client-sdk.md`](workstreams/client-sdk.md)
 
-Dependencies: SR-0 and SR-1. SR-2 is now complete for the proof host, so client SDK implementation is the next shared-runtime workstream.
+Dependencies: SR-0 and SR-1. SR-2 is complete for the proof host.
+
+Progress: **SR-CLIENT-01 and SR-CLIENT-02 are implemented on the active client-SDK branch: the new `transports/android-binder-client` module owns exact host configuration plus explicit bind/protocol-negotiation/disconnect state. Registration and `LocalLlmClient` adaptation are next.**
 
 Exit gate:
 
