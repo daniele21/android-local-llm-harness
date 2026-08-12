@@ -71,14 +71,12 @@ class HarnessSharedRuntimeClientTest {
             return PrepareResult(true, ModelDigest("ab".repeat(32)), "ready")
         }
 
-        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
-            error("not used")
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId = error("not used")
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId =
             error("not used")
 
-        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
-            error("not used")
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle = error("not used")
 
         override fun closeSession(sessionId: SessionId) = Unit
     }
