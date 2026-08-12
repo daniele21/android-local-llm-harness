@@ -1,7 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import io.github.daniele21.localllm.contracts.ContextPolicy
-import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -90,12 +89,9 @@ class BinderLifecycleAdapterTest {
     @Test
     fun `prepare wakes immediately when its endpoint epoch is invalidated`() {
         val invalidations = FakeEndpointInvalidations()
-        val endpoint = RegisteredSharedRuntimeEndpoint(
-            FakeSharedRuntimeRemoteService(),
-            token,
-            connectionEpoch = 3L,
-        )
-        endpoint.service.prepareHandler = { _, _ -> invalidations.invalidate(3L, "host died") }
+        val service = FakeSharedRuntimeRemoteService()
+        val endpoint = RegisteredSharedRuntimeEndpoint(service, token, connectionEpoch = 3L)
+        service.prepareHandler = { _, _ -> invalidations.invalidate(3L, "host died") }
         val adapter = BinderLifecycleAdapter(
             endpointProvider = { endpoint },
             endpointInvalidations = invalidations,
