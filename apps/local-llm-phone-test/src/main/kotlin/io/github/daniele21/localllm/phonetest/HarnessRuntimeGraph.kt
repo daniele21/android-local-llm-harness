@@ -181,12 +181,14 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
         }
         return when (applicationId) {
             HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
+
             HarnessSharedRuntimeBindings.consoleApplicationId -> {
                 require(useCaseId == HarnessSharedRuntimeBindings.consoleUseCaseId) {
                     "Unknown useCaseId ${useCaseId.value}"
                 }
                 HarnessSharedRuntimeBindings.resolveConsole(selected)
             }
+
             else -> error("Unknown applicationId ${applicationId.value}")
         }
     }
