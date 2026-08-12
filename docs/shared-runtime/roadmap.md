@@ -16,7 +16,7 @@ SR-0 Decision and scope                    DONE
    |
 SR-1 Binder protocol v1                    DONE
    |--------------------------|
-SR-2 Host service          SR-3 Client SDK DONE / IN PROGRESS
+SR-2 Host service          SR-3 Client SDK DONE / DONE
    |--------------------------|
 SR-4 Two-APK vertical slice                PLANNED
    |
@@ -83,7 +83,7 @@ Exit gate:
 
 ## SR-3 — Client SDK
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Goal: hide AIDL plumbing behind a lifecycle-safe client artifact.
 
@@ -91,7 +91,7 @@ Owner: [`workstreams/client-sdk.md`](workstreams/client-sdk.md)
 
 Dependencies: SR-0 and SR-1. SR-2 is complete for the proof host.
 
-Progress: **SR-CLIENT-01 through SR-CLIENT-06 are implemented on the active client-SDK branch. The client now owns explicit binding and v1 negotiation, registered-client lifecycle, non-main prepare/session adaptation, ordered bounded streaming reconstruction, idempotent cancellation and connection-epoch/dead-object/timeout handling without automatic replay. Console composition (`SR-CLIENT-07`) and packaged-AAR/API hardening (`SR-CLIENT-08`) remain.**
+Progress: **SR-CLIENT-01 through SR-CLIENT-08 are implemented. The client exposes a high-level `BinderLocalLlmClient` over exact binding, v1 negotiation, registered-client lifecycle, non-main prepare/session adaptation, ordered bounded streaming, idempotent cancellation and deterministic epoch/dead-object/timeout handling. The Console now has explicit shared-runtime connect/retry states and a remote inference target without conflating proof-host inference with console-local diagnostics. Packaged client/contract AAR consumption, consumer shrinker rules and client-AAR structure are repository-validated.**
 
 Exit gate:
 
@@ -113,7 +113,7 @@ Planned slice:
 
 - `apps/local-llm-phone-test` exposes the completed proof host service and exact same-signer console binding;
 - the host user explicitly installs/selects a curated Qwen3.5 model;
-- `apps/local-llm-console` connects through the SR-3 client adapter and uses its existing inference control;
+- `apps/local-llm-console` connects through the completed SR-3 client adapter and uses its existing inference control;
 - prepare, open session, stream, cancel, complete and close cross the real process boundary;
 - disconnected, unavailable and incompatible states remain distinct in the console.
 
