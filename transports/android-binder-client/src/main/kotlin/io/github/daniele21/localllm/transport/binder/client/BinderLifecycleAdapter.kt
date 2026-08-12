@@ -14,6 +14,7 @@ import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParce
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.toWire
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -42,6 +43,8 @@ internal class BinderLifecycleAdapter(
     private val timeouts: BinderLifecycleTimeouts = BinderLifecycleTimeouts(),
     private val correlationIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
 ) {
+    private val closedSessions = ConcurrentHashMap.newKeySet<String>()
+
     fun prepare(useCaseId: UseCaseId): PrepareResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider()
@@ -99,6 +102,7 @@ internal class BinderLifecycleAdapter(
     }
 
     fun closeSession(sessionId: SessionId) {
+        if (!closedSessions.add(sessionId.value)) return
         val endpoint = endpointProvider() ?: return
         val request = CloseSessionRequestParcel(
             clientToken = endpoint.clientToken,
