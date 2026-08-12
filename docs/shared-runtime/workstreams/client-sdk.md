@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-client
 Canonical scope: shared-runtime.client-sdk
 Read when: implementing service binding, the Binder-backed client, callback mapping or console consumer integration
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-12
 
 ## Goal
 
@@ -28,7 +28,7 @@ Provide a small Android client artifact that binds explicitly to the host, negot
 
 Do not import host runtime, backend, model-store or phone UI code into the client module.
 
-## Planned owner
+## Owner
 
 `transports/android-binder-client` owns:
 
@@ -41,6 +41,14 @@ Do not import host runtime, backend, model-store or phone UI code into the clien
 - mapping to the supported `LocalLlmClient` surface.
 
 The first consumer is `apps/local-llm-console`. A published consumer SDK is a later SR-6 output, not implied by creating the internal module.
+
+Current implementation status:
+
+- the Android library module exists and exposes an explicit `SharedRuntimeHostConfig` using exact package/service identity;
+- no package scanning or implicit service discovery is present;
+- `SharedRuntimeConnection` performs explicit bind, v1 protocol negotiation, typed connection-state transitions and idempotent close;
+- Android binding details stay behind an internal environment boundary so connection behavior is deterministic under JVM tests;
+- registration, lifecycle adaptation, streaming reconstruction and console consumption remain subsequent SR-3 tasks.
 
 ## Connection API
 
@@ -158,8 +166,8 @@ Before publication, validate source/binary API and one consumer project using th
 
 | ID | State | Task |
 | --- | --- | --- |
-| SR-CLIENT-01 | PLANNED | Create client module and explicit host-component configuration. |
-| SR-CLIENT-02 | PLANNED | Implement typed bind/negotiate/disconnect state machine. |
+| SR-CLIENT-01 | DONE | Create client module and explicit host-component configuration. |
+| SR-CLIENT-02 | DONE | Implement typed bind/negotiate/disconnect state machine. |
 | SR-CLIENT-03 | PLANNED | Implement registration and non-main blocking adapter for lifecycle calls. |
 | SR-CLIENT-04 | PLANNED | Implement ordered callback mapper and bounded terminal reconstruction. |
 | SR-CLIENT-05 | PLANNED | Implement idempotent generation handle, cancellation and close. |
@@ -196,4 +204,12 @@ Tests cover:
 
 ## Focused validation
 
-When the module exists, run its unit/compile/lint/AAR checks and console unit/lint/assembly checks. Run packaged-AAR consumer verification before publication. Multi-app and physical-device execution belongs to [`validation-rollout.md`](validation-rollout.md).
+Run:
+
+```bash
+./gradlew :transports:android-binder-client:testDebugUnitTest \
+  :transports:android-binder-client:lintDebug \
+  :transports:android-binder-client:assembleDebug
+```
+
+The repository-wide Android gate also includes the client module. Run packaged-AAR consumer verification before publication. Multi-app and physical-device execution belongs to [`validation-rollout.md`](validation-rollout.md).
