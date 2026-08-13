@@ -1,0 +1,40 @@
+name: Agent CA2 roadmap
+
+on:
+  push:
+    branches:
+      - agent/consumer-api-ca2
+
+permissions:
+  contents: write
+
+jobs:
+  update-roadmap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/consumer-api-ca2
+          fetch-depth: 1
+      - name: Mark CA-2 in progress
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('docs/shared-runtime/consumer-api/roadmap.md')
+          text = path.read_text()
+          marker = '## CA-2 — Public surface\n\nState: **PLANNED**'
+          replacement = '## CA-2 — Public surface\n\nState: **IN PROGRESS**'
+          if marker not in text:
+              raise SystemExit('CA-2 planned marker not found')
+          path.write_text(text.replace(marker, replacement, 1))
+          PY
+      - name: Commit roadmap and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/agent-ca2-roadmap.yml
+          git add docs/shared-runtime/consumer-api/roadmap.md
+          git commit -m "docs(consumer-api): mark CA-2 in progress"
+          git push origin HEAD:agent/consumer-api-ca2
