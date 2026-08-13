@@ -258,10 +258,7 @@ private fun createClient(buildId: String): BinderLocalLlmClient {
     )
 }
 
-private fun awaitConnection(
-    client: BinderLocalLlmClient,
-    expected: SharedRuntimeConnectionState,
-): Boolean {
+private fun awaitConnection(client: BinderLocalLlmClient, expected: SharedRuntimeConnectionState): Boolean {
     val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CONNECTION_TIMEOUT_SECONDS)
     while (System.nanoTime() < deadline) {
         if (client.connectionSnapshot.state == expected) return true
