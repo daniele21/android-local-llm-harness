@@ -86,7 +86,7 @@ class SharedRuntimeResilienceAcceptanceTest {
 
         assertEquals("Preparation failed", parcel.detail)
         assertFalse(parcel.detail.orEmpty().contains(sentinel))
-        assertFalse(parcel.error?.message.orEmpty().contains(sentinel))
+        assertFalse(parcel.error?.safeMessage.orEmpty().contains(sentinel))
     }
 
     @Test
