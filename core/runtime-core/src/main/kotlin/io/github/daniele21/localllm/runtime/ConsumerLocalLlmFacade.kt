@@ -79,21 +79,9 @@ class ConsumerLocalLlmFacade(
             ?: return ConsumerSessionResult.Rejected(
                 ConsumerFailure(ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND, "Prepared selection is unavailable"),
             )
-        val request = binding.selection.toSelectionRequest()
-        val validated = policyService.validateSelection(applicationId, binding.selection.useCaseId, request)
-        if (validated is ConsumerPolicyDecision.Rejected) {
-            val failure = if (validated.code == ConsumerCapabilityErrorCode.STALE_CAPABILITY) {
-                ConsumerFailure(ConsumerErrorCode.PREPARED_SELECTION_STALE, "Prepared selection is stale")
-            } else {
-                validated.toFailure()
-            }
-            return ConsumerSessionResult.Rejected(failure)
-        }
-        validated as ConsumerPolicyDecision.Accepted
-        if (!binding.selection.matches(validated)) {
-            return ConsumerSessionResult.Rejected(
-                ConsumerFailure(ConsumerErrorCode.PREPARED_SELECTION_STALE, "Prepared selection no longer matches host policy"),
-            )
+        val validationFailure = preparedBindingFailure(binding)
+        if (validationFailure != null) {
+            return ConsumerSessionResult.Rejected(validationFailure)
         }
 
         val sessionId = runCatching {
@@ -109,6 +97,26 @@ class ConsumerLocalLlmFacade(
         sessions[sessionId] = SessionBinding(binding.selection, binding.limits)
         preparedSelections.remove(preparedId, binding)
         return ConsumerSessionResult.Created(sessionId)
+    }
+
+    private fun preparedBindingFailure(binding: PreparedBinding): ConsumerFailure? {
+        val request = binding.selection.toSelectionRequest()
+        return when (val validated = policyService.validateSelection(applicationId, binding.selection.useCaseId, request)) {
+            is ConsumerPolicyDecision.Rejected -> if (validated.code == ConsumerCapabilityErrorCode.STALE_CAPABILITY) {
+                ConsumerFailure(ConsumerErrorCode.PREPARED_SELECTION_STALE, "Prepared selection is stale")
+            } else {
+                validated.toFailure()
+            }
+
+            is ConsumerPolicyDecision.Accepted -> if (binding.selection.matches(validated)) {
+                null
+            } else {
+                ConsumerFailure(
+                    ConsumerErrorCode.PREPARED_SELECTION_STALE,
+                    "Prepared selection no longer matches host policy",
+                )
+            }
+        }
     }
 
     override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
