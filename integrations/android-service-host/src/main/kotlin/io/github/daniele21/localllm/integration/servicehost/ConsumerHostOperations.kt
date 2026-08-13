@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class ConsumerHostOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
+    private val consumerResources: ConsumerHostResources,
     private val controlExecutor: HostControlExecutor,
 ) {
     fun capabilities(
@@ -114,7 +115,7 @@ internal class ConsumerHostOperations(
                             result.sessionId,
                         )
                 ) {
-                    is LedgerResult.Success -> resources.markConsumerSession(context.token, result.sessionId)
+                    is LedgerResult.Success -> consumerResources.markSession(context.token, result.sessionId)
                     is LedgerResult.Failure -> {
                         runCatching { context.client.closeSession(result.sessionId) }
                         callback.onResult(failureResult(request.operationId, registered.reason.toWireCode()))
@@ -154,11 +155,11 @@ internal class ConsumerHostOperations(
             val sessionId =
                 ledger.sessionId(token, caller, request.externalSessionId).successOrNull()
                     ?: return@submitOrReject
-            if (!resources.isConsumerSession(token, sessionId)) return@submitOrReject
-            val client = resources.consumerClient(token) ?: return@submitOrReject
+            if (!consumerResources.ownsSession(token, sessionId)) return@submitOrReject
+            val client = consumerResources.client(token) ?: return@submitOrReject
             try {
                 client.closeSession(sessionId)
-                resources.removeConsumerSession(token, sessionId)
+                consumerResources.removeSession(token, sessionId)
                 ledger.removeSession(token, caller, request.externalSessionId)
             } catch (_: RuntimeException) {
                 // Preserve ownership so death/disconnect cleanup can retry.
@@ -180,7 +181,7 @@ internal class ConsumerHostOperations(
         }
         val dispatcher = resources.callbackDispatcher(context.token)
         val sessionId = ledger.sessionId(context.token, caller, externalSessionId).successOrNull()
-        if (dispatcher == null || sessionId == null || !resources.isConsumerSession(context.token, sessionId)) {
+        if (dispatcher == null || sessionId == null || !consumerResources.ownsSession(context.token, sessionId)) {
             callback.onEvent(failureEvent(externalRequestId, WireErrorCodes.SESSION_UNAVAILABLE))
             return
         }
@@ -221,7 +222,7 @@ internal class ConsumerHostOperations(
                 }.getOrNull()
         ) {
             is ConsumerGenerationStartResult.Accepted -> {
-                resources.attachConsumerHandle(start.handle)
+                resources.attachHandle(start.handle.requestId, ConsumerGenerationHandleBridge(start.handle))
                 if (ledger.requestId(context.token, caller, externalRequestId).successOrNull() == null) {
                     resources.removeHandle(requestId)
                 }
@@ -253,7 +254,7 @@ internal class ConsumerHostOperations(
         if (request.operationId.isBlank()) return null
         val token = request.clientToken.toHostTokenOrNull() ?: return null
         if (ledger.validateConnection(token, caller).failureOrNull() != null) return null
-        val client = resources.consumerClient(token) ?: return null
+        val client = consumerResources.client(token) ?: return null
         return ConsumerContext(token, client)
     }
 
