@@ -7,18 +7,20 @@ import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnect
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig
 
-/** Compile-only consumer proving the reviewed Binder client API from packaged AARs. */
+/** Packaged-AAR consumer used by SR-3 packaging checks and SR-6 release-like device evidence. */
 class PackagedBinderClientConsumer(context: Context) : AutoCloseable {
-    private val client = BinderLocalLlmClient.create(
-        context = context,
-        hostConfig = SharedRuntimeHostConfig.create(
-            "io.github.daniele21.localllm.phonetest.debug",
-            "io.github.daniele21.localllm.phonetest.HarnessSharedRuntimeService",
-        ),
-        applicationId = ApplicationId("local-llm-console"),
-        clientBuildId = "packaged-consumer-fixture",
-        observer = SharedRuntimeConnectionObserver {},
-    )
+    private val client =
+        BinderLocalLlmClient.create(
+            context = context,
+            hostConfig =
+                SharedRuntimeHostConfig.create(
+                    BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
+                    BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
+                ),
+            applicationId = ApplicationId("local-llm-console"),
+            clientBuildId = "packaged-consumer-fixture-${BuildConfig.VERSION_NAME}",
+            observer = SharedRuntimeConnectionObserver {},
+        )
 
     val connectionState: SharedRuntimeConnectionState
         get() = client.connectionSnapshot.state
