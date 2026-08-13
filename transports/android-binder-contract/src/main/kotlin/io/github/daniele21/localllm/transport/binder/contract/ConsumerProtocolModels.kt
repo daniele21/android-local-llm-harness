@@ -67,34 +67,12 @@ data class ConsumerCapabilitiesParcel(
 ) : Parcelable
 
 @Parcelize
-data class ConsumerCapabilitiesRequestParcel(
-    val clientToken: ClientTokenParcel,
-    val operationId: String,
-    val useCaseId: String,
-) : Parcelable
-
-@Parcelize
-data class ConsumerCapabilitiesResultParcel(
-    val operationId: String,
-    val capabilities: ConsumerCapabilitiesParcel?,
-    val error: WireErrorParcel?,
-) : Parcelable
-
-@Parcelize
 data class ConsumerSelectionParcel(
     val capabilityRevision: String?,
     val preset: ConsumerPresetParcel?,
     val reasoningPreferenceTag: String,
     val outputConstraintTag: String?,
     val sessionKindTag: String?,
-) : Parcelable
-
-@Parcelize
-data class ConsumerPrepareRequestParcel(
-    val clientToken: ClientTokenParcel,
-    val operationId: String,
-    val useCaseId: String,
-    val selection: ConsumerSelectionParcel,
 ) : Parcelable
 
 @Parcelize
@@ -109,28 +87,6 @@ data class ConsumerPreparedSelectionParcel(
 ) : Parcelable
 
 @Parcelize
-data class ConsumerPrepareResultParcel(
-    val operationId: String,
-    val selection: ConsumerPreparedSelectionParcel?,
-    val error: WireErrorParcel?,
-) : Parcelable
-
-@Parcelize
-data class ConsumerCreateSessionRequestParcel(
-    val clientToken: ClientTokenParcel,
-    val operationId: String,
-    val preparedId: String,
-    val externalSessionId: String,
-) : Parcelable
-
-@Parcelize
-data class ConsumerSessionResultParcel(
-    val operationId: String,
-    val externalSessionId: String?,
-    val error: WireErrorParcel?,
-) : Parcelable
-
-@Parcelize
 data class ConsumerGenerationInputParcel(
     val typeTag: String,
     val text: String?,
@@ -139,15 +95,6 @@ data class ConsumerGenerationInputParcel(
 
 @Parcelize
 data class ConsumerOutputConstraintParcel(val typeTag: String, val jsonSchema: String?) : Parcelable
-
-@Parcelize
-data class ConsumerGenerationRequestParcel(
-    val clientToken: ClientTokenParcel,
-    val externalRequestId: String,
-    val externalSessionId: String,
-    val input: ConsumerGenerationInputParcel,
-    val outputConstraint: ConsumerOutputConstraintParcel,
-) : Parcelable
 
 @Parcelize
 data class ConsumerExecutionIdentityParcel(
@@ -170,6 +117,28 @@ data class ConsumerInferenceMetricsParcel(
     val answerTokens: Int?,
     val queueMs: Long,
     val stopReasonTag: String,
+) : Parcelable
+
+@Parcelize
+data class ConsumerRequestParcel(
+    val clientToken: ClientTokenParcel,
+    val operationId: String,
+    val useCaseId: String? = null,
+    val selection: ConsumerSelectionParcel? = null,
+    val preparedId: String? = null,
+    val externalSessionId: String? = null,
+    val externalRequestId: String? = null,
+    val input: ConsumerGenerationInputParcel? = null,
+    val outputConstraint: ConsumerOutputConstraintParcel? = null,
+) : Parcelable
+
+@Parcelize
+data class ConsumerResultParcel(
+    val operationId: String,
+    val capabilities: ConsumerCapabilitiesParcel? = null,
+    val preparedSelection: ConsumerPreparedSelectionParcel? = null,
+    val externalSessionId: String? = null,
+    val error: WireErrorParcel? = null,
 ) : Parcelable
 
 @Parcelize
