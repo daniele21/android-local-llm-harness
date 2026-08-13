@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
 import io.github.daniele21.localllm.contracts.ConsumerContentType
 import io.github.daniele21.localllm.contracts.ConsumerErrorCode
+import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.ConsumerFailure
 import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
 import io.github.daniele21.localllm.contracts.ConsumerGenerationHandle
@@ -12,6 +13,8 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationInput
 import io.github.daniele21.localllm.contracts.ConsumerGenerationListener
 import io.github.daniele21.localllm.contracts.ConsumerGenerationRequest
 import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
+import io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics
+import io.github.daniele21.localllm.contracts.ConsumerInferenceResult
 import io.github.daniele21.localllm.contracts.ConsumerLimits
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraint
@@ -23,12 +26,14 @@ import io.github.daniele21.localllm.contracts.ConsumerPreparedSelection
 import io.github.daniele21.localllm.contracts.ConsumerReasoningPreference
 import io.github.daniele21.localllm.contracts.ConsumerSelectionRequest
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
+import io.github.daniele21.localllm.contracts.ConsumerStopReason
 import io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode
 import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationInput
 import io.github.daniele21.localllm.contracts.GenerationListener
+import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
@@ -36,6 +41,7 @@ import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionOptions
+import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseCapabilities
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -128,7 +134,7 @@ class ConsumerLocalLlmFacade(
         if (mapped is RequestMapping.Rejected) return ConsumerGenerationStartResult.Rejected(mapped.failure)
         mapped as RequestMapping.Accepted
 
-        val projector = ConsumerEventProjector(binding.selection.reasoningMode, listener)
+        val projector = ConsumerEventProjector(binding.selection, listener)
         val handle = runCatching { delegate.generate(mapped.request, projector) }.getOrNull()
             ?: return ConsumerGenerationStartResult.Rejected(
                 ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, "Unable to start generation"),
@@ -239,32 +245,45 @@ class ConsumerLocalLlmFacade(
     }
 
     private class ConsumerEventProjector(
-        private val reasoningMode: EffectiveConsumerReasoningMode,
+        private val selection: ConsumerPreparedSelection,
         private val listener: ConsumerGenerationListener,
     ) : GenerationListener {
+        private var terminal = false
+
         override fun onEvent(event: GenerationEvent) {
+            if (terminal) return
             when (event) {
                 is GenerationEvent.Queued -> listener.onEvent(ConsumerGenerationEvent.Queued(event.requestId, event.position))
 
-                is GenerationEvent.Prepared -> Unit
+                is GenerationEvent.Prepared -> listener.onEvent(
+                    ConsumerGenerationEvent.Prepared(event.requestId, selection.toExecutionIdentity()),
+                )
 
                 is GenerationEvent.Started -> listener.onEvent(ConsumerGenerationEvent.Started(event.requestId))
 
                 is GenerationEvent.TextDelta -> projectDelta(event)?.let(listener::onEvent)
 
-                is GenerationEvent.Completed -> listener.onEvent(
-                    ConsumerGenerationEvent.Completed(
-                        requestId = event.requestId,
-                        answer = event.answerOutput,
-                        surfacedReasoning = event.reasoningOutput.takeIf {
-                            reasoningMode == EffectiveConsumerReasoningMode.SURFACED
-                        },
-                    ),
-                )
+                is GenerationEvent.Completed -> {
+                    terminal = true
+                    listener.onEvent(
+                        ConsumerGenerationEvent.Completed(
+                            requestId = event.requestId,
+                            result = ConsumerInferenceResult(
+                                answer = event.answerOutput,
+                                surfacedReasoning = event.reasoningOutput.takeIf {
+                                    selection.reasoningMode == EffectiveConsumerReasoningMode.SURFACED
+                                },
+                                metrics = event.metrics.toConsumerMetrics(selection.reasoningMode),
+                                execution = selection.toExecutionIdentity(),
+                            ),
+                        ),
+                    )
+                }
 
-                is GenerationEvent.Failed -> listener.onEvent(
-                    ConsumerGenerationEvent.Failed(event.requestId, event.error.toConsumerFailure()),
-                )
+                is GenerationEvent.Failed -> {
+                    terminal = true
+                    listener.onEvent(ConsumerGenerationEvent.Failed(event.requestId, event.error.toConsumerFailure()))
+                }
             }
         }
 
@@ -275,7 +294,7 @@ class ConsumerLocalLlmFacade(
                 ConsumerContentType.ANSWER,
             )
 
-            GenerationContentType.REASONING -> if (reasoningMode == EffectiveConsumerReasoningMode.SURFACED) {
+            GenerationContentType.REASONING -> if (selection.reasoningMode == EffectiveConsumerReasoningMode.SURFACED) {
                 ConsumerGenerationEvent.ContentDelta(event.requestId, event.text, ConsumerContentType.REASONING)
             } else {
                 null
@@ -288,6 +307,37 @@ private class ConsumerGenerationHandleAdapter(private val delegate: GenerationHa
     override val requestId = delegate.requestId
 
     override fun cancel() = delegate.cancel()
+}
+
+private fun ConsumerPreparedSelection.toExecutionIdentity() = ConsumerExecutionIdentity(
+    useCaseId = useCaseId,
+    capabilityRevision = capabilityRevision,
+    preset = preset,
+    reasoningMode = reasoningMode,
+    outputConstraint = outputConstraint,
+    sessionKind = sessionKind,
+)
+
+private fun GenerationMetrics.toConsumerMetrics(reasoningMode: EffectiveConsumerReasoningMode) = ConsumerInferenceMetrics(
+    outputTokens = outputTokens,
+    timeToFirstTokenMs = timeToFirstTokenMs,
+    totalMs = totalMs,
+    decodeTokensPerSecond = decodeTokensPerSecond,
+    inputTokens = inputTokens,
+    reasoningTokens = reasoningTokens.takeIf { reasoningMode == EffectiveConsumerReasoningMode.SURFACED },
+    answerTokens = answerTokens,
+    queueMs = queueMs,
+    stopReason = stopReason.toConsumerStopReason(),
+)
+
+private fun StopReason.toConsumerStopReason(): ConsumerStopReason = when (this) {
+    StopReason.END_OF_GENERATION -> ConsumerStopReason.END_OF_GENERATION
+    StopReason.MAX_OUTPUT_TOKENS -> ConsumerStopReason.MAX_OUTPUT_TOKENS
+    StopReason.STOP_SEQUENCE -> ConsumerStopReason.STOP_SEQUENCE
+    StopReason.GRAMMAR_COMPLETE -> ConsumerStopReason.GRAMMAR_COMPLETE
+    StopReason.GENERATION_GUARD_REPETITION -> ConsumerStopReason.GENERATION_GUARD_REPETITION
+    StopReason.GENERATION_GUARD_THINKING_BUDGET -> ConsumerStopReason.GENERATION_GUARD_THINKING_BUDGET
+    StopReason.UNKNOWN -> ConsumerStopReason.UNKNOWN
 }
 
 private fun ConsumerPreparedSelection.toSelectionRequest() = ConsumerSelectionRequest(

@@ -36,7 +36,7 @@ Exit gate: all target decisions are accepted or revised.
 
 ## CA-1 — Capability policy
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Owner: [`capabilities-and-policy.md`](capabilities-and-policy.md)
 
@@ -52,7 +52,7 @@ Exit gate: an authenticated use case resolves a deterministic, privacy-safe capa
 
 ## CA-2 — Public surface
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Owner: [`public-surface-v1.md`](public-surface-v1.md)
 
@@ -68,7 +68,7 @@ Exit gate: a fake/in-process consumer completes discover -> prepare -> session -
 
 ## CA-3 — Results and metrics
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Owner: [`results-and-metrics.md`](results-and-metrics.md)
 

@@ -101,13 +101,23 @@ sealed interface ConsumerGenerationEvent {
 
     data class Queued(override val requestId: RequestId, val position: Int) : ConsumerGenerationEvent
 
+    data class Prepared(override val requestId: RequestId, val execution: ConsumerExecutionIdentity) : ConsumerGenerationEvent
+
     data class Started(override val requestId: RequestId) : ConsumerGenerationEvent
 
     data class ContentDelta(override val requestId: RequestId, val text: String, val contentType: ConsumerContentType) :
         ConsumerGenerationEvent
 
-    data class Completed(override val requestId: RequestId, val answer: String, val surfacedReasoning: String? = null) :
-        ConsumerGenerationEvent
+    data class Completed(override val requestId: RequestId, val result: ConsumerInferenceResult) : ConsumerGenerationEvent {
+        val answer: String
+            get() = result.answer
+        val surfacedReasoning: String?
+            get() = result.surfacedReasoning
+        val metrics: ConsumerInferenceMetrics
+            get() = result.metrics
+        val execution: ConsumerExecutionIdentity
+            get() = result.execution
+    }
 
     data class Failed(override val requestId: RequestId, val failure: ConsumerFailure) : ConsumerGenerationEvent
 }
