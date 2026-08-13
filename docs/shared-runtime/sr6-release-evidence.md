@@ -72,6 +72,21 @@ The consumer fixture references the packaged AARs rather than project-source cli
 
 The instrumentation test does not print prompt or generated output content.
 
+## Repository authorization review
+
+The repository-side security boundary is deliberately narrower than a same-signer check alone:
+
+- the exported host service requires a `signature` protection-level permission;
+- host authorization checks the Binder calling UID/PID permission result before registration;
+- a calling UID must resolve to exactly one package; empty or ambiguous UID/package mappings fail closed;
+- the package must match an exact host allowlist entry;
+- the package signing certificate must match the host-derived accepted certificate set;
+- the host owns the `ApplicationId`, allowed `UseCaseId` and model binding rather than accepting client-selected model identity;
+- a release host allows only the exact release Console package and `io.github.daniele21.localllm.consumerfixture` for the SR-6 packaged-consumer proof;
+- debug hosts do not authorize the release evidence consumer package.
+
+The SR-6 consumer package was added explicitly to the release allowlist because signature permission alone would allow binding but the host package policy would correctly reject registration. Unit coverage now protects that exact release/debug split. The physical independently signed denial remains mandatory because deterministic policy review does not substitute for Android package-manager enforcement on device.
+
 ## Independent-signer denial
 
 Unless `--skip-negative` is used, the runner creates a short-lived PKCS12 key in a temporary directory, rebuilds only the consumer fixture with that independent identity, and verifies that its certificate digest differs from the still-installed host.
