@@ -276,7 +276,13 @@ jobs:
           tasks=(spotlessCheck detekt verifyNoModelArtifacts)
           for module in "${selected_modules[@]}"; do
             [[ -n "$module" ]] || continue
-            tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            if [[ "$module" == "apps:shared-runtime-client-consumer-fixture" ]]; then
+              # This fixture has no debug unit-test variant. Its SR-6 behavior is compiled
+              # as release instrumentation below when packaging validation is enabled.
+              tasks+=(":${module}:lintDebug")
+            else
+              tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            fi
             if [[ "$module" == "apps:local-llm-console" ]]; then
               tasks+=(":apps:local-llm-console:lintInternal")
             fi
