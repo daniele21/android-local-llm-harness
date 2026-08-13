@@ -20,6 +20,7 @@ import io.github.daniele21.localllm.contracts.ConsumerPreparedSelection
 import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.ConsumerSelectionRequest
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
+import io.github.daniele21.localllm.contracts.ConsumerStopReason
 import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
@@ -95,8 +96,25 @@ class ConsumerLocalLlmFacadeTest {
         assertTrue(start is ConsumerGenerationStartResult.Accepted)
         assertEquals(1, events.filterIsInstance<ConsumerGenerationEvent.Started>().size)
         assertFalse(events.filterIsInstance<ConsumerGenerationEvent.ContentDelta>().any { it.contentType == ConsumerContentType.REASONING })
-        assertEquals("{\"pii\":[]}", events.filterIsInstance<ConsumerGenerationEvent.Completed>().single().answer)
-        assertNull(events.filterIsInstance<ConsumerGenerationEvent.Completed>().single().surfacedReasoning)
+        val completed = events.filterIsInstance<ConsumerGenerationEvent.Completed>().single()
+        val publicPrepared = events.filterIsInstance<ConsumerGenerationEvent.Prepared>().single()
+        assertEquals("{\"pii\":[]}", completed.answer)
+        assertNull(completed.surfacedReasoning)
+        assertEquals(2, completed.metrics.outputTokens)
+        assertEquals(0L, completed.metrics.timeToFirstTokenMs)
+        assertEquals(1L, completed.metrics.totalMs)
+        assertEquals(2.0, completed.metrics.decodeTokensPerSecond)
+        assertEquals(1, completed.metrics.inputTokens)
+        assertNull(completed.metrics.reasoningTokens)
+        assertEquals(1, completed.metrics.answerTokens)
+        assertEquals(0L, completed.metrics.queueMs)
+        assertEquals(ConsumerStopReason.END_OF_GENERATION, completed.metrics.stopReason)
+        assertEquals(fixture.useCaseId, completed.execution.useCaseId)
+        assertEquals(fixture.presetRef, completed.execution.preset)
+        assertEquals(ConsumerOutputConstraintKind.JSON_SCHEMA, completed.execution.outputConstraint)
+        assertEquals(SessionKind.STATELESS, completed.execution.sessionKind)
+        assertEquals(prepared.selection.capabilityRevision, completed.execution.capabilityRevision)
+        assertEquals(completed.execution, publicPrepared.execution)
         val legacyRequest = checkNotNull(fixture.delegate.lastRequest)
         assertEquals(fixture.applicationId, legacyRequest.applicationId)
         assertEquals(fixture.useCaseId, legacyRequest.useCaseId)
@@ -154,6 +172,26 @@ class ConsumerLocalLlmFacadeTest {
         assertEquals(ConsumerErrorCode.INVALID_INPUT, oversized.failure.code)
         assertEquals(ConsumerErrorCode.OUTPUT_NOT_ALLOWED, wrongOutput.failure.code)
         assertEquals(0, fixture.delegate.generateCalls)
+    }
+
+    @Test
+    fun `public result metrics exclude host diagnostic fields`() {
+        val fields = io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics::class.java.declaredFields
+            .map { it.name.lowercase() }
+        val forbidden = listOf(
+            "modelloadms",
+            "modelloadkind",
+            "prefillms",
+            "decodems",
+            "promptplanningms",
+            "contextcreationms",
+            "thermal",
+            "memory",
+            "pss",
+            "digest",
+        )
+
+        assertFalse(fields.any { it in forbidden })
     }
 
     @Test
@@ -330,7 +368,18 @@ private class FacadeLocalClient(private val digest: ModelDigest, private val pre
             GenerationEvent.Completed(
                 requestId = request.requestId,
                 output = "hidden{\"pii\":[]}",
-                metrics = GenerationMetrics(0, 0, 0, 1, 1, 2, 2.0, stopReason = StopReason.END_OF_GENERATION),
+                metrics = GenerationMetrics(
+                    0,
+                    0,
+                    0,
+                    1,
+                    1,
+                    2,
+                    2.0,
+                    stopReason = StopReason.END_OF_GENERATION,
+                    reasoningTokens = 1,
+                    answerTokens = 1,
+                ),
                 reasoningOutput = "hidden",
                 answerOutput = "{\"pii\":[]}",
             ),

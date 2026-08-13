@@ -11,7 +11,15 @@ Last reviewed: 2026-08-13
 
 Define what a calling app receives from Harness during and after inference, and separate stable consumer metrics from deeper Harness diagnostics.
 
-The core contracts already distinguish `REASONING` and `ANSWER` deltas and already capture a rich `GenerationMetrics` superset. This workstream should project those capabilities into a smaller, precisely defined application-facing contract.
+The core contracts already distinguish `REASONING` and `ANSWER` deltas and already capture a rich `GenerationMetrics` superset. This workstream projects those capabilities into a smaller, precisely defined application-facing contract.
+
+## Accepted CA-3 contract
+
+CA-3 uses the internal `GenerationMetrics` as the source of truth and adds no parallel telemetry path. The consumer projection exposes Tier 1 (`outputTokens`, `timeToFirstTokenMs`, `totalMs`, `decodeTokensPerSecond`) plus privacy-safe Tier 2 (`inputTokens`, surfaced `reasoningTokens`, `answerTokens`, `queueMs`, stable `stopReason`). Model load, prompt planning, context creation, phase timing, memory, thermal, cache and backend counters remain Harness diagnostics.
+
+`ConsumerExecutionIdentity` reports only effective logical configuration: use case, capability revision, preset, surfaced reasoning mode, output constraint and session kind. ADR 0013 keeps exact model/artifact identity host-owned, so CA-3 does not expose a consumer model ID or artifact digest in terminal results.
+
+Internal `GenerationEvent.Prepared` is not forwarded verbatim. CA-3 projects it to a new public `Prepared` event containing only `ConsumerExecutionIdentity`. Exactly one public terminal event is emitted; events received after a terminal event are ignored by the public projector.
 
 ## Result model
 
@@ -192,16 +200,18 @@ A terminal result should include privacy-safe identity sufficient to reproduce/u
 
 ```kotlin
 data class ConsumerExecutionIdentity(
-    val modelId: ConsumerModelId,
+    val useCaseId: UseCaseId,
+    val capabilityRevision: String,
     val preset: InferencePresetRef?,
-    val reasoningMode: EffectiveReasoningMode,
-    val outputKind: ConsumerOutputConstraintKind,
+    val reasoningMode: EffectiveConsumerReasoningMode,
+    val outputConstraint: ConsumerOutputConstraintKind,
+    val sessionKind: SessionKind,
 )
 ```
 
 Request/session ID and protocol information may belong in request details rather than the primary result object.
 
-Exact artifact digest is useful for engineering evidence but may be too low-level for the basic consumer API. Security/public API review should decide whether it is available through a request-detail projection.
+Exact model and artifact identity remain host-private in the ordinary consumer API. Engineering evidence may use separate Harness diagnostics, but CA-3 does not add model IDs or artifact digests to consumer results.
 
 ## Effective versus requested values
 
@@ -210,13 +220,13 @@ The terminal/prepared metadata should report **effective** logical configuration
 Example:
 
 ```text
-requested model: omitted
 requested preset: omitted
 
 result identity:
-model = qwen35-0.8b-q4
+useCase = document-pii-detection
 preset = balanced@3
 reasoning = disabled
+output = json-schema
 ```
 
 This lets consumer logs/UI explain what actually ran without exposing raw internal tuning.
