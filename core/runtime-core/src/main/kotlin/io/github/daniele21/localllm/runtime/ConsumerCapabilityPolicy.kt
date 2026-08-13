@@ -32,13 +32,17 @@ data class ConsumerUseCasePolicy(
     val defaultPreset: InferencePresetRef? = null,
     val reasoning: ConsumerReasoningCapability = ConsumerReasoningCapability.NOT_SUPPORTED,
     val outputConstraints: Set<ConsumerOutputConstraintKind>,
+    val defaultOutputConstraint: ConsumerOutputConstraintKind,
     val sessionKinds: Set<SessionKind>,
+    val defaultSessionKind: SessionKind,
     val limits: ConsumerLimits,
 ) {
     init {
         require(revision.isNotBlank()) { "Consumer policy revision must not be blank" }
         require(outputConstraints.isNotEmpty()) { "Consumer policy must expose an output constraint" }
         require(sessionKinds.isNotEmpty()) { "Consumer policy must expose a session kind" }
+        require(defaultOutputConstraint in outputConstraints) { "Consumer default output constraint must be exposed" }
+        require(defaultSessionKind in sessionKinds) { "Consumer default session kind must be exposed" }
         require(defaultPreset == null || defaultPreset in exposedPresets) {
             "Consumer default preset must be exposed"
         }
@@ -137,14 +141,17 @@ class ConsumerCapabilityPolicyService(
             )
         }
 
-        if (request.sessionKind !in context.policy.sessionKinds) {
+        val outputConstraint = request.outputConstraint ?: context.policy.defaultOutputConstraint
+        val sessionKind = request.sessionKind ?: context.policy.defaultSessionKind
+
+        if (sessionKind !in context.policy.sessionKinds) {
             return rejected(
                 ConsumerCapabilityErrorCode.SESSION_KIND_NOT_ALLOWED,
                 "Requested session kind is not allowed for this use case",
             )
         }
-        if (request.outputConstraint !in context.policy.outputConstraints ||
-            request.outputConstraint !in effectiveOutputConstraints(context.resolved, preset)
+        if (outputConstraint !in context.policy.outputConstraints ||
+            outputConstraint !in effectiveOutputConstraints(context.resolved, preset)
         ) {
             return rejected(
                 ConsumerCapabilityErrorCode.OUTPUT_NOT_ALLOWED,
@@ -168,8 +175,8 @@ class ConsumerCapabilityPolicyService(
             resolvedUseCase = context.resolved,
             preset = preset,
             reasoningMode = reasoningMode,
-            outputConstraint = request.outputConstraint,
-            sessionKind = request.sessionKind,
+            outputConstraint = outputConstraint,
+            sessionKind = sessionKind,
             capabilityRevision = capabilities.capabilityRevision,
         )
     }
@@ -219,7 +226,9 @@ class ConsumerCapabilityPolicyService(
             defaultPreset = policy.defaultPreset?.takeIf(presetsByRef::containsKey),
             reasoning = policy.reasoning,
             outputConstraints = policy.outputConstraints,
+            defaultOutputConstraint = policy.defaultOutputConstraint,
             sessionKinds = policy.sessionKinds,
+            defaultSessionKind = policy.defaultSessionKind,
             limits = policy.limits,
             capabilityRevision = capabilityRevision,
         )
@@ -337,7 +346,9 @@ class ConsumerCapabilityPolicyService(
             append('|').append(policy.defaultPreset?.canonicalValue().orEmpty())
             append('|').append(policy.exposedPresets.map(InferencePresetRef::canonicalValue).sorted().joinToString(","))
             append('|').append(policy.outputConstraints.map { it.name }.sorted().joinToString(","))
+            append('|').append(policy.defaultOutputConstraint.name)
             append('|').append(policy.sessionKinds.map { it.name }.sorted().joinToString(","))
+            append('|').append(policy.defaultSessionKind.name)
             append('|').append(policy.limits.maxInputCharacters)
             append('|').append(policy.limits.maxConversationMessages)
             append('|').append(policy.limits.maxJsonSchemaCharacters)

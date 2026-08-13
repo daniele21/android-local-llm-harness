@@ -49,7 +49,9 @@ data class UseCaseCapabilities(
     val defaultPreset: InferencePresetRef?,
     val reasoning: ConsumerReasoningCapability,
     val outputConstraints: Set<ConsumerOutputConstraintKind>,
+    val defaultOutputConstraint: ConsumerOutputConstraintKind,
     val sessionKinds: Set<SessionKind>,
+    val defaultSessionKind: SessionKind,
     val limits: ConsumerLimits,
     val capabilityRevision: String,
 ) {
@@ -57,6 +59,8 @@ data class UseCaseCapabilities(
         require(capabilityRevision.isNotBlank()) { "Capability revision must not be blank" }
         require(sessionKinds.isNotEmpty()) { "At least one session kind must be exposed" }
         require(outputConstraints.isNotEmpty()) { "At least one output constraint must be exposed" }
+        require(defaultOutputConstraint in outputConstraints) { "Default output constraint must be exposed" }
+        require(defaultSessionKind in sessionKinds) { "Default session kind must be exposed" }
         require(defaultPreset == null || presets.any { it.ref == defaultPreset && it.isDefault }) {
             "Default preset must be present and marked as default"
         }
@@ -68,8 +72,8 @@ data class ConsumerSelectionRequest(
     val capabilityRevision: String? = null,
     val preset: InferencePresetRef? = null,
     val reasoning: ConsumerReasoningPreference = ConsumerReasoningPreference.DEFAULT,
-    val outputConstraint: ConsumerOutputConstraintKind = ConsumerOutputConstraintKind.TEXT,
-    val sessionKind: SessionKind = SessionKind.STATELESS,
+    val outputConstraint: ConsumerOutputConstraintKind? = null,
+    val sessionKind: SessionKind? = null,
 ) {
     init {
         require(capabilityRevision == null || capabilityRevision.isNotBlank()) {

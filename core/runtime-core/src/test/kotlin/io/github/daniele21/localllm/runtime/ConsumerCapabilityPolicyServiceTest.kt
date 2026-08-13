@@ -54,7 +54,9 @@ class ConsumerCapabilityPolicyServiceTest {
         assertEquals(listOf(fixture.deterministicRef), capabilities.presets.map { it.ref })
         assertEquals(fixture.deterministicRef, capabilities.defaultPreset)
         assertEquals(setOf(ConsumerOutputConstraintKind.JSON_SCHEMA), capabilities.outputConstraints)
+        assertEquals(ConsumerOutputConstraintKind.JSON_SCHEMA, capabilities.defaultOutputConstraint)
         assertEquals(setOf(SessionKind.STATELESS), capabilities.sessionKinds)
+        assertEquals(SessionKind.STATELESS, capabilities.defaultSessionKind)
         assertEquals(0, fixture.store.verifyCalls)
         assertEquals(1, fixture.store.findCalls)
     }
@@ -102,16 +104,15 @@ class ConsumerCapabilityPolicyServiceTest {
         val decision = fixture.service.validateSelection(
             fixture.applicationId,
             fixture.useCaseId,
-            ConsumerSelectionRequest(
-                capabilityRevision = discovered.capabilityRevision,
-                outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-            ),
+            ConsumerSelectionRequest(capabilityRevision = discovered.capabilityRevision),
         )
 
         val accepted = decision as ConsumerPolicyDecision.Accepted
         assertEquals(fixture.deterministicRef, accepted.preset?.ref)
         assertEquals(fixture.digest, accepted.resolvedUseCase.model.artifact.digest)
         assertEquals(EffectiveConsumerReasoningMode.DISABLED, accepted.reasoningMode)
+        assertEquals(ConsumerOutputConstraintKind.JSON_SCHEMA, accepted.outputConstraint)
+        assertEquals(SessionKind.STATELESS, accepted.sessionKind)
     }
 
     @Test
@@ -290,7 +291,9 @@ private class CapabilityFixture(
                 defaultPreset = deterministicRef,
                 reasoning = reasoningCapability,
                 outputConstraints = policyOutputConstraints,
+                defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
                 sessionKinds = setOf(SessionKind.STATELESS),
+                defaultSessionKind = SessionKind.STATELESS,
                 limits = ConsumerLimits(
                     maxInputCharacters = 32_768,
                     maxConversationMessages = 1,
