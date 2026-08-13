@@ -65,8 +65,10 @@ class SharedRuntimeReleaseEvidenceTest {
         val completeSession = client.createSession(APPLICATION_ID, USE_CASE_ID)
         val completedLatch = CountDownLatch(1)
         val sawDelta = AtomicBoolean(false)
+        val preparedEvent = AtomicReference<GenerationEvent.Prepared>()
         val completedEvent = AtomicReference<GenerationEvent>()
         val completeRequestId = RequestId("sr6-complete-${UUID.randomUUID()}")
+        val clientStartedAtNanos = System.nanoTime()
 
         client.generate(
             GenerationRequest(
@@ -79,6 +81,8 @@ class SharedRuntimeReleaseEvidenceTest {
             ),
         ) { event ->
             when (event) {
+                is GenerationEvent.Prepared -> preparedEvent.compareAndSet(null, event)
+
                 is GenerationEvent.TextDelta -> sawDelta.set(true)
 
                 is GenerationEvent.Completed,
@@ -96,14 +100,36 @@ class SharedRuntimeReleaseEvidenceTest {
             "Release generation did not terminate",
             completedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS),
         )
+        val clientObservedTotalMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - clientStartedAtNanos)
         val terminal = completedEvent.get()
         assertTrue("Expected a successful packaged-client completion", terminal is GenerationEvent.Completed)
         assertTrue("Expected at least one streamed Binder delta", sawDelta.get())
+        val prepared = requireNotNull(preparedEvent.get()) { "Expected prepared configuration before terminal event" }
+        assertEquals(prepare.modelDigest, prepared.modelDigest)
+        val configuration = prepared.configuration
+        println(
+            "SR6_SHARED_RUNTIME generationProfile " +
+                "presetId=${configuration.preset?.id?.value ?: "none"} " +
+                "presetVersion=${configuration.preset?.version ?: -1} " +
+                "contextSize=${configuration.contextSize} " +
+                "maxOutputTokens=${configuration.maxOutputTokens} " +
+                "thinkingMode=${configuration.thinkingMode.name} " +
+                "temperature=${configuration.temperature} " +
+                "topP=${configuration.topP} " +
+                "topK=${configuration.topK} " +
+                "minP=${configuration.minP} " +
+                "presencePenalty=${configuration.presencePenalty} " +
+                "repeatPenalty=${configuration.repeatPenalty} " +
+                "repeatLastN=${configuration.repeatLastN}",
+        )
         val metrics = (terminal as GenerationEvent.Completed).metrics
+        val transportEnvelopeMs = (clientObservedTotalMs - metrics.totalMs).coerceAtLeast(0L)
         println(
             "SR6_SHARED_RUNTIME generation " +
                 "ttftMs=${metrics.timeToFirstTokenMs ?: -1} " +
-                "totalMs=${metrics.totalMs} " +
+                "coreTotalMs=${metrics.totalMs} " +
+                "clientObservedTotalMs=$clientObservedTotalMs " +
+                "transportEnvelopeMs=$transportEnvelopeMs " +
                 "inputTokens=${metrics.inputTokens ?: -1} " +
                 "outputTokens=${metrics.outputTokens ?: -1} " +
                 "decodeTokensPerSecond=${metrics.decodeTokensPerSecond ?: -1.0} " +
