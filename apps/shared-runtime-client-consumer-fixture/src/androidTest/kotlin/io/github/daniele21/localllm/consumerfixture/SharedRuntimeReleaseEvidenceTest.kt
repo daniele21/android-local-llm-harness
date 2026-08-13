@@ -249,10 +249,10 @@ private fun createClient(buildId: String): BinderLocalLlmClient {
     return BinderLocalLlmClient.create(
         context = context,
         hostConfig =
-            SharedRuntimeHostConfig.create(
-                BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
-                BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
-            ),
+        SharedRuntimeHostConfig.create(
+            BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
+            BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
+        ),
         applicationId = APPLICATION_ID,
         clientBuildId = buildId,
     )
