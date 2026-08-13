@@ -80,12 +80,14 @@ class SharedRuntimeTwoApkE2eTest {
         ) { event ->
             when (event) {
                 is GenerationEvent.TextDelta -> sawDelta.set(true)
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     terminalEvent.set(event)
                     terminal.countDown()
                 }
+
                 else -> Unit
             }
         }
@@ -125,12 +127,14 @@ class SharedRuntimeTwoApkE2eTest {
                 is GenerationEvent.Prepared,
                 is GenerationEvent.TextDelta,
                 -> started.countDown()
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     terminalEvent.set(event)
                     terminal.countDown()
                 }
+
                 else -> Unit
             }
         }
