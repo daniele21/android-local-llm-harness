@@ -112,13 +112,16 @@ class SharedRuntimeReleaseEvidenceTest {
         ) { event ->
             when (event) {
                 is GenerationEvent.Prepared -> preparedEvent.compareAndSet(null, event)
+
                 is GenerationEvent.TextDelta -> sawDelta.set(true)
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     terminalEvent.set(event)
                     terminalLatch.countDown()
                 }
+
                 else -> Unit
             }
         }
@@ -156,12 +159,14 @@ class SharedRuntimeReleaseEvidenceTest {
                 is GenerationEvent.Prepared,
                 is GenerationEvent.TextDelta,
                 -> startedLatch.countDown()
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     terminalEvent.set(event)
                     terminalLatch.countDown()
                 }
+
                 else -> Unit
             }
         }
