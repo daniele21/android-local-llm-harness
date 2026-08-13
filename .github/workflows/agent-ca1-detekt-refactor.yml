@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  refactor:
+  apply:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
@@ -21,161 +21,152 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Refactor CA-1 validation helpers
+      - name: Refactor CA-1 selection validation
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicy.kt')
-          source = path.read_text()
+          p = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicy.kt')
+          s = p.read_text()
+          start = s.index('    fun validateSelection(')
+          end = s.index('    private fun resolveContext', start)
+          replacement = (
+              '    fun validateSelection(\n'
+              '        applicationId: ApplicationId,\n'
+              '        useCaseId: UseCaseId,\n'
+              '        request: ConsumerSelectionRequest,\n'
+              '    ): ConsumerPolicyDecision =\n'
+              '        when (val context = resolveContext(applicationId, useCaseId)) {\n'
+              '            is ContextResult.Rejected -> rejected(context.code, context.detail)\n'
+              '            is ContextResult.Resolved -> validateResolvedSelection(context, request)\n'
+              '        }\n\n'
+              '    private fun validateResolvedSelection(\n'
+              '        context: ContextResult.Resolved,\n'
+              '        request: ConsumerSelectionRequest,\n'
+              '    ): ConsumerPolicyDecision {\n'
+              '        val capabilityError = capabilityError(context.capabilities, request)\n'
+              '        if (capabilityError != null) return capabilityError\n\n'
+              '        val presetRef = request.preset ?: context.policy.defaultPreset\n'
+              '        val preset = presetRef?.let(context.presetsByRef::get)\n'
+              '        val presetError = presetError(context, presetRef, preset)\n'
+              '        if (presetError != null) return presetError\n\n'
+              '        val outputConstraint = request.outputConstraint ?: context.policy.defaultOutputConstraint\n'
+              '        val sessionKind = request.sessionKind ?: context.policy.defaultSessionKind\n'
+              '        val constraintError = constraintError(context, preset, outputConstraint, sessionKind)\n'
+              '        if (constraintError != null) return constraintError\n\n'
+              '        return resolveAcceptedDecision(context, request, preset, outputConstraint, sessionKind)\n'
+              '    }\n\n'
+              '    private fun capabilityError(\n'
+              '        capabilities: UseCaseCapabilities,\n'
+              '        request: ConsumerSelectionRequest,\n'
+              '    ): ConsumerPolicyDecision.Rejected? =\n'
+              '        when {\n'
+              '            request.capabilityRevision != null && request.capabilityRevision != capabilities.capabilityRevision -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.STALE_CAPABILITY,\n'
+              '                "Capability revision is stale; discover capabilities again before preparation",\n'
+              '            )\n'
+              '            capabilities.readiness == UseCaseReadiness.UNAVAILABLE_MODEL -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.MODEL_UNAVAILABLE,\n'
+              '                "The model bound to this use case is unavailable",\n'
+              '            )\n'
+              '            capabilities.readiness == UseCaseReadiness.UNAVAILABLE_HOST_POLICY -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,\n'
+              '                "The host cannot currently evaluate model readiness",\n'
+              '            )\n'
+              '            capabilities.readiness == UseCaseReadiness.INCOMPATIBLE -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,\n'
+              '                "Consumer policy is incompatible with the resolved use-case profile",\n'
+              '            )\n'
+              '            else -> null\n'
+              '        }\n\n'
+              '    private fun presetError(\n'
+              '        context: ContextResult.Resolved,\n'
+              '        presetRef: InferencePresetRef?,\n'
+              '        preset: InferencePreset?,\n'
+              '    ): ConsumerPolicyDecision.Rejected? =\n'
+              '        when {\n'
+              '            presetRef == null -> null\n'
+              '            presetRef !in context.policy.exposedPresets -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.PRESET_NOT_ALLOWED,\n'
+              '                "Requested preset is not exposed for this use case",\n'
+              '            )\n'
+              '            preset == null -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,\n'
+              '                "Requested preset is not present in the resolved use-case profile",\n'
+              '            )\n'
+              '            else -> null\n'
+              '        }\n\n'
+              '    private fun constraintError(\n'
+              '        context: ContextResult.Resolved,\n'
+              '        preset: InferencePreset?,\n'
+              '        outputConstraint: ConsumerOutputConstraintKind,\n'
+              '        sessionKind: SessionKind,\n'
+              '    ): ConsumerPolicyDecision.Rejected? =\n'
+              '        when {\n'
+              '            sessionKind !in context.policy.sessionKinds -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.SESSION_KIND_NOT_ALLOWED,\n'
+              '                "Requested session kind is not allowed for this use case",\n'
+              '            )\n'
+              '            outputConstraint !in context.policy.outputConstraints ||\n'
+              '                outputConstraint !in effectiveOutputConstraints(context.resolved, preset) -> rejected(\n'
+              '                ConsumerCapabilityErrorCode.OUTPUT_NOT_ALLOWED,\n'
+              '                "Requested output constraint is not allowed by the effective preset/use-case policy",\n'
+              '            )\n'
+              '            else -> null\n'
+              '        }\n\n'
+              '    private fun resolveAcceptedDecision(\n'
+              '        context: ContextResult.Resolved,\n'
+              '        request: ConsumerSelectionRequest,\n'
+              '        preset: InferencePreset?,\n'
+              '        outputConstraint: ConsumerOutputConstraintKind,\n'
+              '        sessionKind: SessionKind,\n'
+              '    ): ConsumerPolicyDecision =\n'
+              '        when (\n'
+              '            val result = resolveReasoningMode(\n'
+              '                capability = context.policy.reasoning,\n'
+              '                preference = request.reasoning,\n'
+              '                preset = preset,\n'
+              '                resolved = context.resolved,\n'
+              '            )\n'
+              '        ) {\n'
+              '            is ReasoningResolution.Accepted -> ConsumerPolicyDecision.Accepted(\n'
+              '                resolvedUseCase = context.resolved,\n'
+              '                preset = preset,\n'
+              '                reasoningMode = result.mode,\n'
+              '                outputConstraint = outputConstraint,\n'
+              '                sessionKind = sessionKind,\n'
+              '                capabilityRevision = context.capabilities.capabilityRevision,\n'
+              '            )\n'
+              '            is ReasoningResolution.Rejected -> rejected(result.code, result.detail)\n'
+              '        }\n\n'
+          )
+          s = s[:start] + replacement + s[end:]
 
-          start = source.index('    fun validateSelection(')
-          end = source.index('    private fun resolveContext', start)
-          replacement = '''    fun validateSelection(
-              applicationId: ApplicationId,
-              useCaseId: UseCaseId,
-              request: ConsumerSelectionRequest,
-          ): ConsumerPolicyDecision =
-              when (val context = resolveContext(applicationId, useCaseId)) {
-                  is ContextResult.Rejected -> rejected(context.code, context.detail)
-                  is ContextResult.Resolved -> validateResolvedSelection(context, request)
-              }
-
-          private fun validateResolvedSelection(
-              context: ContextResult.Resolved,
-              request: ConsumerSelectionRequest,
-          ): ConsumerPolicyDecision {
-              val capabilityError = capabilityError(context.capabilities, request)
-              if (capabilityError != null) return capabilityError
-
-              val presetRef = request.preset ?: context.policy.defaultPreset
-              val preset = presetRef?.let(context.presetsByRef::get)
-              val presetError = presetError(context, presetRef, preset)
-              if (presetError != null) return presetError
-
-              val outputConstraint = request.outputConstraint ?: context.policy.defaultOutputConstraint
-              val sessionKind = request.sessionKind ?: context.policy.defaultSessionKind
-              val constraintError = constraintError(context, preset, outputConstraint, sessionKind)
-              if (constraintError != null) return constraintError
-
-              return resolveAcceptedDecision(context, request, preset, outputConstraint, sessionKind)
-          }
-
-          private fun capabilityError(
-              capabilities: UseCaseCapabilities,
-              request: ConsumerSelectionRequest,
-          ): ConsumerPolicyDecision.Rejected? =
-              when {
-                  request.capabilityRevision != null && request.capabilityRevision != capabilities.capabilityRevision -> rejected(
-                      ConsumerCapabilityErrorCode.STALE_CAPABILITY,
-                      "Capability revision is stale; discover capabilities again before preparation",
-                  )
-                  capabilities.readiness == UseCaseReadiness.UNAVAILABLE_MODEL -> rejected(
-                      ConsumerCapabilityErrorCode.MODEL_UNAVAILABLE,
-                      "The model bound to this use case is unavailable",
-                  )
-                  capabilities.readiness == UseCaseReadiness.UNAVAILABLE_HOST_POLICY -> rejected(
-                      ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
-                      "The host cannot currently evaluate model readiness",
-                  )
-                  capabilities.readiness == UseCaseReadiness.INCOMPATIBLE -> rejected(
-                      ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
-                      "Consumer policy is incompatible with the resolved use-case profile",
-                  )
-                  else -> null
-              }
-
-          private fun presetError(
-              context: ContextResult.Resolved,
-              presetRef: InferencePresetRef?,
-              preset: InferencePreset?,
-          ): ConsumerPolicyDecision.Rejected? =
-              when {
-                  presetRef == null -> null
-                  presetRef !in context.policy.exposedPresets -> rejected(
-                      ConsumerCapabilityErrorCode.PRESET_NOT_ALLOWED,
-                      "Requested preset is not exposed for this use case",
-                  )
-                  preset == null -> rejected(
-                      ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
-                      "Requested preset is not present in the resolved use-case profile",
-                  )
-                  else -> null
-              }
-
-          private fun constraintError(
-              context: ContextResult.Resolved,
-              preset: InferencePreset?,
-              outputConstraint: ConsumerOutputConstraintKind,
-              sessionKind: SessionKind,
-          ): ConsumerPolicyDecision.Rejected? =
-              when {
-                  sessionKind !in context.policy.sessionKinds -> rejected(
-                      ConsumerCapabilityErrorCode.SESSION_KIND_NOT_ALLOWED,
-                      "Requested session kind is not allowed for this use case",
-                  )
-                  outputConstraint !in context.policy.outputConstraints ||
-                      outputConstraint !in effectiveOutputConstraints(context.resolved, preset) -> rejected(
-                      ConsumerCapabilityErrorCode.OUTPUT_NOT_ALLOWED,
-                      "Requested output constraint is not allowed by the effective preset/use-case policy",
-                  )
-                  else -> null
-              }
-
-          private fun resolveAcceptedDecision(
-              context: ContextResult.Resolved,
-              request: ConsumerSelectionRequest,
-              preset: InferencePreset?,
-              outputConstraint: ConsumerOutputConstraintKind,
-              sessionKind: SessionKind,
-          ): ConsumerPolicyDecision =
-              when (
-                  val result = resolveReasoningMode(
-                      capability = context.policy.reasoning,
-                      preference = request.reasoning,
-                      preset = preset,
-                      resolved = context.resolved,
-                  )
-              ) {
-                  is ReasoningResolution.Accepted -> ConsumerPolicyDecision.Accepted(
-                      resolvedUseCase = context.resolved,
-                      preset = preset,
-                      reasoningMode = result.mode,
-                      outputConstraint = outputConstraint,
-                      sessionKind = sessionKind,
-                      capabilityRevision = context.capabilities.capabilityRevision,
-                  )
-                  is ReasoningResolution.Rejected -> rejected(result.code, result.detail)
-              }
-
-'''
-          source = source[:start] + replacement + source[end:]
-
-          start = source.index('    private fun policyIsCompatible(')
-          end = source.index('    private fun effectiveOutputConstraints', start)
-          replacement = '''    private fun policyIsCompatible(
-              policy: ConsumerUseCasePolicy,
-              resolved: ResolvedUseCase,
-              presetsByRef: Map<InferencePresetRef, InferencePreset>,
-          ): Boolean {
-              val presetsCompatible = presetsByRef.keys.containsAll(policy.exposedPresets)
-              val defaultPresetCompatible = policy.defaultPreset == null || policy.defaultPreset in presetsByRef
-              val internalOutputKinds = buildSet {
-                  add(resolved.useCase.outputMode.toConsumerKind())
-                  resolved.useCase.presets.forEach { preset ->
-                      preset.allowedOutputModes.forEach { add(it.toConsumerKind()) }
-                  }
-              }
-              val outputsCompatible = internalOutputKinds.containsAll(policy.outputConstraints)
-              val defaultPreset = policy.defaultPreset?.let(presetsByRef::get)
-              val reasoningCompatible = policy.reasoning != ConsumerReasoningCapability.SURFACED_REQUIRED_BY_POLICY ||
-                  supportsSurfacedReasoning(defaultPreset, resolved)
-              return presetsCompatible && defaultPresetCompatible && outputsCompatible && reasoningCompatible
-          }
-
-'''
-          source = source[:start] + replacement + source[end:]
-          path.write_text(source)
+          start = s.index('    private fun policyIsCompatible(')
+          end = s.index('    private fun effectiveOutputConstraints', start)
+          replacement = (
+              '    private fun policyIsCompatible(\n'
+              '        policy: ConsumerUseCasePolicy,\n'
+              '        resolved: ResolvedUseCase,\n'
+              '        presetsByRef: Map<InferencePresetRef, InferencePreset>,\n'
+              '    ): Boolean {\n'
+              '        val presetsCompatible = presetsByRef.keys.containsAll(policy.exposedPresets)\n'
+              '        val defaultPresetCompatible = policy.defaultPreset == null || policy.defaultPreset in presetsByRef\n'
+              '        val internalOutputKinds = buildSet {\n'
+              '            add(resolved.useCase.outputMode.toConsumerKind())\n'
+              '            resolved.useCase.presets.forEach { preset ->\n'
+              '                preset.allowedOutputModes.forEach { add(it.toConsumerKind()) }\n'
+              '            }\n'
+              '        }\n'
+              '        val outputsCompatible = internalOutputKinds.containsAll(policy.outputConstraints)\n'
+              '        val defaultPreset = policy.defaultPreset?.let(presetsByRef::get)\n'
+              '        val reasoningCompatible = policy.reasoning != ConsumerReasoningCapability.SURFACED_REQUIRED_BY_POLICY ||\n'
+              '            supportsSurfacedReasoning(defaultPreset, resolved)\n'
+              '        return presetsCompatible && defaultPresetCompatible && outputsCompatible && reasoningCompatible\n'
+              '    }\n\n'
+          )
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s)
           PY
       - name: Format and validate CA-1
         run: |
