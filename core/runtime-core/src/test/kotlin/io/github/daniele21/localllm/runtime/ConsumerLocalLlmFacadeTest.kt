@@ -175,10 +175,7 @@ class ConsumerLocalLlmFacadeTest {
     }
 }
 
-private class FacadeFixture(
-    maxInputCharacters: Int = 32_768,
-    maxJsonSchemaCharacters: Int = 32_768,
-) {
+private class FacadeFixture(maxInputCharacters: Int = 32_768, maxJsonSchemaCharacters: Int = 32_768) {
     val applicationId = ApplicationId("ombra")
     val useCaseId = UseCaseId("document-pii-detection")
     val digest = ModelDigest("b".repeat(64))
@@ -300,10 +297,7 @@ private class FacadeModelStore(digest: ModelDigest) : ModelStore {
     override fun snapshot() = ModelStoreSnapshot(models.size, models.values.sumOf { it.sizeBytes }, models.values.toList())
 }
 
-private class FacadeLocalClient(
-    private val digest: ModelDigest,
-    private val presetRef: InferencePresetRef,
-) : LocalLlmClient {
+private class FacadeLocalClient(private val digest: ModelDigest, private val presetRef: InferencePresetRef) : LocalLlmClient {
     var prepareCalls = 0
     var generateCalls = 0
     var lastRequest: GenerationRequest? = null

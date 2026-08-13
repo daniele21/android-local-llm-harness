@@ -111,10 +111,7 @@ class ConsumerLocalLlmFacade(
         return ConsumerSessionResult.Created(sessionId)
     }
 
-    override fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult {
+    override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
         val binding = sessions[request.sessionId]
             ?: return ConsumerGenerationStartResult.Rejected(
                 ConsumerFailure(ConsumerErrorCode.SESSION_NOT_FOUND, "Consumer session is unavailable"),
@@ -166,11 +163,7 @@ class ConsumerLocalLlmFacade(
     }
 
     private object ConsumerRequestMapper {
-        fun map(
-            applicationId: ApplicationId,
-            request: ConsumerGenerationRequest,
-            binding: SessionBinding,
-        ): RequestMapping {
+        fun map(applicationId: ApplicationId, request: ConsumerGenerationRequest, binding: SessionBinding): RequestMapping {
             val input = mapInput(request.input, binding.limits)
                 ?: return RequestMapping.Rejected(
                     ConsumerFailure(ConsumerErrorCode.INVALID_INPUT, "Consumer input exceeds the authorized limits"),
@@ -207,16 +200,18 @@ class ConsumerLocalLlmFacade(
         }
 
         private fun mapInput(input: ConsumerGenerationInput, limits: ConsumerLimits): GenerationInput? = when (input) {
-            is ConsumerGenerationInput.Text -> input.value
-                .takeIf { it.length <= limits.maxInputCharacters }
-                ?.let(GenerationInput::Text)
+            is ConsumerGenerationInput.Text ->
+                input.value
+                    .takeIf { it.length <= limits.maxInputCharacters }
+                    ?.let(GenerationInput::Text)
 
-            is ConsumerGenerationInput.Messages -> input.values
-                .takeIf { messages ->
-                    messages.size <= limits.maxConversationMessages &&
-                        messages.sumOf { it.content.length } <= limits.maxInputCharacters
-                }
-                ?.let(GenerationInput::Messages)
+            is ConsumerGenerationInput.Messages ->
+                input.values
+                    .takeIf { messages ->
+                        messages.size <= limits.maxConversationMessages &&
+                            messages.sumOf { it.content.length } <= limits.maxInputCharacters
+                    }
+                    ?.let(GenerationInput::Messages)
         }
 
         private fun mapOutput(
@@ -225,9 +220,12 @@ class ConsumerLocalLlmFacade(
             limits: ConsumerLimits,
         ): OutputConstraint? = when {
             expected == ConsumerOutputConstraintKind.TEXT && output is ConsumerOutputConstraint.Text -> OutputConstraint.Text
+
             expected == ConsumerOutputConstraintKind.JSON && output is ConsumerOutputConstraint.Json -> OutputConstraint.Json
+
             expected == ConsumerOutputConstraintKind.JSON_SCHEMA && output is ConsumerOutputConstraint.JsonSchema &&
                 output.schema.length <= limits.maxJsonSchemaCharacters -> OutputConstraint.JsonSchema(output.schema)
+
             else -> null
         }
     }
@@ -239,9 +237,13 @@ class ConsumerLocalLlmFacade(
         override fun onEvent(event: GenerationEvent) {
             when (event) {
                 is GenerationEvent.Queued -> listener.onEvent(ConsumerGenerationEvent.Queued(event.requestId, event.position))
+
                 is GenerationEvent.Prepared -> Unit
+
                 is GenerationEvent.Started -> listener.onEvent(ConsumerGenerationEvent.Started(event.requestId))
+
                 is GenerationEvent.TextDelta -> projectDelta(event)?.let(listener::onEvent)
+
                 is GenerationEvent.Completed -> listener.onEvent(
                     ConsumerGenerationEvent.Completed(
                         requestId = event.requestId,
@@ -251,6 +253,7 @@ class ConsumerLocalLlmFacade(
                         },
                     ),
                 )
+
                 is GenerationEvent.Failed -> listener.onEvent(
                     ConsumerGenerationEvent.Failed(event.requestId, event.error.toConsumerFailure()),
                 )
@@ -299,7 +302,8 @@ private fun ConsumerPreparedSelection.matches(decision: ConsumerPolicyDecision.A
 
 private fun ConsumerPolicyDecision.Rejected.toFailure() = ConsumerFailure(code.toConsumerErrorCode(), "Consumer selection was rejected")
 
-private fun ConsumerCapabilityResult.Rejected.toFailure() = ConsumerFailure(code.toConsumerErrorCode(), "Consumer capability is unavailable")
+private fun ConsumerCapabilityResult.Rejected.toFailure() =
+    ConsumerFailure(code.toConsumerErrorCode(), "Consumer capability is unavailable")
 
 private fun ConsumerCapabilityErrorCode.toConsumerErrorCode(): ConsumerErrorCode = when (this) {
     ConsumerCapabilityErrorCode.USE_CASE_NOT_ALLOWED -> ConsumerErrorCode.USE_CASE_NOT_ALLOWED

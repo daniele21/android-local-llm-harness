@@ -7,10 +7,7 @@ value class ConsumerPreparedId(val value: String) {
     }
 }
 
-data class ConsumerPrepareRequest(
-    val useCaseId: UseCaseId,
-    val selection: ConsumerSelectionRequest = ConsumerSelectionRequest(),
-)
+data class ConsumerPrepareRequest(val useCaseId: UseCaseId, val selection: ConsumerSelectionRequest = ConsumerSelectionRequest())
 
 data class ConsumerPreparedSelection(
     val preparedId: ConsumerPreparedId,
@@ -106,17 +103,11 @@ sealed interface ConsumerGenerationEvent {
 
     data class Started(override val requestId: RequestId) : ConsumerGenerationEvent
 
-    data class ContentDelta(
-        override val requestId: RequestId,
-        val text: String,
-        val contentType: ConsumerContentType,
-    ) : ConsumerGenerationEvent
+    data class ContentDelta(override val requestId: RequestId, val text: String, val contentType: ConsumerContentType) :
+        ConsumerGenerationEvent
 
-    data class Completed(
-        override val requestId: RequestId,
-        val answer: String,
-        val surfacedReasoning: String? = null,
-    ) : ConsumerGenerationEvent
+    data class Completed(override val requestId: RequestId, val answer: String, val surfacedReasoning: String? = null) :
+        ConsumerGenerationEvent
 
     data class Failed(override val requestId: RequestId, val failure: ConsumerFailure) : ConsumerGenerationEvent
 }
