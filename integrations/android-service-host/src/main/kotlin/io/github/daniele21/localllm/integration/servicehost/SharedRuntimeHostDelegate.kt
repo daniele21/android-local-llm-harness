@@ -3,18 +3,9 @@ package io.github.daniele21.localllm.integration.servicehost
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
-import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
-import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
-import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
-import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
-import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
-import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
-import io.github.daniele21.localllm.transport.binder.contract.PrepareRequestParcel
-import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
-import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
@@ -30,10 +21,13 @@ class SharedRuntimeHostDelegate(
         HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
 ) : AutoCloseable {
     private val resources = HostRuntimeResources()
+    private val consumerResources = ConsumerHostResources()
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
+
     internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
-    internal val consumerOperations = ConsumerHostOperations(ledger, resources, controlExecutor)
+    internal val consumerOperations =
+        ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
 
     fun registerClient(
         caller: AuthorizedCaller,
@@ -45,16 +39,25 @@ class SharedRuntimeHostDelegate(
             callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
             return
         }
-        val negotiated = try {
-            negotiateProtocol(protocolInfo, hello)
-        } catch (error: WireProtocolException) {
-            callback.onResult(registrationFailure(error.toHostWireError()))
-            return
-        }
+        val negotiated =
+            try {
+                negotiateProtocol(protocolInfo, hello)
+            } catch (error: WireProtocolException) {
+                callback.onResult(registrationFailure(error.toHostWireError()))
+                return
+            }
         controlExecutor.submitOrReject(
-            onRejected = { callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE))) },
+            onRejected = {
+                callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
+            },
         ) {
-            completeRegistration(caller, lifecycle, callback, negotiated.minor, negotiated.enabledFeatures.sorted())
+            completeRegistration(
+                caller,
+                lifecycle,
+                callback,
+                negotiated.minor,
+                negotiated.enabledFeatures.sorted(),
+            )
         }
     }
 
@@ -68,8 +71,11 @@ class SharedRuntimeHostDelegate(
         if (!closed.compareAndSet(false, true)) return
         controlExecutor.closeSafely()
         synchronized(lifecycleLock) {
-            ledger.activeConnections.forEach { connection -> cleanupConnection(connection.token, connection.caller) }
+            ledger.activeConnections.forEach { connection ->
+                cleanupConnection(connection.token, connection.caller)
+            }
             resources.closeAll()
+            consumerResources.clear()
         }
     }
 
@@ -85,15 +91,18 @@ class SharedRuntimeHostDelegate(
             return@synchronized
         }
         when (val registration = ledger.register(caller)) {
-            is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
-            is LedgerResult.Success -> finishRegistration(
-                caller,
-                lifecycle,
-                callback,
-                registration.value,
-                negotiatedMinor,
-                enabledFeatures,
-            )
+            is LedgerResult.Failure ->
+                callback.onResult(registrationFailure(registration.reason.toHostWireError()))
+
+            is LedgerResult.Success ->
+                finishRegistration(
+                    caller,
+                    lifecycle,
+                    callback,
+                    registration.value,
+                    negotiatedMinor,
+                    enabledFeatures,
+                )
         }
     }
 
@@ -112,13 +121,16 @@ class SharedRuntimeHostDelegate(
             return
         }
         resources.attachCallbackDispatcher(token, dispatcher)
-        val consumer = consumerClientFactory?.let { factory -> runCatching { factory(caller.applicationId) }.getOrNull() }
+        val consumer =
+            consumerClientFactory?.let { factory ->
+                runCatching { factory(caller.applicationId) }.getOrNull()
+            }
         if (consumerClientFactory != null && consumer == null) {
             cleanupConnection(token, caller)
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
             return
         }
-        consumer?.let { resources.attachConsumerClient(token, it) }
+        consumer?.let { consumerResources.attachClient(token, it) }
         val deathLink = lifecycle.link {
             controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
         }
@@ -133,17 +145,19 @@ class SharedRuntimeHostDelegate(
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
         val closing = ledger.beginClose(token, caller).successOrNull() ?: return
-        closing.requestIds.forEach { requestId -> resources.removeHandle(requestId)?.cancelSafely() }
-        val consumer = resources.consumerClient(token)
+        closing.requestIds.forEach { requestId ->
+            resources.removeHandle(requestId)?.cancelSafely()
+        }
+        val consumer = consumerResources.client(token)
         closing.sessionIds.forEach { sessionId ->
-            if (resources.isConsumerSession(token, sessionId) && consumer != null) {
+            if (consumerResources.ownsSession(token, sessionId) && consumer != null) {
                 runCatching { consumer.closeSession(sessionId) }
-                resources.removeConsumerSession(token, sessionId)
+                consumerResources.removeSession(token, sessionId)
             } else {
                 runCatching { client.closeSession(sessionId) }
             }
         }
-        resources.removeConsumerClient(token)
+        consumerResources.removeClient(token)
         resources.removeDeathLink(token)?.unlinkSafely()
         resources.removeCallbackDispatcher(token)?.closeSafely()
         ledger.finishClose(token, caller)
