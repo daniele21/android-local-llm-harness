@@ -45,7 +45,7 @@ Positive signing:
 
 Model precondition:
   The release host must already contain an explicitly installed and selected curated Qwen3.5 model.
-  This runner never copies, downloads, or discovers a host-private GGUF path.
+  The runner never copies, downloads, or discovers a host-private GGUF path.
 EOF
 }
 
@@ -128,7 +128,7 @@ resolve_apksigner() {
         sdk_root="$HOME/Library/Android/sdk"
     fi
     if [[ -n "$sdk_root" && -d "$sdk_root/build-tools" ]]; then
-        candidate="$(find "$sdk_root/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+        candidate="$(find "$sdk_root/build-tools" -type f -name apksigner 2>/dev/null | sort | tail -n 1)"
     fi
     if [[ -n "$candidate" && -x "$candidate" ]]; then
         printf '%s\n' "$candidate"
@@ -180,12 +180,29 @@ apk_cert_digest() {
         head -n 1
 }
 
-installed_version() {
+sha256_value() {
+    local file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" | awk '{print $1}'
+    else
+        shasum -a 256 "$file" | awk '{print $1}'
+    fi
+}
+
+package_version_name() {
     local package_name="$1"
     "${ADB_CMD[@]}" shell dumpsys package "$package_name" 2>/dev/null |
         tr -d '\r' |
-        awk '/versionName=/{print; exit} /versionCode=/{versionCode=$0} END{if (versionCode != "") print versionCode}' |
-        sed 's/^[[:space:]]*//'
+        sed -n 's/^[[:space:]]*versionName=//p' |
+        head -n 1
+}
+
+package_version_code() {
+    local package_name="$1"
+    "${ADB_CMD[@]}" shell dumpsys package "$package_name" 2>/dev/null |
+        tr -d '\r' |
+        sed -n 's/^[[:space:]]*versionCode=\([0-9][0-9]*\).*/\1/p' |
+        head -n 1
 }
 
 find_instrumentation() {
@@ -214,7 +231,13 @@ run_instrumentation() {
     "${ADB_CMD[@]}" shell am instrument -w -r -e class "$test_class" "$runner" | tee "$log_file"
     local status=${PIPESTATUS[0]}
     set -e
-    if [[ $status -ne 0 ]] || ! grep -Eq 'OK \([0-9]+ tests?\)|INSTRUMENTATION_CODE: -1' "$log_file"; then
+    if [[ $status -ne 0 ]]; then
+        return 1
+    fi
+    if ! grep -Eq 'OK \([0-9]+ tests?\)' "$log_file"; then
+        return 1
+    fi
+    if ! grep -Fq 'INSTRUMENTATION_CODE: -1' "$log_file"; then
         return 1
     fi
 }
@@ -243,6 +266,10 @@ if [[ -z "$APKSIGNER_BIN" ]]; then
 fi
 if ! command -v keytool >/dev/null 2>&1; then
     echo "Error: keytool is required for the ephemeral independently signed negative fixture." >&2
+    exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Error: python3 is required to generate the ephemeral signing password." >&2
     exit 1
 fi
 
@@ -332,15 +359,25 @@ if [[ "$HOST_CERT" != "$CLIENT_CERT" || "$CLIENT_CERT" != "$CLIENT_TEST_CERT" ]]
     exit 1
 fi
 
+HOST_APK_SHA256="$(sha256_value "$HOST_APK")"
+POSITIVE_CLIENT_APK_SHA256="$(sha256_value "$CLIENT_APK")"
+POSITIVE_CLIENT_TEST_APK_SHA256="$(sha256_value "$CLIENT_TEST_APK")"
+
 "${ADB_CMD[@]}" install -r "$HOST_APK" >/dev/null
 "${ADB_CMD[@]}" shell am start -W -n "$HOST_PACKAGE/io.github.daniele21.localllm.phonetest.MainActivity" >/dev/null
+HOST_VERSION_NAME="$(package_version_name "$HOST_PACKAGE")"
+HOST_VERSION_CODE="$(package_version_code "$HOST_PACKAGE")"
 if [[ "$HOST_ONLY" == "true" ]]; then
     {
         echo "scope=$EVIDENCE_SCOPE"
         echo "result=HOST_READY_FOR_MODEL_SETUP"
         echo "git_commit=$(git rev-parse HEAD)"
+        echo "repository_dirty=false"
         echo "host_package=$HOST_PACKAGE"
+        echo "host_version_name=${HOST_VERSION_NAME:-unknown}"
+        echo "host_version_code=${HOST_VERSION_CODE:-unknown}"
         echo "host_certificate_sha256=$HOST_CERT"
+        echo "host_apk_sha256=$HOST_APK_SHA256"
     } > "$EVIDENCE_DIR/manifest.txt"
     echo "Release host installed and launched. Install/select the curated Qwen3.5 model in the host, then rerun without --host-only."
     exit 0
@@ -350,6 +387,8 @@ fi
 "${ADB_CMD[@]}" uninstall "$CLIENT_PACKAGE.test" >/dev/null 2>&1 || true
 "${ADB_CMD[@]}" install "$CLIENT_APK" >/dev/null
 "${ADB_CMD[@]}" install "$CLIENT_TEST_APK" >/dev/null
+POSITIVE_CLIENT_VERSION_NAME="$(package_version_name "$CLIENT_PACKAGE")"
+POSITIVE_CLIENT_VERSION_CODE="$(package_version_code "$CLIENT_PACKAGE")"
 
 "${ADB_CMD[@]}" logcat -c >/dev/null 2>&1 || true
 POSITIVE_RESULT="PASS"
@@ -360,8 +399,18 @@ fi
     grep -E 'SR6_SHARED_RUNTIME|AndroidRuntime.*(phonetest|consumerfixture)' > "$EVIDENCE_DIR/filtered-logcat.txt" || true
 grep 'SR6_SHARED_RUNTIME' "$EVIDENCE_DIR/positive-instrumentation.log" > "$EVIDENCE_DIR/metrics.txt" || true
 
+MODEL_DIGEST_SHA256="$(sed -n 's/.*SR6_SHARED_RUNTIME identity modelDigestSha256=\([^ ]*\).*/\1/p' "$EVIDENCE_DIR/positive-instrumentation.log" | tail -n 1)"
+NEGOTIATED_MINOR="$(sed -n 's/.*SR6_SHARED_RUNTIME identity .*negotiatedMinor=\([^ ]*\).*/\1/p' "$EVIDENCE_DIR/positive-instrumentation.log" | tail -n 1)"
+ENABLED_FEATURES="$(sed -n 's/.*SR6_SHARED_RUNTIME identity .*enabledFeatures=\([^[:space:]]*\).*/\1/p' "$EVIDENCE_DIR/positive-instrumentation.log" | tail -n 1)"
+if [[ "$POSITIVE_RESULT" == "PASS" && -z "$MODEL_DIGEST_SHA256" ]]; then
+    echo "Error: positive instrumentation passed without recording the selected model digest." >&2
+    POSITIVE_RESULT="FAIL"
+fi
+
 NEGATIVE_RESULT="SKIPPED"
 NEGATIVE_CERT=""
+NEGATIVE_CLIENT_APK_SHA256=""
+NEGATIVE_CLIENT_TEST_APK_SHA256=""
 if [[ "$SKIP_NEGATIVE" != "true" ]]; then
     NEGATIVE_RESULT="PASS"
     NEGATIVE_KEYSTORE="$TEMP_DIR/sr6-negative-client.p12"
@@ -396,6 +445,8 @@ if [[ "$SKIP_NEGATIVE" != "true" ]]; then
         echo "Error: negative fixture signing identity is not independent or test signing does not match target signing." >&2
         exit 1
     fi
+    NEGATIVE_CLIENT_APK_SHA256="$(sha256_value "$CLIENT_APK")"
+    NEGATIVE_CLIENT_TEST_APK_SHA256="$(sha256_value "$CLIENT_TEST_APK")"
     "${ADB_CMD[@]}" install "$CLIENT_APK" >/dev/null
     "${ADB_CMD[@]}" install "$CLIENT_TEST_APK" >/dev/null
     if ! run_instrumentation "$NEGATIVE_TEST_CLASS" "$EVIDENCE_DIR/negative-instrumentation.log"; then
@@ -420,25 +471,32 @@ LLAMA_REVISION="$(git -C third_party/llama.cpp rev-parse HEAD 2>/dev/null || ech
     echo "repository_dirty=false"
     echo "device_kind=$DEVICE_KIND"
     echo "host_package=$HOST_PACKAGE"
-    installed_version "$HOST_PACKAGE"
+    echo "host_version_name=${HOST_VERSION_NAME:-unknown}"
+    echo "host_version_code=${HOST_VERSION_CODE:-unknown}"
     echo "host_certificate_sha256=$HOST_CERT"
     echo "client_package=$CLIENT_PACKAGE"
-    installed_version "$CLIENT_PACKAGE"
+    echo "positive_client_version_name=${POSITIVE_CLIENT_VERSION_NAME:-unknown}"
+    echo "positive_client_version_code=${POSITIVE_CLIENT_VERSION_CODE:-unknown}"
     echo "positive_client_certificate_sha256=$CLIENT_CERT"
     echo "negative_client_certificate_sha256=${NEGATIVE_CERT:-not-run}"
     echo "client_sdk_version=${CLIENT_SDK_VERSION:-unknown}"
     echo "binder_protocol_major=${PROTOCOL_MAJOR:-unknown}"
     echo "binder_protocol_minor=${PROTOCOL_MINOR:-unknown}"
+    echo "negotiated_protocol_minor=${NEGOTIATED_MINOR:-unknown}"
+    echo "negotiated_features=${ENABLED_FEATURES:-unknown}"
+    echo "model_digest_sha256=${MODEL_DIGEST_SHA256:-unknown}"
     echo "llama_cpp_revision=$LLAMA_REVISION"
     echo "negative_signing_material_committed=false"
     echo "prompt_output_persisted=false"
 } > "$EVIDENCE_DIR/manifest.txt"
 
-sha256sum "$HOST_APK" > "$EVIDENCE_DIR/apk-sha256.txt" 2>/dev/null || shasum -a 256 "$HOST_APK" > "$EVIDENCE_DIR/apk-sha256.txt"
 {
-    sha256sum "$CLIENT_APK" 2>/dev/null || shasum -a 256 "$CLIENT_APK"
-    sha256sum "$CLIENT_TEST_APK" 2>/dev/null || shasum -a 256 "$CLIENT_TEST_APK"
-} >> "$EVIDENCE_DIR/apk-sha256.txt"
+    echo "host_release_apk_sha256=$HOST_APK_SHA256"
+    echo "positive_client_release_apk_sha256=$POSITIVE_CLIENT_APK_SHA256"
+    echo "positive_client_test_apk_sha256=$POSITIVE_CLIENT_TEST_APK_SHA256"
+    echo "negative_client_release_apk_sha256=${NEGATIVE_CLIENT_APK_SHA256:-not-run}"
+    echo "negative_client_test_apk_sha256=${NEGATIVE_CLIENT_TEST_APK_SHA256:-not-run}"
+} > "$EVIDENCE_DIR/apk-sha256.txt"
 
 cat > "$EVIDENCE_DIR/README.txt" <<EOF
 Shared Runtime SR-6 evidence bundle
@@ -449,6 +507,7 @@ Independent-signer denial result: $NEGATIVE_RESULT
 
 The bundle intentionally omits prompts, generated output, Binder tokens, signing keys/passwords, GGUF bytes and host-private model paths.
 The negative signing key was generated in a temporary directory and deleted after the run.
+The recorded model digest identifies the selected curated artifact without exposing its private filesystem path.
 An emulator run is preflight only and cannot close SR-6.
 EOF
 
