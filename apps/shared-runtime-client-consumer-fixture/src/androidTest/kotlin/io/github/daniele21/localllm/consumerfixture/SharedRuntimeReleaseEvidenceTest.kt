@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
+import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.transport.binder.client.BinderLocalLlmClient
@@ -47,148 +48,9 @@ class SharedRuntimeReleaseEvidenceTest {
 
     @Test
     fun packagedReleaseClientCompletesStreamsCancelsAndCloses() {
-        val prepare = client.prepare(APPLICATION_ID, USE_CASE_ID)
-        assertTrue(
-            "Release-like host is reachable but no curated model is ready. Install and select a supported Qwen3.5 model in the host first.",
-            prepare.ready,
-        )
-        assertNotNull(prepare.modelDigest)
-        val modelDigest = requireNotNull(prepare.modelDigest).sha256
-        val connection = client.connectionSnapshot
-        println(
-            "SR6_SHARED_RUNTIME identity " +
-                "modelDigestSha256=$modelDigest " +
-                "negotiatedMinor=${connection.negotiatedMinor ?: -1} " +
-                "enabledFeatures=${connection.enabledFeatures.sorted().joinToString(",")}",
-        )
-
-        val completeSession = client.createSession(APPLICATION_ID, USE_CASE_ID)
-        val completedLatch = CountDownLatch(1)
-        val sawDelta = AtomicBoolean(false)
-        val preparedEvent = AtomicReference<GenerationEvent.Prepared>()
-        val completedEvent = AtomicReference<GenerationEvent>()
-        val completeRequestId = RequestId("sr6-complete-${UUID.randomUUID()}")
-        val clientStartedAtNanos = System.nanoTime()
-
-        client.generate(
-            GenerationRequest(
-                requestId = completeRequestId,
-                sessionId = completeSession,
-                applicationId = APPLICATION_ID,
-                useCaseId = USE_CASE_ID,
-                input = "Return a short acknowledgement for a local Binder release evidence test.",
-                overrides = GenerationOverrides(maxOutputTokens = 64, temperature = 0f, seed = 61L),
-            ),
-        ) { event ->
-            when (event) {
-                is GenerationEvent.Prepared -> preparedEvent.compareAndSet(null, event)
-
-                is GenerationEvent.TextDelta -> sawDelta.set(true)
-
-                is GenerationEvent.Completed,
-                is GenerationEvent.Failed,
-                -> {
-                    completedEvent.set(event)
-                    completedLatch.countDown()
-                }
-
-                else -> Unit
-            }
-        }
-
-        assertTrue(
-            "Release generation did not terminate",
-            completedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-        )
-        val clientObservedTotalMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - clientStartedAtNanos)
-        val terminal = completedEvent.get()
-        assertTrue("Expected a successful packaged-client completion", terminal is GenerationEvent.Completed)
-        assertTrue("Expected at least one streamed Binder delta", sawDelta.get())
-        val prepared = requireNotNull(preparedEvent.get()) { "Expected prepared configuration before terminal event" }
-        assertEquals(prepare.modelDigest, prepared.modelDigest)
-        val configuration = prepared.configuration
-        println(
-            "SR6_SHARED_RUNTIME generationProfile " +
-                "presetId=${configuration.preset?.id?.value ?: "none"} " +
-                "presetVersion=${configuration.preset?.version ?: -1} " +
-                "contextSize=${configuration.contextSize} " +
-                "maxOutputTokens=${configuration.maxOutputTokens} " +
-                "thinkingMode=${configuration.thinkingMode.name} " +
-                "temperature=${configuration.temperature} " +
-                "topP=${configuration.topP} " +
-                "topK=${configuration.topK} " +
-                "minP=${configuration.minP} " +
-                "presencePenalty=${configuration.presencePenalty} " +
-                "repeatPenalty=${configuration.repeatPenalty} " +
-                "repeatLastN=${configuration.repeatLastN}",
-        )
-        val metrics = (terminal as GenerationEvent.Completed).metrics
-        val transportEnvelopeMs = (clientObservedTotalMs - metrics.totalMs).coerceAtLeast(0L)
-        println(
-            "SR6_SHARED_RUNTIME generation " +
-                "ttftMs=${metrics.timeToFirstTokenMs ?: -1} " +
-                "coreTotalMs=${metrics.totalMs} " +
-                "clientObservedTotalMs=$clientObservedTotalMs " +
-                "transportEnvelopeMs=$transportEnvelopeMs " +
-                "inputTokens=${metrics.inputTokens ?: -1} " +
-                "outputTokens=${metrics.outputTokens ?: -1} " +
-                "decodeTokensPerSecond=${metrics.decodeTokensPerSecond ?: -1.0} " +
-                "stopReason=${metrics.stopReason.name}",
-        )
-        client.closeSession(completeSession)
-
-        val cancelSession = client.createSession(APPLICATION_ID, USE_CASE_ID)
-        val startedLatch = CountDownLatch(1)
-        val cancelledLatch = CountDownLatch(1)
-        val cancelledEvent = AtomicReference<GenerationEvent>()
-        val cancelRequestId = RequestId("sr6-cancel-${UUID.randomUUID()}")
-        val handle = client.generate(
-            GenerationRequest(
-                requestId = cancelRequestId,
-                sessionId = cancelSession,
-                applicationId = APPLICATION_ID,
-                useCaseId = USE_CASE_ID,
-                input = "Generate a long numbered sequence, one item per line, without stopping early.",
-                overrides = GenerationOverrides(maxOutputTokens = 512, temperature = 0f, seed = 62L),
-            ),
-        ) { event ->
-            when (event) {
-                is GenerationEvent.Started,
-                is GenerationEvent.Prepared,
-                is GenerationEvent.TextDelta,
-                -> startedLatch.countDown()
-
-                is GenerationEvent.Completed,
-                is GenerationEvent.Failed,
-                -> {
-                    cancelledEvent.set(event)
-                    cancelledLatch.countDown()
-                }
-
-                else -> Unit
-            }
-        }
-
-        assertTrue(
-            "Release generation never became cancellable",
-            startedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-        )
-        val cancelRequestedAt = System.nanoTime()
-        handle.cancel()
-        assertTrue(
-            "Release cancellation did not terminate",
-            cancelledLatch.await(CANCEL_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-        )
-        val cancelled = cancelledEvent.get()
-        assertTrue("Expected a typed cancelled terminal", cancelled is GenerationEvent.Failed)
-        assertTrue(
-            "Expected LocalLlmError.Cancelled",
-            (cancelled as GenerationEvent.Failed).error is LocalLlmError.Cancelled,
-        )
-        assertEquals(cancelRequestId, cancelled.requestId)
-        val cancellationLatencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - cancelRequestedAt)
-        println("SR6_SHARED_RUNTIME cancellation latencyMs=$cancellationLatencyMs terminal=CANCELLED")
-        client.closeSession(cancelSession)
+        val modelDigest = prepareAndRecordRuntimeIdentity()
+        runSuccessfulGeneration(modelDigest)
+        runCancellation()
     }
 
     @Test
@@ -209,6 +71,147 @@ class SharedRuntimeReleaseEvidenceTest {
             awaitConnection(client, SharedRuntimeConnectionState.CONNECTED),
         )
         println("SR6_SHARED_RUNTIME processDeath disconnect=CONNECTION_LOST reconnect=CONNECTED")
+    }
+
+    private fun prepareAndRecordRuntimeIdentity(): ModelDigest {
+        val prepare = client.prepare(APPLICATION_ID, USE_CASE_ID)
+        assertTrue(
+            "Release-like host is reachable but no curated model is ready. Install and select a supported Qwen3.5 model in the host first.",
+            prepare.ready,
+        )
+        assertNotNull(prepare.modelDigest)
+        val modelDigest = requireNotNull(prepare.modelDigest)
+        val connection = client.connectionSnapshot
+        println(
+            "SR6_SHARED_RUNTIME identity " +
+                "modelDigestSha256=${modelDigest.sha256} " +
+                "negotiatedMinor=${connection.negotiatedMinor ?: -1} " +
+                "enabledFeatures=${connection.enabledFeatures.sorted().joinToString(",")}",
+        )
+        return modelDigest
+    }
+
+    private fun runSuccessfulGeneration(expectedModelDigest: ModelDigest) {
+        val sessionId = client.createSession(APPLICATION_ID, USE_CASE_ID)
+        val terminalLatch = CountDownLatch(1)
+        val sawDelta = AtomicBoolean(false)
+        val preparedEvent = AtomicReference<GenerationEvent.Prepared>()
+        val terminalEvent = AtomicReference<GenerationEvent>()
+        val requestId = RequestId("sr6-complete-${UUID.randomUUID()}")
+        val clientStartedAtNanos = System.nanoTime()
+
+        client.generate(
+            GenerationRequest(
+                requestId = requestId,
+                sessionId = sessionId,
+                applicationId = APPLICATION_ID,
+                useCaseId = USE_CASE_ID,
+                input = "Return a short acknowledgement for a local Binder release evidence test.",
+                overrides = GenerationOverrides(maxOutputTokens = 64, temperature = 0f, seed = 61L),
+            ),
+        ) { event ->
+            when (event) {
+                is GenerationEvent.Prepared -> preparedEvent.compareAndSet(null, event)
+                is GenerationEvent.TextDelta -> sawDelta.set(true)
+                is GenerationEvent.Completed,
+                is GenerationEvent.Failed,
+                -> {
+                    terminalEvent.set(event)
+                    terminalLatch.countDown()
+                }
+                else -> Unit
+            }
+        }
+
+        assertTrue("Release generation did not terminate", terminalLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        val clientObservedTotalMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - clientStartedAtNanos)
+        val terminal = terminalEvent.get()
+        assertTrue("Expected a successful packaged-client completion", terminal is GenerationEvent.Completed)
+        assertTrue("Expected at least one streamed Binder delta", sawDelta.get())
+        val prepared = requireNotNull(preparedEvent.get()) { "Expected prepared configuration before terminal event" }
+        assertEquals(expectedModelDigest, prepared.modelDigest)
+        recordGenerationProfile(prepared)
+        recordGenerationMetrics(terminal as GenerationEvent.Completed, clientObservedTotalMs)
+        client.closeSession(sessionId)
+    }
+
+    private fun runCancellation() {
+        val sessionId = client.createSession(APPLICATION_ID, USE_CASE_ID)
+        val startedLatch = CountDownLatch(1)
+        val terminalLatch = CountDownLatch(1)
+        val terminalEvent = AtomicReference<GenerationEvent>()
+        val requestId = RequestId("sr6-cancel-${UUID.randomUUID()}")
+        val handle = client.generate(
+            GenerationRequest(
+                requestId = requestId,
+                sessionId = sessionId,
+                applicationId = APPLICATION_ID,
+                useCaseId = USE_CASE_ID,
+                input = "Generate a long numbered sequence, one item per line, without stopping early.",
+                overrides = GenerationOverrides(maxOutputTokens = 512, temperature = 0f, seed = 62L),
+            ),
+        ) { event ->
+            when (event) {
+                is GenerationEvent.Started,
+                is GenerationEvent.Prepared,
+                is GenerationEvent.TextDelta,
+                -> startedLatch.countDown()
+                is GenerationEvent.Completed,
+                is GenerationEvent.Failed,
+                -> {
+                    terminalEvent.set(event)
+                    terminalLatch.countDown()
+                }
+                else -> Unit
+            }
+        }
+
+        assertTrue("Release generation never became cancellable", startedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        val cancelRequestedAt = System.nanoTime()
+        handle.cancel()
+        assertTrue("Release cancellation did not terminate", terminalLatch.await(CANCEL_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        val cancelled = terminalEvent.get()
+        assertTrue("Expected a typed cancelled terminal", cancelled is GenerationEvent.Failed)
+        assertTrue("Expected LocalLlmError.Cancelled", (cancelled as GenerationEvent.Failed).error is LocalLlmError.Cancelled)
+        assertEquals(requestId, cancelled.requestId)
+        val cancellationLatencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - cancelRequestedAt)
+        println("SR6_SHARED_RUNTIME cancellation latencyMs=$cancellationLatencyMs terminal=CANCELLED")
+        client.closeSession(sessionId)
+    }
+
+    private fun recordGenerationProfile(prepared: GenerationEvent.Prepared) {
+        val configuration = prepared.configuration
+        println(
+            "SR6_SHARED_RUNTIME generationProfile " +
+                "presetId=${configuration.preset?.id?.value ?: "none"} " +
+                "presetVersion=${configuration.preset?.version ?: -1} " +
+                "contextSize=${configuration.contextSize} " +
+                "maxOutputTokens=${configuration.maxOutputTokens} " +
+                "thinkingMode=${configuration.thinkingMode.name} " +
+                "temperature=${configuration.temperature} " +
+                "topP=${configuration.topP} " +
+                "topK=${configuration.topK} " +
+                "minP=${configuration.minP} " +
+                "presencePenalty=${configuration.presencePenalty} " +
+                "repeatPenalty=${configuration.repeatPenalty} " +
+                "repeatLastN=${configuration.repeatLastN}",
+        )
+    }
+
+    private fun recordGenerationMetrics(completed: GenerationEvent.Completed, clientObservedTotalMs: Long) {
+        val metrics = completed.metrics
+        val transportEnvelopeMs = (clientObservedTotalMs - metrics.totalMs).coerceAtLeast(0L)
+        println(
+            "SR6_SHARED_RUNTIME generation " +
+                "ttftMs=${metrics.timeToFirstTokenMs ?: -1} " +
+                "coreTotalMs=${metrics.totalMs} " +
+                "clientObservedTotalMs=$clientObservedTotalMs " +
+                "transportEnvelopeMs=$transportEnvelopeMs " +
+                "inputTokens=${metrics.inputTokens ?: -1} " +
+                "outputTokens=${metrics.outputTokens ?: -1} " +
+                "decodeTokensPerSecond=${metrics.decodeTokensPerSecond ?: -1.0} " +
+                "stopReason=${metrics.stopReason.name}",
+        )
     }
 
     private fun runShell(command: String) {
