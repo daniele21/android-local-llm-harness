@@ -17,7 +17,29 @@ import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
+internal interface ConsumerSharedRuntimeRemoteService {
+    @Throws(RemoteException::class)
+    fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun cancel(request: CancelRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun closeSession(request: CloseSessionRequestParcel)
+}
+
 internal interface SharedRuntimeRemoteService {
+    val consumer: ConsumerSharedRuntimeRemoteService
+
     @Throws(RemoteException::class)
     fun protocolInfo(): ProtocolInfoParcel
 
@@ -42,24 +64,6 @@ internal interface SharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun cancel(request: CancelRequestParcel)
-
-    @Throws(RemoteException::class)
-    fun consumerCapabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
-
-    @Throws(RemoteException::class)
-    fun consumerPrepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
-
-    @Throws(RemoteException::class)
-    fun consumerOpenSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
-
-    @Throws(RemoteException::class)
-    fun consumerGenerate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
-
-    @Throws(RemoteException::class)
-    fun consumerCancel(request: CancelRequestParcel)
-
-    @Throws(RemoteException::class)
-    fun consumerCloseSession(request: CloseSessionRequestParcel)
 
     @Throws(RemoteException::class)
     fun unregisterClient(clientToken: ClientTokenParcel)
