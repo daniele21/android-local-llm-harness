@@ -26,26 +26,26 @@ SR-5/SR-6 and applicable Qwen3.5 physical evidence remain external dependencies 
 
 ## CA-0 — Boundary decisions
 
-State: **PLANNED**
+State: **DONE**
 
 Goal: accept the durable responsibility split in [`target.md`](target.md).
 
-Tasks: decide logical model choice, preset-first tuning, surfaced reasoning, public metric tiers, capability discovery and deterministic session selection. Resolve any conflict with accepted ADR/shared-runtime target text before code changes.
+Accepted decisions are recorded in ADR 0013: the consumer selects an authenticated use case rather than a model identifier; Harness owns exact model/artifact resolution; consumer tuning is preset/policy constrained; surfaced reasoning, public metric tiers, capability discovery and deterministic prepared-session semantics remain host-governed.
 
 Exit gate: all target decisions are accepted or revised.
 
 ## CA-1 — Capability policy
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Owner: [`capabilities-and-policy.md`](capabilities-and-policy.md)
 
 Tasks:
 
-- define logical model IDs, readiness and capability revision;
+- define use-case readiness and capability revision without exposing model selectors or artifact identity;
 - define per-app/use-case allowlists, defaults and preset compatibility;
 - define reasoning/output/session capabilities and consumer limits;
-- implement one host policy registry reusing existing resolution;
+- implement one host policy registry reusing existing application/use-case resolution;
 - add default, allowlist, unavailable, stale-capability and privacy tests.
 
 Exit gate: an authenticated use case resolves a deterministic, privacy-safe capability set and every advertised choice is revalidated before preparation.
