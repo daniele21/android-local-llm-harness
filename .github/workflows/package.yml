@@ -139,7 +139,11 @@ jobs:
 
           ./gradlew "${gradle_args[@]}" \
             assembleDebug \
+            :transports:android-binder-contract:assembleRelease \
+            :transports:android-binder-client:assembleRelease \
             :apps:local-llm-console:assembleInternal \
+            :apps:shared-runtime-client-consumer-fixture:assembleRelease \
+            :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest \
             :apps:device-test-runner:assembleDebugAndroidTest \
             :apps:local-llm-phone-test:lintRelease \
             :apps:local-llm-phone-test:bundleRelease \
@@ -158,6 +162,16 @@ jobs:
         with:
           name: local-llm-console-apks
           path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload shared-runtime consumer fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: shared-runtime-consumer-fixture
+          path: |
+            apps/shared-runtime-client-consumer-fixture/build/outputs/apk/**/*.apk
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
