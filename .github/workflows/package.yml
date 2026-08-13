@@ -16,6 +16,7 @@ on:
       - "gradle.properties"
       - ".gitmodules"
       - "third_party/llama.cpp"
+      - "scripts/build-console-release.sh"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
   pull_request:
@@ -33,6 +34,7 @@ on:
       - "gradle.properties"
       - ".gitmodules"
       - "third_party/llama.cpp"
+      - "scripts/build-console-release.sh"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
   workflow_dispatch:
@@ -126,6 +128,7 @@ jobs:
       - name: Build and validate Android packages
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          LOCAL_LLM_CONSOLE_ALLOW_UNSIGNED_RELEASE: "true"
           LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
         shell: bash
         run: |
@@ -142,6 +145,7 @@ jobs:
             :transports:android-binder-contract:assembleRelease \
             :transports:android-binder-client:assembleRelease \
             :apps:local-llm-console:assembleInternal \
+            :apps:local-llm-console:bundleRelease \
             :apps:shared-runtime-client-consumer-fixture:assembleRelease \
             :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest \
             :apps:device-test-runner:assembleDebugAndroidTest \
@@ -162,6 +166,15 @@ jobs:
         with:
           name: local-llm-console-apks
           path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload console release bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-console-release-bundle
+          path: apps/local-llm-console/build/outputs/bundle/**/*.aab
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
