@@ -81,7 +81,11 @@ if [[ -z "$ADB_BIN" ]]; then
     exit 1
 fi
 
-mapfile -t DEVICES < <("$ADB_BIN" devices | awk 'NR > 1 && $2 == "device" {print $1}')
+DEVICES=()
+while IFS= read -r device; do
+    [[ -n "$device" ]] && DEVICES+=("$device")
+done < <("$ADB_BIN" devices | awk 'NR > 1 && $2 == "device" {print $1}')
+
 if [[ ${#DEVICES[@]} -eq 0 ]]; then
     echo "Error: no online ADB device or emulator is available." >&2
     exit 1
