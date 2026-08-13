@@ -2,8 +2,16 @@ package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ConsumerLimits
+import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
+import io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind
+import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.LocalLlmClient
+import io.github.daniele21.localllm.contracts.MAX_CONVERSATION_MESSAGES
+import io.github.daniele21.localllm.contracts.MAX_GENERATION_INPUT_CHARACTERS
+import io.github.daniele21.localllm.contracts.MAX_JSON_SCHEMA_CHARACTERS
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
@@ -12,6 +20,10 @@ import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
+import io.github.daniele21.localllm.runtime.ConsumerLocalLlmFacade
+import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
+import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistry
 import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
@@ -74,6 +86,38 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
      */
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
+
+    fun consumerClient(applicationId: ApplicationId): ConsumerLocalLlmClient {
+        require(applicationId == HarnessSharedRuntimeBindings.consoleApplicationId) {
+            "Consumer API is not configured for applicationId ${applicationId.value}"
+        }
+        val policy =
+            ConsumerUseCasePolicy(
+                applicationId = applicationId,
+                useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
+                revision = "shared-console-consumer-v1",
+                exposedPresets = emptySet(),
+                defaultPreset = null,
+                reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
+                outputConstraints = setOf(ConsumerOutputConstraintKind.TEXT),
+                defaultOutputConstraint = ConsumerOutputConstraintKind.TEXT,
+                sessionKinds = setOf(SessionKind.STATELESS),
+                defaultSessionKind = SessionKind.STATELESS,
+                limits =
+                    ConsumerLimits(
+                        maxInputCharacters = MAX_GENERATION_INPUT_CHARACTERS,
+                        maxConversationMessages = MAX_CONVERSATION_MESSAGES,
+                        maxJsonSchemaCharacters = MAX_JSON_SCHEMA_CHARACTERS,
+                    ),
+            )
+        val capabilityPolicy =
+            ConsumerCapabilityPolicyService(
+                profileRegistry = registry,
+                modelStore = modelStore,
+                policyRegistry = InMemoryConsumerUseCasePolicyRegistry(listOf(policy)),
+            )
+        return ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
+    }
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
