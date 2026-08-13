@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime
 Canonical scope: shared-runtime.roadmap
 Read when: selecting a shared-runtime milestone, checking dependencies or defining a focused pull request
-Last reviewed: 2026-08-12
+Last reviewed: 2026-08-13
 
 This roadmap owns capability order and exit gates. Detailed behavior belongs in the linked workstreams; integrated repository priority and blockers remain in [`../current-state.md`](../current-state.md).
 
@@ -18,11 +18,11 @@ SR-1 Binder protocol v1                    DONE
    |--------------------------|
 SR-2 Host service          SR-3 Client SDK DONE / DONE
    |--------------------------|
-SR-4 Two-APK vertical slice                PLANNED
+SR-4 Two-APK vertical slice                IN PROGRESS
    |
-SR-5 Resilience and isolation              PLANNED
+SR-5 Resilience and isolation              DONE
    |
-SR-6 Device evidence and release           PLANNED
+SR-6 Device evidence and release           IN PROGRESS
 
 Q35 physical runtime evidence ----- release dependency -----^
 ```
@@ -103,31 +103,41 @@ Exit gate:
 
 ## SR-4 — Two-APK vertical slice
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: prove the full path using existing repository applications.
 
 Dependencies: SR-2 and SR-3.
 
-Planned slice:
+Integrated implementation:
 
-- `apps/local-llm-phone-test` exposes the completed proof host service and exact same-signer console binding;
-- the host user explicitly installs/selects a curated Qwen3.5 model;
-- `apps/local-llm-console` connects through the completed SR-3 client adapter and uses its existing inference control;
-- prepare, open session, stream, cancel, complete and close cross the real process boundary;
-- disconnected, unavailable and incompatible states remain distinct in the console.
+- `apps/local-llm-phone-test` exposes the proof host service and exact same-signer console binding;
+- `apps/local-llm-console` contains a real Binder instrumentation flow for prepare, session, stream, complete, cancel and close;
+- `scripts/run-shared-runtime-device-e2e.sh` installs the two debug APKs and executes the cross-process preflight;
+- unavailable, denied, incompatible and disconnected states remain typed.
+
+Remaining exit evidence: execute the repeatable two-APK preflight on an actual emulator/device with a curated Qwen3.5 model installed and selected in the host. Repository implementation alone does not satisfy this physical/execution gate.
 
 Exit gate: a repeatable emulator/device preflight installs both APKs and completes the functional flow without bypassing runtime, store or authorization policy.
 
 ## SR-5 — Resilience and isolation
 
-State: **PLANNED**
+State: **DONE**
 
 Goal: harden the boundary for multiple callers and partial failure.
 
 Owner: [`workstreams/validation-rollout.md`](workstreams/validation-rollout.md)
 
-Dependencies: SR-4.
+Dependencies: SR-4 implementation.
+
+Integrated evidence:
+
+- external IDs are isolated through host-owned internal identities;
+- one client's close/death cannot drain another client's resources;
+- bounded host/client callback queues fail closed under backpressure;
+- client/host disconnect, callback failure, stale epochs and cancellation converge deterministically;
+- prepare/runtime detail is scrubbed at the Binder boundary;
+- protocol compatibility fixtures from SR-1 remain green.
 
 Exit gate:
 
@@ -140,13 +150,24 @@ Exit gate:
 
 ## SR-6 — Physical-device evidence and release
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: validate the exact two-APK distribution and decide whether the client artifact can be published.
 
 Owner: [`workstreams/validation-rollout.md`](workstreams/validation-rollout.md)
+Runbook: [`sr6-release-evidence.md`](sr6-release-evidence.md)
 
 Dependencies: SR-5 plus applicable Q35 runtime/device gates.
+
+Repository implementation in progress:
+
+- packaged release Binder client/contract AAR consumer fixture;
+- same-signer release-like functional/cancellation/process-death instrumentation;
+- independently signed ephemeral negative fixture;
+- physical-device evidence capture with package/certificate/protocol/device/memory/thermal identity;
+- explicit evidence privacy boundary and archive format.
+
+Remaining exit evidence requires execution on representative physical hardware and completion of the public API/security/versioning/release review for the exact candidate. Q35 physical runtime evidence remains an independent release dependency.
 
 Exit gate:
 
