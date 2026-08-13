@@ -135,3 +135,7 @@ discover -> prepare -> session -> generate -> close
 ```
 
 using only public consumer types, while tests also prove stale selections and invalid input/output fail before delegation and no caller/model/artifact/raw-tuning authority appears in the consumer surface.
+
+### Current validation evidence
+
+`ConsumerLocalLlmFacadeTest` covers the lifecycle exit gate, stale selection rejection, pre-delegation input/output validation and public-surface authority checks. The focused CA-2 gate passes repository formatting, Detekt and `:core:runtime-core:testDebugUnitTest`; repository-wide CI remains the integration gate before the slice can advance beyond `IN PROGRESS`.
