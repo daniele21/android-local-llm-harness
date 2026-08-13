@@ -1,0 +1,37 @@
+name: Agent CA2 format
+
+on:
+  push:
+    branches:
+      - agent/consumer-api-ca2
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/consumer-api-ca2
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply repository formatter
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+      - name: Commit formatted sources and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/agent-ca2-format.yml
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "style(consumer-api): apply repository formatting"
+          git push origin HEAD:agent/consumer-api-ca2
