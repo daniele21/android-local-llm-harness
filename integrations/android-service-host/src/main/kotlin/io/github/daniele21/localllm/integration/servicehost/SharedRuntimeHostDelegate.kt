@@ -1,9 +1,13 @@
 package io.github.daniele21.localllm.integration.servicehost
 
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.PrepareRequestParcel
@@ -19,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SharedRuntimeHostDelegate(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
+    private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     private val ledger: ClientConnectionLedger = ClientConnectionLedger(),
     private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
@@ -27,13 +32,8 @@ class SharedRuntimeHostDelegate(
     private val resources = HostRuntimeResources()
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
-    private val runtimeOperations =
-        HostRuntimeOperations(
-            client = client,
-            ledger = ledger,
-            resources = resources,
-            controlExecutor = controlExecutor,
-        )
+    private val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
+    private val consumerOperations = ConsumerHostOperations(ledger, resources, controlExecutor)
 
     fun registerClient(
         caller: AuthorizedCaller,
@@ -45,19 +45,14 @@ class SharedRuntimeHostDelegate(
             callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
             return
         }
-        val negotiated =
-            try {
-                negotiateProtocol(protocolInfo, hello)
-            } catch (error: WireProtocolException) {
-                callback.onResult(registrationFailure(error.toHostWireError()))
-                return
-            }
+        val negotiated = try {
+            negotiateProtocol(protocolInfo, hello)
+        } catch (error: WireProtocolException) {
+            callback.onResult(registrationFailure(error.toHostWireError()))
+            return
+        }
         controlExecutor.submitOrReject(
-            onRejected = {
-                callback.onResult(
-                    registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)),
-                )
-            },
+            onRejected = { callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE))) },
         ) {
             completeRegistration(caller, lifecycle, callback, negotiated.minor, negotiated.enabledFeatures.sorted())
         }
@@ -76,6 +71,35 @@ class SharedRuntimeHostDelegate(
 
     fun closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) = runtimeOperations.closeSession(caller, request)
 
+    fun consumerCapabilities(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        callback: HostResultCallback<ConsumerResultParcel>,
+    ) = consumerOperations.capabilities(caller, request, callback)
+
+    fun consumerPrepare(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        callback: HostResultCallback<ConsumerResultParcel>,
+    ) = consumerOperations.prepare(caller, request, callback)
+
+    fun consumerOpenSession(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        callback: HostResultCallback<ConsumerResultParcel>,
+    ) = consumerOperations.openSession(caller, request, callback)
+
+    fun consumerGenerate(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        callback: ConsumerHostEventCallback,
+    ) = consumerOperations.generate(caller, request, callback)
+
+    fun consumerCancel(caller: AuthorizedCaller, request: CancelRequestParcel) = consumerOperations.cancel(caller, request)
+
+    fun consumerCloseSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) =
+        consumerOperations.closeSession(caller, request)
+
     fun unregisterClient(caller: AuthorizedCaller, clientToken: String) {
         if (closed.get()) return
         val token = runCatching { HostClientToken(clientToken) }.getOrNull() ?: return
@@ -86,9 +110,7 @@ class SharedRuntimeHostDelegate(
         if (!closed.compareAndSet(false, true)) return
         controlExecutor.closeSafely()
         synchronized(lifecycleLock) {
-            ledger.activeConnections.forEach { connection ->
-                cleanupConnection(connection.token, connection.caller)
-            }
+            ledger.activeConnections.forEach { connection -> cleanupConnection(connection.token, connection.caller) }
             resources.closeAll()
         }
     }
@@ -106,38 +128,64 @@ class SharedRuntimeHostDelegate(
         }
         when (val registration = ledger.register(caller)) {
             is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
+            is LedgerResult.Success -> finishRegistration(
+                caller,
+                lifecycle,
+                callback,
+                registration.value,
+                negotiatedMinor,
+                enabledFeatures,
+            )
+        }
+    }
 
-            is LedgerResult.Success -> {
-                val token = registration.value
-                val dispatcher = runCatching(callbackDispatcherFactory::create).getOrNull()
-                if (dispatcher == null) {
-                    cleanupConnection(token, caller)
-                    callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
-                    return@synchronized
-                }
-                resources.attachCallbackDispatcher(token, dispatcher)
-                val deathLink = lifecycle.link {
-                    controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
-                }
-                if (deathLink == null) {
-                    cleanupConnection(token, caller)
-                    callback.onResult(
-                        registrationFailure(
-                            wireError(WireErrorCodes.CLIENT_DISCONNECTED),
-                        ),
-                    )
-                } else {
-                    resources.attachDeathLink(token, deathLink)
-                    callback.onResult(registrationSuccess(token, negotiatedMinor, enabledFeatures))
-                }
-            }
+    private fun finishRegistration(
+        caller: AuthorizedCaller,
+        lifecycle: ClientLifecycleLinker,
+        callback: HostResultCallback<RegistrationResultParcel>,
+        token: HostClientToken,
+        negotiatedMinor: Int,
+        enabledFeatures: List<String>,
+    ) {
+        val dispatcher = runCatching(callbackDispatcherFactory::create).getOrNull()
+        if (dispatcher == null) {
+            cleanupConnection(token, caller)
+            callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
+            return
+        }
+        resources.attachCallbackDispatcher(token, dispatcher)
+        val consumer = consumerClientFactory?.let { factory -> runCatching { factory(caller.applicationId) }.getOrNull() }
+        if (consumerClientFactory != null && consumer == null) {
+            cleanupConnection(token, caller)
+            callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
+            return
+        }
+        consumer?.let { resources.attachConsumerClient(token, it) }
+        val deathLink = lifecycle.link {
+            controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
+        }
+        if (deathLink == null) {
+            cleanupConnection(token, caller)
+            callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
+        } else {
+            resources.attachDeathLink(token, deathLink)
+            callback.onResult(registrationSuccess(token, negotiatedMinor, enabledFeatures))
         }
     }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
         val closing = ledger.beginClose(token, caller).successOrNull() ?: return
         closing.requestIds.forEach { requestId -> resources.removeHandle(requestId)?.cancelSafely() }
-        closing.sessionIds.forEach { sessionId -> runCatching { client.closeSession(sessionId) } }
+        val consumer = resources.consumerClient(token)
+        closing.sessionIds.forEach { sessionId ->
+            if (resources.isConsumerSession(token, sessionId) && consumer != null) {
+                runCatching { consumer.closeSession(sessionId) }
+                resources.removeConsumerSession(token, sessionId)
+            } else {
+                runCatching { client.closeSession(sessionId) }
+            }
+        }
+        resources.removeConsumerClient(token)
         resources.removeDeathLink(token)?.unlinkSafely()
         resources.removeCallbackDispatcher(token)?.closeSafely()
         ledger.finishClose(token, caller)
