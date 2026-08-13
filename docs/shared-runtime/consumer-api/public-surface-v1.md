@@ -341,14 +341,15 @@ Capability discovery and optional selection should prefer feature-negotiated add
 
 ## Migration from current Console proof
 
-The current proof client can be migrated in stages:
+The current proof client can be migrated into the OMBRA reference consumer in stages:
 
 1. keep existing fixed `console-inference-playground` use case;
 2. expose one capability response with one default model/preset;
 3. switch Console UI to capability-driven display;
-4. add multiple authorized logical models/presets only after policy tests exist;
-5. remove Console-local model/health/runtime ownership unrelated to consumer behavior;
-6. use Console as the reference consumer for packaged client SDK validation.
+4. add the authorized `document-pii-detection` use case with deterministic defaults and `JSON_SCHEMA` capability;
+5. remove Console-local model/health/runtime ownership and raw generation controls unrelated to consumer behavior;
+6. implement the product flow owned by [`pii-redactor/`](pii-redactor/) without adding PII-specific public SDK types;
+7. use the packaged OMBRA application as the reference consumer for client SDK validation.
 
 ## Acceptance criteria
 

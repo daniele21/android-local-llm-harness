@@ -20,7 +20,7 @@ contract/unit semantics
   -> host policy resolution with fakes
   -> Binder wire mapping/compatibility fixtures
   -> packaged client SDK consumer compilation
-  -> reference Console two-APK behavior
+  -> OMBRA reference-consumer two-APK behavior
   -> physical same-signer host/client evidence
   -> public API/security/versioning review
 ```
@@ -144,7 +144,7 @@ Exact version numbers are assigned during implementation/release planning, not i
 
 ## Reference consumer requirement
 
-`apps/local-llm-console` should become the reference consumer, not a second Harness control plane.
+`apps/local-llm-console` should become the OMBRA reference consumer, not a second Harness control plane. Product-specific PDF, PII, review, export and visual acceptance belongs to [`pii-redactor/`](pii-redactor/); this source retains the generic SDK boundary.
 
 Its success criteria:
 
@@ -153,24 +153,26 @@ Its success criteria:
 - contains no GGUF model store/download/install pipeline;
 - contains no independent runtime tuning engine;
 - does not recreate Harness-wide health/cache/thermal/benchmark controls;
-- discovers authorized model/preset capabilities from the host;
-- runs prompt -> reasoning/answer stream -> terminal result;
+- discovers authorized use-case/output/default capabilities from the host;
+- runs bounded text -> structured answer stream -> terminal result;
 - shows only public metrics/request details;
 - handles unavailable/denied/incompatible/disconnected states clearly.
 
 Any remaining Console-local diagnostics must be justified as consumer-SDK diagnostics rather than duplicated host control-plane behavior.
 
-## Reference UI acceptance
+OMBRA intentionally uses deterministic defaults, requires structured output and does not surface model/preset alternatives or reasoning in its primary product UI. Generic optional-capability, alternate-selection, surfaced-reasoning and disallowed-selection scenarios remain covered by contract tests, Binder fixtures and the packaged `apps/shared-runtime-client-consumer-fixture`; they must not be added to OMBRA merely to satisfy protocol coverage.
 
-The reference Console should use progressive disclosure:
+## Generic reference UI acceptance
+
+The packaged reference consumer should use progressive disclosure. Exact OMBRA screens and brand mapping are defined in [`pii-redactor/ux-and-brand.md`](pii-redactor/ux-and-brand.md).
 
 ### Primary
 
 - connection state;
-- prompt/input;
+- product-owned bounded input/task state;
 - allowed model/preset selectors only when more than one useful choice exists;
 - reasoning toggle only when surfaced reasoning is available;
-- answer;
+- application-facing structured result or its product projection;
 - Tier 1 metrics.
 
 ### Secondary request details

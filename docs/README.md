@@ -36,6 +36,7 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`adr/README.md`](adr/README.md) — accepted durable decisions
 - [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
 - [`shared-runtime/README.md`](shared-runtime/README.md) — planned cross-application Binder runtime routing and workstreams
+- [`shared-runtime/consumer-api/pii-redactor/README.md`](shared-runtime/consumer-api/pii-redactor/README.md) — OMBRA PDF/PII reference-consumer product and implementation plan
 - [`definition-of-done.md`](definition-of-done.md) — merge and production completion policy
 - [`versioning.md`](versioning.md) — version and release policy
 - [`releases/harness-0.5.md`](releases/harness-0.5.md) — Harness 0.5.0 release gates
@@ -75,6 +76,7 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`harness-brand-guidelines.md`](harness-brand-guidelines.md) — concise brand and product-language contract
 - [`android-brand-assets.md`](android-brand-assets.md) — generated Android identity
 - [`assets/brand/README.md`](assets/brand/README.md) and [`assets/brand/master/README.md`](assets/brand/master/README.md) — asset routing and vector masters
+- [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md) — OMBRA brand-kit and consumer-flow visual references
 
 ### Build, distribution and evidence
 

@@ -47,8 +47,11 @@ This plan proposes a constrained consumer API rather than exposing raw generatio
 | How are reasoning, answer, streaming and public metrics represented? | [`results-and-metrics.md`](results-and-metrics.md) |
 | How do we prove the boundary, compatibility, security and consumer usability? | [`validation-and-rollout.md`](validation-and-rollout.md) |
 | In what order should this be implemented and what closes each milestone? | [`roadmap.md`](roadmap.md) |
+| How does the first product-shaped PDF/PII reference consumer work? | [`pii-redactor/README.md`](pii-redactor/README.md) |
 
 Do not read every workstream for a focused change. For example, a metrics-only change should read the result contract plus the relevant existing core metrics source, not the entire capability-policy plan.
+
+The nested PII plan owns document extraction, PII definitions, prompt payload, result validation, review, redaction, export and OMBRA presentation. Those application details do not belong in the generic SDK, Binder protocol or Harness runtime.
 
 ## Proposed v1 at a glance
 

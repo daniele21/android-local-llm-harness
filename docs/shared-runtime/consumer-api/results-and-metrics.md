@@ -255,9 +255,9 @@ reasoning = ""   -> only valid if the channel was surfaced but produced no conte
 
 A successful text request should normally require a valid answer according to the resolved generation/output contract.
 
-## UI projection for the reference Console
+## UI projection for the reference consumer
 
-The reference app should display Tier 1 metrics by default:
+The reference app must consume and make Tier 1 metrics available through an appropriate product projection:
 
 ```text
 TTFT       412 ms
@@ -266,7 +266,7 @@ Total      3.21 s
 Tokens     154
 ```
 
-A collapsed `Request details` surface may reveal Tier 2 fields and effective logical model/preset identity. It should not recreate Harness-wide diagnostics.
+A generic inference playground may show Tier 1 beside the answer. The OMBRA product flow defined in [`pii-redactor/`](pii-redactor/) keeps them in a secondary `Request details` surface so document review remains primary. That surface may also reveal Tier 2 fields and effective logical model/preset identity; it must not recreate Harness-wide diagnostics.
 
 If surfaced reasoning is enabled, show it as a visually separate collapsible/secondary section so the final answer remains primary.
 

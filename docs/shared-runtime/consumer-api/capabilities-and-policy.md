@@ -279,19 +279,20 @@ ConsumerUseCasePolicy(
 
 Existing `AppModelBinding` / resolved use-case configuration should be reused where semantics fit. Do not create a parallel model-resolution engine.
 
-## Console reference policy
+## Reference-consumer policy
 
-The reference `local-llm-console` should eventually exercise a deliberately small matrix, for example:
+The first product-shaped reference consumer is the OMBRA PDF/PII application defined in [`pii-redactor/`](pii-redactor/). Its initial host policy should remain deliberately narrow:
 
 ```text
-use case: console-inference-playground
-models: curated Qwen3.5 0.8B and 2B when installed/validated
-presets: balanced + one contrast preset
-reasoning: surfaced when model/profile supports it
-output: text initially; JSON only if explicitly added to the reference scenario
+use case: document-pii-detection
+model: one reviewed default logical model for the device/host policy
+preset: one deterministic host-owned default
+reasoning: disabled / not surfaced
+output: JSON_SCHEMA required
+session: STATELESS
 ```
 
-The exact model list must follow the repository's reviewed curated catalog/runtime evidence rather than this planning example.
+Model alternatives and additional presets are not useful primary product choices for this workflow. They may be advertised later only after the generic policy tests and PII quality evidence justify them. Exact artifact support follows the reviewed curated catalog/runtime evidence, not the application plan.
 
 ## Authorization and information minimization
 

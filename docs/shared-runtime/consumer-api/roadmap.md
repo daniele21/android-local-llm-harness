@@ -17,7 +17,7 @@ CA-0 Boundary decisions
  -> CA-2 Public surface
  -> CA-3 Results and metrics
  -> CA-4 Binder integration
- -> CA-5 Reference Console
+ -> CA-5 OMBRA reference consumer
  -> CA-6 Validation
  -> CA-7 Release readiness
 ```
@@ -89,20 +89,21 @@ Tasks:
 
 Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior.
 
-## CA-5 — Reference Console
+## CA-5 — OMBRA reference consumer
 
 State: **PLANNED**
 
-Goal: make `local-llm-console` a pure reference consumer.
+Goal: turn `apps/local-llm-console` into the pure OMBRA PDF/PII reference consumer defined by [`pii-redactor/`](pii-redactor/).
 
 Tasks:
 
-- remove or isolate local model/runtime/control-plane responsibilities not required by a consumer;
-- drive model/preset/reasoning UI from host capabilities;
-- render answer plus Tier 1 metrics, with Tier 2 under `Request details`;
+- remove local model/runtime/control-plane responsibilities and raw inference controls;
+- use host capabilities and deterministic defaults for `document-pii-detection`;
+- prove bounded text input, fixed `JSON_SCHEMA` output and typed terminal behavior in a real document workflow;
+- implement the OMBRA milestones without introducing application-specific SDK or AIDL contracts;
 - handle unavailable, denied, incompatible, disconnected and cancelled states.
 
-Exit gate: the Console has no LLM runtime/model-management implementation and uses the packaged public client boundary.
+Exit gate: OMBRA has no LLM runtime/model-management implementation, uses the packaged public client boundary and meets the OMB-7 exit gate in [`pii-redactor/roadmap.md`](pii-redactor/roadmap.md). OMB-8 validation/release work remains mapped to CA-6/CA-7.
 
 ## CA-6 — Validation
 
@@ -131,7 +132,7 @@ Exit gate: packaged SDK and reference consumer satisfy shared-runtime release po
 | CA-2 | Consumer facade and session semantics |
 | CA-3 | Result/reasoning/public metrics |
 | CA-4 | Binder mapping and packaged SDK |
-| CA-5 | Console simplification/UX |
+| CA-5 | OMBRA pure-consumer migration and product UX |
 | CA-6 | Security, compatibility and device evidence |
 | CA-7 | API reference/version/release |
 
