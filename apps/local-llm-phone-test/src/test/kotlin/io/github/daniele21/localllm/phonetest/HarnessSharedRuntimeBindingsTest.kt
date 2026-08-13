@@ -18,6 +18,17 @@ class HarnessSharedRuntimeBindingsTest {
     }
 
     @Test
+    fun `release host external clients include exact packaged evidence consumer`() {
+        assertEquals(
+            setOf(
+                HarnessSharedRuntimeBindings.CONSOLE_RELEASE_PACKAGE,
+                HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE,
+            ),
+            HarnessSharedRuntimeBindings.externalClientPackages(debugHost = false),
+        )
+    }
+
+    @Test
     fun `debug host authorizes only exact debug and internal console packages`() {
         val packages = HarnessSharedRuntimeBindings.consolePackages(debugHost = true)
 
@@ -30,6 +41,14 @@ class HarnessSharedRuntimeBindingsTest {
         )
         assertFalse(HarnessSharedRuntimeBindings.CONSOLE_RELEASE_PACKAGE in packages)
         assertTrue(packages.none { it == "io.github.daniele21.localllm.console.debug.extra" })
+    }
+
+    @Test
+    fun `debug host does not authorize release evidence consumer`() {
+        val packages = HarnessSharedRuntimeBindings.externalClientPackages(debugHost = true)
+
+        assertEquals(HarnessSharedRuntimeBindings.consolePackages(debugHost = true), packages)
+        assertFalse(HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE in packages)
     }
 
     @Test

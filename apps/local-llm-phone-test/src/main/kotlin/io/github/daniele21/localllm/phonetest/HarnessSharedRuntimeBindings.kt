@@ -5,7 +5,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
 import io.github.daniele21.localllm.models.ResolvedUseCase
 
-/** Host-owned identities and fixed use-case binding for the first external proof client. */
+/** Host-owned identities and fixed use-case binding for external shared-runtime proof clients. */
 internal object HarnessSharedRuntimeBindings {
     val consoleApplicationId = ApplicationId("local-llm-console")
     val consoleUseCaseId = UseCaseId("console-inference-playground")
@@ -13,12 +13,16 @@ internal object HarnessSharedRuntimeBindings {
     const val CONSOLE_RELEASE_PACKAGE = "io.github.daniele21.localllm.console"
     const val CONSOLE_DEBUG_PACKAGE = "io.github.daniele21.localllm.console.debug"
     const val CONSOLE_INTERNAL_PACKAGE = "io.github.daniele21.localllm.console.internal"
+    const val SR6_RELEASE_CONSUMER_PACKAGE = "io.github.daniele21.localllm.consumerfixture"
 
     fun consolePackages(debugHost: Boolean): Set<String> = if (debugHost) {
         setOf(CONSOLE_DEBUG_PACKAGE, CONSOLE_INTERNAL_PACKAGE)
     } else {
         setOf(CONSOLE_RELEASE_PACKAGE)
     }
+
+    fun externalClientPackages(debugHost: Boolean): Set<String> =
+        consolePackages(debugHost) + if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved = resolvedPhoneUseCase(

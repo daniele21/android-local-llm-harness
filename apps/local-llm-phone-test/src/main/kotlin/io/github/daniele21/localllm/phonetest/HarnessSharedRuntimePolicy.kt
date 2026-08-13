@@ -8,7 +8,7 @@ import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPoli
 import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSha256
 import java.security.MessageDigest
 
-/** Exact package/use-case policy for the proof host and first external same-signer client. */
+/** Exact package/use-case policy for the proof host and external same-signer clients. */
 internal object HarnessSharedRuntimePolicy {
     fun authorizedClients(context: Context): List<AuthorizedClientPolicy> {
         val acceptedSigningCertificates = currentPackageSigningCertificates(context)
@@ -18,7 +18,7 @@ internal object HarnessSharedRuntimePolicy {
             allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
             acceptedSigningCertificates = acceptedSigningCertificates,
         )
-        val console = HarnessSharedRuntimeBindings.consolePackages(BuildConfig.DEBUG).map { packageName ->
+        val externalClients = HarnessSharedRuntimeBindings.externalClientPackages(BuildConfig.DEBUG).map { packageName ->
             AuthorizedClientPolicy(
                 packageName = packageName,
                 applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
@@ -26,7 +26,7 @@ internal object HarnessSharedRuntimePolicy {
                 acceptedSigningCertificates = acceptedSigningCertificates,
             )
         }
-        return listOf(internal) + console
+        return listOf(internal) + externalClients
     }
 
     @Suppress("DEPRECATION")

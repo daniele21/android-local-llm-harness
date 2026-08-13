@@ -86,6 +86,7 @@ jobs:
           bash scripts/test-verify-llama-cpp-pin.sh
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
+          bash scripts/capture-shared-runtime-release-evidence.sh --help >/dev/null
 
   native:
     name: Native host tests
@@ -275,7 +276,13 @@ jobs:
           tasks=(spotlessCheck detekt verifyNoModelArtifacts)
           for module in "${selected_modules[@]}"; do
             [[ -n "$module" ]] || continue
-            tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            if [[ "$module" == "apps:shared-runtime-client-consumer-fixture" ]]; then
+              # This fixture has no debug unit-test variant. Its SR-6 behavior is compiled
+              # as release instrumentation below when packaging validation is enabled.
+              tasks+=(":${module}:lintDebug")
+            else
+              tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+            fi
             if [[ "$module" == "apps:local-llm-console" ]]; then
               tasks+=(":apps:local-llm-console:lintInternal")
             fi
@@ -286,10 +293,14 @@ jobs:
               :backends:llama-cpp:assembleDebug
               :transports:android-binder-contract:assembleDebug
               :transports:android-binder-contract:assembleDebugAndroidTest
+              :transports:android-binder-contract:assembleRelease
               :transports:android-binder-client:assembleDebug
+              :transports:android-binder-client:assembleRelease
               :integrations:android-service-host:assembleDebug
               :apps:local-llm-console:assembleInternal
               :apps:shared-runtime-client-consumer-fixture:assembleDebug
+              :apps:shared-runtime-client-consumer-fixture:assembleRelease
+              :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest
               :apps:device-test-runner:assembleDebug
               :apps:device-test-runner:assembleDebugAndroidTest
               :apps:local-llm-phone-test:assembleDebug

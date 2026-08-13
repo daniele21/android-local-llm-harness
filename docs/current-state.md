@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-13
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -89,6 +89,19 @@ Overview, Diagnostics and Settings still retain some Activity-owned renderable s
 
 Normal telemetry excludes prompt/output/system-prompt/template/schema/stop-sequence text, filesystem paths, document URIs and signed URLs.
 
+### Shared Android runtime
+
+The shared-runtime implementation has advanced beyond proposal status:
+
+- SR-0 decision/scope, SR-1 Binder protocol v1, SR-2 authenticated host service and SR-3 lifecycle-safe Binder client SDK are integrated;
+- the host uses a signature-protected exported service, exact component binding, host-owned application/use-case/model resolution and per-client ownership ledgers;
+- the client exposes `BinderLocalLlmClient` with typed connection states, bounded ordered callbacks, deterministic cancellation, epoch invalidation and disconnect handling;
+- SR-4 two-APK debug instrumentation and `scripts/run-shared-runtime-device-e2e.sh` are integrated, while the actual emulator/device execution evidence remains pending;
+- SR-5 deterministic isolation, duplicate external-ID separation, client cleanup, callback backpressure, disconnect convergence and Binder-boundary privacy hardening are integrated and green;
+- SR-6 release-like evidence tooling uses a packaged release client AAR consumer, same-signer host/client tests, process-death/reconnect validation, an independently signed denial fixture and privacy-safe evidence capture.
+
+Shared-runtime production/release readiness is still blocked until SR-6 is executed on representative physical hardware and the exact candidate passes release review. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
+
 ## Open implementation blocks
 
 ### 1. Q35-6 physical Android tuning evidence
@@ -103,7 +116,20 @@ Repository-side tuning infrastructure is complete. Remaining work:
 
 Specification: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
 
-### 2. Q35-7 validation suite
+### 2. SR-6 shared-runtime physical release evidence
+
+Repository-side release-evidence tooling is implemented. Remaining work:
+
+- execute the release-like same-signer host and packaged-client flow on a physical `arm64-v8a` device;
+- verify prepare/session/stream/complete/cancel/close against the host-selected curated Qwen3.5 model;
+- capture process-death/reconnect, memory, thermal and privacy-safe timing/token evidence;
+- execute the independently signed negative fixture and require `PERMISSION_DENIED`;
+- compare Binder overhead against a matching in-process run on the same device/model/profile identity;
+- complete package replacement/upgrade coverage plus public API, security, versioning and release-note review.
+
+Runbook: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
+
+### 3. Q35-7 validation suite
 
 After Q35-6 measured profiles exist:
 
@@ -112,13 +138,13 @@ After Q35-6 measured profiles exist:
 - run repeated lifecycle, memory and thermal device evidence for both tiers;
 - prepare certification-consumable evidence without conflating catalog availability with support certification.
 
-### 3. Remaining phone-app UDF migration
+### 4. Remaining phone-app UDF migration
 
 - move Overview, Diagnostics and Settings renderable state/intent behind typed state/effect boundaries;
 - reduce Activity-owned mirrors;
 - complete deterministic restoration and Back behavior without persisting sensitive content.
 
-### 4. RAM residency policy completion
+### 5. RAM residency policy completion
 
 Explicit manual unload is implemented. Remaining residency work is:
 
@@ -127,7 +153,7 @@ Explicit manual unload is implemented. Remaining residency work is:
 - privacy-safe automatic unload reasons for TTL, memory pressure, switch and shutdown;
 - race, pinning, idempotent cleanup and reload-classification validation.
 
-### 5. UI/accessibility and release evidence
+### 6. UI/accessibility and release evidence
 
 - compact/expanded/landscape/large-font and screenshot-regression coverage;
 - TalkBack/focus-order and recreation evidence;
@@ -135,18 +161,27 @@ Explicit manual unload is implemented. Remaining residency work is:
 
 ## Immediate next block
 
-Proceed with **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh`. Do not promote candidate profiles to `MEASURED` from synthetic/emulator/CI results. Q35-4 and Q35-5 are closed.
+The two device-dependent tracks are now explicit and may share the same representative hardware session:
+
+1. complete **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh` for the 0.8B and 2B curated reference artifacts;
+2. execute **SR-6 release-like shared-runtime evidence** using `scripts/capture-shared-runtime-release-evidence.sh` against the exact host-selected model/profile identity.
+
+Do not promote Q35 candidate profiles to `MEASURED`, publish the Binder client AAR or describe the shared host as production-ready from emulator/CI results.
 
 ## Blockers and deferred evidence
 
 - representative physical-device performance evidence is required to close Q35-6;
 - Q35-7/Q35-8 require the measured Q35-6 profile evidence;
-- Binder/AIDL shared runtime and Capacitor remain later phases;
-- GPU/Vulkan, simultaneous decode, multimodal and speculative decoding remain outside the current production-capable embedded scope.
+- SR-4 execution evidence and SR-6 physical release evidence remain pending until run on the exact recorded host/client/runtime/model identity;
+- SR-6 consumer release also requires matching Binder-overhead evidence, invalid-signer denial, compatibility/replacement review and final public API/security/versioning review;
+- Capacitor remains a later integration phase after the Android shared-runtime release boundary is validated;
+- GPU/Vulkan, simultaneous decode, multimodal and speculative decoding remain outside the current production-capable scope.
 
 ## Source links
 
 - Capability milestones: [`roadmap.md`](roadmap.md)
+- Shared runtime roadmap: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
+- SR-6 release evidence: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5-only product status: [`qwen35/README.md`](qwen35/README.md)
 - Target behavior: [`implementation-plan.md`](implementation-plan.md)
 - Phone architecture: [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
