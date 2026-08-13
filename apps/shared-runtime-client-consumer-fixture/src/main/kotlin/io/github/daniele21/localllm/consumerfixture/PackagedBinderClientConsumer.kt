@@ -13,10 +13,10 @@ class PackagedBinderClientConsumer(context: Context) : AutoCloseable {
         BinderLocalLlmClient.create(
             context = context,
             hostConfig =
-                SharedRuntimeHostConfig.create(
-                    BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
-                    BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
-                ),
+            SharedRuntimeHostConfig.create(
+                BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
+                BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
+            ),
             applicationId = ApplicationId("local-llm-console"),
             clientBuildId = "packaged-consumer-fixture-${BuildConfig.VERSION_NAME}",
             observer = SharedRuntimeConnectionObserver {},
