@@ -5,6 +5,9 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
@@ -19,7 +22,11 @@ internal interface SharedRuntimeRemoteService {
     fun protocolInfo(): ProtocolInfoParcel
 
     @Throws(RemoteException::class)
-    fun registerClient(hello: ClientHelloParcel, hostDisconnectingCallback: () -> Unit, callback: (RegistrationResultParcel) -> Unit)
+    fun registerClient(
+        hello: ClientHelloParcel,
+        hostDisconnectingCallback: () -> Unit,
+        callback: (RegistrationResultParcel) -> Unit,
+    )
 
     @Throws(RemoteException::class)
     fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit)
@@ -35,6 +42,24 @@ internal interface SharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun cancel(request: CancelRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun consumerCapabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun consumerPrepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun consumerOpenSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun consumerGenerate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun consumerCancel(request: CancelRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun consumerCloseSession(request: CloseSessionRequestParcel)
 
     @Throws(RemoteException::class)
     fun unregisterClient(clientToken: ClientTokenParcel)
