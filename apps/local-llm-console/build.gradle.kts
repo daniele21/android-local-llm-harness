@@ -88,5 +88,7 @@ dependencies {
     implementation(project(":observability:in-memory-store"))
     implementation(project(":transports:android-binder-client"))
 
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     testImplementation(libs.junit4)
 }
