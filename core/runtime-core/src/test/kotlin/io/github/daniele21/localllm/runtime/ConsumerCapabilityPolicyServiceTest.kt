@@ -348,26 +348,25 @@ private class CapabilityFixture(
         return ResolvedUseCase(binding, useCase, model)
     }
 
-    private fun preset(ref: InferencePresetRef, thinking: Boolean): InferencePreset =
-        InferencePreset(
-            ref = ref,
-            generation = GenerationDefaults(
-                maxOutputTokens = 256,
-                temperature = 0f,
-                topP = 1f,
-                topK = 0,
-                thinkingMode = if (thinking) ThinkingMode.ENABLED else ThinkingMode.DISABLED,
-                seed = 42L,
-                reasoningStreamProtocol = if (thinking) {
-                    ReasoningStreamProtocol.QWEN35_THINK_TAGS
-                } else {
-                    ReasoningStreamProtocol.NONE
-                },
-            ),
-            systemPromptVersion = "v1",
-            systemPrompt = "Return PII as structured JSON.",
-            allowedOutputModes = setOf(OutputMode.JSON_SCHEMA),
-        )
+    private fun preset(ref: InferencePresetRef, thinking: Boolean): InferencePreset = InferencePreset(
+        ref = ref,
+        generation = GenerationDefaults(
+            maxOutputTokens = 256,
+            temperature = 0f,
+            topP = 1f,
+            topK = 0,
+            thinkingMode = if (thinking) ThinkingMode.ENABLED else ThinkingMode.DISABLED,
+            seed = 42L,
+            reasoningStreamProtocol = if (thinking) {
+                ReasoningStreamProtocol.QWEN35_THINK_TAGS
+            } else {
+                ReasoningStreamProtocol.NONE
+            },
+        ),
+        systemPromptVersion = "v1",
+        systemPrompt = "Return PII as structured JSON.",
+        allowedOutputModes = setOf(OutputMode.JSON_SCHEMA),
+    )
 }
 
 private class FixtureProfileRegistry(private val expected: ResolvedUseCase) : ModelProfileRegistry {

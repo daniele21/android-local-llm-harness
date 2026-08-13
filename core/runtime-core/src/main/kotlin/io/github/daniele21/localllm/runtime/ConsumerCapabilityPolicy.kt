@@ -49,9 +49,7 @@ interface ConsumerUseCasePolicyRegistry {
     fun find(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerUseCasePolicy?
 }
 
-class InMemoryConsumerUseCasePolicyRegistry(
-    policies: Collection<ConsumerUseCasePolicy>,
-) : ConsumerUseCasePolicyRegistry {
+class InMemoryConsumerUseCasePolicyRegistry(policies: Collection<ConsumerUseCasePolicy>) : ConsumerUseCasePolicyRegistry {
     private val policiesByKey: Map<PolicyKey, ConsumerUseCasePolicy>
 
     init {
@@ -76,10 +74,7 @@ sealed interface ConsumerPolicyDecision {
         val capabilityRevision: String,
     ) : ConsumerPolicyDecision
 
-    data class Rejected(
-        val code: ConsumerCapabilityErrorCode,
-        val detail: String,
-    ) : ConsumerPolicyDecision
+    data class Rejected(val code: ConsumerCapabilityErrorCode, val detail: String) : ConsumerPolicyDecision
 }
 
 class ConsumerCapabilityPolicyService(
@@ -93,11 +88,7 @@ class ConsumerCapabilityPolicyService(
             is ContextResult.Resolved -> ConsumerCapabilityResult.Available(context.capabilities)
         }
 
-    fun validateSelection(
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-        request: ConsumerSelectionRequest,
-    ): ConsumerPolicyDecision {
+    fun validateSelection(applicationId: ApplicationId, useCaseId: UseCaseId, request: ConsumerSelectionRequest): ConsumerPolicyDecision {
         val context = when (val result = resolveContext(applicationId, useCaseId)) {
             is ContextResult.Rejected -> return ConsumerPolicyDecision.Rejected(result.code, result.detail)
             is ContextResult.Resolved -> result
@@ -271,10 +262,7 @@ class ConsumerCapabilityPolicyService(
         return true
     }
 
-    private fun effectiveOutputConstraints(
-        resolved: ResolvedUseCase,
-        preset: InferencePreset?,
-    ): Set<ConsumerOutputConstraintKind> =
+    private fun effectiveOutputConstraints(resolved: ResolvedUseCase, preset: InferencePreset?): Set<ConsumerOutputConstraintKind> =
         if (preset == null) {
             setOf(resolved.useCase.outputMode.toConsumerKind())
         } else {
@@ -336,11 +324,7 @@ class ConsumerCapabilityPolicyService(
             generation.reasoningStreamProtocol != ReasoningStreamProtocol.NONE
     }
 
-    private fun capabilityRevision(
-        policy: ConsumerUseCasePolicy,
-        resolved: ResolvedUseCase,
-        readiness: UseCaseReadiness,
-    ): String {
+    private fun capabilityRevision(policy: ConsumerUseCasePolicy, resolved: ResolvedUseCase, readiness: UseCaseReadiness): String {
         val canonical = buildString {
             append(policy.revision)
             append('|').append(policy.applicationId.value)
@@ -374,19 +358,13 @@ class ConsumerCapabilityPolicyService(
             val capabilities: UseCaseCapabilities,
         ) : ContextResult
 
-        data class Rejected(
-            val code: ConsumerCapabilityErrorCode,
-            val detail: String,
-        ) : ContextResult
+        data class Rejected(val code: ConsumerCapabilityErrorCode, val detail: String) : ContextResult
     }
 
     private sealed interface ReasoningResolution {
         data class Accepted(val mode: EffectiveConsumerReasoningMode) : ReasoningResolution
 
-        data class Rejected(
-            val code: ConsumerCapabilityErrorCode,
-            val detail: String,
-        ) : ReasoningResolution
+        data class Rejected(val code: ConsumerCapabilityErrorCode, val detail: String) : ReasoningResolution
     }
 }
 

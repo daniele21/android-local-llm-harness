@@ -32,11 +32,7 @@ enum class ConsumerOutputConstraintKind {
     JSON_SCHEMA,
 }
 
-data class ConsumerLimits(
-    val maxInputCharacters: Int,
-    val maxConversationMessages: Int,
-    val maxJsonSchemaCharacters: Int,
-) {
+data class ConsumerLimits(val maxInputCharacters: Int, val maxConversationMessages: Int, val maxJsonSchemaCharacters: Int) {
     init {
         require(maxInputCharacters > 0) { "Maximum input characters must be positive" }
         require(maxConversationMessages > 0) { "Maximum conversation messages must be positive" }
@@ -44,10 +40,7 @@ data class ConsumerLimits(
     }
 }
 
-data class ConsumerPresetOption(
-    val ref: InferencePresetRef,
-    val isDefault: Boolean,
-)
+data class ConsumerPresetOption(val ref: InferencePresetRef, val isDefault: Boolean)
 
 data class UseCaseCapabilities(
     val useCaseId: UseCaseId,
@@ -100,10 +93,7 @@ enum class ConsumerCapabilityErrorCode {
 sealed interface ConsumerCapabilityResult {
     data class Available(val capabilities: UseCaseCapabilities) : ConsumerCapabilityResult
 
-    data class Rejected(
-        val code: ConsumerCapabilityErrorCode,
-        val detail: String,
-    ) : ConsumerCapabilityResult {
+    data class Rejected(val code: ConsumerCapabilityErrorCode, val detail: String) : ConsumerCapabilityResult {
         init {
             require(detail.isNotBlank()) { "Capability rejection detail must not be blank" }
         }
