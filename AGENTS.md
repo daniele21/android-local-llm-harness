@@ -71,6 +71,7 @@ Start from the domain owner, then inspect direct consumers and tests before edit
 | Shared Compose components | `ui/design-system` | both Android apps and accessibility tests |
 | Connected phone behavior | `apps/local-llm-phone-test` | owning domain contracts; keep policy out of the app |
 | Standalone console | `apps/local-llm-console` | observability and model-store contracts |
+| Packaged shared-runtime client validation | `apps/shared-runtime-client-consumer-fixture` | Binder client/contract AARs and packaging validation |
 | Device lifecycle validation | `apps/device-test-runner` and `scripts` | production store/runtime/backend and evidence docs |
 | CI, packaging or repository navigation | `.github/workflows`, Gradle or `scripts` | affected docs and validation guards |
 

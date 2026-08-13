@@ -11,11 +11,16 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.health.HealthEngine
 import io.github.daniele21.localllm.observability.health.ModelIntegrityHealthCheck
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import io.github.daniele21.localllm.store.FileSystemModelStore
+import io.github.daniele21.localllm.transport.binder.client.BinderLocalLlmClient
+import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionObserver
+import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig
 import java.util.concurrent.Executors
 
 @Suppress("MagicNumber", "TooManyFunctions")
@@ -35,7 +40,24 @@ class MainActivity : Activity() {
         )
     }
     private val cacheControl: ConsoleCacheControl = DisconnectedCacheControl
-    private val inferenceControl: ConsoleInferenceControl = DisconnectedConsoleInferenceControl
+    private val binderClient: BinderLocalLlmClient by lazy {
+        BinderLocalLlmClient.create(
+            context = this,
+            hostConfig = SharedRuntimeHostConfig.create(
+                BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
+                BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
+            ),
+            applicationId = CONSOLE_APPLICATION_ID,
+            clientBuildId = "console-${BuildConfig.VERSION_NAME}",
+            observer = SharedRuntimeConnectionObserver { publishSharedRuntimeConnectionState() },
+        )
+    }
+    private val inferenceControl: SharedRuntimeConsoleInferenceControl by lazy {
+        SharedRuntimeConsoleInferenceControl(
+            client = binderClient,
+            targets = listOf(CONSOLE_INFERENCE_TARGET),
+        )
+    }
     private val inferenceDialog by lazy { ConsoleInferenceRequestDialog(this) }
     private val dataSource: ConsoleDataSource by lazy {
         TelemetryConsoleDataSource(
@@ -87,9 +109,8 @@ class MainActivity : Activity() {
         addView(label("Android local inference control plane", 16f))
         addView(
             label(
-                "Phase 2 observability, local model inventory, explicit diagnostics and capability-driven inference. " +
-                    "The standalone sandbox does not invent a runtime target; playground execution, cache diagnostics " +
-                    "and cross-application access require a real embedded source or protected bridge.",
+                "Local diagnostics remain sandbox-owned. The Playground can explicitly connect to the protected " +
+                    "shared Android runtime; opening or refreshing this screen never binds, prepares or loads a model.",
                 14f,
             ).apply { setPadding(0, 8, 0, 16) },
         )
@@ -288,6 +309,17 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun publishSharedRuntimeConnectionState() {
+        runOnUiThread {
+            if (isFinishing || isDestroyed || !::content.isInitialized) return@runOnUiThread
+            snapshot = snapshot?.copy(
+                capturedAtEpochMs = System.currentTimeMillis(),
+                inference = inferenceControl.snapshot(),
+            )
+            render()
+        }
+    }
+
     private fun beginAction(type: ConsoleActionType) {
         actionExecutionInProgress = true
         activeActionType = type
@@ -307,6 +339,10 @@ class MainActivity : Activity() {
 
         ConsoleActionType.REPAIR_CACHE -> ConsoleActionCompletion(
             cacheRepair = cacheControl.repair(requireNotNull(action.cacheId)),
+        )
+
+        ConsoleActionType.CONNECT_SHARED_RUNTIME -> ConsoleActionCompletion(
+            inferenceOutcome = inferenceControl.connect(),
         )
 
         ConsoleActionType.CANCEL_INFERENCE -> ConsoleActionCompletion(
@@ -366,6 +402,12 @@ class MainActivity : Activity() {
     }
 
     private companion object {
+        val CONSOLE_APPLICATION_ID = ApplicationId("local-llm-console")
+        val CONSOLE_INFERENCE_TARGET = ConsoleInferenceTarget(
+            applicationId = CONSOLE_APPLICATION_ID,
+            useCaseId = UseCaseId("console-inference-playground"),
+            label = "Shared host playground",
+        )
         const val INFERENCE_SOURCE_ERROR = "Inference playground unavailable"
         val HEALTH_ACTION_TYPES = setOf(
             ConsoleActionType.RUN_ALL_HEALTH_CHECKS,

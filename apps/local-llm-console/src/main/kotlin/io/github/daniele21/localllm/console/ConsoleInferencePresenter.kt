@@ -18,7 +18,7 @@ class ConsoleInferencePresenter {
         cards += privacyCard()
 
         when {
-            !inference.available -> cards += emptyCard("Inference playground is not connected")
+            !inference.available -> cards += emptyCard(inference.detail ?: "Inference playground is not connected")
             inference.targets.isEmpty() -> cards += emptyCard("No application and use-case targets are registered")
             else -> cards += targetsCard(inference)
         }
@@ -33,7 +33,7 @@ class ConsoleInferencePresenter {
 
         return ConsoleScreen(
             title = "Inference playground",
-            subtitle = "Explicit one-shot generation through a connected LocalLlmClient",
+            subtitle = "Explicit one-shot generation through the protected shared Android runtime",
             cards = cards,
             actions = actions(inference),
         )
@@ -42,6 +42,9 @@ class ConsoleInferencePresenter {
     fun overview(snapshot: ConsoleSnapshot): ConsoleCard = summary(snapshot.inference)
 
     private fun actions(state: ConsoleInferenceState): List<ConsoleAction> {
+        if (state.connectionState != ConsoleInferenceConnectionState.CONNECTED) {
+            return connectionActions(state.connectionState)
+        }
         val actions = mutableListOf<ConsoleAction>()
         if (state.available && state.targets.isNotEmpty()) {
             actions += ConsoleAction(
@@ -66,10 +69,43 @@ class ConsoleInferencePresenter {
         return actions
     }
 
+    private fun connectionActions(state: ConsoleInferenceConnectionState): List<ConsoleAction> = when (state) {
+        ConsoleInferenceConnectionState.CONNECTING -> listOf(
+            ConsoleAction(
+                type = ConsoleActionType.CONNECT_SHARED_RUNTIME,
+                label = "Connecting to shared runtime",
+                enabled = false,
+            ),
+        )
+
+        ConsoleInferenceConnectionState.CLOSED -> emptyList()
+
+        ConsoleInferenceConnectionState.CONNECTED -> emptyList()
+
+        ConsoleInferenceConnectionState.DISCONNECTED -> listOf(
+            ConsoleAction(
+                type = ConsoleActionType.CONNECT_SHARED_RUNTIME,
+                label = "Connect shared runtime",
+            ),
+        )
+
+        ConsoleInferenceConnectionState.HOST_NOT_INSTALLED,
+        ConsoleInferenceConnectionState.PERMISSION_DENIED,
+        ConsoleInferenceConnectionState.INCOMPATIBLE,
+        ConsoleInferenceConnectionState.CONNECTION_LOST,
+        -> listOf(
+            ConsoleAction(
+                type = ConsoleActionType.CONNECT_SHARED_RUNTIME,
+                label = "Retry shared runtime connection",
+            ),
+        )
+    }
+
     private fun summary(state: ConsoleInferenceState): ConsoleCard = ConsoleCard(
         title = "Playground state",
         lines = listOf(
             "Availability: ${if (state.available) "Available" else "Not connected"}",
+            "Connection: ${state.connectionState.name}",
             "Phase: ${state.phase.name}",
             "Registered targets: ${state.targets.size}",
             "Active target: ${targetLabel(state)}",

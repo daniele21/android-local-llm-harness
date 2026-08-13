@@ -33,9 +33,11 @@ include(
     ":observability:benchmark-engine",
     ":transports:in-process",
     ":transports:android-binder-contract",
+    ":transports:android-binder-client",
     ":integrations:android-service-host",
     ":ui:design-system",
     ":apps:local-llm-console",
+    ":apps:shared-runtime-client-consumer-fixture",
     ":apps:device-test-runner",
     ":apps:local-llm-phone-test",
 )

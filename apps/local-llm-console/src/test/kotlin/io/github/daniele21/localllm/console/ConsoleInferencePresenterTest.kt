@@ -16,11 +16,46 @@ class ConsoleInferencePresenterTest {
     )
 
     @Test
-    fun `disconnected playground has no generation action`() {
+    fun `disconnected playground exposes explicit connect action`() {
         val screen = presenter.present(ConsoleTab.PLAYGROUND, emptySnapshot())
 
         assertTrue(screen.cards.any { it.lines.contains("Inference playground is not connected") })
-        assertTrue(screen.actions.isEmpty())
+        assertEquals(ConsoleActionType.CONNECT_SHARED_RUNTIME, screen.actions.single().type)
+        assertEquals("Connect shared runtime", screen.actions.single().label)
+    }
+
+    @Test
+    fun `connecting playground disables duplicate connect`() {
+        val snapshot = emptySnapshot().copy(
+            inference = DisconnectedConsoleInferenceControl.snapshot().copy(
+                source = "Shared Android runtime (Binder)",
+                connectionState = ConsoleInferenceConnectionState.CONNECTING,
+                detail = "Connecting to shared runtime",
+            ),
+        )
+
+        val screen = presenter.present(ConsoleTab.PLAYGROUND, snapshot)
+
+        assertEquals(ConsoleActionType.CONNECT_SHARED_RUNTIME, screen.actions.single().type)
+        assertFalse(screen.actions.single().enabled)
+    }
+
+    @Test
+    fun `incompatible playground exposes retry without generation action`() {
+        val snapshot = emptySnapshot().copy(
+            inference = DisconnectedConsoleInferenceControl.snapshot().copy(
+                source = "Shared Android runtime (Binder)",
+                connectionState = ConsoleInferenceConnectionState.INCOMPATIBLE,
+                detail = "Shared-runtime protocol is incompatible",
+                sourceError = "Shared-runtime protocol is incompatible",
+            ),
+        )
+
+        val screen = presenter.present(ConsoleTab.PLAYGROUND, snapshot)
+
+        assertEquals(ConsoleActionType.CONNECT_SHARED_RUNTIME, screen.actions.single().type)
+        assertEquals("Retry shared runtime connection", screen.actions.single().label)
+        assertTrue(screen.actions.none { it.type == ConsoleActionType.START_INFERENCE })
     }
 
     @Test
@@ -91,6 +126,7 @@ class ConsoleInferencePresenterTest {
         source = "Embedded runtime",
         targets = listOf(target),
         phase = phase,
+        connectionState = ConsoleInferenceConnectionState.CONNECTED,
     )
 
     private fun emptySnapshot() = ConsoleSnapshot(
