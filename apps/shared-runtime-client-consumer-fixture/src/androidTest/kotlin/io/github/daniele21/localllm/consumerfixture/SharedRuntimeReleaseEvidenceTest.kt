@@ -53,6 +53,14 @@ class SharedRuntimeReleaseEvidenceTest {
             prepare.ready,
         )
         assertNotNull(prepare.modelDigest)
+        val modelDigest = requireNotNull(prepare.modelDigest).sha256
+        val connection = client.connectionSnapshot
+        println(
+            "SR6_SHARED_RUNTIME identity " +
+                "modelDigestSha256=$modelDigest " +
+                "negotiatedMinor=${connection.negotiatedMinor ?: -1} " +
+                "enabledFeatures=${connection.enabledFeatures.sorted().joinToString(",")}",
+        )
 
         val completeSession = client.createSession(APPLICATION_ID, USE_CASE_ID)
         val completedLatch = CountDownLatch(1)
@@ -72,17 +80,22 @@ class SharedRuntimeReleaseEvidenceTest {
         ) { event ->
             when (event) {
                 is GenerationEvent.TextDelta -> sawDelta.set(true)
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     completedEvent.set(event)
                     completedLatch.countDown()
                 }
+
                 else -> Unit
             }
         }
 
-        assertTrue("Release generation did not terminate", completedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        assertTrue(
+            "Release generation did not terminate",
+            completedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+        )
         val terminal = completedEvent.get()
         assertTrue("Expected a successful packaged-client completion", terminal is GenerationEvent.Completed)
         assertTrue("Expected at least one streamed Binder delta", sawDelta.get())
@@ -103,7 +116,6 @@ class SharedRuntimeReleaseEvidenceTest {
         val cancelledLatch = CountDownLatch(1)
         val cancelledEvent = AtomicReference<GenerationEvent>()
         val cancelRequestId = RequestId("sr6-cancel-${UUID.randomUUID()}")
-        val startedAtNanos = AtomicReference<Long>()
         val handle = client.generate(
             GenerationRequest(
                 requestId = cancelRequestId,
@@ -118,27 +130,35 @@ class SharedRuntimeReleaseEvidenceTest {
                 is GenerationEvent.Started,
                 is GenerationEvent.Prepared,
                 is GenerationEvent.TextDelta,
-                -> {
-                    startedAtNanos.compareAndSet(null, System.nanoTime())
-                    startedLatch.countDown()
-                }
+                -> startedLatch.countDown()
+
                 is GenerationEvent.Completed,
                 is GenerationEvent.Failed,
                 -> {
                     cancelledEvent.set(event)
                     cancelledLatch.countDown()
                 }
+
                 else -> Unit
             }
         }
 
-        assertTrue("Release generation never became cancellable", startedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        assertTrue(
+            "Release generation never became cancellable",
+            startedLatch.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+        )
         val cancelRequestedAt = System.nanoTime()
         handle.cancel()
-        assertTrue("Release cancellation did not terminate", cancelledLatch.await(CANCEL_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        assertTrue(
+            "Release cancellation did not terminate",
+            cancelledLatch.await(CANCEL_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+        )
         val cancelled = cancelledEvent.get()
         assertTrue("Expected a typed cancelled terminal", cancelled is GenerationEvent.Failed)
-        assertTrue("Expected LocalLlmError.Cancelled", (cancelled as GenerationEvent.Failed).error is LocalLlmError.Cancelled)
+        assertTrue(
+            "Expected LocalLlmError.Cancelled",
+            (cancelled as GenerationEvent.Failed).error is LocalLlmError.Cancelled,
+        )
         assertEquals(cancelRequestId, cancelled.requestId)
         val cancellationLatencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - cancelRequestedAt)
         println("SR6_SHARED_RUNTIME cancellation latencyMs=$cancellationLatencyMs terminal=CANCELLED")
