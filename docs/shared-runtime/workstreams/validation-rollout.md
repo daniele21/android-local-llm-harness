@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.validation-rollout
 Read when: adding shared-runtime tests, two-APK device execution, evidence, compatibility matrices or release gates
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-13
 
 ## Goal
 
@@ -26,6 +26,7 @@ This workstream does not certify model quality. It consumes exact Qwen3.5 runtim
 - [`../../device-e2e-evidence.md`](../../device-e2e-evidence.md)
 - [`../../definition-of-done.md`](../../definition-of-done.md)
 - [`../../versioning.md`](../../versioning.md)
+- [`../sr6-release-evidence.md`](../sr6-release-evidence.md)
 - app scoped guides, manifests, build variants and packaging scripts
 - existing device runner and evidence redaction scripts
 
@@ -46,92 +47,107 @@ Passing a lower layer never substitutes for a higher required layer. Emulator re
 
 ## Test applications
 
-Primary positive path:
+Primary development/preflight path:
 
 - host: `apps/local-llm-phone-test`;
 - client: `apps/local-llm-console`;
-- exact build variants signed by an accepted common signing lineage;
+- debug variants signed by the common Android debug signing identity;
 - exact host component and permission names supplied to the client build.
+
+Primary SR-6 release-like path:
+
+- host: release `apps/local-llm-phone-test` APK;
+- client: release `apps/shared-runtime-client-consumer-fixture` APK consuming packaged release Binder AARs;
+- host/client/test APKs signed by the accepted common external signing identity;
+- exact package, version and certificate digests recorded before execution.
 
 Negative authorization path:
 
-- produce a minimal client fixture signed with an ephemeral independent key generated outside source control;
-- attempt explicit binding and verify denial before protocol/runtime information;
-- delete or retain the key only in the temporary evidence workspace according to the runner policy;
+- rebuild only the consumer fixture with an ephemeral independent PKCS12 key generated outside source control;
+- attempt explicit binding and verify `PERMISSION_DENIED` before protocol/runtime information;
+- delete the key and password with the runner temporary workspace;
 - never commit keystores, passwords or exported signing material.
 
 Do not use `sharedUserId`. Do not weaken the service permission to simplify instrumentation.
 
-## Two-APK runner
+## Device runners
 
-Add one focused script after SR-4, proposed as:
+SR-4 debug/emulator/device functional preflight:
 
 ```text
 scripts/run-shared-runtime-device-e2e.sh
 ```
 
-Responsibilities:
+SR-6 release-like evidence capture:
 
-1. require an explicit device or exactly one connected device;
-2. verify physical/emulator classification and label evidence accurately;
-3. build or accept exact host/client APK paths;
-4. record package, version, certificate digest, protocol/SDK identity and git commit;
-5. install/upgrade host and client in deterministic order;
-6. verify the host has an exact curated model installed/selected without copying it into source;
-7. drive bind, prepare, session, streaming, cancellation and cleanup scenarios;
-8. capture privacy-safe results, relevant process/resource snapshots and filtered logs;
-9. run negative signature and version cases when requested;
-10. leave installed apps/model state according to explicit cleanup flags.
+```text
+scripts/capture-shared-runtime-release-evidence.sh
+```
 
-The runner does not download arbitrary models, expose host-private paths or record prompts/outputs in shared reports.
+The SR-6 runner:
+
+1. requires an explicit device or exactly one connected device;
+2. rejects emulators by default and labels `--allow-emulator` execution as preflight only;
+3. requires a clean checkout and records the exact git commit;
+4. builds same-signer release host/client/test APKs using external signing material;
+5. verifies APK signing-certificate SHA-256 digests before installation;
+6. installs/upgrades the host while preserving its selected curated-model state;
+7. executes packaged-AAR prepare/session/stream/complete/cancel/close tests;
+8. terminates/restarts the host and verifies typed disconnect/reconnect behavior;
+9. captures privacy-safe timing/token/cancellation markers plus memory/thermal snapshots;
+10. generates a temporary independent signing identity and verifies denial;
+11. archives reviewable evidence without prompts, outputs, keys, Binder tokens, GGUF bytes, adb serials or host-private paths.
+
+Use `--host-only` to install/launch the correctly signed release host for first-time curated-model setup. The runner never downloads arbitrary models or reaches into host-private model storage.
 
 ## Functional matrix
 
-| Case | Expected result |
-| --- | --- |
-| Host absent | Typed host-not-installed state; no retry loop. |
-| Host present, model absent | Bind succeeds; prepare fails explicitly without download. |
-| Valid same-signer client | Register, prepare, stream, complete and close. |
-| Invalid signer | Bind/authorization denied before runtime information. |
-| Unauthorized use case | Typed denial; no model load. |
-| Protocol major mismatch | Incompatible before registration/prepare. |
-| Compatible minor mismatch | Negotiated common feature set. |
-| Cancel while queued | One cancelled terminal event and released mapping. |
-| Cancel during decode | Cooperative backend cancellation and reusable runtime. |
-| Client killed | Host cancels/closes only that client's resources. |
-| Host killed | Client receives one disconnect outcome; reconnect starts clean. |
-| Two clients | Existing scheduler serializes decode; ownership remains isolated. |
-| Same external IDs | Host internal IDs remain collision-free across clients. |
-| Slow callback | Bounded backpressure cancellation; no unbounded growth. |
-| Unbind/rebind | Old sessions invalid; new registration works. |
+| Case | Expected result | Evidence owner |
+| --- | --- | --- |
+| Host absent | Typed host-not-installed state; no retry loop. | SR-3 deterministic / SR-4 preflight |
+| Host present, model absent | Bind succeeds; prepare fails explicitly without download. | SR-4/SR-6 device |
+| Valid same-signer client | Register, prepare, stream, complete and close. | SR-4 debug + SR-6 release-like |
+| Invalid signer | Bind/authorization denied before runtime information. | SR-6 release-like |
+| Unauthorized use case | Typed denial; no model load. | SR-2/SR-5 deterministic |
+| Protocol major mismatch | Incompatible before registration/prepare. | SR-1 fixtures |
+| Compatible minor mismatch | Negotiated common feature set. | SR-1 fixtures |
+| Cancel while queued | One cancelled terminal event and released mapping. | SR-5 deterministic |
+| Cancel during decode | Cooperative backend cancellation and reusable runtime. | SR-6 physical |
+| Client killed | Host cancels/closes only that client's resources. | SR-5 deterministic / device review |
+| Host killed | Client receives one disconnect outcome; reconnect starts clean. | SR-5 deterministic + SR-6 physical |
+| Two clients | Existing scheduler serializes decode; ownership remains isolated. | SR-5 deterministic |
+| Same external IDs | Host internal IDs remain collision-free across clients. | SR-5 deterministic |
+| Slow callback | Bounded backpressure cancellation; no unbounded growth. | SR-5 deterministic |
+| Unbind/rebind | Old sessions invalid; new registration works. | SR-5 deterministic / SR-6 device |
 
 ## Lifecycle and resource matrix
 
 Measure or assert:
 
-- service create/bind/unbind/destroy counts;
-- active client/session/request ledger size before and after each terminal path;
-- Binder death-recipient registration/removal;
+- service create/bind/unbind/destroy counts where instrumentation exposes them safely;
+- active client/session/request ledger cleanup through deterministic host tests;
+- Binder death-recipient registration/removal through deterministic host tests;
 - runtime loaded-model and scheduler state after client death;
 - model remains installed and selected after service/client cleanup;
 - host UI recreation does not duplicate runtime/service graph;
-- process PSS before connection, after load, after generation and after cleanup;
-- cancellation latency and time from core delta to client callback;
-- no sustained callback/executor/thread growth over repeated runs.
+- process PSS before and after the release-like evidence sequence;
+- cancellation latency and generation timing metrics;
+- thermal snapshots before and after the evidence sequence;
+- no sustained callback/executor/thread growth over repeated runs when the matrix is extended.
 
 Transport overhead is compared with an equivalent in-process run only when execution identity, model state and device conditions are comparable. Do not attribute model performance changes to Binder without matching evidence.
 
 ## Privacy and security checks
 
-Use unique non-sensitive sentinel strings in test prompt/output and assert absence from:
+Use unique non-sensitive sentinel strings in deterministic tests and assert absence from:
 
 - normal host/client structured telemetry;
 - Room databases or exported reports;
-- logcat captured by the runner;
+- filtered logcat captured by the runner;
 - saved instance state and app-private preference/database projections;
-- failure messages and evidence JSON/CSV.
+- failure messages and evidence files.
 
-The interactive client may display bounded output in memory. Test artifacts shared from the run omit prompt, reasoning and answer text.
+The release-like instrumentation may hold bounded generated output in memory only long enough to reconstruct the core terminal event. Shared artifacts omit prompt, reasoning and answer text.
 
 Security review covers:
 
@@ -141,8 +157,8 @@ Security review covers:
 - token entropy and cross-UID rejection;
 - use-case allowlist and absence of client model control;
 - request/session quota enforcement;
-- denial behavior without information leakage;
-- no path, Binder token or certificate disclosure;
+- independently signed client denial without information leakage;
+- no path, Binder token, key/password or full-certificate disclosure;
 - no unintended diagnostics/control-plane access.
 
 ## Compatibility matrix
@@ -168,31 +184,31 @@ harness git commit
 host package/version/build type/signing certificate digest
 client package/version/build type/signing certificate digest
 client SDK version
-Binder protocol major/minor and negotiated features
+Binder protocol major/minor and negotiated features where available
 Android device model/version/ABI
-exact model artifact digest and runtime/generation profile identity
+exact host-selected model artifact identity from the prepare/runtime evidence
 llama.cpp revision
-scenario and cold/warm classification
+scenario and cold/warm classification where applicable
 terminal code/stop reason
 timing, token, memory and thermal fields applicable to the scenario
 ```
 
-It excludes GGUF bytes, prompt/output/schema text, app-private paths, Binder tokens, signing keys/passwords and full certificate data.
+It excludes GGUF bytes, prompt/output/schema text, app-private paths, Binder tokens, signing keys/passwords, adb serials and full certificate data.
 
 ## Task ledger
 
 | ID | State | Task |
 | --- | --- | --- |
-| SR-VAL-01 | PLANNED | Define shared-runtime test fixtures and evidence schema. |
-| SR-VAL-02 | PLANNED | Add host/client fake and Binder instrumentation coverage. |
-| SR-VAL-03 | PLANNED | Add repeatable two-APK emulator preflight runner. |
-| SR-VAL-04 | PLANNED | Add ephemeral independently signed denial fixture. |
-| SR-VAL-05 | PLANNED | Add multi-client, ID collision, death and backpressure matrix. |
-| SR-VAL-06 | PLANNED | Add prompt/output sentinel privacy assertions. |
-| SR-VAL-07 | PLANNED | Add protocol/SDK/host upgrade compatibility matrix. |
-| SR-VAL-08 | PLANNED | Run physical-device two-APK functional/lifecycle evidence. |
-| SR-VAL-09 | PLANNED | Compare Binder overhead against matching in-process evidence. |
-| SR-VAL-10 | PLANNED | Complete security, public API, packaging and consumer-release review. |
+| SR-VAL-01 | DONE | Shared-runtime fixtures, matrices and evidence identity are defined. |
+| SR-VAL-02 | DONE | Host/client deterministic coverage and real two-APK Binder instrumentation exist. |
+| SR-VAL-03 | DONE | Repeatable SR-4 two-APK debug emulator/device preflight runner is integrated. |
+| SR-VAL-04 | IN PROGRESS | Ephemeral independently signed denial fixture and runner are implemented; physical execution is pending. |
+| SR-VAL-05 | DONE | Multi-client, ID collision, death and bounded-backpressure matrices are deterministic and green. |
+| SR-VAL-06 | DONE | Binder-boundary runtime-detail/sentinel privacy assertions are deterministic and green. |
+| SR-VAL-07 | IN PROGRESS | Protocol fixtures are complete; package upgrade/replacement device evidence remains pending. |
+| SR-VAL-08 | IN PROGRESS | Physical release-like functional/lifecycle runner is implemented; representative device evidence is pending. |
+| SR-VAL-09 | PLANNED | Compare Binder overhead against matching in-process evidence on the same device/model/profile identity. |
+| SR-VAL-10 | IN PROGRESS | Packaged release AAR consumer is executable; final security/public-API/versioning/release review remains pending. |
 
 ## Merge gate
 
@@ -200,13 +216,13 @@ Each implementation PR runs the narrowest deterministic checks for its owner. SR
 
 - both application unit/lint/assembly checks;
 - binder contract/client/host checks;
+- packaged consumer-fixture compilation;
 - repository formatting, Detekt and model-artifact guard;
 - repository-wide Android checks for shared contracts/Gradle/manifests;
 - packaging verification;
-- emulator/device runner preflight when the changed behavior requires it;
 - documentation and agent-navigation guards.
 
-Exact commands are added when the planned modules/tasks exist so this document does not advertise non-existent Gradle targets as executable today.
+Physical runner execution is mandatory for the SR-6 exit gate, but it is not fabricated in generic GitHub-hosted CI when no representative Android device, selected model or signing identity is available.
 
 ## Consumer-release gate
 
@@ -218,9 +234,10 @@ Do not publish the client AAR or describe the host as application-consumable unt
 - cancellation, death, memory and thermal behavior is reviewable;
 - invalid-signer and incompatible-version cases pass;
 - public API and protocol compatibility policies are accepted;
-- consumer sample uses the packaged AAR;
+- the consumer sample executes against the packaged release AAR;
+- release notes bind host/client/protocol/runtime/backend/model identities;
 - release artifacts are built from an exact validated `main` commit.
 
 ## Completion criteria
 
-SR-5 completes when isolation, death, bounded transport and privacy matrices pass deterministically. SR-6 completes only when physical evidence and release review support the exact distribution claim. Host/client emulator success alone cannot close SR-6.
+SR-5 completes when isolation, death, bounded transport and privacy matrices pass deterministically. SR-6 completes only when physical evidence and release review support the exact distribution claim. Host/client emulator success or repository CI alone cannot close SR-6.
