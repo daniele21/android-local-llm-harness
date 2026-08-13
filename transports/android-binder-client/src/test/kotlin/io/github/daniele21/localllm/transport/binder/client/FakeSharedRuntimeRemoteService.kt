@@ -22,6 +22,8 @@ internal class FakeSharedRuntimeRemoteService(
     var protocol: ProtocolInfoParcel = compatibleProtocolInfo(),
     var registration: RegistrationResultParcel = successfulRegistration(),
 ) : SharedRuntimeRemoteService {
+    override val consumer: ConsumerSharedRuntimeRemoteService = FakeConsumerRemoteService(this)
+
     var registerCalls = 0
     var unregisterCalls = 0
     var closeSessionCalls = 0
@@ -81,34 +83,34 @@ internal class FakeSharedRuntimeRemoteService(
         cancelFailure?.let { throw it }
     }
 
-    override fun consumerCapabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+    fun consumerCapabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
         lastConsumerRequest = request
         requireNotNull(consumerCapabilitiesHandler) { "Consumer capabilities handler not configured" }(request, callback)
     }
 
-    override fun consumerPrepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+    fun consumerPrepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
         lastConsumerRequest = request
         requireNotNull(consumerPrepareHandler) { "Consumer prepare handler not configured" }(request, callback)
     }
 
-    override fun consumerOpenSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+    fun consumerOpenSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
         lastConsumerRequest = request
         requireNotNull(consumerOpenSessionHandler) { "Consumer open-session handler not configured" }(request, callback)
     }
 
-    override fun consumerGenerate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+    fun consumerGenerate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
         consumerGenerateCalls += 1
         lastConsumerRequest = request
         requireNotNull(consumerGenerationHandler) { "Consumer generation handler not configured" }(request, callback)
     }
 
-    override fun consumerCancel(request: CancelRequestParcel) {
+    fun consumerCancel(request: CancelRequestParcel) {
         consumerCancelCalls += 1
         lastCancelRequest = request
         cancelFailure?.let { throw it }
     }
 
-    override fun consumerCloseSession(request: CloseSessionRequestParcel) {
+    fun consumerCloseSession(request: CloseSessionRequestParcel) {
         consumerCloseSessionCalls += 1
     }
 
@@ -119,6 +121,17 @@ internal class FakeSharedRuntimeRemoteService(
     fun disconnectFromHost() {
         hostDisconnecting?.invoke()
     }
+}
+
+private class FakeConsumerRemoteService(
+    private val parent: FakeSharedRuntimeRemoteService,
+) : ConsumerSharedRuntimeRemoteService {
+    override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerCapabilities(request, callback)
+    override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerPrepare(request, callback)
+    override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerOpenSession(request, callback)
+    override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) = parent.consumerGenerate(request, callback)
+    override fun cancel(request: CancelRequestParcel) = parent.consumerCancel(request)
+    override fun closeSession(request: CloseSessionRequestParcel) = parent.consumerCloseSession(request)
 }
 
 internal class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSource {

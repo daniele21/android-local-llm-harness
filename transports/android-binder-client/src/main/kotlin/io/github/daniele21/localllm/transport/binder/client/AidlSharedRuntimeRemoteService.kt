@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.transport.binder.contract.GenerationEventPar
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
@@ -25,6 +26,9 @@ import io.github.daniele21.localllm.transport.binder.contract.RegistrationResult
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
 internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmService) : SharedRuntimeRemoteService {
+    override val consumer: ConsumerSharedRuntimeRemoteService =
+        AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi)
+
     override fun protocolInfo(): ProtocolInfoParcel = delegate.protocolInfo
 
     override fun registerClient(
@@ -74,34 +78,34 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
 
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
 
-    override fun consumerCapabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.consumerCapabilities(request, consumerResultCallback(callback))
-    }
-
-    override fun consumerPrepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.consumerPrepare(request, consumerResultCallback(callback))
-    }
-
-    override fun consumerOpenSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.consumerOpenSession(request, consumerResultCallback(callback))
-    }
-
-    override fun consumerGenerate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
-        delegate.consumerGenerate(
-            request,
-            object : IConsumerGenerationCallback.Stub() {
-                override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
-            },
-        )
-    }
-
-    override fun consumerCancel(request: CancelRequestParcel) = delegate.consumerCancel(request)
-
-    override fun consumerCloseSession(request: CloseSessionRequestParcel) = delegate.consumerCloseSession(request)
-
     override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
+}
 
-    private fun consumerResultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback =
+private class AidlConsumerSharedRuntimeRemoteService(
+    private val delegate: IConsumerLocalLlmService,
+) : ConsumerSharedRuntimeRemoteService {
+    override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.capabilities(request, resultCallback(callback))
+    }
+
+    override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.prepare(request, resultCallback(callback))
+    }
+
+    override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.openSession(request, resultCallback(callback))
+    }
+
+    override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+        delegate.generate(request, object : IConsumerGenerationCallback.Stub() {
+            override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
+        })
+    }
+
+    override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
+    override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
+
+    private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback =
         object : IConsumerResultCallback.Stub() {
             override fun onResult(result: ConsumerResultParcel) = callback(result)
         }
