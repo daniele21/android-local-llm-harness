@@ -32,8 +32,8 @@ class SharedRuntimeHostDelegate(
     private val resources = HostRuntimeResources()
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
-    private val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
-    private val consumerOperations = ConsumerHostOperations(ledger, resources, controlExecutor)
+    internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
+    internal val consumerOperations = ConsumerHostOperations(ledger, resources, controlExecutor)
 
     fun registerClient(
         caller: AuthorizedCaller,
@@ -57,48 +57,6 @@ class SharedRuntimeHostDelegate(
             completeRegistration(caller, lifecycle, callback, negotiated.minor, negotiated.enabledFeatures.sorted())
         }
     }
-
-    fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) =
-        runtimeOperations.prepare(caller, request, callback)
-
-    fun openSession(caller: AuthorizedCaller, request: OpenSessionRequestParcel, callback: HostResultCallback<SessionResultParcel>) =
-        runtimeOperations.openSession(caller, request, callback)
-
-    fun generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) =
-        runtimeOperations.generate(caller, request, callback)
-
-    fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) = runtimeOperations.cancel(caller, request)
-
-    fun closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) = runtimeOperations.closeSession(caller, request)
-
-    fun consumerCapabilities(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) = consumerOperations.capabilities(caller, request, callback)
-
-    fun consumerPrepare(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) = consumerOperations.prepare(caller, request, callback)
-
-    fun consumerOpenSession(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) = consumerOperations.openSession(caller, request, callback)
-
-    fun consumerGenerate(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: ConsumerHostEventCallback,
-    ) = consumerOperations.generate(caller, request, callback)
-
-    fun consumerCancel(caller: AuthorizedCaller, request: CancelRequestParcel) = consumerOperations.cancel(caller, request)
-
-    fun consumerCloseSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) =
-        consumerOperations.closeSession(caller, request)
 
     fun unregisterClient(caller: AuthorizedCaller, clientToken: String) {
         if (closed.get()) return
