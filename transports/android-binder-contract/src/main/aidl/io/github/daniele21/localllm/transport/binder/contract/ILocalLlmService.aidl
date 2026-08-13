@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.transport.binder.contract.CloseSessionReques
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel;
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel;
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle;
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback;
@@ -38,27 +39,5 @@ interface ILocalLlmService {
 
     oneway void unregisterClient(in ClientTokenParcel clientToken);
 
-    void consumerCapabilities(
-        in ConsumerRequestParcel request,
-        IConsumerResultCallback callback
-    );
-
-    void consumerPrepare(
-        in ConsumerRequestParcel request,
-        IConsumerResultCallback callback
-    );
-
-    void consumerOpenSession(
-        in ConsumerRequestParcel request,
-        IConsumerResultCallback callback
-    );
-
-    void consumerGenerate(
-        in ConsumerRequestParcel request,
-        IConsumerGenerationCallback callback
-    );
-
-    oneway void consumerCancel(in CancelRequestParcel request);
-
-    oneway void consumerCloseSession(in CloseSessionRequestParcel request);
+    IConsumerLocalLlmService getConsumerApi();
 }

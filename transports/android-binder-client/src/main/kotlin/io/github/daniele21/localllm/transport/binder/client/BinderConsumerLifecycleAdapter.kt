@@ -52,7 +52,7 @@ internal class BinderConsumerLifecycleAdapter(
             operationId = operationId,
             useCaseId = useCaseId.value,
         )
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumerCapabilities(request, callback) }) {
+        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.capabilities(request, callback) }) {
             is ConsumerRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     capabilityTransportFailure()
@@ -74,7 +74,7 @@ internal class BinderConsumerLifecycleAdapter(
             useCaseId = request.useCaseId.value,
             selection = request.selection.toConsumerWire(),
         )
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumerPrepare(wire, callback) }) {
+        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.prepare(wire, callback) }) {
             is ConsumerRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     prepareTransportFailure()
@@ -97,7 +97,7 @@ internal class BinderConsumerLifecycleAdapter(
             preparedId = preparedId.value,
             externalSessionId = externalSessionId,
         )
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumerOpenSession(request, callback) }) {
+        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.openSession(request, callback) }) {
             is ConsumerRemoteOutcome.Received -> mapSession(endpoint, operationId, externalSessionId, outcome.result)
             ConsumerRemoteOutcome.Timeout -> {
                 closeRemoteSession(endpoint, externalSessionId)
@@ -136,7 +136,7 @@ internal class BinderConsumerLifecycleAdapter(
     private fun closeRemoteSession(endpoint: RegisteredSharedRuntimeEndpoint, externalSessionId: String) {
         if (!isCurrent(endpoint)) return
         try {
-            endpoint.service.consumerCloseSession(
+            endpoint.service.consumer.closeSession(
                 CloseSessionRequestParcel(endpoint.clientToken, externalSessionId),
             )
         } catch (_: RemoteException) {

@@ -72,7 +72,7 @@ internal class BinderConsumerGenerationAdapter(
                     outputConstraint = request.outputConstraint.toConsumerWire(),
                 )
             try {
-                endpoint.service.consumerGenerate(wire) { event -> enqueue(generation, event) }
+                endpoint.service.consumer.generate(wire) { event -> enqueue(generation, event) }
             } catch (_: RemoteException) {
                 active.remove(request.requestId.value, generation)
                 generation.finish()
@@ -130,7 +130,7 @@ internal class BinderConsumerGenerationAdapter(
     private fun cancel(generation: ActiveConsumerGeneration) {
         if (generation.terminal || !generation.markCancelSent()) return
         try {
-            generation.endpoint.service.consumerCancel(
+            generation.endpoint.service.consumer.cancel(
                 CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
             )
         } catch (_: RemoteException) {
@@ -142,7 +142,7 @@ internal class BinderConsumerGenerationAdapter(
     private fun requestRemoteCancel(generation: ActiveConsumerGeneration) {
         if (!generation.markCancelSent()) return
         try {
-            generation.endpoint.service.consumerCancel(
+            generation.endpoint.service.consumer.cancel(
                 CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
             )
         } catch (_: RemoteException) {
