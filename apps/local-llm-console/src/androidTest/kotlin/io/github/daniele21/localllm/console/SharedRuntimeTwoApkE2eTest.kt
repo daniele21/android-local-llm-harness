@@ -43,7 +43,7 @@ class SharedRuntimeTwoApkE2eTest {
         )
         client.connect()
         assertTrue(
-            "Console did not connect to the separately installed proof host: ${client.connectionSnapshot}",
+            "Console did not connect to the separately installed proof host; inspect the typed connection state locally.",
             awaitConnection(SharedRuntimeConnectionState.CONNECTED),
         )
     }
@@ -57,7 +57,7 @@ class SharedRuntimeTwoApkE2eTest {
     fun prepareSessionStreamCompleteAndCloseCrossRealBinderBoundary() {
         val prepare = client.prepare(APPLICATION_ID, USE_CASE_ID)
         assertTrue(
-            "Proof host is reachable but its curated model is not ready. Install and select a supported Qwen3.5 model in the host first: ${prepare.detail}",
+            "Proof host is reachable but its curated model is not ready. Install and select a supported Qwen3.5 model in the host first.",
             prepare.ready,
         )
         assertNotNull(prepare.modelDigest)
@@ -91,8 +91,7 @@ class SharedRuntimeTwoApkE2eTest {
         }
 
         assertTrue("Shared-runtime generation did not reach a terminal event", terminal.await(GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-        val event = terminalEvent.get()
-        assertTrue("Expected a successful cross-process completion but received $event", event is GenerationEvent.Completed)
+        assertTrue("Expected a successful cross-process completion", terminalEvent.get() is GenerationEvent.Completed)
         assertTrue("Expected at least one streamed delta across Binder", sawDelta.get())
 
         client.closeSession(sessionId)
@@ -102,7 +101,7 @@ class SharedRuntimeTwoApkE2eTest {
     fun cancelDuringGenerationCrossesBinderAndLeavesSessionClosable() {
         val prepare = client.prepare(APPLICATION_ID, USE_CASE_ID)
         assertTrue(
-            "Proof host is reachable but its curated model is not ready. Install and select a supported Qwen3.5 model in the host first: ${prepare.detail}",
+            "Proof host is reachable but its curated model is not ready. Install and select a supported Qwen3.5 model in the host first.",
             prepare.ready,
         )
 
@@ -140,9 +139,9 @@ class SharedRuntimeTwoApkE2eTest {
         handle.cancel()
         assertTrue("Cancelled generation did not terminate", terminal.await(CANCEL_TIMEOUT_SECONDS, TimeUnit.SECONDS))
         val event = terminalEvent.get()
-        assertTrue("Expected typed cancellation, received $event", event is GenerationEvent.Failed)
+        assertTrue("Expected a typed failed terminal event after cancellation", event is GenerationEvent.Failed)
         val error = (event as GenerationEvent.Failed).error
-        assertTrue("Expected LocalLlmError.Cancelled, received $error", error is LocalLlmError.Cancelled)
+        assertTrue("Expected LocalLlmError.Cancelled", error is LocalLlmError.Cancelled)
         assertEquals(requestId, event.requestId)
 
         client.closeSession(sessionId)
