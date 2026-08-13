@@ -45,7 +45,8 @@ internal class BinderConsumerGenerationAdapter(
         request: ConsumerGenerationRequest,
         listener: ConsumerGenerationListener,
     ): ConsumerGenerationStartResult {
-        val endpoint = endpointProvider() ?: return rejectedTransport()
+        val endpoint = endpointProvider()
+        if (endpoint == null) return rejectedTransport()
         val externalRequestId = externalRequestIds.nextId()
         val generation =
             ActiveConsumerGeneration(
@@ -55,33 +56,16 @@ internal class BinderConsumerGenerationAdapter(
                 listener = listener,
                 reconstructor = ConsumerGenerationEventReconstructor(externalRequestId, request.requestId),
             )
-        synchronized(lifecycleLock) {
-            if (closed.get()) return rejectedTransport()
-            if (active.putIfAbsent(request.requestId.value, generation) != null) {
-                return ConsumerGenerationStartResult.Rejected(
-                    ConsumerFailure(ConsumerErrorCode.INVALID_INPUT, "Request ID is already active"),
-                )
-            }
-            val wire =
-                ConsumerRequestParcel(
-                    clientToken = endpoint.clientToken,
-                    operationId = externalRequestId,
-                    externalSessionId = request.sessionId.value,
-                    externalRequestId = externalRequestId,
-                    input = request.input.toConsumerWire(),
-                    outputConstraint = request.outputConstraint.toConsumerWire(),
-                )
-            try {
-                endpoint.service.consumer.generate(wire) { event -> enqueue(generation, event) }
-            } catch (_: RemoteException) {
-                active.remove(request.requestId.value, generation)
-                generation.finish()
-                return rejectedTransport()
+        return synchronized(lifecycleLock) {
+            when {
+                closed.get() -> rejectedTransport()
+                active.putIfAbsent(request.requestId.value, generation) != null ->
+                    ConsumerGenerationStartResult.Rejected(
+                        ConsumerFailure(ConsumerErrorCode.INVALID_INPUT, "Request ID is already active"),
+                    )
+                else -> submitGeneration(endpoint, request, generation)
             }
         }
-        return ConsumerGenerationStartResult.Accepted(
-            BinderConsumerGenerationHandle(request.requestId) { cancel(generation) },
-        )
     }
 
     override fun close() {
@@ -91,6 +75,32 @@ internal class BinderConsumerGenerationAdapter(
             active.forEach { _, generation -> cancel(generation) }
             active.clear()
             callbackExecutor.shutdownNow()
+        }
+    }
+
+    private fun submitGeneration(
+        endpoint: RegisteredSharedRuntimeEndpoint,
+        request: ConsumerGenerationRequest,
+        generation: ActiveConsumerGeneration,
+    ): ConsumerGenerationStartResult {
+        val wire =
+            ConsumerRequestParcel(
+                clientToken = endpoint.clientToken,
+                operationId = generation.externalRequestId,
+                externalSessionId = request.sessionId.value,
+                externalRequestId = generation.externalRequestId,
+                input = request.input.toConsumerWire(),
+                outputConstraint = request.outputConstraint.toConsumerWire(),
+            )
+        return try {
+            endpoint.service.consumer.generate(wire) { event -> enqueue(generation, event) }
+            ConsumerGenerationStartResult.Accepted(
+                BinderConsumerGenerationHandle(request.requestId) { cancel(generation) },
+            )
+        } catch (_: RemoteException) {
+            active.remove(request.requestId.value, generation)
+            generation.finish()
+            rejectedTransport()
         }
     }
 
@@ -120,7 +130,7 @@ internal class BinderConsumerGenerationAdapter(
                 } else if (!generation.deliver(mapped)) {
                     failProtocol(generation, "Consumer generation listener failed")
                 } else if (mapped is ConsumerGenerationEvent.Completed || mapped is ConsumerGenerationEvent.Failed) {
-                    finish(generation)
+                    if (generation.finish()) active.remove(generation.requestId.value, generation)
                 }
             }
         }
@@ -163,10 +173,6 @@ internal class BinderConsumerGenerationAdapter(
         generation.deliverTerminal(runtimeFailure("Binder protocol failure: $detail"))
     }
 
-    private fun finish(generation: ActiveConsumerGeneration) {
-        if (generation.finish()) active.remove(generation.requestId.value, generation)
-    }
-
     private fun drainDisconnected() {
         active.forEach { _, generation ->
             if (generation.disconnectionDetail != null) failDisconnected(generation)
@@ -181,12 +187,6 @@ internal class BinderConsumerGenerationAdapter(
             // A queued callback will drain invalidations after it runs.
         }
     }
-
-    private fun runtimeFailure(message: String): ConsumerGenerationEvent.Failed =
-        ConsumerGenerationEvent.Failed(
-            RequestId("transport-failure"),
-            ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, message),
-        )
 
     private companion object {
         const val DEFAULT_CALLBACK_QUEUE_CAPACITY = 256
@@ -248,6 +248,12 @@ private class BinderConsumerGenerationHandle(
         if (cancelled.compareAndSet(false, true)) cancelAction()
     }
 }
+
+private fun runtimeFailure(message: String): ConsumerGenerationEvent.Failed =
+    ConsumerGenerationEvent.Failed(
+        RequestId("transport-failure"),
+        ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, message),
+    )
 
 private fun rejectedTransport() =
     ConsumerGenerationStartResult.Rejected(
