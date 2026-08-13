@@ -1,0 +1,112 @@
+name: Agent CA1 defaults
+
+on:
+  push:
+    branches:
+      - agent/consumer-api-ca0-ca1
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Make consumer defaults host-owned
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/ConsumerCapabilities.kt')
+          s = p.read_text()
+          s = s.replace(
+              '    val outputConstraints: Set<ConsumerOutputConstraintKind>,\n    val sessionKinds: Set<SessionKind>,\n',
+              '    val outputConstraints: Set<ConsumerOutputConstraintKind>,\n    val defaultOutputConstraint: ConsumerOutputConstraintKind,\n    val sessionKinds: Set<SessionKind>,\n    val defaultSessionKind: SessionKind,\n',
+          )
+          s = s.replace(
+              '        require(outputConstraints.isNotEmpty()) { "At least one output constraint must be exposed" }\n',
+              '        require(outputConstraints.isNotEmpty()) { "At least one output constraint must be exposed" }\n        require(defaultOutputConstraint in outputConstraints) { "Default output constraint must be exposed" }\n        require(defaultSessionKind in sessionKinds) { "Default session kind must be exposed" }\n',
+          )
+          s = s.replace(
+              '    val outputConstraint: ConsumerOutputConstraintKind = ConsumerOutputConstraintKind.TEXT,\n    val sessionKind: SessionKind = SessionKind.STATELESS,\n',
+              '    val outputConstraint: ConsumerOutputConstraintKind? = null,\n    val sessionKind: SessionKind? = null,\n',
+          )
+          p.write_text(s)
+
+          p = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicy.kt')
+          s = p.read_text()
+          s = s.replace(
+              '    val outputConstraints: Set<ConsumerOutputConstraintKind>,\n    val sessionKinds: Set<SessionKind>,\n',
+              '    val outputConstraints: Set<ConsumerOutputConstraintKind>,\n    val defaultOutputConstraint: ConsumerOutputConstraintKind,\n    val sessionKinds: Set<SessionKind>,\n    val defaultSessionKind: SessionKind,\n',
+          )
+          s = s.replace(
+              '        require(sessionKinds.isNotEmpty()) { "Consumer policy must expose a session kind" }\n',
+              '        require(sessionKinds.isNotEmpty()) { "Consumer policy must expose a session kind" }\n        require(defaultOutputConstraint in outputConstraints) { "Consumer default output constraint must be exposed" }\n        require(defaultSessionKind in sessionKinds) { "Consumer default session kind must be exposed" }\n',
+          )
+          s = s.replace(
+              '        if (request.sessionKind !in context.policy.sessionKinds) {\n',
+              '        val outputConstraint = request.outputConstraint ?: context.policy.defaultOutputConstraint\n        val sessionKind = request.sessionKind ?: context.policy.defaultSessionKind\n\n        if (sessionKind !in context.policy.sessionKinds) {\n',
+          )
+          s = s.replace(
+              '        if (request.outputConstraint !in context.policy.outputConstraints ||\n            request.outputConstraint !in effectiveOutputConstraints(context.resolved, preset)\n',
+              '        if (outputConstraint !in context.policy.outputConstraints ||\n            outputConstraint !in effectiveOutputConstraints(context.resolved, preset)\n',
+          )
+          s = s.replace(
+              '            outputConstraint = request.outputConstraint,\n            sessionKind = request.sessionKind,\n',
+              '            outputConstraint = outputConstraint,\n            sessionKind = sessionKind,\n',
+          )
+          s = s.replace(
+              '            outputConstraints = policy.outputConstraints,\n            sessionKinds = policy.sessionKinds,\n',
+              '            outputConstraints = policy.outputConstraints,\n            defaultOutputConstraint = policy.defaultOutputConstraint,\n            sessionKinds = policy.sessionKinds,\n            defaultSessionKind = policy.defaultSessionKind,\n',
+          )
+          s = s.replace(
+              '            append(\'|\').append(policy.outputConstraints.map { it.name }.sorted().joinToString(","))\n            append(\'|\').append(policy.sessionKinds.map { it.name }.sorted().joinToString(","))\n',
+              '            append(\'|\').append(policy.outputConstraints.map { it.name }.sorted().joinToString(","))\n            append(\'|\').append(policy.defaultOutputConstraint.name)\n            append(\'|\').append(policy.sessionKinds.map { it.name }.sorted().joinToString(","))\n            append(\'|\').append(policy.defaultSessionKind.name)\n',
+          )
+          p.write_text(s)
+
+          p = Path('core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicyServiceTest.kt')
+          s = p.read_text()
+          s = s.replace(
+              '        assertEquals(setOf(ConsumerOutputConstraintKind.JSON_SCHEMA), capabilities.outputConstraints)\n        assertEquals(setOf(SessionKind.STATELESS), capabilities.sessionKinds)\n',
+              '        assertEquals(setOf(ConsumerOutputConstraintKind.JSON_SCHEMA), capabilities.outputConstraints)\n        assertEquals(ConsumerOutputConstraintKind.JSON_SCHEMA, capabilities.defaultOutputConstraint)\n        assertEquals(setOf(SessionKind.STATELESS), capabilities.sessionKinds)\n        assertEquals(SessionKind.STATELESS, capabilities.defaultSessionKind)\n',
+          )
+          s = s.replace(
+              '            ConsumerSelectionRequest(\n                capabilityRevision = discovered.capabilityRevision,\n                outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,\n            ),\n',
+              '            ConsumerSelectionRequest(capabilityRevision = discovered.capabilityRevision),\n',
+              1,
+          )
+          s = s.replace(
+              '        assertEquals(EffectiveConsumerReasoningMode.DISABLED, accepted.reasoningMode)\n',
+              '        assertEquals(EffectiveConsumerReasoningMode.DISABLED, accepted.reasoningMode)\n        assertEquals(ConsumerOutputConstraintKind.JSON_SCHEMA, accepted.outputConstraint)\n        assertEquals(SessionKind.STATELESS, accepted.sessionKind)\n',
+              1,
+          )
+          s = s.replace(
+              '                outputConstraints = policyOutputConstraints,\n                sessionKinds = setOf(SessionKind.STATELESS),\n',
+              '                outputConstraints = policyOutputConstraints,\n                defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,\n                sessionKinds = setOf(SessionKind.STATELESS),\n                defaultSessionKind = SessionKind.STATELESS,\n',
+          )
+          p.write_text(s)
+          PY
+      - name: Format and test CA-1
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply :core:runtime-core:testDebugUnitTest
+      - name: Commit CA-1 defaults
+        run: |
+          git add core/contracts/src/main/kotlin/io/github/daniele21/localllm/contracts/ConsumerCapabilities.kt \
+            core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicy.kt \
+            core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/ConsumerCapabilityPolicyServiceTest.kt
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'feat(consumer-api): make policy defaults explicit'
+          git push origin HEAD:${{ github.ref_name }}
