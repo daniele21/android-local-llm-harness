@@ -90,16 +90,34 @@ w: file:///home/runner/work/android-local-llm-harness/android-local-llm-harness/
 > Task :spotlessKotlinGradle
 > Task :spotlessKotlinGradleApply
 > Task :spotlessKotlin
-> Task :spotlessKotlinApply FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/gate-1786658652652.json
+> Task :spotlessKotlinApply
+> Task :spotlessApply
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/gate-1786658948505.json
+
+BUILD SUCCESSFUL in 1m 42s
+6 actionable tasks: 6 executed
+Configuration cache entry stored.
+
+> Task :detekt FAILED
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessRuntimeGraph.kt:41:16: Class 'HarnessRuntimeGraph' with '11' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/AidlSharedRuntimeRemoteService.kt:27:16: Class 'AidlSharedRuntimeRemoteService' with '15' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/BinderConsumerGenerationAdapter.kt:27:16: Class 'BinderConsumerGenerationAdapter' with '12' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/SharedRuntimeRemoteService.kt:20:20: Interface 'SharedRuntimeRemoteService' with '14' functions detected. Defined threshold inside interfaces is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-contract/src/main/kotlin/io/github/daniele21/localllm/transport/binder/contract/ConsumerCoreWireMapping.kt:1:1: File '/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-contract/src/main/kotlin/io/github/daniele21/localllm/transport/binder/contract/ConsumerCoreWireMapping.kt' with '30' functions detected. Defined threshold inside files is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/SharedRuntimeHostDelegate.kt:23:7: Class 'SharedRuntimeHostDelegate' with '17' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/SharedRuntimeBinderStub.kt:25:7: Class 'SharedRuntimeBinderStub' with '17' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/HostRuntimeResources.kt:11:16: Class 'HostRuntimeResources' with '16' functions detected. Defined threshold inside classes is set to '11' [TooManyFunctions]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/BinderConsumerGenerationAdapter.kt:44:9: Function generate has 5 return statements which exceeds the limit of 4. [ReturnCount]
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/ConsumerHostOperations.kt:230:17: Function resolveContext has 5 return statements which exceeds the limit of 4. [ReturnCount]
+
+Analysis failed with 10 weighted issues.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/gate-1786659042333.json
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':spotlessKotlinApply' (registered in build file 'build.gradle.kts').
-> There were 1 lint error(s), they must be fixed or suppressed.
-  transports/android-binder-contract/src/main/kotlin/io/github/daniele21/localllm/transport/binder/contract/ConsumerEventReconstructor.kt:L1 ktlint(standard:filename) File 'ConsumerEventReconstructor.kt' contains a single class, and possibly related top level declarations for that class. The file should be named after the class, 'ConsumerGenerationEventReconstructor.kt'
-  Resolve these lints or suppress with `suppressLintsFor`
+Execution failed for task ':detekt' (registered in build file 'build.gradle.kts').
+> Process 'command '/usr/lib/jvm/temurin-17-jdk-amd64/bin/java'' finished with non-zero exit value 2
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -107,6 +125,5 @@ Execution failed for task ':spotlessKotlinApply' (registered in build file 'buil
 > Run with --scan to get full insights from a Build Scan (powered by Develocity).
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 1m 29s
-6 actionable tasks: 6 executed
-Configuration cache entry stored.
+BUILD FAILED in 14s
+1 actionable task: 1 executed
