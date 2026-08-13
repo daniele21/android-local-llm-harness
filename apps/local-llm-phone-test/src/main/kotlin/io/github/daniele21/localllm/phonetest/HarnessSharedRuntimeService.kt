@@ -22,7 +22,7 @@ class HarnessSharedRuntimeService : Service() {
             permissionName = BuildConfig.SHARED_RUNTIME_PERMISSION,
             policies = HarnessSharedRuntimePolicy.authorizedClients(this),
             hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
-            consumerClientFactory = runtimeGraph::consumerClient,
+            consumerClientFactory = runtimeGraph.consumerClientFactory,
         )
         memoryPressureCallbacks = AndroidMemoryPressureCallbacks(
             lowMemoryProbe = ActivityManagerLowMemoryProbe(this),

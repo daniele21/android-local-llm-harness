@@ -7,9 +7,6 @@ import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind
 import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.LocalLlmClient
-import io.github.daniele21.localllm.contracts.MAX_CONVERSATION_MESSAGES
-import io.github.daniele21.localllm.contracts.MAX_GENERATION_INPUT_CHARACTERS
-import io.github.daniele21.localllm.contracts.MAX_JSON_SCHEMA_CHARACTERS
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -87,7 +84,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
-    fun consumerClient(applicationId: ApplicationId): ConsumerLocalLlmClient {
+    val consumerClientFactory: (ApplicationId) -> ConsumerLocalLlmClient = { applicationId ->
         require(applicationId == HarnessSharedRuntimeBindings.consoleApplicationId) {
             "Consumer API is not configured for applicationId ${applicationId.value}"
         }
@@ -105,9 +102,9 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 defaultSessionKind = SessionKind.STATELESS,
                 limits =
                     ConsumerLimits(
-                        maxInputCharacters = MAX_GENERATION_INPUT_CHARACTERS,
-                        maxConversationMessages = MAX_CONVERSATION_MESSAGES,
-                        maxJsonSchemaCharacters = MAX_JSON_SCHEMA_CHARACTERS,
+                        maxInputCharacters = 32_768,
+                        maxConversationMessages = 128,
+                        maxJsonSchemaCharacters = 32_768,
                     ),
             )
         val capabilityPolicy =
