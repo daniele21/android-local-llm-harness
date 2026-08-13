@@ -9,359 +9,133 @@ Last reviewed: 2026-08-13
 
 ## Goal
 
-Define a small application-facing inference surface that preserves the existing `LocalLlmClient` lifecycle while adding capability discovery and constrained selection without exposing the internal generation/runtime superset.
+Define the small application-facing inference surface introduced by CA-2. The surface is additive: the existing `LocalLlmClient` remains the internal/embedded superset, while `ConsumerLocalLlmClient` is the constrained consumer boundary.
 
-This document owns public API shape and lifecycle semantics. Capability contents belong to [`capabilities-and-policy.md`](capabilities-and-policy.md); result semantics belong to [`results-and-metrics.md`](results-and-metrics.md).
+Capability contents belong to [`capabilities-and-policy.md`](capabilities-and-policy.md); public result metrics are deferred to CA-3 in [`results-and-metrics.md`](results-and-metrics.md).
 
-## Design constraints
+## Accepted CA-2 shape
 
-The public surface must:
+The consumer surface does not expose or accept:
 
-- remain backend-neutral;
-- keep generated AIDL/Parcelable types internal to the Binder transport;
-- derive caller identity at the host boundary;
-- preserve explicit `UseCaseId`;
-- support default-only consumers with minimal setup;
-- allow optional host-advertised model/preset choice;
-- make session/request ownership deterministic;
-- stream content without forcing the app to reconstruct transport details;
-- keep low-level tuning out of ordinary consumer code;
-- map failures to stable typed outcomes.
+- `ApplicationId` as caller-controlled authorization input;
+- model IDs/selectors, `ModelDigest`, GGUF paths or URLs;
+- `GenerationOverrides` or raw sampling/runtime tuning;
+- manual context sizing;
+- host-wide runtime snapshots or diagnostics;
+- internal `Prepared` configuration metadata.
+
+The host-side facade is constructed with an already authenticated `ApplicationId`, reuses the CA-1 policy service and delegates execution to the existing `LocalLlmClient` only after consumer policy has been validated.
 
 ## Public lifecycle
 
-Preferred v1 flow:
-
 ```text
-connect / negotiate
-  -> capabilities(useCase)
-  -> prepare(useCase, optional selection)
-  -> createSession(prepared selection, options)
-  -> generate(input, output request, listener)
-  -> cancel or terminal result
+capabilities(useCase)
+  -> prepare(useCase, optional constrained selection)
+  -> createSession(preparedId)
+  -> generate(sessionId, bounded input, output constraint)
+  -> cancel or terminal event
   -> closeSession
 ```
 
-A minimal app may accept all defaults:
+A consumer can omit preset, reasoning, output kind and session kind during preparation. Harness resolves the advertised host defaults.
+
+## Capability discovery
+
+`capabilities(useCaseId)` returns only the authenticated application/use-case-scoped `UseCaseCapabilities` from CA-1.
+
+Discovery is informational and side-effect free with respect to model verification, loading and download. The capability revision is revalidated at preparation time and is never treated as an authorization token by itself.
+
+## Preparation
+
+`ConsumerPrepareRequest` contains:
+
+- required `UseCaseId`;
+- optional `ConsumerSelectionRequest` containing capability revision, allowed preset, reasoning preference, output kind and session kind.
+
+Preparation performs two policy checks:
+
+1. validate the caller/use-case/selection before touching the legacy runtime;
+2. after normal host preparation, rediscover and revalidate the same explicit choices against the current capability revision.
+
+The second pass allows an expected `AVAILABLE_REQUIRES_PREPARATION -> READY` transition without trusting a stale discovery response or silently widening policy.
+
+A successful result returns `ConsumerPreparedSelection` with an opaque `ConsumerPreparedId`, effective preset, reasoning mode, output kind, session kind and current capability revision. Exact model/artifact identity remains host-private.
+
+## Session binding
+
+`createSession(preparedId)` revalidates the prepared selection and creates the legacy session with only the host-authorized `SessionKind`. Manual context policy is not consumer-controlled.
+
+The effective selection is immutable for the created session. Policy changes apply to future preparation rather than silently mutating an active session.
+
+Prepared IDs are consumed after successful session creation in CA-2 v1.
+
+## Generation input
+
+The public request accepts only:
+
+- bounded text;
+- bounded user/assistant messages.
+
+Raw-completion input is intentionally absent. Input/message limits come from the prepared CA-1 capability policy and are enforced before delegating to `LocalLlmClient`.
+
+## Output constraints
+
+The generation request carries one concrete consumer output constraint:
+
+- text;
+- JSON;
+- JSON schema with bounded schema text.
+
+Its kind must match the output kind frozen during preparation. A mismatch fails before legacy generation starts.
+
+## Preset and reasoning mapping
+
+Generation does not repeat mutable selection options. The facade maps the prepared selection to a narrow internal `GenerationOverrides` containing only:
+
+- the already authorized preset reference;
+- the already resolved effective reasoning/thinking mode.
+
+Temperature, top-p, top-k, token budget, penalties, seed and other raw tuning controls remain host/preset-owned.
+
+## Event projection
+
+The facade projects the internal event superset into `ConsumerGenerationEvent`:
 
 ```text
-capabilities(useCase)
-  -> prepare(useCase)
-  -> createSession(...)
-  -> generate(prompt)
+Queued
+Started
+ContentDelta(ANSWER)
+ContentDelta(REASONING) only when surfaced reasoning was authorized
+Completed(answer, optional surfacedReasoning)
+Failed(coarse typed consumer failure)
 ```
 
-The SDK may provide convenience helpers later, but the explicit lifecycle remains testable and observable.
+Internal `GenerationEvent.Prepared`, model digests, effective raw generation metadata and backend error details are never forwarded. Public performance metrics are intentionally not added in CA-2 because CA-3 owns their stable projection.
 
-## Proposed public concepts
+## Failure model
 
-Names below are planning names; implementation may adapt them to existing core naming if semantics remain exact.
+Consumer failures are coarse and actionable. Categories include capability/policy rejection, invalid bounded input, missing/stale prepared selection, missing session, preparation failure, cancellation and runtime failure.
 
-### UseCaseCapabilities
+Host-private paths, native exception text and backend diagnostics are not used as public failure messages.
 
-Describes only options the verified application is authorized to use for one `UseCaseId`.
+## Cancellation and close
 
-Conceptual fields:
+`ConsumerGenerationHandle.cancel()` delegates cancellation for the caller-owned request while preserving its request ID. `closeSession` only delegates for a session owned by this facade and removes that binding.
 
-```kotlin
-data class UseCaseCapabilities(
-    val useCaseId: UseCaseId,
-    val models: List<ConsumerModelOption>,
-    val defaultModelId: ConsumerModelId?,
-    val presets: List<ConsumerPresetOption>,
-    val defaultPreset: InferencePresetRef?,
-    val reasoning: ReasoningCapability,
-    val outputConstraints: Set<ConsumerOutputConstraintKind>,
-    val sessionKinds: Set<SessionKind>,
-    val limits: ConsumerLimits,
-    val capabilityRevision: String,
-)
-```
+## Compatibility
 
-The capability object is not a global Harness inventory. It is already filtered by caller/use-case policy.
+CA-2 is SDK/runtime-core additive. It does not alter AIDL or Binder wire semantics; Binder mapping remains CA-4. The legacy `LocalLlmClient` is unchanged for existing embedded and internal consumers.
 
-### ConsumerSelection
+## CA-2 exit gate
 
-Represents consumer intent without raw runtime tuning.
-
-```kotlin
-data class ConsumerSelection(
-    val modelId: ConsumerModelId? = null,
-    val preset: InferencePresetRef? = null,
-    val reasoning: ConsumerReasoningPreference = DEFAULT,
-)
-```
-
-`null` means “use the advertised default”, not “choose any model”.
-
-### ConsumerPrepareRequest
-
-```kotlin
-data class ConsumerPrepareRequest(
-    val useCaseId: UseCaseId,
-    val selection: ConsumerSelection = ConsumerSelection(),
-)
-```
-
-The host resolves it to one effective allowed configuration.
-
-### ConsumerPrepareResult
-
-Should return enough identity for the consumer to understand what was accepted without leaking artifact paths or full runtime internals.
-
-Conceptually:
-
-```kotlin
-data class ConsumerPrepareResult(
-    val ready: Boolean,
-    val effectiveModel: ConsumerModelIdentity?,
-    val effectivePreset: InferencePresetRef?,
-    val reasoningMode: EffectiveReasoningMode?,
-    val capabilityRevision: String,
-    val detailCode: ConsumerPrepareCode,
-)
-```
-
-The host may retain exact model digest internally or expose a privacy-safe artifact identity only in request details if release/security review accepts it.
-
-## Caller identity
-
-The external app must not be trusted to provide its own `ApplicationId` as authorization input.
-
-At the Binder host:
+CA-2 is complete when focused tests prove that a consumer can execute:
 
 ```text
-calling UID/package/signing lineage
-  -> authenticated host application identity
-  -> application policy
+discover -> prepare -> session -> generate -> close
 ```
 
-The high-level client SDK may keep an application identity concept for embedded/in-process compatibility, but the shared-host implementation derives and validates it at the transport boundary.
+using only public consumer types, while tests also prove stale selections and invalid input/output fail before delegation and no caller/model/artifact/raw-tuning authority appears in the consumer surface.
 
-## UseCaseId
+### Current validation evidence
 
-`UseCaseId` remains explicit and required because it is the primary policy/routing key.
-
-A single app may have multiple use cases with different allowed models, presets, output modes and reasoning policies.
-
-Example:
-
-```text
-mail-summary      -> small model + balanced/fast + text
-mail-reply        -> larger model + quality + text
-mail-classify     -> small model + deterministic + JSON
-```
-
-The consumer cannot invent a new use case and receive generic inference automatically.
-
-## Model selection semantics
-
-A model choice is a logical `ConsumerModelId` advertised by capabilities.
-
-The public API does not accept:
-
-- `ModelDigest` as a load command;
-- model path;
-- URL;
-- quantization override;
-- arbitrary runtime profile ID.
-
-The host maps the logical choice to its exact artifact/profile policy.
-
-### Availability
-
-Capability discovery may describe availability such as:
-
-```text
-READY
-AVAILABLE_REQUIRES_LOAD
-UNAVAILABLE_NOT_INSTALLED
-UNAVAILABLE_POLICY
-```
-
-Only states that are useful and privacy-safe for the current caller should be exposed. The exact enum is owned by the capability-policy workstream.
-
-An explicitly selected unavailable model fails predictably; Harness does not silently pick a different model.
-
-## Preset selection semantics
-
-A preset is a versioned host-defined contract represented by `InferencePresetRef` or a compatible consumer projection.
-
-The consumer does not set the preset’s individual sampling/runtime fields. A selected preset must be valid for the selected/default model and use case.
-
-If the preset is omitted, the host resolves the advertised default.
-
-If a preset is requested but incompatible with the selected model, fail with a typed configuration error rather than silently changing either choice.
-
-## Reasoning preference
-
-The public request needs a small preference, for example:
-
-```kotlin
-enum class ConsumerReasoningPreference {
-    DEFAULT,
-    DISABLED,
-    SURFACED_IF_SUPPORTED,
-}
-```
-
-A stronger `REQUIRED` mode may be added only if product use cases need fail-closed reasoning support.
-
-The preference controls whether an intentionally surfaced reasoning channel may be returned; it does not expose arbitrary hidden model internals.
-
-## Output request
-
-Reuse the existing text/JSON/JSON-schema concepts where wire and security limits permit.
-
-Conceptually:
-
-```kotlin
-sealed interface ConsumerOutputConstraint {
-    data object Text
-    data object Json
-    data class JsonSchema(val schema: String)
-}
-```
-
-Schema size and syntax remain bounded by Harness policy. A use case may allow only a subset.
-
-## Generation request
-
-The ordinary consumer generation request should be narrower than core `GenerationRequest`.
-
-Conceptually:
-
-```kotlin
-data class ConsumerGenerationRequest(
-    val requestId: RequestId,
-    val sessionId: SessionId,
-    val input: GenerationInput,
-    val outputConstraint: ConsumerOutputConstraint = Text,
-)
-```
-
-Model/preset/reasoning selection is preferably resolved during prepare/session creation rather than repeated as mutable raw request options.
-
-This makes a conversational session’s execution identity stable and simplifies policy enforcement.
-
-## Session options
-
-Preserve `STATELESS` and `CONVERSATIONAL` where advertised.
-
-Public session options should expose only stable product semantics such as session kind. Manual context sizing should remain host-owned for ordinary cross-app consumers unless a separate requirement proves it belongs in public v1.
-
-Preferred shape:
-
-```kotlin
-data class ConsumerSessionOptions(
-    val kind: SessionKind = STATELESS,
-)
-```
-
-Harness owns effective context size and reuse policy through model/preset/use-case configuration.
-
-## Public client methods
-
-A likely evolved high-level surface is:
-
-```kotlin
-interface SharedLocalLlmClient {
-    fun connectionState(): SharedRuntimeConnectionState
-
-    fun capabilities(useCaseId: UseCaseId): UseCaseCapabilities
-
-    fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult
-
-    fun createSession(
-        useCaseId: UseCaseId,
-        options: ConsumerSessionOptions = ConsumerSessionOptions(),
-    ): SessionId
-
-    fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): GenerationHandle
-
-    fun closeSession(sessionId: SessionId)
-}
-```
-
-Implementation must evaluate whether this becomes an additive interface, an evolution of `LocalLlmClient`, or a consumer facade layered over it. Avoid breaking embedded consumers merely to make Binder naming cleaner.
-
-## Event surface
-
-The public listener should preserve ordered lifecycle events but may project the internal superset.
-
-Required semantic events:
-
-```text
-Queued (optional if queueing is exposed)
-Prepared / Started identity
-ReasoningDelta (when surfaced)
-AnswerDelta
-Completed(result + metrics)
-Failed(error)
-```
-
-Transport-only details such as callback sequence bookkeeping remain internal.
-
-## Effective configuration disclosure
-
-The consumer needs to know which logical choices actually ran:
-
-- effective logical model ID/name;
-- effective preset ID/version;
-- effective reasoning mode;
-- output constraint;
-- request/session identifiers as needed.
-
-It does not need raw temperature/top-p/top-k/context/thread/batch values by default. Those remain request-detail or Harness diagnostic information only if explicitly approved.
-
-## Cancellation
-
-`GenerationHandle.cancel()` remains first-class.
-
-Cancellation must:
-
-- apply only to the caller-owned request;
-- converge to exactly one terminal outcome;
-- preserve the same request ID;
-- release request resources;
-- leave the host reusable for subsequent requests.
-
-## Compatibility strategy
-
-The Binder protocol already negotiates major/minor/features. Implementation must classify each API addition as:
-
-- SDK-only facade change;
-- backward-compatible optional protocol feature;
-- incompatible protocol semantic change.
-
-Capability discovery and optional selection should prefer feature-negotiated additive wire fields where semantics remain unambiguous. If enabling client model choice changes an accepted invariant that older hosts cannot interpret safely, increment the appropriate compatibility boundary instead of pretending it is a minor feature.
-
-## Migration from current Console proof
-
-The current proof client can be migrated into the OMBRA reference consumer in stages:
-
-1. keep existing fixed `console-inference-playground` use case;
-2. expose one capability response with one default model/preset;
-3. switch Console UI to capability-driven display;
-4. add the authorized `document-pii-detection` use case with deterministic defaults and `JSON_SCHEMA` capability;
-5. remove Console-local model/health/runtime ownership and raw generation controls unrelated to consumer behavior;
-6. implement the product flow owned by [`pii-redactor/`](pii-redactor/) without adding PII-specific public SDK types;
-7. use the packaged OMBRA application as the reference consumer for client SDK validation.
-
-## Acceptance criteria
-
-The public surface is ready for implementation when:
-
-- required versus optional consumer choices are agreed;
-- session selection semantics are deterministic;
-- application identity is not client-trusted;
-- model/preset selection cannot bypass allowlists;
-- no raw llama.cpp/runtime tuning leaks into the ordinary consumer contract;
-- reasoning and answer are independently representable;
-- output constraints are use-case bounded;
-- cancellation and typed terminal behavior remain intact;
-- compatibility impact is classified before wire changes begin;
-- the surface can be demonstrated by a consumer app with no model/runtime implementation.
+`ConsumerLocalLlmFacadeTest` covers the lifecycle exit gate, stale selection rejection, pre-delegation input/output validation and public-surface authority checks. The focused CA-2 gate passes repository formatting, Detekt and `:core:runtime-core:testDebugUnitTest`; repository-wide CI remains the integration gate before the slice can advance beyond `IN PROGRESS`.

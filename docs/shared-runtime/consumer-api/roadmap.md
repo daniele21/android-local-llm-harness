@@ -52,7 +52,7 @@ Exit gate: an authenticated use case resolves a deterministic, privacy-safe capa
 
 ## CA-2 — Public surface
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Owner: [`public-surface-v1.md`](public-surface-v1.md)
 
