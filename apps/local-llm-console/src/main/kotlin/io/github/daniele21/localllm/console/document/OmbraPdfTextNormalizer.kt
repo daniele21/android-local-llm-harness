@@ -12,10 +12,10 @@ import kotlin.math.min
  *
  * AndroidX exposes a continuous text stream in viewing order plus zero or more line bounds. Some
  * generated PDFs return very fine-grained CR/LF-delimited text even when the geometry still places
- * that content on one visual line. This normalizer expands text into line fragments only when the
- * text-line count and bounds count agree, treats internal line terminators as extraction artifacts
- * when one bound proves a single visual line, and otherwise preserves the API stream conservatively.
- * OMB-2 will own the production extraction contract and its malformed/ambiguous-content policy.
+ * that content on one visual line. This normalizer collapses clearly glyph-fragmented streams back
+ * into one visual fragment while preserving a geometry anchor; conventional multi-line streams are
+ * still expanded against their line bounds when the mapping is unambiguous. OMB-2 will own the
+ * production extraction contract and its malformed/ambiguous-content policy.
  */
 @OptIn(ExperimentalPdfApi::class)
 internal object OmbraPdfTextNormalizer {
@@ -44,17 +44,38 @@ internal object OmbraPdfTextNormalizer {
         return when {
             content.bounds.isEmpty() -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
 
+            content.bounds.size == 1 ->
+                listOf(PendingFragment(normalizeFragmentedText(normalized), RectF(content.bounds.single())))
+
+            looksGlyphFragmented(textLines) ->
+                listOf(
+                    PendingFragment(
+                        text = normalizeFragmentedText(normalized),
+                        bounds = readingAnchorBounds(content.bounds),
+                    ),
+                )
+
             content.bounds.size == textLines.size ->
                 textLines.zip(content.bounds) { text, bounds -> PendingFragment(text, RectF(bounds)) }
-
-            content.bounds.size == 1 ->
-                listOf(PendingFragment(normalizeSingleBoundText(normalized), RectF(content.bounds.single())))
 
             else -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
         }
     }
 
-    private fun normalizeSingleBoundText(text: String): String {
+    private fun looksGlyphFragmented(textLines: List<String>): Boolean {
+        if (textLines.size < MIN_GLYPH_FRAGMENT_COUNT) return false
+        val shortFragments = textLines.count { line -> line.codePointCount(0, line.length) <= MAX_GLYPH_FRAGMENT_CODE_POINTS }
+        return shortFragments * 2 >= textLines.size
+    }
+
+    private fun readingAnchorBounds(bounds: List<RectF>): RectF {
+        val first = bounds.first()
+        val left = bounds.minOf { bound -> bound.left }
+        val right = bounds.maxOf { bound -> bound.right }
+        return RectF(left, first.top, right, first.bottom)
+    }
+
+    private fun normalizeFragmentedText(text: String): String {
         val pieces = text.split('\n')
         val firstContentIndex = pieces.indexOfFirst { piece -> piece.isNotEmpty() }
         if (firstContentIndex < 0) return ""
@@ -150,6 +171,8 @@ internal object OmbraPdfTextNormalizer {
 
     private data class TextFragment(val text: String, val bounds: RectF)
 
+    private const val MIN_GLYPH_FRAGMENT_COUNT = 3
+    private const val MAX_GLYPH_FRAGMENT_CODE_POINTS = 3
     private const val MIN_VERTICAL_OVERLAP_RATIO = 0.5f
     private const val MAX_CENTER_DELTA_RATIO = 0.35f
     private const val WORD_GAP_RATIO = 0.35f
