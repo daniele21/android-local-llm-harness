@@ -108,51 +108,50 @@ internal class OmbraPdfParserSpike(context: Context) {
         }
     }
 
-    private suspend fun bindParserService(): ParserSession =
-        suspendCancellableCoroutine { continuation ->
-            var bound = false
-            lateinit var connection: ServiceConnection
-            connection =
-                object : ServiceConnection {
-                    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                        if (!continuation.isActive) {
-                            if (bound) safeUnbind(connection)
-                            return
-                        }
-                        if (service == null) {
-                            continuation.resumeWithException(IOException("Isolated PDF parser connected without Binder"))
-                            return
-                        }
-                        continuation.resume(ParserSession(Messenger(service), connection))
+    private suspend fun bindParserService(): ParserSession = suspendCancellableCoroutine { continuation ->
+        var bound = false
+        lateinit var connection: ServiceConnection
+        connection =
+            object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    if (!continuation.isActive) {
+                        if (bound) safeUnbind(connection)
+                        return
                     }
-
-                    override fun onServiceDisconnected(name: ComponentName?) {
-                        if (continuation.isActive) {
-                            continuation.resumeWithException(IOException("Isolated PDF parser disconnected before binding completed"))
-                        }
+                    if (service == null) {
+                        continuation.resumeWithException(IOException("Isolated PDF parser connected without Binder"))
+                        return
                     }
+                    continuation.resume(ParserSession(Messenger(service), connection))
+                }
 
-                    override fun onBindingDied(name: ComponentName?) {
-                        if (continuation.isActive) {
-                            continuation.resumeWithException(IOException("Isolated PDF parser binding died"))
-                        }
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(IOException("Isolated PDF parser disconnected before binding completed"))
                     }
                 }
 
-            bound =
-                applicationContext.bindService(
-                    Intent(applicationContext, OmbraPdfIsolatedParserSpikeService::class.java),
-                    connection,
-                    Context.BIND_AUTO_CREATE,
-                )
-            if (!bound) {
-                continuation.resumeWithException(IOException("Unable to bind isolated PDF parser"))
-                return@suspendCancellableCoroutine
+                override fun onBindingDied(name: ComponentName?) {
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(IOException("Isolated PDF parser binding died"))
+                    }
+                }
             }
-            continuation.invokeOnCancellation {
-                if (bound) safeUnbind(connection)
-            }
+
+        bound =
+            applicationContext.bindService(
+                Intent(applicationContext, OmbraPdfIsolatedParserSpikeService::class.java),
+                connection,
+                Context.BIND_AUTO_CREATE,
+            )
+        if (!bound) {
+            continuation.resumeWithException(IOException("Unable to bind isolated PDF parser"))
+            return@suspendCancellableCoroutine
         }
+        continuation.invokeOnCancellation {
+            if (bound) safeUnbind(connection)
+        }
+    }
 
     private fun openReadOnly(uri: Uri): ParcelFileDescriptor {
         if (uri.scheme == "file") {
