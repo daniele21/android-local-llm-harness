@@ -151,6 +151,7 @@ dependencies {
 
     // OMB-0 selected parser: PdfBox-Android runs only behind the isolated parser service.
     implementation(libs.pdfbox.android)
+    implementation(libs.kotlinx.coroutines.android)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
