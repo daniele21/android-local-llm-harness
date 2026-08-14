@@ -19,24 +19,17 @@ enum class RuntimeMismatchReason {
     WARMUP_POLICY,
 }
 
-data class QualityCompatibility(
-    val mismatchReasons: Set<QualityMismatchReason>,
-) {
+data class QualityCompatibility(val mismatchReasons: Set<QualityMismatchReason>) {
     val compatible: Boolean
         get() = mismatchReasons.isEmpty()
 }
 
-data class RuntimeCompatibility(
-    val mismatchReasons: Set<RuntimeMismatchReason>,
-) {
+data class RuntimeCompatibility(val mismatchReasons: Set<RuntimeMismatchReason>) {
     val compatible: Boolean
         get() = mismatchReasons.isEmpty()
 }
 
-data class EvaluationCompatibility(
-    val quality: QualityCompatibility,
-    val runtime: RuntimeCompatibility,
-)
+data class EvaluationCompatibility(val quality: QualityCompatibility, val runtime: RuntimeCompatibility)
 
 enum class EvaluationFailureStage {
     PREFLIGHT,
