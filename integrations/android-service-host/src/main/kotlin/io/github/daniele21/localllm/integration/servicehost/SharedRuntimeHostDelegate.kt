@@ -68,19 +68,6 @@ class SharedRuntimeHostDelegate(
         }
     }
 
-    fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) =
-        runtimeOperations.prepare(caller, request, callback)
-
-    fun openSession(caller: AuthorizedCaller, request: OpenSessionRequestParcel, callback: HostResultCallback<SessionResultParcel>) =
-        runtimeOperations.openSession(caller, request, callback)
-
-    fun generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) =
-        runtimeOperations.generate(caller, request, callback)
-
-    fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) = runtimeOperations.cancel(caller, request)
-
-    fun closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) = runtimeOperations.closeSession(caller, request)
-
     fun unregisterClient(caller: AuthorizedCaller, clientToken: String) {
         if (closed.get()) return
         val token = runCatching { HostClientToken(clientToken) }.getOrNull() ?: return
@@ -183,3 +170,27 @@ class SharedRuntimeHostDelegate(
         ledger.finishClose(token, caller)
     }
 }
+
+internal fun SharedRuntimeHostDelegate.prepare(
+    caller: AuthorizedCaller,
+    request: PrepareRequestParcel,
+    callback: HostResultCallback<PrepareResultParcel>,
+) = runtimeOperations.prepare(caller, request, callback)
+
+internal fun SharedRuntimeHostDelegate.openSession(
+    caller: AuthorizedCaller,
+    request: OpenSessionRequestParcel,
+    callback: HostResultCallback<SessionResultParcel>,
+) = runtimeOperations.openSession(caller, request, callback)
+
+internal fun SharedRuntimeHostDelegate.generate(
+    caller: AuthorizedCaller,
+    request: GenerationRequestParcel,
+    callback: HostEventCallback,
+) = runtimeOperations.generate(caller, request, callback)
+
+internal fun SharedRuntimeHostDelegate.cancel(caller: AuthorizedCaller, request: CancelRequestParcel) =
+    runtimeOperations.cancel(caller, request)
+
+internal fun SharedRuntimeHostDelegate.closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) =
+    runtimeOperations.closeSession(caller, request)
