@@ -50,11 +50,13 @@ CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `co
 
 CA-5 is now active through OMBRA OMB-0. The first slice freezes product/parser/export/schema/use-case decisions before domain/UI implementation. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
-### Model evaluation planning
+### Model evaluation
 
-EVAL-0 is complete as a documentation/architecture milestone. The dataset-based model-evaluation capability now has a canonical target, dependency graph, detailed task ledgers and maintenance rules under [`model-evaluation/README.md`](model-evaluation/README.md).
+EVAL-0 and EVAL-1 are complete. `evaluation/contracts` is the concrete backend-independent boundary for dataset/case/evaluator/sampling/run/result value semantics, deterministic SHA-256 identity, compatibility reasons and bounded evaluation failures. It depends on `core/contracts` and does not introduce a second runtime, model store, telemetry path or persistence implementation.
 
-EVAL-1 Contracts and identity is `READY`; `EVAL-C-01` is the first implementation task. This work does not replace the existing telemetry-derived benchmark engine. Host-side model-evaluation implementation may proceed in parallel with OMBRA and the physical Q35-6/SR-6 evidence tracks, subject to normal development capacity.
+EVAL-1 unlocks independent host-side work on dataset schema (`EVAL-D-01`), evaluator registry (`EVAL-E-01`), fake-driven runner plus controlled evaluation binding (`EVAL-R-01/R-02`), persistence contract (`EVAL-P-01`), Performance UDF shell (`EVAL-U-01`) and deterministic identity evidence (`EVAL-V-01`). Canonical state and dependency routing: [`model-evaluation/README.md`](model-evaluation/README.md).
+
+This parallel capability does not replace the existing telemetry-derived benchmark engine and does not change the current OMBRA-focused repository sequencing.
 
 ## Open blockers
 
@@ -82,7 +84,7 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 3. keep OMB-4 real Consumer API integration behind the accepted OMBRA domain/extraction/composition boundaries;
 4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
-Model evaluation is planned and ready to begin at EVAL-C-01, but this addition does not replace the repository's current OMBRA-focused immediate block.
+Model-evaluation post-EVAL-1 work is independently ready in seven entry tasks and may proceed in parallel without changing this immediate repository block.
 
 ## Source links
 
