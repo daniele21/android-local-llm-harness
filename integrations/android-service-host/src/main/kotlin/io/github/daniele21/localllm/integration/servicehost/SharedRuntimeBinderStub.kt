@@ -99,7 +99,4 @@ class SharedRuntimeBinderStub(
         is AuthorizationResult.Allowed -> result.caller
         is AuthorizationResult.Denied -> null
     }
-
-    private fun requireAuthorizedCaller(): AuthorizedCaller =
-        authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
 }
