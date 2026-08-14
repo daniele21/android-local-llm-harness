@@ -99,7 +99,10 @@ class EvaluationEngine(
 
     fun activeRun(): EvaluationRunId? = activeRunId
 
-    private suspend fun executeClaimed(config: EvaluationRunConfig, observer: EvaluationEngineObserver): EvaluationEngineTerminal {
+    private suspend fun executeClaimed(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+    ): EvaluationEngineTerminal {
         val results = mutableListOf<EvaluationCaseResult>()
         emitState(config, observer, EvaluationRunState.CREATED)
         emitState(config, observer, EvaluationRunState.VALIDATING)
