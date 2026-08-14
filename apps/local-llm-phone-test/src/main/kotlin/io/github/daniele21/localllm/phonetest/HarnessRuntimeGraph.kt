@@ -113,7 +113,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 modelStore = modelStore,
                 policyRegistry = InMemoryConsumerUseCasePolicyRegistry(listOf(policy)),
             )
-        return ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
+        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
     }
 
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
