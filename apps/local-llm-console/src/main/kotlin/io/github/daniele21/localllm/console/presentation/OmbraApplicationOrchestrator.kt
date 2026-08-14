@@ -1,13 +1,15 @@
 package io.github.daniele21.localllm.console.presentation
 
 import io.github.daniele21.localllm.console.application.InMemoryOmbraSensitiveTaskStore
+import io.github.daniele21.localllm.console.application.NoOpOmbraDocumentSourceCapabilityCleanup
 import io.github.daniele21.localllm.console.application.OmbraAnalysisClient
 import io.github.daniele21.localllm.console.application.OmbraDocumentExporter
 import io.github.daniele21.localllm.console.application.OmbraDocumentExtractor
+import io.github.daniele21.localllm.console.application.OmbraDocumentSourceCapabilityCleanup
 import io.github.daniele21.localllm.console.application.OmbraSensitiveTaskStore
 
 /**
- * Presentation/application-flow orchestrator used by OMB-1B. Android lifecycle, URI, Binder and
+ * Presentation/application-flow orchestrator used by OMBRA. Android lifecycle, URI, Binder and
  * PDF objects are intentionally absent. Reducer effects delegate only to application-layer ports.
  */
 internal class OmbraApplicationOrchestrator(
@@ -15,8 +17,16 @@ internal class OmbraApplicationOrchestrator(
     analysisClient: OmbraAnalysisClient,
     exporter: OmbraDocumentExporter,
     taskStore: OmbraSensitiveTaskStore = InMemoryOmbraSensitiveTaskStore(),
+    sourceCapabilityCleanup: OmbraDocumentSourceCapabilityCleanup = NoOpOmbraDocumentSourceCapabilityCleanup,
 ) {
-    private val effectExecutor = OmbraWorkflowEffectExecutor(extractor, analysisClient, exporter, taskStore)
+    private val effectExecutor =
+        OmbraWorkflowEffectExecutor(
+            extractor = extractor,
+            analysisClient = analysisClient,
+            exporter = exporter,
+            taskStore = taskStore,
+            sourceCapabilityCleanup = sourceCapabilityCleanup,
+        )
 
     var state: OmbraWorkflowState = OmbraWorkflowState()
         private set
