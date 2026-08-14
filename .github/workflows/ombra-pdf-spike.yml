@@ -124,10 +124,12 @@ jobs:
       - name: Run OMB-0 PDF runtime evidence
         shell: bash
         run: |
+          set -o pipefail
           bash scripts/run-ombra-pdf-spike-device-e2e.sh \
             --device emulator-5554 \
             --adb "$ANDROID_HOME/platform-tools/adb" \
-            --cleanup
+            --cleanup \
+            2>&1 | tee "$RUNNER_TEMP/ombra-runtime-step.log"
 
       - name: Upload OMBRA runtime evidence
         if: always()
@@ -140,5 +142,6 @@ jobs:
             apps/local-llm-console/build/outputs/androidTest-results/**
             ${{ runner.temp }}/omb0-apk-size-delta.txt
             ${{ runner.temp }}/ombra-emulator.log
+            ${{ runner.temp }}/ombra-runtime-step.log
           if-no-files-found: warn
           retention-days: 14
