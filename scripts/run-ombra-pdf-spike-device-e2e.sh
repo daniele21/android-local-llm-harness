@@ -7,7 +7,7 @@ ADB_PATH="${ADB:-}"
 CLEANUP="false"
 
 APP_PACKAGE="io.github.daniele21.localllm.console.debug"
-TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfBoxFallbackInstrumentedTest"
+TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfIsolationInstrumentedTest"
 REPORT_DIR="$ROOT_DIR/build/reports/ombra"
 RUNTIME_LOG="$REPORT_DIR/omb0-pdf-runtime-gradle.log"
 
@@ -23,7 +23,7 @@ Options:
   --help, -h         Show this help.
 
 The test is self-contained and does not require a Harness host or model. It generates synthetic
-PDFs in app-private cache, exercises the active OMB-0 parser fidelity spike, and records only
+PDFs in app-private cache, exercises the active OMB-0 parser trust-boundary spike, and records only
 privacy-safe device/build metadata.
 EOF
 }
@@ -126,7 +126,7 @@ echo "Building OMBRA/Console and instrumentation APKs..."
     :apps:local-llm-console:assembleDebugAndroidTest \
     2>&1 | tee -a "$RUNTIME_LOG"
 
-echo "Running active parser fidelity fixture evidence..."
+echo "Running isolated parser trust-boundary fixture evidence..."
 ./gradlew \
     :apps:local-llm-console:connectedDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS" \
