@@ -13,11 +13,7 @@ import java.io.OutputStream
  * system sans-serif text, bounded input and no attempt to preserve source-PDF objects or layout.
  */
 internal class OmbraPdfWriterSpike {
-    fun write(
-        pages: List<String>,
-        output: OutputStream,
-        maxCharacters: Int = DEFAULT_MAX_CHARACTERS,
-    ) {
+    fun write(pages: List<String>, output: OutputStream, maxCharacters: Int = DEFAULT_MAX_CHARACTERS) {
         require(pages.isNotEmpty()) { "At least one page is required" }
         require(pages.size <= MAX_PAGES) { "Too many pages" }
         require(maxCharacters > 0) { "maxCharacters must be positive" }
@@ -55,11 +51,7 @@ internal class OmbraPdfWriterSpike {
         }
     }
 
-    private fun drawNormalizedText(
-        text: String,
-        paint: Paint,
-        canvas: android.graphics.Canvas,
-    ) {
+    private fun drawNormalizedText(text: String, paint: Paint, canvas: android.graphics.Canvas) {
         var y = TOP_MARGIN_POINTS + TEXT_SIZE_POINTS
         text.lineSequence().forEach { sourceLine ->
             wrapLine(sourceLine, paint).forEach { line ->
