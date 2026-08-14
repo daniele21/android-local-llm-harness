@@ -50,16 +50,16 @@ class EvaluationQualityAggregator {
         )
     }
 
-    private fun qualityContribution(result: EvaluationCaseResult): Double? =
-        when (result.status) {
-            EvaluationCaseStatus.SCORED -> result.outcome!!.score.value
-            EvaluationCaseStatus.INVALID_OUTPUT,
-            EvaluationCaseStatus.TIMEOUT,
-            EvaluationCaseStatus.RUNTIME_FAILURE,
-            -> 0.0
+    private fun qualityContribution(result: EvaluationCaseResult): Double? = when (result.status) {
+        EvaluationCaseStatus.SCORED -> result.outcome!!.score.value
 
-            EvaluationCaseStatus.CANCELLED -> null
-        }
+        EvaluationCaseStatus.INVALID_OUTPUT,
+        EvaluationCaseStatus.TIMEOUT,
+        EvaluationCaseStatus.RUNTIME_FAILURE,
+        -> 0.0
+
+        EvaluationCaseStatus.CANCELLED -> null
+    }
 
     private fun aggregateCategoryScores(categoryScores: List<EvaluationCategoryScore>): NormalizedScore? {
         if (categoryScores.isEmpty()) return null
