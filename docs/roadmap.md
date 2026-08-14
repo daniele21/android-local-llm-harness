@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-14
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
@@ -18,6 +18,7 @@ The repository remains not production-ready until representative physical-device
 | Repository foundation and protected integration | Implemented | Confirm the repository-level `dev` ruleset before release |
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
+| Dataset-based model evaluation | Planned | Contracts, dataset packs, deterministic scoring, execution, comparison UI and physical-device evidence |
 | Curated model distribution and installation | Implemented / device evidence pending | Real remote download/install validation on representative phones |
 | Qwen3.5-only product transition | Planned | Non-destructive support migration, compatibility, tuning, validation and certification |
 | Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
@@ -116,6 +117,8 @@ Remaining:
 - complete unavailable/loading/error state tests;
 - physical-device evidence for real values and lifecycle behavior;
 - later signature-protected diagnostics bridge for cross-application inspection.
+
+Dataset-based semantic model evaluation is a separate planned control-plane capability. Its dependency-aware implementation plan is [`model-evaluation/README.md`](model-evaluation/README.md); the existing benchmark engine remains the owner of telemetry-derived runtime baselines and regression health.
 
 ## 5. Connected Android application
 
