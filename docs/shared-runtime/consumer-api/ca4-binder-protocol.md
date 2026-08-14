@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-consumer-api
 Canonical scope: shared-runtime.consumer-api.binder
 Read when: changing Binder mapping for the public consumer API
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 ## Classification
 
@@ -55,11 +55,19 @@ They must not contain:
 - runtime snapshot or diagnostic telemetry;
 - backend exception text.
 
+This boundary is protected by deterministic wire-DTO tests in addition to the public Kotlin-surface checks from CA-2/CA-3.
+
 ## Compatibility behavior
 
-`consumer-api-v1` is introduced at protocol minor `1`. Hosts supporting only minor `0` do not advertise the feature, so a consumer client requiring it fails during registration with `FEATURE_UNAVAILABLE` before any model or runtime access.
+`consumer-api-v1` is introduced at protocol minor `1`. Hosts supporting only minor `0` do not advertise the feature, so a consumer client requiring it fails negotiation before registration, model access or runtime access.
 
 Hosts at minor `1` keep all legacy methods operational. Consumer methods are appended to `ILocalLlmService`; existing transaction meanings are not repurposed.
+
+Deterministic compatibility coverage proves both directions:
+
+- a legacy client with no consumer feature requirement can still negotiate minor `0` against a v1.0 host;
+- a consumer client requiring `consumer-api-v1` fails closed against that same host;
+- the consumer client negotiates minor `1` only when the host advertises the feature.
 
 ## Ordering and terminal rules
 
@@ -72,6 +80,40 @@ Consumer generation keeps the existing Binder transport invariants:
 - post-terminal, duplicate or gapped callbacks fail closed;
 - completed output is reconstructed from deltas rather than duplicated in the terminal parcel.
 
+The client adapter and wire reconstructor now have focused deterministic coverage for ordered reconstruction, public metric projection, sequence gaps, duplicate callbacks and idempotent cancellation.
+
+## Host ownership
+
+The host owns application identity, exact model/artifact resolution and runtime configuration.
+
+On registration, the authenticated caller maps to one host-created `ConsumerLocalLlmClient`. Consumer RPCs then operate only through that client and the caller's allowlisted use cases. A request for a non-authorized use case is rejected before the public consumer client is invoked.
+
+Prepared selections, sessions and generation requests remain opaque across the process boundary. Host-side resource ledgers retain ownership and cleanup semantics already established by SR-2/SR-5.
+
+## Packaged SDK boundary
+
+`apps/shared-runtime-client-consumer-fixture` includes a public Consumer API compilation fixture that constructs `BinderConsumerLocalLlmClient` from the packaged release client/contract AARs.
+
+The fixture intentionally has no:
+
+- trusted caller-supplied `ApplicationId`;
+- model ID/digest/path/URL;
+- arbitrary generation overrides;
+- dependency on host/runtime implementation modules.
+
+This keeps packaged-AAR usability part of the repository validation gate rather than an assumption from project-source compilation.
+
 ## Exit evidence
 
-CA-4 is complete only when contract, host adapter, client adapter, compatibility fixtures and packaged-AAR consumer validation all pass. Physical two-APK execution remains CA-6 evidence and is not implied by JVM/AAR validation.
+CA-4 is complete only when all of the following are true on the exact branch head:
+
+1. consumer contract/AIDL and wire mappings compile and pass unit tests;
+2. host consumer authorization, caller-derived identity and privacy behavior pass deterministic tests;
+3. Binder consumer lifecycle/generation adapters pass ordering, cancellation, stale-epoch and protocol-failure tests;
+4. v1.0/v1.1 compatibility behavior passes deterministic tests;
+5. the packaged release AAR consumer fixture compiles against the public consumer client;
+6. repository and documentation validation are green.
+
+The current branch contains evidence for items 1-5. Item 6 remains the final merge gate until GitHub Actions is green on the exact head.
+
+Physical two-APK Consumer API scenarios remain CA-6 evidence and are not fabricated or substituted by deterministic repository tests.
