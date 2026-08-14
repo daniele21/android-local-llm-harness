@@ -229,11 +229,13 @@ internal class ConsumerHostOperations(
     }
 
     private fun resolveContext(caller: AuthorizedCaller, request: ConsumerRequestParcel): ConsumerContext? {
-        if (request.operationId.isBlank()) return null
-        val token = request.clientToken.toHostTokenOrNull() ?: return null
-        if (ledger.validateConnection(token, caller).failureOrNull() != null) return null
-        val client = consumerResources.client(token) ?: return null
-        return ConsumerContext(token, client)
+        val token = request.clientToken.toHostTokenOrNull()
+        val validToken =
+            token?.takeIf {
+                request.operationId.isNotBlank() && ledger.validateConnection(it, caller).failureOrNull() == null
+            }
+        val client = validToken?.let(consumerResources::client)
+        return if (validToken != null && client != null) ConsumerContext(validToken, client) else null
     }
 
     private fun submitRequestCleanup(
