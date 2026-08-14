@@ -21,9 +21,6 @@ jobs:
     name: Sandboxed parser and writer runtime evidence
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
-      ANDROID_USER_HOME: ${{ runner.temp }}/android-user
 
     steps:
       - name: Check out repository
@@ -39,6 +36,13 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Configure Android AVD home
+        shell: bash
+        run: |
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/android-avd" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=$RUNNER_TEMP/android-user" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-avd" "$RUNNER_TEMP/android-user"
 
       - name: Install emulator image
         shell: bash
@@ -75,7 +79,6 @@ jobs:
             exit 1
           fi
 
-          mkdir -p "$ANDROID_AVD_HOME" "$ANDROID_USER_HOME"
           echo "no" | avdmanager create avd \
             --force \
             --name ombra-api35 \
