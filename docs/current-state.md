@@ -111,7 +111,8 @@ The application-facing API is now an active implementation track rather than a d
 - CA-2 `ConsumerLocalLlmClient` is integrated as the constrained public facade for discover -> prepare -> session -> generate -> close;
 - CA-3 public result, surfaced-reasoning, execution-identity and Tier 1/Tier 2 metric projection is integrated in `dev`;
 - CA-4 Binder integration is active on PR #104 and evolves Binder v1 append-only to protocol minor 1 with the optional `consumer-api-v1` feature;
-- CA-4 already contains consumer-specific AIDL/wire DTOs, host mapping and Binder consumer lifecycle/generation adapters, but its deterministic compatibility and packaged-AAR exit evidence is not complete yet;
+- the active CA-4 branch contains consumer-specific AIDL/wire DTOs, host mapping, Binder consumer lifecycle/generation adapters, deterministic host/client/wire/compatibility tests and a packaged-AAR Consumer API compilation fixture;
+- CA-4 remains `IN PROGRESS` until repository and documentation validation are green on the exact branch head and the PR is integrated in `dev`;
 - CA-5 OMBRA reference-consumer migration must not start from an unvalidated CA-4 public transport boundary.
 
 Canonical sequence and exit gates are owned by [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md).
@@ -120,13 +121,11 @@ Canonical sequence and exit gates are owned by [`shared-runtime/consumer-api/roa
 
 ### 1. CA-4 Binder Consumer API exit gate
 
-The transport implementation exists, but CA-4 remains `IN PROGRESS` until all deterministic evidence is present:
+The implementation and deterministic evidence are now present on the active branch. Remaining merge gate:
 
-- add focused lifecycle tests for capability discovery, prepare, session ownership, stale epoch and transport failures;
-- add focused generation tests for ordered reconstruction, terminal uniqueness, cancellation, overflow/protocol failure and disconnect convergence;
-- prove old Binder v1.0 behavior remains available while v1.1 advertises `consumer-api-v1`;
-- extend the packaged client/contract AAR consumer fixture so it compiles and exercises `BinderConsumerLocalLlmClient` without project-internal transport dependencies;
-- run repository validation against the exact PR head and only then mark CA-4 `DONE`/merge it into `dev`.
+- obtain green repository and documentation validation on the exact PR head;
+- fix any failures without weakening the security/privacy/compatibility contract;
+- only after the exact head is green, mark CA-4 `DONE` and merge PR #104 into `dev`.
 
 Specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md).
 
@@ -187,11 +186,11 @@ Explicit manual unload is implemented. Remaining residency work is:
 
 ## Immediate next block
 
-Complete the deterministic CA-4 gate before widening the public consumer surface:
+Complete the CA-4 validation/integration gate before widening the public consumer surface:
 
-1. finish CA-4 lifecycle/generation/compatibility tests and packaged-AAR fixture coverage;
-2. obtain a green repository validation run for the exact CA-4 head;
-3. update the CA-4 roadmap/specification to `DONE` only after the exit gate is satisfied and merge PR #104 into `dev`;
+1. require green repository and documentation validation for the exact CA-4 head;
+2. fix any deterministic validation failures with dedicated commits;
+3. mark CA-4 `DONE` only after the exit gate is green and merge PR #104 into `dev`;
 4. start CA-5 OMBRA reference-consumer work from the resulting green `dev` baseline.
 
 The two device-dependent tracks remain parallel and may share the same representative hardware session:
@@ -203,7 +202,7 @@ Do not promote Q35 candidate profiles to `MEASURED`, publish the Binder client A
 
 ## Blockers and deferred evidence
 
-- CA-4 cannot be marked `DONE` until deterministic compatibility and packaged-AAR validation pass on the exact branch head;
+- CA-4 cannot be marked `DONE` until repository/documentation validation passes on the exact branch head and the PR is integrated;
 - CA-5 should start only from the integrated CA-4 public transport boundary;
 - representative physical-device performance evidence is required to close Q35-6;
 - Q35-7/Q35-8 require the measured Q35-6 profile evidence;
