@@ -50,7 +50,7 @@ Canonical evidence: [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.m
 
 State: **IN PROGRESS**
 
-Active slice: **OMB-1A — pure models, definitions and validation**. OMB-0 is integrated, so this slice is now based directly on `dev` and independently mergeable once its exact-head gate is green.
+Active slice: **OMB-1B — immutable workflow state, reducer/effects, ports and fake application orchestration**. OMB-1A is integrated in `dev`; this slice is based directly on that baseline and is the remaining OMB-1 exit-gate implementation.
 
 Owner: [`architecture.md`](architecture.md)
 
@@ -62,9 +62,17 @@ Tasks:
 - define interfaces for extractor, analysis client, exporter and sensitive in-memory task store;
 - cover cancellation, late callbacks, reset and process-recreation semantics with fakes.
 
-Progress: OMB-1A has the pure document/source, PII-definition, validated-finding and review-decision model boundaries with stable identifiers, bounded custom definitions and content-free debug representations. OMB-1B remains required for immutable workflow state, reducer/effects, ports and fake orchestration.
+Progress:
 
-Exit gate: a pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code.
+- OMB-1A is integrated with document/source, PII-definition, validated-finding and review-decision domain boundaries, stable identifiers, bounded custom definitions and content-free debug representations;
+- OMB-1B adds application-owned operation/source/destination identities and privacy-safe export receipts below presentation;
+- application ports and the sensitive in-memory task store have no dependency on presentation;
+- presentation owns immutable workflow state, reducer, effects, effect execution and orchestration, with monotonic operation IDs and typed retry/cancellation states;
+- asynchronous callbacks are checked against the active operation before any sensitive-store mutation, so cancelled or superseded work cannot repopulate cleared task data;
+- cancellation remains `CANCELLING` until the underlying port acknowledges its local terminal/cleanup point;
+- deterministic JVM coverage drives import -> definitions -> fake validated findings -> review decisions -> export, plus zero-finding export, retry, reset, process recreation and late-callback rejection.
+
+Exit gate: a pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code. The implementation is present on OMB-1B; mark OMB-1 `DONE` only after this slice is integrated and its exact-head gate is green.
 
 ## OMB-2 — PDF import and extraction
 

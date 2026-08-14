@@ -49,15 +49,16 @@ Keep the first vertical slice inside the application module. Create a new Gradle
 
 | Package concept | Owns | Must not own |
 | --- | --- | --- |
-| `document` | picker result mapping, PDF metadata, extraction, normalization and segments | Compose, Binder, PII policy or export UI |
+| `document` | PDF/document domain plus Android source/extraction adapters behind the application port | Compose, Binder, PII policy or export UI |
 | `pii` | built-in/custom definitions, selection and stable identifiers | model IDs, prompt templates or Android storage |
 | `analysis` | prompt payload, schema, chunk planning, finding validation and merge | Binder implementation, PDF rendering or UI |
 | `inference` | narrow adapter over the packaged Consumer API and capability mapping | PII rules, model installation or generated-content persistence |
 | `redaction` | occurrence resolution, decisions, placeholders and export model | LLM calls, document picker or Compose |
-| `presentation` | immutable screen state, reducers, effects and Compose views | PDF parsing, file writes, Binder/AIDL or policy duplication |
+| `application` | content-free operation/source/destination identities, async extractor/analysis/export ports and sensitive in-memory task storage | Compose, Android `Uri`/PDF objects, Binder/AIDL implementation or model policy |
+| `presentation` | immutable workflow/screen state, reducer, typed effects, effect execution, orchestration and Compose views | PDF parsing, file writes, Binder/AIDL implementation or policy duplication |
 | Activity/composition | lifecycle, Activity Result launchers, dependency assembly and navigation host | domain state machines or long-running work |
 
-Interfaces are injected at the boundaries so PDF, Binder and destination I/O can be replaced with deterministic fakes.
+Interfaces are injected at the boundaries so PDF, Binder and destination I/O can be replaced with deterministic fakes. Application contracts sit below presentation; presentation may alias those internal types for readability, but application code must never import presentation types.
 
 ## Domain model
 
@@ -119,6 +120,8 @@ Idle
 
 Sensitive fields such as segments, findings and reveal mappings remain in process-memory repositories owned by the ViewModel graph. Saved state may retain only non-sensitive route/stage hints; after process death the workflow returns to import.
 
+OMB-1B keeps the state itself content-free: only counts, opaque process-local capability references, operation identity, lifecycle state and privacy-safe export metadata are retained there. Document text, filenames, definitions, findings and review surfaces stay in the in-memory sensitive task store.
+
 ## Effects
 
 The presentation layer emits typed effects for:
@@ -130,7 +133,9 @@ The presentation layer emits typed effects for:
 - exporting and optionally opening/sharing the completed document;
 - announcing important accessibility state changes.
 
-Every effect has one operation ID. Late callbacks are ignored after cancellation or a newer operation becomes active. Terminal state is accepted exactly once.
+Every long-running effect has one monotonic operation ID. Async callbacks are allowed to mutate sensitive task state only while that exact operation ID/kind remains active. Late callbacks are ignored after cancellation or a newer operation becomes active. Terminal state is accepted exactly once.
+
+Cancellation is a two-step lifecycle: the reducer enters `CANCELLING`, the relevant port receives `cancel`, and only the port's local terminal/cleanup acknowledgement releases the workflow back to its safe stage. This prevents a new operation from starting while the previous adapter may still own resources.
 
 ## Consumer API mapping
 
@@ -197,19 +202,37 @@ It must not log or persist PDF names when they may contain PII, URIs, definition
 ## Dependency direction
 
 ```text
-presentation -> application orchestrators -> document/pii/analysis/redaction interfaces
-                                   -> inference adapter -> packaged Consumer API
+presentation
+  -> application contracts / ports / sensitive task store
+      -> document / pii / analysis / redaction domain
 
-document implementation -> Android document/PDF APIs or reviewed parser
-export implementation   -> Android PDF/destination APIs
-OMBRA Compose views      -> ui/design-system
+presentation
+  -> pii / redaction domain types needed for workflow decisions
+
+inference adapter
+  -> application analysis port
+  -> packaged Consumer API
+
+document Android adapter
+  -> application extractor port
+  -> document domain
+  -> Android document/PDF APIs or reviewed parser
+
+export Android adapter
+  -> application exporter port
+  -> Android PDF/destination APIs
+
+OMBRA Compose views
+  -> presentation state/actions
+  -> ui/design-system
 ```
 
-No dependency points from the Consumer API, transport or Harness host back into OMBRA domain packages.
+No application-layer file may import `presentation`. No dependency points from the Consumer API, transport or Harness host back into OMBRA domain packages.
 
 ## Architectural gates
 
 - The app compiles without model-store, runtime-core, llama.cpp/JNI and host observability implementations.
+- Application contracts/ports and sensitive storage compile without presentation dependencies.
 - PDF and custom-PII behavior is testable with no Android UI and no model.
 - Screens contain no Binder, URI-stream, parser or PDF-writer logic.
 - Harness contains no OMBRA prompt builder, PII type or redaction/export class.
