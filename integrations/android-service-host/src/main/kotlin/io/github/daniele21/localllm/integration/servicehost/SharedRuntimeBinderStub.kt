@@ -11,9 +11,9 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
-import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IPrepareCallback
 import io.github.daniele21.localllm.transport.binder.contract.IRegistrationCallback
@@ -41,7 +41,12 @@ class SharedRuntimeBinderStub(
             deliverRemote { callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_NOT_REGISTERED))) }
             return
         }
-        delegate.registerClient(caller, hello, BinderClientLifecycleLinker(lifecycle), remoteRegistrationCallback(delegate, caller, callback))
+        delegate.registerClient(
+            caller,
+            hello,
+            BinderClientLifecycleLinker(lifecycle),
+            remoteRegistrationCallback(delegate, caller, callback),
+        )
     }
 
     override fun prepare(request: PrepareRequestParcel, callback: IPrepareCallback) {
@@ -65,7 +70,9 @@ class SharedRuntimeBinderStub(
     override fun generate(request: GenerationRequestParcel, callback: IGenerationCallback) {
         val caller = authorizedCallerOrNull()
         if (caller == null) {
-            deliverRemote { callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED))) }
+            deliverRemote {
+                callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED)))
+            }
             return
         }
         delegate.runtimeOperations.generate(caller, request, remoteGenerationCallback(delegate, caller, request.clientToken, callback))
@@ -93,5 +100,6 @@ class SharedRuntimeBinderStub(
         is AuthorizationResult.Denied -> null
     }
 
-    private fun requireAuthorizedCaller(): AuthorizedCaller = authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
+    private fun requireAuthorizedCaller(): AuthorizedCaller =
+        authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
 }

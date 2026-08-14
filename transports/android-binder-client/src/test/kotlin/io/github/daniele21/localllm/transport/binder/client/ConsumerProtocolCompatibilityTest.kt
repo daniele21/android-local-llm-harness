@@ -68,37 +68,33 @@ class ConsumerProtocolCompatibilityTest {
         assertEquals(1, service.registerCalls)
     }
 
-    private fun legacyProtocolInfo() =
-        ProtocolInfoParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = 0,
-            minSupportedMinor = 0,
-            supportedFeatures = legacyFeatures.sorted(),
-            hostBuildId = "legacy-host",
-        )
+    private fun legacyProtocolInfo() = ProtocolInfoParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = 0,
+        minSupportedMinor = 0,
+        supportedFeatures = legacyFeatures.sorted(),
+        hostBuildId = "legacy-host",
+    )
 
-    private fun legacyRegistration() =
-        RegistrationResultParcel(
-            clientToken = ClientTokenParcel("legacy-client-token"),
-            negotiatedMinor = 0,
-            enabledFeatures = legacyFeatures.sorted(),
-            error = null,
-        )
+    private fun legacyRegistration() = RegistrationResultParcel(
+        clientToken = ClientTokenParcel("legacy-client-token"),
+        negotiatedMinor = 0,
+        enabledFeatures = legacyFeatures.sorted(),
+        error = null,
+    )
 
-    private fun legacyHello() =
-        ClientHelloParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = BinderProtocolV1.MINOR,
-            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            requiredFeatures = emptyList(),
-            clientBuildId = "legacy-client",
-        )
+    private fun legacyHello() = ClientHelloParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = BinderProtocolV1.MINOR,
+        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        requiredFeatures = emptyList(),
+        clientBuildId = "legacy-client",
+    )
 
-    private fun consumerHello() =
-        legacyHello().copy(
-            requiredFeatures = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
-            clientBuildId = "consumer-client",
-        )
+    private fun consumerHello() = legacyHello().copy(
+        requiredFeatures = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
+        clientBuildId = "consumer-client",
+    )
 
     private class CompatibilityBinding : SharedRuntimeBinding {
         var bindCalls = 0
@@ -107,10 +103,7 @@ class ConsumerProtocolCompatibilityTest {
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = true
 
-        override fun bind(
-            hostConfig: SharedRuntimeHostConfig,
-            callbacks: SharedRuntimeBindingCallbacks,
-        ): SharedRuntimeBindResult {
+        override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
             bindCalls += 1
             this.callbacks = callbacks
             return SharedRuntimeBindResult.STARTED

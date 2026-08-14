@@ -110,13 +110,12 @@ class BinderConsumerGenerationAdapterTest {
         adapter.close()
     }
 
-    private fun request() =
-        ConsumerGenerationRequest(
-            requestId = RequestId("consumer-request-1"),
-            sessionId = SessionId("consumer-session-1"),
-            input = ConsumerGenerationInput.Text("hello"),
-            outputConstraint = ConsumerOutputConstraint.Text,
-        )
+    private fun request() = ConsumerGenerationRequest(
+        requestId = RequestId("consumer-request-1"),
+        sessionId = SessionId("consumer-session-1"),
+        input = ConsumerGenerationInput.Text("hello"),
+        outputConstraint = ConsumerOutputConstraint.Text,
+    )
 
     private fun events(externalRequestId: String): List<ConsumerGenerationEventParcel> {
         val requestId = RequestId("consumer-request-1")

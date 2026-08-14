@@ -81,9 +81,7 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
 }
 
-private class AidlConsumerSharedRuntimeRemoteService(
-    private val delegate: IConsumerLocalLlmService,
-) : ConsumerSharedRuntimeRemoteService {
+private class AidlConsumerSharedRuntimeRemoteService(private val delegate: IConsumerLocalLlmService) : ConsumerSharedRuntimeRemoteService {
     override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
         delegate.capabilities(request, resultCallback(callback))
     }
@@ -97,9 +95,12 @@ private class AidlConsumerSharedRuntimeRemoteService(
     }
 
     override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
-        delegate.generate(request, object : IConsumerGenerationCallback.Stub() {
-            override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
-        })
+        delegate.generate(
+            request,
+            object : IConsumerGenerationCallback.Stub() {
+                override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
+            },
+        )
     }
 
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)

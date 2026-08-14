@@ -41,10 +41,7 @@ internal class BinderConsumerGenerationAdapter(
         scheduleDrain()
     }
 
-    fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult {
+    fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
         val endpoint = endpointProvider()
         if (endpoint == null) return rejectedTransport()
         val externalRequestId = externalRequestIds.nextId()
@@ -59,10 +56,12 @@ internal class BinderConsumerGenerationAdapter(
         return synchronized(lifecycleLock) {
             when {
                 closed.get() -> rejectedTransport()
+
                 active.putIfAbsent(request.requestId.value, generation) != null ->
                     ConsumerGenerationStartResult.Rejected(
                         ConsumerFailure(ConsumerErrorCode.INVALID_INPUT, "Request ID is already active"),
                     )
+
                 else -> submitGeneration(endpoint, request, generation)
             }
         }
@@ -121,8 +120,11 @@ internal class BinderConsumerGenerationAdapter(
     private fun process(generation: ActiveConsumerGeneration, event: ConsumerGenerationEventParcel) {
         when {
             generation.terminal -> Unit
+
             generation.disconnectionDetail != null -> failDisconnected(generation)
+
             generation.overflowDetail != null -> failProtocol(generation, requireNotNull(generation.overflowDetail))
+
             else -> {
                 val mapped = generation.accept(event, maxAggregateCharacters)
                 if (mapped == null) {
@@ -238,10 +240,8 @@ private class ActiveConsumerGeneration(
     }
 }
 
-private class BinderConsumerGenerationHandle(
-    override val requestId: RequestId,
-    private val cancelAction: () -> Unit,
-) : ConsumerGenerationHandle {
+private class BinderConsumerGenerationHandle(override val requestId: RequestId, private val cancelAction: () -> Unit) :
+    ConsumerGenerationHandle {
     private val cancelled = AtomicBoolean(false)
 
     override fun cancel() {
@@ -249,24 +249,21 @@ private class BinderConsumerGenerationHandle(
     }
 }
 
-private fun runtimeFailure(message: String): ConsumerGenerationEvent.Failed =
-    ConsumerGenerationEvent.Failed(
-        RequestId("transport-failure"),
-        ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, message),
-    )
+private fun runtimeFailure(message: String): ConsumerGenerationEvent.Failed = ConsumerGenerationEvent.Failed(
+    RequestId("transport-failure"),
+    ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, message),
+)
 
-private fun rejectedTransport() =
-    ConsumerGenerationStartResult.Rejected(
-        ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, "Shared runtime transport is unavailable"),
-    )
+private fun rejectedTransport() = ConsumerGenerationStartResult.Rejected(
+    ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, "Shared runtime transport is unavailable"),
+)
 
-private fun consumerSerialExecutor(queueCapacity: Int): ExecutorService =
-    ThreadPoolExecutor(
-        1,
-        1,
-        0L,
-        TimeUnit.MILLISECONDS,
-        ArrayBlockingQueue(queueCapacity),
-        { runnable -> Thread(runnable, "local-llm-consumer-callback").apply { isDaemon = true } },
-        ThreadPoolExecutor.AbortPolicy(),
-    )
+private fun consumerSerialExecutor(queueCapacity: Int): ExecutorService = ThreadPoolExecutor(
+    1,
+    1,
+    0L,
+    TimeUnit.MILLISECONDS,
+    ArrayBlockingQueue(queueCapacity),
+    { runnable -> Thread(runnable, "local-llm-consumer-callback").apply { isDaemon = true } },
+    ThreadPoolExecutor.AbortPolicy(),
+)

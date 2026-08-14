@@ -33,9 +33,7 @@ internal class ConsumerHostResources {
     }
 }
 
-internal class ConsumerGenerationHandleBridge(
-    private val delegate: ConsumerGenerationHandle,
-) : GenerationHandle {
+internal class ConsumerGenerationHandleBridge(private val delegate: ConsumerGenerationHandle) : GenerationHandle {
     override val requestId: RequestId = delegate.requestId
 
     override fun cancel() = delegate.cancel()

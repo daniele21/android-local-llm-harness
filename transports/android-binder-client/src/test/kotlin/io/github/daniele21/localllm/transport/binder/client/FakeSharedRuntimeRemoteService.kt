@@ -123,13 +123,15 @@ internal class FakeSharedRuntimeRemoteService(
     }
 }
 
-private class FakeConsumerRemoteService(
-    private val parent: FakeSharedRuntimeRemoteService,
-) : ConsumerSharedRuntimeRemoteService {
-    override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerCapabilities(request, callback)
-    override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerPrepare(request, callback)
-    override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) = parent.consumerOpenSession(request, callback)
-    override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) = parent.consumerGenerate(request, callback)
+private class FakeConsumerRemoteService(private val parent: FakeSharedRuntimeRemoteService) : ConsumerSharedRuntimeRemoteService {
+    override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) =
+        parent.consumerCapabilities(request, callback)
+    override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) =
+        parent.consumerPrepare(request, callback)
+    override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) =
+        parent.consumerOpenSession(request, callback)
+    override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) =
+        parent.consumerGenerate(request, callback)
     override fun cancel(request: CancelRequestParcel) = parent.consumerCancel(request)
     override fun closeSession(request: CloseSessionRequestParcel) = parent.consumerCloseSession(request)
 }
@@ -151,19 +153,17 @@ internal class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSour
     }
 }
 
-internal fun compatibleProtocolInfo(protocolMajor: Int = BinderProtocolV1.MAJOR): ProtocolInfoParcel =
-    ProtocolInfoParcel(
-        protocolMajor = protocolMajor,
-        protocolMinor = BinderProtocolV1.MINOR,
-        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-        supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-        hostBuildId = "test-host",
-    )
+internal fun compatibleProtocolInfo(protocolMajor: Int = BinderProtocolV1.MAJOR): ProtocolInfoParcel = ProtocolInfoParcel(
+    protocolMajor = protocolMajor,
+    protocolMinor = BinderProtocolV1.MINOR,
+    minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+    supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
+    hostBuildId = "test-host",
+)
 
-internal fun successfulRegistration(): RegistrationResultParcel =
-    RegistrationResultParcel(
-        clientToken = ClientTokenParcel("test-client-token"),
-        negotiatedMinor = BinderProtocolV1.MINOR,
-        enabledFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-        error = null,
-    )
+internal fun successfulRegistration(): RegistrationResultParcel = RegistrationResultParcel(
+    clientToken = ClientTokenParcel("test-client-token"),
+    negotiatedMinor = BinderProtocolV1.MINOR,
+    enabledFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
+    error = null,
+)

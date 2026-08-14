@@ -27,11 +27,7 @@ internal class ConsumerHostOperations(
     private val consumerResources: ConsumerHostResources,
     private val controlExecutor: HostControlExecutor,
 ) {
-    fun capabilities(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) {
+    fun capabilities(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: HostResultCallback<ConsumerResultParcel>) {
         controlExecutor.submitOrReject(
             onRejected = { callback.onResult(failureResult(request.operationId, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
@@ -53,11 +49,7 @@ internal class ConsumerHostOperations(
         }
     }
 
-    fun prepare(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) {
+    fun prepare(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: HostResultCallback<ConsumerResultParcel>) {
         controlExecutor.submitOrReject(
             onRejected = { callback.onResult(failureResult(request.operationId, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
@@ -84,11 +76,7 @@ internal class ConsumerHostOperations(
         }
     }
 
-    fun openSession(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: HostResultCallback<ConsumerResultParcel>,
-    ) {
+    fun openSession(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: HostResultCallback<ConsumerResultParcel>) {
         controlExecutor.submitOrReject(
             onRejected = { callback.onResult(failureResult(request.operationId, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
@@ -116,6 +104,7 @@ internal class ConsumerHostOperations(
                         )
                 ) {
                     is LedgerResult.Success -> consumerResources.markSession(context.token, result.sessionId)
+
                     is LedgerResult.Failure -> {
                         runCatching { context.client.closeSession(result.sessionId) }
                         callback.onResult(failureResult(request.operationId, registered.reason.toWireCode()))
@@ -127,11 +116,7 @@ internal class ConsumerHostOperations(
         }
     }
 
-    fun generate(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: ConsumerHostEventCallback,
-    ) {
+    fun generate(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
         controlExecutor.submitOrReject(
             onRejected = { callback.onEvent(failureEvent(request.externalRequestId, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
@@ -167,11 +152,7 @@ internal class ConsumerHostOperations(
         }
     }
 
-    private fun runGeneration(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-        callback: ConsumerHostEventCallback,
-    ) {
+    private fun runGeneration(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
         val context = resolveContext(caller, request)
         val externalRequestId = request.externalRequestId?.takeIf(String::isNotBlank)
         val externalSessionId = request.externalSessionId?.takeIf(String::isNotBlank)
@@ -247,10 +228,7 @@ internal class ConsumerHostOperations(
         }
     }
 
-    private fun resolveContext(
-        caller: AuthorizedCaller,
-        request: ConsumerRequestParcel,
-    ): ConsumerContext? {
+    private fun resolveContext(caller: AuthorizedCaller, request: ConsumerRequestParcel): ConsumerContext? {
         if (request.operationId.isBlank()) return null
         val token = request.clientToken.toHostTokenOrNull() ?: return null
         if (ledger.validateConnection(token, caller).failureOrNull() != null) return null
@@ -313,26 +291,23 @@ private fun io.github.daniele21.localllm.transport.binder.contract.ClientTokenPa
 private fun String?.toAuthorizedUseCase(caller: AuthorizedCaller): UseCaseId? =
     this?.takeIf(String::isNotBlank)?.let(::UseCaseId)?.takeIf(caller::allows)
 
-private fun LedgerFailure.toWireCode(): String =
-    when (this) {
-        LedgerFailure.CLIENT_TOKEN_INVALID -> WireErrorCodes.CLIENT_TOKEN_INVALID
-        LedgerFailure.SESSION_NOT_OWNED -> WireErrorCodes.SESSION_UNAVAILABLE
-        else -> WireErrorCodes.CLIENT_BACKPRESSURE
-    }
+private fun LedgerFailure.toWireCode(): String = when (this) {
+    LedgerFailure.CLIENT_TOKEN_INVALID -> WireErrorCodes.CLIENT_TOKEN_INVALID
+    LedgerFailure.SESSION_NOT_OWNED -> WireErrorCodes.SESSION_UNAVAILABLE
+    else -> WireErrorCodes.CLIENT_BACKPRESSURE
+}
 
-private fun failureResult(operationId: String, code: String): ConsumerResultParcel =
-    ConsumerResultParcel(
-        operationId = operationId,
-        error = wireError(code),
-    )
+private fun failureResult(operationId: String, code: String): ConsumerResultParcel = ConsumerResultParcel(
+    operationId = operationId,
+    error = wireError(code),
+)
 
-private fun failureEvent(externalRequestId: String?, code: String): ConsumerGenerationEventParcel =
-    ConsumerGenerationEventParcel(
-        externalRequestId = externalRequestId.orEmpty(),
-        sequence = 0L,
-        eventTag = ConsumerWireTags.EVENT_FAILED,
-        error = wireError(code),
-    )
+private fun failureEvent(externalRequestId: String?, code: String): ConsumerGenerationEventParcel = ConsumerGenerationEventParcel(
+    externalRequestId = externalRequestId.orEmpty(),
+    sequence = 0L,
+    eventTag = ConsumerWireTags.EVENT_FAILED,
+    error = wireError(code),
+)
 
 private fun io.github.daniele21.localllm.contracts.ConsumerFailure.toConsumerWireError() =
     io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel(

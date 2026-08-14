@@ -122,36 +122,33 @@ class ConsumerHostOperationsTest {
         return requireNotNull(result?.clientToken)
     }
 
-    private fun consumerHello() =
-        ClientHelloParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = BinderProtocolV1.MINOR,
-            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            requiredFeatures = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
-            clientBuildId = "consumer-host-test",
-        )
+    private fun consumerHello() = ClientHelloParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = BinderProtocolV1.MINOR,
+        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        requiredFeatures = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
+        clientBuildId = "consumer-host-test",
+    )
 
-    private fun protocolInfo() =
-        ProtocolInfoParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = BinderProtocolV1.MINOR,
-            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-            hostBuildId = "host-test",
-        )
+    private fun protocolInfo() = ProtocolInfoParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = BinderProtocolV1.MINOR,
+        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
+        hostBuildId = "host-test",
+    )
 
     private fun immediateControlExecutor() = HostControlExecutor { task ->
         task()
         true
     }
 
-    private fun immediateDispatcherFactory() =
-        HostCallbackDispatcherFactory {
-            HostCallbackDispatcher { task ->
-                task()
-                true
-            }
+    private fun immediateDispatcherFactory() = HostCallbackDispatcherFactory {
+        HostCallbackDispatcher { task ->
+            task()
+            true
         }
+    }
 
     private class FakeLifecycle : ClientLifecycleLinker {
         override fun link(onDeath: () -> Unit): ClientDeathLink = ClientDeathLink {}
@@ -179,26 +176,21 @@ class ConsumerHostOperationsTest {
             )
         }
 
-        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult =
-            ConsumerPrepareResult.Rejected(
-                io.github.daniele21.localllm.contracts.ConsumerFailure(
-                    io.github.daniele21.localllm.contracts.ConsumerErrorCode.PREPARE_FAILED,
-                    "unused",
-                ),
-            )
+        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult = ConsumerPrepareResult.Rejected(
+            io.github.daniele21.localllm.contracts.ConsumerFailure(
+                io.github.daniele21.localllm.contracts.ConsumerErrorCode.PREPARE_FAILED,
+                "unused",
+            ),
+        )
 
-        override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult =
-            ConsumerSessionResult.Rejected(
-                io.github.daniele21.localllm.contracts.ConsumerFailure(
-                    io.github.daniele21.localllm.contracts.ConsumerErrorCode.SESSION_NOT_FOUND,
-                    "unused",
-                ),
-            )
+        override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult = ConsumerSessionResult.Rejected(
+            io.github.daniele21.localllm.contracts.ConsumerFailure(
+                io.github.daniele21.localllm.contracts.ConsumerErrorCode.SESSION_NOT_FOUND,
+                "unused",
+            ),
+        )
 
-        override fun generate(
-            request: ConsumerGenerationRequest,
-            listener: ConsumerGenerationListener,
-        ): ConsumerGenerationStartResult =
+        override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult =
             ConsumerGenerationStartResult.Accepted(
                 object : ConsumerGenerationHandle {
                     override val requestId: RequestId = request.requestId
@@ -212,22 +204,16 @@ class ConsumerHostOperationsTest {
     private class UnusedLocalClient : LocalLlmClient {
         override fun runtimeSnapshot() = RuntimeSnapshot(RuntimeState.IDLE, null, 0, 0)
 
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId) =
-            PrepareResult(false, null, "unused")
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId) = PrepareResult(false, null, "unused")
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId) = SessionId("unused")
 
-        override fun createSession(
-            applicationId: ApplicationId,
-            useCaseId: UseCaseId,
-            options: SessionOptions,
-        ) = SessionId("unused")
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions) = SessionId("unused")
 
-        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
-            object : GenerationHandle {
-                override val requestId: RequestId = request.requestId
-                override fun cancel() = Unit
-            }
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle = object : GenerationHandle {
+            override val requestId: RequestId = request.requestId
+            override fun cancel() = Unit
+        }
 
         override fun closeSession(sessionId: SessionId) = Unit
     }

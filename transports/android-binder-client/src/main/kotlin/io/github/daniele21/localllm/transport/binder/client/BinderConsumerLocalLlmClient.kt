@@ -48,10 +48,7 @@ internal constructor(
         return lifecycle.createSession(preparedId)
     }
 
-    override fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult {
+    override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
         checkOpen()
         return generation.generate(request, listener)
     }
@@ -90,15 +87,15 @@ internal constructor(
             return BinderConsumerLocalLlmClient(
                 connection = connection,
                 lifecycle =
-                    BinderConsumerLifecycleAdapter(
-                        endpointProvider = { connection.endpoint },
-                        endpointInvalidations = connection.endpointInvalidations,
-                    ),
+                BinderConsumerLifecycleAdapter(
+                    endpointProvider = { connection.endpoint },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
                 generation =
-                    BinderConsumerGenerationAdapter(
-                        endpointProvider = { connection.endpoint },
-                        endpointInvalidations = connection.endpointInvalidations,
-                    ),
+                BinderConsumerGenerationAdapter(
+                    endpointProvider = { connection.endpoint },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
             )
         }
     }

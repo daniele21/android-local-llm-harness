@@ -93,9 +93,8 @@ internal class ConsumerRuntimeBinderStub(
         }
     }
 
-    private fun authorizedCallerOrNull(): AuthorizedCaller? =
-        when (val result = authorizer.authorize(callingProcessSource.current())) {
-            is AuthorizationResult.Allowed -> result.caller
-            is AuthorizationResult.Denied -> null
-        }
+    private fun authorizedCallerOrNull(): AuthorizedCaller? = when (val result = authorizer.authorize(callingProcessSource.current())) {
+        is AuthorizationResult.Allowed -> result.caller
+        is AuthorizationResult.Denied -> null
+    }
 }

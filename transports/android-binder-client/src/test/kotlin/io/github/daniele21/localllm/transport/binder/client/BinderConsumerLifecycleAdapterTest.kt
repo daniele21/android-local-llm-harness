@@ -136,39 +136,36 @@ class BinderConsumerLifecycleAdapterTest {
         )
     }
 
-    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLifecycleAdapter =
-        BinderConsumerLifecycleAdapter(
-            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
-            blockingCallGuard = BlockingCallGuard {},
-            operationTimeoutMillis = 100,
-            correlationIds = deterministicIds(),
-        )
+    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLifecycleAdapter = BinderConsumerLifecycleAdapter(
+        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
+        blockingCallGuard = BlockingCallGuard {},
+        operationTimeoutMillis = 100,
+        correlationIds = deterministicIds(),
+    )
 
-    private fun capabilities() =
-        UseCaseCapabilities(
-            useCaseId = useCaseId,
-            readiness = UseCaseReadiness.READY,
-            presets = emptyList(),
-            defaultPreset = null,
-            reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
-            outputConstraints = setOf(ConsumerOutputConstraintKind.JSON_SCHEMA),
-            defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-            sessionKinds = setOf(SessionKind.STATELESS),
-            defaultSessionKind = SessionKind.STATELESS,
-            limits = ConsumerLimits(32_768, 128, 32_768),
-            capabilityRevision = "cap-rev-1",
-        )
+    private fun capabilities() = UseCaseCapabilities(
+        useCaseId = useCaseId,
+        readiness = UseCaseReadiness.READY,
+        presets = emptyList(),
+        defaultPreset = null,
+        reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
+        outputConstraints = setOf(ConsumerOutputConstraintKind.JSON_SCHEMA),
+        defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+        sessionKinds = setOf(SessionKind.STATELESS),
+        defaultSessionKind = SessionKind.STATELESS,
+        limits = ConsumerLimits(32_768, 128, 32_768),
+        capabilityRevision = "cap-rev-1",
+    )
 
-    private fun preparedSelection() =
-        ConsumerPreparedSelection(
-            preparedId = ConsumerPreparedId("prepared-1"),
-            useCaseId = useCaseId,
-            capabilityRevision = "cap-rev-1",
-            preset = null,
-            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-            outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-            sessionKind = SessionKind.STATELESS,
-        )
+    private fun preparedSelection() = ConsumerPreparedSelection(
+        preparedId = ConsumerPreparedId("prepared-1"),
+        useCaseId = useCaseId,
+        capabilityRevision = "cap-rev-1",
+        preset = null,
+        reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+        outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+        sessionKind = SessionKind.STATELESS,
+    )
 
     private fun deterministicIds(): CorrelationIdSource {
         var next = 0

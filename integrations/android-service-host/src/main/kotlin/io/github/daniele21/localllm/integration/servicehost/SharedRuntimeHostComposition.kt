@@ -38,10 +38,7 @@ class SharedRuntimeHostComposition(
     }
 }
 
-internal fun hostProtocolInfo(
-    hostBuildId: String,
-    consumerApiEnabled: Boolean = false,
-): ProtocolInfoParcel {
+internal fun hostProtocolInfo(hostBuildId: String, consumerApiEnabled: Boolean = false): ProtocolInfoParcel {
     require(hostBuildId.isNotBlank()) { "Host build ID must not be blank" }
     require(hostBuildId.length <= BinderProtocolV1.MAX_CLIENT_BUILD_ID_CHARACTERS) {
         "Host build ID exceeds protocol limit"

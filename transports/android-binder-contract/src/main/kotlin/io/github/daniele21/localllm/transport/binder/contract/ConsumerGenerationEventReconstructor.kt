@@ -5,10 +5,7 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
 import io.github.daniele21.localllm.contracts.ConsumerInferenceResult
 import io.github.daniele21.localllm.contracts.RequestId
 
-class ConsumerGenerationEventReconstructor(
-    private val externalRequestId: String,
-    private val requestId: RequestId,
-) {
+class ConsumerGenerationEventReconstructor(private val externalRequestId: String, private val requestId: RequestId) {
     private var nextSequence = 0L
     private var terminated = false
     private val reasoning = StringBuilder()
@@ -35,23 +32,26 @@ class ConsumerGenerationEventReconstructor(
         return mapped
     }
 
-    private fun mapEvent(event: ConsumerGenerationEventParcel): ConsumerGenerationEvent =
-        when (event.eventTag) {
-            ConsumerWireTags.EVENT_QUEUED ->
-                ConsumerGenerationEvent.Queued(requestId, requireNotNull(event.queuePosition))
+    private fun mapEvent(event: ConsumerGenerationEventParcel): ConsumerGenerationEvent = when (event.eventTag) {
+        ConsumerWireTags.EVENT_QUEUED ->
+            ConsumerGenerationEvent.Queued(requestId, requireNotNull(event.queuePosition))
 
-            ConsumerWireTags.EVENT_PREPARED ->
-                ConsumerGenerationEvent.Prepared(
-                    requestId,
-                    requireNotNull(event.execution).toCoreExecutionIdentity(),
-                )
+        ConsumerWireTags.EVENT_PREPARED ->
+            ConsumerGenerationEvent.Prepared(
+                requestId,
+                requireNotNull(event.execution).toCoreExecutionIdentity(),
+            )
 
-            ConsumerWireTags.EVENT_STARTED -> ConsumerGenerationEvent.Started(requestId)
-            ConsumerWireTags.EVENT_CONTENT_DELTA -> mapDelta(event)
-            ConsumerWireTags.EVENT_COMPLETED -> mapCompleted(event)
-            ConsumerWireTags.EVENT_FAILED -> mapFailed(event)
-            else -> throw invalidWireTag("consumer generation event", event.eventTag)
-        }
+        ConsumerWireTags.EVENT_STARTED -> ConsumerGenerationEvent.Started(requestId)
+
+        ConsumerWireTags.EVENT_CONTENT_DELTA -> mapDelta(event)
+
+        ConsumerWireTags.EVENT_COMPLETED -> mapCompleted(event)
+
+        ConsumerWireTags.EVENT_FAILED -> mapFailed(event)
+
+        else -> throw invalidWireTag("consumer generation event", event.eventTag)
+    }
 
     private fun mapDelta(event: ConsumerGenerationEventParcel): ConsumerGenerationEvent.ContentDelta {
         val text = requireNotNull(event.deltaText)
@@ -72,12 +72,12 @@ class ConsumerGenerationEventReconstructor(
         return ConsumerGenerationEvent.Completed(
             requestId = requestId,
             result =
-                ConsumerInferenceResult(
-                    answer = answer.toString(),
-                    surfacedReasoning = reasoning.toString().takeIf { it.isNotEmpty() },
-                    metrics = requireNotNull(event.metrics).toCoreConsumerMetrics(),
-                    execution = requireNotNull(event.execution).toCoreExecutionIdentity(),
-                ),
+            ConsumerInferenceResult(
+                answer = answer.toString(),
+                surfacedReasoning = reasoning.toString().takeIf { it.isNotEmpty() },
+                metrics = requireNotNull(event.metrics).toCoreConsumerMetrics(),
+                execution = requireNotNull(event.execution).toCoreExecutionIdentity(),
+            ),
         )
     }
 

@@ -45,11 +45,8 @@ data class ConsumerPresetParcel(val id: String, val version: Int) : Parcelable
 data class ConsumerPresetOptionParcel(val preset: ConsumerPresetParcel, val isDefault: Boolean) : Parcelable
 
 @Parcelize
-data class ConsumerLimitsParcel(
-    val maxInputCharacters: Int,
-    val maxConversationMessages: Int,
-    val maxJsonSchemaCharacters: Int,
-) : Parcelable
+data class ConsumerLimitsParcel(val maxInputCharacters: Int, val maxConversationMessages: Int, val maxJsonSchemaCharacters: Int) :
+    Parcelable
 
 @Parcelize
 data class ConsumerCapabilitiesParcel(
@@ -87,11 +84,8 @@ data class ConsumerPreparedSelectionParcel(
 ) : Parcelable
 
 @Parcelize
-data class ConsumerGenerationInputParcel(
-    val typeTag: String,
-    val text: String?,
-    val messages: List<ConversationMessageParcel>,
-) : Parcelable
+data class ConsumerGenerationInputParcel(val typeTag: String, val text: String?, val messages: List<ConversationMessageParcel>) :
+    Parcelable
 
 @Parcelize
 data class ConsumerOutputConstraintParcel(val typeTag: String, val jsonSchema: String?) : Parcelable

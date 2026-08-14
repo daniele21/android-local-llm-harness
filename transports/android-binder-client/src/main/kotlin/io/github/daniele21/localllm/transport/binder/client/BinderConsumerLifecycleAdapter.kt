@@ -60,6 +60,7 @@ internal class BinderConsumerLifecycleAdapter(
                     runCatching { outcome.result.toCoreCapabilityResult() }.getOrElse { capabilityTransportFailure() }
                 }
             }
+
             else -> capabilityTransportFailure()
         }
     }
@@ -82,6 +83,7 @@ internal class BinderConsumerLifecycleAdapter(
                     runCatching { outcome.result.toCorePrepareResult() }.getOrElse { prepareTransportFailure() }
                 }
             }
+
             else -> prepareTransportFailure()
         }
     }
@@ -99,10 +101,12 @@ internal class BinderConsumerLifecycleAdapter(
         )
         return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.openSession(request, callback) }) {
             is ConsumerRemoteOutcome.Received -> mapSession(endpoint, operationId, externalSessionId, outcome.result)
+
             ConsumerRemoteOutcome.Timeout -> {
                 closeRemoteSession(endpoint, externalSessionId)
                 sessionTransportFailure()
             }
+
             else -> sessionTransportFailure()
         }
     }
@@ -144,10 +148,7 @@ internal class BinderConsumerLifecycleAdapter(
         }
     }
 
-    private fun await(
-        endpoint: RegisteredSharedRuntimeEndpoint,
-        call: ((ConsumerResultParcel) -> Unit) -> Unit,
-    ): ConsumerRemoteOutcome {
+    private fun await(endpoint: RegisteredSharedRuntimeEndpoint, call: ((ConsumerResultParcel) -> Unit) -> Unit): ConsumerRemoteOutcome {
         val waiter = ConsumerCallbackWaiter()
         val subscription = endpointInvalidations?.addListener { epoch, detail ->
             if (epoch == endpoint.connectionEpoch) waiter.disconnect(detail)
@@ -189,12 +190,11 @@ private class ConsumerCallbackWaiter {
         if (detail.isNotBlank()) finish(ConsumerRemoteOutcome.Disconnected)
     }
 
-    fun await(timeoutMillis: Long): ConsumerRemoteOutcome =
-        if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
-            requireNotNull(outcome.get())
-        } else {
-            ConsumerRemoteOutcome.Timeout
-        }
+    fun await(timeoutMillis: Long): ConsumerRemoteOutcome = if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
+        requireNotNull(outcome.get())
+    } else {
+        ConsumerRemoteOutcome.Timeout
+    }
 
     private fun finish(value: ConsumerRemoteOutcome) {
         if (outcome.compareAndSet(null, value)) latch.countDown()
@@ -230,11 +230,10 @@ private class ConsumerBinderSessionRegistry {
     fun clearClosed() = closed.clear()
 }
 
-private fun capabilityTransportFailure() =
-    ConsumerCapabilityResult.Rejected(
-        ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
-        "Shared runtime transport is unavailable",
-    )
+private fun capabilityTransportFailure() = ConsumerCapabilityResult.Rejected(
+    ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
+    "Shared runtime transport is unavailable",
+)
 
 private fun prepareTransportFailure() =
     ConsumerPrepareResult.Rejected(ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, "Shared runtime transport is unavailable"))
