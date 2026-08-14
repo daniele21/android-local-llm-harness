@@ -17,6 +17,7 @@ activityCompose = "1.12.1"
 navigationCompose = "2.9.5"
 lifecycle = "2.9.4"
 coroutines = "1.10.2"
+androidxPdf = "1.0.0-alpha19"
 kotlin = "2.2.10"
 
 [libraries]
@@ -40,6 +41,8 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-pdf-core = { module = "androidx.pdf:pdf-core", version.ref = "androidxPdf" }
+androidx-pdf-document-service = { module = "androidx.pdf:pdf-document-service", version.ref = "androidxPdf" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlin-parcelize-runtime = { module = "org.jetbrains.kotlin:kotlin-parcelize-runtime", version.ref = "kotlin" }
 
