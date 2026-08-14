@@ -18,5 +18,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".document.OmbraPdfIsolatedParserSpikeService"
+            android:exported="false"
+            android:isolatedProcess="true" />
     </application>
 </manifest>
