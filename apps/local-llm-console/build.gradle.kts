@@ -57,16 +57,11 @@ val currentVersionName = versionProperties.getProperty("versionName") ?: "0.1.0"
 android {
     namespace = "io.github.daniele21.localllm.console"
     compileSdk = libs.versions.compileSdk.get().toInt()
-    // AndroidX PDF alpha19 requires extension level 19. Keep this OMBRA-only: the Harness host
-    // and reusable libraries retain their repository-wide compile/min SDK compatibility policy.
-    compileSdkExtension = 19
     buildToolsVersion = libs.versions.buildTools.get()
 
     defaultConfig {
         applicationId = "io.github.daniele21.localllm.console"
-        // OMBRA deliberately raises only the consumer APK floor to Android 9 so it can use the
-        // sandboxed AndroidX PDF document APIs. Harness host/library compatibility remains at 26.
-        minSdk = 28
+        minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = currentVersionCode
         versionName = currentVersionName
@@ -154,10 +149,9 @@ dependencies {
     implementation(project(":observability:in-memory-store"))
     implementation(project(":transports:android-binder-client"))
 
-    // OMB-0A parser spike: first-party, sandboxed PDF loading/content extraction. These remain
-    // experimental until representative fixtures and packaged-size evidence close OMB-0.
-    implementation(libs.androidx.pdf.core)
-    implementation(libs.androidx.pdf.document.service)
+    // OMB-0 selected parser: PdfBox-Android runs only behind the isolated parser service.
+    implementation(libs.pdfbox.android)
+    implementation(libs.kotlinx.coroutines.android)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

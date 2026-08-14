@@ -1,0 +1,147 @@
+name: OMBRA PDF runtime spike
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "apps/local-llm-console/src/main/kotlin/io/github/daniele21/localllm/console/document/**"
+      - "apps/local-llm-console/src/androidTest/**"
+      - "apps/local-llm-console/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - "scripts/run-ombra-pdf-spike-device-e2e.sh"
+      - "scripts/measure-ombra-pdf-apk-delta.sh"
+      - ".github/workflows/ombra-pdf-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pdf-runtime-spike:
+    name: Sandboxed parser and writer runtime evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Android AVD home
+        shell: bash
+        run: |
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/android-avd" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=$RUNNER_TEMP/android-user" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-avd" "$RUNNER_TEMP/android-user"
+
+      - name: Install emulator image
+        shell: bash
+        run: |
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+
+      - name: Enable KVM access
+        shell: bash
+        run: |
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Create and start emulator
+        shell: bash
+        run: |
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          if [[ ! -x "$EMULATOR_BIN" ]]; then
+            echo "Error: emulator binary is unavailable at $EMULATOR_BIN." >&2
+            find "$ANDROID_HOME" -maxdepth 3 -type f -name emulator -print >&2 || true
+            exit 1
+          fi
+
+          echo "no" | avdmanager create avd \
+            --force \
+            --name ombra-api35 \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6"
+
+          echo "Configured AVDs:"
+          avdmanager list avd
+          find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print || true
+
+          nohup "$EMULATOR_BIN" \
+            -avd ombra-api35 \
+            -port 5554 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            > "$RUNNER_TEMP/ombra-emulator.log" 2>&1 &
+
+          if ! timeout 180 adb -s emulator-5554 wait-for-device; then
+            adb devices -l >&2 || true
+            cat "$RUNNER_TEMP/ombra-emulator.log" >&2 || true
+            echo "Error: emulator-5554 did not become reachable within 180 seconds." >&2
+            exit 1
+          fi
+
+          for attempt in $(seq 1 90); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              adb -s emulator-5554 shell settings put global window_animation_scale 0
+              adb -s emulator-5554 shell settings put global transition_animation_scale 0
+              adb -s emulator-5554 shell settings put global animator_duration_scale 0
+              exit 0
+            fi
+            sleep 2
+          done
+
+          adb devices -l >&2 || true
+          cat "$RUNNER_TEMP/ombra-emulator.log" >&2 || true
+          echo "Error: emulator-5554 did not finish booting within the bounded boot window." >&2
+          exit 1
+
+      - name: Run OMB-0 PDF runtime evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/run-ombra-pdf-spike-device-e2e.sh \
+            --device emulator-5554 \
+            --adb "$ANDROID_HOME/platform-tools/adb" \
+            --cleanup \
+            2>&1 | tee "$RUNNER_TEMP/ombra-runtime-step.log"
+
+      - name: Measure PDF APK size delta
+        shell: bash
+        run: |
+          bash scripts/measure-ombra-pdf-apk-delta.sh
+          test -s build/reports/ombra/omb0-apk-size-delta.txt
+          cat build/reports/ombra/omb0-apk-size-delta.txt
+          cp build/reports/ombra/omb0-apk-size-delta.txt "$RUNNER_TEMP/omb0-apk-size-delta.txt"
+
+      - name: Upload OMBRA runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ombra-pdf-runtime-evidence
+          path: |
+            build/reports/ombra/**
+            apps/local-llm-console/build/reports/androidTests/**
+            apps/local-llm-console/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/omb0-apk-size-delta.txt
+            ${{ runner.temp }}/ombra-emulator.log
+            ${{ runner.temp }}/ombra-runtime-step.log
+          if-no-files-found: warn
+          retention-days: 14

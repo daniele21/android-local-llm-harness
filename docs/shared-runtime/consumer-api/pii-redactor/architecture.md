@@ -160,7 +160,7 @@ The host derives `ApplicationId` from the verified caller. Consumer code contain
 - Write output only after the user chooses a destination.
 - Never overwrite the input URI or export an opaque overlay that preserves recoverable original text.
 
-OMB-0A selects the AndroidX PDF sandboxed document APIs as the primary parser direction. OMBRA may therefore set its own application `minSdk` to 28 while the Harness host and reusable libraries remain at the repository floor of 26. The selection must still pass representative text-PDF fidelity, malformed/encrypted input, cleanup and packaged-size evidence before OMB-0 closes. PdfBox-Android remains a documented fallback only if that bounded spike fails. See [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.md). OCR dependencies remain out of scope.
+OMB-0 runtime evidence selects **PdfBox-Android behind a permissionless Android isolated process** as the v1 parser boundary. The OMBRA app opens the user-selected document read-only and transfers only a file-descriptor capability to the parser service; extracted page text returns through a bounded framed pipe while Binder/Messenger carries control metadata only. This keeps untrusted PDF parsing outside the OMBRA application UID and avoids raising the OMBRA/Console minimum SDK solely for AndroidX PDF. Representative text, malformed/encrypted/image-only behavior, cancellation/reuse, APK-size and Unicode export evidence are recorded in [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.md). OCR dependencies remain out of scope.
 
 ## Prompt-injection boundary
 
