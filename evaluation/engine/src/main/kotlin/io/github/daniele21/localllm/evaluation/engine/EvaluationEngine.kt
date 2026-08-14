@@ -141,6 +141,7 @@ class EvaluationEngine(
             emitProgress(config, observer, attempted, results.size, caseId)
             when (val execution = caseExecution.execute(config, caseId)) {
                 is EvaluationStepResult.Failure -> return fail(config, observer, results, execution.failure)
+
                 is EvaluationStepResult.Success -> {
                     require(execution.value.caseId == caseId) {
                         "Evaluation case execution result ID must match requested case ID"
