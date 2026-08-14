@@ -112,7 +112,7 @@ internal class BinderConsumerGenerationAdapter(
             callbackExecutor.execute { process(generation, event) }
         } catch (_: RejectedExecutionException) {
             if (!closed.get() && generation.markOverflow(CALLBACK_QUEUE_OVERFLOW_DETAIL)) {
-                requestRemoteCancel(generation)
+                requestConsumerRemoteCancel(generation)
             }
         }
     }
@@ -140,26 +140,8 @@ internal class BinderConsumerGenerationAdapter(
     }
 
     private fun cancel(generation: ActiveConsumerGeneration) {
-        if (generation.terminal || !generation.markCancelSent()) return
-        try {
-            generation.endpoint.service.consumer.cancel(
-                CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
-            )
-        } catch (_: RemoteException) {
-            generation.markDisconnected(CANCEL_TRANSPORT_FAILURE_DETAIL)
-            scheduleDrain()
-        }
-    }
-
-    private fun requestRemoteCancel(generation: ActiveConsumerGeneration) {
-        if (!generation.markCancelSent()) return
-        try {
-            generation.endpoint.service.consumer.cancel(
-                CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
-            )
-        } catch (_: RemoteException) {
-            generation.markDisconnected(CANCEL_TRANSPORT_FAILURE_DETAIL)
-        }
+        if (generation.terminal) return
+        if (requestConsumerRemoteCancel(generation)) scheduleDrain()
     }
 
     private fun failDisconnected(generation: ActiveConsumerGeneration) {
@@ -171,7 +153,7 @@ internal class BinderConsumerGenerationAdapter(
     private fun failProtocol(generation: ActiveConsumerGeneration, detail: String) {
         if (!generation.finish()) return
         active.remove(generation.requestId.value, generation)
-        requestRemoteCancel(generation)
+        requestConsumerRemoteCancel(generation)
         generation.deliverTerminal(runtimeFailure("Binder protocol failure: $detail"))
     }
 
@@ -195,7 +177,6 @@ internal class BinderConsumerGenerationAdapter(
         const val DEFAULT_MAX_AGGREGATE_CHARACTERS = 1_048_576
         const val CALLBACK_QUEUE_OVERFLOW_DETAIL = "Client callback queue capacity exceeded"
         const val STALE_CONNECTION_DETAIL = "Callback arrived from a stale shared-runtime registration"
-        const val CANCEL_TRANSPORT_FAILURE_DETAIL = "Host Binder connection failed during cancellation"
     }
 }
 
@@ -249,6 +230,19 @@ private class BinderConsumerGenerationHandle(override val requestId: RequestId, 
     }
 }
 
+private fun requestConsumerRemoteCancel(generation: ActiveConsumerGeneration): Boolean {
+    if (!generation.markCancelSent()) return false
+    return try {
+        generation.endpoint.service.consumer.cancel(
+            CancelRequestParcel(generation.endpoint.clientToken, generation.externalRequestId),
+        )
+        false
+    } catch (_: RemoteException) {
+        generation.markDisconnected(CANCEL_TRANSPORT_FAILURE_DETAIL)
+        true
+    }
+}
+
 private fun runtimeFailure(message: String): ConsumerGenerationEvent.Failed = ConsumerGenerationEvent.Failed(
     RequestId("transport-failure"),
     ConsumerFailure(ConsumerErrorCode.RUNTIME_FAILURE, message),
@@ -267,3 +261,5 @@ private fun consumerSerialExecutor(queueCapacity: Int): ExecutorService = Thread
     { runnable -> Thread(runnable, "local-llm-consumer-callback").apply { isDaemon = true } },
     ThreadPoolExecutor.AbortPolicy(),
 )
+
+private const val CANCEL_TRANSPORT_FAILURE_DETAIL = "Host Binder connection failed during cancellation"
