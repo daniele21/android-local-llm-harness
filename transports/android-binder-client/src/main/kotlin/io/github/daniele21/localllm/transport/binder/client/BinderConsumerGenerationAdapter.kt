@@ -206,8 +206,9 @@ private class ActiveConsumerGeneration(
     fun markDisconnected(detail: String): Boolean = disconnected.compareAndSet(null, detail)
 
     fun accept(event: ConsumerGenerationEventParcel, maxAggregateCharacters: Int): ConsumerGenerationEvent? {
-        if (event.deltaText != null) {
-            aggregateCharacters += event.deltaText.length
+        val deltaText = event.deltaText
+        if (deltaText != null) {
+            aggregateCharacters += deltaText.length
             if (aggregateCharacters > maxAggregateCharacters) return null
         }
         return runCatching { reconstructor.accept(event) }.getOrNull()
