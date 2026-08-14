@@ -25,11 +25,7 @@ class FixedSupportedEvaluationModelSource(profiles: Collection<GgufModelProfile>
     override fun find(modelProfileId: String): GgufModelProfile? = profilesById[modelProfileId]
 }
 
-data class ResolvedEvaluationModel(
-    val identity: EvaluationModelIdentity,
-    val profile: GgufModelProfile,
-    val storedModel: StoredModel,
-)
+data class ResolvedEvaluationModel(val identity: EvaluationModelIdentity, val profile: GgufModelProfile, val storedModel: StoredModel)
 
 sealed interface EvaluationModelResolution {
     data class Resolved(val model: ResolvedEvaluationModel) : EvaluationModelResolution
@@ -37,10 +33,7 @@ sealed interface EvaluationModelResolution {
     data class Rejected(val failure: EvaluationFailure) : EvaluationModelResolution
 }
 
-class ControlledEvaluationModelResolver(
-    private val supportedModels: SupportedEvaluationModelSource,
-    private val modelStore: ModelStore,
-) {
+class ControlledEvaluationModelResolver(private val supportedModels: SupportedEvaluationModelSource, private val modelStore: ModelStore) {
     fun resolve(identity: EvaluationModelIdentity): EvaluationModelResolution {
         val profile = supportedModels.find(identity.modelProfileId)
             ?: return rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
