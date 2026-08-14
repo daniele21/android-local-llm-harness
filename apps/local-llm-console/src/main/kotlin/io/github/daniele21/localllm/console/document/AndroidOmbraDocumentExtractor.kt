@@ -41,7 +41,8 @@ internal class AndroidOmbraDocumentExtractor(
     private val sourceResolver: OmbraDocumentSourceResolver,
     private val reader: OmbraPdfTextReader,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-) : OmbraDocumentExtractor, AutoCloseable {
+) : OmbraDocumentExtractor,
+    AutoCloseable {
     private val operations = ConcurrentHashMap<OmbraOperationId, Job>()
 
     constructor(context: Context, sourceResolver: OmbraDocumentSourceResolver) : this(
