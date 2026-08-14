@@ -50,6 +50,12 @@ CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `co
 
 CA-5 is now active through OMBRA OMB-0. The first slice freezes product/parser/export/schema/use-case decisions before domain/UI implementation. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
+### Model evaluation planning
+
+EVAL-0 is complete as a documentation/architecture milestone. The dataset-based model-evaluation capability now has a canonical target, dependency graph, detailed task ledgers and maintenance rules under [`model-evaluation/README.md`](model-evaluation/README.md).
+
+EVAL-1 Contracts and identity is `READY`; `EVAL-C-01` is the first implementation task. This work does not replace the existing telemetry-derived benchmark engine. Host-side model-evaluation implementation may proceed in parallel with OMBRA and the physical Q35-6/SR-6 evidence tracks, subject to normal development capacity.
+
 ## Open blockers
 
 ### 1. OMBRA OMB-0 decisions and spikes
@@ -76,9 +82,12 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 3. keep OMB-4 real Consumer API integration behind the accepted OMBRA domain/extraction/composition boundaries;
 4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
+Model evaluation is planned and ready to begin at EVAL-C-01, but this addition does not replace the repository's current OMBRA-focused immediate block.
+
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
+- Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
 - OMBRA roadmap: [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
