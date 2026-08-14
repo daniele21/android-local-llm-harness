@@ -42,10 +42,7 @@ data class EvaluatorSpec(
     }
 }
 
-data class CaseEvaluatorIdentity(
-    val caseId: EvaluationCaseId,
-    val evaluator: EvaluatorSpec,
-)
+data class CaseEvaluatorIdentity(val caseId: EvaluationCaseId, val evaluator: EvaluatorSpec)
 
 enum class EvaluatorOutcomeCode {
     CORRECT,
@@ -56,10 +53,7 @@ enum class EvaluatorOutcomeCode {
     CONSTRAINT_VIOLATION,
 }
 
-data class EvaluationOutcome(
-    val score: NormalizedScore,
-    val code: EvaluatorOutcomeCode,
-) {
+data class EvaluationOutcome(val score: NormalizedScore, val code: EvaluatorOutcomeCode) {
     init {
         when (code) {
             EvaluatorOutcomeCode.CORRECT -> require(score.value == 1.0) {
