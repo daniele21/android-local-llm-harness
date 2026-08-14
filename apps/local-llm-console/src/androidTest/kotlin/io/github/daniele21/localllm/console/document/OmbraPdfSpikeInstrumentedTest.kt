@@ -41,15 +41,15 @@ class OmbraPdfSpikeInstrumentedTest {
         writeTextPdf(
             file = source,
             pages =
+            listOf(
                 listOf(
-                    listOf(
-                        DrawnText("LEFT_A", 36f, 90f),
-                        DrawnText("LEFT_B", 36f, 120f),
-                        DrawnText("RIGHT_A", 320f, 90f),
-                        DrawnText("RIGHT_B", 320f, 120f),
-                    ),
-                    listOf(DrawnText("SECOND_PAGE", 36f, 90f)),
+                    DrawnText("LEFT_A", 36f, 90f),
+                    DrawnText("LEFT_B", 36f, 120f),
+                    DrawnText("RIGHT_A", 320f, 90f),
+                    DrawnText("RIGHT_B", 320f, 120f),
                 ),
+                listOf(DrawnText("SECOND_PAGE", 36f, 90f)),
+            ),
         )
 
         val parser = OmbraPdfParserSpike(targetContext)
@@ -100,15 +100,15 @@ class OmbraPdfSpikeInstrumentedTest {
         writeTextPdf(
             file = source,
             pages =
-                List(120) { pageIndex ->
-                    List(20) { lineIndex ->
-                        DrawnText(
-                            text = "PAGE_${pageIndex}_LINE_$lineIndex local parser cancellation evidence",
-                            x = 36f,
-                            y = 40f + (lineIndex * 18f),
-                        )
-                    }
-                },
+            List(120) { pageIndex ->
+                List(20) { lineIndex ->
+                    DrawnText(
+                        text = "PAGE_${pageIndex}_LINE_$lineIndex local parser cancellation evidence",
+                        x = 36f,
+                        y = 40f + (lineIndex * 18f),
+                    )
+                }
+            },
         )
 
         val parser = OmbraPdfParserSpike(targetContext)
@@ -136,9 +136,9 @@ class OmbraPdfSpikeInstrumentedTest {
         FileOutputStream(output).use { stream ->
             OmbraPdfWriterSpike().write(
                 pages =
-                    listOf(
-                        "Cliente: [FULL_NAME_1]\nEmail: [EMAIL_1]\nTelefono: [TELEPHONE_1]",
-                    ),
+                listOf(
+                    "Cliente: [FULL_NAME_1]\nEmail: [EMAIL_1]\nTelefono: [TELEPHONE_1]",
+                ),
                 output = stream,
             )
         }
