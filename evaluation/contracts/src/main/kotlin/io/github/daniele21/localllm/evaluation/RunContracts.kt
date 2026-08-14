@@ -72,7 +72,7 @@ data class EvaluationCaseMetrics(
         listOf(inputTokens, outputTokens).forEach { value ->
             require(value == null || value >= 0) { "Evaluation token counts must not be negative" }
         }
-        require(decodeTokensPerSecond == null || decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0) {
+        require(decodeTokensPerSecond == null || (decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0)) {
             "Decode throughput must be finite and non-negative"
         }
         validateOptionalStableText(thermalStatus, "Thermal status", 64)
@@ -119,7 +119,7 @@ data class EvaluationCategoryScore(
 ) {
     init {
         require(scoredCaseCount > 0) { "Category scored-case count must be positive" }
-        require(weight == null || weight.isFinite() && weight > 0.0) { "Category weight must be finite and positive" }
+        require(weight == null || (weight.isFinite() && weight > 0.0)) { "Category weight must be finite and positive" }
     }
 }
 
