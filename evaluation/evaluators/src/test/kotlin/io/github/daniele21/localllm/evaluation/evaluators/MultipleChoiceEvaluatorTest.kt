@@ -50,10 +50,7 @@ class MultipleChoiceEvaluatorTest {
         evaluator.evaluate("A", "A", spec("A,a", MultipleChoiceEvaluator.CASE_INSENSITIVE))
     }
 
-    private fun spec(
-        labels: String,
-        casePolicy: String = MultipleChoiceEvaluator.CASE_SENSITIVE,
-    ) = EvaluatorSpec(
+    private fun spec(labels: String, casePolicy: String = MultipleChoiceEvaluator.CASE_SENSITIVE) = EvaluatorSpec(
         type = EvaluatorType.MULTIPLE_CHOICE,
         version = MultipleChoiceEvaluator.VERSION,
         parameters = mapOf(
