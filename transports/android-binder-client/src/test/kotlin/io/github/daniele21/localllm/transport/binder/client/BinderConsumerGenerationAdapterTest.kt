@@ -56,7 +56,7 @@ class BinderConsumerGenerationAdapterTest {
         val completed = received.filterIsInstance<ConsumerGenerationEvent.Completed>().single()
         assertEquals("ok", completed.answer)
         assertEquals(2, completed.metrics.outputTokens)
-        assertEquals(25.0, completed.metrics.decodeTokensPerSecond, 0.0)
+        assertEquals(25.0, requireNotNull(completed.metrics.decodeTokensPerSecond), 0.0)
         assertEquals(ConsumerStopReason.END_OF_GENERATION, completed.metrics.stopReason)
         assertEquals("cap-rev-1", completed.execution.capabilityRevision)
         assertEquals(
