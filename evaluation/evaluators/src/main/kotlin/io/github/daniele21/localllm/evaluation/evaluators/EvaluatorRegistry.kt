@@ -7,10 +7,7 @@ import io.github.daniele21.localllm.evaluation.EvaluatorSpec
 import io.github.daniele21.localllm.evaluation.EvaluatorType
 import io.github.daniele21.localllm.evaluation.EvaluatorVersion
 
-data class EvaluatorKey(
-    val type: EvaluatorType,
-    val version: EvaluatorVersion,
-)
+data class EvaluatorKey(val type: EvaluatorType, val version: EvaluatorVersion)
 
 data class EvaluatorParameterPolicy(
     val requiredKeys: Set<String> = emptySet(),
@@ -44,10 +41,7 @@ data class EvaluatorParameterPolicy(
     }
 }
 
-data class EvaluatorRegistration(
-    val key: EvaluatorKey,
-    val parameters: EvaluatorParameterPolicy = EvaluatorParameterPolicy(),
-)
+data class EvaluatorRegistration(val key: EvaluatorKey, val parameters: EvaluatorParameterPolicy = EvaluatorParameterPolicy())
 
 sealed interface EvaluatorLookupResult {
     data class Supported(val registration: EvaluatorRegistration) : EvaluatorLookupResult
