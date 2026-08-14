@@ -6,10 +6,7 @@ import io.github.daniele21.localllm.contracts.MAX_NATIVE_SEED
 import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.ThinkingMode
 
-data class EvaluationExecutionProfileRef(
-    val id: EvaluationExecutionProfileId,
-    val version: Int,
-) {
+data class EvaluationExecutionProfileRef(val id: EvaluationExecutionProfileId, val version: Int) {
     init {
         require(version > 0) { "Execution profile version must be positive" }
     }
@@ -25,10 +22,7 @@ enum class EvaluationModelLoadPolicy {
     REQUIRE_COLD_LOAD,
 }
 
-data class CaseExecutionSemanticIdentity(
-    val caseId: EvaluationCaseId,
-    val outputConstraintDigest: String,
-) {
+data class CaseExecutionSemanticIdentity(val caseId: EvaluationCaseId, val outputConstraintDigest: String) {
     init {
         validateSha256(outputConstraintDigest, "Output-constraint digest")
     }
