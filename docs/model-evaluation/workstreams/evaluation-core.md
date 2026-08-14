@@ -23,6 +23,23 @@ This workstream does not own dataset-pack installation or Performance UI composi
 - A case outcome distinguishes semantic incorrectness from runtime/format failure.
 - Comparison compatibility is computed in domain code, never inferred from labels in the UI.
 
+## EVAL-1 contract freeze
+
+`evaluation/contracts` is the only module introduced by EVAL-1. Engine, dataset-store and persistence modules remain deferred until their workstreams contain concrete behavior.
+
+The frozen v1 contract boundary provides:
+
+- value-semantic dataset, case, category, evaluator, execution-profile, sampling and run identifiers;
+- lowercase SHA-256 wrappers for dataset, sample-set, evaluator-set, case-semantics, semantic-execution and run fingerprints;
+- declarative evaluator type/version/parameter contracts and normalized `[0,1]` outcomes;
+- ordered sampling selection with digest verification and explicit policy/version/seed;
+- run config, lifecycle, progress, privacy-safe case metrics/results, quality/reliability summaries and typed failures;
+- semantic execution identity over backend/template/context/preset/thinking/sampling/output semantics using exact scalar representation;
+- full run identity over exact model, dataset, sampling, evaluator, semantic execution and runtime environment;
+- separate typed quality/runtime incompatibility reasons without a universal score.
+
+Canonical hashing uses explicit field order, length-prefixed text, raw float bits and sorted parameter maps. Prompt, expected-answer and generated-answer content are deliberately absent from persistent result contracts and run fingerprints.
+
 ## Core contract target
 
 At minimum the domain needs stable equivalents of:
@@ -43,7 +60,7 @@ EvaluationProgress
 EvaluationCompatibility
 ```
 
-Concrete names may change during implementation when tests expose a better ownership boundary; semantic responsibilities must remain explicit.
+Concrete names may change only through an intentional contract change with affected consumers/tests updated; semantic responsibilities remain explicit.
 
 ## Runner behavior
 
@@ -74,23 +91,23 @@ Run/result retention is independently bounded. Removing evaluation history must 
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-C-01 | READY | EVAL-0 | Establish concrete package/module ownership for contracts without speculative empty modules. |
-| EVAL-C-02 | PLANNED | EVAL-C-01 | Define dataset, case, evaluator and execution-profile identifiers with value semantics. |
-| EVAL-C-03 | PLANNED | EVAL-C-02 | Define evaluator spec, typed evaluator outcome and normalized `[0,1]` scoring contract. |
-| EVAL-C-04 | PLANNED | EVAL-C-02 | Define sampling selection and ordered `SampleSetDigest` contract. |
-| EVAL-C-05 | PLANNED | EVAL-C-02,EVAL-C-03,EVAL-C-04 | Define `EvaluationRunConfig`, lifecycle state, progress and summary contracts. |
-| EVAL-C-06 | PLANNED | EVAL-C-05 | Define semantic execution identity and exact immutable fields included in its fingerprint. |
-| EVAL-C-07 | PLANNED | EVAL-C-06 | Define quality-compatibility and runtime-compatibility result contracts with typed mismatch reasons. |
-| EVAL-C-08 | PLANNED | EVAL-C-02,EVAL-C-06 | Implement canonical serialization/hash utilities with deterministic ordering and tests. |
-| EVAL-C-09 | PLANNED | EVAL-C-03,EVAL-C-05 | Define bounded validation/error taxonomy for preflight, evaluation, cancellation and partial persistence failures. |
+| EVAL-C-01 | DONE | EVAL-0 | Establish concrete package/module ownership for contracts without speculative empty modules. |
+| EVAL-C-02 | DONE | EVAL-C-01 | Define dataset, case, evaluator and execution-profile identifiers with value semantics. |
+| EVAL-C-03 | DONE | EVAL-C-02 | Define evaluator spec, typed evaluator outcome and normalized `[0,1]` scoring contract. |
+| EVAL-C-04 | DONE | EVAL-C-02 | Define sampling selection and ordered `SampleSetDigest` contract. |
+| EVAL-C-05 | DONE | EVAL-C-02,EVAL-C-03,EVAL-C-04 | Define `EvaluationRunConfig`, lifecycle state, progress and summary contracts. |
+| EVAL-C-06 | DONE | EVAL-C-05 | Define semantic execution identity and exact immutable fields included in its fingerprint. |
+| EVAL-C-07 | DONE | EVAL-C-06 | Define quality-compatibility and runtime-compatibility result contracts with typed mismatch reasons. |
+| EVAL-C-08 | DONE | EVAL-C-02,EVAL-C-06 | Implement canonical serialization/hash utilities with deterministic ordering and tests. |
+| EVAL-C-09 | DONE | EVAL-C-03,EVAL-C-05 | Define bounded validation/error taxonomy for preflight, evaluation, cancellation and partial persistence failures. |
 
-EVAL-1 closes when EVAL-C-01 through EVAL-C-09 are `DONE`.
+EVAL-1 is complete when this change passes the repository merge gates.
 
 ## Task ledger — deterministic evaluators
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-E-01 | PLANNED | EVAL-C-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
+| EVAL-E-01 | READY | EVAL-C-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
 | EVAL-E-02 | PLANNED | EVAL-E-01 | Implement normalized exact-match evaluator with explicit whitespace/case normalization policy. |
 | EVAL-E-03 | PLANNED | EVAL-E-01 | Implement multiple-choice evaluator that extracts only allowed answer labels and rejects ambiguity. |
 | EVAL-E-04 | PLANNED | EVAL-E-01 | Implement numeric-final-answer evaluator with locale-independent parsing and bounded tolerance policy where declared. |
@@ -107,8 +124,8 @@ EVAL-3 closes when EVAL-E-01 through EVAL-E-10 are `DONE`.
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-R-01 | PLANNED | EVAL-C-05,EVAL-C-09 | Implement `EvaluationEngine` lifecycle/state machine against fake case source/evaluator/runtime interfaces. |
-| EVAL-R-02 | PLANNED | EVAL-C-06 | Define controlled evaluation binding/profile resolution for one selected installed supported artifact without mutating ordinary app bindings. |
+| EVAL-R-01 | READY | EVAL-C-05,EVAL-C-09 | Implement `EvaluationEngine` lifecycle/state machine against fake case source/evaluator/runtime interfaces. |
+| EVAL-R-02 | READY | EVAL-C-06 | Define controlled evaluation binding/profile resolution for one selected installed supported artifact without mutating ordinary app bindings. |
 | EVAL-R-03 | PLANNED | EVAL-R-02 | Implement full-run preflight for model installation/support, dataset compatibility, evaluator support and execution-profile validity. |
 | EVAL-R-04 | PLANNED | EVAL-R-01,EVAL-R-03 | Integrate model preparation and optional unscored warm-up with explicit run identity. |
 | EVAL-R-05 | PLANNED | EVAL-R-01,EVAL-R-03 | Implement isolated session/context lifecycle per scored case while preserving allowed warm model residency. |
@@ -120,13 +137,13 @@ EVAL-3 closes when EVAL-E-01 through EVAL-E-10 are `DONE`.
 | EVAL-R-11 | PLANNED | EVAL-R-04,EVAL-R-05,EVAL-R-08,EVAL-R-09 | Validate cleanup for completion, evaluator failure, runtime failure, timeout and cancellation. |
 | EVAL-R-12 | PLANNED | EVAL-R-10,EVAL-R-11 | Add deterministic runner integration tests using fake runtime, fake telemetry and fixed case order. |
 
-EVAL-4 may begin at EVAL-R-01 after EVAL-1. It closes only after production dataset access from EVAL-2 and evaluator implementations from EVAL-3 are integrated into EVAL-R-06/R-12.
+EVAL-4 may begin at EVAL-R-01/R-02. It closes only after production dataset access from EVAL-2 and evaluator implementations from EVAL-3 are integrated into EVAL-R-06/R-12.
 
 ## Task ledger — persistence and comparison
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-P-01 | PLANNED | EVAL-C-05,EVAL-C-07 | Define evaluation repository queries, retention and deletion contract. |
+| EVAL-P-01 | READY | EVAL-C-05,EVAL-C-07 | Define evaluation repository queries, retention and deletion contract. |
 | EVAL-P-02 | PLANNED | EVAL-P-01 | Implement bounded in-memory repository with deterministic ordering and test parity baseline. |
 | EVAL-P-03 | PLANNED | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
 | EVAL-P-04 | PLANNED | EVAL-P-03 | Implement Room DAO/repository and database migration wiring without coupling telemetry schema ownership. |
@@ -141,13 +158,14 @@ EVAL-5 closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner pe
 
 ## Parallel execution guidance
 
-After EVAL-C-01 through EVAL-C-09 close EVAL-1, the following can be assigned independently:
+EVAL-1 now unlocks these independent lanes:
 
 - evaluator lane: EVAL-E-01 onward;
-- runner lane: EVAL-R-01 through fake-runtime behavior;
-- persistence lane: EVAL-P-01 through repository/store implementation;
+- runner lane: EVAL-R-01 and EVAL-R-02;
+- persistence lane: EVAL-P-01 onward;
 - dataset lane in [`datasets.md`](datasets.md);
-- UI fake-state lane in [`performance-ui.md`](performance-ui.md).
+- UI fake-state lane in [`performance-ui.md`](performance-ui.md);
+- deterministic identity validation in [`validation.md`](validation.md).
 
 Within the evaluator lane, EVAL-E-02 through EVAL-E-06 can run in parallel after EVAL-E-01. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
 
