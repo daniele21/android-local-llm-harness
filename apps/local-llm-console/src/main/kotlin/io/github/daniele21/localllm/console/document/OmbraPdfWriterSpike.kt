@@ -27,7 +27,8 @@ internal class OmbraPdfWriterSpike {
                 textSize = TEXT_SIZE_POINTS
             }
 
-        PdfDocument().use { document ->
+        val document = PdfDocument()
+        try {
             pages.forEachIndexed { pageIndex, text ->
                 requireSupportedGlyphs(text, paint)
                 val pageInfo =
@@ -48,6 +49,8 @@ internal class OmbraPdfWriterSpike {
                 }
             }
             document.writeTo(output)
+        } finally {
+            document.close()
         }
     }
 
