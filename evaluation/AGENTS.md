@@ -11,9 +11,10 @@ This guide owns navigation and validation for model-evaluation implementation un
 
 ## Current ownership
 
-`evaluation/contracts` is the only concrete EVAL-1 module. It owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/evaluators` owns the versioned evaluator registry and deterministic scorer implementations. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
 
-Do not create `evaluation/engine`, dataset-store or persistence modules until the corresponding workstream contains real behavior. EVAL-1 intentionally establishes contracts without speculative empty modules.
+Do not create dataset-store or persistence implementation modules until the corresponding workstream contains real behavior. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
 
 ## Contract invariants
 
@@ -37,5 +38,7 @@ For contract-only iteration run:
   :evaluation:contracts:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
 ```
+
+For evaluator work run the equivalent scoped checks for `:evaluation:evaluators` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
 
 Because adding or changing the module list affects repository navigation and build configuration, also run the repository documentation/navigation guards and the applicable repository-wide gate before merge.
