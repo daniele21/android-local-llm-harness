@@ -35,7 +35,7 @@ class OmbraApplicationOrchestratorTest {
         assertEquals(1, orchestrator.state.counts.documentPageCount)
         assertEquals(1, orchestrator.state.counts.segmentCount)
 
-        assertTrue(orchestrator.setDefinitions(fixture.definitions))
+        assertTrue(orchestrator.task.setDefinitions(fixture.definitions))
         assertEquals(OmbraWorkflowStage.DEFINITIONS_READY, orchestrator.state.stage)
         assertEquals(2, orchestrator.state.counts.activeDefinitionCount)
 
@@ -45,15 +45,15 @@ class OmbraApplicationOrchestratorTest {
         assertEquals(2, orchestrator.state.counts.reviewOccurrenceCount)
         assertEquals(2, analysis.lastRequest?.definitions?.size)
 
-        assertFalse(orchestrator.startExport(OmbraExportDestinationRef(10)))
+        assertFalse(orchestrator.task.startExport(OmbraExportDestinationRef(10)))
         assertEquals(OmbraWorkflowStage.REVIEW_READY, orchestrator.state.stage)
 
-        val review = orchestrator.taskSnapshot().reviewOccurrences
+        val review = orchestrator.task.snapshot().reviewOccurrences
         assertEquals(2, review.size)
-        assertTrue(orchestrator.setDecision(review[0].id, ReviewDecisionState.ACCEPTED))
-        assertTrue(orchestrator.setDecision(review[1].id, ReviewDecisionState.IGNORED))
+        assertTrue(orchestrator.task.setDecision(review[0].id, ReviewDecisionState.ACCEPTED))
+        assertTrue(orchestrator.task.setDecision(review[1].id, ReviewDecisionState.IGNORED))
 
-        assertTrue(orchestrator.startExport(OmbraExportDestinationRef(10)))
+        assertTrue(orchestrator.task.startExport(OmbraExportDestinationRef(10)))
         assertEquals(OmbraWorkflowStage.EXPORTED, orchestrator.state.stage)
         assertEquals(OmbraExportReceipt(pageCount = 1, byteCount = 2048), orchestrator.state.exportReceipt)
         val exportedReview = requireNotNull(exporter.lastRequest).reviewOccurrences
@@ -62,7 +62,7 @@ class OmbraApplicationOrchestratorTest {
 
         assertTrue(orchestrator.reset())
         assertEquals(OmbraWorkflowStage.IDLE, orchestrator.state.stage)
-        val cleared = orchestrator.taskSnapshot()
+        val cleared = orchestrator.task.snapshot()
         assertNull(cleared.descriptor)
         assertTrue(cleared.segments.isEmpty())
         assertTrue(cleared.findings.isEmpty())
@@ -72,19 +72,20 @@ class OmbraApplicationOrchestratorTest {
     fun zeroFindingAnalysisCanExportAfterReviewGate() {
         val fixture = Fixture()
         val exporter = ImmediateExporter()
-        val orchestrator = OmbraApplicationOrchestrator(
-            extractor = ImmediateExtractor(fixture.document),
-            analysisClient = ImmediateAnalysisClient(emptyList()),
-            exporter = exporter,
-        )
+        val orchestrator =
+            OmbraApplicationOrchestrator(
+                extractor = ImmediateExtractor(fixture.document),
+                analysisClient = ImmediateAnalysisClient(emptyList()),
+                exporter = exporter,
+            )
 
         assertTrue(orchestrator.startImport(OmbraDocumentSourceRef(3)))
-        assertTrue(orchestrator.setDefinitions(fixture.definitions))
+        assertTrue(orchestrator.task.setDefinitions(fixture.definitions))
         assertTrue(orchestrator.startAnalysis())
         assertEquals(OmbraWorkflowStage.REVIEW_READY, orchestrator.state.stage)
         assertEquals(0, orchestrator.state.counts.reviewOccurrenceCount)
 
-        assertTrue(orchestrator.startExport(OmbraExportDestinationRef(4)))
+        assertTrue(orchestrator.task.startExport(OmbraExportDestinationRef(4)))
         assertEquals(OmbraWorkflowStage.EXPORTED, orchestrator.state.stage)
         assertTrue(requireNotNull(exporter.lastRequest).reviewOccurrences.isEmpty())
     }
@@ -93,11 +94,12 @@ class OmbraApplicationOrchestratorTest {
     fun cancelledExtractionIgnoresLateCallbackAndKeepsTaskEmpty() {
         val fixture = Fixture()
         val extractor = DeferredExtractor()
-        val orchestrator = OmbraApplicationOrchestrator(
-            extractor = extractor,
-            analysisClient = ImmediateAnalysisClient(emptyList()),
-            exporter = ImmediateExporter(),
-        )
+        val orchestrator =
+            OmbraApplicationOrchestrator(
+                extractor = extractor,
+                analysisClient = ImmediateAnalysisClient(emptyList()),
+                exporter = ImmediateExporter(),
+            )
 
         assertTrue(orchestrator.startImport(OmbraDocumentSourceRef(12)))
         assertEquals(OmbraWorkflowStage.EXTRACTING, orchestrator.state.stage)
@@ -109,7 +111,7 @@ class OmbraApplicationOrchestratorTest {
 
         extractor.complete(Result.success(fixture.document))
         assertEquals(OmbraWorkflowStage.IDLE, orchestrator.state.stage)
-        assertNull(orchestrator.taskSnapshot().descriptor)
+        assertNull(orchestrator.task.snapshot().descriptor)
     }
 
     private class ImmediateExtractor(private val document: OmbraExtractedDocument) : OmbraDocumentExtractor {
@@ -194,24 +196,28 @@ class OmbraApplicationOrchestratorTest {
 
     private class Fixture {
         private val text = "Cliente Mario Rossi email mario.rossi@example.it"
-        private val segment = DocumentSegment(
-            id = SegmentId.fromIndices(pageIndex = 0, blockIndex = 0),
-            pageIndex = 0,
-            blockIndex = 0,
-            normalizedText = text,
-        )
-        val document = OmbraExtractedDocument(
-            descriptor = DocumentDescriptor(displayName = "contratto-mario.pdf", pageCount = 1),
-            segments = listOf(segment),
-        )
-        val definitions = listOf(
-            OmbraBuiltInPiiDefinitions.all.single { it.id == PiiTypeId.parse("full-name") },
-            OmbraBuiltInPiiDefinitions.all.single { it.id == PiiTypeId.parse("email") },
-        )
-        val findings = listOf(
-            finding("full-name", "Mario Rossi"),
-            finding("email", "mario.rossi@example.it"),
-        )
+        private val segment =
+            DocumentSegment(
+                id = SegmentId.fromIndices(pageIndex = 0, blockIndex = 0),
+                pageIndex = 0,
+                blockIndex = 0,
+                normalizedText = text,
+            )
+        val document =
+            OmbraExtractedDocument(
+                descriptor = DocumentDescriptor(displayName = "contratto-mario.pdf", pageCount = 1),
+                segments = listOf(segment),
+            )
+        val definitions =
+            listOf(
+                OmbraBuiltInPiiDefinitions.all.single { it.id == PiiTypeId.parse("full-name") },
+                OmbraBuiltInPiiDefinitions.all.single { it.id == PiiTypeId.parse("email") },
+            )
+        val findings =
+            listOf(
+                finding("full-name", "Mario Rossi"),
+                finding("email", "mario.rossi@example.it"),
+            )
 
         private fun finding(typeId: String, surface: String): ValidatedFinding {
             val start = text.indexOf(surface)
@@ -219,12 +225,12 @@ class OmbraApplicationOrchestratorTest {
                 typeId = PiiTypeId.parse(typeId),
                 surface = surface,
                 occurrences =
-                listOf(
-                    SourceOccurrence(
-                        segmentId = segment.id,
-                        range = SourceRange(startInclusive = start, endExclusive = start + surface.length),
+                    listOf(
+                        SourceOccurrence(
+                            segmentId = segment.id,
+                            range = SourceRange(startInclusive = start, endExclusive = start + surface.length),
+                        ),
                     ),
-                ),
             )
         }
     }
