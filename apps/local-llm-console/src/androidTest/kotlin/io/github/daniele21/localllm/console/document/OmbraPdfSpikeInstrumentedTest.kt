@@ -269,8 +269,7 @@ class OmbraPdfSpikeInstrumentedTest {
         }
     }
 
-    private fun diagnosticText(text: String): String =
-        text.replace("\n", "\\n").replace("\r", "\\r").take(500)
+    private fun diagnosticText(text: String): String = text.replace("\n", "\\n").replace("\r", "\\r").take(500)
 
     private data class DrawnText(val text: String, val x: Float, val y: Float)
 }
