@@ -10,34 +10,25 @@ import kotlin.math.min
 /**
  * OMB-0 geometry-aware normalization for AndroidX PDF text fragments.
  *
- * AndroidX may return very fine-grained text elements, including individual characters, and may
- * suffix those fragments with CR/LF terminators even when their bounds place them on the same
- * visual line. Treating either the element or its trailing terminator as a line therefore corrupts
- * otherwise valid text. This normalizer removes only fragment-edge line terminators, reconstructs
- * visual lines from geometry and infers only clearly visible inter-word gaps. If geometry is
- * unavailable or ambiguous, it preserves the API stream order without inventing separators.
- * OMB-2 will own the production extraction contract.
+ * AndroidX exposes a continuous text stream in viewing order plus zero or more line bounds. Some
+ * generated PDFs return very fine-grained CR/LF-delimited text even when the geometry still places
+ * that content on one visual line. This normalizer expands text into line fragments only when the
+ * text-line count and bounds count agree, treats internal line terminators as extraction artifacts
+ * when one bound proves a single visual line, and otherwise preserves the API stream conservatively.
+ * OMB-2 will own the production extraction contract and its malformed/ambiguous-content policy.
  */
 @OptIn(ExperimentalPdfApi::class)
 internal object OmbraPdfTextNormalizer {
     fun normalize(contents: List<PdfPageTextContent>): String {
-        val nonEmpty =
-            contents.mapNotNull { content ->
-                val text = normalizeFragmentText(content.text)
-                if (text.isEmpty()) null else content to text
-            }
-        if (nonEmpty.isEmpty()) return ""
-        if (nonEmpty.any { (content, _) -> content.bounds.size != 1 }) {
-            return nonEmpty.joinToString(separator = "") { (_, text) -> text }
+        val expanded = contents.flatMap(::expandContent)
+        if (expanded.isEmpty()) return ""
+
+        val bounded = expanded.filter { fragment -> fragment.bounds != null }
+        if (bounded.size != expanded.size) {
+            return expanded.joinToString(separator = "") { fragment -> fragment.text }
         }
 
-        val fragments =
-            nonEmpty.map { (content, text) ->
-                TextFragment(
-                    text = text,
-                    bounds = RectF(content.bounds.single()),
-                )
-            }
+        val fragments = bounded.map { fragment -> TextFragment(fragment.text, requireNotNull(fragment.bounds)) }
         val lines = groupIntoVisualLines(fragments)
         val typicalCharacterWidth = medianCharacterWidth(fragments)
         return lines.joinToString(separator = "\n") { line ->
@@ -45,7 +36,20 @@ internal object OmbraPdfTextNormalizer {
         }
     }
 
-    private fun normalizeFragmentText(text: String): String = text.trimEnd('\r', '\n')
+    private fun expandContent(content: PdfPageTextContent): List<PendingFragment> {
+        val normalized = content.text.replace("\r\n", "\n").replace('\r', '\n')
+        val textLines = normalized.split('\n').filter { line -> line.isNotEmpty() }
+        if (textLines.isEmpty()) return emptyList()
+
+        return when {
+            content.bounds.isEmpty() -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
+            content.bounds.size == textLines.size ->
+                textLines.zip(content.bounds) { text, bounds -> PendingFragment(text, RectF(bounds)) }
+            content.bounds.size == 1 ->
+                listOf(PendingFragment(textLines.joinToString(separator = ""), RectF(content.bounds.single())))
+            else -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
+        }
+    }
 
     private fun groupIntoVisualLines(fragments: List<TextFragment>): List<List<TextFragment>> {
         val sorted =
@@ -115,6 +119,8 @@ internal object OmbraPdfTextNormalizer {
             widths[middle]
         }
     }
+
+    private data class PendingFragment(val text: String, val bounds: RectF?)
 
     private data class TextFragment(val text: String, val bounds: RectF)
 
