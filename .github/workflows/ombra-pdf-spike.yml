@@ -54,14 +54,6 @@ jobs:
             "emulator" \
             "system-images;android-35;google_apis;x86_64"
 
-      - name: Measure PDF APK size delta
-        shell: bash
-        run: |
-          bash scripts/measure-ombra-pdf-apk-delta.sh
-          test -s build/reports/ombra/omb0-apk-size-delta.txt
-          cat build/reports/ombra/omb0-apk-size-delta.txt
-          cp build/reports/ombra/omb0-apk-size-delta.txt "$RUNNER_TEMP/omb0-apk-size-delta.txt"
-
       - name: Enable KVM access
         shell: bash
         run: |
@@ -130,6 +122,14 @@ jobs:
             --adb "$ANDROID_HOME/platform-tools/adb" \
             --cleanup \
             2>&1 | tee "$RUNNER_TEMP/ombra-runtime-step.log"
+
+      - name: Measure PDF APK size delta
+        shell: bash
+        run: |
+          bash scripts/measure-ombra-pdf-apk-delta.sh
+          test -s build/reports/ombra/omb0-apk-size-delta.txt
+          cat build/reports/ombra/omb0-apk-size-delta.txt
+          cp build/reports/ombra/omb0-apk-size-delta.txt "$RUNNER_TEMP/omb0-apk-size-delta.txt"
 
       - name: Upload OMBRA runtime evidence
         if: always()
