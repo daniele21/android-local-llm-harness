@@ -69,13 +69,6 @@ internal class OmbraPdfParserSpike(context: Context) {
     }
 }
 
-internal data class OmbraPdfParserSpikeResult(
-    val pageCount: Int,
-    val pages: List<OmbraPdfParserSpikePage>,
-    val truncated: Boolean,
-)
+internal data class OmbraPdfParserSpikeResult(val pageCount: Int, val pages: List<OmbraPdfParserSpikePage>, val truncated: Boolean)
 
-internal data class OmbraPdfParserSpikePage(
-    val pageIndex: Int,
-    val text: String,
-)
+internal data class OmbraPdfParserSpikePage(val pageIndex: Int, val text: String)
