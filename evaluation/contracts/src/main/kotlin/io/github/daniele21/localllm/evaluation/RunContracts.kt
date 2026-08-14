@@ -123,10 +123,7 @@ data class EvaluationCategoryScore(
     }
 }
 
-data class EvaluationQualitySummary(
-    val aggregateScore: NormalizedScore?,
-    val categoryScores: List<EvaluationCategoryScore>,
-)
+data class EvaluationQualitySummary(val aggregateScore: NormalizedScore?, val categoryScores: List<EvaluationCategoryScore>)
 
 data class EvaluationReliabilitySummary(
     val totalCases: Int,
