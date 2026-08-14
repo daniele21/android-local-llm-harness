@@ -51,25 +51,34 @@ class OmbraPdfIsolatedParserSpikeService : Service() {
 
             Thread(
                 {
-                    runCatching {
-                        PDFBoxResourceLoader.init(applicationContext)
-                        val result =
+                    val parsed =
+                        runCatching {
+                            PDFBoxResourceLoader.init(applicationContext)
                             ParcelFileDescriptor.AutoCloseInputStream(input).use { inputStream ->
                                 PDDocument.load(inputStream).use { document ->
                                     extractBounded(document, maxPages, maxCharacters)
                                 }
                             }
+                        }
+                    val result =
+                        parsed.getOrElse { throwable ->
+                            runCatching { output.close() }
+                            sendCompletion(replyTo, RESULT_ERROR, throwable.javaClass.simpleName)
+                            return@Thread
+                        }
+
+                    // Notify the caller after parsing succeeds but before writing the potentially
+                    // large frame. The caller can then start draining the pipe, so output larger
+                    // than the kernel pipe buffer cannot deadlock waiting for a post-write signal.
+                    sendCompletion(replyTo, RESULT_OK, null)
+                    runCatching {
                         ParcelFileDescriptor.AutoCloseOutputStream(output).use { outputStream ->
                             DataOutputStream(outputStream.buffered()).use { data ->
                                 writeFrame(data, result)
                             }
                         }
-                    }.onSuccess {
-                        sendCompletion(replyTo, RESULT_OK, null)
-                    }.onFailure { throwable ->
-                        runCatching { input.close() }
+                    }.onFailure {
                         runCatching { output.close() }
-                        sendCompletion(replyTo, RESULT_ERROR, throwable.javaClass.simpleName)
                     }
                 },
                 "ombra-pdf-parser-spike",
