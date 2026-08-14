@@ -163,35 +163,55 @@ internal class OmbraPdfParserSpike(context: Context) {
     }
 
     private fun readFrame(input: DataInputStream, maxPages: Int, maxCharacters: Int): OmbraPdfParserSpikeResult {
-        if (input.readInt() != OmbraPdfIsolatedParserSpikeService.FRAME_MAGIC) {
-            throw IOException("Invalid isolated PDF parser frame")
-        }
+        validateFrameMagic(input.readInt())
         val pageCount = input.readInt()
         val truncated = input.readBoolean()
         val returnedPages = input.readInt()
-        if (pageCount < 0 || returnedPages !in 0..maxPages) {
-            throw IOException("Invalid isolated PDF parser frame bounds")
-        }
+        validateFrameBounds(pageCount, returnedPages, maxPages)
 
         val pages = ArrayList<OmbraPdfParserSpikePage>(returnedPages)
         var returnedCharacters = 0
         repeat(returnedPages) {
             val pageIndex = input.readInt()
             val byteCount = input.readInt()
-            if (pageIndex < 0 || pageIndex >= pageCount || byteCount < 0 || byteCount > MAX_PAGE_UTF8_BYTES) {
-                throw IOException("Invalid isolated PDF parser page frame")
-            }
+            validatePageFrame(pageIndex, pageCount, byteCount)
             val bytes = ByteArray(byteCount)
             input.readFully(bytes)
             val text = bytes.toString(Charsets.UTF_8)
             returnedCharacters += text.length
-            if (returnedCharacters > maxCharacters) {
-                throw IOException("Isolated PDF parser exceeded requested character bound")
-            }
+            validateCharacterBound(returnedCharacters, maxCharacters)
             pages += OmbraPdfParserSpikePage(pageIndex, text)
         }
 
         return OmbraPdfParserSpikeResult(pageCount = pageCount, pages = pages, truncated = truncated)
+    }
+
+    private fun validateFrameMagic(magic: Int) {
+        if (magic != OmbraPdfIsolatedParserSpikeService.FRAME_MAGIC) {
+            throw IOException("Invalid isolated PDF parser frame")
+        }
+    }
+
+    private fun validateFrameBounds(pageCount: Int, returnedPages: Int, maxPages: Int) {
+        val invalidPageCount = pageCount < 0
+        val invalidReturnedPages = returnedPages !in 0..maxPages
+        if (invalidPageCount || invalidReturnedPages) {
+            throw IOException("Invalid isolated PDF parser frame bounds")
+        }
+    }
+
+    private fun validatePageFrame(pageIndex: Int, pageCount: Int, byteCount: Int) {
+        val invalidPageIndex = pageIndex < 0 || pageIndex >= pageCount
+        val invalidByteCount = byteCount < 0 || byteCount > MAX_PAGE_UTF8_BYTES
+        if (invalidPageIndex || invalidByteCount) {
+            throw IOException("Invalid isolated PDF parser page frame")
+        }
+    }
+
+    private fun validateCharacterBound(returnedCharacters: Int, maxCharacters: Int) {
+        if (returnedCharacters > maxCharacters) {
+            throw IOException("Isolated PDF parser exceeded requested character bound")
+        }
     }
 
     private fun safeUnbind(connection: ServiceConnection) {
