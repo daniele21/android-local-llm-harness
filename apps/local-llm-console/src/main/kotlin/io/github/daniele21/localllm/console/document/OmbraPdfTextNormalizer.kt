@@ -10,25 +10,31 @@ import kotlin.math.min
 /**
  * OMB-0 geometry-aware normalization for AndroidX PDF text fragments.
  *
- * AndroidX may return very fine-grained text elements, including individual characters. Treating
- * every element as a line therefore corrupts otherwise valid text. When every element has one
- * bounding rectangle, this normalizer reconstructs visual lines from geometry and infers only
- * clearly visible inter-word gaps. If geometry is unavailable or ambiguous, it preserves the API
- * stream order without inventing separators. OMB-2 will own the production extraction contract.
+ * AndroidX may return very fine-grained text elements, including individual characters, and may
+ * suffix those fragments with CR/LF terminators even when their bounds place them on the same
+ * visual line. Treating either the element or its trailing terminator as a line therefore corrupts
+ * otherwise valid text. This normalizer removes only fragment-edge line terminators, reconstructs
+ * visual lines from geometry and infers only clearly visible inter-word gaps. If geometry is
+ * unavailable or ambiguous, it preserves the API stream order without inventing separators.
+ * OMB-2 will own the production extraction contract.
  */
 @OptIn(ExperimentalPdfApi::class)
 internal object OmbraPdfTextNormalizer {
     fun normalize(contents: List<PdfPageTextContent>): String {
-        val nonEmpty = contents.filter { content -> content.text.isNotEmpty() }
+        val nonEmpty =
+            contents.mapNotNull { content ->
+                val text = normalizeFragmentText(content.text)
+                if (text.isEmpty()) null else content to text
+            }
         if (nonEmpty.isEmpty()) return ""
-        if (nonEmpty.any { content -> content.bounds.size != 1 }) {
-            return nonEmpty.joinToString(separator = "") { content -> content.text }
+        if (nonEmpty.any { (content, _) -> content.bounds.size != 1 }) {
+            return nonEmpty.joinToString(separator = "") { (_, text) -> text }
         }
 
         val fragments =
-            nonEmpty.map { content ->
+            nonEmpty.map { (content, text) ->
                 TextFragment(
-                    text = content.text,
+                    text = text,
                     bounds = RectF(content.bounds.single()),
                 )
             }
@@ -38,6 +44,8 @@ internal object OmbraPdfTextNormalizer {
             reconstructLine(line, typicalCharacterWidth)
         }
     }
+
+    private fun normalizeFragmentText(text: String): String = text.trimEnd('\r', '\n')
 
     private fun groupIntoVisualLines(fragments: List<TextFragment>): List<List<TextFragment>> {
         val sorted =
