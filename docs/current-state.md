@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 This is the single operational ledger for what is integrated, what remains blocked and which implementation block is next. Capability history belongs in [`roadmap.md`](roadmap.md); release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -102,9 +102,35 @@ The shared-runtime implementation has advanced beyond proposal status:
 
 Shared-runtime production/release readiness is still blocked until SR-6 is executed on representative physical hardware and the exact candidate passes release review. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
+### Public Consumer API
+
+The application-facing API is now an active implementation track rather than a documentation-only proposal:
+
+- CA-0 boundary decisions are accepted in ADR 0013;
+- CA-1 capability/policy discovery is integrated and keeps exact model/artifact selection host-owned;
+- CA-2 `ConsumerLocalLlmClient` is integrated as the constrained public facade for discover -> prepare -> session -> generate -> close;
+- CA-3 public result, surfaced-reasoning, execution-identity and Tier 1/Tier 2 metric projection is integrated in `dev`;
+- CA-4 Binder integration is active on PR #104 and evolves Binder v1 append-only to protocol minor 1 with the optional `consumer-api-v1` feature;
+- CA-4 already contains consumer-specific AIDL/wire DTOs, host mapping and Binder consumer lifecycle/generation adapters, but its deterministic compatibility and packaged-AAR exit evidence is not complete yet;
+- CA-5 OMBRA reference-consumer migration must not start from an unvalidated CA-4 public transport boundary.
+
+Canonical sequence and exit gates are owned by [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md).
+
 ## Open implementation blocks
 
-### 1. Q35-6 physical Android tuning evidence
+### 1. CA-4 Binder Consumer API exit gate
+
+The transport implementation exists, but CA-4 remains `IN PROGRESS` until all deterministic evidence is present:
+
+- add focused lifecycle tests for capability discovery, prepare, session ownership, stale epoch and transport failures;
+- add focused generation tests for ordered reconstruction, terminal uniqueness, cancellation, overflow/protocol failure and disconnect convergence;
+- prove old Binder v1.0 behavior remains available while v1.1 advertises `consumer-api-v1`;
+- extend the packaged client/contract AAR consumer fixture so it compiles and exercises `BinderConsumerLocalLlmClient` without project-internal transport dependencies;
+- run repository validation against the exact PR head and only then mark CA-4 `DONE`/merge it into `dev`.
+
+Specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md).
+
+### 2. Q35-6 physical Android tuning evidence
 
 Repository-side tuning infrastructure is complete. Remaining work:
 
@@ -116,7 +142,7 @@ Repository-side tuning infrastructure is complete. Remaining work:
 
 Specification: [`qwen35/workstreams/runtime-tuning.md`](qwen35/workstreams/runtime-tuning.md).
 
-### 2. SR-6 shared-runtime physical release evidence
+### 3. SR-6 shared-runtime physical release evidence
 
 Repository-side release-evidence tooling is implemented. Remaining work:
 
@@ -129,7 +155,7 @@ Repository-side release-evidence tooling is implemented. Remaining work:
 
 Runbook: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
-### 3. Q35-7 validation suite
+### 4. Q35-7 validation suite
 
 After Q35-6 measured profiles exist:
 
@@ -138,13 +164,13 @@ After Q35-6 measured profiles exist:
 - run repeated lifecycle, memory and thermal device evidence for both tiers;
 - prepare certification-consumable evidence without conflating catalog availability with support certification.
 
-### 4. Remaining phone-app UDF migration
+### 5. Remaining phone-app UDF migration
 
 - move Overview, Diagnostics and Settings renderable state/intent behind typed state/effect boundaries;
 - reduce Activity-owned mirrors;
 - complete deterministic restoration and Back behavior without persisting sensitive content.
 
-### 5. RAM residency policy completion
+### 6. RAM residency policy completion
 
 Explicit manual unload is implemented. Remaining residency work is:
 
@@ -153,7 +179,7 @@ Explicit manual unload is implemented. Remaining residency work is:
 - privacy-safe automatic unload reasons for TTL, memory pressure, switch and shutdown;
 - race, pinning, idempotent cleanup and reload-classification validation.
 
-### 6. UI/accessibility and release evidence
+### 7. UI/accessibility and release evidence
 
 - compact/expanded/landscape/large-font and screenshot-regression coverage;
 - TalkBack/focus-order and recreation evidence;
@@ -161,26 +187,37 @@ Explicit manual unload is implemented. Remaining residency work is:
 
 ## Immediate next block
 
-The two device-dependent tracks are now explicit and may share the same representative hardware session:
+Complete the deterministic CA-4 gate before widening the public consumer surface:
 
-1. complete **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh` for the 0.8B and 2B curated reference artifacts;
-2. execute **SR-6 release-like shared-runtime evidence** using `scripts/capture-shared-runtime-release-evidence.sh` against the exact host-selected model/profile identity.
+1. finish CA-4 lifecycle/generation/compatibility tests and packaged-AAR fixture coverage;
+2. obtain a green repository validation run for the exact CA-4 head;
+3. update the CA-4 roadmap/specification to `DONE` only after the exit gate is satisfied and merge PR #104 into `dev`;
+4. start CA-5 OMBRA reference-consumer work from the resulting green `dev` baseline.
 
-Do not promote Q35 candidate profiles to `MEASURED`, publish the Binder client AAR or describe the shared host as production-ready from emulator/CI results.
+The two device-dependent tracks remain parallel and may share the same representative hardware session:
+
+- complete **Q35-6 physical-device evidence** using `scripts/run-qwen35-tuning-matrix.sh` for the 0.8B and 2B curated reference artifacts;
+- execute **SR-6 release-like shared-runtime evidence** using `scripts/capture-shared-runtime-release-evidence.sh` against the exact host-selected model/profile identity.
+
+Do not promote Q35 candidate profiles to `MEASURED`, publish the Binder client AAR or describe the shared host/public consumer transport as production-ready from emulator/CI results alone.
 
 ## Blockers and deferred evidence
 
+- CA-4 cannot be marked `DONE` until deterministic compatibility and packaged-AAR validation pass on the exact branch head;
+- CA-5 should start only from the integrated CA-4 public transport boundary;
 - representative physical-device performance evidence is required to close Q35-6;
 - Q35-7/Q35-8 require the measured Q35-6 profile evidence;
 - SR-4 execution evidence and SR-6 physical release evidence remain pending until run on the exact recorded host/client/runtime/model identity;
 - SR-6 consumer release also requires matching Binder-overhead evidence, invalid-signer denial, compatibility/replacement review and final public API/security/versioning review;
-- Capacitor remains a later integration phase after the Android shared-runtime release boundary is validated;
+- Capacitor remains a later integration phase after the Android shared-runtime/public-consumer release boundary is validated;
 - GPU/Vulkan, simultaneous decode, multimodal and speculative decoding remain outside the current production-capable scope.
 
 ## Source links
 
 - Capability milestones: [`roadmap.md`](roadmap.md)
 - Shared runtime roadmap: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
+- Public Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
+- CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
 - SR-6 release evidence: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5-only product status: [`qwen35/README.md`](qwen35/README.md)
 - Target behavior: [`implementation-plan.md`](implementation-plan.md)
