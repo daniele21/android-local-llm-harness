@@ -102,21 +102,13 @@ internal data class PerformanceActiveRunState(
     }
 }
 
-internal data class PerformanceDatasetState(
-    val loading: Boolean = false,
-    val installedCount: Int = 0,
-    val error: String? = null,
-) {
+internal data class PerformanceDatasetState(val loading: Boolean = false, val installedCount: Int = 0, val error: String? = null) {
     init {
         require(installedCount >= 0) { "Installed dataset count must not be negative" }
     }
 }
 
-internal data class PerformanceHistoryState(
-    val loading: Boolean = false,
-    val runCount: Int = 0,
-    val error: String? = null,
-) {
+internal data class PerformanceHistoryState(val loading: Boolean = false, val runCount: Int = 0, val error: String? = null) {
     init {
         require(runCount >= 0) { "Performance history run count must not be negative" }
     }
