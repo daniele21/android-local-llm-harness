@@ -26,11 +26,12 @@ class EvaluationQualityAggregator {
         }
 
         val categoryScores = categories.mapNotNull { category ->
-            val contributions = caseResults
-                .asSequence()
-                .filter { it.categoryId == category.id }
-                .mapNotNull(::qualityContribution)
-                .toList()
+            val contributions =
+                caseResults
+                    .asSequence()
+                    .filter { it.categoryId == category.id }
+                    .mapNotNull(::qualityContribution)
+                    .toList()
             if (contributions.isEmpty()) {
                 null
             } else {
