@@ -28,30 +28,29 @@ Work may proceed in parallel only when ownership is disjoint. The real inference
 
 ## OMB-0 — Decisions and technical spikes
 
-State: **IN PROGRESS**
+State: **DONE**
 
-Active slice: **OMB-0A — target/architecture decisions and bounded parser/export spike record**.
+Integrated through PR #106 after the exact-head repository/documentation gates and the dedicated OMBRA PDF runtime workflow passed.
 
-Goal: accept the target and remove high-risk uncertainty before product code grows.
+Accepted evidence and decisions:
 
-Tasks:
+- OMBRA naming and package/signing boundary are fixed for v1;
+- v1 accepts text-bearing PDF only, normalized flattened export and mandatory human review;
+- `PdfBox-Android` runs behind a permissionless Android `isolatedProcess` parser boundary;
+- malformed, encrypted and image-only inputs fail closed/non-plaintext as specified;
+- cancellation, parser reuse and resource cleanup are covered by the runtime spike;
+- framework `PdfDocument` export round-trips placeholders while source PII values remain absent;
+- representative European glyphs round-trip and unsupported glyphs fail closed;
+- the measured PDF-enabled debug APK delta is recorded and accepted for the reference-consumer path;
+- `document-pii-detection`, `STATELESS`, fixed `JSON_SCHEMA`, reasoning-disabled behavior and host-owned model/preset selection require no new Consumer API/Binder primitive.
 
-- accept OMBRA naming as product label while preserving Harness host identity and current package/signing boundary;
-- accept text-bearing PDF only, normalized-layout export and mandatory human review;
-- run a bounded parser spike for extraction fidelity, min SDK, licensing, APK size, malformed-input behavior and cleanup;
-- run a PDF writer/font/glyph/export-verification spike;
-- freeze built-in category definitions, fixed result schema and placeholder rules;
-- confirm `document-pii-detection`, reasoning-disabled behavior and deterministic preset direction;
-- accept the OMBRA light palette and choose bundled-font review versus deterministic system fallback;
-- classify any needed Consumer API/wire feature before implementation.
-
-Exit gate: product, parser/export, schema, use-case and brand decisions are reviewable; no unresolved choice would force a different architecture.
+Canonical evidence: [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.md).
 
 ## OMB-1 — Pure domain and application state
 
 State: **IN PROGRESS**
 
-Active slice: **OMB-1A — pure models, definitions and validation**. This slice is implemented on a stacked branch while OMB-0 runtime evidence closes; it must not merge ahead of the OMB-0 exit gate.
+Active slice: **OMB-1A — pure models, definitions and validation**. OMB-0 is integrated, so this slice is now based directly on `dev` and independently mergeable once its exact-head gate is green.
 
 Owner: [`architecture.md`](architecture.md)
 
@@ -63,7 +62,7 @@ Tasks:
 - define interfaces for extractor, analysis client, exporter and sensitive in-memory task store;
 - cover cancellation, late callbacks, reset and process-recreation semantics with fakes.
 
-Progress: OMB-1A now has the pure document/source, PII-definition, validated-finding and review-decision model boundaries with stable identifiers, bounded custom definitions and content-free debug representations. OMB-1B remains required for immutable workflow state, reducer/effects, ports and fake orchestration.
+Progress: OMB-1A has the pure document/source, PII-definition, validated-finding and review-decision model boundaries with stable identifiers, bounded custom definitions and content-free debug representations. OMB-1B remains required for immutable workflow state, reducer/effects, ports and fake orchestration.
 
 Exit gate: a pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code.
 
