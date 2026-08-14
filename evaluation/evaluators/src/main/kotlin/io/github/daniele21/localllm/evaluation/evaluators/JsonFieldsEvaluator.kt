@@ -30,7 +30,9 @@ class JsonFieldsEvaluator {
         }
         return when (matched) {
             requiredFields.size -> EvaluationOutcome(NormalizedScore(1.0), EvaluatorOutcomeCode.CORRECT)
+
             0 -> EvaluationOutcome(NormalizedScore(0.0), EvaluatorOutcomeCode.INCORRECT)
+
             else -> EvaluationOutcome(
                 score = NormalizedScore(matched.toDouble() / requiredFields.size.toDouble()),
                 code = EvaluatorOutcomeCode.PARTIAL,
@@ -78,16 +80,19 @@ private sealed interface JsonValue {
 
 private fun jsonEquals(expected: JsonValue, actual: JsonValue): Boolean = when {
     expected is JsonValue.NumberValue && actual is JsonValue.NumberValue -> expected.value.compareTo(actual.value) == 0
+
     expected is JsonValue.ObjectValue && actual is JsonValue.ObjectValue -> {
         expected.fields.keys == actual.fields.keys && expected.fields.all { (key, value) ->
             jsonEquals(value, actual.fields.getValue(key))
         }
     }
+
     expected is JsonValue.ArrayValue && actual is JsonValue.ArrayValue -> {
         expected.values.size == actual.values.size && expected.values.indices.all { index ->
             jsonEquals(expected.values[index], actual.values[index])
         }
     }
+
     else -> expected == actual
 }
 
