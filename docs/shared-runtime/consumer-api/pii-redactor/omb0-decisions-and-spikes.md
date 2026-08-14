@@ -11,13 +11,13 @@ This record owns the decisions and evidence needed to close OMB-0. It does not r
 
 ## Integrated prerequisite
 
-CA-4 is integrated in `dev` through PR #104. The public Consumer API now has the Binder v1.1 `consumer-api-v1` boundary, packaged client fixture, authenticated caller mapping, structured-output transport and deterministic compatibility/privacy coverage required to begin the OMBRA consumer implementation.
+CA-4 is integrated in `dev` through PR #104. The public Consumer API has the Binder v1.1 `consumer-api-v1` boundary, packaged client fixture, authenticated caller mapping, structured-output transport and deterministic compatibility/privacy coverage required by OMBRA.
 
 Physical two-APK evidence remains CA-6/OMB-8 work and is not implied by this record.
 
 ## Accepted product decisions
 
-The following decisions were already specified by the OMBRA target and are now treated as OMB-0 inputs rather than open alternatives:
+The following decisions are frozen for OMBRA v1:
 
 - user-facing product name is **OMBRA** while Local LLM Harness remains the host/runtime identity;
 - `apps/local-llm-console` keeps its current package/signing boundary during the migration;
@@ -25,12 +25,12 @@ The following decisions were already specified by the OMBRA target and are now t
 - OCR, scanned/image-only documents and arbitrary original-layout preservation are out of scope;
 - export creates a new normalized, flattened PDF instead of modifying the source or overlaying recoverable content;
 - human review is mandatory before export;
-- source PDF bytes/URI and export destination never cross the Binder boundary;
+- source PDF bytes/URI and export destination never cross the Harness Binder boundary;
 - normal telemetry never persists extracted text, definitions, findings, prompts, schema payloads or revealed values.
 
 ## PII and structured-output contract
 
-The v1 built-in identifiers remain frozen for the first implementation slice:
+The v1 built-in identifiers are frozen:
 
 ```text
 full-name
@@ -53,7 +53,7 @@ OMBRA uses exactly one host-authorized use case:
 document-pii-detection
 ```
 
-Initial capability direction:
+Initial capability contract:
 
 - `STATELESS` sessions;
 - fixed `JSON_SCHEMA` output;
@@ -61,91 +61,118 @@ Initial capability direction:
 - host-selected default logical model and deterministic preset;
 - no consumer model ID, artifact ID, sampler, seed, raw token budget or AIDL access.
 
-No new Consumer API or Binder primitive is currently required. OMB-4 should first attempt the complete flow using the integrated CA-4 public surface. Any future transport gap must be demonstrated by a failing OMBRA use case before changing the shared protocol.
+The OMB-0 evidence does not expose a missing Consumer API or Binder primitive. OMB-4 must first implement the complete flow with the integrated CA-4 public surface. Any later protocol change requires a concrete failing consumer case.
 
-## Parser spike — selected direction
+## Parser decision
 
-### Candidate selected for bounded implementation spike
+### Final selected direction
 
-Use AndroidX PDF `1.0.0-alpha19` through:
+Use **PdfBox-Android `2.0.27.0` inside a permissionless Android isolated process**, not in the OMBRA application process.
+
+The OMB-0A AndroidX PDF spike was useful to establish the trust-boundary requirements, but the final bounded runtime evidence moved the parser behind `OmbraPdfIsolatedParserSpikeService` and restored the repository-wide OMBRA/Console `minSdk` instead of requiring the AndroidX PDF API-28/SDK-extension-19 product floor.
+
+The selected shape is:
 
 ```text
-androidx.pdf:pdf-core
-androidx.pdf:pdf-document-service
-SandboxedPdfLoader
+OMBRA app process
+    -> opens user URI read-only
+    -> passes only ParcelFileDescriptor capability
+    -> isolatedProcess parser service
+       -> PdfBox-Android
+       -> page-by-page bounded extraction
+       -> UTF-8 framed output pipe
+    -> OMBRA receives page index + extracted text only
 ```
 
-Rationale:
+Security and ownership properties proven by the spike:
 
-- AndroidX exposes page content including ordered text objects and bounds;
-- `SandboxedPdfLoader` processes PDFs through a sandboxed Android service instead of parsing an untrusted PDF directly inside the OMBRA application process;
-- the API owns/communicates descriptor cleanup explicitly and provides typed password/open failures;
-- it avoids introducing a second third-party PDF parser stack into a privacy/security-sensitive application.
+- the parser runs under a UID different from the OMBRA application UID;
+- the isolated service owns no application permissions;
+- OMBRA opens the source and transfers only a read-only file descriptor;
+- document-sized extracted content flows through a pipe rather than Binder transaction payloads;
+- Messenger carries only completion/error metadata;
+- page count and returned character counts are bounded;
+- page frames validate magic, page indices and byte bounds before materialization;
+- descriptors, document objects and service bindings are closed on success, failure and cancellation paths;
+- cancellation leaves the parser reusable for a subsequent request.
 
-Primary references:
+PdfBox-Android remains an implementation dependency of the OMBRA consumer only. It does not enter Harness runtime/public contracts.
 
-- https://developer.android.com/jetpack/androidx/releases/pdf
-- https://developer.android.com/reference/kotlin/androidx/pdf/SandboxedPdfLoader
-- https://developer.android.com/reference/kotlin/androidx/pdf/PdfDocument
+## Runtime extraction evidence
 
-### Android build and minimum-version requirements
+GitHub Actions workflow **OMBRA PDF runtime spike**, exact PR #106 head gate, completed successfully on an API-35 emulator.
 
-AndroidX PDF read/render support is backported to `minSdk = 28`. The repository-wide Harness floor remains API 26, but the OMBRA consumer APK is allowed to use API 28 as its own product floor.
+The focused runtime suite executed **6 instrumentation tests** and passed.
 
-The alpha19 AAR metadata also requires Android SDK extension level 19 at compile time. OMBRA therefore sets `compileSdkExtension = 19` locally in `apps/local-llm-console`; the requirement is not propagated to the Harness host or reusable library modules.
+Evidence covers:
 
-This is an intentional consumer-only compatibility trade-off. It avoids using framework `PdfRenderer.Page.getTextContents()`, whose text-content API starts at API 35, and avoids taking the older PdfBox-Android dependency solely to preserve Android 8 support.
+- two-page page-ordered extraction;
+- visual reading order for a fragmented/two-column fixture;
+- page-count and character truncation bounds;
+- image-only input producing no plaintext rather than fabricated text;
+- malformed input failing closed;
+- password-protected input failing closed;
+- cooperative cancellation and parser reuse;
+- permissionless isolated-process execution with a distinct parser UID;
+- normalized PDF export and parser round-trip;
+- representative European Unicode round-trip and unsupported-glyph rejection.
 
-### Alternative considered: PdfBox-Android
+The final OMB-2 extractor still owns production typed error mapping, stable block/segment mapping, final byte/resource policy and broader fixture coverage. Those are implementation requirements, not unresolved architecture choices.
 
-`com.tom-roush:pdfbox-android:2.0.27.0` supports API 19+ and is Apache-2.0 licensed, but its public repository remains based on Apache PDFBox 2.0.27 and would execute a larger third-party parser surface in the app process unless OMBRA introduced an additional isolation boundary.
+## APK-size evidence
 
-Reference: https://github.com/TomRoush/PdfBox-Android
+The automated size gate measured the PDF-enabled OMBRA/Console debug APK against the pre-PDF CA-4 baseline:
 
-It remains a fallback only if the AndroidX runtime/size/fidelity spike fails.
+```text
+baseline_apk_bytes = 1,300,694
+current_apk_bytes  = 10,918,600
+delta_bytes        = 9,617,906
+delta_percent      = 739.44%
+```
 
-### Code spike now present
+The increase is accepted for the OMBRA reference-consumer path because:
 
-`OmbraPdfParserSpike`:
+- the PDF parser is app-specific and does not inflate the Harness host or reusable client/runtime AARs;
+- parser isolation is a stronger requirement than minimizing this reference APK at OMB-0;
+- v1 deliberately trades application size for local-only document processing and a narrow parser trust boundary.
 
-- opens the user document with `SandboxedPdfLoader`;
-- exposes only page index + extracted text to the spike result;
-- bounds page count and total extracted characters;
-- closes the opened `PdfDocument` deterministically;
-- deliberately does not become the final OMBRA domain API.
+Release/minification optimization may reduce the distributed delta later, but OMB-0 does not depend on such an assumption.
 
-The final OMB-2 extractor must additionally prove stable block segmentation, cancellation, encrypted/malformed/image-only outcomes, byte/resource bounds and representative reading-order behavior.
+## Export and font/glyph decision
 
-## Export spike — selected direction
+Use framework `android.graphics.pdf.PdfDocument` for normalized, flattened export. It creates new pages and never copies source-PDF objects/bytes into the output.
 
-Use framework `android.graphics.pdf.PdfDocument` for normalized export. It is available from API 19 and creates a new PDF by drawing each new page onto a Canvas and writing the completed document to an `OutputStream`.
+The writer contract is:
 
-Primary reference: https://developer.android.com/reference/android/graphics/pdf/PdfDocument
+- deterministic page geometry and wrapping;
+- bounded page/character counts;
+- resources closed on every path;
+- accepted source values are absent from the newly generated output;
+- placeholders survive independent parser round-trip;
+- unsupported glyphs fail closed instead of silently substituting unknown characters.
 
-`OmbraPdfWriterSpike` now proves the intended ownership shape:
+For v1, the accepted font policy is **Android system sans-serif plus explicit glyph preflight/fail-closed behavior**. The runtime fixture round-tripped representative Italian/European text including accented Italian, em dash, German/Spanish/Polish characters, ordinal symbol and euro sign. A deliberately unsupported Unicode code point was rejected.
 
-- no source-PDF objects or bytes are copied into output;
-- page geometry and line wrapping are deterministic inputs;
-- input page/character counts are bounded;
-- writer/page resources are closed on every path;
-- unsupported glyphs fail closed instead of silently substituting unknown content.
+A bundled font is therefore not required by OMB-0. OMB-5/OMB-8 may revisit font packaging only if the supported-language corpus demonstrates a concrete glyph gap.
 
-The spike currently uses the Android system sans-serif typeface only to exercise the writer path. The final font policy is **not yet accepted** because exported glyph coverage must be verified across representative Italian/European text fixtures. A bundled reviewed font is preferred if system fallback cannot provide deterministic coverage without hidden substitution.
+## OMB-0 evidence ledger
 
-## Remaining OMB-0 evidence
-
-OMB-0 is intentionally still `IN PROGRESS`. Before marking it `DONE`, the branch must record:
-
-1. repository validation that the AndroidX PDF dependencies, API 28 app floor, SDK extension 19 compile requirement, parser spike and writer spike compile/package cleanly;
-2. packaged APK size delta for the PDF artifacts;
-3. runtime fixture evidence for representative text PDFs, multi-column/fragmented text, empty-text/image-only input, malformed input and encrypted input;
-4. cancellation/resource-cleanup evidence for parser operations;
-5. writer round-trip evidence that exported text contains expected placeholders and omits accepted source values;
-6. font/glyph policy decision after representative Unicode fixtures;
-7. final confirmation that no shared Consumer API/wire change is needed.
-
-If one of these results changes the parser/export architecture, update this record before starting OMB-1/OMB-2 implementation that depends on it.
+| Gate | Result |
+| --- | --- |
+| Repository/build/package validation | PASS |
+| Parser trust-boundary decision | ACCEPTED — PdfBox-Android in isolated process |
+| OMBRA minimum SDK | Repository consumer floor retained; AndroidX API-28 raise removed |
+| Runtime representative fixtures | PASS |
+| Malformed/encrypted/image-only behavior | PASS / fail-closed as specified |
+| Cancellation and cleanup | PASS |
+| Writer placeholder/source-value round-trip | PASS |
+| Representative European glyph round-trip | PASS |
+| Unsupported glyph behavior | PASS — fail closed |
+| APK-size delta | MEASURED — +9,617,906 bytes (+739.44%) |
+| Consumer API/wire change required | NO |
 
 ## Exit rule
 
-OMB-0 can become `DONE` only when all remaining evidence above is reviewable and no unresolved parser, export, schema, use-case or brand decision could force a different package or trust boundary.
+The OMB-0 architectural uncertainty is closed: product, parser trust boundary, export strategy, schema, use case, font/glyph policy and Consumer API boundary are reviewable and internally consistent.
+
+The milestone remains `IN PROGRESS` on this feature branch until PR #106 is integrated into `dev`. After integration, the next OMBRA branch must mark OMB-0 `DONE` before OMB-1 can be treated as independently mergeable.
