@@ -80,11 +80,10 @@ data class EvaluationSemanticExecutionIdentity(
     }
 
     companion object {
-        fun create(execution: EvaluationSemanticExecution): EvaluationSemanticExecutionIdentity =
-            EvaluationSemanticExecutionIdentity(
-                execution = execution,
-                fingerprint = CanonicalEvaluationHasher.semanticExecutionFingerprint(execution),
-            )
+        fun create(execution: EvaluationSemanticExecution): EvaluationSemanticExecutionIdentity = EvaluationSemanticExecutionIdentity(
+            execution = execution,
+            fingerprint = CanonicalEvaluationHasher.semanticExecutionFingerprint(execution),
+        )
     }
 }
 
