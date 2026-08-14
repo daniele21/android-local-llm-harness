@@ -48,10 +48,33 @@ internal object OmbraPdfTextNormalizer {
                 textLines.zip(content.bounds) { text, bounds -> PendingFragment(text, RectF(bounds)) }
 
             content.bounds.size == 1 ->
-                listOf(PendingFragment(textLines.joinToString(separator = ""), RectF(content.bounds.single())))
+                listOf(PendingFragment(normalizeSingleBoundText(normalized), RectF(content.bounds.single())))
 
             else -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
         }
+    }
+
+    private fun normalizeSingleBoundText(text: String): String {
+        val pieces = text.split('\n')
+        val firstContentIndex = pieces.indexOfFirst { piece -> piece.isNotEmpty() }
+        if (firstContentIndex < 0) return ""
+        val lastContentIndex = pieces.indexOfLast { piece -> piece.isNotEmpty() }
+        val builder = StringBuilder()
+        var pendingGap = false
+
+        for (index in firstContentIndex..lastContentIndex) {
+            val piece = pieces[index]
+            if (piece.isEmpty()) {
+                pendingGap = builder.isNotEmpty()
+                continue
+            }
+            if (pendingGap && builder.lastOrNull()?.isWhitespace() != true && piece.firstOrNull()?.isWhitespace() != true) {
+                builder.append(' ')
+            }
+            builder.append(piece)
+            pendingGap = false
+        }
+        return builder.toString()
     }
 
     private fun groupIntoVisualLines(fragments: List<TextFragment>): List<List<TextFragment>> {
