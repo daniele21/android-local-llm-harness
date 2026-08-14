@@ -9,6 +9,7 @@ on:
       - "apps/local-llm-console/build.gradle.kts"
       - "gradle/libs.versions.toml"
       - "scripts/run-ombra-pdf-spike-device-e2e.sh"
+      - "scripts/measure-ombra-pdf-apk-delta.sh"
       - ".github/workflows/ombra-pdf-spike.yml"
   workflow_dispatch:
 
@@ -24,6 +25,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -43,6 +46,10 @@ jobs:
             "build-tools;36.0.0" \
             "emulator" \
             "system-images;android-35;google_apis;x86_64"
+
+      - name: Measure PDF APK size delta
+        shell: bash
+        run: bash scripts/measure-ombra-pdf-apk-delta.sh
 
       - name: Enable KVM access
         shell: bash
