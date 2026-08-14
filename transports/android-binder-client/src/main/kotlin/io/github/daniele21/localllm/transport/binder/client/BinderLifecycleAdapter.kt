@@ -240,7 +240,7 @@ private sealed interface RemoteCallbackOutcome<out T : Any> {
 
 private fun prepareFailure(detail: String): PrepareResult = PrepareResult(false, null, detail)
 
-private object AndroidMainThreadBlockingCallGuard : BlockingCallGuard {
+internal object AndroidMainThreadBlockingCallGuard : BlockingCallGuard {
     override fun requireAllowed() {
         check(Looper.myLooper() != Looper.getMainLooper()) {
             "Shared-runtime blocking lifecycle calls are not allowed on the Android main thread"
