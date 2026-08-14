@@ -107,15 +107,15 @@ EVAL-1 is complete when this change passes the repository merge gates.
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-E-01 | READY | EVAL-C-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
-| EVAL-E-02 | PLANNED | EVAL-E-01 | Implement normalized exact-match evaluator with explicit whitespace/case normalization policy. |
-| EVAL-E-03 | PLANNED | EVAL-E-01 | Implement multiple-choice evaluator that extracts only allowed answer labels and rejects ambiguity. |
-| EVAL-E-04 | PLANNED | EVAL-E-01 | Implement numeric-final-answer evaluator with locale-independent parsing and bounded tolerance policy where declared. |
-| EVAL-E-05 | PLANNED | EVAL-E-01 | Implement JSON parse/schema/field evaluator with deterministic partial field scoring. |
-| EVAL-E-06 | PLANNED | EVAL-E-01 | Implement regex/format constraint evaluator using bounded repository-defined patterns only. |
-| EVAL-E-07 | PLANNED | EVAL-E-01,EVAL-E-06 | Implement instruction-constraint aggregation for declarative verifiable constraints. |
-| EVAL-E-08 | PLANNED | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-07 | Implement category and weighted suite score aggregation including zero-score failure semantics. |
-| EVAL-E-09 | PLANNED | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-06,EVAL-E-07 | Add adversarial/malformed-output fixtures and deterministic golden tests for every evaluator version. |
+| EVAL-E-01 | DONE | EVAL-C-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
+| EVAL-E-02 | DONE | EVAL-E-01 | Implement normalized exact-match evaluator with explicit whitespace/case normalization policy. |
+| EVAL-E-03 | DONE | EVAL-E-01 | Implement multiple-choice evaluator that extracts only allowed answer labels and rejects ambiguity. |
+| EVAL-E-04 | DONE | EVAL-E-01 | Implement numeric-final-answer evaluator with locale-independent parsing and bounded tolerance policy where declared. |
+| EVAL-E-05 | DONE | EVAL-E-01 | Implement JSON parse/schema/field evaluator with deterministic partial field scoring. |
+| EVAL-E-06 | DONE | EVAL-E-01 | Implement regex/format constraint evaluator using bounded repository-defined patterns only. |
+| EVAL-E-07 | DONE | EVAL-E-01,EVAL-E-06 | Implement instruction-constraint aggregation for declarative verifiable constraints. |
+| EVAL-E-08 | READY | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-07 | Implement category and weighted suite score aggregation including zero-score failure semantics. |
+| EVAL-E-09 | READY | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-06,EVAL-E-07 | Add adversarial/malformed-output fixtures and deterministic golden tests for every evaluator version. |
 | EVAL-E-10 | PLANNED | EVAL-E-08,EVAL-E-09 | Document evaluator semantics and freeze v1 behavior for dataset-pack compatibility. |
 
 EVAL-3 closes when EVAL-E-01 through EVAL-E-10 are `DONE`.
@@ -158,16 +158,9 @@ EVAL-5 closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner pe
 
 ## Parallel execution guidance
 
-EVAL-1 now unlocks these independent lanes:
+EVAL-1 unlocks independent dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes.
 
-- evaluator lane: EVAL-E-01 onward;
-- runner lane: EVAL-R-01 and EVAL-R-02;
-- persistence lane: EVAL-P-01 onward;
-- dataset lane in [`datasets.md`](datasets.md);
-- UI fake-state lane in [`performance-ui.md`](performance-ui.md);
-- deterministic identity validation in [`validation.md`](validation.md).
-
-Within the evaluator lane, EVAL-E-02 through EVAL-E-06 can run in parallel after EVAL-E-01. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
+Within the evaluator lane, EVAL-E-01 through EVAL-E-07 are integrated. EVAL-E-08 aggregation and EVAL-E-09 golden/adversarial coverage are now independent and may run in parallel; EVAL-E-10 follows only after both are complete. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
 
 ## Completion gates
 
