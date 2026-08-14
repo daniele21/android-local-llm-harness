@@ -11,9 +11,10 @@ This guide owns navigation and validation for model-evaluation implementation un
 
 ## Current ownership
 
-`evaluation/contracts` is the only concrete EVAL-1 module. It owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/engine` owns evaluation-run lifecycle, single-run ownership, fake-friendly execution ports and controlled evaluation-only model resolution. It must not mutate ordinary app bindings or absorb scorer, persistence or Compose responsibilities.
 
-Do not create `evaluation/engine`, dataset-store or persistence modules until the corresponding workstream contains real behavior. EVAL-1 intentionally establishes contracts without speculative empty modules.
+Do not create dataset-store or persistence implementation modules until the corresponding workstream contains real behavior. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
 
 ## Contract invariants
 
@@ -25,6 +26,8 @@ Do not create `evaluation/engine`, dataset-store or persistence modules until th
 - Evaluator specs are declarative and bounded; they cannot name classes, scripts, URLs or executable code.
 - Failure contracts use bounded typed codes rather than arbitrary backend exception text.
 - Prompt, expected-answer and generated-answer content is not part of persistent run/result contracts.
+- The engine executes exactly the ordered sample selection it receives; dataset parsing/sampling belong upstream.
+- Evaluation-only model selection is explicit and read-only with respect to normal application binding/profile state.
 
 ## Validation
 
@@ -37,5 +40,7 @@ For contract-only iteration run:
   :evaluation:contracts:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
 ```
+
+For engine work run the equivalent scoped checks for `:evaluation:engine` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
 
 Because adding or changing the module list affects repository navigation and build configuration, also run the repository documentation/navigation guards and the applicable repository-wide gate before merge.
