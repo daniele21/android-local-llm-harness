@@ -57,6 +57,9 @@ val currentVersionName = versionProperties.getProperty("versionName") ?: "0.1.0"
 android {
     namespace = "io.github.daniele21.localllm.console"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    // AndroidX PDF alpha19 requires extension level 19. Keep this OMBRA-only: the Harness host
+    // and reusable libraries retain their repository-wide compile/min SDK compatibility policy.
+    compileSdkExtension = 19
     buildToolsVersion = libs.versions.buildTools.get()
 
     defaultConfig {
