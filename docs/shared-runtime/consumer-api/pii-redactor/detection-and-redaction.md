@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.detection-redaction
 Read when: implementing PII definitions, PDF text segmentation, prompt/schema composition, finding validation or anonymized export
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 ## Goal
 
@@ -57,10 +57,13 @@ Custom definitions:
 
 - exist only for the active task in v1;
 - require a nonblank name and definition;
-- are normalized to a collision-free ID within the active set;
+- receive a collision-free **content-free ordinal ID** such as `custom-1`, `custom-2`, rather than deriving the ID from user-entered label/definition text;
 - have strict name, definition, example and count limits;
-- reject NUL/control characters and misleading duplicate IDs;
-- are serialized as data, not appended as free-form system instructions.
+- reject NUL/control characters and duplicate IDs;
+- are serialized as data, not appended as free-form system instructions;
+- keep label, definition and example in sensitive task memory and out of normal logging/telemetry.
+
+The content-free custom ID is intentional: `typeId` participates in structured request/result handling, while the user-authored label and definition remain sensitive application data. Human-readable placeholder labels are a separate OMB-5 concern and must not reuse source values.
 
 The implementation should use conservative initial bounds and tune them only with context-budget tests. Exact accepted limits become code constants and capability-aware UI copy, not duplicated magic values in Compose.
 
@@ -267,6 +270,7 @@ After writing, an automated verifier for tests re-extracts exported text and ass
 ## Acceptance criteria
 
 - Built-in/custom definitions have one deterministic serialization owner.
+- Custom `typeId` values remain content-free and do not encode user-entered label, definition or example text.
 - Chunk planning proves no input or schema limit is exceeded.
 - The fixed schema round-trips through the supported Consumer API constraint.
 - Model output cannot introduce an unselected PII type or nonexistent source value into the redaction plan.
