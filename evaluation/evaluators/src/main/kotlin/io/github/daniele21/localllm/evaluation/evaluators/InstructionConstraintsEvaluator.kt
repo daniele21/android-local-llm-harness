@@ -41,9 +41,9 @@ class InstructionConstraintsEvaluator(private val regexEvaluator: RegexFormatEva
             CONSTRAINT_EXCLUDES -> !contains(generated, spec.parameters.getValue(PARAM_EXCLUDES_TEXT), casePolicy)
             CONSTRAINT_STARTS_WITH -> startsWith(generated, spec.parameters.getValue(PARAM_STARTS_WITH_TEXT), casePolicy)
             CONSTRAINT_ENDS_WITH -> endsWith(generated, spec.parameters.getValue(PARAM_ENDS_WITH_TEXT), casePolicy)
-            CONSTRAINT_MIN_WORDS -> wordCount(generated) >= parseCount(spec.parameters.getValue(PARAM_MIN_WORDS))
-            CONSTRAINT_MAX_WORDS -> wordCount(generated) <= parseCount(spec.parameters.getValue(PARAM_MAX_WORDS))
-            CONSTRAINT_EXACT_LINES -> lineCount(generated) == parseCount(spec.parameters.getValue(PARAM_EXACT_LINES))
+            CONSTRAINT_MIN_WORDS -> instructionWordCount(generated) >= parseCount(spec.parameters.getValue(PARAM_MIN_WORDS))
+            CONSTRAINT_MAX_WORDS -> instructionWordCount(generated) <= parseCount(spec.parameters.getValue(PARAM_MAX_WORDS))
+            CONSTRAINT_EXACT_LINES -> instructionLineCount(generated) == parseCount(spec.parameters.getValue(PARAM_EXACT_LINES))
             CONSTRAINT_FORMAT -> evaluateFormat(generated, spec)
             else -> error("Unsupported instruction constraint")
         }
@@ -114,10 +114,6 @@ class InstructionConstraintsEvaluator(private val regexEvaluator: RegexFormatEva
         CASE_INSENSITIVE -> source.lowercase(Locale.ROOT).endsWith(target.lowercase(Locale.ROOT))
         else -> error("Unsupported instruction constraint case policy")
     }
-
-    private fun wordCount(value: String): Int = value.trim().takeIf(String::isNotEmpty)?.split(WHITESPACE_RUN)?.size ?: 0
-
-    private fun lineCount(value: String): Int = LINE_BREAK.split(value).size
 
     private fun parseCount(raw: String): Int {
         require(COUNT.matches(raw)) { "Instruction count parameter must be a positive base-10 integer" }
@@ -208,7 +204,13 @@ class InstructionConstraintsEvaluator(private val regexEvaluator: RegexFormatEva
         private const val MAX_CONSTRAINTS = 16
         private const val MAX_COUNT = 100_000
         private val COUNT = Regex("[1-9]\\d{0,5}")
-        private val WHITESPACE_RUN = Regex("\\s+")
-        private val LINE_BREAK = Regex("\\r\\n|\\r|\\n")
     }
 }
+
+private fun instructionWordCount(value: String): Int =
+    value.trim().takeIf(String::isNotEmpty)?.split(INSTRUCTION_WHITESPACE_RUN)?.size ?: 0
+
+private fun instructionLineCount(value: String): Int = INSTRUCTION_LINE_BREAK.split(value).size
+
+private val INSTRUCTION_WHITESPACE_RUN = Regex("\\s+")
+private val INSTRUCTION_LINE_BREAK = Regex("\\r\\n|\\r|\\n")
