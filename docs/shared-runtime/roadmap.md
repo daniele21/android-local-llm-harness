@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime
 Canonical scope: shared-runtime.roadmap
 Read when: selecting a shared-runtime milestone, checking dependencies or defining a focused pull request
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 This roadmap owns capability order and exit gates. Detailed behavior belongs in the linked workstreams; integrated repository priority and blockers remain in [`../current-state.md`](../current-state.md).
 
@@ -156,18 +156,31 @@ Goal: validate the exact two-APK distribution and decide whether the client arti
 
 Owner: [`workstreams/validation-rollout.md`](workstreams/validation-rollout.md)
 Runbook: [`sr6-release-evidence.md`](sr6-release-evidence.md)
+Governance review: [`sr6-release-governance-review.md`](sr6-release-governance-review.md)
 
 Dependencies: SR-5 plus applicable Q35 runtime/device gates.
 
-Repository implementation in progress:
+Repository implementation now includes:
 
 - packaged release Binder client/contract AAR consumer fixture;
 - same-signer release-like functional/cancellation/process-death instrumentation;
 - independently signed ephemeral negative fixture;
 - physical-device evidence capture with package/certificate/protocol/device/memory/thermal identity;
-- explicit evidence privacy boundary and archive format.
+- explicit evidence privacy boundary and archive format;
+- a dedicated same-signer package-replacement runner that proves packaged Binder traffic before and after `adb install -r` while preserving selected model identity;
+- a dedicated SR-VAL-09 comparator that rejects unmatched model/context/thinking/tuning-case evidence and reports Binder envelope versus warm in-process evidence without inventing a performance threshold;
+- repository-level public API/security/versioning/packaging/console-governance review.
 
-Remaining exit evidence requires execution on representative physical hardware and completion of the public API/security/versioning/release review for the exact candidate. Q35 physical runtime evidence remains an independent release dependency.
+Repository implementation for the release closeout is therefore complete enough to execute the remaining exact-candidate gates. **SR-6 itself remains IN PROGRESS** because physical-device evidence cannot be substituted by CI or documentation.
+
+Remaining exit evidence:
+
+- same-signer release-like matrix on representative physical arm64-v8a hardware;
+- independently signed release-package denial on physical hardware;
+- package-replacement pre/post Binder traffic capture for the exact base/replacement candidates;
+- matched SR-VAL-09 Binder versus in-process physical evidence on the same device/model/profile conditions;
+- applicable Q35 physical runtime evidence;
+- final release-note binding of exact commit/package/protocol/runtime/backend/model/signing identities.
 
 Exit gate:
 
