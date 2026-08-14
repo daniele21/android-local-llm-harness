@@ -27,9 +27,7 @@ object CanonicalEvaluationHasher {
         return EvaluatorSetDigest(sha256(canonical))
     }
 
-    fun caseExecutionSemanticsDigest(
-        cases: List<CaseExecutionSemanticIdentity>,
-    ): CaseExecutionSemanticsDigest {
+    fun caseExecutionSemanticsDigest(cases: List<CaseExecutionSemanticIdentity>): CaseExecutionSemanticsDigest {
         require(cases.isNotEmpty()) { "Cannot hash empty case execution semantics" }
         val canonical = CanonicalBuilder("case-execution-semantics-v1")
             .number("count", cases.size.toLong())
@@ -43,9 +41,7 @@ object CanonicalEvaluationHasher {
         return CaseExecutionSemanticsDigest(sha256(canonical))
     }
 
-    fun semanticExecutionFingerprint(
-        execution: EvaluationSemanticExecution,
-    ): EvaluationSemanticExecutionFingerprint {
+    fun semanticExecutionFingerprint(execution: EvaluationSemanticExecution): EvaluationSemanticExecutionFingerprint {
         val canonical = CanonicalBuilder("semantic-execution-v1")
             .number("semanticsVersion", execution.semanticsVersion.toLong())
             .text("profileId", execution.profile.id.value)
