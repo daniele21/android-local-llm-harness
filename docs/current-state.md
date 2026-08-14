@@ -44,11 +44,11 @@ SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling 
 
 The shared runtime is not production/release ready until the physical SR-6 evidence is executed on representative hardware. Canonical status and runbook: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
-### Public Consumer API
+### Public Consumer API and OMBRA
 
 CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, Binder lifecycle/generation adapters, deterministic privacy/compatibility coverage and packaged release-AAR compilation evidence.
 
-CA-5 is now active through OMBRA OMB-0. The first slice freezes product/parser/export/schema/use-case decisions before domain/UI implementation. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
+CA-5 is active through OMBRA. OMB-0 is integrated through PR #106 with the isolated PdfBox parser/export decision and runtime evidence. OMB-1A and OMB-1B are integrated through PRs #107 and #108, closing the pure domain/application-state gate with Android-independent models, immutable workflow state, focused reducer transitions, replaceable async ports, sensitive in-memory task storage and fake end-to-end orchestration. OMB-2 is now the active implementation block for production PDF import/extraction behind the application port. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
 ### Model evaluation
 
@@ -60,9 +60,9 @@ This parallel capability does not replace the existing telemetry-derived benchma
 
 ## Open blockers
 
-### 1. OMBRA OMB-0 decisions and spikes
+### 1. OMBRA OMB-2 production PDF import and extraction
 
-Complete the bounded parser/export decision slice before growing application code. The selected path must preserve OMBRA as a pure consumer: local PDF access/extraction/export, no model/runtime ownership, fixed structured-output semantics and mandatory human review.
+Complete the production extraction boundary before growing analysis or UI code. The active slice must keep raw URI/PDF ownership local to OMBRA, route extraction through the reviewed isolated PdfBox process, produce deterministic page/block source mapping, fail closed with typed outcomes and prove cancellation/resource cleanup. OMB-2 must also wire the PDF-only `OpenDocument` capability and prove that reset releases source capability state and sensitive task data.
 
 ### 2. Physical Android evidence
 
@@ -79,12 +79,12 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 
 ## Immediate next block
 
-1. complete OMB-0A product/parser/export/schema/use-case decisions and bounded spikes;
-2. start OMB-1 pure Android-independent domain/state only after OMB-0 architecture choices are reviewable;
+1. complete OMB-2A production PDF source capability, extractor adapter, deterministic segmentation and emulator/resource-cleanup evidence;
+2. close the remaining OMB-2 picker/reset/typed-failure exit-gate work before starting OMB-3 analysis composition;
 3. keep OMB-4 real Consumer API integration behind the accepted OMBRA domain/extraction/composition boundaries;
 4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
-Model-evaluation post-EVAL-1 work is independently ready in seven entry tasks and may proceed in parallel without changing this immediate repository block.
+Model-evaluation work may proceed in parallel when ownership is disjoint, without changing this immediate OMBRA sequencing.
 
 ## Source links
 
