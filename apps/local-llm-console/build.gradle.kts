@@ -80,8 +80,7 @@ android {
     signingConfigs {
         create("upload") {
             if (consoleUploadSigningConfigured) {
-                storeFile = file(consoleUploadSigningEnvironment.getValue("storeFile")!!
-                )
+                storeFile = file(consoleUploadSigningEnvironment.getValue("storeFile")!!)
                 storePassword = consoleUploadSigningEnvironment.getValue("storePassword")
                 keyAlias = consoleUploadSigningEnvironment.getValue("keyAlias")
                 keyPassword = consoleUploadSigningEnvironment.getValue("keyPassword")
@@ -115,7 +114,7 @@ android {
             isMinifyEnabled = false
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
             manifestPlaceholders["sharedRuntimeHostPackage"] = sharedRuntimeReleaseHostPackage
-            buildConfigField("String", "SHARED_RUNTIME_HOST_PACKAGE", "\"$sharedRuntimeReleaseHostPackage\"")
+            buildConfigField("String", "SHARED_RUNTIME_HOST_PACKAGE", "\"$sharedRuntimeHostPackage\"")
             if (consoleUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
             }
