@@ -1,0 +1,44 @@
+name: SR-6 release tooling
+
+on:
+  pull_request:
+    paths:
+      - "scripts/compare-shared-runtime-transport-evidence.py"
+      - "scripts/tests/test_compare_shared_runtime_transport_evidence.py"
+      - "scripts/capture-shared-runtime-package-upgrade-evidence.sh"
+      - ".github/workflows/sr6-release-tooling.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "scripts/compare-shared-runtime-transport-evidence.py"
+      - "scripts/tests/test_compare_shared_runtime_transport_evidence.py"
+      - "scripts/capture-shared-runtime-package-upgrade-evidence.sh"
+      - ".github/workflows/sr6-release-tooling.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  release-tooling:
+    name: SR-6 release evidence tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Run transport comparator unit tests
+        run: python3 -m unittest scripts.tests.test_compare_shared_runtime_transport_evidence
+
+      - name: Validate package-upgrade runner
+        shell: bash
+        run: |
+          bash -n scripts/capture-shared-runtime-package-upgrade-evidence.sh
+          bash scripts/capture-shared-runtime-package-upgrade-evidence.sh --help >/dev/null
+
+      - name: Validate comparator CLI
+        run: |
+          python3 -m py_compile scripts/compare-shared-runtime-transport-evidence.py
+          python3 scripts/compare-shared-runtime-transport-evidence.py --help >/dev/null
