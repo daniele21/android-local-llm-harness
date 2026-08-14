@@ -88,9 +88,11 @@ Primary references:
 - https://developer.android.com/reference/kotlin/androidx/pdf/SandboxedPdfLoader
 - https://developer.android.com/reference/kotlin/androidx/pdf/PdfDocument
 
-### Minimum Android version
+### Android build and minimum-version requirements
 
 AndroidX PDF read/render support is backported to `minSdk = 28`. The repository-wide Harness floor remains API 26, but the OMBRA consumer APK is allowed to use API 28 as its own product floor.
+
+The alpha19 AAR metadata also requires Android SDK extension level 19 at compile time. OMBRA therefore sets `compileSdkExtension = 19` locally in `apps/local-llm-console`; the requirement is not propagated to the Harness host or reusable library modules.
 
 This is an intentional consumer-only compatibility trade-off. It avoids using framework `PdfRenderer.Page.getTextContents()`, whose text-content API starts at API 35, and avoids taking the older PdfBox-Android dependency solely to preserve Android 8 support.
 
@@ -134,7 +136,7 @@ The spike currently uses the Android system sans-serif typeface only to exercise
 
 OMB-0 is intentionally still `IN PROGRESS`. Before marking it `DONE`, the branch must record:
 
-1. repository validation that the AndroidX PDF dependencies, API 28 app floor, parser spike and writer spike compile/package cleanly;
+1. repository validation that the AndroidX PDF dependencies, API 28 app floor, SDK extension 19 compile requirement, parser spike and writer spike compile/package cleanly;
 2. packaged APK size delta for the PDF artifacts;
 3. runtime fixture evidence for representative text PDFs, multi-column/fragmented text, empty-text/image-only input, malformed input and encrypted input;
 4. cancellation/resource-cleanup evidence for parser operations;
