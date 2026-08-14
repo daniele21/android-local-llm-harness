@@ -42,7 +42,9 @@ class OmbraPdfIsolatedParserSpikeService : Service() {
             val replyTo = message.replyTo
             val maxPages = message.data.getInt(KEY_MAX_PAGES, 0)
             val maxCharacters = message.data.getInt(KEY_MAX_CHARACTERS, 0)
-            if (input == null || output == null || replyTo == null || maxPages <= 0 || maxCharacters <= 0) {
+            val invalidDescriptors = input == null || output == null || replyTo == null
+            val invalidBounds = maxPages <= 0 || maxCharacters <= 0
+            if (invalidDescriptors || invalidBounds) {
                 input?.close()
                 output?.close()
                 sendCompletion(replyTo, RESULT_ERROR, "InvalidRequest")
