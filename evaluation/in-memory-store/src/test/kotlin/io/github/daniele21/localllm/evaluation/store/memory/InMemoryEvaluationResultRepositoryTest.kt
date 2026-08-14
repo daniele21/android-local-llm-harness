@@ -21,7 +21,9 @@ import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
 import io.github.daniele21.localllm.evaluation.SamplingPolicyId
 import io.github.daniele21.localllm.evaluation.SamplingPolicyRef
 import io.github.daniele21.localllm.evaluation.SamplingSelection
-import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.startCoroutine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -29,7 +31,7 @@ import org.junit.Test
 
 class InMemoryEvaluationResultRepositoryTest {
     @Test
-    fun `history order is deterministic by newest start then run id`() = runTest {
+    fun `history order is deterministic by newest start then run id`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 10_000 }
         repository.createRun(summary("run-b", 100))
         repository.createRun(summary("run-c", 200))
@@ -42,7 +44,7 @@ class InMemoryEvaluationResultRepositoryTest {
     }
 
     @Test
-    fun `query filters by dataset model state and timestamp`() = runTest {
+    fun `query filters by dataset model state and timestamp`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 10_000 }
         repository.createRun(summary("matching", 100, datasetId = "dataset-a", modelDigest = "a".repeat(64)))
         repository.createRun(summary("other-dataset", 90, datasetId = "dataset-b", modelDigest = "a".repeat(64)))
@@ -61,7 +63,7 @@ class InMemoryEvaluationResultRepositoryTest {
     }
 
     @Test
-    fun `terminal deletion is allowed while active deletion is rejected`() = runTest {
+    fun `terminal deletion is allowed while active deletion is rejected`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 10_000 }
         repository.createRun(summary("active", 100))
         repository.createRun(summary("terminal", 90, state = EvaluationRunState.CANCELLED))
@@ -73,7 +75,7 @@ class InMemoryEvaluationResultRepositoryTest {
     }
 
     @Test
-    fun `retention removes oldest terminal runs but never active runs`() = runTest {
+    fun `retention removes oldest terminal runs but never active runs`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 10_000 }
         repository.createRun(summary("active", 10, state = EvaluationRunState.CREATED))
         repository.createRun(summary("new-terminal", 300, state = EvaluationRunState.CANCELLED))
@@ -90,7 +92,7 @@ class InMemoryEvaluationResultRepositoryTest {
     }
 
     @Test
-    fun `age retention uses injected clock deterministically`() = runTest {
+    fun `age retention uses injected clock deterministically`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 1_000 }
         repository.createRun(summary("expired", 100, state = EvaluationRunState.CANCELLED))
         repository.createRun(summary("fresh", 950, state = EvaluationRunState.CANCELLED))
@@ -102,7 +104,7 @@ class InMemoryEvaluationResultRepositoryTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `run configuration is immutable after creation`() = runTest {
+    fun `run configuration is immutable after creation`() = runSuspend {
         val repository = InMemoryEvaluationResultRepository { 1_000 }
         val created = summary("run", 100)
         repository.createRun(created)
@@ -160,5 +162,19 @@ class InMemoryEvaluationResultRepositoryTest {
             completedAtEpochMs = if (terminal) startedAt + 10 else null,
             failure = null,
         )
+    }
+
+    private fun <T> runSuspend(block: suspend () -> T): T {
+        var outcome: Result<T>? = null
+        block.startCoroutine(
+            object : Continuation<T> {
+                override val context = EmptyCoroutineContext
+
+                override fun resumeWith(result: Result<T>) {
+                    outcome = result
+                }
+            },
+        )
+        return requireNotNull(outcome).getOrThrow()
     }
 }
