@@ -23,11 +23,7 @@ enum class EvaluatorType {
     INSTRUCTION_CONSTRAINTS,
 }
 
-data class EvaluatorSpec(
-    val type: EvaluatorType,
-    val version: EvaluatorVersion,
-    val parameters: Map<String, String> = emptyMap(),
-) {
+data class EvaluatorSpec(val type: EvaluatorType, val version: EvaluatorVersion, val parameters: Map<String, String> = emptyMap()) {
     init {
         require(parameters.size <= MAX_EVALUATOR_PARAMETERS) {
             "Evaluator parameters must not exceed $MAX_EVALUATOR_PARAMETERS entries"
