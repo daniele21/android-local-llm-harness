@@ -8,9 +8,7 @@ import io.github.daniele21.localllm.evaluation.EvaluatorVersion
 import io.github.daniele21.localllm.evaluation.NormalizedScore
 import java.util.Locale
 
-class InstructionConstraintsEvaluator(
-    private val regexEvaluator: RegexFormatEvaluator = RegexFormatEvaluator(),
-) {
+class InstructionConstraintsEvaluator(private val regexEvaluator: RegexFormatEvaluator = RegexFormatEvaluator()) {
     fun evaluate(generated: String, spec: EvaluatorSpec): EvaluationOutcome {
         require(spec.type == EvaluatorType.INSTRUCTION_CONSTRAINTS && spec.version == VERSION) {
             "Instruction constraints evaluator requires INSTRUCTION_CONSTRAINTS v${VERSION.value} spec"
@@ -25,7 +23,9 @@ class InstructionConstraintsEvaluator(
 
         return when (passed) {
             checks.size -> EvaluationOutcome(NormalizedScore(1.0), EvaluatorOutcomeCode.CORRECT)
+
             0 -> EvaluationOutcome(NormalizedScore(0.0), EvaluatorOutcomeCode.CONSTRAINT_VIOLATION)
+
             else -> EvaluationOutcome(
                 score = NormalizedScore(passed.toDouble() / checks.size.toDouble()),
                 code = EvaluatorOutcomeCode.PARTIAL,
@@ -33,24 +33,20 @@ class InstructionConstraintsEvaluator(
         }
     }
 
-    private fun evaluateConstraint(
-        constraint: String,
-        generated: String,
-        spec: EvaluatorSpec,
-        casePolicy: String,
-    ): Boolean = when (constraint) {
-        CONSTRAINT_NON_EMPTY -> generated.isNotBlank()
-        CONSTRAINT_SINGLE_LINE -> '\n' !in generated && '\r' !in generated
-        CONSTRAINT_CONTAINS -> contains(generated, spec.parameters.getValue(PARAM_CONTAINS_TEXT), casePolicy)
-        CONSTRAINT_EXCLUDES -> !contains(generated, spec.parameters.getValue(PARAM_EXCLUDES_TEXT), casePolicy)
-        CONSTRAINT_STARTS_WITH -> startsWith(generated, spec.parameters.getValue(PARAM_STARTS_WITH_TEXT), casePolicy)
-        CONSTRAINT_ENDS_WITH -> endsWith(generated, spec.parameters.getValue(PARAM_ENDS_WITH_TEXT), casePolicy)
-        CONSTRAINT_MIN_WORDS -> wordCount(generated) >= parseCount(spec.parameters.getValue(PARAM_MIN_WORDS))
-        CONSTRAINT_MAX_WORDS -> wordCount(generated) <= parseCount(spec.parameters.getValue(PARAM_MAX_WORDS))
-        CONSTRAINT_EXACT_LINES -> lineCount(generated) == parseCount(spec.parameters.getValue(PARAM_EXACT_LINES))
-        CONSTRAINT_FORMAT -> evaluateFormat(generated, spec)
-        else -> error("Unsupported instruction constraint")
-    }
+    private fun evaluateConstraint(constraint: String, generated: String, spec: EvaluatorSpec, casePolicy: String): Boolean =
+        when (constraint) {
+            CONSTRAINT_NON_EMPTY -> generated.isNotBlank()
+            CONSTRAINT_SINGLE_LINE -> '\n' !in generated && '\r' !in generated
+            CONSTRAINT_CONTAINS -> contains(generated, spec.parameters.getValue(PARAM_CONTAINS_TEXT), casePolicy)
+            CONSTRAINT_EXCLUDES -> !contains(generated, spec.parameters.getValue(PARAM_EXCLUDES_TEXT), casePolicy)
+            CONSTRAINT_STARTS_WITH -> startsWith(generated, spec.parameters.getValue(PARAM_STARTS_WITH_TEXT), casePolicy)
+            CONSTRAINT_ENDS_WITH -> endsWith(generated, spec.parameters.getValue(PARAM_ENDS_WITH_TEXT), casePolicy)
+            CONSTRAINT_MIN_WORDS -> wordCount(generated) >= parseCount(spec.parameters.getValue(PARAM_MIN_WORDS))
+            CONSTRAINT_MAX_WORDS -> wordCount(generated) <= parseCount(spec.parameters.getValue(PARAM_MAX_WORDS))
+            CONSTRAINT_EXACT_LINES -> lineCount(generated) == parseCount(spec.parameters.getValue(PARAM_EXACT_LINES))
+            CONSTRAINT_FORMAT -> evaluateFormat(generated, spec)
+            else -> error("Unsupported instruction constraint")
+        }
 
     private fun evaluateFormat(generated: String, spec: EvaluatorSpec): Boolean {
         val outcome = regexEvaluator.evaluate(
