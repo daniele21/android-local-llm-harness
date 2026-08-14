@@ -1,9 +1,6 @@
 package io.github.daniele21.localllm.evaluation
 
-data class SamplingPolicyRef(
-    val id: SamplingPolicyId,
-    val version: Int,
-) {
+data class SamplingPolicyRef(val id: SamplingPolicyId, val version: Int) {
     init {
         require(version > 0) { "Sampling policy version must be positive" }
     }
@@ -31,13 +28,14 @@ data class SamplingSelection(
             policy: SamplingPolicyRef,
             seed: Long,
             orderedCaseIds: List<EvaluationCaseId>,
-        ): SamplingSelection = SamplingSelection(
-            dataset = dataset,
-            policy = policy,
-            seed = seed,
-            orderedCaseIds = orderedCaseIds.toList(),
-            digest = CanonicalEvaluationHasher.sampleSetDigest(orderedCaseIds),
-        )
+        ): SamplingSelection =
+            SamplingSelection(
+                dataset = dataset,
+                policy = policy,
+                seed = seed,
+                orderedCaseIds = orderedCaseIds.toList(),
+                digest = CanonicalEvaluationHasher.sampleSetDigest(orderedCaseIds),
+            )
     }
 }
 
