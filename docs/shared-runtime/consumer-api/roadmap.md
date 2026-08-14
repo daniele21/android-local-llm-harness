@@ -84,11 +84,11 @@ Exit gate: public content and metric semantics are deterministic and backend-neu
 
 ## CA-4 — Binder integration
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Owner: [`ca4-binder-protocol.md`](ca4-binder-protocol.md)
 
-Implemented on the active CA-4 branch:
+Integrated in PR #104:
 
 - Binder protocol minor evolution from v1.0 to v1.1;
 - optional `consumer-api-v1` feature negotiation while retaining legacy v1.0 behavior;
@@ -100,19 +100,17 @@ Implemented on the active CA-4 branch:
 - deterministic host/client/wire/privacy and v1.0/v1.1 compatibility coverage;
 - packaged release-AAR Consumer API compilation fixture.
 
-Remaining before the CA-4 exit gate:
-
-- repository and documentation validation must be green on the exact branch head;
-- any failure must be fixed without weakening the accepted security/privacy/compatibility boundary;
-- merge PR #104 into `dev` only after those gates are green.
+Repository and documentation validation passed on the exact PR head before merge into `dev`. Physical two-APK Consumer API evidence remains owned by CA-6 and is not inferred from JVM/AAR validation.
 
 Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior and the exact integrated head passes repository validation.
 
 ## CA-5 — OMBRA reference consumer
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Goal: turn `apps/local-llm-console` into the pure OMBRA PDF/PII reference consumer defined by [`pii-redactor/`](pii-redactor/).
+
+Active slice: OMB-0 decisions and bounded parser/export technical spikes. Product implementation must follow the accepted OMBRA responsibility split rather than extending the legacy Console control plane.
 
 Tasks:
 
