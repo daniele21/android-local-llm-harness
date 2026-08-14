@@ -1,7 +1,7 @@
 # OMB-0 decisions and technical spikes
 
 Status: active
-Document type: decision-and-spike-record
+Document type: feature-specification
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.omb0
 Read when: implementing OMBRA before OMB-0 is complete or reviewing parser/export/use-case decisions
