@@ -52,8 +52,10 @@ fun ConsumerSelectionParcel.toCoreSelection(): ConsumerSelectionRequest = Consum
     capabilityRevision = capabilityRevision,
     preset = preset?.toCorePreset(),
     reasoning = enumTag(reasoningPreferenceTag, "consumer reasoning preference"),
-    outputConstraint = outputConstraintTag?.let { enumTag(it, "consumer output constraint") },
-    sessionKind = sessionKindTag?.let { enumTag(it, "consumer session kind") },
+    outputConstraint = outputConstraintTag?.let {
+        enumTag<ConsumerOutputConstraintKind>(it, "consumer output constraint")
+    },
+    sessionKind = sessionKindTag?.let { enumTag<SessionKind>(it, "consumer session kind") },
 )
 
 fun ConsumerPreparedSelection.toConsumerWire(): ConsumerPreparedSelectionParcel = ConsumerPreparedSelectionParcel(
