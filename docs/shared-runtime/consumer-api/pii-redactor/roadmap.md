@@ -48,45 +48,60 @@ Canonical evidence: [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.m
 
 ## OMB-1 — Pure domain and application state
 
-State: **IN PROGRESS**
+State: **DONE**
 
-Active slice: **OMB-1B — immutable workflow state, reducer/effects, ports and fake application orchestration**. OMB-1A is integrated in `dev`; this slice is based directly on that baseline and is the remaining OMB-1 exit-gate implementation.
+Integrated through PR #108 after exact-head Documentation validation and repository Validate passed. The focused OMBRA JVM gate also passed Spotless, Detekt and Console unit tests on the same implementation.
 
 Owner: [`architecture.md`](architecture.md)
 
-Tasks:
+Completed boundary:
 
-- add Android-independent document segment, PII definition, finding, occurrence, decision and redaction models;
-- add built-in/custom definition validation;
-- implement immutable workflow state, reducer, operation IDs and typed effects;
-- define interfaces for extractor, analysis client, exporter and sensitive in-memory task store;
-- cover cancellation, late callbacks, reset and process-recreation semantics with fakes.
+- Android-independent document segment, PII definition, finding, occurrence, decision and redaction models;
+- built-in/custom definition validation with bounded content-free identifiers;
+- immutable workflow state, operation IDs, typed effects and focused start/completion/lifecycle transition groups;
+- replaceable asynchronous extractor, analysis-client and exporter ports;
+- sensitive in-memory task storage below presentation;
+- separated task mutations through `OmbraTaskActions`, keeping orchestration responsibility narrow;
+- cancellation remains `CANCELLING` until the active port acknowledges local termination/cleanup;
+- callbacks verify active operation identity before any sensitive-store mutation;
+- reset/process recreation clear sensitive task memory while monotonic operation identity prevents stale callback reuse;
+- deterministic JVM coverage drives import -> definitions -> fake validated findings -> review decisions -> export, including zero-finding export, retry, reset, process recreation and late-callback rejection.
 
-Progress:
-
-- OMB-1A is integrated with document/source, PII-definition, validated-finding and review-decision domain boundaries, stable identifiers, bounded custom definitions and content-free debug representations;
-- OMB-1B adds application-owned operation/source/destination identities and privacy-safe export receipts below presentation;
-- application ports and the sensitive in-memory task store have no dependency on presentation;
-- presentation owns immutable workflow state, reducer, effects, effect execution and orchestration, with monotonic operation IDs and typed retry/cancellation states;
-- asynchronous callbacks are checked against the active operation before any sensitive-store mutation, so cancelled or superseded work cannot repopulate cleared task data;
-- cancellation remains `CANCELLING` until the underlying port acknowledges its local terminal/cleanup point;
-- deterministic JVM coverage drives import -> definitions -> fake validated findings -> review decisions -> export, plus zero-finding export, retry, reset, process recreation and late-callback rejection.
-
-Exit gate: a pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code. The implementation is present on OMB-1B; mark OMB-1 `DONE` only after this slice is integrated and its exact-head gate is green.
+Exit gate: **PASSED**. A pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code.
 
 ## OMB-2 — PDF import and extraction
 
-State: **PLANNED**
+State: **IN PROGRESS**
+
+Active slice: **OMB-2A — PDF source capability, production extractor adapter and deterministic segment mapping**.
 
 Owner: [`detection-and-redaction.md`](detection-and-redaction.md)
 
 Tasks:
 
-- integrate the reviewed PDF reader behind the extractor interface;
+- integrate the reviewed isolated PDF reader behind the `OmbraDocumentExtractor` application port;
 - wire `OpenDocument` with PDF MIME filtering and least-privilege URI handling;
+- keep raw Android `Uri` values behind process-local source capabilities rather than workflow state;
 - implement metadata inspection, page/block normalization and stable source mapping;
 - add resource/page/byte bounds and typed encrypted/image-only/malformed outcomes;
 - add synthetic PDF generators/fixtures and extraction/cancellation tests.
+
+Current OMB-2A progress:
+
+- production `AndroidOmbraDocumentExtractor` adapts the reviewed isolated PdfBox reader to the asynchronous application port;
+- process-local `OmbraDocumentSourceRef` resolution keeps raw URI/display-name data outside reducer state and content-free debug surfaces;
+- deterministic page/block segmentation produces stable `DocumentSegment` identities and rejects unsupported control characters fail-closed;
+- extraction failures are mapped to typed, content-free application outcomes;
+- cancellation waits for coroutine/reader termination before acknowledging the operation;
+- the existing OMBRA PDF emulator suite now includes production-extractor device coverage in addition to parser isolation/runtime evidence.
+
+Remaining before OMB-2 can be `DONE`:
+
+- exact-head repository/documentation validation for OMB-2A;
+- emulator evidence for the production extractor path, including generated PDF extraction, blank/image-only handling and cancellation cleanup;
+- complete picker wiring/least-privilege content-URI ownership needed by the OMB-2 exit gate;
+- verify malformed/encrypted/limit mapping through the production adapter rather than only the underlying parser spike;
+- prove reset releases source capabilities and retains no sensitive task data.
 
 Exit gate: supported fixtures produce deterministic page-ordered segments; unsupported and cancelled inputs close all resources and retain no sensitive task data after reset.
 
