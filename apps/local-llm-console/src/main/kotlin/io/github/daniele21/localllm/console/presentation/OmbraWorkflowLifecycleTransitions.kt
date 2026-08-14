@@ -5,10 +5,10 @@ internal object OmbraWorkflowLifecycleTransitions {
         val operation = state.activeOperation ?: return OmbraWorkflowTransitionSupport.unchanged(state)
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.CANCELLING,
-                    cancelReturnStage = OmbraWorkflowTransitionSupport.cancelReturnStage(operation.kind),
-                ),
+            state.copy(
+                stage = OmbraWorkflowStage.CANCELLING,
+                cancelReturnStage = OmbraWorkflowTransitionSupport.cancelReturnStage(operation.kind),
+            ),
             effects = listOf(OmbraWorkflowEffect.CancelOperation(operation.id, operation.kind)),
         )
     }
@@ -22,13 +22,13 @@ internal object OmbraWorkflowLifecycleTransitions {
         }
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = requireNotNull(state.cancelReturnStage),
-                    activeOperation = null,
-                    cancelReturnStage = null,
-                    failureCode = null,
-                    retryTarget = null,
-                ),
+            state.copy(
+                stage = requireNotNull(state.cancelReturnStage),
+                activeOperation = null,
+                cancelReturnStage = null,
+                failureCode = null,
+                retryTarget = null,
+            ),
         )
     }
 
@@ -40,18 +40,20 @@ internal object OmbraWorkflowLifecycleTransitions {
         val (operationId, nextOrdinal) = OmbraWorkflowTransitionSupport.allocateOperation(state)
         return when (retryTarget) {
             OmbraRetryTarget.EXTRACTION -> retryExtraction(state, operationId, nextOrdinal)
+
             OmbraRetryTarget.ANALYSIS ->
                 OmbraWorkflowTransition(
                     state =
-                        state.copy(
-                            stage = OmbraWorkflowStage.ANALYZING,
-                            activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.ANALYSIS),
-                            failureCode = null,
-                            retryTarget = null,
-                            nextOperationOrdinal = nextOrdinal,
-                        ),
+                    state.copy(
+                        stage = OmbraWorkflowStage.ANALYZING,
+                        activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.ANALYSIS),
+                        failureCode = null,
+                        retryTarget = null,
+                        nextOperationOrdinal = nextOrdinal,
+                    ),
                     effects = listOf(OmbraWorkflowEffect.AnalyzeTask(operationId)),
                 )
+
             OmbraRetryTarget.EXPORT -> retryExport(state, operationId, nextOrdinal)
         }
     }
@@ -71,40 +73,32 @@ internal object OmbraWorkflowLifecycleTransitions {
         )
     }
 
-    private fun retryExtraction(
-        state: OmbraWorkflowState,
-        operationId: OmbraOperationId,
-        nextOrdinal: Long,
-    ): OmbraWorkflowTransition {
+    private fun retryExtraction(state: OmbraWorkflowState, operationId: OmbraOperationId, nextOrdinal: Long): OmbraWorkflowTransition {
         val sourceRef = state.sourceRef ?: return OmbraWorkflowTransitionSupport.unchanged(state)
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.EXTRACTING,
-                    activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXTRACTION),
-                    failureCode = null,
-                    retryTarget = null,
-                    nextOperationOrdinal = nextOrdinal,
-                ),
+            state.copy(
+                stage = OmbraWorkflowStage.EXTRACTING,
+                activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXTRACTION),
+                failureCode = null,
+                retryTarget = null,
+                nextOperationOrdinal = nextOrdinal,
+            ),
             effects = listOf(OmbraWorkflowEffect.ExtractDocument(operationId, sourceRef)),
         )
     }
 
-    private fun retryExport(
-        state: OmbraWorkflowState,
-        operationId: OmbraOperationId,
-        nextOrdinal: Long,
-    ): OmbraWorkflowTransition {
+    private fun retryExport(state: OmbraWorkflowState, operationId: OmbraOperationId, nextOrdinal: Long): OmbraWorkflowTransition {
         val destinationRef = state.exportDestinationRef ?: return OmbraWorkflowTransitionSupport.unchanged(state)
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.EXPORTING,
-                    activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXPORT),
-                    failureCode = null,
-                    retryTarget = null,
-                    nextOperationOrdinal = nextOrdinal,
-                ),
+            state.copy(
+                stage = OmbraWorkflowStage.EXPORTING,
+                activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXPORT),
+                failureCode = null,
+                retryTarget = null,
+                nextOperationOrdinal = nextOrdinal,
+            ),
             effects = listOf(OmbraWorkflowEffect.ExportTask(operationId, destinationRef)),
         )
     }

@@ -6,17 +6,17 @@ internal object OmbraWorkflowStartTransitions {
         val (operationId, nextOrdinal) = OmbraWorkflowTransitionSupport.allocateOperation(state)
         return OmbraWorkflowTransition(
             state =
-                OmbraWorkflowState(
-                    stage = OmbraWorkflowStage.EXTRACTING,
-                    activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXTRACTION),
-                    sourceRef = action.sourceRef,
-                    nextOperationOrdinal = nextOrdinal,
-                ),
+            OmbraWorkflowState(
+                stage = OmbraWorkflowStage.EXTRACTING,
+                activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXTRACTION),
+                sourceRef = action.sourceRef,
+                nextOperationOrdinal = nextOrdinal,
+            ),
             effects =
-                listOf(
-                    OmbraWorkflowEffect.ClearSensitiveTask,
-                    OmbraWorkflowEffect.ExtractDocument(operationId, action.sourceRef),
-                ),
+            listOf(
+                OmbraWorkflowEffect.ClearSensitiveTask,
+                OmbraWorkflowEffect.ExtractDocument(operationId, action.sourceRef),
+            ),
         )
     }
 
@@ -27,18 +27,18 @@ internal object OmbraWorkflowStartTransitions {
         require(action.activeDefinitionCount > 0) { "activeDefinitionCount must be positive" }
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.DEFINITIONS_READY,
-                    counts =
-                        state.counts.copy(
-                            activeDefinitionCount = action.activeDefinitionCount,
-                            findingCount = 0,
-                            reviewOccurrenceCount = 0,
-                        ),
-                    exportReceipt = null,
-                    failureCode = null,
-                    retryTarget = null,
+            state.copy(
+                stage = OmbraWorkflowStage.DEFINITIONS_READY,
+                counts =
+                state.counts.copy(
+                    activeDefinitionCount = action.activeDefinitionCount,
+                    findingCount = 0,
+                    reviewOccurrenceCount = 0,
                 ),
+                exportReceipt = null,
+                failureCode = null,
+                retryTarget = null,
+            ),
         )
     }
 
@@ -49,13 +49,13 @@ internal object OmbraWorkflowStartTransitions {
         val (operationId, nextOrdinal) = OmbraWorkflowTransitionSupport.allocateOperation(state)
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.ANALYZING,
-                    activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.ANALYSIS),
-                    nextOperationOrdinal = nextOrdinal,
-                    failureCode = null,
-                    retryTarget = null,
-                ),
+            state.copy(
+                stage = OmbraWorkflowStage.ANALYZING,
+                activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.ANALYSIS),
+                nextOperationOrdinal = nextOrdinal,
+                failureCode = null,
+                retryTarget = null,
+            ),
             effects = listOf(OmbraWorkflowEffect.AnalyzeTask(operationId)),
         )
     }
@@ -67,14 +67,14 @@ internal object OmbraWorkflowStartTransitions {
         val (operationId, nextOrdinal) = OmbraWorkflowTransitionSupport.allocateOperation(state)
         return OmbraWorkflowTransition(
             state =
-                state.copy(
-                    stage = OmbraWorkflowStage.EXPORTING,
-                    activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXPORT),
-                    exportDestinationRef = action.destinationRef,
-                    nextOperationOrdinal = nextOrdinal,
-                    failureCode = null,
-                    retryTarget = null,
-                ),
+            state.copy(
+                stage = OmbraWorkflowStage.EXPORTING,
+                activeOperation = OmbraActiveOperation(operationId, OmbraOperationKind.EXPORT),
+                exportDestinationRef = action.destinationRef,
+                nextOperationOrdinal = nextOrdinal,
+                failureCode = null,
+                retryTarget = null,
+            ),
             effects = listOf(OmbraWorkflowEffect.ExportTask(operationId, action.destinationRef)),
         )
     }

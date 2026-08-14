@@ -225,12 +225,12 @@ class OmbraApplicationOrchestratorTest {
                 typeId = PiiTypeId.parse(typeId),
                 surface = surface,
                 occurrences =
-                    listOf(
-                        SourceOccurrence(
-                            segmentId = segment.id,
-                            range = SourceRange(startInclusive = start, endExclusive = start + surface.length),
-                        ),
+                listOf(
+                    SourceOccurrence(
+                        segmentId = segment.id,
+                        range = SourceRange(startInclusive = start, endExclusive = start + surface.length),
                     ),
+                ),
             )
         }
     }
