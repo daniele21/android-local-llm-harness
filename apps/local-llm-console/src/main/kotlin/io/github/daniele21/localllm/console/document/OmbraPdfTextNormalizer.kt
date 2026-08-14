@@ -43,10 +43,13 @@ internal object OmbraPdfTextNormalizer {
 
         return when {
             content.bounds.isEmpty() -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
+
             content.bounds.size == textLines.size ->
                 textLines.zip(content.bounds) { text, bounds -> PendingFragment(text, RectF(bounds)) }
+
             content.bounds.size == 1 ->
                 listOf(PendingFragment(textLines.joinToString(separator = ""), RectF(content.bounds.single())))
+
             else -> listOf(PendingFragment(textLines.joinToString(separator = "\n"), null))
         }
     }
