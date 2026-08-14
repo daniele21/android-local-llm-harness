@@ -46,7 +46,7 @@ The initial product support envelope remains the repository-reviewed Qwen3.5 den
 | Milestone | State | Exit meaning |
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependencies and completion gates are canonical. |
-| EVAL-1 Contracts and identity | PLANNED | Stable dataset, case, evaluator, run and comparability contracts exist. |
+| EVAL-1 Contracts and identity | READY | Stable dataset, case, evaluator, run and comparability contracts are the first implementation milestone. |
 | EVAL-2 Dataset system | PLANNED | Versioned packs, validation, deterministic sampling and app-private storage work. |
 | EVAL-3 Deterministic evaluators | PLANNED | Required evaluator types score fixtures reproducibly. |
 | EVAL-4 Evaluation runner | PLANNED | Selected models execute cases through the normal runtime and collect correlated telemetry. |
