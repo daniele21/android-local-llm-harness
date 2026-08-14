@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ SCRIPT = Path(__file__).parents[1] / "compare-shared-runtime-transport-evidence.
 SPEC = importlib.util.spec_from_file_location("sr6_transport_compare", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
+sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
