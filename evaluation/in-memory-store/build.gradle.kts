@@ -19,13 +19,10 @@ android {
     lint {
         lintConfig = rootProject.file("lint.xml")
         abortOnError = true
-        htmlReport = true
-        sarifReport = true
     }
 }
 
 dependencies {
     api(project(":evaluation:contracts"))
     testImplementation(libs.junit4)
-    testImplementation(libs.kotlinx.coroutines.test)
 }
