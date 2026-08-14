@@ -7,7 +7,7 @@ ADB_PATH="${ADB:-}"
 CLEANUP="false"
 
 APP_PACKAGE="io.github.daniele21.localllm.console.debug"
-TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfSpikeInstrumentedTest"
+TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfRawDiagnosticInstrumentedTest"
 REPORT_DIR="$ROOT_DIR/build/reports/ombra"
 RUNTIME_LOG="$REPORT_DIR/omb0-pdf-runtime-gradle.log"
 
