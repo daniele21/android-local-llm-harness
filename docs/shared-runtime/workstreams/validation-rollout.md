@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.validation-rollout
 Read when: adding shared-runtime tests, two-APK device execution, evidence, compatibility matrices or release gates
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 ## Goal
 
@@ -27,6 +27,7 @@ This workstream does not certify model quality. It consumes exact Qwen3.5 runtim
 - [`../../definition-of-done.md`](../../definition-of-done.md)
 - [`../../versioning.md`](../../versioning.md)
 - [`../sr6-release-evidence.md`](../sr6-release-evidence.md)
+- [`../sr6-release-governance-review.md`](../sr6-release-governance-review.md)
 - app scoped guides, manifests, build variants and packaging scripts
 - existing device runner and evidence redaction scripts
 
@@ -84,7 +85,19 @@ SR-6 release-like evidence capture:
 scripts/capture-shared-runtime-release-evidence.sh
 ```
 
-The SR-6 runner:
+SR-6 compatible host package replacement evidence:
+
+```text
+scripts/capture-shared-runtime-package-upgrade-evidence.sh
+```
+
+SR-VAL-09 matched transport comparison:
+
+```text
+scripts/compare-shared-runtime-transport-evidence.py
+```
+
+The SR-6 release-like runner:
 
 1. requires an explicit device or exactly one connected device;
 2. rejects emulators by default and labels `--allow-emulator` execution as preflight only;
@@ -99,6 +112,10 @@ The SR-6 runner:
 11. archives reviewable evidence without prompts, outputs, keys, Binder tokens, GGUF bytes, adb serials or host-private paths.
 
 Use `--host-only` to install/launch the correctly signed release host for first-time curated-model setup. The runner never downloads arbitrary models or reaches into host-private model storage.
+
+The package-replacement runner is intentionally separate from the main release-like runner. It accepts exact base/replacement host APKs plus their full source commit SHAs, verifies the same accepted signing certificate across host/client/test artifacts, executes packaged-client Binder traffic before replacement, applies `adb install -r`, executes the same traffic after replacement, and requires the selected model digest to remain unchanged. It does not claim that a live session survives package/process replacement.
+
+The SR-VAL-09 comparator consumes one packaged Binder instrumentation log and one Qwen3.5 in-process tuning log. It accepts only warm in-process samples with the same model digest, context size and thinking mode plus the explicit `sr6-transport-v1` tuning case. It validates the Binder transport envelope against `clientObservedTotalMs - coreTotalMs` and reports comparison measurements without inventing a pass/fail threshold. The paired tuning run must use the same non-sensitive generation intent as the Binder scenario; `tuningCaseId` is retained instead of prompt text.
 
 ## Functional matrix
 
@@ -119,6 +136,7 @@ Use `--host-only` to install/launch the correctly signed release host for first-
 | Same external IDs | Host internal IDs remain collision-free across clients. | SR-5 deterministic |
 | Slow callback | Bounded backpressure cancellation; no unbounded growth. | SR-5 deterministic |
 | Unbind/rebind | Old sessions invalid; new registration works. | SR-5 deterministic / SR-6 device |
+| Compatible host package replacement | New packaged-client traffic works before and after replacement; selected model identity is preserved. | SR-6 physical |
 
 ## Lifecycle and resource matrix
 
@@ -160,6 +178,8 @@ Security review covers:
 - independently signed client denial without information leakage;
 - no path, Binder token, key/password or full-certificate disclosure;
 - no unintended diagnostics/control-plane access.
+
+The repository-level public API/security/versioning/packaging/console-governance review is recorded in [`../sr6-release-governance-review.md`](../sr6-release-governance-review.md). That review accepts the implementation for exact-candidate device validation but explicitly does not approve publication without the physical consumer-release gate.
 
 ## Compatibility matrix
 
@@ -205,10 +225,10 @@ It excludes GGUF bytes, prompt/output/schema text, app-private paths, Binder tok
 | SR-VAL-04 | IN PROGRESS | Ephemeral independently signed denial fixture and runner are implemented; physical execution is pending. |
 | SR-VAL-05 | DONE | Multi-client, ID collision, death and bounded-backpressure matrices are deterministic and green. |
 | SR-VAL-06 | DONE | Binder-boundary runtime-detail/sentinel privacy assertions are deterministic and green. |
-| SR-VAL-07 | IN PROGRESS | Protocol fixtures are complete; package upgrade/replacement device evidence remains pending. |
+| SR-VAL-07 | IN PROGRESS | Protocol fixtures and a dedicated package-replacement pre/post traffic runner are complete; physical replacement evidence remains pending. |
 | SR-VAL-08 | IN PROGRESS | Physical release-like functional/lifecycle runner is implemented; representative device evidence is pending. |
-| SR-VAL-09 | PLANNED | Compare Binder overhead against matching in-process evidence on the same device/model/profile identity. |
-| SR-VAL-10 | IN PROGRESS | Packaged release AAR consumer is executable; final security/public-API/versioning/release review remains pending. |
+| SR-VAL-09 | IN PROGRESS | Matched Binder/in-process comparator and identity checks are implemented; same-device/model/profile physical comparison remains pending. |
+| SR-VAL-10 | DONE | Packaged release AAR consumer plus repository-level security/public-API/versioning/packaging/console-governance review are complete; publication remains gated by exact-candidate physical evidence. |
 
 ## Merge gate
 
@@ -220,7 +240,9 @@ Each implementation PR runs the narrowest deterministic checks for its owner. SR
 - repository formatting, Detekt and model-artifact guard;
 - repository-wide Android checks for shared contracts/Gradle/manifests;
 - packaging verification;
-- documentation and agent-navigation guards.
+- documentation and agent-navigation guards;
+- `python3 -m unittest scripts.tests.test_compare_shared_runtime_transport_evidence` for the SR-VAL-09 comparator;
+- `bash -n scripts/capture-shared-runtime-package-upgrade-evidence.sh` for the upgrade runner.
 
 Physical runner execution is mandatory for the SR-6 exit gate, but it is not fabricated in generic GitHub-hosted CI when no representative Android device, selected model or signing identity is available.
 
