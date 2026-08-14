@@ -1,9 +1,10 @@
 # SR-6 release governance review
 
-Status: accepted for repository implementation; distribution remains gated by physical evidence
-Document type: release-review
+Status: active
+Document type: release-checklist
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.sr6-release-governance
+Read when: reviewing SR-6 release governance, publication gates, transport evidence or package replacement evidence
 Last reviewed: 2026-08-14
 
 ## Decision
