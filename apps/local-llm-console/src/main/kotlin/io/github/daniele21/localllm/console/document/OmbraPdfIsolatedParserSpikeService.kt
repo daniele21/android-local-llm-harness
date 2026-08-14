@@ -30,10 +30,7 @@ class OmbraPdfIsolatedParserSpikeService : Service() {
 
     override fun onBind(intent: Intent?): IBinder = messenger.binder
 
-    private class IncomingHandler(
-        looper: Looper,
-        private val applicationContext: android.content.Context,
-    ) : Handler(looper) {
+    private class IncomingHandler(looper: Looper, private val applicationContext: android.content.Context) : Handler(looper) {
         override fun handleMessage(message: Message) {
             if (message.what != MESSAGE_PARSE) {
                 super.handleMessage(message)
@@ -93,5 +90,4 @@ class OmbraPdfIsolatedParserSpikeService : Service() {
 }
 
 @Suppress("DEPRECATION")
-private fun Bundle.parcelFileDescriptor(key: String): ParcelFileDescriptor? =
-    getParcelable(key)
+private fun Bundle.parcelFileDescriptor(key: String): ParcelFileDescriptor? = getParcelable(key)
