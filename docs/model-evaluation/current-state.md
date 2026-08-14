@@ -7,7 +7,7 @@ Canonical scope: model-evaluation.state
 Read when: determining current model-evaluation progress, blockers or the next ready tasks
 Last reviewed: 2026-08-14
 
-This is the operational status ledger for model evaluation. Capability sequencing is owned by [`roadmap.md`](roadmap.md); detailed acceptance criteria remain in the owning workstream specifications.
+This is the operational status ledger for model evaluation. Repository-level integrated state and immediate sequencing remain in [`../current-state.md`](../current-state.md). Capability sequencing inside this feature is owned by [`roadmap.md`](roadmap.md); detailed acceptance criteria remain in the owning workstream specifications.
 
 ## Milestone state
 
