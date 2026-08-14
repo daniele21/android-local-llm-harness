@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.pdf.ExperimentalPdfApi
 import androidx.pdf.SandboxedPdfLoader
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * OMB-0A bounded parser spike.
@@ -32,6 +34,7 @@ internal class OmbraPdfParserSpike(context: Context) {
             var truncated = openedDocument.pageCount > pagesToRead
 
             for (pageIndex in 0 until pagesToRead) {
+                currentCoroutineContext().ensureActive()
                 if (remainingCharacters == 0) {
                     truncated = true
                     break
