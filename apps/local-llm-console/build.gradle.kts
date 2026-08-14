@@ -114,7 +114,7 @@ android {
             isMinifyEnabled = false
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
             manifestPlaceholders["sharedRuntimeHostPackage"] = sharedRuntimeReleaseHostPackage
-            buildConfigField("String", "SHARED_RUNTIME_HOST_PACKAGE", "\"$sharedRuntimeHostPackage\"")
+            buildConfigField("String", "SHARED_RUNTIME_HOST_PACKAGE", "\"$sharedRuntimeReleaseHostPackage\"")
             if (consoleUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
             }
