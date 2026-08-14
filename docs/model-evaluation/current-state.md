@@ -16,7 +16,7 @@ This is the operational status ledger for model evaluation. Repository-level int
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, compatibility, hashing and failure contracts with deterministic tests. |
 | EVAL-2 Dataset system | READY | `EVAL-D-01` can define manifest/JSONL schemas from the frozen contracts. |
-| EVAL-3 Deterministic evaluators | IN PROGRESS | Registry and six deterministic scorer implementations are integrated; v1 golden/adversarial coverage is complete and suite aggregation remains active. |
+| EVAL-3 Deterministic evaluators | IN PROGRESS | Registry, six deterministic scorers, v1 golden/adversarial coverage and suite quality aggregation are integrated; only the evaluator v1 compatibility freeze remains. |
 | EVAL-4 Evaluation runner | READY | `EVAL-R-01` and `EVAL-R-02` can progress independently against contracts/fakes. |
 | EVAL-5 Persistence and comparison | READY | `EVAL-P-01` can freeze repository/query/retention behavior. |
 | EVAL-6 General Purpose v1 | PLANNED | Source/license and pack assembly depend on dataset/evaluator foundations. |
@@ -38,19 +38,21 @@ Every scorer exposes a versioned `EvaluatorRegistration`. `EvaluatorRegistry` re
 
 EVAL-E-09 adds deterministic golden fixtures for every scorer v1 plus registry composition, and adversarial fixtures for ambiguity, locale-dependent numeric text, duplicate JSON keys, out-of-pattern text, duplicate instruction constraints and unknown evaluator versions.
 
+EVAL-E-08 adds deterministic category/suite quality aggregation. `SCORED` preserves the evaluator score including partial outcomes; invalid output, timeout and runtime failure contribute quality `0`; cancelled cases are excluded from quality denominators. Category scores are arithmetic means. Suite scores use normalized declared category weights when every scored category is weighted, otherwise an unweighted category mean; mixed weight declarations fail closed.
+
 ## Ready now
 
 These tasks are mutually independent unless the same developer/review capacity is shared:
 
 - `EVAL-D-01` — versioned manifest and canonical JSONL case schema;
-- `EVAL-E-08` — category and weighted suite quality aggregation, including zero-score runtime-failure semantics;
+- `EVAL-E-10` — document/freeze evaluator v1 semantics for dataset-pack compatibility;
 - `EVAL-R-01` — evaluation lifecycle engine against fakes;
 - `EVAL-R-02` — controlled selected-model evaluation binding/profile resolution;
 - `EVAL-P-01` — evaluation repository/query/retention contract;
 - `EVAL-U-01` — Performance navigation/UDF state/effect contract;
 - `EVAL-V-01` — identity/hash golden fixtures and cross-run deterministic serialization tests.
 
-`EVAL-E-10` remains gated on EVAL-E-08 and will freeze/document evaluator v1 semantics for dataset-pack compatibility after aggregation is integrated.
+EVAL-E-10 can close independently now that both aggregation and evaluator golden/adversarial coverage are integrated. Its completion closes the EVAL-3 milestone.
 
 ## Parallel fan-out
 
