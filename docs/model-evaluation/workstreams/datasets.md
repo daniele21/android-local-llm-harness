@@ -93,7 +93,7 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-D-01 | PLANNED | EVAL-C-02,EVAL-C-03 | Define versioned manifest and canonical JSONL case schemas from the shared contracts. |
+| EVAL-D-01 | READY | EVAL-C-02,EVAL-C-03 | Define versioned manifest and canonical JSONL case schemas from the shared contracts. |
 | EVAL-D-02 | PLANNED | EVAL-D-01,EVAL-C-09 | Implement bounded streaming JSONL parser with typed line/field/schema errors. |
 | EVAL-D-03 | PLANNED | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
 | EVAL-D-04 | PLANNED | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
@@ -129,7 +129,7 @@ EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-After EVAL-D-01 fixes the schema, EVAL-D-02 parsing, EVAL-D-04 digesting and EVAL-GP-01 source inventory can proceed in parallel.
+EVAL-D-01 is now ready. After it fixes the schema, EVAL-D-02 parsing, EVAL-D-04 digesting and EVAL-GP-01 source inventory can proceed in parallel.
 
 After evaluator semantics are available:
 
