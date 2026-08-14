@@ -22,18 +22,18 @@ class EvaluationQualityAggregatorTest {
     private val aggregator = EvaluationQualityAggregator()
 
     @Test
-    fun `weighted suite aggregate uses manifest category weights`() {
+    fun `weighted suite aggregate preserves partial evaluator scores`() {
         val categories = listOf(category("knowledge", 0.75), category("format", 0.25))
         val results = listOf(
             result("k1", "knowledge", score = 1.0),
-            result("k2", "knowledge", score = 0.0),
+            result("k2", "knowledge", score = 0.5),
             result("f1", "format", score = 1.0),
         )
 
         val summary = aggregator.aggregate(categories, results)
 
-        assertEquals(0.625, summary.aggregateScore!!.value, 0.0)
-        assertEquals(0.5, summary.categoryScores[0].score.value, 0.0)
+        assertEquals(0.8125, summary.aggregateScore!!.value, 0.0)
+        assertEquals(0.75, summary.categoryScores[0].score.value, 0.0)
         assertEquals(2, summary.categoryScores[0].scoredCaseCount)
         assertEquals(1.0, summary.categoryScores[1].score.value, 0.0)
     }
@@ -132,10 +132,15 @@ private fun result(
 ): EvaluationCaseResult {
     val id = EvaluationCaseId(caseId)
     val outcome = when (status) {
-        EvaluationCaseStatus.SCORED -> EvaluationOutcome(
-            score = NormalizedScore(requireNotNull(score)),
-            code = if (score == 1.0) EvaluatorOutcomeCode.CORRECT else EvaluatorOutcomeCode.INCORRECT,
-        )
+        EvaluationCaseStatus.SCORED -> {
+            val value = requireNotNull(score)
+            val code = when (value) {
+                1.0 -> EvaluatorOutcomeCode.CORRECT
+                0.0 -> EvaluatorOutcomeCode.INCORRECT
+                else -> EvaluatorOutcomeCode.PARTIAL
+            }
+            EvaluationOutcome(score = NormalizedScore(value), code = code)
+        }
 
         EvaluationCaseStatus.INVALID_OUTPUT -> EvaluationOutcome(
             score = NormalizedScore(0.0),
