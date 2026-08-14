@@ -35,6 +35,7 @@ internal class FakeSharedRuntimeRemoteService(
     var lastGenerationRequest: GenerationRequestParcel? = null
     var lastCancelRequest: CancelRequestParcel? = null
     var lastConsumerRequest: ConsumerRequestParcel? = null
+    var lastConsumerCloseSessionRequest: CloseSessionRequestParcel? = null
     var cancelFailure: RemoteException? = null
     var registrationHandler: ((ClientHelloParcel, (RegistrationResultParcel) -> Unit) -> Unit)? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
@@ -112,6 +113,7 @@ internal class FakeSharedRuntimeRemoteService(
 
     fun consumerCloseSession(request: CloseSessionRequestParcel) {
         consumerCloseSessionCalls += 1
+        lastConsumerCloseSessionRequest = request
     }
 
     override fun unregisterClient(clientToken: ClientTokenParcel) {
