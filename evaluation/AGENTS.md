@@ -11,9 +11,11 @@ This guide owns navigation and validation for model-evaluation implementation un
 
 ## Current ownership
 
-`evaluation/contracts` is the only concrete EVAL-1 module. It owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+`evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility, persistence and failure contracts plus deterministic canonical hashing.
 
-Do not create `evaluation/engine`, dataset-store or persistence modules until the corresponding workstream contains real behavior. EVAL-1 intentionally establishes contracts without speculative empty modules.
+`evaluation/in-memory-store` owns the deterministic privacy-safe in-memory implementation of `EvaluationResultRepository`. It is the parity reference for persistent stores: run configuration is immutable, lifecycle transitions are validated, case results remain bounded to the selected sample set, history ordering is deterministic, active runs cannot be deleted, and retention applies only to terminal runs.
+
+Do not add Room or other durable storage behavior to the in-memory module. Durable persistence belongs to its own implementation module and must preserve the same public repository semantics.
 
 ## Contract invariants
 
@@ -25,16 +27,19 @@ Do not create `evaluation/engine`, dataset-store or persistence modules until th
 - Evaluator specs are declarative and bounded; they cannot name classes, scripts, URLs or executable code.
 - Failure contracts use bounded typed codes rather than arbitrary backend exception text.
 - Prompt, expected-answer and generated-answer content is not part of persistent run/result contracts.
+- Persistence implementations must not invent alternate lifecycle, ordering, deletion or retention semantics.
 
 ## Validation
 
-For contract-only iteration run:
+For evaluation contract/store iteration run:
 
 ```bash
 ./gradlew :evaluation:contracts:spotlessCheck \
   :evaluation:contracts:testDebugUnitTest \
   :evaluation:contracts:compileDebugKotlin \
-  :evaluation:contracts:lintDebug
+  :evaluation:contracts:lintDebug \
+  :evaluation:in-memory-store:testDebugUnitTest \
+  :evaluation:in-memory-store:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
 ```
 
