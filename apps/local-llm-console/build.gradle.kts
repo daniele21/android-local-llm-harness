@@ -80,7 +80,8 @@ android {
     signingConfigs {
         create("upload") {
             if (consoleUploadSigningConfigured) {
-                storeFile = file(consoleUploadSigningEnvironment.getValue("storeFile")!!)
+                storeFile = file(consoleUploadSigningEnvironment.getValue("storeFile")!!
+                )
                 storePassword = consoleUploadSigningEnvironment.getValue("storePassword")
                 keyAlias = consoleUploadSigningEnvironment.getValue("keyAlias")
                 keyPassword = consoleUploadSigningEnvironment.getValue("keyPassword")
@@ -158,6 +159,10 @@ dependencies {
     // experimental until representative fixtures and packaged-size evidence close OMB-0.
     implementation(libs.androidx.pdf.core)
     implementation(libs.androidx.pdf.document.service)
+
+    // OMB-0B fallback fidelity spike. Keep AndroidX in place while comparing the same fixtures;
+    // if PdfBox wins, the final OMB-0 decision must also resolve parser-process isolation.
+    implementation(libs.pdfbox.android)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
