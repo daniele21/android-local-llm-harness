@@ -5,7 +5,7 @@ Document type: architecture
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.architecture
 Read when: placing OMBRA PDF, PII, inference, redaction, export or presentation logic
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 ## Deployment shape
 
@@ -160,7 +160,7 @@ The host derives `ApplicationId` from the verified caller. Consumer code contain
 - Write output only after the user chooses a destination.
 - Never overwrite the input URI or export an opaque overlay that preserves recoverable original text.
 
-Parser selection is an implementation spike because Android's renderer is not a complete text-extraction API. The selected dependency must support the repository min SDK, have an acceptable license and size, close native/Java resources deterministically and pass representative text-PDF fixtures. OCR dependencies remain out of scope.
+OMB-0A selects the AndroidX PDF sandboxed document APIs as the primary parser direction. OMBRA may therefore set its own application `minSdk` to 28 while the Harness host and reusable libraries remain at the repository floor of 26. The selection must still pass representative text-PDF fidelity, malformed/encrypted input, cleanup and packaged-size evidence before OMB-0 closes. PdfBox-Android remains a documented fallback only if that bounded spike fails. See [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.md). OCR dependencies remain out of scope.
 
 ## Prompt-injection boundary
 
