@@ -22,6 +22,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.DataInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.CountDownLatch
@@ -100,6 +101,8 @@ class OmbraPdfIsolationInstrumentedTest {
                         Bundle().apply {
                             putParcelable(OmbraPdfIsolatedParserSpikeService.KEY_INPUT, sourceDescriptor)
                             putParcelable(OmbraPdfIsolatedParserSpikeService.KEY_OUTPUT, outputPipe[1])
+                            putInt(OmbraPdfIsolatedParserSpikeService.KEY_MAX_PAGES, 10)
+                            putInt(OmbraPdfIsolatedParserSpikeService.KEY_MAX_CHARACTERS, 10_000)
                         }
                 }
 
@@ -118,21 +121,18 @@ class OmbraPdfIsolationInstrumentedTest {
             )
             assertNotEquals("Parser must not run under the OMBRA app UID", Process.myUid(), parserUid)
 
-            val extracted =
-                ParcelFileDescriptor.AutoCloseInputStream(outputRead).bufferedReader(Charsets.UTF_8).use { reader -> reader.readText() }
+            val data =
+                DataInputStream(ParcelFileDescriptor.AutoCloseInputStream(outputRead).buffered()).use { input ->
+                    assertEquals(OmbraPdfIsolatedParserSpikeService.FRAME_MAGIC, input.readInt())
+                    assertEquals(1, input.readInt())
+                    assertEquals(false, input.readBoolean())
+                    assertEquals(1, input.readInt())
+                    assertEquals(0, input.readInt())
+                    val byteCount = input.readInt()
+                    ByteArray(byteCount).also(input::readFully).toString(Charsets.UTF_8)
+                }
             outputRead = null
-            val normalized =
-                extracted
-                    .replace("\r\n", "\n")
-                    .replace('\r', '\n')
-                    .lineSequence()
-                    .map { line -> line.trim().replace(Regex("\\s+"), " ") }
-                    .filter { line -> line.isNotEmpty() }
-                    .joinToString("\n")
-            assertTextOrder(
-                normalized,
-                listOf("LEFT TOP", "RIGHT TOP", "LEFT BOTTOM", "RIGHT BOTTOM"),
-            )
+            assertTextOrder(data, listOf("LEFT TOP", "RIGHT TOP", "LEFT BOTTOM", "RIGHT BOTTOM"))
         } finally {
             outputRead?.close()
             if (bound) context.unbindService(connection)
