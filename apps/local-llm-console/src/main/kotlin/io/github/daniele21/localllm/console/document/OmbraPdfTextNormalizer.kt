@@ -81,12 +81,7 @@ internal object OmbraPdfTextNormalizer {
         return builder.toString()
     }
 
-    private fun shouldInsertSpace(
-        previousText: String,
-        currentText: String,
-        horizontalGap: Float,
-        typicalCharacterWidth: Float,
-    ): Boolean {
+    private fun shouldInsertSpace(previousText: String, currentText: String, horizontalGap: Float, typicalCharacterWidth: Float): Boolean {
         if (previousText.lastOrNull()?.isWhitespace() == true) return false
         if (currentText.firstOrNull()?.isWhitespace() == true) return false
         if (typicalCharacterWidth <= 0f) return false
