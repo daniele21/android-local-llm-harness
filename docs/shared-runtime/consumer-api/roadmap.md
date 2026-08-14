@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime-consumer-api
 Canonical scope: shared-runtime.consumer-api.roadmap
 Read when: selecting the next consumer-API milestone or exit gate
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 This roadmap owns implementation order. Detailed behavior stays in the focused consumer-API specifications; shared-runtime security and physical release gates remain in the SR roadmap.
 
@@ -68,26 +68,45 @@ Exit gate: a fake/in-process consumer completes discover -> prepare -> session -
 
 ## CA-3 — Results and metrics
 
-State: **IN PROGRESS**
+State: **DONE**
 
 Owner: [`results-and-metrics.md`](results-and-metrics.md)
 
-Tasks: freeze reasoning/answer events, terminal result identity, Tier 1 and Tier 2 metrics, timing anchors and token accounting; project from internal metrics without diagnostic leakage.
+Integrated behavior:
+
+- reasoning/answer content remains explicitly typed;
+- terminal success returns `ConsumerInferenceResult` with stable public metrics and privacy-safe execution identity;
+- Tier 1 and privacy-safe Tier 2 metrics are projected from the internal `GenerationMetrics` source of truth;
+- exact model/artifact identity and deeper runtime diagnostics remain Harness-owned;
+- the public projector enforces one terminal outcome and ignores post-terminal internal events.
 
 Exit gate: public content and metric semantics are deterministic and backend-neutral.
 
 ## CA-4 — Binder integration
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
-Tasks:
+Owner: [`ca4-binder-protocol.md`](ca4-binder-protocol.md)
 
-- classify additions as SDK-only, optional protocol feature or incompatible change;
-- map capability discovery, constrained selection, results and metrics across Binder;
-- preserve ordering, terminal uniqueness, cancellation and transaction bounds;
-- extend compatibility fixtures and packaged SDK validation.
+Implemented on the active CA-4 branch:
 
-Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior.
+- Binder protocol minor evolution from v1.0 to v1.1;
+- optional `consumer-api-v1` feature negotiation while retaining legacy v1.0 behavior;
+- consumer-specific AIDL service/callback surface and privacy-safe wire DTOs;
+- host mapping to authenticated `ConsumerLocalLlmClient` instances;
+- Binder consumer lifecycle and generation adapters;
+- result/metric and execution-identity projection across the wire;
+- bounded ordered generation reconstruction, cancellation and stale-connection handling;
+- deterministic host/client/wire/privacy and v1.0/v1.1 compatibility coverage;
+- packaged release-AAR Consumer API compilation fixture.
+
+Remaining before the CA-4 exit gate:
+
+- repository and documentation validation must be green on the exact branch head;
+- any failure must be fixed without weakening the accepted security/privacy/compatibility boundary;
+- merge PR #104 into `dev` only after those gates are green.
+
+Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior and the exact integrated head passes repository validation.
 
 ## CA-5 — OMBRA reference consumer
 

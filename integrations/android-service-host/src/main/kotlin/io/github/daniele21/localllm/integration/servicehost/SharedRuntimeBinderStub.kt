@@ -4,8 +4,15 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IPrepareCallback
@@ -21,8 +28,10 @@ class SharedRuntimeBinderStub(
     private val delegate: SharedRuntimeHostDelegate,
     private val callingProcessSource: CallingProcessSource = BinderCallingProcessSource(),
 ) : ILocalLlmService.Stub() {
+    private val consumerStub = ConsumerRuntimeBinderStub(authorizer, delegate, callingProcessSource)
+
     override fun getProtocolInfo(): ProtocolInfoParcel {
-        requireAuthorizedCaller()
+        authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
         return delegate.protocolInfo
     }
 
@@ -33,10 +42,10 @@ class SharedRuntimeBinderStub(
             return
         }
         delegate.registerClient(
-            caller = caller,
-            hello = hello,
-            lifecycle = BinderClientLifecycleLinker(lifecycle),
-            callback = remoteRegistrationCallback(delegate, caller, callback),
+            caller,
+            hello,
+            BinderClientLifecycleLinker(lifecycle),
+            remoteRegistrationCallback(delegate, caller, callback),
         )
     }
 
@@ -46,7 +55,7 @@ class SharedRuntimeBinderStub(
             deliverRemote { callback.onResult(prepareFailure(request.operationId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED))) }
             return
         }
-        delegate.prepare(caller, request, remotePrepareCallback(delegate, caller, request.clientToken, callback))
+        delegate.runtimeOperations.prepare(caller, request, remotePrepareCallback(delegate, caller, request.clientToken, callback))
     }
 
     override fun openSession(request: OpenSessionRequestParcel, callback: ISessionCallback) {
@@ -55,7 +64,7 @@ class SharedRuntimeBinderStub(
             deliverRemote { callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.CLIENT_NOT_REGISTERED))) }
             return
         }
-        delegate.openSession(caller, request, remoteSessionCallback(delegate, caller, request.clientToken, callback))
+        delegate.runtimeOperations.openSession(caller, request, remoteSessionCallback(delegate, caller, request.clientToken, callback))
     }
 
     override fun generate(request: GenerationRequestParcel, callback: IGenerationCallback) {
@@ -66,29 +75,28 @@ class SharedRuntimeBinderStub(
             }
             return
         }
-        delegate.generate(caller, request, remoteGenerationCallback(delegate, caller, request.clientToken, callback))
+        delegate.runtimeOperations.generate(caller, request, remoteGenerationCallback(delegate, caller, request.clientToken, callback))
     }
 
     override fun cancel(request: CancelRequestParcel) {
-        val caller = authorizedCallerOrNull() ?: return
-        delegate.cancel(caller, request)
+        authorizedCallerOrNull()?.let { delegate.runtimeOperations.cancel(it, request) }
     }
 
     override fun closeSession(request: CloseSessionRequestParcel) {
-        val caller = authorizedCallerOrNull() ?: return
-        delegate.closeSession(caller, request)
+        authorizedCallerOrNull()?.let { delegate.runtimeOperations.closeSession(it, request) }
     }
 
     override fun unregisterClient(clientToken: ClientTokenParcel) {
-        val caller = authorizedCallerOrNull() ?: return
-        delegate.unregisterClient(caller, clientToken.value)
+        authorizedCallerOrNull()?.let { delegate.unregisterClient(it, clientToken.value) }
+    }
+
+    override fun getConsumerApi(): IConsumerLocalLlmService {
+        authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
+        return consumerStub
     }
 
     private fun authorizedCallerOrNull(): AuthorizedCaller? = when (val result = authorizer.authorize(callingProcessSource.current())) {
         is AuthorizationResult.Allowed -> result.caller
         is AuthorizationResult.Denied -> null
     }
-
-    private fun requireAuthorizedCaller(): AuthorizedCaller =
-        authorizedCallerOrNull() ?: throw SecurityException("Caller is not authorized")
 }

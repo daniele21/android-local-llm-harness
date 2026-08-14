@@ -4,9 +4,15 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IPrepareCallback
@@ -20,6 +26,9 @@ import io.github.daniele21.localllm.transport.binder.contract.RegistrationResult
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
 internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmService) : SharedRuntimeRemoteService {
+    override val consumer: ConsumerSharedRuntimeRemoteService =
+        AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi)
+
     override fun protocolInfo(): ProtocolInfoParcel = delegate.protocolInfo
 
     override fun registerClient(
@@ -70,4 +79,35 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
 
     override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
+}
+
+private class AidlConsumerSharedRuntimeRemoteService(private val delegate: IConsumerLocalLlmService) : ConsumerSharedRuntimeRemoteService {
+    override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.capabilities(request, resultCallback(callback))
+    }
+
+    override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.prepare(request, resultCallback(callback))
+    }
+
+    override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
+        delegate.openSession(request, resultCallback(callback))
+    }
+
+    override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+        delegate.generate(
+            request,
+            object : IConsumerGenerationCallback.Stub() {
+                override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
+            },
+        )
+    }
+
+    override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
+    override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
+
+    private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback =
+        object : IConsumerResultCallback.Stub() {
+            override fun onResult(result: ConsumerResultParcel) = callback(result)
+        }
 }

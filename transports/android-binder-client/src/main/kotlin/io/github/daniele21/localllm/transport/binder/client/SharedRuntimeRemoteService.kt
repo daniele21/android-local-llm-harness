@@ -5,6 +5,9 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
@@ -14,7 +17,29 @@ import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
+internal interface ConsumerSharedRuntimeRemoteService {
+    @Throws(RemoteException::class)
+    fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun cancel(request: CancelRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun closeSession(request: CloseSessionRequestParcel)
+}
+
 internal interface SharedRuntimeRemoteService {
+    val consumer: ConsumerSharedRuntimeRemoteService
+
     @Throws(RemoteException::class)
     fun protocolInfo(): ProtocolInfoParcel
 

@@ -5,7 +5,7 @@ import kotlinx.parcelize.Parcelize
 
 object BinderProtocolV1 {
     const val MAJOR = 1
-    const val MINOR = 0
+    const val MINOR = 1
     const val MIN_SUPPORTED_MINOR = 0
 
     const val MAX_IDENTIFIER_CHARACTERS = 128
@@ -24,6 +24,7 @@ object BinderProtocolV1 {
     const val FEATURE_REASONING_CONTENT = "reasoning-content"
     const val FEATURE_THINKING_MODE = "thinking-mode"
     const val FEATURE_SESSION_OPTIONS = "session-options"
+    const val FEATURE_CONSUMER_API_V1 = "consumer-api-v1"
 
     val KNOWN_FEATURES: Set<String> =
         setOf(
@@ -34,6 +35,7 @@ object BinderProtocolV1 {
             FEATURE_REASONING_CONTENT,
             FEATURE_THINKING_MODE,
             FEATURE_SESSION_OPTIONS,
+            FEATURE_CONSUMER_API_V1,
         )
 }
 
