@@ -87,22 +87,26 @@ internal class AndroidOmbraDocumentExtractor(
         scope.cancel()
     }
 
-    private suspend fun extract(source: OmbraDocumentSource): OmbraExtractedDocument {
-        val parsed =
-            try {
-                reader.read(source.uri)
-            } catch (exception: IOException) {
-                throw mapReaderFailure(exception)
-            } catch (_: SecurityException) {
-                throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
-            }
+    private suspend fun extract(source: OmbraDocumentSource): OmbraExtractedDocument = buildDocument(source, readPdf(source))
 
-        if (parsed.truncated) {
-            throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.LIMIT_EXCEEDED)
+    private suspend fun readPdf(source: OmbraDocumentSource): OmbraPdfReadResult =
+        try {
+            reader.read(source.uri)
+        } catch (exception: IOException) {
+            throw mapReaderFailure(exception)
+        } catch (_: SecurityException) {
+            throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
         }
-        if (parsed.pageCount <= 0) {
-            throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.EMPTY_PDF)
-        }
+
+    private fun buildDocument(source: OmbraDocumentSource, parsed: OmbraPdfReadResult): OmbraExtractedDocument {
+        val documentFailure =
+            when {
+                parsed.truncated -> OmbraDocumentExtractionFailureCode.LIMIT_EXCEEDED
+                parsed.pageCount <= 0 -> OmbraDocumentExtractionFailureCode.EMPTY_PDF
+                else -> null
+            }
+        if (documentFailure != null) throw OmbraDocumentExtractionException(documentFailure)
+
         val segments = OmbraPdfSegmenter.segment(parsed.pages)
         if (segments.isEmpty()) {
             throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.IMAGE_ONLY_PDF)
