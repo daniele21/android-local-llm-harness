@@ -157,11 +157,10 @@ class OmbraPdfSpikeInstrumentedTest {
         assertFalse(extracted.contains("+39 333 1234567"))
     }
 
-    private fun fixtureFile(name: String): File =
-        File(targetContext.cacheDir, "ombra-$name").also { file ->
-            file.delete()
-            createdFiles += file
-        }
+    private fun fixtureFile(name: String): File = File(targetContext.cacheDir, "ombra-$name").also { file ->
+        file.delete()
+        createdFiles += file
+    }
 
     private fun readEncryptedFixture(): ByteArray {
         val instrumentationContext = InstrumentationRegistry.getInstrumentation().context
@@ -228,9 +227,5 @@ class OmbraPdfSpikeInstrumentedTest {
         }
     }
 
-    private data class DrawnText(
-        val text: String,
-        val x: Float,
-        val y: Float,
-    )
+    private data class DrawnText(val text: String, val x: Float, val y: Float)
 }
