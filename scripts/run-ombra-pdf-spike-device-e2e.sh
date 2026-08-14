@@ -7,7 +7,7 @@ ADB_PATH="${ADB:-}"
 CLEANUP="false"
 
 APP_PACKAGE="io.github.daniele21.localllm.console.debug"
-TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfIsolationInstrumentedTest"
+TEST_CLASSES="io.github.daniele21.localllm.console.document.OmbraPdfSpikeInstrumentedTest,io.github.daniele21.localllm.console.document.OmbraPdfIsolationInstrumentedTest"
 REPORT_DIR="$ROOT_DIR/build/reports/ombra"
 RUNTIME_LOG="$REPORT_DIR/omb0-pdf-runtime-gradle.log"
 
@@ -22,9 +22,10 @@ Options:
   --cleanup          Uninstall the OMBRA/Console debug APK after the run.
   --help, -h         Show this help.
 
-The test is self-contained and does not require a Harness host or model. It generates synthetic
-PDFs in app-private cache, exercises the active OMB-0 parser trust-boundary spike, and records only
-privacy-safe device/build metadata.
+The suite is self-contained and does not require a Harness host or model. It generates synthetic
+PDFs in app-private cache and exercises the selected PdfBox parser through the isolated-process
+boundary, including fidelity, bounded extraction, malformed/encrypted inputs, cancellation/reuse,
+normalized export round-trip, glyph policy and process isolation.
 EOF
 }
 
@@ -106,8 +107,8 @@ if [[ "$("${ADB_CMD[@]}" shell getprop ro.kernel.qemu | tr -d '\r')" == "1" ]]; 
     DEVICE_KIND="emulator"
 fi
 SDK_INT="$("${ADB_CMD[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
-if [[ -z "$SDK_INT" || "$SDK_INT" -lt 28 ]]; then
-    echo "Error: OMBRA PDF spike requires Android API 28 or newer; device reports '$SDK_INT'." >&2
+if [[ -z "$SDK_INT" || "$SDK_INT" -lt 26 ]]; then
+    echo "Error: OMBRA PDF spike requires Android API 26 or newer; device reports '$SDK_INT'." >&2
     exit 1
 fi
 
@@ -126,10 +127,10 @@ echo "Building OMBRA/Console and instrumentation APKs..."
     :apps:local-llm-console:assembleDebugAndroidTest \
     2>&1 | tee -a "$RUNTIME_LOG"
 
-echo "Running isolated parser trust-boundary fixture evidence..."
+echo "Running final isolated PdfBox parser acceptance evidence..."
 ./gradlew \
     :apps:local-llm-console:connectedDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS" \
+    -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASSES" \
     2>&1 | tee -a "$RUNTIME_LOG"
 
 REPORT="$REPORT_DIR/omb0-pdf-runtime-spike.txt"
@@ -139,7 +140,7 @@ REPORT="$REPORT_DIR/omb0-pdf-runtime-spike.txt"
     echo "device_serial=$DEVICE_SERIAL"
     echo "sdk_int=$SDK_INT"
     echo "app_package=$APP_PACKAGE"
-    echo "test_class=$TEST_CLASS"
+    echo "test_classes=$TEST_CLASSES"
     echo "git_commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 } > "$REPORT"
 
