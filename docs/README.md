@@ -5,7 +5,7 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating the canonical owner of repository documentation or changing documentation governance
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-14
 
 Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
 
@@ -19,6 +19,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
 | What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
 | What is the Qwen3.5-only product status and plan? | [`qwen35/README.md`](qwen35/README.md) |
+| How are model quality and dataset-based performance evaluated? | [`model-evaluation/README.md`](model-evaluation/README.md) |
 | What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
 | What is required before merge or release? | [`definition-of-done.md`](definition-of-done.md) |
 | What remains for Harness 0.5.0? | [`releases/harness-0.5.md`](releases/harness-0.5.md) |
@@ -53,12 +54,13 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`harness-model-inventory-state.md`](harness-model-inventory-state.md) — unified model presentation state
 - [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md) — model-aware generation planning
 
-### Observability and diagnostics
+### Observability, diagnostics and evaluation
 
 - [`console-observability.md`](console-observability.md) — standalone console observability
 - [`health-engine.md`](health-engine.md) — health and sanity behavior
 - [`resource-observability.md`](resource-observability.md) — resource capture and load classification
-- [`benchmark-engine.md`](benchmark-engine.md) — benchmark history and regression policy
+- [`benchmark-engine.md`](benchmark-engine.md) — telemetry-derived benchmark history and regression policy
+- [`model-evaluation/README.md`](model-evaluation/README.md) — dataset-based model-quality execution, performance comparison and implementation plan
 - [`harness-telemetry-composition.md`](harness-telemetry-composition.md) — connected telemetry composition
 - [`harness-logs-composition.md`](harness-logs-composition.md) — connected log composition
 - [`harness-health-composition.md`](harness-health-composition.md) — connected health composition
