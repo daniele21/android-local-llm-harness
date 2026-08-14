@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: repository
 Canonical scope: target.repository
 Read when: a change affects repository-wide product behavior, phase boundaries or acceptance criteria
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-14
 
 This document defines the repository-level target and routes work to the focused specification that owns each behavior. It intentionally avoids repeating module contracts, implementation status or release evidence.
 
@@ -22,6 +22,7 @@ The product must:
 - treat cancellation, shutdown, partial failure and cleanup as normal lifecycle paths;
 - exclude prompts and generated content from normal telemetry and shared evidence;
 - use measurements from representative hardware before changing residency, concurrency or cache policy;
+- support explicit dataset-based model evaluation without conflating semantic quality with runtime regression baselines;
 - remain merge-ready through deterministic automation while reserving production-readiness claims for physical-device evidence.
 
 ## Canonical lifecycle
@@ -65,7 +66,8 @@ catalog release
 | Runtime telemetry and console surfaces | [`console-observability.md`](console-observability.md) |
 | Health behavior | [`health-engine.md`](health-engine.md) |
 | Resource observation | [`resource-observability.md`](resource-observability.md) |
-| Benchmark and regression behavior | [`benchmark-engine.md`](benchmark-engine.md) |
+| Benchmark and runtime regression behavior | [`benchmark-engine.md`](benchmark-engine.md) |
+| Dataset-based model quality/performance evaluation | [`model-evaluation/README.md`](model-evaluation/README.md) |
 | Connected phone application boundary | [`features/phone-app-architecture.md`](features/phone-app-architecture.md) |
 | Phone UX/UI acceptance criteria | [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md) |
 | Shared visual system | [`design-system.md`](design-system.md) and [`harness-brand-guidelines.md`](harness-brand-guidelines.md) |
