@@ -49,7 +49,11 @@ jobs:
 
       - name: Measure PDF APK size delta
         shell: bash
-        run: bash scripts/measure-ombra-pdf-apk-delta.sh
+        run: |
+          bash scripts/measure-ombra-pdf-apk-delta.sh
+          test -s build/reports/ombra/omb0-apk-size-delta.txt
+          cat build/reports/ombra/omb0-apk-size-delta.txt
+          cp build/reports/ombra/omb0-apk-size-delta.txt "$RUNNER_TEMP/omb0-apk-size-delta.txt"
 
       - name: Enable KVM access
         shell: bash
@@ -61,13 +65,20 @@ jobs:
       - name: Create and start emulator
         shell: bash
         run: |
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          if [[ ! -x "$EMULATOR_BIN" ]]; then
+            echo "Error: emulator binary is unavailable at $EMULATOR_BIN." >&2
+            find "$ANDROID_HOME" -maxdepth 3 -type f -name emulator -print >&2 || true
+            exit 1
+          fi
+
           echo "no" | avdmanager create avd \
             --force \
             --name ombra-api35 \
             --package "system-images;android-35;google_apis;x86_64" \
             --device "pixel_6"
 
-          nohup emulator \
+          nohup "$EMULATOR_BIN" \
             -avd ombra-api35 \
             -port 5554 \
             -no-window \
@@ -116,6 +127,7 @@ jobs:
             build/reports/ombra/**
             apps/local-llm-console/build/reports/androidTests/**
             apps/local-llm-console/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/omb0-apk-size-delta.txt
             ${{ runner.temp }}/ombra-emulator.log
           if-no-files-found: warn
           retention-days: 14
