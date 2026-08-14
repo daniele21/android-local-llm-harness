@@ -32,9 +32,13 @@ internal enum class PerformanceSection(val route: String) {
 
 internal sealed interface PerformanceSampleSelection {
     data object Smoke : PerformanceSampleSelection
+
     data object Quick : PerformanceSampleSelection
+
     data object Standard : PerformanceSampleSelection
+
     data object Extended : PerformanceSampleSelection
+
     data object All : PerformanceSampleSelection
 
     data class Custom(val count: Int) : PerformanceSampleSelection {
@@ -68,6 +72,7 @@ internal data class PerformanceRunSetupState(
 
 internal sealed interface PerformanceRunReadiness {
     data object Incomplete : PerformanceRunReadiness
+
     data object Ready : PerformanceRunReadiness
 
     data class Blocked(val reasons: List<PerformanceBlockReason>) : PerformanceRunReadiness {
@@ -132,21 +137,33 @@ internal data class PerformanceState(
 
 internal sealed interface PerformanceIntent {
     data class SelectSection(val section: PerformanceSection) : PerformanceIntent
+
     data class SelectModel(val model: EvaluationModelIdentity) : PerformanceIntent
+
     data class SelectDataset(val dataset: PerformanceDatasetSelection) : PerformanceIntent
+
     data class SelectSample(val selection: PerformanceSampleSelection) : PerformanceIntent
+
     data class SelectExecutionProfile(val profile: EvaluationExecutionProfileRef) : PerformanceIntent
+
     data object StartRun : PerformanceIntent
+
     data object CancelRun : PerformanceIntent
+
     data object ImportDataset : PerformanceIntent
+
     data class DeleteDataset(val id: EvaluationDatasetId, val version: EvaluationDatasetVersion) : PerformanceIntent
+
     data class OpenRun(val runId: EvaluationRunId) : PerformanceIntent
+
     data class SelectCompareRun(val runId: EvaluationRunId) : PerformanceIntent
+
     data object Refresh : PerformanceIntent
 }
 
 internal sealed interface PerformanceEffect {
     data object OpenDocumentPicker : PerformanceEffect
+
     data object NavigateToModels : PerformanceEffect
 
     data class ShowMessage(val message: String) : PerformanceEffect {
