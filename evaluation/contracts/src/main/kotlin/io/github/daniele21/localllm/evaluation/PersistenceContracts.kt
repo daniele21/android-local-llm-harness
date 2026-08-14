@@ -19,10 +19,7 @@ data class EvaluationRunQuery(
     }
 }
 
-data class EvaluationRetentionPolicy(
-    val maxTerminalRuns: Int = DEFAULT_MAX_TERMINAL_EVALUATION_RUNS,
-    val maxAgeMs: Long? = null,
-) {
+data class EvaluationRetentionPolicy(val maxTerminalRuns: Int = DEFAULT_MAX_TERMINAL_EVALUATION_RUNS, val maxAgeMs: Long? = null) {
     init {
         require(maxTerminalRuns >= 0) { "Evaluation retention run limit must not be negative" }
         require(maxAgeMs == null || maxAgeMs > 0) {
@@ -31,10 +28,7 @@ data class EvaluationRetentionPolicy(
     }
 }
 
-data class PersistedEvaluationRun(
-    val summary: EvaluationRunSummary,
-    val caseResults: List<EvaluationCaseResult>,
-) {
+data class PersistedEvaluationRun(val summary: EvaluationRunSummary, val caseResults: List<EvaluationCaseResult>) {
     init {
         require(caseResults.map { it.caseId }.distinct().size == caseResults.size) {
             "Persisted evaluation case IDs must be unique per run"
@@ -51,10 +45,7 @@ enum class EvaluationRunDeleteStatus {
     ACTIVE_RUN,
 }
 
-data class EvaluationRetentionResult(
-    val deletedRunIds: List<EvaluationRunId>,
-    val retainedRunCount: Int,
-) {
+data class EvaluationRetentionResult(val deletedRunIds: List<EvaluationRunId>, val retainedRunCount: Int) {
     init {
         require(deletedRunIds.distinct().size == deletedRunIds.size) {
             "Retention result deleted run IDs must be unique"
