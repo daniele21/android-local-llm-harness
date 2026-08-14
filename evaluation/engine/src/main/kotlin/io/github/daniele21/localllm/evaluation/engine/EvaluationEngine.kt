@@ -29,10 +29,7 @@ interface EvaluationModelPreparationPort {
 }
 
 interface EvaluationCaseExecutionPort {
-    suspend fun execute(
-        config: EvaluationRunConfig,
-        caseId: EvaluationCaseId,
-    ): EvaluationStepResult<EvaluationCaseResult>
+    suspend fun execute(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult>
 }
 
 interface EvaluationEngineObserver {
@@ -47,15 +44,9 @@ sealed interface EvaluationEngineTerminal {
     val runId: EvaluationRunId
     val results: List<EvaluationCaseResult>
 
-    data class Completed(
-        override val runId: EvaluationRunId,
-        override val results: List<EvaluationCaseResult>,
-    ) : EvaluationEngineTerminal
+    data class Completed(override val runId: EvaluationRunId, override val results: List<EvaluationCaseResult>) : EvaluationEngineTerminal
 
-    data class Cancelled(
-        override val runId: EvaluationRunId,
-        override val results: List<EvaluationCaseResult>,
-    ) : EvaluationEngineTerminal
+    data class Cancelled(override val runId: EvaluationRunId, override val results: List<EvaluationCaseResult>) : EvaluationEngineTerminal
 
     data class Failed(
         override val runId: EvaluationRunId,
@@ -189,11 +180,7 @@ class EvaluationEngine(
         return EvaluationEngineTerminal.Cancelled(config.runId, results.toList())
     }
 
-    private suspend fun emitState(
-        config: EvaluationRunConfig,
-        observer: EvaluationEngineObserver,
-        state: EvaluationRunState,
-    ) {
+    private suspend fun emitState(config: EvaluationRunConfig, observer: EvaluationEngineObserver, state: EvaluationRunState) {
         observer.onStateChanged(config.runId, state)
     }
 
