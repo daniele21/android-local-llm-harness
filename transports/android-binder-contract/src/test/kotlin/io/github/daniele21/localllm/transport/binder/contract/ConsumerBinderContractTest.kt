@@ -12,6 +12,7 @@ import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -95,11 +96,11 @@ class ConsumerBinderContractTest {
         assertEquals("answer", result.answer)
         assertEquals(metrics, result.metrics)
         assertEquals(execution, result.execution)
-        assertEquals(null, completed.deltaText)
+        assertNull(completed.deltaText)
     }
 
     @Test
-    fun `consumer reconstructor rejects duplicate or post-terminal callbacks`() {
+    fun `consumer reconstructor rejects duplicate callbacks`() {
         val externalRequestId = "wire-request"
         val requestId = RequestId("public-request")
         val reconstructor = ConsumerGenerationEventReconstructor(externalRequestId, requestId)
