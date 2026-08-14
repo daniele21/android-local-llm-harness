@@ -96,15 +96,17 @@ Implemented on the active CA-4 branch:
 - host mapping to authenticated `ConsumerLocalLlmClient` instances;
 - Binder consumer lifecycle and generation adapters;
 - result/metric and execution-identity projection across the wire;
-- bounded ordered generation reconstruction, cancellation and stale-connection handling.
+- bounded ordered generation reconstruction, cancellation and stale-connection handling;
+- deterministic host/client/wire/privacy and v1.0/v1.1 compatibility coverage;
+- packaged release-AAR Consumer API compilation fixture.
 
 Remaining before the CA-4 exit gate:
 
-- deterministic consumer Binder lifecycle/generation/compatibility coverage for the new surface;
-- packaged client/contract AAR consumer fixture coverage for `BinderConsumerLocalLlmClient`;
-- repository validation with the exact integrated branch head.
+- repository and documentation validation must be green on the exact branch head;
+- any failure must be fixed without weakening the accepted security/privacy/compatibility boundary;
+- merge PR #104 into `dev` only after those gates are green.
 
-Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior.
+Exit gate: packaged client SDK round-trips accepted semantics with explicit old/new compatibility behavior and the exact integrated head passes repository validation.
 
 ## CA-5 — OMBRA reference consumer
 
