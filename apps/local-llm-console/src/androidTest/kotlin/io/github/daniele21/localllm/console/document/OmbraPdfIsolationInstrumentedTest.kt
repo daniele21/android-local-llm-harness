@@ -20,7 +20,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -90,7 +89,7 @@ class OmbraPdfIsolationInstrumentedTest {
         var outputRead: ParcelFileDescriptor? = null
         try {
             assertTrue("Timed out binding isolated parser service", connected.await(10, TimeUnit.SECONDS))
-            val messenger = remote ?: fail("Isolated parser service connected without Messenger")
+            val messenger = remote ?: throw AssertionError("Isolated parser service connected without Messenger")
             val sourceDescriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
             val outputPipe = ParcelFileDescriptor.createPipe()
             outputRead = outputPipe[0]
