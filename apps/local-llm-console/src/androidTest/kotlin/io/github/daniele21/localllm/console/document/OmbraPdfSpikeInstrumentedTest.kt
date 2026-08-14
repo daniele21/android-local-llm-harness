@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.console.document
 
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.util.Base64
@@ -43,12 +44,14 @@ class OmbraPdfSpikeInstrumentedTest {
             pages =
             listOf(
                 listOf(
-                    DrawnText("LEFT_A", 36f, 90f),
-                    DrawnText("LEFT_B", 36f, 120f),
-                    DrawnText("RIGHT_A", 320f, 90f),
-                    DrawnText("RIGHT_B", 320f, 120f),
+                    // Intentionally draw the left column before the right column. The parser
+                    // contract under test is visual reading order, not PDF object creation order.
+                    DrawnText("LEFT TOP", 36f, 90f),
+                    DrawnText("LEFT BOTTOM", 36f, 120f),
+                    DrawnText("RIGHT TOP", 320f, 90f),
+                    DrawnText("RIGHT BOTTOM", 320f, 120f),
                 ),
-                listOf(DrawnText("SECOND_PAGE", 36f, 90f)),
+                listOf(DrawnText("SECOND PAGE", 36f, 90f)),
             ),
         )
 
@@ -59,8 +62,11 @@ class OmbraPdfSpikeInstrumentedTest {
         assertFalse(full.truncated)
 
         val firstPage = full.pages.first().text
-        assertTextOrder(firstPage, "LEFT_A", "LEFT_B", "RIGHT_A", "RIGHT_B")
-        assertTrue(full.pages[1].text.contains("SECOND_PAGE"))
+        assertTextOrder(firstPage, "LEFT TOP", "RIGHT TOP", "LEFT BOTTOM", "RIGHT BOTTOM")
+        assertTrue(
+            "Expected second-page marker in extracted text: '${diagnosticText(full.pages[1].text)}'",
+            full.pages[1].text.contains("SECOND PAGE"),
+        )
 
         val pageBounded = parser.extractText(Uri.fromFile(source), maxPages = 1)
         assertEquals(1, pageBounded.pages.size)
@@ -205,6 +211,7 @@ class OmbraPdfSpikeInstrumentedTest {
         val paint =
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
                 textSize = 12f
             }
         try {
@@ -250,11 +257,20 @@ class OmbraPdfSpikeInstrumentedTest {
         var previous = -1
         expected.forEach { value ->
             val index = text.indexOf(value)
-            assertTrue("Expected '$value' in extracted page text", index >= 0)
-            assertTrue("Expected stable reading order for '$value'", index > previous)
+            assertTrue(
+                "Expected '$value' in extracted page text: '${diagnosticText(text)}'",
+                index >= 0,
+            )
+            assertTrue(
+                "Expected visual reading order for '$value' in: '${diagnosticText(text)}'",
+                index > previous,
+            )
             previous = index
         }
     }
+
+    private fun diagnosticText(text: String): String =
+        text.replace("\n", "\\n").replace("\r", "\\r").take(500)
 
     private data class DrawnText(val text: String, val x: Float, val y: Float)
 }
