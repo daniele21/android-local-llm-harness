@@ -8,6 +8,8 @@ CLEANUP="false"
 
 APP_PACKAGE="io.github.daniele21.localllm.console.debug"
 TEST_CLASS="io.github.daniele21.localllm.console.document.OmbraPdfSpikeInstrumentedTest"
+REPORT_DIR="$ROOT_DIR/build/reports/ombra"
+RUNTIME_LOG="$REPORT_DIR/omb0-pdf-runtime-gradle.log"
 
 usage() {
     cat <<'EOF'
@@ -111,6 +113,8 @@ fi
 
 export ANDROID_SERIAL="$DEVICE_SERIAL"
 cd "$ROOT_DIR"
+mkdir -p "$REPORT_DIR"
+: > "$RUNTIME_LOG"
 
 echo "OMB-0 PDF runtime spike"
 echo "Device: $DEVICE_SERIAL ($DEVICE_KIND, API $SDK_INT)"
@@ -119,15 +123,15 @@ echo "App:    $APP_PACKAGE"
 echo "Building OMBRA/Console and instrumentation APKs..."
 ./gradlew \
     :apps:local-llm-console:assembleDebug \
-    :apps:local-llm-console:assembleDebugAndroidTest
+    :apps:local-llm-console:assembleDebugAndroidTest \
+    2>&1 | tee -a "$RUNTIME_LOG"
 
 echo "Running sandboxed parser and normalized-writer fixture evidence..."
 ./gradlew \
     :apps:local-llm-console:connectedDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS"
+    -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS" \
+    2>&1 | tee -a "$RUNTIME_LOG"
 
-REPORT_DIR="$ROOT_DIR/build/reports/ombra"
-mkdir -p "$REPORT_DIR"
 REPORT="$REPORT_DIR/omb0-pdf-runtime-spike.txt"
 {
     echo "result=PASS"
