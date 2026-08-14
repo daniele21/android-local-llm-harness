@@ -69,6 +69,7 @@ jobs:
 
           nohup emulator \
             -avd ombra-api35 \
+            -port 5554 \
             -no-window \
             -no-audio \
             -no-boot-anim \
@@ -76,19 +77,26 @@ jobs:
             -no-snapshot \
             > "$RUNNER_TEMP/ombra-emulator.log" 2>&1 &
 
-          adb wait-for-device
-          for attempt in $(seq 1 120); do
-            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
-              adb shell settings put global window_animation_scale 0
-              adb shell settings put global transition_animation_scale 0
-              adb shell settings put global animator_duration_scale 0
+          if ! timeout 180 adb -s emulator-5554 wait-for-device; then
+            adb devices -l >&2 || true
+            cat "$RUNNER_TEMP/ombra-emulator.log" >&2 || true
+            echo "Error: emulator-5554 did not become reachable within 180 seconds." >&2
+            exit 1
+          fi
+
+          for attempt in $(seq 1 90); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              adb -s emulator-5554 shell settings put global window_animation_scale 0
+              adb -s emulator-5554 shell settings put global transition_animation_scale 0
+              adb -s emulator-5554 shell settings put global animator_duration_scale 0
               exit 0
             fi
             sleep 2
           done
 
-          cat "$RUNNER_TEMP/ombra-emulator.log" >&2
-          echo "Error: emulator did not finish booting." >&2
+          adb devices -l >&2 || true
+          cat "$RUNNER_TEMP/ombra-emulator.log" >&2 || true
+          echo "Error: emulator-5554 did not finish booting within the bounded boot window." >&2
           exit 1
 
       - name: Run OMB-0 PDF runtime evidence
