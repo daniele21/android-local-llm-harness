@@ -84,6 +84,9 @@ object CanonicalEvaluationHasher {
             .text("datasetVersion", identity.dataset.version.value)
             .text("datasetDigest", identity.dataset.digest.sha256)
             .text("sampleSetDigest", identity.sampleSetDigest.sha256)
+            .text("samplingPolicyId", identity.samplingPolicy.id.value)
+            .number("samplingPolicyVersion", identity.samplingPolicy.version.toLong())
+            .number("samplingSeed", identity.samplingSeed)
             .text("evaluatorSetDigest", identity.evaluatorSetDigest.sha256)
             .text("semanticExecutionFingerprint", identity.semanticExecution.fingerprint.sha256)
             .text("deviceClass", environment.deviceClass)
@@ -104,6 +107,8 @@ object CanonicalEvaluationHasher {
             model = identity.model,
             dataset = identity.dataset,
             sampleSetDigest = identity.sampleSetDigest,
+            samplingPolicy = identity.samplingPolicy,
+            samplingSeed = identity.samplingSeed,
             evaluatorSetDigest = identity.evaluatorSetDigest,
             semanticExecution = identity.semanticExecution,
             runtimeEnvironment = identity.runtimeEnvironment,

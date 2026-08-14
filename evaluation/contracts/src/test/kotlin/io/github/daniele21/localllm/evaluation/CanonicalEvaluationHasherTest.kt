@@ -41,12 +41,14 @@ class CanonicalEvaluationHasherTest {
     }
 
     @Test
-    fun `run fingerprint includes runtime environment but model differences remain explicit identity`() {
+    fun `run fingerprint includes sampling policy seed runtime environment and model identity`() {
         val baseline = runIdentity()
         val changedRuntime = EvaluationRunIdentity.create(
             model = baseline.model,
             dataset = baseline.dataset,
             sampleSetDigest = baseline.sampleSetDigest,
+            samplingPolicy = baseline.samplingPolicy,
+            samplingSeed = baseline.samplingSeed,
             evaluatorSetDigest = baseline.evaluatorSetDigest,
             semanticExecution = baseline.semanticExecution,
             runtimeEnvironment = baseline.runtimeEnvironment.copy(deviceClass = "pixel-class-b"),
@@ -55,6 +57,18 @@ class CanonicalEvaluationHasherTest {
             model = baseline.model.copy(artifactDigest = ModelDigest("b".repeat(64))),
             dataset = baseline.dataset,
             sampleSetDigest = baseline.sampleSetDigest,
+            samplingPolicy = baseline.samplingPolicy,
+            samplingSeed = baseline.samplingSeed,
+            evaluatorSetDigest = baseline.evaluatorSetDigest,
+            semanticExecution = baseline.semanticExecution,
+            runtimeEnvironment = baseline.runtimeEnvironment,
+        )
+        val changedSamplingSeed = EvaluationRunIdentity.create(
+            model = baseline.model,
+            dataset = baseline.dataset,
+            sampleSetDigest = baseline.sampleSetDigest,
+            samplingPolicy = baseline.samplingPolicy,
+            samplingSeed = baseline.samplingSeed + 1,
             evaluatorSetDigest = baseline.evaluatorSetDigest,
             semanticExecution = baseline.semanticExecution,
             runtimeEnvironment = baseline.runtimeEnvironment,
@@ -62,6 +76,7 @@ class CanonicalEvaluationHasherTest {
 
         assertNotEquals(baseline.fingerprint, changedRuntime.fingerprint)
         assertNotEquals(baseline.fingerprint, changedModel.fingerprint)
+        assertNotEquals(baseline.fingerprint, changedSamplingSeed.fingerprint)
     }
 
     private fun runIdentity(): EvaluationRunIdentity = EvaluationRunIdentity.create(
@@ -77,6 +92,8 @@ class CanonicalEvaluationHasherTest {
             EvaluationDatasetDigest("1".repeat(64)),
         ),
         sampleSetDigest = SampleSetDigest("2".repeat(64)),
+        samplingPolicy = SamplingPolicyRef(SamplingPolicyId("stratified"), 1),
+        samplingSeed = 7L,
         evaluatorSetDigest = EvaluatorSetDigest("3".repeat(64)),
         semanticExecution = EvaluationSemanticExecutionIdentity.create(semanticExecution()),
         runtimeEnvironment = EvaluationRuntimeEnvironmentIdentity(

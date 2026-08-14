@@ -120,18 +120,25 @@ data class EvaluationRunIdentity(
     val model: EvaluationModelIdentity,
     val dataset: EvaluationDatasetIdentity,
     val sampleSetDigest: SampleSetDigest,
+    val samplingPolicy: SamplingPolicyRef,
+    val samplingSeed: Long,
     val evaluatorSetDigest: EvaluatorSetDigest,
     val semanticExecution: EvaluationSemanticExecutionIdentity,
     val runtimeEnvironment: EvaluationRuntimeEnvironmentIdentity,
     val fingerprint: EvaluationRunFingerprint,
 ) {
     init {
+        require(runtimeEnvironment.backendRevision == semanticExecution.execution.backendRevision) {
+            "Runtime backend revision must match semantic execution backend revision"
+        }
         require(
             fingerprint == CanonicalEvaluationHasher.runFingerprint(
                 EvaluationRunIdentityUnchecked(
                     model = model,
                     dataset = dataset,
                     sampleSetDigest = sampleSetDigest,
+                    samplingPolicy = samplingPolicy,
+                    samplingSeed = samplingSeed,
                     evaluatorSetDigest = evaluatorSetDigest,
                     semanticExecution = semanticExecution,
                     runtimeEnvironment = runtimeEnvironment,
@@ -141,10 +148,13 @@ data class EvaluationRunIdentity(
     }
 
     companion object {
+        @Suppress("LongParameterList")
         fun create(
             model: EvaluationModelIdentity,
             dataset: EvaluationDatasetIdentity,
             sampleSetDigest: SampleSetDigest,
+            samplingPolicy: SamplingPolicyRef,
+            samplingSeed: Long,
             evaluatorSetDigest: EvaluatorSetDigest,
             semanticExecution: EvaluationSemanticExecutionIdentity,
             runtimeEnvironment: EvaluationRuntimeEnvironmentIdentity,
@@ -153,6 +163,8 @@ data class EvaluationRunIdentity(
                 model = model,
                 dataset = dataset,
                 sampleSetDigest = sampleSetDigest,
+                samplingPolicy = samplingPolicy,
+                samplingSeed = samplingSeed,
                 evaluatorSetDigest = evaluatorSetDigest,
                 semanticExecution = semanticExecution,
                 runtimeEnvironment = runtimeEnvironment,
@@ -161,6 +173,8 @@ data class EvaluationRunIdentity(
                 model = model,
                 dataset = dataset,
                 sampleSetDigest = sampleSetDigest,
+                samplingPolicy = samplingPolicy,
+                samplingSeed = samplingSeed,
                 evaluatorSetDigest = evaluatorSetDigest,
                 semanticExecution = semanticExecution,
                 runtimeEnvironment = runtimeEnvironment,
@@ -174,6 +188,8 @@ internal data class EvaluationRunIdentityUnchecked(
     val model: EvaluationModelIdentity,
     val dataset: EvaluationDatasetIdentity,
     val sampleSetDigest: SampleSetDigest,
+    val samplingPolicy: SamplingPolicyRef,
+    val samplingSeed: Long,
     val evaluatorSetDigest: EvaluatorSetDigest,
     val semanticExecution: EvaluationSemanticExecutionIdentity,
     val runtimeEnvironment: EvaluationRuntimeEnvironmentIdentity,

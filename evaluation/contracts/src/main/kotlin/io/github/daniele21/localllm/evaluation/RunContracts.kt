@@ -96,9 +96,10 @@ data class EvaluationCaseResult(
             }
 
             EvaluationCaseStatus.INVALID_OUTPUT -> require(
-                outcome?.code == EvaluatorOutcomeCode.INVALID_OUTPUT ||
-                    outcome?.code == EvaluatorOutcomeCode.AMBIGUOUS_OUTPUT,
-            ) { "Invalid-output case result requires an invalid or ambiguous evaluator outcome" }
+                outcome != null &&
+                    failure == null &&
+                    (outcome.code == EvaluatorOutcomeCode.INVALID_OUTPUT || outcome.code == EvaluatorOutcomeCode.AMBIGUOUS_OUTPUT),
+            ) { "Invalid-output case result requires an invalid or ambiguous evaluator outcome without runtime failure" }
 
             EvaluationCaseStatus.TIMEOUT,
             EvaluationCaseStatus.RUNTIME_FAILURE,
@@ -167,6 +168,7 @@ data class EvaluationRunSummary(
         require(progress.totalCases == config.sampling.orderedCaseIds.size) {
             "Run progress total must match sampling selection"
         }
+        identity?.let { validateIdentityMatchesConfig(it, config) }
         if (state == EvaluationRunState.COMPLETED) {
             require(identity != null && completedAtEpochMs != null && failure == null) {
                 "Completed run summary requires identity and completion timestamp without failure"
@@ -179,6 +181,19 @@ data class EvaluationRunSummary(
             require(completedAtEpochMs != null) { "Cancelled run summary requires completion timestamp" }
         }
     }
+}
+
+private fun validateIdentityMatchesConfig(identity: EvaluationRunIdentity, config: EvaluationRunConfig) {
+    require(identity.model == config.model) { "Run identity model must match run config" }
+    require(identity.dataset == config.dataset) { "Run identity dataset must match run config" }
+    require(identity.sampleSetDigest == config.sampling.digest) { "Run identity sample set must match run config" }
+    require(identity.samplingPolicy == config.sampling.policy) { "Run identity sampling policy must match run config" }
+    require(identity.samplingSeed == config.sampling.seed) { "Run identity sampling seed must match run config" }
+    require(identity.semanticExecution.execution.profile == config.executionProfile) {
+        "Run identity execution profile must match run config"
+    }
+    require(identity.runtimeEnvironment.loadPolicy == config.loadPolicy) { "Run identity load policy must match run config" }
+    require(identity.runtimeEnvironment.warmupPolicy == config.warmupPolicy) { "Run identity warm-up policy must match run config" }
 }
 
 private const val MAX_CASE_TIMEOUT_MS = 10 * 60 * 1_000L
