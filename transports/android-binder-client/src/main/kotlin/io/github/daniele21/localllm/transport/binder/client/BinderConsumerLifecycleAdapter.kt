@@ -1,7 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import android.os.DeadObjectException
-import android.os.Looper
 import android.os.RemoteException
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
@@ -28,7 +27,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 internal class BinderConsumerLifecycleAdapter(
     private val endpointProvider: () -> RegisteredSharedRuntimeEndpoint?,
-    endpointInvalidations: SharedRuntimeEndpointInvalidationSource? = null,
+    private val endpointInvalidations: SharedRuntimeEndpointInvalidationSource? = null,
+    private val blockingCallGuard: BlockingCallGuard = AndroidMainThreadBlockingCallGuard,
     private val operationTimeoutMillis: Long = DEFAULT_OPERATION_TIMEOUT_MILLIS,
     private val correlationIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
 ) : AutoCloseable {
@@ -40,7 +40,7 @@ internal class BinderConsumerLifecycleAdapter(
     }
 
     fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult {
-        requireBackgroundThread()
+        blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider()
             ?: return ConsumerCapabilityResult.Rejected(
                 ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE,
@@ -65,7 +65,7 @@ internal class BinderConsumerLifecycleAdapter(
     }
 
     fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult {
-        requireBackgroundThread()
+        blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return prepareTransportFailure()
         val operationId = correlationIds.nextId()
         val wire = ConsumerRequestParcel(
@@ -87,7 +87,7 @@ internal class BinderConsumerLifecycleAdapter(
     }
 
     fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult {
-        requireBackgroundThread()
+        blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return sessionTransportFailure()
         val operationId = correlationIds.nextId()
         val externalSessionId = correlationIds.nextId()
@@ -166,12 +166,6 @@ internal class BinderConsumerLifecycleAdapter(
 
     private fun isCurrent(endpoint: RegisteredSharedRuntimeEndpoint): Boolean =
         endpointProvider()?.connectionEpoch == endpoint.connectionEpoch
-
-    private fun requireBackgroundThread() {
-        check(Looper.myLooper() != Looper.getMainLooper()) {
-            "Shared-runtime blocking lifecycle calls are not allowed on the Android main thread"
-        }
-    }
 
     private companion object {
         const val DEFAULT_OPERATION_TIMEOUT_MILLIS = 120_000L
