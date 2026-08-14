@@ -16,44 +16,44 @@ This is the operational status ledger for model evaluation. Repository-level int
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, compatibility, hashing and failure contracts with deterministic tests. |
 | EVAL-2 Dataset system | READY | `EVAL-D-01` can define manifest/JSONL schemas from the frozen contracts. |
-| EVAL-3 Deterministic evaluators | READY | `EVAL-E-01` can implement the fail-closed evaluator registry. |
+| EVAL-3 Deterministic evaluators | IN PROGRESS | Registry plus exact-match, multiple-choice, numeric, JSON-fields, regex/format and instruction-constraint evaluators are integrated; aggregation and golden/adversarial coverage are next. |
 | EVAL-4 Evaluation runner | READY | `EVAL-R-01` and `EVAL-R-02` can progress independently against contracts/fakes. |
 | EVAL-5 Persistence and comparison | READY | `EVAL-P-01` can freeze repository/query/retention behavior. |
 | EVAL-6 General Purpose v1 | PLANNED | Source/license and pack assembly depend on dataset/evaluator foundations. |
 | EVAL-7 Performance UI/custom import | READY | `EVAL-U-01` can define the Performance UDF/navigation contract against fakes. |
 | EVAL-8 Validation/device evidence | PLANNED | `EVAL-V-01` is ready incrementally; final Android/device evidence remains late-gated. |
 
-## EVAL-1 integrated boundary
+## Integrated evaluator boundary
 
-EVAL-1 introduces one concrete module only: `evaluation/contracts`. It depends on `core/contracts` for stable public generation/model value types and remains independent from Compose, Room, app state and `llama.cpp` implementation types.
+`evaluation/evaluators` now contains the versioned fail-closed registry and the deterministic v1 scorer set required before suite aggregation:
 
-The boundary now provides:
+- normalized exact match with explicit case/whitespace policy;
+- multiple choice with bounded allowed-label extraction and ambiguity rejection;
+- locale-independent numeric final answer with declared bounded tolerance;
+- JSON-fields scoring with a strict bounded parser and transparent partial field score;
+- repository-defined regex/format checks only, without arbitrary user regex execution;
+- declarative instruction constraints with transparent satisfied/declared partial scoring and bounded format delegation.
 
-- dataset/case/category/evaluator/execution/sampling/run identifiers and bounded value semantics;
-- deterministic ordered sample-set, evaluator-set, case-semantics, semantic-execution and full-run SHA-256 identity;
-- explicit sampling policy/version/seed in the reproducible run fingerprint;
-- declarative evaluator specs plus normalized typed outcomes;
-- run config/lifecycle/progress/result/summary contracts without persisted prompt/expected/generated content;
-- separate quality/runtime compatibility reasons;
-- bounded typed failure taxonomy without arbitrary backend exception text.
-
-Future `evaluation/engine`, dataset-store and persistence modules remain intentionally uncreated until their corresponding workstreams implement real behavior.
+Every scorer exposes a versioned `EvaluatorRegistration`. `EvaluatorRegistry` remains composition-based rather than hardcoding a global scorer list; concrete evaluator composition belongs to the runner/factory integration. No evaluator uses an LLM judge or arbitrary executable code.
 
 ## Ready now
 
 These tasks are mutually independent unless the same developer/review capacity is shared:
 
 - `EVAL-D-01` — versioned manifest and canonical JSONL case schema;
-- `EVAL-E-01` — versioned fail-closed evaluator registry;
+- `EVAL-E-08` — category and weighted suite quality aggregation, including zero-score runtime-failure semantics;
+- `EVAL-E-09` — adversarial/malformed-output fixtures and golden tests for every evaluator v1;
 - `EVAL-R-01` — evaluation lifecycle engine against fakes;
 - `EVAL-R-02` — controlled selected-model evaluation binding/profile resolution;
 - `EVAL-P-01` — evaluation repository/query/retention contract;
 - `EVAL-U-01` — Performance navigation/UDF state/effect contract;
 - `EVAL-V-01` — identity/hash golden fixtures and cross-run deterministic serialization tests.
 
+`EVAL-E-08` and `EVAL-E-09` can now run in parallel. `EVAL-E-10` remains gated on both and will freeze/document evaluator v1 semantics for dataset-pack compatibility.
+
 ## Parallel fan-out
 
-EVAL-1 is no longer the serialization gate. Dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes may now proceed concurrently.
+EVAL-1 is no longer the serialization gate. Dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes may proceed concurrently.
 
 General Purpose source/license inventory unlocks after `EVAL-D-01`; production runner scoring remains gated on dataset/evaluator implementations; connected history/compare remains gated on persistence; final runtime comparison evidence remains gated on Q35-6 measured profiles.
 
