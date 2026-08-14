@@ -46,23 +46,15 @@ The shared runtime is not production/release ready until the physical SR-6 evide
 
 ### Public Consumer API
 
-- CA-0 boundary decisions, CA-1 capability policy, CA-2 `ConsumerLocalLlmClient` and CA-3 results/metrics are integrated in `dev`;
-- CA-3 is `DONE` after PR #103;
-- CA-4 Binder integration is active on PR #104 and remains `IN PROGRESS` until its exact head is green and integrated;
-- the CA-4 branch contains Binder v1.1 `consumer-api-v1`, consumer AIDL/wire contracts, authenticated host mapping, Binder lifecycle/generation adapters, deterministic host/client/wire/compatibility tests and a packaged-AAR Consumer API fixture.
+CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, Binder lifecycle/generation adapters, deterministic privacy/compatibility coverage and packaged release-AAR compilation evidence.
 
-CA-5 OMBRA must start only from the integrated CA-4 boundary. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md). CA-4 behavior and exit evidence: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md).
+CA-5 is now active through OMBRA OMB-0. The first slice freezes product/parser/export/schema/use-case decisions before domain/UI implementation. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
 ## Open blockers
 
-### 1. CA-4 validation and integration
+### 1. OMBRA OMB-0 decisions and spikes
 
-The deterministic implementation/evidence is present on PR #104. Remaining gate:
-
-1. repository and documentation validation green on the exact head;
-2. fix failures without weakening security, privacy or compatibility semantics;
-3. mark CA-4 `DONE` only after the gate passes;
-4. merge PR #104 into `dev`.
+Complete the bounded parser/export decision slice before growing application code. The selected path must preserve OMBRA as a pure consumer: local PDF access/extraction/export, no model/runtime ownership, fixed structured-output semantics and mandatory human review.
 
 ### 2. Physical Android evidence
 
@@ -79,9 +71,9 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 
 ## Immediate next block
 
-1. close the failing CA-4 repository/documentation checks on PR #104;
-2. when the exact head is green, update CA-4 to `DONE` and merge #104 into `dev`;
-3. start CA-5 OMBRA from that green integrated baseline;
+1. complete OMB-0A product/parser/export/schema/use-case decisions and bounded spikes;
+2. start OMB-1 pure Android-independent domain/state only after OMB-0 architecture choices are reviewable;
+3. keep OMB-4 real Consumer API integration behind the accepted OMBRA domain/extraction/composition boundaries;
 4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
 ## Source links
@@ -89,6 +81,7 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 - Capability roadmap: [`roadmap.md`](roadmap.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
+- OMBRA roadmap: [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Shared runtime roadmap: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - SR-6 evidence runbook: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5 status: [`qwen35/README.md`](qwen35/README.md)

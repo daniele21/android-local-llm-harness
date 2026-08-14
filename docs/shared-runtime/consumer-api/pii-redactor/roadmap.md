@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.roadmap
 Read when: selecting the next OMBRA implementation slice, dependency or exit gate
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 This roadmap owns implementation order and milestone state. Detailed behavior stays in the focused OMBRA specifications. Repository priority belongs in [`../../../current-state.md`](../../../current-state.md); generic Consumer API milestones remain in [`../roadmap.md`](../roadmap.md).
 
@@ -28,7 +28,9 @@ Work may proceed in parallel only when ownership is disjoint. The real inference
 
 ## OMB-0 — Decisions and technical spikes
 
-State: **PLANNED**
+State: **IN PROGRESS**
+
+Active slice: **OMB-0A — target/architecture decisions and bounded parser/export spike record**.
 
 Goal: accept the target and remove high-risk uncertainty before product code grows.
 
@@ -216,4 +218,4 @@ Each PR implements one coherent vertical boundary, updates only the canonical st
 
 ## State rule
 
-All OMB milestones are **PLANNED**. Mark a milestone `IN PROGRESS` only after its first implementation slice begins and `DONE` only when the stated exit gate is integrated and tested. A generated visual board, emulator screenshot or successful fake model does not complete a physical, quality or release gate.
+Mark a milestone `IN PROGRESS` only after its first implementation slice begins and `DONE` only when the stated exit gate is integrated and tested. A generated visual board, emulator screenshot or successful fake model does not complete a physical, quality or release gate.
