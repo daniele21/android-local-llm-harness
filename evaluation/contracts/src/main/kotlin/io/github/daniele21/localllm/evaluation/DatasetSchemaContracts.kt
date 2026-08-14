@@ -26,11 +26,7 @@ enum class EvaluationResponseFormat {
     JSON,
 }
 
-data class EvaluationDatasetCategoryDefinition(
-    val id: EvaluationCategoryId,
-    val displayName: String,
-    val weight: Double? = null,
-) {
+data class EvaluationDatasetCategoryDefinition(val id: EvaluationCategoryId, val displayName: String, val weight: Double? = null) {
     init {
         validateStableText(displayName, "Dataset category display name", MAX_DATASET_DISPLAY_TEXT)
         require(weight == null || (weight.isFinite() && weight > 0.0)) {
@@ -39,10 +35,7 @@ data class EvaluationDatasetCategoryDefinition(
     }
 }
 
-data class EvaluationDatasetPresetDefinition(
-    val id: String,
-    val orderedCaseIds: List<EvaluationCaseId>,
-) {
+data class EvaluationDatasetPresetDefinition(val id: String, val orderedCaseIds: List<EvaluationCaseId>) {
     init {
         validateStableText(id, "Dataset preset ID", MAX_DATASET_ID_TEXT)
         require(orderedCaseIds.isNotEmpty()) { "Dataset preset must contain at least one case" }
@@ -92,10 +85,7 @@ data class EvaluationDatasetManifestV1(
         )
 }
 
-data class EvaluationCaseMessage(
-    val role: EvaluationMessageRole,
-    val content: String,
-) {
+data class EvaluationCaseMessage(val role: EvaluationMessageRole, val content: String) {
     init {
         require(content.isNotEmpty()) { "Evaluation case message content must not be empty" }
         require('\u0000' !in content) { "Evaluation case message content must not contain NUL" }
@@ -105,10 +95,7 @@ data class EvaluationCaseMessage(
     }
 }
 
-data class EvaluationExpectedAnswer(
-    val kind: EvaluationExpectedAnswerKind,
-    val value: String,
-) {
+data class EvaluationExpectedAnswer(val kind: EvaluationExpectedAnswerKind, val value: String) {
     init {
         require(value.isNotEmpty()) { "Evaluation expected answer must not be empty" }
         require('\u0000' !in value) { "Evaluation expected answer must not contain NUL" }
