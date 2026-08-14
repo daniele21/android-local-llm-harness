@@ -49,7 +49,9 @@ Exit gate: product, parser/export, schema, use-case and brand decisions are revi
 
 ## OMB-1 — Pure domain and application state
 
-State: **PLANNED**
+State: **IN PROGRESS**
+
+Active slice: **OMB-1A — pure models, definitions and validation**. This slice is implemented on a stacked branch while OMB-0 runtime evidence closes; it must not merge ahead of the OMB-0 exit gate.
 
 Owner: [`architecture.md`](architecture.md)
 
@@ -60,6 +62,8 @@ Tasks:
 - implement immutable workflow state, reducer, operation IDs and typed effects;
 - define interfaces for extractor, analysis client, exporter and sensitive in-memory task store;
 - cover cancellation, late callbacks, reset and process-recreation semantics with fakes.
+
+Progress: OMB-1A now has the pure document/source, PII-definition, validated-finding and review-decision model boundaries with stable identifiers, bounded custom definitions and content-free debug representations. OMB-1B remains required for immutable workflow state, reducer/effects, ports and fake orchestration.
 
 Exit gate: a pure JVM test drives import metadata -> definitions -> fake candidates -> decisions -> export outcome without Android UI, Binder or model code.
 
