@@ -120,6 +120,15 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("all",))
 
+    def test_evaluation_contract_change_runs_all_android_modules(self) -> None:
+        scope = classify_paths(
+            ["evaluation/contracts/src/main/kotlin/EvaluationRunConfig.kt"]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("all",))
+
     def test_observability_contract_change_runs_all_android_modules(self) -> None:
         scope = classify_paths(
             ["observability/contracts/src/main/kotlin/Telemetry.kt"]
