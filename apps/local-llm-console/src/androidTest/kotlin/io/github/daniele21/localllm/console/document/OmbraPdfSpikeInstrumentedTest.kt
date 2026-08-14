@@ -157,6 +157,35 @@ class OmbraPdfSpikeInstrumentedTest {
         assertFalse(extracted.contains("+39 333 1234567"))
     }
 
+    @Test
+    fun normalizedWriterRoundTripsRepresentativeEuropeanGlyphsAndRejectsUnknownGlyphs() = runBlocking {
+        val representativeText =
+            "Città: Città Sant'Angelo — già più perché; José Müller; Straße; Łódź; nº 12; € 1.234,56"
+        val output = fixtureFile("unicode-output.pdf")
+        FileOutputStream(output).use { stream ->
+            OmbraPdfWriterSpike().write(
+                pages = listOf(representativeText),
+                output = stream,
+            )
+        }
+
+        val extracted =
+            OmbraPdfParserSpike(targetContext)
+                .extractText(Uri.fromFile(output))
+                .pages
+                .joinToString(separator = "\n") { page -> page.text }
+        assertTrue("Representative European text must survive normalized export", extracted.contains(representativeText))
+
+        val unsupported = String(Character.toChars(0x10FFFF))
+        val rejected =
+            runCatching {
+                FileOutputStream(fixtureFile("unsupported-glyph.pdf")).use { stream ->
+                    OmbraPdfWriterSpike().write(pages = listOf("unsupported=$unsupported"), output = stream)
+                }
+            }.exceptionOrNull()
+        assertNotNull("Unknown glyphs must fail closed rather than substitute silently", rejected)
+    }
+
     private fun fixtureFile(name: String): File = File(targetContext.cacheDir, "ombra-$name").also { file ->
         file.delete()
         createdFiles += file
