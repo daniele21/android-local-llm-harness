@@ -132,13 +132,15 @@ For performance evidence intended to choose defaults, run enough repetitions to 
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-V-01 | PLANNED | EVAL-C-08 | Add identity/hash golden fixtures and cross-run deterministic serialization tests. |
+| EVAL-V-01 | READY | EVAL-C-08 | Add identity/hash golden fixtures and cross-run deterministic serialization tests. |
 | EVAL-V-02 | PLANNED | EVAL-D-09 | Add dataset parser limits, malformed-input and atomic-install/rollback tests. |
 | EVAL-V-03 | PLANNED | EVAL-E-09 | Add evaluator golden corpus including ambiguous, malformed and edge outputs. |
 | EVAL-V-04 | PLANNED | EVAL-R-12 | Add runner lifecycle matrix using fake runtime/telemetry failure injection. |
 | EVAL-V-05 | PLANNED | EVAL-P-10 | Add persistence/restart/retention/comparison compatibility matrix. |
 | EVAL-V-06 | PLANNED | EVAL-U-25,EVAL-U-33,EVAL-U-44 | Add connected UI state tests for run, import, history, comparison and failure surfaces. |
 | EVAL-V-07 | PLANNED | EVAL-D-05,EVAL-P-07 | Add privacy sentinel tests across telemetry, logs, evaluation persistence and default diagnostics export. |
+
+EVAL-V-01 can start immediately from the frozen EVAL-1 hashing contracts; it is incremental merge evidence and does not imply EVAL-8 is otherwise ready.
 
 ## Task ledger — Android integration
 
@@ -166,7 +168,7 @@ For performance evidence intended to choose defaults, run enough repetitions to 
 
 ## Parallel execution guidance
 
-- EVAL-V-01, V-02 and V-03 can run independently as their owning components finish.
+- EVAL-V-01 is ready now; V-02 and V-03 unlock independently as their owning components finish.
 - EVAL-V-05 can proceed independently of Android instrumentation once persistence is complete.
 - EVAL-V-10 and UI deterministic validation may proceed in parallel.
 - EVAL-V-21 and V-22 are independent after the same device/profile prerequisites are available and may run in parallel on separate representative devices.
