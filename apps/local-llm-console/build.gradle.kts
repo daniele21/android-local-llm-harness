@@ -61,7 +61,9 @@ android {
 
     defaultConfig {
         applicationId = "io.github.daniele21.localllm.console"
-        minSdk = libs.versions.minSdk.get().toInt()
+        // OMBRA deliberately raises only the consumer APK floor to Android 9 so it can use the
+        // sandboxed AndroidX PDF document APIs. Harness host/library compatibility remains at 26.
+        minSdk = 28
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = currentVersionCode
         versionName = currentVersionName
@@ -148,6 +150,11 @@ dependencies {
     implementation(project(":observability:health-engine"))
     implementation(project(":observability:in-memory-store"))
     implementation(project(":transports:android-binder-client"))
+
+    // OMB-0A parser spike: first-party, sandboxed PDF loading/content extraction. These remain
+    // experimental until representative fixtures and packaged-size evidence close OMB-0.
+    implementation(libs.androidx.pdf.core)
+    implementation(libs.androidx.pdf.document.service)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
