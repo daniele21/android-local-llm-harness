@@ -115,7 +115,7 @@ EVAL-1 is complete when this change passes the repository merge gates.
 | EVAL-E-06 | DONE | EVAL-E-01 | Implement regex/format constraint evaluator using bounded repository-defined patterns only. |
 | EVAL-E-07 | DONE | EVAL-E-01,EVAL-E-06 | Implement instruction-constraint aggregation for declarative verifiable constraints. |
 | EVAL-E-08 | READY | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-07 | Implement category and weighted suite score aggregation including zero-score failure semantics. |
-| EVAL-E-09 | READY | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-06,EVAL-E-07 | Add adversarial/malformed-output fixtures and deterministic golden tests for every evaluator version. |
+| EVAL-E-09 | DONE | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-06,EVAL-E-07 | Add adversarial/malformed-output fixtures and deterministic golden tests for every evaluator version. |
 | EVAL-E-10 | PLANNED | EVAL-E-08,EVAL-E-09 | Document evaluator semantics and freeze v1 behavior for dataset-pack compatibility. |
 
 EVAL-3 closes when EVAL-E-01 through EVAL-E-10 are `DONE`.
@@ -160,7 +160,7 @@ EVAL-5 closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner pe
 
 EVAL-1 unlocks independent dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes.
 
-Within the evaluator lane, EVAL-E-01 through EVAL-E-07 are integrated. EVAL-E-08 aggregation and EVAL-E-09 golden/adversarial coverage are now independent and may run in parallel; EVAL-E-10 follows only after both are complete. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
+Within the evaluator lane, EVAL-E-01 through EVAL-E-07 and EVAL-E-09 are integrated after this change. EVAL-E-08 aggregation remains ready; EVAL-E-10 follows only after EVAL-E-08 is complete. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
 
 ## Completion gates
 
