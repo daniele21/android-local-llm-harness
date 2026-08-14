@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.routing
 Read when: locating the target, architecture, UX, detection pipeline or delivery plan for the first PII Consumer API application
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 This is the progressive-disclosure entry point for turning `apps/local-llm-console` into **OMBRA**, a minimal product-shaped application that uses Local LLM Harness to find user-selected PII in a text-bearing PDF, supports human review and exports a newly generated anonymized PDF.
 
@@ -32,20 +32,21 @@ user-selected PDF
 | --- | --- |
 | What is the user outcome, MVP scope and responsibility split? | [`target.md`](target.md) |
 | Where do document, PII, inference, redaction and UI responsibilities live? | [`architecture.md`](architecture.md) |
+| Which OMB-0 decisions/spikes are accepted or still open? | [`omb0-decisions-and-spikes.md`](omb0-decisions-and-spikes.md) |
 | How are definitions, prompt input, chunking, JSON results and export handled? | [`detection-and-redaction.md`](detection-and-redaction.md) |
 | How are the OMBRA brand kit and six mockup views implemented? | [`ux-and-brand.md`](ux-and-brand.md) |
 | Which automated, quality, privacy and physical checks are required? | [`validation-and-rollout.md`](validation-and-rollout.md) |
 | In what order should implementation land and what closes each milestone? | [`roadmap.md`](roadmap.md) |
 | Where are the generated visual references? | [`../assets/README.md`](../assets/README.md) |
 
-Do not read every source for a focused change. A PDF parser change should read the document pipeline and validation sources. A Compose styling change should read the UX/brand source and the repository design-system contract. A Binder change should start from the parent Consumer API workstream, not this application plan.
+Do not read every source for a focused change. A PDF parser change should read the OMB-0 decision record, document pipeline and validation sources. A Compose styling change should read the UX/brand source and the repository design-system contract. A Binder change should start from the parent Consumer API workstream, not this application plan.
 
 ## Naming and ownership
 
 - **OMBRA** is the user-facing brand of the reference consumer; it does not replace the Harness host identity.
 - `apps/local-llm-console` remains the first implementation owner so the plan satisfies CA-5 without adding a second application or duplicated Binder composition.
 - Package, module and signing identity remain unchanged until a separate migration decision proves a rename is required.
-- `document-pii-detection` is the proposed host-authorized `UseCaseId`.
+- `document-pii-detection` is the host-authorized `UseCaseId` target for OMBRA.
 - `InferencePreset` means a Harness-owned execution behavior; `PiiDefinitionSet` means consumer-owned detection categories. They are never the same abstraction.
 
 ## Ownership map
@@ -73,7 +74,7 @@ Do not read every source for a focused change. A PDF parser change should read t
 
 ## Relationship to the Consumer API roadmap
 
-The PII workflow is the concrete CA-5 reference application. PII UI, parsing and fake-driven reducers may be developed after its own boundary decisions, but the real two-APK inference slice depends on accepted and implemented CA-0 through CA-4 behavior. This plan must not add PII-specific AIDL methods or bypass capability discovery to move faster.
+The PII workflow is the concrete CA-5 reference application. CA-0 through CA-4 are now integrated; OMB-0 is the active gate before OMBRA domain/product implementation grows. This plan must not add PII-specific AIDL methods or bypass capability discovery to move faster.
 
 ## Visual direction
 
