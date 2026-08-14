@@ -183,11 +183,8 @@ internal fun SharedRuntimeHostDelegate.openSession(
     callback: HostResultCallback<SessionResultParcel>,
 ) = runtimeOperations.openSession(caller, request, callback)
 
-internal fun SharedRuntimeHostDelegate.generate(
-    caller: AuthorizedCaller,
-    request: GenerationRequestParcel,
-    callback: HostEventCallback,
-) = runtimeOperations.generate(caller, request, callback)
+internal fun SharedRuntimeHostDelegate.generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) =
+    runtimeOperations.generate(caller, request, callback)
 
 internal fun SharedRuntimeHostDelegate.cancel(caller: AuthorizedCaller, request: CancelRequestParcel) =
     runtimeOperations.cancel(caller, request)
