@@ -3,9 +3,16 @@ package io.github.daniele21.localllm.integration.servicehost
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
+import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.PrepareRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
@@ -60,6 +67,19 @@ class SharedRuntimeHostDelegate(
             )
         }
     }
+
+    fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) =
+        runtimeOperations.prepare(caller, request, callback)
+
+    fun openSession(caller: AuthorizedCaller, request: OpenSessionRequestParcel, callback: HostResultCallback<SessionResultParcel>) =
+        runtimeOperations.openSession(caller, request, callback)
+
+    fun generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) =
+        runtimeOperations.generate(caller, request, callback)
+
+    fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) = runtimeOperations.cancel(caller, request)
+
+    fun closeSession(caller: AuthorizedCaller, request: CloseSessionRequestParcel) = runtimeOperations.closeSession(caller, request)
 
     fun unregisterClient(caller: AuthorizedCaller, clientToken: String) {
         if (closed.get()) return
