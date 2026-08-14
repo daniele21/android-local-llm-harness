@@ -8,13 +8,16 @@ import android.content.pm.ServiceInfo
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -40,7 +43,22 @@ class OmbraPdfIsolationInstrumentedTest {
         val source = File(context.cacheDir, "ombra-isolated-parser.pdf")
         writeFixture(source)
         val connected = CountDownLatch(1)
+        val completed = CountDownLatch(1)
         var remote: Messenger? = null
+        var completionResult = OmbraPdfIsolatedParserSpikeService.RESULT_ERROR
+        var parserUid = Process.myUid()
+        var completionError: String? = "NoCompletion"
+        val replyMessenger =
+            Messenger(
+                Handler(Looper.getMainLooper()) { message ->
+                    if (message.what != OmbraPdfIsolatedParserSpikeService.MESSAGE_COMPLETE) return@Handler false
+                    completionResult = message.data.getInt(OmbraPdfIsolatedParserSpikeService.KEY_RESULT)
+                    parserUid = message.data.getInt(OmbraPdfIsolatedParserSpikeService.KEY_PARSER_UID)
+                    completionError = message.data.getString(OmbraPdfIsolatedParserSpikeService.KEY_ERROR_TYPE)
+                    completed.countDown()
+                    true
+                },
+            )
         val connection =
             object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -50,6 +68,14 @@ class OmbraPdfIsolationInstrumentedTest {
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     remote = null
+                    completionError = "ServiceDisconnected"
+                    completed.countDown()
+                }
+
+                override fun onBindingDied(name: ComponentName?) {
+                    remote = null
+                    completionError = "BindingDied"
+                    completed.countDown()
                 }
             }
 
@@ -61,13 +87,16 @@ class OmbraPdfIsolationInstrumentedTest {
             )
         assertTrue("Expected isolated parser service binding to succeed", bound)
 
+        var outputRead: ParcelFileDescriptor? = null
         try {
             assertTrue("Timed out binding isolated parser service", connected.await(10, TimeUnit.SECONDS))
             val messenger = remote ?: fail("Isolated parser service connected without Messenger")
             val sourceDescriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
             val outputPipe = ParcelFileDescriptor.createPipe()
+            outputRead = outputPipe[0]
             val message =
                 Message.obtain(null, OmbraPdfIsolatedParserSpikeService.MESSAGE_PARSE).apply {
+                    replyTo = replyMessenger
                     data =
                         Bundle().apply {
                             putParcelable(OmbraPdfIsolatedParserSpikeService.KEY_INPUT, sourceDescriptor)
@@ -79,20 +108,22 @@ class OmbraPdfIsolationInstrumentedTest {
             sourceDescriptor.close()
             outputPipe[1].close()
 
-            val response =
-                ParcelFileDescriptor.AutoCloseInputStream(outputPipe[0])
-                    .bufferedReader(Charsets.UTF_8)
-                    .use { reader -> reader.readText() }
-            assertTrue("Expected successful isolated parser response, got '$response'", response.startsWith("OK:"))
-
-            val headerEnd = response.indexOf('\n')
-            assertTrue("Expected isolated parser UID header, got '$response'", headerEnd > 3)
-            val parserUid = response.substring(3, headerEnd).toInt()
+            assertTrue(
+                "Isolated parser did not complete within the bounded window; last error=$completionError",
+                completed.await(15, TimeUnit.SECONDS),
+            )
+            assertEquals(
+                "Isolated parser failed with $completionError",
+                OmbraPdfIsolatedParserSpikeService.RESULT_OK,
+                completionResult,
+            )
             assertNotEquals("Parser must not run under the OMBRA app UID", Process.myUid(), parserUid)
 
+            val extracted =
+                ParcelFileDescriptor.AutoCloseInputStream(outputRead).bufferedReader(Charsets.UTF_8).use { reader -> reader.readText() }
+            outputRead = null
             val normalized =
-                response
-                    .substring(headerEnd + 1)
+                extracted
                     .replace("\r\n", "\n")
                     .replace('\r', '\n')
                     .lineSequence()
@@ -104,7 +135,8 @@ class OmbraPdfIsolationInstrumentedTest {
                 listOf("LEFT TOP", "RIGHT TOP", "LEFT BOTTOM", "RIGHT BOTTOM"),
             )
         } finally {
-            context.unbindService(connection)
+            outputRead?.close()
+            if (bound) context.unbindService(connection)
             source.delete()
         }
     }
