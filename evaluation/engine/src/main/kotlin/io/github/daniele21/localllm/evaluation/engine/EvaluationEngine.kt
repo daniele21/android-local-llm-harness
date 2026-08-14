@@ -99,16 +99,14 @@ class EvaluationEngine(
 
     fun activeRun(): EvaluationRunId? = activeRunId
 
-    private suspend fun executeClaimed(
-        config: EvaluationRunConfig,
-        observer: EvaluationEngineObserver,
-    ): EvaluationEngineTerminal {
+    private suspend fun executeClaimed(config: EvaluationRunConfig, observer: EvaluationEngineObserver): EvaluationEngineTerminal {
         val results = mutableListOf<EvaluationCaseResult>()
         emitState(config, observer, EvaluationRunState.CREATED)
         emitState(config, observer, EvaluationRunState.VALIDATING)
 
         when (val validation = preflight.validate(config)) {
             is EvaluationStepResult.Failure -> return fail(config, observer, results, validation.failure)
+
             is EvaluationStepResult.Success -> Unit
         }
 
@@ -117,6 +115,7 @@ class EvaluationEngine(
         emitState(config, observer, EvaluationRunState.PREPARING_MODEL)
         when (val preparation = modelPreparation.prepare(config)) {
             is EvaluationStepResult.Failure -> return fail(config, observer, results, preparation.failure)
+
             is EvaluationStepResult.Success -> Unit
         }
 
@@ -126,6 +125,7 @@ class EvaluationEngine(
             emitState(config, observer, EvaluationRunState.WARMING_UP)
             when (val warmup = modelPreparation.warmup(config)) {
                 is EvaluationStepResult.Failure -> return fail(config, observer, results, warmup.failure)
+
                 is EvaluationStepResult.Success -> Unit
             }
         }
@@ -144,6 +144,7 @@ class EvaluationEngine(
             emitProgress(config, observer, attempted, results.size, caseId)
             when (val execution = caseExecution.execute(config, caseId)) {
                 is EvaluationStepResult.Failure -> return fail(config, observer, results, execution.failure)
+
                 is EvaluationStepResult.Success -> {
                     require(execution.value.caseId == caseId) {
                         "Evaluation case execution result ID must match requested case ID"
