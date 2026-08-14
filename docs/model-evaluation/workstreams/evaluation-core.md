@@ -107,7 +107,7 @@ EVAL-1 is complete when this change passes the repository merge gates.
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-E-01 | DONE | EVAL-E-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
+| EVAL-E-01 | DONE | EVAL-C-03,EVAL-C-09 | Implement versioned evaluator registry with fail-closed lookup and parameter validation. |
 | EVAL-E-02 | DONE | EVAL-E-01 | Implement normalized exact-match evaluator with explicit whitespace/case normalization policy. |
 | EVAL-E-03 | DONE | EVAL-E-01 | Implement multiple-choice evaluator that extracts only allowed answer labels and rejects ambiguity. |
 | EVAL-E-04 | DONE | EVAL-E-01 | Implement numeric-final-answer evaluator with locale-independent parsing and bounded tolerance policy where declared. |
