@@ -41,11 +41,7 @@ internal class OmbraPdfParserSpike(context: Context) {
                 }
 
                 val content = openedDocument.getPageContent(pageIndex)
-                val pageText =
-                    content
-                        ?.textContents
-                        .orEmpty()
-                        .joinToString(separator = "\n") { textContent -> textContent.text }
+                val pageText = OmbraPdfTextNormalizer.normalize(content?.textContents.orEmpty())
                 val boundedText = pageText.take(remainingCharacters)
                 if (boundedText.length < pageText.length) {
                     truncated = true
