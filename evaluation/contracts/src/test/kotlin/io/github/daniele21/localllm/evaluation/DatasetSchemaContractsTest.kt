@@ -1,7 +1,7 @@
 package io.github.daniele21.localllm.evaluation
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFailsWith
+import org.junit.Assert.fail
 import org.junit.Test
 
 class DatasetSchemaContractsTest {
@@ -16,7 +16,7 @@ class DatasetSchemaContractsTest {
 
     @Test
     fun manifestRejectsUnsupportedSchemaVersion() {
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             manifest(schemaVersion = 2)
         }
     }
@@ -24,7 +24,7 @@ class DatasetSchemaContractsTest {
     @Test
     fun manifestRejectsDuplicateCategoryIds() {
         val category = category("reasoning")
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             manifest(categories = listOf(category, category))
         }
     }
@@ -37,7 +37,7 @@ class DatasetSchemaContractsTest {
         )
         assertEquals(listOf("case-b", "case-a"), preset.orderedCaseIds.map { it.value })
 
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             EvaluationDatasetPresetDefinition(
                 id = "invalid",
                 orderedCaseIds = listOf(caseId("case-a"), caseId("case-a")),
@@ -63,17 +63,17 @@ class DatasetSchemaContractsTest {
         assertEquals(EvaluatorType.MULTIPLE_CHOICE, case.evaluator.type)
         assertEquals(mapOf("labels" to "A,B,C,D"), case.evaluator.parameters)
 
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             case.copy(messages = listOf(EvaluationCaseMessage(EvaluationMessageRole.SYSTEM, "Rules")))
         }
     }
 
     @Test
     fun outputContractRejectsDuplicateStopsAndInvalidTokenLimit() {
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             EvaluationCaseOutputContract(maxOutputTokens = 0)
         }
-        assertFailsWith<IllegalArgumentException> {
+        expectIllegalArgument {
             EvaluationCaseOutputContract(stopSequences = listOf("END", "END"))
         }
     }
@@ -99,4 +99,13 @@ class DatasetSchemaContractsTest {
     )
 
     private fun caseId(value: String) = EvaluationCaseId(value)
+
+    private fun expectIllegalArgument(block: () -> Unit) {
+        try {
+            block()
+            fail("Expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            Unit
+        }
+    }
 }
