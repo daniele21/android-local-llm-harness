@@ -190,12 +190,12 @@ Exact names should align with the existing app architecture conventions.
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-U-01 | PLANNED | EVAL-C-05 | Define Performance route/navigation placement and state/effect contract consistent with phone-app architecture. |
+| EVAL-U-01 | READY | EVAL-C-05 | Define Performance route/navigation placement and state/effect contract consistent with phone-app architecture. |
 | EVAL-U-02 | PLANNED | EVAL-U-01 | Implement ViewModel/reducer using fake evaluation, dataset and history repositories. |
 | EVAL-U-03 | PLANNED | EVAL-U-02 | Add top-level Performance entry and Run/Datasets/History/Compare subnavigation for compact/expanded shells. |
 | EVAL-U-04 | PLANNED | EVAL-U-02 | Add deterministic loading, empty, unavailable and error states before backend connection. |
 
-These tasks can run in parallel with engine/storage implementation after EVAL-1.
+These tasks can now run in parallel with engine/storage implementation after EVAL-1.
 
 ## Task ledger — run configuration and execution
 
@@ -245,7 +245,7 @@ EVAL-7 closes when EVAL-U-01 through EVAL-U-33 and EVAL-U-40 through EVAL-U-44 a
 
 ## Parallel execution guidance
 
-After EVAL-U-02 exists:
+EVAL-U-01 can start immediately. After EVAL-U-02 exists:
 
 - run-selector UI EVAL-U-10/U-12/U-13 can be built against fakes independently;
 - history/result presentation EVAL-U-20 onward can use fixture repositories while persistence is implemented;

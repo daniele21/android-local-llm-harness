@@ -40,14 +40,23 @@ EvaluationRepository
 
 The runtime remains the owner of generation lifecycle and observability remains the owner of runtime measurements. Model evaluation owns orchestration, task-quality scoring and evaluation-specific persistence.
 
-## Intended ownership
+## Implemented EVAL-1 boundary
 
-Implementation should introduce modules only when concrete behavior justifies the boundary. The target ownership map is:
+EVAL-1 introduces one concrete Gradle module:
 
 ```text
 evaluation/contracts
-    dataset, case, evaluator, run, result and comparison contracts
+    backend-independent dataset/case/evaluator/sampling/run/result contracts
+    deterministic canonical SHA-256 identity
+    quality/runtime compatibility result types
+    bounded evaluation failure taxonomy
+```
 
+`evaluation/contracts` depends on `core/contracts` for stable public model/generation value types. It does not depend on Compose, Room, runtime-core, observability implementations or `llama.cpp` implementation types.
+
+No engine/store module is created by EVAL-1. The following remain target boundaries and are extracted only when their workstreams implement real behavior:
+
+```text
 evaluation/engine
     sampling orchestration, runtime execution, evaluator dispatch,
     cancellation, progress and result aggregation
@@ -66,7 +75,7 @@ apps/local-llm-phone-test
     Performance UI, document picker and presentation state/effects
 ```
 
-If the first implementation can preserve these responsibilities with fewer Gradle modules, packages may be used initially. New modules should be extracted when independent dependencies, persistence/platform isolation or test/reuse boundaries become concrete.
+This follows the repository rule that a new module needs a concrete responsibility and test boundary rather than speculative structure.
 
 ## Dependency direction
 
@@ -110,7 +119,7 @@ The engine therefore needs a controlled evaluation binding/profile layer that:
 5. never mutates the developer's ordinary application/use-case binding as a side effect;
 6. releases evaluation-owned sessions/contexts on completion, failure or cancellation.
 
-The concrete binding mechanism must be decided in EVAL-1/EVAL-4 without bypassing `RuntimeOrchestrator` or the model store.
+The concrete binding mechanism is owned by `EVAL-R-02` and must not bypass `RuntimeOrchestrator` or the model store.
 
 ## Dataset pack architecture
 
@@ -189,7 +198,7 @@ V1 target:
 - stable tie-breaking independent of filesystem iteration order;
 - explicit sampling policy version and seed/rank identity.
 
-Selected case IDs are hashed into `sampleSetDigest` and persisted with the run.
+Selected case IDs are hashed into `SampleSetDigest`. The full run identity additionally records sampling policy ID/version and seed so two ways of producing the same selected IDs remain reproducibly distinguishable.
 
 ## Evaluator registry
 
@@ -208,13 +217,42 @@ The registry rejects unknown versions before a run begins. Evaluators must be pu
 
 No evaluator may perform network access or model inference in v1.
 
+## Identity layers
+
+EVAL-1 separates identities by purpose.
+
+Quality-compatible identity is derived from:
+
+```text
+dataset digest
+ordered sample-set digest
+evaluator-set digest
+semantic execution fingerprint
+```
+
+Semantic execution includes versioned execution profile, backend revision, context/preset/thinking/sampler/seed/template/system-prompt semantics and a digest over per-case output-constraint semantics. The selected model and physical device are deliberately outside quality compatibility so supported models can be compared on the same semantic work.
+
+Full run identity additionally includes:
+
+```text
+exact model artifact/profile/tier/quantization
+sampling policy/version/seed
+runtime device class / Android API / ABI
+harness build identity
+runtime tuning profile/version
+model load policy
+warm-up policy
+```
+
+The full run fingerprint is evidence identity, not a universal comparison key. Runtime comparison applies the stricter runtime-compatibility dimensions.
+
 ## Evaluation run lifecycle
 
 ```text
 CREATED
   -> VALIDATING
   -> PREPARING_MODEL
-  -> OPTIONAL_WARMUP
+  -> WARMING_UP (when configured)
   -> RUNNING
        -> case N: session/context create
        -> generate
@@ -247,7 +285,7 @@ Model residency and case context are separate concerns.
 
 ## Telemetry correlation
 
-Each case receives a stable evaluation case-execution ID and normal generation request ID. The evaluation engine correlates the request ID with existing telemetry/resource records to attach privacy-safe metrics.
+Each attempted case retains its stable evaluation case ID and the normal generation request ID. The evaluation engine correlates the request ID with existing telemetry/resource records to attach privacy-safe metrics.
 
 Do not copy prompt/output into telemetry to make correlation easier.
 
@@ -266,7 +304,7 @@ EvaluationRunEntity
 
 Run entity stores identity/configuration, status, aggregate scores, metric summaries and timestamps. Case result stores case ID/category, evaluator outcome, correlated request ID, typed error/stop outcome and privacy-safe measurements.
 
-Default persistence excludes case input, expected text and generated text.
+Default persistence excludes case input, expected text and generated text. The EVAL-1 result contracts likewise contain no fields for those values.
 
 A bounded retention policy applies independently to evaluation runs/results. Deleting an evaluation run must not delete ordinary telemetry or installed datasets.
 
@@ -276,13 +314,13 @@ Comparison logic is domain logic, not UI logic. It receives two or more run summ
 
 - quality compatibility;
 - runtime compatibility;
-- incompatibility reasons;
+- typed incompatibility reasons;
 - category score deltas when valid;
 - aggregate quality delta when valid;
 - latency/throughput/resource deltas only when runtime-compatible;
 - Pareto-relevant values without choosing a universal winner.
 
-The UI consumes these typed results and does not recreate compatibility checks ad hoc.
+EVAL-1 freezes the compatibility result/mismatch contracts; calculation is implemented later by `EVAL-P-08`. The UI consumes those typed results and never recreates compatibility checks ad hoc.
 
 ## Concurrency
 
@@ -301,6 +339,7 @@ Parallel model evaluation on one device is deferred until runtime concurrency po
 - Prompt, expected and generated content stay outside normal telemetry/logs.
 - Diagnostic export includes only privacy-safe evaluation identities/scores/metrics unless a future explicit export policy says otherwise.
 - Dataset deletion and result deletion are separate explicit operations.
+- Evaluation failures persist bounded stage/code/case/retryability fields rather than arbitrary backend exception text.
 
 ## Relationship to existing benchmark engine
 

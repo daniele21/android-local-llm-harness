@@ -80,6 +80,7 @@ PACKAGING_SUFFIXES = (
 GRADLE_MODULES = (
     "core:contracts",
     "core:runtime-core",
+    "evaluation:contracts",
     "models:model-profile",
     "models:model-store",
     "models:model-catalog",
@@ -110,6 +111,7 @@ GLOBAL_GRADLE_PATHS = {
 GLOBAL_GRADLE_PREFIXES = ("build-logic/", "gradle/")
 PUBLIC_CONTRACT_PREFIXES = (
     "core/contracts/",
+    "evaluation/contracts/",
     "observability/contracts/",
 )
 

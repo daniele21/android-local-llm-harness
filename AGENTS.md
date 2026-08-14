@@ -11,6 +11,7 @@ Always read this guide, then the closest scoped guide when the target is below o
 | [`models/AGENTS.md`](models/AGENTS.md) | Profiles, installed storage, catalog, download and installation |
 | [`backends/llama-cpp/AGENTS.md`](backends/llama-cpp/AGENTS.md) | Kotlin/JNI/C++ backend, GGUF inspection, CMake and upstream pin |
 | [`observability/AGENTS.md`](observability/AGENTS.md) | Telemetry, persistence, health, resources and benchmarks |
+| [`evaluation/AGENTS.md`](evaluation/AGENTS.md) | Model-evaluation contracts, identity, evaluators, runner and result persistence |
 | [`apps/local-llm-phone-test/AGENTS.md`](apps/local-llm-phone-test/AGENTS.md) | Connected Compose app, model management and device evidence |
 
 Use additional sources only when they answer a question required by the task:
@@ -27,6 +28,7 @@ Use additional sources only when they answer a question required by the task:
 | Harness 0.5 release gates | [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) |
 | Documentation ownership and lifecycle | [`docs/README.md`](docs/README.md) |
 | Public embedded API | [`docs/api-usage.md`](docs/api-usage.md) |
+| Dataset-based model evaluation | [`docs/model-evaluation/README.md`](docs/model-evaluation/README.md) |
 | Cross-application Binder runtime target and workstreams | [`docs/shared-runtime/README.md`](docs/shared-runtime/README.md) |
 | Physical-device execution | [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) and [`docs/play-internal-phone-test.md`](docs/play-internal-phone-test.md) |
 
@@ -62,9 +64,10 @@ Start from the domain owner, then inspect direct consumers and tests before edit
 | Catalog, targeting or compatibility | `models/model-catalog` | downloader, installer and phone UI |
 | Remote transfer and verified holding | `models/model-download` | catalog input, installer and app orchestration |
 | Verified installation and inspection | `models/model-install` | model store, backend inspector and phone UI |
+| Model-evaluation identity, evaluator, sampling, run or compatibility contract | `evaluation/contracts` | focused evaluation workstream, then engine/store/UI consumers |
 | JNI, native generation or GGUF inspection | `backends/llama-cpp` | runtime adapter, installer and device validation |
 | Telemetry or query contracts | `observability/contracts` | all stores, engines and presenters |
-| Persistence or migration | matching observability store | contracts, engines, migration tests and UI queries |
+| Persistence or migration | matching observability/evaluation store | contracts, engines, migration tests and UI queries |
 | Health, resources or benchmarks | matching observability engine | contracts, stores and Diagnostics UI |
 | Embedded transport | `transports/in-process` | public contracts and runtime orchestrator |
 | Shared Binder/AIDL transport | `docs/shared-runtime/README.md` until its modules exist | core contracts, runtime, host/client apps and security boundary |

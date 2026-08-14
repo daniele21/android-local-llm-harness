@@ -46,14 +46,14 @@ The initial product support envelope remains the repository-reviewed Qwen3.5 den
 | Milestone | State | Exit meaning |
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependencies and completion gates are canonical. |
-| EVAL-1 Contracts and identity | READY | Stable dataset, case, evaluator, run and comparability contracts are the first implementation milestone. |
-| EVAL-2 Dataset system | PLANNED | Versioned packs, validation, deterministic sampling and app-private storage work. |
-| EVAL-3 Deterministic evaluators | PLANNED | Required evaluator types score fixtures reproducibly. |
-| EVAL-4 Evaluation runner | PLANNED | Selected models execute cases through the normal runtime and collect correlated telemetry. |
-| EVAL-5 Persistence and comparison | PLANNED | Runs survive restart and compatible runs can be compared safely. |
-| EVAL-6 General Purpose v1 | PLANNED | The built-in benchmark pack is licensed, versioned, validated and reproducible. |
-| EVAL-7 Performance UI and custom import | PLANNED | Developers can select model/dataset/sample count, run, inspect, import and compare. |
-| EVAL-8 Validation and device evidence | PLANNED | Host, Android integration and representative physical-device evidence satisfy exit gates. |
+| EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes deterministic identity, scoring, run, compatibility and failure contracts. |
+| EVAL-2 Dataset system | READY | Versioned pack/schema implementation can start at EVAL-D-01. |
+| EVAL-3 Deterministic evaluators | READY | Evaluator registry implementation can start at EVAL-E-01. |
+| EVAL-4 Evaluation runner | READY | Fake-driven runner and controlled model-binding work can start independently. |
+| EVAL-5 Persistence and comparison | READY | Evaluation repository/retention contracts can now be implemented. |
+| EVAL-6 General Purpose v1 | PLANNED | The built-in benchmark pack follows dataset/evaluator foundations and license review. |
+| EVAL-7 Performance UI and custom import | READY | Performance UDF/navigation shell can start against fakes. |
+| EVAL-8 Validation and device evidence | PLANNED | EVAL-V-01 deterministic identity evidence is ready; final Android/device gates remain late. |
 
 Milestone state is owned by [`current-state.md`](current-state.md). Dependency order and parallel work are owned by [`roadmap.md`](roadmap.md).
 

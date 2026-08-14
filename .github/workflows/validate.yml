@@ -245,6 +245,7 @@ jobs:
           all_modules=(
             core:contracts
             core:runtime-core
+            evaluation:contracts
             models:model-profile
             models:model-store
             models:model-catalog
