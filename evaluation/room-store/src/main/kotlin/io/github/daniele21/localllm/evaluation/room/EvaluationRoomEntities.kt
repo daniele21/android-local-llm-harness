@@ -92,12 +92,7 @@ data class EvaluationRuntimeEnvironmentEntity(
     val warmupPolicy: String,
 )
 
-data class EvaluationProgressEntity(
-    val totalCases: Int,
-    val attemptedCases: Int,
-    val completedCases: Int,
-    val currentCaseId: String?,
-)
+data class EvaluationProgressEntity(val totalCases: Int, val attemptedCases: Int, val completedCases: Int, val currentCaseId: String?)
 
 data class EvaluationReliabilityEntity(
     val totalCases: Int,
@@ -110,12 +105,7 @@ data class EvaluationReliabilityEntity(
     val skipped: Int,
 )
 
-data class EvaluationFailureEntity(
-    val stage: String,
-    val code: String,
-    val caseId: String?,
-    val retryable: Boolean,
-)
+data class EvaluationFailureEntity(val stage: String, val code: String, val caseId: String?, val retryable: Boolean)
 
 @Entity(
     tableName = "evaluation_sample_cases",
