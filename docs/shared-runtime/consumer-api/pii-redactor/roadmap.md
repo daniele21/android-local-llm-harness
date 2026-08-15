@@ -210,8 +210,8 @@ Active OMB-7B candidate — PR #235 plus its validated cleanup descendant #236:
 
 Remaining before OMB-7 can be `DONE`:
 
-- fold the exact green OMB-7B cleanup head into PR #235 and integrate it into `dev` only after the exact-head repository gate is green;
-- complete the remaining semantics/adaptive/large-font/screenshot state-matrix coverage that belongs to the product-flow exit gate;
+- integrate the exact green OMB-7B head into `dev` after repository/documentation/PDF gates pass;
+- complete the remaining semantics/adaptive/large-font/screenshot state-matrix coverage owned by the product-flow exit gate;
 - integrate the final OMB-6B approved identity before claiming the complete app-label/theme/icon identity requirement.
 
 Exit gate: **OPEN**. `apps/local-llm-console` must be an integrated pure OMBRA reference consumer using only packaged inference contracts, document-domain/PDF dependencies and the shared design-system module, with the full product state matrix and approved identity covered.
@@ -238,40 +238,6 @@ Remaining:
 - finalize API/app version, release notes, shrinker, signing and compatibility documentation together with applicable CA-6/CA-7/SR prerequisites.
 
 Exit gate: **OPEN**. The exact distributed build must meet OMBRA validation completion criteria and applicable Consumer API/SR prerequisites. The merged corpus alone is preparation evidence and introduces no legal compliance or guaranteed-detection claim.
-
-## Recommended pull-request slices
-
-| Slice | Deliverable | State |
-| --- | --- | --- |
-| OMB-0A | Target/architecture decisions and parser/export spike report in owning docs | DONE |
-| OMB-1A | Pure models, definitions and validation | DONE |
-| OMB-1B | Reducer, effects and fake application orchestrator | DONE |
-| OMB-2A | Production PDF extractor and deterministic segmentation | DONE |
-| OMB-2B | PDF picker, typed failure mapping and source lifecycle cleanup | DONE |
-| OMB-3A | Prompt/schema/chunk planner | DONE |
-| OMB-3B | Result validation, merge and fake analysis flow | DONE |
-| OMB-4A | Host use-case policy after parent capability slice | DONE |
-| OMB-4B | Packaged Consumer API adapter and Binder coverage | DONE |
-| OMB-5A | Review decisions, occurrences and placeholders | DONE |
-| OMB-5B | New-PDF export and independent verification | DONE |
-| OMB-5C | Hidden/reveal review projection | DONE |
-| OMB-6A | OMBRA themes, tokens and reusable product components | DONE |
-| OMB-6B | Approved vector masters, launcher generator and package checks | IN PROGRESS / REVIEW GATED |
-| OMB-7A | Import/definitions/custom/analysis Compose flow | DONE |
-| OMB-7B | Review/export flow, old Console removal and pure-consumer dependency cleanup | IN PROGRESS |
-| OMB-8A | Deterministic quality corpus and scorer | DONE |
-| OMB-8B | Thresholds, physical/security/release evidence | PLANNED |
-
-Each PR implements one coherent vertical boundary, updates only the canonical state/specification that changed and runs the narrowest relevant gate plus downstream consumers.
-
-## Validation by slice
-
-- Pure domain: JVM unit and property/boundary tests.
-- PDF/import/export: module tests, generated fixture round-trips and resource cleanup.
-- Consumer API/host: contract, Binder mapping, integration, compatibility and packaged-AAR checks.
-- Design system/UI: token contrast, component tests, semantics, screenshots, Lint and assembly.
-- Shared contracts, Gradle, manifests or multiple apps: repository-wide Android gate.
-- Distribution claim: exact physical-device evidence.
 
 ## State rule
 
