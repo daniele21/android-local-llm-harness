@@ -115,12 +115,14 @@ class EvaluationRunPreflightTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `non preflight failure from compatibility source is rejected`() = runBlocking {
-        val invalid = EvaluationFailure(
-            stage = EvaluationFailureStage.MODEL_PREPARATION,
-            code = EvaluationFailureCode.RUNTIME_FAILURE,
-        )
-        preflight(datasetCheck = { _, _ -> invalid }).validate(config())
+    fun `non preflight failure from compatibility source is rejected`() {
+        runBlocking {
+            val invalid = EvaluationFailure(
+                stage = EvaluationFailureStage.MODEL_PREPARATION,
+                code = EvaluationFailureCode.RUNTIME_FAILURE,
+            )
+            preflight(datasetCheck = { _, _ -> invalid }).validate(config())
+        }
     }
 
     private fun preflight(
