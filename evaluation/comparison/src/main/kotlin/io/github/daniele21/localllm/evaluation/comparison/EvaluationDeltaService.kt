@@ -6,11 +6,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationQualitySummary
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.PersistedEvaluationRun
 
-data class EvaluationNumericDelta(
-    val left: Double,
-    val right: Double,
-    val pairedCaseCount: Int? = null,
-) {
+data class EvaluationNumericDelta(val left: Double, val right: Double, val pairedCaseCount: Int? = null) {
     init {
         require(left.isFinite() && right.isFinite()) { "Comparison values must be finite" }
         require(pairedCaseCount == null || pairedCaseCount > 0) { "Paired case count must be positive when declared" }
@@ -20,15 +16,9 @@ data class EvaluationNumericDelta(
         get() = right - left
 }
 
-data class EvaluationCategoryDelta(
-    val categoryId: EvaluationCategoryId,
-    val score: EvaluationNumericDelta,
-)
+data class EvaluationCategoryDelta(val categoryId: EvaluationCategoryId, val score: EvaluationNumericDelta)
 
-data class EvaluationQualityDeltas(
-    val aggregateScore: EvaluationNumericDelta?,
-    val categories: List<EvaluationCategoryDelta>,
-)
+data class EvaluationQualityDeltas(val aggregateScore: EvaluationNumericDelta?, val categories: List<EvaluationCategoryDelta>)
 
 data class EvaluationRuntimeDeltas(
     val timeToFirstTokenMs: EvaluationNumericDelta?,
@@ -38,10 +28,7 @@ data class EvaluationRuntimeDeltas(
     val decodeTokensPerSecond: EvaluationNumericDelta?,
 )
 
-data class EvaluationResourceDeltas(
-    val processPssBytes: EvaluationNumericDelta?,
-    val availableMemoryBytes: EvaluationNumericDelta?,
-)
+data class EvaluationResourceDeltas(val processPssBytes: EvaluationNumericDelta?, val availableMemoryBytes: EvaluationNumericDelta?)
 
 enum class EvaluationDeltaUnavailableReason {
     COMPARISON_IDENTITY_UNAVAILABLE,
@@ -64,9 +51,7 @@ data class EvaluationRunDeltas(
     val resources: EvaluationDeltaFamily<EvaluationResourceDeltas>,
 )
 
-class EvaluationDeltaService(
-    private val compatibilityService: EvaluationCompatibilityService = EvaluationCompatibilityService(),
-) {
+class EvaluationDeltaService(private val compatibilityService: EvaluationCompatibilityService = EvaluationCompatibilityService()) {
     fun compare(left: PersistedEvaluationRun, right: PersistedEvaluationRun): EvaluationRunDeltas {
         if (!left.summary.isCompleted() || !right.summary.isCompleted()) {
             return unavailableAll(EvaluationDeltaUnavailableReason.RUN_NOT_COMPLETED)
@@ -85,8 +70,7 @@ class EvaluationDeltaService(
     }
 }
 
-private fun io.github.daniele21.localllm.evaluation.EvaluationRunSummary.isCompleted(): Boolean =
-    state == EvaluationRunState.COMPLETED
+private fun io.github.daniele21.localllm.evaluation.EvaluationRunSummary.isCompleted(): Boolean = state == EvaluationRunState.COMPLETED
 
 private fun qualityDeltas(
     left: PersistedEvaluationRun,
