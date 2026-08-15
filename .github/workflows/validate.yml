@@ -245,9 +245,11 @@ jobs:
             core:contracts
             core:runtime-core
             evaluation:contracts
+            evaluation:comparison
             evaluation:evaluators
             evaluation:engine
             evaluation:in-memory-store
+            evaluation:room-store
             models:model-profile
             models:model-store
             models:model-catalog
