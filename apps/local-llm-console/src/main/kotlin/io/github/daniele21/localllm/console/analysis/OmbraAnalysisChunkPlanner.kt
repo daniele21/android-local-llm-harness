@@ -73,10 +73,12 @@ internal class OmbraAnalysisChunkPlanner(private val policy: OmbraAnalysisPlanni
                 val wholeCandidate = candidate.asAnalysisSegment()
                 when {
                     fits(definitions, chunkSegments + wholeCandidate, limits) -> chunkSegments += wholeCandidate
+
                     chunkSegments.isNotEmpty() -> {
                         pending.addFirst(candidate)
                         continueChunk = false
                     }
+
                     else -> {
                         val split =
                             largestFittingPrefix(candidate, definitions, limits)
