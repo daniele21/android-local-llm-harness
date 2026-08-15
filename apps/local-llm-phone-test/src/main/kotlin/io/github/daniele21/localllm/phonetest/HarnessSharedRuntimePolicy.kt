@@ -12,51 +12,69 @@ import java.security.MessageDigest
 internal object HarnessSharedRuntimePolicy {
     fun authorizedClients(context: Context): List<AuthorizedClientPolicy> {
         val acceptedSigningCertificates = currentPackageSigningCertificates(context)
-        val internal = AuthorizedClientPolicy(
-            packageName = context.packageName,
-            applicationId = HarnessRuntimeGraph.APPLICATION_ID,
-            allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
-            acceptedSigningCertificates = acceptedSigningCertificates,
-        )
-        val externalClients = HarnessSharedRuntimeBindings.externalClientPackages(BuildConfig.DEBUG).map { packageName ->
+        val internal =
             AuthorizedClientPolicy(
-                packageName = packageName,
-                applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
-                allowedUseCases = setOf(HarnessSharedRuntimeBindings.consoleUseCaseId),
+                packageName = context.packageName,
+                applicationId = HarnessRuntimeGraph.APPLICATION_ID,
+                allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
                 acceptedSigningCertificates = acceptedSigningCertificates,
             )
-        }
-        return listOf(internal) + externalClients
+        val consoleClients =
+            HarnessSharedRuntimeBindings.consolePackages(BuildConfig.DEBUG).map { packageName ->
+                AuthorizedClientPolicy(
+                    packageName = packageName,
+                    applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+                    allowedUseCases = HarnessSharedRuntimeBindings.consoleUseCases,
+                    acceptedSigningCertificates = acceptedSigningCertificates,
+                )
+            }
+        val releaseEvidenceClient =
+            if (BuildConfig.DEBUG) {
+                emptyList()
+            } else {
+                listOf(
+                    AuthorizedClientPolicy(
+                        packageName = HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE,
+                        applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+                        allowedUseCases = setOf(HarnessSharedRuntimeBindings.consoleUseCaseId),
+                        acceptedSigningCertificates = acceptedSigningCertificates,
+                    ),
+                )
+            }
+        return listOf(internal) + consoleClients + releaseEvidenceClient
     }
 
     @Suppress("DEPRECATION")
     private fun currentPackageSigningCertificates(context: Context): Set<SigningCertificateSha256> {
         val packageManager = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        val packageInfo = packageManager.getPackageInfo(context.packageName, flags)
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = requireNotNull(packageInfo.signingInfo) { "Host signing information is unavailable" }
-            if (signingInfo.hasMultipleSigners()) {
-                signingInfo.apkContentsSigners.orEmpty().toList()
+        val flags =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
             } else {
-                signingInfo.signingCertificateHistory.orEmpty().toList()
+                PackageManager.GET_SIGNATURES
             }
-        } else {
-            packageInfo.signatures.orEmpty().toList()
-        }
+        val packageInfo = packageManager.getPackageInfo(context.packageName, flags)
+        val signatures =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val signingInfo = requireNotNull(packageInfo.signingInfo) { "Host signing information is unavailable" }
+                if (signingInfo.hasMultipleSigners()) {
+                    signingInfo.apkContentsSigners.orEmpty().toList()
+                } else {
+                    signingInfo.signingCertificateHistory.orEmpty().toList()
+                }
+            } else {
+                packageInfo.signatures.orEmpty().toList()
+            }
         check(signatures.isNotEmpty()) { "Host signing certificate is unavailable" }
         return signatures.map(::sha256).toSet()
     }
 
     private fun sha256(signature: Signature): SigningCertificateSha256 {
         val digest = MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
-        val hex = digest.joinToString(separator = "") { byte ->
-            "%02x".format(byte.toInt() and 0xff)
-        }
+        val hex =
+            digest.joinToString(separator = "") { byte ->
+                "%02x".format(byte.toInt() and 0xff)
+            }
         return SigningCertificateSha256.parse(hex)
     }
 }
