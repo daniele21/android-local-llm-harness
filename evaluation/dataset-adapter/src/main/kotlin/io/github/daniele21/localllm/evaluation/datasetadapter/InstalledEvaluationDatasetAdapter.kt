@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationCaseId
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetCategoryDefinition
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetIdentity
+import io.github.daniele21.localllm.evaluation.EvaluationDatasetManifestV1
 import io.github.daniele21.localllm.evaluation.EvaluationFailure
 import io.github.daniele21.localllm.evaluation.EvaluationFailureCode
 import io.github.daniele21.localllm.evaluation.EvaluationFailureStage
@@ -76,30 +77,41 @@ class InstalledEvaluationDatasetAdapter(
         if (pack.manifest.identity != identity) {
             return SnapshotLoad.Failed(EvaluationFailureCode.DATASET_DIGEST_MISMATCH)
         }
-
-        val cases = try {
-            File(pack.directory, CASES_FILE_NAME).inputStream().buffered().use(parser::parse)
-        } catch (error: EvaluationDatasetParseException) {
-            return SnapshotLoad.Failed(error.toFailureCode())
-        } catch (_: Exception) {
-            return SnapshotLoad.Failed(EvaluationFailureCode.DATASET_NOT_FOUND)
+        return when (val cases = readCases(pack.directory)) {
+            is CaseLoad.Failed -> SnapshotLoad.Failed(cases.code)
+            is CaseLoad.Loaded -> validateCases(identity, pack.manifest, cases.cases)
         }
+    }
 
-        if (cases.size != pack.manifest.caseCount || cases.map { it.id }.distinct().size != cases.size) {
+    private fun readCases(directory: File): CaseLoad = try {
+        CaseLoad.Loaded(
+            File(directory, CASES_FILE_NAME).inputStream().buffered().use(parser::parse),
+        )
+    } catch (error: EvaluationDatasetParseException) {
+        CaseLoad.Failed(error.toFailureCode())
+    } catch (_: Exception) {
+        CaseLoad.Failed(EvaluationFailureCode.DATASET_NOT_FOUND)
+    }
+
+    private fun validateCases(
+        identity: EvaluationDatasetIdentity,
+        manifest: EvaluationDatasetManifestV1,
+        cases: List<EvaluationDatasetCaseV1>,
+    ): SnapshotLoad {
+        if (cases.size != manifest.caseCount || cases.map { it.id }.distinct().size != cases.size) {
             return SnapshotLoad.Failed(EvaluationFailureCode.SAMPLE_SET_INVALID)
         }
-        val knownCategories = pack.manifest.categories.mapTo(mutableSetOf()) { it.id }
+        val knownCategories = manifest.categories.mapTo(mutableSetOf()) { it.id }
         if (cases.any { it.categoryId !in knownCategories }) {
             return SnapshotLoad.Failed(EvaluationFailureCode.SAMPLE_SET_INVALID)
         }
-        if (EvaluationDatasetContentDigester.verify(pack.manifest, cases) !is DatasetDigestVerification.Match) {
+        if (EvaluationDatasetContentDigester.verify(manifest, cases) !is DatasetDigestVerification.Match) {
             return SnapshotLoad.Failed(EvaluationFailureCode.DATASET_DIGEST_MISMATCH)
         }
-
         return SnapshotLoad.Loaded(
             DatasetSnapshot(
                 identity = identity,
-                categories = pack.manifest.categories.toList(),
+                categories = manifest.categories.toList(),
                 byId = cases.associateBy { it.id },
             ),
         )
@@ -120,6 +132,12 @@ private sealed interface SnapshotLoad {
     data class Loaded(val snapshot: DatasetSnapshot) : SnapshotLoad
 
     data class Failed(val code: EvaluationFailureCode) : SnapshotLoad
+}
+
+private sealed interface CaseLoad {
+    data class Loaded(val cases: List<EvaluationDatasetCaseV1>) : CaseLoad
+
+    data class Failed(val code: EvaluationFailureCode) : CaseLoad
 }
 
 private fun EvaluationDatasetParseException.toFailureCode(): EvaluationFailureCode = when (code) {
