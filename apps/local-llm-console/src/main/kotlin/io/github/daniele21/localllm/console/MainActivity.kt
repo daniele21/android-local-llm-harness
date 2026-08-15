@@ -20,6 +20,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val exportPicker =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+            viewModel.exportTo(uri)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewModel = ViewModelProvider(this)[OmbraProductViewModel::class.java]
@@ -28,6 +33,7 @@ class MainActivity : ComponentActivity() {
                 OmbraProductApp(
                     viewModel = viewModel,
                     onPickDocument = { documentPicker.launch(viewModel.createOpenDocumentIntent()) },
+                    onExport = { exportPicker.launch(viewModel.suggestedExportName()) },
                 )
             }
         }

@@ -24,6 +24,8 @@ internal sealed interface OmbraWorkflowAction {
 
     data object RetryRequested : OmbraWorkflowAction
 
+    data object ReturnToReviewRequested : OmbraWorkflowAction
+
     data object ResetRequested : OmbraWorkflowAction
 
     data object ProcessRecreated : OmbraWorkflowAction
@@ -70,6 +72,8 @@ internal object OmbraWorkflowReducer {
             OmbraWorkflowLifecycleTransitions.cancellationAcknowledged(state, action)
 
         OmbraWorkflowAction.RetryRequested -> OmbraWorkflowLifecycleTransitions.retry(state)
+
+        OmbraWorkflowAction.ReturnToReviewRequested -> OmbraWorkflowLifecycleTransitions.returnToReview(state)
 
         OmbraWorkflowAction.ResetRequested -> OmbraWorkflowLifecycleTransitions.reset(state, cancelActive = true)
 

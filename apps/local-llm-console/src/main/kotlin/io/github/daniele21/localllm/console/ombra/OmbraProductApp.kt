@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,8 @@ import io.github.daniele21.localllm.console.pii.PiiDefinitionDraft
 import io.github.daniele21.localllm.console.pii.PiiDefinitionValidation
 import io.github.daniele21.localllm.console.pii.PiiTypeId
 import io.github.daniele21.localllm.console.presentation.OmbraFailureCode
+import io.github.daniele21.localllm.console.presentation.OmbraOperationKind
+import io.github.daniele21.localllm.console.presentation.OmbraRetryTarget
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowStage
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowState
 import io.github.daniele21.localllm.ui.designsystem.LocalOmbraSpacing
@@ -40,11 +43,18 @@ import io.github.daniele21.localllm.ui.designsystem.OmbraStatusTone
 import io.github.daniele21.localllm.ui.designsystem.OmbraTaskProgressStep
 
 @Composable
-internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: () -> Unit) {
+internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: () -> Unit, onExport: () -> Unit) {
     val workflow by viewModel.workflow.collectAsStateWithLifecycle()
     val connection by viewModel.connection.collectAsStateWithLifecycle()
     val definitions by viewModel.definitions.collectAsStateWithLifecycle()
+    val review by viewModel.review.collectAsStateWithLifecycle()
     val harness = ombraHarnessUiStatus(connection.state)
+
+    LaunchedEffect(workflow.stage) {
+        if (workflow.stage == OmbraWorkflowStage.REVIEW_READY && review == OmbraReviewUiState.NotReady) {
+            viewModel.prepareReview()
+        }
+    }
 
     when (workflow.stage) {
         OmbraWorkflowStage.IDLE -> OmbraImportScreen(harness = harness, onPickDocument = onPickDocument)
@@ -65,15 +75,13 @@ internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: (
                 task = viewModel.taskSnapshot(),
                 state = definitions,
                 harness = harness,
-                onToggle = viewModel::toggleDefinition,
-                onAddCustom = viewModel::addCustomDefinition,
+                onToggle = { id, selected -> viewModel.toggleDefinition(id, selected) },
+                onAddCustom = { draft -> viewModel.addCustomDefinition(draft) },
                 onAnalyze = viewModel::startAnalysis,
                 onReset = viewModel::reset,
             )
 
-        OmbraWorkflowStage.ANALYZING,
-        OmbraWorkflowStage.CANCELLING,
-        ->
+        OmbraWorkflowStage.ANALYZING ->
             OmbraAnalysisScreen(
                 workflow = workflow,
                 harness = harness,
@@ -83,26 +91,49 @@ internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: (
             )
 
         OmbraWorkflowStage.REVIEW_READY ->
-            OmbraAnalysisReadyScreen(
-                task = viewModel.taskSnapshot(),
+            OmbraReviewScreen(
+                state = review,
                 harness = harness,
-                onReset = viewModel::reset,
+                onPrepareReview = { viewModel.prepareReview() },
+                onMove = { delta -> viewModel.moveReview(delta) },
+                onToggleReveal = { viewModel.toggleReveal() },
+                onDecision = { decision -> viewModel.setReviewDecision(decision) },
+                onExport = onExport,
+                onReset = { viewModel.reset() },
             )
+
+        OmbraWorkflowStage.EXPORTING ->
+            OmbraExportProgressScreen(
+                harness = harness,
+                onCancel = { viewModel.cancel() },
+            )
+
+        OmbraWorkflowStage.EXPORTED ->
+            OmbraExportSuccessScreen(
+                receipt = workflow.exportReceipt,
+                onReset = { viewModel.reset() },
+            )
+
+        OmbraWorkflowStage.CANCELLING -> {
+            if (workflow.activeOperation?.kind == OmbraOperationKind.EXPORT) {
+                OmbraExportProgressScreen(harness = harness, onCancel = {})
+            } else {
+                OmbraAnalysisScreen(
+                    workflow = workflow,
+                    harness = harness,
+                    extractionComplete = workflow.activeOperation?.kind != OmbraOperationKind.EXTRACTION,
+                    analysisComplete = false,
+                    onCancel = {},
+                )
+            }
+        }
 
         OmbraWorkflowStage.FAILED ->
             OmbraFailureScreen(
                 workflow = workflow,
                 harness = harness,
                 onRetry = viewModel::retry,
-                onReset = viewModel::reset,
-            )
-
-        OmbraWorkflowStage.EXPORTING,
-        OmbraWorkflowStage.EXPORTED,
-        ->
-            OmbraAnalysisReadyScreen(
-                task = viewModel.taskSnapshot(),
-                harness = harness,
+                onReturnToReview = viewModel::returnToReview,
                 onReset = viewModel::reset,
             )
     }
@@ -288,26 +319,11 @@ private fun OmbraAnalysisScreen(
 }
 
 @Composable
-private fun OmbraAnalysisReadyScreen(task: OmbraSensitiveTaskSnapshot, harness: OmbraHarnessUiStatus, onReset: () -> Boolean) {
-    OmbraScaffold(title = "OMBRA", stepLabel = "Analisi completata") { innerPadding ->
-        OmbraScrollableContent(innerPadding = innerPadding) {
-            Text(text = "Revisione pronta", style = MaterialTheme.typography.headlineLarge)
-            OmbraStatusBadge(text = harness.label, tone = harness.tone)
-            OmbraReviewBanner(
-                title = "${task.reviewOccurrences.size} occorrenze da verificare",
-                detail = "Il rilevamento è terminato. La schermata di revisione ed export viene collegata nel blocco OMB-7B.",
-                tone = OmbraStatusTone.REVIEW,
-            )
-            OmbraSecondaryButton(text = "Nuovo documento", onClick = { onReset() })
-        }
-    }
-}
-
-@Composable
 private fun OmbraFailureScreen(
     workflow: OmbraWorkflowState,
     harness: OmbraHarnessUiStatus,
     onRetry: () -> Boolean,
+    onReturnToReview: () -> Boolean,
     onReset: () -> Boolean,
 ) {
     val message = failureMessage(workflow.failureCode)
@@ -323,7 +339,11 @@ private fun OmbraFailureScreen(
                 detail = message,
                 tone = OmbraStatusTone.ERROR,
             )
-            OmbraPrimaryButton(text = "Riprova", onClick = { onRetry() })
+            if (workflow.retryTarget == OmbraRetryTarget.EXPORT) {
+                OmbraPrimaryButton(text = "Torna alla revisione", onClick = { onReturnToReview() })
+            } else {
+                OmbraPrimaryButton(text = "Riprova", onClick = { onRetry() })
+            }
             OmbraSecondaryButton(text = "Nuovo documento", onClick = { onReset() })
         }
     }
@@ -352,7 +372,7 @@ private fun failureMessage(code: OmbraFailureCode?): String = when (code) {
         "L’analisi locale non ha prodotto un risultato valido. Nessun risultato parziale viene usato."
 
     OmbraFailureCode.EXPORT_FAILED ->
-        "L’export non è stato completato. Il documento originale non è stato modificato."
+        "L’export non è stato completato. Il file parziale viene rimosso e non viene usato come risultato."
 
     null -> "L’operazione è stata interrotta senza produrre un risultato utilizzabile."
 }

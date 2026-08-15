@@ -47,6 +47,8 @@ internal class OmbraApplicationOrchestrator(
 
     fun retry(): Boolean = dispatch(OmbraWorkflowAction.RetryRequested)
 
+    fun returnToReview(): Boolean = dispatch(OmbraWorkflowAction.ReturnToReviewRequested)
+
     fun reset(): Boolean = dispatch(OmbraWorkflowAction.ResetRequested)
 
     fun onProcessRecreated(): Boolean = dispatch(OmbraWorkflowAction.ProcessRecreated)

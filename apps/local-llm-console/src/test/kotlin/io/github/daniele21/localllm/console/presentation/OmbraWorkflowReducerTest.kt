@@ -97,6 +97,53 @@ class OmbraWorkflowReducerTest {
     }
 
     @Test
+    fun exportFailureReturnsToReviewAndRequiresAFreshDestination() {
+        val review = OmbraWorkflowState(
+            stage = OmbraWorkflowStage.REVIEW_READY,
+            sourceRef = OmbraDocumentSourceRef(5),
+            counts = OmbraWorkflowCounts(
+                documentPageCount = 2,
+                segmentCount = 3,
+                activeDefinitionCount = 2,
+                findingCount = 1,
+                reviewOccurrenceCount = 1,
+            ),
+        )
+        val firstDestination = OmbraExportDestinationRef(11)
+        val exporting = OmbraWorkflowReducer.reduce(
+            review,
+            OmbraWorkflowAction.StartExport(firstDestination),
+        )
+        val failedOperation = requireNotNull(exporting.state.activeOperation).id
+        val failed = OmbraWorkflowReducer.reduce(
+            exporting.state,
+            OmbraWorkflowAction.OperationFailed(failedOperation, OmbraFailureCode.EXPORT_FAILED),
+        )
+
+        assertEquals(OmbraWorkflowStage.FAILED, failed.state.stage)
+        assertEquals(OmbraRetryTarget.EXPORT, failed.state.retryTarget)
+        assertEquals(firstDestination, failed.state.exportDestinationRef)
+
+        val recovered = OmbraWorkflowReducer.reduce(
+            failed.state,
+            OmbraWorkflowAction.ReturnToReviewRequested,
+        )
+        assertEquals(OmbraWorkflowStage.REVIEW_READY, recovered.state.stage)
+        assertNull(recovered.state.exportDestinationRef)
+        assertNull(recovered.state.retryTarget)
+        assertNull(recovered.state.failureCode)
+
+        val secondDestination = OmbraExportDestinationRef(12)
+        val restarted = OmbraWorkflowReducer.reduce(
+            recovered.state,
+            OmbraWorkflowAction.StartExport(secondDestination),
+        )
+        assertEquals(OmbraWorkflowStage.EXPORTING, restarted.state.stage)
+        assertEquals(secondDestination, restarted.state.exportDestinationRef)
+        assertTrue(restarted.effects.single() is OmbraWorkflowEffect.ExportTask)
+    }
+
+    @Test
     fun processRecreationReturnsToImportAndClearsTaskData() {
         val reviewState = OmbraWorkflowState(
             stage = OmbraWorkflowStage.REVIEW_READY,
