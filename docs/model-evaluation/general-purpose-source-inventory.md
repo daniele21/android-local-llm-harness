@@ -14,22 +14,31 @@ This inventory freezes candidate upstream identities for EVAL-GP-01. It does **n
 General Purpose v1 never consumes a floating `main`/`master` reference. Every curated source record must retain:
 
 - upstream project/dataset identifier;
-- exact immutable revision;
+- exact immutable revision that resolves in the canonical upstream;
 - exact config/path and split;
 - upstream-native record ID where one exists;
 - otherwise a deterministic source ID derived from the pinned revision, split and zero-based source ordinal;
 - the original upstream identity separately from the Harness case ID.
 
-The eventual 160 public-derived case list is frozen only by EVAL-GP-04 after source/license review and deterministic sampling are available.
+A candidate pin is not accepted merely because it appears in a secondary benchmark copy. GP-01 verifies the canonical artifact/path at the exact upstream revision. The eventual 160 public-derived case list is frozen only by EVAL-GP-04 after source/license review and deterministic sampling are available.
 
 ## Candidate sources
 
 | Harness category | Canonical upstream | Candidate revision | Config/path + split | Upstream record identity | Planned cases |
 | --- | --- | --- | --- | --- | ---: |
 | General knowledge/reasoning | `TIGER-Lab/MMLU-Pro` Hugging Face dataset | `24ac2da5bb7c7b42ea1a984c6b535e35a73d30b3` | `default`, `data/test-00000-of-00001.parquet`, `test` | native integer `question_id` | 60 |
-| Instruction following | `google-research/google-research` | `7de7de58d15f16c328219027a9a735c0f483e282` | `instruction_following_eval/data/input_data.jsonl` | native integer `key` | 40 |
-| Mathematical reasoning | `openai/grade-school-math` | `9ed55d834ddcd3eae7b9084c5698892f4d731465` | `grade_school_math/data/test.jsonl`, `test` | `gsm8k:<revision>:test:<zero-based-ordinal>` | 30 |
+| Instruction following | `google-research/google-research` | `26d8ccdab6fec61b5c83ad6327ea8bda9e580288` | `instruction_following_eval/data/input_data.jsonl` | native integer `key` | 40 |
+| Mathematical reasoning | `openai/grade-school-math` | `b0bb162abedc65e1fdd8e93ed090fd7598ee68bc` | `grade_school_math/data/test.jsonl`, `test` | `gsm8k:<revision>:test:<zero-based-ordinal>` | 30 |
 | Science/commonsense | `allenai/ai2_arc` Hugging Face dataset | `210d026faf9955653af8916fad021475a3f00453` | `ARC-Challenge`, `test-00000-of-00001.parquet`, `test` | native string `id` | 30 |
+
+## Pin verification evidence
+
+The two GitHub-backed inputs are pinned to commits returned by the canonical upstream file history rather than an inferred repository snapshot:
+
+- IFEval `input_data.jsonl` resolves at `26d8ccdab6fec61b5c83ad6327ea8bda9e580288`, the latest commit touching that canonical file in the upstream history used by GP-01;
+- GSM8K `test.jsonl` resolves at `b0bb162abedc65e1fdd8e93ed090fd7598ee68bc`, the upstream release commit that introduced the canonical test file.
+
+The Hugging Face-backed MMLU-Pro and ARC Challenge pins resolve directly to the immutable dataset revisions and paths listed above. Pack construction must re-check path resolution and source-content digests before GP-04 freezes IDs.
 
 ## MMLU-Pro
 
