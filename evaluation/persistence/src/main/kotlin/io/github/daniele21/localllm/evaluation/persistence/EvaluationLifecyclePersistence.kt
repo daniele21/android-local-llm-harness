@@ -44,6 +44,8 @@ class EvaluationLifecyclePersistence(private val repository: EvaluationResultRep
             }
 
             override suspend fun onCaseResult(runId: EvaluationRunId, result: EvaluationCaseResult) {
+                require(runId == config.runId) { "Case-result observer run ID must match persisted run" }
+                repository.appendCaseResult(runId, result)
                 observer.onCaseResult(runId, result)
             }
         }
