@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.evaluation.engine
 
 import io.github.daniele21.localllm.contracts.GenerationEvent
+import io.github.daniele21.localllm.contracts.GenerationHandle
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.RequestId
@@ -8,6 +9,7 @@ import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.evaluation.EvaluationCaseId
 import io.github.daniele21.localllm.evaluation.EvaluationCaseMetrics
 import io.github.daniele21.localllm.evaluation.EvaluationCaseResult
+import io.github.daniele21.localllm.evaluation.EvaluationCaseStatus
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1
 import io.github.daniele21.localllm.evaluation.EvaluationFailure
 import io.github.daniele21.localllm.evaluation.EvaluationFailureCode
@@ -16,7 +18,9 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 
 fun interface EvaluationCaseDefinitionSource {
     fun load(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationDatasetCaseV1?
@@ -48,19 +52,43 @@ class LocalLlmScoredCaseExecution(
         val request = createRequest(config, case, binding, sessionId) ?: return invalidConfiguration(caseId)
         if (!request.matches(binding, sessionId)) return invalidConfiguration(caseId)
 
-        return suspendCoroutine { continuation ->
-            val terminal = AtomicBoolean(false)
-            try {
-                client.generate(request) { event ->
-                    val result = terminalResult(case, caseId, event)
-                    if (result != null && terminal.compareAndSet(false, true)) {
-                        continuation.resume(result)
-                    }
+        return try {
+            withTimeout(config.caseTimeoutMs) {
+                awaitTerminal(case, caseId, request)
+            }
+        } catch (_: TimeoutCancellationException) {
+            timeoutResult(case, request.requestId)
+        }
+    }
+
+    private suspend fun awaitTerminal(
+        case: EvaluationDatasetCaseV1,
+        caseId: EvaluationCaseId,
+        request: GenerationRequest,
+    ): EvaluationStepResult<EvaluationCaseResult> = suspendCancellableCoroutine { continuation ->
+        val terminal = AtomicBoolean(false)
+        var generationHandle: GenerationHandle? = null
+        continuation.invokeOnCancellation {
+            if (terminal.compareAndSet(false, true)) {
+                cancelQuietly(generationHandle)
+            }
+        }
+        try {
+            val startedHandle = client.generate(request) { event ->
+                val result = terminalResult(case, caseId, event)
+                if (result != null && terminal.compareAndSet(false, true) && continuation.isActive) {
+                    continuation.resume(result)
                 }
-            } catch (_: Exception) {
-                if (terminal.compareAndSet(false, true)) {
-                    continuation.resume(generationFailure(caseId))
-                }
+            }
+            generationHandle = startedHandle
+            if (continuation.isCancelled) {
+                cancelQuietly(startedHandle)
+            }
+        } catch (error: CancellationException) {
+            continuation.cancel(error)
+        } catch (_: Exception) {
+            if (terminal.compareAndSet(false, true) && continuation.isActive) {
+                continuation.resume(generationFailure(caseId))
             }
         }
     }
@@ -83,6 +111,25 @@ class LocalLlmScoredCaseExecution(
 
         else -> null
     }
+
+    private fun timeoutResult(case: EvaluationDatasetCaseV1, requestId: RequestId): EvaluationStepResult.Success<EvaluationCaseResult> =
+        EvaluationStepResult.Success(
+            EvaluationCaseResult(
+                caseId = case.id,
+                categoryId = case.categoryId,
+                evaluator = case.evaluator,
+                status = EvaluationCaseStatus.TIMEOUT,
+                outcome = null,
+                requestId = requestId,
+                metrics = correlatedMetrics(requestId),
+                failure = EvaluationFailure(
+                    stage = EvaluationFailureStage.GENERATION,
+                    code = EvaluationFailureCode.CASE_TIMEOUT,
+                    caseId = case.id,
+                    retryable = true,
+                ),
+            ),
+        )
 
     private fun correlatedMetrics(requestId: RequestId): EvaluationCaseMetrics = try {
         telemetry.metrics(requestId)
@@ -114,6 +161,10 @@ class LocalLlmScoredCaseExecution(
     private fun GenerationRequest.matches(binding: EvaluationRuntimeBinding, sessionId: SessionId): Boolean = this.sessionId == sessionId &&
         applicationId == binding.applicationId &&
         useCaseId == binding.useCaseId
+
+    private fun cancelQuietly(handle: GenerationHandle?) {
+        runCatching { handle?.cancel() }
+    }
 }
 
 private fun generationFailure(caseId: EvaluationCaseId): EvaluationStepResult.Failure = EvaluationStepResult.Failure(
