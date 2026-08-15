@@ -39,6 +39,8 @@ internal sealed interface OmbraWorkflowEffect {
     data class CancelOperation(val operationId: OmbraOperationId, val operationKind: OmbraOperationKind) : OmbraWorkflowEffect
 
     data object ClearSensitiveTask : OmbraWorkflowEffect
+
+    data object ReleaseDocumentSources : OmbraWorkflowEffect
 }
 
 internal data class OmbraWorkflowTransition(val state: OmbraWorkflowState, val effects: List<OmbraWorkflowEffect> = emptyList())
