@@ -88,7 +88,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         require(applicationId == HarnessSharedRuntimeBindings.consoleApplicationId) {
             "Consumer API is not configured for applicationId ${applicationId.value}"
         }
-        val policy =
+        val legacyConsolePolicy =
             ConsumerUseCasePolicy(
                 applicationId = applicationId,
                 useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
@@ -101,17 +101,22 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 sessionKinds = setOf(SessionKind.STATELESS),
                 defaultSessionKind = SessionKind.STATELESS,
                 limits =
-                ConsumerLimits(
-                    maxInputCharacters = 32_768,
-                    maxConversationMessages = 128,
-                    maxJsonSchemaCharacters = 32_768,
-                ),
+                    ConsumerLimits(
+                        maxInputCharacters = 32_768,
+                        maxConversationMessages = 128,
+                        maxJsonSchemaCharacters = 32_768,
+                    ),
+            )
+        val policies =
+            listOf(
+                legacyConsolePolicy,
+                HarnessOmbraConsumerPolicy.create(applicationId),
             )
         val capabilityPolicy =
             ConsumerCapabilityPolicyService(
                 profileRegistry = registry,
                 modelStore = modelStore,
-                policyRegistry = InMemoryConsumerUseCasePolicyRegistry(listOf(policy)),
+                policyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies),
             )
         ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
     }
@@ -222,16 +227,18 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
         return when (applicationId) {
             HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
 
-            HarnessSharedRuntimeBindings.consoleApplicationId -> {
-                require(useCaseId == HarnessSharedRuntimeBindings.consoleUseCaseId) {
-                    "Unknown useCaseId ${useCaseId.value}"
-                }
-                HarnessSharedRuntimeBindings.resolveConsole(selected)
-            }
+            HarnessSharedRuntimeBindings.consoleApplicationId -> resolveConsoleConsumer(selected, useCaseId)
 
             else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
         }
     }
+
+    private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase =
+        when (useCaseId) {
+            HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
+            HarnessSharedRuntimeBindings.ombraUseCaseId -> HarnessSharedRuntimeBindings.resolveOmbra(model)
+            else -> error("Unknown useCaseId ${useCaseId.value}")
+        }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
