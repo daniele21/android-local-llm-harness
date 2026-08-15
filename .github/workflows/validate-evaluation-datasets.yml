@@ -3,17 +3,21 @@ name: Validate evaluation datasets
 on:
   pull_request:
     paths:
+      - "evaluation/dataset-adapter/**"
       - "evaluation/datasets/**"
       - "evaluation/contracts/**"
       - "evaluation/evaluators/**"
+      - "evaluation/engine/**"
       - "settings.gradle.kts"
       - ".github/workflows/validate-evaluation-datasets.yml"
   push:
     branches: [dev]
     paths:
+      - "evaluation/dataset-adapter/**"
       - "evaluation/datasets/**"
       - "evaluation/contracts/**"
       - "evaluation/evaluators/**"
+      - "evaluation/engine/**"
       - "settings.gradle.kts"
       - ".github/workflows/validate-evaluation-datasets.yml"
 
@@ -39,7 +43,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Validate evaluation dataset module
+      - name: Validate evaluation dataset modules
         run: |
           ./gradlew --no-configuration-cache \
             spotlessCheck \
@@ -47,4 +51,7 @@ jobs:
             verifyNoModelArtifacts \
             :evaluation:datasets:testDebugUnitTest \
             :evaluation:datasets:lintDebug \
-            :evaluation:datasets:compileDebugKotlin
+            :evaluation:datasets:compileDebugKotlin \
+            :evaluation:dataset-adapter:testDebugUnitTest \
+            :evaluation:dataset-adapter:lintDebug \
+            :evaluation:dataset-adapter:compileDebugKotlin
