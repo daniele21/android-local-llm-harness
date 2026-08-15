@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: model-evaluation
 Canonical scope: model-evaluation.routing
 Read when: locating the model-quality evaluation plan, implementation status, dependencies or owning workstream
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This is the single entry point for model-quality evaluation in the Android Local LLM Harness. The capability answers a different question from [`../benchmark-engine.md`](../benchmark-engine.md): the existing benchmark engine detects runtime-performance regressions from completed telemetry, while model evaluation actively executes a versioned test set against a selected supported model and scores task quality together with runtime cost.
 
@@ -47,13 +47,13 @@ The initial product support envelope remains the repository-reviewed Qwen3.5 den
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependencies and completion gates are canonical. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes deterministic identity, scoring, run, compatibility and failure contracts. |
-| EVAL-2 Dataset system | READY | Versioned pack/schema implementation can start at EVAL-D-01. |
-| EVAL-3 Deterministic evaluators | READY | Evaluator registry implementation can start at EVAL-E-01. |
+| EVAL-2 Dataset system | IN PROGRESS | Manifest/case wire schema v1 is frozen; parser, validation, digest, installation, sampling and import remain. |
+| EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and v1 compatibility semantics are frozen. |
 | EVAL-4 Evaluation runner | READY | Fake-driven runner and controlled model-binding work can start independently. |
-| EVAL-5 Persistence and comparison | READY | Evaluation repository/retention contracts can now be implemented. |
-| EVAL-6 General Purpose v1 | PLANNED | The built-in benchmark pack follows dataset/evaluator foundations and license review. |
+| EVAL-5 Persistence and comparison | READY | Repository/query/retention contract is frozen; in-memory and Room persistence can start in parallel. |
+| EVAL-6 General Purpose v1 | READY | Exact source/license inventory can start after the dataset schema freeze while pack assembly remains later-gated. |
 | EVAL-7 Performance UI and custom import | READY | Performance UDF/navigation shell can start against fakes. |
-| EVAL-8 Validation and device evidence | PLANNED | EVAL-V-01 deterministic identity evidence is ready; final Android/device gates remain late. |
+| EVAL-8 Validation and device evidence | PLANNED | Incremental deterministic evidence can progress; final Android/device gates remain late. |
 
 Milestone state is owned by [`current-state.md`](current-state.md). Dependency order and parallel work are owned by [`roadmap.md`](roadmap.md).
 
@@ -64,6 +64,8 @@ Milestone state is owned by [`current-state.md`](current-state.md). Dependency o
 | Current state, blockers and next ready tasks | [`current-state.md`](current-state.md) |
 | Milestone order, task dependencies and parallel lanes | [`roadmap.md`](roadmap.md) |
 | Product behavior, scoring principles and non-goals | [`target.md`](target.md) |
+| Frozen evaluator type/version/parameter/score semantics | [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) |
+| Frozen manifest and canonical JSONL wire schema | [`dataset-schema-v1.md`](dataset-schema-v1.md) |
 | Target module boundaries and execution flow | [`architecture.md`](architecture.md) |
 | Contracts, evaluators, runner and persistence tasks | [`workstreams/evaluation-core.md`](workstreams/evaluation-core.md) |
 | Dataset packs, sampling, import and General Purpose v1 | [`workstreams/datasets.md`](workstreams/datasets.md) |
