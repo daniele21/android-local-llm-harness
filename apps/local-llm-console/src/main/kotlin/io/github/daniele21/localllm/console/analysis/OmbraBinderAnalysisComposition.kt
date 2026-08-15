@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.console.application.OmbraAnalysisClient
 import io.github.daniele21.localllm.console.application.OmbraAnalysisRequest
 import io.github.daniele21.localllm.console.application.OmbraOperationId
 import io.github.daniele21.localllm.transport.binder.client.BinderConsumerLocalLlmClient
+import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionObserver
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig
@@ -61,7 +62,10 @@ internal class OmbraBinderAnalysisComposition private constructor(
     }
 
     companion object {
-        fun create(context: Context): OmbraBinderAnalysisComposition {
+        fun create(
+            context: Context,
+            observer: SharedRuntimeConnectionObserver = SharedRuntimeConnectionObserver {},
+        ): OmbraBinderAnalysisComposition {
             val consumerClient =
                 BinderConsumerLocalLlmClient.create(
                     context = context.applicationContext,
@@ -71,6 +75,7 @@ internal class OmbraBinderAnalysisComposition private constructor(
                         BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
                     ),
                     clientBuildId = "ombra-${BuildConfig.VERSION_NAME}",
+                    observer = observer,
                 )
             return OmbraBinderAnalysisComposition(
                 consumerClient = consumerClient,
