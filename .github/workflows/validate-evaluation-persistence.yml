@@ -39,15 +39,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Validate comparison and Room schema modules
-        run: |
-          ./gradlew --no-configuration-cache \
-            spotlessCheck \
-            detekt \
-            verifyNoModelArtifacts \
-            :evaluation:comparison:testDebugUnitTest \
-            :evaluation:comparison:lintDebug \
-            :evaluation:comparison:compileDebugKotlin \
-            :evaluation:room-store:testDebugUnitTest \
-            :evaluation:room-store:lintDebug \
-            :evaluation:room-store:compileDebugKotlin
+      - name: Repository quality gate
+        run: ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
+      - name: Comparison compile and tests
+        run: ./gradlew --no-configuration-cache :evaluation:comparison:compileDebugKotlin :evaluation:comparison:testDebugUnitTest
+      - name: Comparison lint
+        run: ./gradlew --no-configuration-cache :evaluation:comparison:lintDebug
+      - name: Room schema compile and tests
+        run: ./gradlew --no-configuration-cache :evaluation:room-store:compileDebugKotlin :evaluation:room-store:testDebugUnitTest
+      - name: Room schema lint
+        run: ./gradlew --no-configuration-cache :evaluation:room-store:lintDebug
