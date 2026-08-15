@@ -10,7 +10,6 @@ import io.github.daniele21.localllm.console.pii.PiiDefinitionSource
 import io.github.daniele21.localllm.console.pii.PiiTypeId
 import io.github.daniele21.localllm.contracts.ConsumerLimits
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -191,11 +190,10 @@ class OmbraSequentialAnalysisClientTest {
         assertEquals(1, fake.closeCount)
     }
 
-    private fun client(fake: FakeChunkClient): OmbraSequentialAnalysisClient =
-        OmbraSequentialAnalysisClient(
-            chunkClient = fake,
-            planner = OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = 0)),
-        )
+    private fun client(fake: FakeChunkClient): OmbraSequentialAnalysisClient = OmbraSequentialAnalysisClient(
+        chunkClient = fake,
+        planner = OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = 0)),
+    )
 
     private fun segment(text: String): DocumentSegment = DocumentSegment(
         id = SegmentId.fromIndices(0, 0),
