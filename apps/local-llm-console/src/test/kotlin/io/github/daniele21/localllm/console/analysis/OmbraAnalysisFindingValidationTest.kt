@@ -106,10 +106,10 @@ class OmbraAnalysisFindingValidationTest {
         val second =
             OmbraChunkFindingValidation(
                 findings =
-                    listOf(
-                        ValidatedFinding(email.id, "Alice", listOf(exact)),
-                        ValidatedFinding(name.id, "Alice X", listOf(overlap)),
-                    ),
+                listOf(
+                    ValidatedFinding(email.id, "Alice", listOf(exact)),
+                    ValidatedFinding(name.id, "Alice X", listOf(overlap)),
+                ),
                 invalidFindingCount = 1,
                 issueCounts = mapOf(OmbraFindingValidationIssue.SOURCE_SURFACE_NOT_FOUND to 1),
             )
