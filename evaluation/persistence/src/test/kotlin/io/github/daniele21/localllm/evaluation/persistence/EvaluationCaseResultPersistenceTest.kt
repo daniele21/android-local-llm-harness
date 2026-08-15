@@ -83,20 +83,18 @@ class EvaluationCaseResultPersistenceTest {
     }
 
     private fun firstCaseSucceedsThenFails(persistedResult: EvaluationCaseResult) = object : EvaluationCaseExecutionPort {
-        override suspend fun execute(
-            config: EvaluationRunConfig,
-            caseId: EvaluationCaseId,
-        ): EvaluationStepResult<EvaluationCaseResult> = if (caseId == CASE_A) {
-            EvaluationStepResult.Success(persistedResult)
-        } else {
-            EvaluationStepResult.Failure(
-                EvaluationFailure(
-                    stage = EvaluationFailureStage.GENERATION,
-                    code = EvaluationFailureCode.RUNTIME_FAILURE,
-                    caseId = caseId,
-                ),
-            )
-        }
+        override suspend fun execute(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> =
+            if (caseId == CASE_A) {
+                EvaluationStepResult.Success(persistedResult)
+            } else {
+                EvaluationStepResult.Failure(
+                    EvaluationFailure(
+                        stage = EvaluationFailureStage.GENERATION,
+                        code = EvaluationFailureCode.RUNTIME_FAILURE,
+                        caseId = caseId,
+                    ),
+                )
+            }
     }
 
     private fun runtimeFailureResult(caseId: EvaluationCaseId) = EvaluationCaseResult(
