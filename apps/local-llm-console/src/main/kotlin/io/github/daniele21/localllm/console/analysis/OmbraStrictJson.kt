@@ -33,41 +33,41 @@ internal class OmbraStrictJsonReader(
     private val maxStringCharacters: Int = MAX_STRING_CHARACTERS,
 ) {
     fun parse(input: String): OmbraJsonValue {
-        if (input.length > maxInputCharacters) throw OmbraJsonException(OmbraJsonFailureCode.INPUT_TOO_LARGE)
-        val cursor = Cursor(input)
+        if (input.length > maxInputCharacters) failJson(OmbraJsonFailureCode.INPUT_TOO_LARGE)
+        val cursor = OmbraJsonCursor(input)
         val value = parseValue(cursor, depth = 0)
         cursor.skipWhitespace()
-        if (!cursor.isAtEnd()) throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+        if (!cursor.isAtEnd()) failJson()
         return value
     }
 
-    private fun parseValue(cursor: Cursor, depth: Int): OmbraJsonValue {
-        if (depth > maxDepth) throw OmbraJsonException(OmbraJsonFailureCode.DEPTH_EXCEEDED)
+    private fun parseValue(cursor: OmbraJsonCursor, depth: Int): OmbraJsonValue {
+        if (depth > maxDepth) failJson(OmbraJsonFailureCode.DEPTH_EXCEEDED)
         cursor.skipWhitespace()
         val next = cursor.peek()
         return when {
             next == '{' -> parseObject(cursor, depth + 1)
             next == '[' -> parseArray(cursor, depth + 1)
             next == '"' -> OmbraJsonValue.StringValue(parseString(cursor))
-            next == 't' -> parseLiteral(cursor, "true", OmbraJsonValue.BooleanValue(true))
-            next == 'f' -> parseLiteral(cursor, "false", OmbraJsonValue.BooleanValue(false))
-            next == 'n' -> parseLiteral(cursor, "null", OmbraJsonValue.NullValue)
+            next == 't' -> cursor.consumeLiteral("true", OmbraJsonValue.BooleanValue(true))
+            next == 'f' -> cursor.consumeLiteral("false", OmbraJsonValue.BooleanValue(false))
+            next == 'n' -> cursor.consumeLiteral("null", OmbraJsonValue.NullValue)
             next == '-' || (next != null && next in '0'..'9') -> OmbraJsonValue.IntegerValue(parseInteger(cursor))
-            else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            else -> failJson()
         }
     }
 
-    private fun parseObject(cursor: Cursor, depth: Int): OmbraJsonValue.ObjectValue {
+    private fun parseObject(cursor: OmbraJsonCursor, depth: Int): OmbraJsonValue.ObjectValue {
         cursor.expect('{')
         cursor.skipWhitespace()
         if (cursor.consumeIf('}')) return OmbraJsonValue.ObjectValue(emptyMap())
         val fields = linkedMapOf<String, OmbraJsonValue>()
         while (true) {
-            if (fields.size >= maxContainerEntries) throw OmbraJsonException(OmbraJsonFailureCode.CONTAINER_TOO_LARGE)
+            if (fields.size >= maxContainerEntries) failJson(OmbraJsonFailureCode.CONTAINER_TOO_LARGE)
             cursor.skipWhitespace()
-            if (cursor.peek() != '"') throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            if (cursor.peek() != '"') failJson()
             val key = parseString(cursor)
-            if (key in fields) throw OmbraJsonException(OmbraJsonFailureCode.DUPLICATE_KEY)
+            if (key in fields) failJson(OmbraJsonFailureCode.DUPLICATE_KEY)
             cursor.skipWhitespace()
             cursor.expect(':')
             fields[key] = parseValue(cursor, depth)
@@ -75,44 +75,44 @@ internal class OmbraStrictJsonReader(
             when {
                 cursor.consumeIf('}') -> return OmbraJsonValue.ObjectValue(fields)
                 cursor.consumeIf(',') -> Unit
-                else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+                else -> failJson()
             }
         }
     }
 
-    private fun parseArray(cursor: Cursor, depth: Int): OmbraJsonValue.ArrayValue {
+    private fun parseArray(cursor: OmbraJsonCursor, depth: Int): OmbraJsonValue.ArrayValue {
         cursor.expect('[')
         cursor.skipWhitespace()
         if (cursor.consumeIf(']')) return OmbraJsonValue.ArrayValue(emptyList())
         val values = mutableListOf<OmbraJsonValue>()
         while (true) {
-            if (values.size >= maxContainerEntries) throw OmbraJsonException(OmbraJsonFailureCode.CONTAINER_TOO_LARGE)
+            if (values.size >= maxContainerEntries) failJson(OmbraJsonFailureCode.CONTAINER_TOO_LARGE)
             values += parseValue(cursor, depth)
             cursor.skipWhitespace()
             when {
                 cursor.consumeIf(']') -> return OmbraJsonValue.ArrayValue(values)
                 cursor.consumeIf(',') -> Unit
-                else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+                else -> failJson()
             }
         }
     }
 
-    private fun parseString(cursor: Cursor): String {
+    private fun parseString(cursor: OmbraJsonCursor): String {
         cursor.expect('"')
         val value = StringBuilder()
         while (true) {
-            val character = cursor.take() ?: throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            val character = cursor.take() ?: failJson()
             when {
                 character == '"' -> return value.toString()
                 character == '\\' -> appendEscaped(cursor, value)
-                character.code < 0x20 -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+                character.code < 0x20 -> failJson()
                 else -> value.append(character)
             }
-            if (value.length > maxStringCharacters) throw OmbraJsonException(OmbraJsonFailureCode.STRING_TOO_LARGE)
+            if (value.length > maxStringCharacters) failJson(OmbraJsonFailureCode.STRING_TOO_LARGE)
         }
     }
 
-    private fun appendEscaped(cursor: Cursor, value: StringBuilder) {
+    private fun appendEscaped(cursor: OmbraJsonCursor, value: StringBuilder) {
         when (val escape = cursor.take()) {
             '"', '\\', '/' -> value.append(escape)
             'b' -> value.append('\b')
@@ -121,88 +121,47 @@ internal class OmbraStrictJsonReader(
             'r' -> value.append('\r')
             't' -> value.append('\t')
             'u' -> appendUnicodeEscape(cursor, value)
-            else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            else -> failJson()
         }
     }
 
-    private fun appendUnicodeEscape(cursor: Cursor, value: StringBuilder) {
+    private fun appendUnicodeEscape(cursor: OmbraJsonCursor, value: StringBuilder) {
         val first = readHexCodeUnit(cursor)
         if (first.isHighSurrogate()) {
             cursor.expect('\\')
             cursor.expect('u')
             val second = readHexCodeUnit(cursor)
-            if (!second.isLowSurrogate()) throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            if (!second.isLowSurrogate()) failJson()
             value.append(first)
             value.append(second)
         } else {
-            if (first.isLowSurrogate()) throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            if (first.isLowSurrogate()) failJson()
             value.append(first)
         }
     }
 
-    private fun readHexCodeUnit(cursor: Cursor): Char {
+    private fun readHexCodeUnit(cursor: OmbraJsonCursor): Char {
         var code = 0
         repeat(4) {
-            val digit = cursor.take()?.digitToIntOrNull(16) ?: throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+            val digit = cursor.take()?.digitToIntOrNull(16) ?: failJson()
             code = code * 16 + digit
         }
         return code.toChar()
     }
 
-    private fun parseInteger(cursor: Cursor): Long {
+    private fun parseInteger(cursor: OmbraJsonCursor): Long {
         val start = cursor.position
         cursor.consumeIf('-')
-        val first = cursor.peek()
-        when {
-            first == '0' -> cursor.take()
-            first != null && first in '1'..'9' -> consumeDigits(cursor)
-            else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+        when (val first = cursor.peek()) {
+            '0' -> cursor.take()
+            in '1'..'9' -> cursor.consumeDigits()
+            else -> failJson()
         }
-        if (cursor.peek() == '.' || cursor.peek() == 'e' || cursor.peek() == 'E') {
-            throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
+        when (cursor.peek()) {
+            '.', 'e', 'E' -> failJson()
+            else -> Unit
         }
-        return cursor.substring(start, cursor.position).toLongOrNull()
-            ?: throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
-    }
-
-    private fun consumeDigits(cursor: Cursor) {
-        while (true) {
-            val next = cursor.peek()
-            if (next == null || next !in '0'..'9') return
-            cursor.take()
-        }
-    }
-
-    private fun parseLiteral(cursor: Cursor, literal: String, value: OmbraJsonValue): OmbraJsonValue {
-        literal.forEach(cursor::expect)
-        return value
-    }
-
-    private class Cursor(private val input: String) {
-        var position: Int = 0
-            private set
-
-        fun isAtEnd(): Boolean = position == input.length
-
-        fun peek(): Char? = input.getOrNull(position)
-
-        fun take(): Char? = input.getOrNull(position)?.also { position += 1 }
-
-        fun consumeIf(expected: Char): Boolean {
-            if (peek() != expected) return false
-            position += 1
-            return true
-        }
-
-        fun expect(expected: Char) {
-            if (!consumeIf(expected)) throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
-        }
-
-        fun skipWhitespace() {
-            while (peek() == ' ' || peek() == '\n' || peek() == '\r' || peek() == '\t') position += 1
-        }
-
-        fun substring(start: Int, end: Int): String = input.substring(start, end)
+        return cursor.substring(start, cursor.position).toLongOrNull() ?: failJson()
     }
 
     private companion object {
@@ -212,3 +171,47 @@ internal class OmbraStrictJsonReader(
         const val MAX_STRING_CHARACTERS = 4_096
     }
 }
+
+private class OmbraJsonCursor(private val input: String) {
+    var position: Int = 0
+        private set
+
+    fun isAtEnd(): Boolean = position == input.length
+
+    fun peek(): Char? = input.getOrNull(position)
+
+    fun take(): Char? = input.getOrNull(position)?.also { position += 1 }
+
+    fun consumeIf(expected: Char): Boolean {
+        if (peek() != expected) return false
+        position += 1
+        return true
+    }
+
+    fun expect(expected: Char) {
+        if (!consumeIf(expected)) failJson()
+    }
+
+    fun skipWhitespace() {
+        while (isJsonWhitespace(peek())) position += 1
+    }
+
+    fun consumeDigits() {
+        while (peek()?.isDigit() == true) position += 1
+    }
+
+    fun consumeLiteral(literal: String, value: OmbraJsonValue): OmbraJsonValue {
+        literal.forEach(::expect)
+        return value
+    }
+
+    fun substring(start: Int, end: Int): String = input.substring(start, end)
+}
+
+private fun isJsonWhitespace(character: Char?): Boolean =
+    when (character) {
+        ' ', '\n', '\r', '\t' -> true
+        else -> false
+    }
+
+private fun failJson(code: OmbraJsonFailureCode = OmbraJsonFailureCode.INVALID_JSON): Nothing = throw OmbraJsonException(code)
