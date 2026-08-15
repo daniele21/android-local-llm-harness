@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.daniele21.localllm.console.application.OmbraSensitiveTaskSnapshot
 import io.github.daniele21.localllm.console.pii.PiiDefinitionDraft
-import io.github.daniele21.localllm.console.pii.PiiDefinitionIssue
 import io.github.daniele21.localllm.console.pii.PiiDefinitionValidation
 import io.github.daniele21.localllm.console.pii.PiiTypeId
 import io.github.daniele21.localllm.console.presentation.OmbraFailureCode
@@ -356,25 +355,4 @@ private fun failureMessage(code: OmbraFailureCode?): String = when (code) {
         "L’export non è stato completato. Il documento originale non è stato modificato."
 
     null -> "L’operazione è stata interrotta senza produrre un risultato utilizzabile."
-}
-
-private fun PiiDefinitionValidation.errorForName(): String? = when {
-    PiiDefinitionIssue.BLANK_LABEL in issues -> "Inserisci un nome."
-    PiiDefinitionIssue.LABEL_TOO_LONG in issues -> "Il nome è troppo lungo."
-    PiiDefinitionIssue.UNSUPPORTED_CONTROL_CHARACTER in issues -> "Il testo contiene caratteri non supportati."
-    PiiDefinitionIssue.CUSTOM_DEFINITION_LIMIT_REACHED in issues -> "Hai raggiunto il numero massimo di definizioni personalizzate."
-    else -> null
-}
-
-private fun PiiDefinitionValidation.errorForDefinition(): String? = when {
-    PiiDefinitionIssue.BLANK_DEFINITION in issues -> "Inserisci una definizione."
-    PiiDefinitionIssue.DEFINITION_TOO_LONG in issues -> "La definizione è troppo lunga."
-    PiiDefinitionIssue.UNSUPPORTED_CONTROL_CHARACTER in issues -> "Il testo contiene caratteri non supportati."
-    else -> null
-}
-
-private fun PiiDefinitionValidation.errorForExample(): String? = when {
-    PiiDefinitionIssue.EXAMPLE_TOO_LONG in issues -> "L’esempio è troppo lungo."
-    PiiDefinitionIssue.UNSUPPORTED_CONTROL_CHARACTER in issues -> "Il testo contiene caratteri non supportati."
-    else -> null
 }
