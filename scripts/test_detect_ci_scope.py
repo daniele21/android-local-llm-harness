@@ -29,6 +29,24 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("core:runtime-core",))
 
+    def test_evaluator_change_selects_only_evaluator_module(self) -> None:
+        scope = classify_paths(
+            ["evaluation/evaluators/src/main/kotlin/ExactMatchEvaluator.kt"]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:evaluators",))
+
+    def test_evaluation_engine_change_selects_only_engine_module(self) -> None:
+        scope = classify_paths(
+            ["evaluation/engine/src/main/kotlin/EvaluationEngine.kt"]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:engine",))
+
     def test_model_distribution_modules_are_selected_explicitly(self) -> None:
         scope = classify_paths(
             [
