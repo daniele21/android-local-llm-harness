@@ -83,10 +83,8 @@ class DatasetSamplePresetResolverTest {
         assertTrue(first.digest != second.digest)
     }
 
-    private fun resolved(
-        ranking: StratifiedSamplingRanking,
-        request: EvaluationSampleRequest,
-    ) = (EvaluationSamplePresetResolver.resolve(ranking, request) as DatasetSampleResolution.Resolved).selection
+    private fun resolved(ranking: StratifiedSamplingRanking, request: EvaluationSampleRequest) =
+        (EvaluationSamplePresetResolver.resolve(ranking, request) as DatasetSampleResolution.Resolved).selection
 
     private fun ranking(count: Int) = StratifiedSamplingRanking(
         dataset = EvaluationDatasetIdentity(
