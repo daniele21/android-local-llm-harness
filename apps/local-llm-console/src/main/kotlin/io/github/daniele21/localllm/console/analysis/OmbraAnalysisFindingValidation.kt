@@ -227,14 +227,13 @@ internal object OmbraAnalysisFindingMerger {
     private fun conflictsForLeft(
         left: Pair<PiiTypeId, SourceOccurrence>,
         later: List<Pair<PiiTypeId, SourceOccurrence>>,
-    ): List<OmbraFindingConflict> =
-        later.asSequence()
-            .takeWhile { right ->
-                right.second.segmentId == left.second.segmentId &&
-                    right.second.range.startInclusive < left.second.range.endExclusive
-            }.filter { right -> left.first != right.first && left.second.range.overlaps(right.second.range) }
-            .map { right -> OmbraFindingConflict(left.first, left.second, right.first, right.second) }
-            .toList()
+    ): List<OmbraFindingConflict> = later.asSequence()
+        .takeWhile { right ->
+            right.second.segmentId == left.second.segmentId &&
+                right.second.range.startInclusive < left.second.range.endExclusive
+        }.filter { right -> left.first != right.first && left.second.range.overlaps(right.second.range) }
+        .map { right -> OmbraFindingConflict(left.first, left.second, right.first, right.second) }
+        .toList()
 
     private data class FindingKey(val typeId: PiiTypeId, val surface: String)
 
