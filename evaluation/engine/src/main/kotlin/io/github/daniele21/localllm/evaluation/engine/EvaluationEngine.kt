@@ -10,7 +10,12 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 sealed interface EvaluationStepResult<out T> {
     data class Success<T>(val value: T) : EvaluationStepResult<T>
@@ -62,6 +67,7 @@ class EvaluationEngine(
 ) {
     private val ownershipLock = Any()
     private val cancelRequested = AtomicBoolean(false)
+    private val activeCaseJob = AtomicReference<Job?>(null)
 
     @Volatile
     private var activeRunId: EvaluationRunId? = null
@@ -89,6 +95,7 @@ class EvaluationEngine(
                 modelPreparation = modelPreparation,
                 caseExecution = caseExecution,
                 cancelRequested = cancelRequested,
+                activeCaseJob = activeCaseJob,
             ).execute()
         } finally {
             release(config.runId)
@@ -100,6 +107,7 @@ class EvaluationEngine(
             false
         } else {
             cancelRequested.set(true)
+            activeCaseJob.get()?.cancel(CancellationException("Evaluation run cancellation requested"))
             true
         }
     }
@@ -111,6 +119,7 @@ class EvaluationEngine(
             false
         } else {
             activeRunId = runId
+            activeCaseJob.set(null)
             cancelRequested.set(false)
             true
         }
@@ -118,6 +127,7 @@ class EvaluationEngine(
 
     private fun release(runId: EvaluationRunId) = synchronized(ownershipLock) {
         if (activeRunId == runId) {
+            activeCaseJob.getAndSet(null)?.cancel()
             activeRunId = null
             cancelRequested.set(false)
         }
@@ -131,6 +141,7 @@ private class EvaluationRunExecution(
     private val modelPreparation: EvaluationModelPreparationPort,
     private val caseExecution: EvaluationCaseExecutionPort,
     private val cancelRequested: AtomicBoolean,
+    private val activeCaseJob: AtomicReference<Job?>,
 ) {
     suspend fun execute(): EvaluationEngineTerminal {
         val results = mutableListOf<EvaluationCaseResult>()
@@ -173,14 +184,21 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.RUNNING)
         val caseIds = config.sampling.orderedCaseIds
         var attempted = 0
-        emitProgress(attempted, results.size, null)
+        observer.emitProgress(config, attempted, results.size, null)
 
         for (caseId in caseIds) {
             if (cancelRequested.get()) return cancel(results)
 
             attempted += 1
-            emitProgress(attempted, results.size, caseId)
-            when (val execution = caseExecution.execute(config, caseId)) {
+            observer.emitProgress(config, attempted, results.size, caseId)
+            val execution = try {
+                executeActiveCase(caseId)
+            } catch (error: CancellationException) {
+                if (!cancelRequested.get()) throw error
+                observer.emitProgress(config, attempted, results.size, null)
+                return cancel(results)
+            }
+            when (execution) {
                 is EvaluationStepResult.Failure -> return fail(results, execution.failure)
                 is EvaluationStepResult.Success -> recordCaseResult(caseId, execution.value, results, attempted)
             }
@@ -189,6 +207,19 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.AGGREGATING)
         observer.emitState(config.runId, EvaluationRunState.COMPLETED)
         return EvaluationEngineTerminal.Completed(config.runId, results.toList())
+    }
+
+    private suspend fun executeActiveCase(caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> = coroutineScope {
+        val job = async { caseExecution.execute(config, caseId) }
+        check(activeCaseJob.compareAndSet(null, job)) { "Evaluation engine already owns an active case job" }
+        try {
+            if (cancelRequested.get()) {
+                job.cancel(CancellationException("Evaluation run cancellation requested"))
+            }
+            job.await()
+        } finally {
+            activeCaseJob.compareAndSet(job, null)
+        }
     }
 
     private suspend fun recordCaseResult(
@@ -202,7 +233,7 @@ private class EvaluationRunExecution(
         }
         results += result
         observer.onCaseResult(config.runId, result)
-        emitProgress(attempted, results.size, null)
+        observer.emitProgress(config, attempted, results.size, null)
     }
 
     private suspend fun cancellationIfRequested(results: List<EvaluationCaseResult>): EvaluationEngineTerminal.Cancelled? =
@@ -218,20 +249,25 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.CANCELLED)
         return EvaluationEngineTerminal.Cancelled(config.runId, results.toList())
     }
-
-    private suspend fun emitProgress(attempted: Int, completed: Int, currentCaseId: EvaluationCaseId?) {
-        observer.onProgress(
-            config.runId,
-            EvaluationProgress(
-                totalCases = config.sampling.orderedCaseIds.size,
-                attemptedCases = attempted,
-                completedCases = completed,
-                currentCaseId = currentCaseId,
-            ),
-        )
-    }
 }
 
 private suspend fun EvaluationEngineObserver.emitState(runId: EvaluationRunId, state: EvaluationRunState) {
     onStateChanged(runId, state)
+}
+
+private suspend fun EvaluationEngineObserver.emitProgress(
+    config: EvaluationRunConfig,
+    attempted: Int,
+    completed: Int,
+    currentCaseId: EvaluationCaseId?,
+) {
+    onProgress(
+        config.runId,
+        EvaluationProgress(
+            totalCases = config.sampling.orderedCaseIds.size,
+            attemptedCases = attempted,
+            completedCases = completed,
+            currentCaseId = currentCaseId,
+        ),
+    )
 }

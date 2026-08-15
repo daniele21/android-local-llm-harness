@@ -15,9 +15,9 @@ This is the operational status ledger for model evaluation. Repository-level int
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, dataset-schema, persistence, compatibility, hashing and failure contracts with deterministic tests. |
-| EVAL-2 Dataset system | IN PROGRESS | D-01 through D-11 are integrated and D-12 closes the generic import/delete documentation in this change; production composition still must consume installed packs through the canonical dataset boundary. |
+| EVAL-2 Dataset system | IN PROGRESS | D-01 through D-12 are integrated. The generic dataset layer is complete; milestone closure now depends only on production composition consuming installed packs through the canonical dataset boundary. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
-| EVAL-4 Evaluation runner | IN PROGRESS | R-01 through R-08 are integrated: controlled preflight, model preparation/warm-up, isolated scored execution, deterministic scoring, request telemetry and typed per-case timeout are real. R-09 active cancellation and R-10 aggregation are next. |
+| EVAL-4 Evaluation runner | IN PROGRESS | R-01 through R-09 are integrated by this change. R-10 has an integrated deterministic aggregation domain but still needs terminal production wiring; R-11 cleanup evidence is now ready. |
 | EVAL-5 Persistence and comparison | IN PROGRESS | P-01/P-02/P-03/P-06/P-07/P-08/P-09 are integrated. P-04 durable Room repository wiring is active and gates P-05 parity; P-10 remains the integration closeout. |
 | EVAL-6 General Purpose v1 | IN PROGRESS | GP-01 exact public-source inventory is complete; GP-02 license/attribution treatment and GP-05/GP-06 Harness-owned authoring are ready independently. |
 | EVAL-7 Performance UI/custom import | IN PROGRESS | U-01 state/effect vocabulary and U-02 fake-driven reducer/ViewModel are integrated; navigation/state rendering and connected selectors remain. |
@@ -42,8 +42,9 @@ EVAL-3 is complete. No v1 evaluator uses an LLM judge, arbitrary executable code
 
 The integrated implementation foundation now includes the following concrete seams without collapsing dataset, runtime, persistence and UI ownership:
 
-- `evaluation/datasets` owns D-01 through D-11 in `dev`: bounded canonical parsing, validation, digest, atomic install, discovery, deterministic sampling/presets, regression fixtures, Android canonical-document import and protected deletion; D-12 adds the explicit developer-facing import contract in [`custom-dataset-import.md`](custom-dataset-import.md);
-- `evaluation/engine` owns R-01 through R-08: lifecycle, controlled model resolution, full preflight, preparation/unscored warm-up, fresh stateless context per scored case, deterministic evaluator dispatch, exact request telemetry correlation and typed per-case timeout/active generation cancellation;
+- `evaluation/datasets` owns D-01 through D-12: bounded canonical parsing, validation, digest, atomic install, discovery, deterministic sampling/presets, regression fixtures, Android canonical-document import, protected deletion and the explicit developer-facing import contract in [`custom-dataset-import.md`](custom-dataset-import.md);
+- `evaluation/engine` owns R-01 through R-09 after this change: lifecycle, controlled model resolution, full preflight, preparation/unscored warm-up, fresh stateless context per scored case, deterministic evaluator dispatch, exact request telemetry correlation, typed per-case timeout and active run cancellation through the active case job/generation handle;
+- `EvaluationRunAggregator` in `evaluation/engine` is the integrated R-10 domain foundation for quality/runtime/resource/reliability aggregation, but the production terminal composition remains open;
 - `evaluation/in-memory-store` owns the P-02 deterministic parity implementation of `EvaluationResultRepository`, including lifecycle validation, active-run deletion protection and bounded terminal retention;
 - `evaluation/persistence` owns P-06 lifecycle/progress persistence plus P-07 durable per-case outcome persistence through the repository boundary, without storing prompt/expected/generated text;
 - `evaluation/room-store` owns the P-03 normalized privacy-safe Room entity graph; P-04 DAO/repository/database implementation is the active durable-store lane and is not yet integrated;
@@ -51,11 +52,11 @@ The integrated implementation foundation now includes the following concrete sea
 - the phone Performance shell owns U-01 typed Run/Datasets/History/Compare state, intents and effects;
 - U-02 adds the fake-driven pure reducer and `StateFlow` ViewModel used by later connected Performance surfaces.
 
-R-08 does not claim run-level cancellation/unattempted-case accounting or aggregate summaries; those remain R-09/R-10. P-07 persists completed case outcomes but durable Room behavior is not production-complete until P-04/P-05 close. U-02 does not claim connected Compose behavior.
+R-09 records an interrupted active case as attempted but not completed and prevents later cases from starting; it does not fabricate a scored `CANCELLED` case outcome without dataset category/evaluator identity. R-10 remains responsible for aggregate accounting. P-07 persists completed case outcomes but durable Room behavior is not production-complete until P-04/P-05 close. U-02 does not claim connected Compose behavior.
 
 ## Frozen dataset, persistence and source foundations
 
-D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation. D-10 extends the same canonical boundary to Android-selected documents, D-11 adds exact-identity protected deletion, and [`custom-dataset-import.md`](custom-dataset-import.md) records the v1 import limits/privacy/error contract for D-12.
+D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation. D-10 extends the same canonical boundary to Android-selected documents, D-11 adds exact-identity protected deletion, and [`custom-dataset-import.md`](custom-dataset-import.md) records the v1 import limits/privacy/error contract for D-12. All generic dataset tasks are complete.
 
 P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`; P-02 provides the in-memory behavioral baseline, P-03 freezes the Room persistence shape, P-06 persists lifecycle/progress, P-07 persists completed privacy-safe case outcomes, P-08 rejects incompatible comparisons with typed reasons and P-09 computes deltas only when the corresponding compatibility level passes.
 
@@ -68,8 +69,9 @@ V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digest
 The following work can proceed concurrently unless it touches the same module-registration files:
 
 - `EVAL-P-04` — complete and validate Room DAO/repository/database migration wiring;
-- `EVAL-R-09` — extend cooperative cancellation through active case execution and account for unattempted cases;
-- `EVAL-R-10` — aggregate quality/runtime/resource/reliability summaries from completed case outcomes;
+- `EVAL-R-10` — wire the integrated aggregator into production `AGGREGATING` with canonical dataset category definitions;
+- `EVAL-R-11` — validate cleanup for completion, evaluator failure, runtime failure, timeout and cancellation;
+- production dataset-to-runner composition — consume only registry-published packs through the canonical parser/identity boundary, closing the remaining EVAL-2 integration gap;
 - `EVAL-GP-02` — public-source license, attribution and redistribution treatment review;
 - `EVAL-GP-05` — author 20 Harness structured-output cases;
 - `EVAL-GP-06` — author 20 Harness context-retrieval cases;
@@ -78,17 +80,17 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-U-11` — installed supported-model selector;
 - `EVAL-U-13` — execution-profile selector and compatibility explanation.
 
-After P-04 is integrated, `EVAL-P-05` Room/in-memory parity becomes ready. After R-09/R-10, cleanup/aggregation validation can advance toward R-11/R-12. The generic dataset implementation no longer has an independent code lane after D-12; remaining dataset work is General Purpose v1 content/licensing plus production runner composition.
+After P-04 is integrated, `EVAL-P-05` Room/in-memory parity becomes ready. R-10 production wiring and R-11 can now proceed in parallel; R-12 becomes ready when both close. The generic dataset implementation no longer has an independent code lane after D-12; remaining dataset work is production runner composition plus General Purpose v1 content/licensing.
 
 ## Parallel fan-out strategy
 
 ```text
-Dataset:      D-01..D-11 DONE -> D-12 docs (closing change)
-              production consumption joins runner/composition
+Dataset:      D-01..D-12 DONE
+              production adapter -> runner/composition
 
-Runner:       R-01..R-08 DONE
-              R-09 cancellation ─┐
-              R-10 aggregation  ─┴─> R-11 cleanup -> R-12 integration
+Runner:       R-01..R-09 DONE
+              R-10 aggregation wiring ─┐
+              R-11 cleanup evidence   ─┴─> R-12 integration
 
 Persistence:  P-02 DONE
               P-06/P-07 DONE
@@ -121,7 +123,7 @@ Potential later blockers are tracked as dependencies rather than hidden assumpti
 - representative physical-device availability for final performance evidence;
 - Q35-6 measured-profile completion for production-facing runtime comparisons.
 
-P-04 currently has an integration-quality blocker rather than an architectural blocker: its previous exact-head validation stopped at Spotless formatting in two Room source files. It must be reformatted and fully revalidated before merge; no P-04 completion claim is made from code presence alone.
+P-04 is still gated on exact-head durable-store validation. Its prior formatter and static-analysis issues were implementation-quality blockers rather than architectural blockers; no P-04 completion claim is made until the final Room repository head is green and integrated.
 
 ## Maintenance rule
 
