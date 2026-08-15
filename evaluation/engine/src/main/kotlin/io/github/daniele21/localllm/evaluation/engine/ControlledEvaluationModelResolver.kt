@@ -34,30 +34,34 @@ sealed interface EvaluationModelResolution {
 }
 
 class ControlledEvaluationModelResolver(private val supportedModels: SupportedEvaluationModelSource, private val modelStore: ModelStore) {
-    fun resolve(identity: EvaluationModelIdentity): EvaluationModelResolution {
+    fun resolve(identity: EvaluationModelIdentity): EvaluationModelResolution = when (
         val profile = supportedModels.find(identity.modelProfileId)
-            ?: return rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
+    ) {
+        null -> rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
+        else -> resolveSupported(identity, profile)
+    }
 
-        if (profile.artifact.digest != identity.artifactDigest) {
-            return rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
-        }
-        if (identity.quantization != null && profile.artifact.quantization != identity.quantization) {
-            return rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
-        }
-
+    private fun resolveSupported(
+        identity: EvaluationModelIdentity,
+        profile: GgufModelProfile,
+    ): EvaluationModelResolution {
         val stored = modelStore.find(identity.artifactDigest)
-            ?: return rejected(EvaluationFailureCode.MODEL_NOT_INSTALLED)
-        if (!stored.verified || stored.digest != identity.artifactDigest) {
-            return rejected(EvaluationFailureCode.MODEL_NOT_INSTALLED)
+        return when {
+            profile.artifact.digest != identity.artifactDigest -> rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
+            identity.quantization != null && profile.artifact.quantization != identity.quantization -> {
+                rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
+            }
+            stored == null || !stored.verified || stored.digest != identity.artifactDigest -> {
+                rejected(EvaluationFailureCode.MODEL_NOT_INSTALLED)
+            }
+            else -> EvaluationModelResolution.Resolved(
+                ResolvedEvaluationModel(
+                    identity = identity,
+                    profile = profile,
+                    storedModel = stored,
+                ),
+            )
         }
-
-        return EvaluationModelResolution.Resolved(
-            ResolvedEvaluationModel(
-                identity = identity,
-                profile = profile,
-                storedModel = stored,
-            ),
-        )
     }
 
     private fun rejected(code: EvaluationFailureCode): EvaluationModelResolution.Rejected = EvaluationModelResolution.Rejected(
