@@ -80,6 +80,7 @@ class LocalLlmScoredCaseExecution(
         )
 
         is GenerationEvent.Failed -> generationFailure(caseId)
+
         else -> null
     }
 
