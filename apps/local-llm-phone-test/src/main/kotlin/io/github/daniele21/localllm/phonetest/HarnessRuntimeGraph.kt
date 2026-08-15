@@ -234,7 +234,7 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
     private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
         HarnessSharedRuntimeBindings.ombraUseCaseId -> HarnessSharedRuntimeBindings.resolveOmbra(model)
-        else -> error("Unknown useCaseId ${useCaseId.value}")
+        else -> throw IllegalArgumentException("Unknown useCaseId ${useCaseId.value}")
     }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
