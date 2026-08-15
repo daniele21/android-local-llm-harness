@@ -245,7 +245,7 @@ class EvaluationDeltaServiceTest {
             quality = quality,
             reliability = null,
             startedAtEpochMs = 1,
-            completedAtEpochMs = 2.takeIf { completed },
+            completedAtEpochMs = 2L.takeIf { completed },
             failure = null,
         )
         return PersistedEvaluationRun(
