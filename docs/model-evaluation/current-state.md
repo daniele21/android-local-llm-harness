@@ -18,7 +18,7 @@ This is the operational status ledger for model evaluation. Repository-level int
 | EVAL-2 Dataset system | IN PROGRESS | D-01 manifest/canonical JSONL schema is frozen; D-02/D-03/D-04 are in active parser/validator/digest convergence before D-05/D-07 replay. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
 | EVAL-4 Evaluation runner | IN PROGRESS | R-01 lifecycle, R-02 controlled selected-model resolution and R-03 production preflight are integrated; R-04 model preparation and R-05 isolated per-case context are ready independently. |
-| EVAL-5 Persistence and comparison | IN PROGRESS | P-01 contracts, P-02 bounded in-memory parity and P-06 lifecycle persistence are integrated; P-03 Room design and P-08 comparison remain active. |
+| EVAL-5 Persistence and comparison | IN PROGRESS | P-01/P-02/P-06 foundations, P-03 privacy-safe Room schema and P-08 typed compatibility are integrated; P-04 durable repository wiring and P-09 deltas are ready. |
 | EVAL-6 General Purpose v1 | IN PROGRESS | GP-01 exact public-source inventory is complete; GP-02 license/attribution treatment and GP-05/GP-06 Harness-owned authoring are ready independently. |
 | EVAL-7 Performance UI/custom import | IN PROGRESS | U-01 state/effect vocabulary and U-02 fake-driven reducer/ViewModel are integrated; navigation/state rendering and connected selectors remain. |
 | EVAL-8 Validation/device evidence | IN PROGRESS | V-01 identity/hash golden evidence is integrated; V-03 evaluator corpus is ready while final Android/device evidence remains late-gated. |
@@ -40,11 +40,13 @@ EVAL-3 is complete. No v1 evaluator uses an LLM judge, arbitrary executable code
 
 ## Integrated implementation foundations
 
-The integrated implementation foundation now includes five concrete seams without prematurely coupling production dataset/runtime behavior:
+The integrated implementation foundation now includes seven concrete seams without prematurely coupling production dataset/runtime behavior:
 
 - `evaluation/engine` owns R-01 single-run lifecycle/progress/cancellation, R-02 controlled resolution of exactly one supported installed model artifact and R-03 deterministic production preflight across model, dataset, evaluator and execution-profile compatibility;
 - `evaluation/in-memory-store` owns the P-02 deterministic parity implementation of `EvaluationResultRepository`, including lifecycle validation, active-run deletion protection and bounded terminal retention;
 - `evaluation/persistence` owns P-06 lifecycle/progress persistence around `EvaluationEngine` without absorbing Room or per-case persistence ownership;
+- `evaluation/room-store` owns the P-03 normalized privacy-safe Room entity graph without DAO, repository or database wiring;
+- `evaluation/comparison` owns P-08 typed quality/runtime compatibility assessment without persistence queries or delta calculation;
 - the phone Performance shell owns U-01 typed Run/Datasets/History/Compare state, intents and effects;
 - U-02 adds the fake-driven pure reducer and `StateFlow` ViewModel used by later connected Performance surfaces.
 
@@ -54,7 +56,7 @@ R-01/R-02/R-03 do not claim model preparation, isolated case execution, active-d
 
 D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation.
 
-P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`; P-02 provides the in-memory behavioral baseline and P-06 now persists lifecycle/progress through that repository boundary.
+P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`; P-02 provides the in-memory behavioral baseline, P-03 freezes the Room persistence shape, P-06 persists lifecycle/progress through the repository boundary and P-08 rejects incompatible comparisons with typed reasons.
 
 GP-01 is satisfied by [`general-purpose-source-inventory.md`](general-purpose-source-inventory.md), which pins immutable MMLU-Pro, IFEval, GSM8K and ARC Challenge source revisions plus stable provenance/source-record identity rules without authorizing redistribution.
 
@@ -70,8 +72,8 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-GP-06` — 20 Harness context-retrieval cases;
 - `EVAL-R-04` — production model preparation plus optional unscored warm-up;
 - `EVAL-R-05` — isolated session/context lifecycle per scored case;
-- `EVAL-P-03` — Room entity design for privacy-safe evaluation persistence;
-- `EVAL-P-08` — typed comparison service;
+- `EVAL-P-04` — Room DAO/repository and database migration wiring;
+- `EVAL-P-09` — compatible quality/runtime/resource delta calculation;
 - `EVAL-U-03` — top-level Performance navigation and subnavigation;
 - `EVAL-U-04` — deterministic loading/empty/unavailable/error states;
 - `EVAL-U-11` — installed supported-model selector;
@@ -94,8 +96,8 @@ Runner:       R-01 DONE
 
 Persistence:  P-02 DONE
               P-06 DONE
-              P-03 ──────> P-04/P-05 parity
-              P-08 ──────> P-09 comparison deltas
+              P-03 DONE -> P-04 -> P-05 parity
+              P-08 DONE -> P-09 comparison deltas
 
 General pack: GP-01 DONE -> GP-02 -> GP-03 -> GP-04
               GP-05 ─┐
