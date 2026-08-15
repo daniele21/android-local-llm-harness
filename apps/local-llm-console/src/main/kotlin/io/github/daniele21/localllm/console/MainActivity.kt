@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
 import io.github.daniele21.localllm.console.ombra.OmbraProductApp
 import io.github.daniele21.localllm.console.ombra.OmbraProductViewModel
+import io.github.daniele21.localllm.console.ombra.suggestedExportName
 import io.github.daniele21.localllm.ui.designsystem.OmbraTheme
 
 class MainActivity : ComponentActivity() {
