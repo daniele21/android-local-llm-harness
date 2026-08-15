@@ -162,6 +162,7 @@ class LocalLlmEvaluationRuntime(
         }
     }
 
+    @Suppress("ThrowsCount")
     private suspend fun <T> withIsolatedSession(
         binding: EvaluationRuntimeBinding,
         failureStage: EvaluationFailureStage,
