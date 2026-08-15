@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.routing
 Read when: locating the target, architecture, UX, detection pipeline or delivery plan for the first PII Consumer API application
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This is the progressive-disclosure entry point for turning `apps/local-llm-console` into **OMBRA**, a minimal product-shaped application that uses Local LLM Harness to find user-selected PII in a text-bearing PDF, supports human review and exports a newly generated anonymized PDF.
 
@@ -36,6 +36,7 @@ user-selected PDF
 | How are definitions, prompt input, chunking, JSON results and export handled? | [`detection-and-redaction.md`](detection-and-redaction.md) |
 | How are the OMBRA brand kit and six mockup views implemented? | [`ux-and-brand.md`](ux-and-brand.md) |
 | Which automated, quality, privacy and physical checks are required? | [`validation-and-rollout.md`](validation-and-rollout.md) |
+| Which frozen semantic-quality thresholds decide supported-model claims? | [`quality-policy-v1.md`](quality-policy-v1.md) |
 | In what order should implementation land and what closes each milestone? | [`roadmap.md`](roadmap.md) |
 | Where are the generated visual references? | [`../assets/README.md`](../assets/README.md) |
 
