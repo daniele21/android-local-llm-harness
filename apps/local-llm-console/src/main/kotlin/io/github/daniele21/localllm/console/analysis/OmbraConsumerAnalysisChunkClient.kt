@@ -1,12 +1,8 @@
 package io.github.daniele21.localllm.console.analysis
 
 import io.github.daniele21.localllm.console.application.OmbraOperationId
-import io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode
-import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
 import io.github.daniele21.localllm.contracts.ConsumerContentType
-import io.github.daniele21.localllm.contracts.ConsumerErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
-import io.github.daniele21.localllm.contracts.ConsumerFailure
 import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
 import io.github.daniele21.localllm.contracts.ConsumerGenerationHandle
 import io.github.daniele21.localllm.contracts.ConsumerGenerationInput
@@ -17,17 +13,11 @@ import io.github.daniele21.localllm.contracts.ConsumerLimits
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraint
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind
-import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
-import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
-import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
-import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
-import io.github.daniele21.localllm.contracts.UseCaseCapabilities
 import io.github.daniele21.localllm.contracts.UseCaseId
-import io.github.daniele21.localllm.contracts.UseCaseReadiness
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
@@ -44,10 +34,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class OmbraConsumerAnalysisChunkClient(
     private val client: ConsumerLocalLlmClient,
     private val lifecycleExecutor: Executor,
-    private val transportConnected: () -> Boolean = { true },
+    transportConnected: () -> Boolean = { true },
     private val useCaseId: UseCaseId = OMBRA_DOCUMENT_PII_USE_CASE,
 ) : OmbraAnalysisChunkClient {
     private val operations = ConcurrentHashMap<OmbraOperationId, ConsumerOperation>()
+    private val failureMapper = OmbraConsumerFailureMapper(transportConnected)
+    private val preparation = OmbraConsumerPreparation(client, useCaseId, failureMapper)
 
     override fun prepare(operationId: OmbraOperationId, onResult: (Result<ConsumerLimits>) -> Unit) {
         val operation = ConsumerOperation(onPrepared = onResult)
@@ -67,16 +59,13 @@ internal class OmbraConsumerAnalysisChunkClient(
             return
         }
         val generation = synchronized(operation) {
-            val sessionId = operation.sessionId
-            val limits = operation.limits
-            if (operation.cancelled || sessionId == null || limits == null || operation.activeGeneration != null) {
-                null
-            } else if (!requestFits(request, limits)) {
-                null
-            } else {
-                ActiveConsumerGeneration(requestId(operationId, request.ordinal), onResult).also {
-                    operation.activeGeneration = it
-                }
+            val limits = operation.limits ?: return@synchronized null
+            if (operation.cancelled) return@synchronized null
+            if (operation.sessionId == null) return@synchronized null
+            if (operation.activeGeneration != null) return@synchronized null
+            if (!requestFits(request, limits)) return@synchronized null
+            ActiveConsumerGeneration(requestId(operationId, request.ordinal), onResult).also {
+                operation.activeGeneration = it
             }
         }
         if (generation == null) {
@@ -97,7 +86,7 @@ internal class OmbraConsumerAnalysisChunkClient(
                     ConsumerGenerationListener { event -> handleEvent(operation, generation, event) },
                 )
             }.getOrElse {
-                finishGeneration(operation, generation, Result.failure(chunkFailure(disconnectedOrGenerationFailure())))
+                finishGeneration(operation, generation, Result.failure(chunkFailure(failureMapper.generationFailure())))
                 return
             }
 
@@ -111,7 +100,11 @@ internal class OmbraConsumerAnalysisChunkClient(
             }
 
             is ConsumerGenerationStartResult.Rejected ->
-                finishGeneration(operation, generation, Result.failure(chunkFailure(mapConsumerFailure(start.failure))))
+                finishGeneration(
+                    operation,
+                    generation,
+                    Result.failure(chunkFailure(failureMapper.mapConsumerFailure(start.failure))),
+                )
         }
     }
 
@@ -144,7 +137,7 @@ internal class OmbraConsumerAnalysisChunkClient(
     }
 
     private fun prepareOnExecutor(operationId: OmbraOperationId, operation: ConsumerOperation) {
-        val outcome = runCatching { prepareConsumerSession() }
+        val outcome = runCatching { preparation.prepare() }
         val prepared = outcome.getOrNull()
         val cancelled = synchronized(operation) {
             operation.preparing = false
@@ -163,68 +156,13 @@ internal class OmbraConsumerAnalysisChunkClient(
         }
         if (prepared == null) {
             operations.remove(operationId, operation)
-            val failure = outcome.exceptionOrNull() as? OmbraAnalysisChunkException
-                ?: chunkFailure(disconnectedOrGenerationFailure())
+            val failure =
+                outcome.exceptionOrNull() as? OmbraAnalysisChunkException
+                    ?: chunkFailure(failureMapper.generationFailure())
             operation.onPrepared(Result.failure(failure))
         } else {
             operation.onPrepared(Result.success(prepared.limits))
         }
-    }
-
-    private fun prepareConsumerSession(): PreparedConsumerOperation {
-        val capabilities = resolveCapabilities()
-        val prepared =
-            when (val result = client.prepare(ConsumerPrepareRequest(useCaseId))) {
-                is ConsumerPrepareResult.Prepared -> result.selection
-                is ConsumerPrepareResult.Rejected -> throw chunkFailure(mapConsumerFailure(result.failure))
-            }
-        if (
-            prepared.useCaseId != useCaseId ||
-            prepared.capabilityRevision != capabilities.capabilityRevision ||
-            prepared.reasoningMode != EffectiveConsumerReasoningMode.DISABLED ||
-            prepared.outputConstraint != ConsumerOutputConstraintKind.JSON_SCHEMA ||
-            prepared.sessionKind != SessionKind.STATELESS
-        ) {
-            throw chunkFailure(OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE)
-        }
-        val sessionId =
-            when (val result = client.createSession(prepared.preparedId)) {
-                is ConsumerSessionResult.Created -> result.sessionId
-                is ConsumerSessionResult.Rejected -> throw chunkFailure(mapConsumerFailure(result.failure))
-            }
-        return PreparedConsumerOperation(sessionId, capabilities.limits, capabilities.capabilityRevision)
-    }
-
-    private fun resolveCapabilities(): UseCaseCapabilities {
-        val capabilities =
-            when (val result = client.capabilities(useCaseId)) {
-                is ConsumerCapabilityResult.Available -> result.capabilities
-                is ConsumerCapabilityResult.Rejected -> throw chunkFailure(mapCapabilityFailure(result.code))
-            }
-        val readinessFailure =
-            when (capabilities.readiness) {
-                UseCaseReadiness.READY,
-                UseCaseReadiness.AVAILABLE_REQUIRES_PREPARATION,
-                -> null
-
-                UseCaseReadiness.UNAVAILABLE_MODEL -> OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE
-
-                UseCaseReadiness.UNAVAILABLE_HOST_POLICY,
-                UseCaseReadiness.INCOMPATIBLE,
-                -> OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
-            }
-        if (readinessFailure != null) throw chunkFailure(readinessFailure)
-        if (
-            capabilities.useCaseId != useCaseId ||
-            capabilities.outputConstraints != setOf(ConsumerOutputConstraintKind.JSON_SCHEMA) ||
-            capabilities.defaultOutputConstraint != ConsumerOutputConstraintKind.JSON_SCHEMA ||
-            capabilities.sessionKinds != setOf(SessionKind.STATELESS) ||
-            capabilities.defaultSessionKind != SessionKind.STATELESS ||
-            capabilities.reasoning != ConsumerReasoningCapability.NOT_SUPPORTED
-        ) {
-            throw chunkFailure(OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE)
-        }
-        return capabilities
     }
 
     private fun handleEvent(operation: ConsumerOperation, generation: ActiveConsumerGeneration, event: ConsumerGenerationEvent) {
@@ -243,7 +181,7 @@ internal class OmbraConsumerAnalysisChunkClient(
             -> Unit
 
             is ConsumerGenerationEvent.Prepared -> {
-                if (!executionMatches(event.execution, operation)) {
+                if (!executionMatches(event.execution, operation, useCaseId)) {
                     generation.handle?.cancel()
                     finishGeneration(
                         operation,
@@ -265,7 +203,9 @@ internal class OmbraConsumerAnalysisChunkClient(
             }
 
             is ConsumerGenerationEvent.Completed -> {
-                val valid = event.result.surfacedReasoning.isNullOrEmpty() && executionMatches(event.result.execution, operation)
+                val valid =
+                    event.result.surfacedReasoning.isNullOrEmpty() &&
+                        executionMatches(event.result.execution, operation, useCaseId)
                 val result =
                     if (valid) {
                         Result.success(event.result.answer)
@@ -276,7 +216,11 @@ internal class OmbraConsumerAnalysisChunkClient(
             }
 
             is ConsumerGenerationEvent.Failed ->
-                finishGeneration(operation, generation, Result.failure(chunkFailure(mapConsumerFailure(event.failure))))
+                finishGeneration(
+                    operation,
+                    generation,
+                    Result.failure(chunkFailure(failureMapper.mapConsumerFailure(event.failure))),
+                )
         }
     }
 
@@ -298,68 +242,7 @@ internal class OmbraConsumerAnalysisChunkClient(
         operation.sessionId?.let { runCatching { client.closeSession(it) } }
         takeCancellationAcknowledgement(operation)?.invoke()
     }
-
-    private fun executionMatches(execution: ConsumerExecutionIdentity, operation: ConsumerOperation): Boolean =
-        execution.useCaseId == useCaseId &&
-            execution.capabilityRevision == operation.capabilityRevision &&
-            execution.reasoningMode == EffectiveConsumerReasoningMode.DISABLED &&
-            execution.outputConstraint == ConsumerOutputConstraintKind.JSON_SCHEMA &&
-            execution.sessionKind == SessionKind.STATELESS
-
-    private fun mapCapabilityFailure(code: ConsumerCapabilityErrorCode): OmbraAnalysisChunkFailureCode = when (code) {
-        ConsumerCapabilityErrorCode.MODEL_UNAVAILABLE -> OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE
-
-        ConsumerCapabilityErrorCode.CAPABILITY_INCOMPATIBLE -> disconnectedOrCapabilityFailure()
-
-        ConsumerCapabilityErrorCode.USE_CASE_NOT_ALLOWED,
-        ConsumerCapabilityErrorCode.STALE_CAPABILITY,
-        ConsumerCapabilityErrorCode.PRESET_NOT_ALLOWED,
-        ConsumerCapabilityErrorCode.REASONING_NOT_ALLOWED,
-        ConsumerCapabilityErrorCode.REASONING_REQUIRED,
-        ConsumerCapabilityErrorCode.OUTPUT_NOT_ALLOWED,
-        ConsumerCapabilityErrorCode.SESSION_KIND_NOT_ALLOWED,
-        -> OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
-    }
-
-    private fun mapConsumerFailure(failure: ConsumerFailure): OmbraAnalysisChunkFailureCode = when (failure.code) {
-        ConsumerErrorCode.MODEL_UNAVAILABLE -> OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE
-
-        ConsumerErrorCode.CANCELLED -> OmbraAnalysisChunkFailureCode.CANCELLED
-
-        ConsumerErrorCode.RUNTIME_FAILURE,
-        ConsumerErrorCode.PREPARE_FAILED,
-        ConsumerErrorCode.SESSION_NOT_FOUND,
-        -> disconnectedOrGenerationFailure()
-
-        ConsumerErrorCode.CAPABILITY_INCOMPATIBLE -> disconnectedOrCapabilityFailure()
-
-        ConsumerErrorCode.USE_CASE_NOT_ALLOWED,
-        ConsumerErrorCode.STALE_CAPABILITY,
-        ConsumerErrorCode.PRESET_NOT_ALLOWED,
-        ConsumerErrorCode.REASONING_NOT_ALLOWED,
-        ConsumerErrorCode.REASONING_REQUIRED,
-        ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
-        ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
-        ConsumerErrorCode.INVALID_INPUT,
-        ConsumerErrorCode.PREPARED_SELECTION_STALE,
-        ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
-        -> OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
-    }
-
-    private fun disconnectedOrCapabilityFailure(): OmbraAnalysisChunkFailureCode = if (transportConnected()) {
-        OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
-    } else {
-        OmbraAnalysisChunkFailureCode.DISCONNECTED
-    }
-
-    private fun disconnectedOrGenerationFailure(): OmbraAnalysisChunkFailureCode = if (transportConnected()) {
-        OmbraAnalysisChunkFailureCode.GENERATION_FAILED
-    } else {
-        OmbraAnalysisChunkFailureCode.DISCONNECTED
-    }
 }
-
-private data class PreparedConsumerOperation(val sessionId: SessionId, val limits: ConsumerLimits, val capabilityRevision: String)
 
 private data class CancelState(val active: ActiveConsumerGeneration?, val preparing: Boolean)
 
@@ -378,6 +261,19 @@ private class ActiveConsumerGeneration(val requestId: RequestId, val onResult: (
     var handle: ConsumerGenerationHandle? = null
 }
 
+private fun executionMatches(
+    execution: ConsumerExecutionIdentity,
+    operation: ConsumerOperation,
+    useCaseId: UseCaseId,
+): Boolean =
+    listOf(
+        execution.useCaseId == useCaseId,
+        execution.capabilityRevision == operation.capabilityRevision,
+        execution.reasoningMode == EffectiveConsumerReasoningMode.DISABLED,
+        execution.outputConstraint == ConsumerOutputConstraintKind.JSON_SCHEMA,
+        execution.sessionKind == SessionKind.STATELESS,
+    ).all { it }
+
 private fun requestFits(request: OmbraStructuredChunkRequest, limits: ConsumerLimits): Boolean =
     composeInput(request).length <= limits.maxInputCharacters && request.outputJsonSchema.length <= limits.maxJsonSchemaCharacters
 
@@ -385,7 +281,7 @@ private fun composeInput(request: OmbraStructuredChunkRequest): String = request
 
 private fun requestId(operationId: OmbraOperationId, chunkOrdinal: Int): RequestId = RequestId("ombra-${operationId.value}-$chunkOrdinal")
 
-private fun chunkFailure(code: OmbraAnalysisChunkFailureCode): OmbraAnalysisChunkException = OmbraAnalysisChunkException(code)
+internal fun chunkFailure(code: OmbraAnalysisChunkFailureCode): OmbraAnalysisChunkException = OmbraAnalysisChunkException(code)
 
 private fun takeCancellationAcknowledgement(operation: ConsumerOperation): (() -> Unit)? = synchronized(operation) {
     operation.cancelAcknowledgement.also { operation.cancelAcknowledgement = null }
