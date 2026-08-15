@@ -73,6 +73,8 @@ resolve the same sample IDs and comparison identity.
 
 `EvaluationIdentityGoldenTest` now freezes v1 golden values for ordered sample-set digest, evaluator-set digest, case-execution semantics digest, semantic-execution fingerprint and full run fingerprint. It also proves parameter-map construction order does not alter evaluator-set identity and equivalent clean run construction yields the same run identity.
 
+`EvaluatorV1Corpus` freezes 24 reusable scorer fixtures: one golden, ambiguous, malformed and edge output shape for each of the six v1 evaluator families. Output shape is fixture metadata rather than a universal outcome mapping, so each scorer retains the behavior frozen in [`../evaluator-semantics-v1.md`](../evaluator-semantics-v1.md).
+
 Model generation may still vary only where the selected execution profile explicitly allows stochasticity; v1 default General Purpose execution should avoid this by using deterministic/fixed settings.
 
 ## Privacy evidence
@@ -136,13 +138,13 @@ For performance evidence intended to choose defaults, run enough repetitions to 
 | --- | --- | --- | --- |
 | EVAL-V-01 | DONE | EVAL-C-08 | Add identity/hash golden fixtures and cross-run deterministic serialization tests. |
 | EVAL-V-02 | PLANNED | EVAL-D-09 | Add dataset parser limits, malformed-input and atomic-install/rollback tests. |
-| EVAL-V-03 | READY | EVAL-E-09 | Add evaluator golden corpus including ambiguous, malformed and edge outputs. |
+| EVAL-V-03 | DONE | EVAL-E-09 | Add evaluator golden corpus including ambiguous, malformed and edge outputs. |
 | EVAL-V-04 | PLANNED | EVAL-R-12 | Add runner lifecycle matrix using fake runtime/telemetry failure injection. |
 | EVAL-V-05 | PLANNED | EVAL-P-10 | Add persistence/restart/retention/comparison compatibility matrix. |
 | EVAL-V-06 | PLANNED | EVAL-U-25,EVAL-U-33,EVAL-U-44 | Add connected UI state tests for run, import, history, comparison and failure surfaces. |
 | EVAL-V-07 | PLANNED | EVAL-D-05,EVAL-P-07 | Add privacy sentinel tests across telemetry, logs, evaluation persistence and default diagnostics export. |
 
-EVAL-V-01 is satisfied by `EvaluationIdentityGoldenTest`. EVAL-V-03 can now extend the scorer-local E-09 golden/adversarial tests into a reusable evaluator corpus without blocking other feature lanes.
+EVAL-V-01 is satisfied by `EvaluationIdentityGoldenTest`. EVAL-V-03 is satisfied by `EvaluatorV1Corpus` and its deterministic coverage, outcome, score and registry tests. Invalid evaluator specs remain separate fail-closed tests rather than output fixtures.
 
 ## Task ledger — Android integration
 
@@ -170,7 +172,7 @@ EVAL-V-01 is satisfied by `EvaluationIdentityGoldenTest`. EVAL-V-03 can now exte
 
 ## Parallel execution guidance
 
-- EVAL-V-03 is ready independently of dataset/runner work.
+- EVAL-V-03 is complete independently of dataset/runner work.
 - EVAL-V-02 unlocks after dataset fixture/install completion.
 - EVAL-V-05 can proceed independently of Android instrumentation once persistence is complete.
 - EVAL-V-10 and UI deterministic validation may proceed in parallel.
