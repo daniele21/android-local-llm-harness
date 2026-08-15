@@ -41,11 +41,15 @@ jobs:
         run: chmod +x gradlew
       - name: Repository quality gate
         run: ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
-      - name: Comparison compile and tests
-        run: ./gradlew --no-configuration-cache :evaluation:comparison:compileDebugKotlin :evaluation:comparison:testDebugUnitTest
+      - name: Comparison compile
+        run: ./gradlew --no-configuration-cache :evaluation:comparison:compileDebugKotlin
+      - name: Comparison tests
+        run: ./gradlew --no-configuration-cache :evaluation:comparison:testDebugUnitTest
       - name: Comparison lint
         run: ./gradlew --no-configuration-cache :evaluation:comparison:lintDebug
-      - name: Room schema compile and tests
-        run: ./gradlew --no-configuration-cache :evaluation:room-store:compileDebugKotlin :evaluation:room-store:testDebugUnitTest
+      - name: Room schema compile
+        run: ./gradlew --no-configuration-cache :evaluation:room-store:compileDebugKotlin
+      - name: Room schema tests
+        run: ./gradlew --no-configuration-cache :evaluation:room-store:testDebugUnitTest
       - name: Room schema lint
         run: ./gradlew --no-configuration-cache :evaluation:room-store:lintDebug
