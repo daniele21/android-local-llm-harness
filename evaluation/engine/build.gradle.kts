@@ -28,6 +28,7 @@ dependencies {
     api(project(":evaluation:contracts"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
+    implementation(project(":observability:contracts"))
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit4)
