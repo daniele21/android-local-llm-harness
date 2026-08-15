@@ -28,9 +28,8 @@ fun OmbraTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable 
     }
 }
 
-fun ombraColorScheme(darkTheme: Boolean): ColorScheme =
-    if (darkTheme) {
-        OmbraDarkColorScheme
-    } else {
-        OmbraLightColorScheme
-    }
+fun ombraColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) {
+    OmbraDarkColorScheme
+} else {
+    OmbraLightColorScheme
+}
