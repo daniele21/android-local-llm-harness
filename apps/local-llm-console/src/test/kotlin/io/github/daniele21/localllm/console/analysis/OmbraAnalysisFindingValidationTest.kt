@@ -106,10 +106,10 @@ class OmbraAnalysisFindingValidationTest {
         val second =
             OmbraChunkFindingValidation(
                 findings =
-                    listOf(
-                        ValidatedFinding(email.id, "Alice", listOf(exact)),
-                        ValidatedFinding(name.id, "Alice X", listOf(overlap)),
-                    ),
+                listOf(
+                    ValidatedFinding(email.id, "Alice", listOf(exact)),
+                    ValidatedFinding(name.id, "Alice X", listOf(overlap)),
+                ),
                 invalidFindingCount = 1,
                 issueCounts = mapOf(OmbraFindingValidationIssue.SOURCE_SURFACE_NOT_FOUND to 1),
             )
@@ -123,13 +123,12 @@ class OmbraAnalysisFindingValidationTest {
         assertFalse(merged.isComplete)
     }
 
-    private fun definition(id: String): PiiDefinition =
-        PiiDefinition(
-            id = PiiTypeId.parse(id),
-            label = id,
-            definition = "Synthetic test definition",
-            source = PiiDefinitionSource.BUILT_IN,
-        )
+    private fun definition(id: String): PiiDefinition = PiiDefinition(
+        id = PiiTypeId.parse(id),
+        label = id,
+        definition = "Synthetic test definition",
+        source = PiiDefinitionSource.BUILT_IN,
+    )
 
     private fun segment(text: String, blockIndex: Int = 0): DocumentSegment = DocumentSegment(
         id = SegmentId.fromIndices(0, blockIndex),
@@ -138,10 +137,9 @@ class OmbraAnalysisFindingValidationTest {
         normalizedText = text,
     )
 
-    private fun chunk(segmentId: String, text: String, ordinal: Int = 0): OmbraAnalysisChunk =
-        OmbraAnalysisChunk(
-            ordinal = ordinal,
-            segments = listOf(OmbraAnalysisSegmentData(segmentId, text)),
-            dataPayload = "{}",
-        )
+    private fun chunk(segmentId: String, text: String, ordinal: Int = 0): OmbraAnalysisChunk = OmbraAnalysisChunk(
+        ordinal = ordinal,
+        segments = listOf(OmbraAnalysisSegmentData(segmentId, text)),
+        dataPayload = "{}",
+    )
 }
