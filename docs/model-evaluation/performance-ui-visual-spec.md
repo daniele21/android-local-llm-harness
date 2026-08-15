@@ -1,7 +1,7 @@
 # Performance UI visual and interaction specification
 
 Status: active
-Document type: UX-implementation-specification
+Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.performance-ui.visual
 Read when: implementing or reviewing Performance Compose surfaces
