@@ -52,7 +52,7 @@ class OmbraReviewScreenInstrumentedTest {
             useUnmergedTree = true,
         ).assertCountEquals(0)
         composeRule.onNodeWithText("Contatta [EMAIL_1]", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Mostra valore").assertIsDisplayed()
+        composeRule.onNodeWithText("Mostra valore").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Esporta PDF").assertIsNotEnabled()
     }
 
@@ -69,7 +69,7 @@ class OmbraReviewScreenInstrumentedTest {
             hasContentDescription(surface, substring = true),
             useUnmergedTree = true,
         ).assertCountEquals(1)
-        composeRule.onNodeWithText("Nascondi valore").assertIsDisplayed()
+        composeRule.onNodeWithText("Nascondi valore").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Esporta PDF").assertIsEnabled()
     }
 
@@ -87,7 +87,7 @@ class OmbraReviewScreenInstrumentedTest {
 
         setReviewContent(OmbraReviewUiState.Ready(presentation, selectedIndex = 0))
 
-        composeRule.onNodeWithText("Conflitti da risolvere").assertIsDisplayed()
+        composeRule.onNodeWithText("Conflitti da risolvere").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Esporta PDF").assertIsNotEnabled()
     }
 
@@ -99,8 +99,8 @@ class OmbraReviewScreenInstrumentedTest {
 
         setReviewContent(OmbraReviewUiState.Empty(presentation))
 
-        composeRule.onNodeWithText("Nessun dato sensibile rilevato").assertIsDisplayed()
-        composeRule.onNodeWithText("Esporta PDF").assertIsEnabled()
+        composeRule.onNodeWithText("Nessun dato sensibile rilevato").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Esporta PDF").performScrollTo().assertIsDisplayed().assertIsEnabled()
     }
 
     @Test
@@ -127,6 +127,7 @@ class OmbraReviewScreenInstrumentedTest {
                 }
             }
         }
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Esporta PDF").performScrollTo().assertIsDisplayed().assertIsEnabled()
     }
@@ -151,8 +152,9 @@ class OmbraReviewScreenInstrumentedTest {
                 )
             }
         }
+        composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Nuovo PDF").performClick()
+        composeRule.onNodeWithText("Nuovo PDF").performScrollTo().performClick()
         composeRule.runOnIdle { assertEquals(1, resetCalls) }
     }
 
@@ -168,6 +170,7 @@ class OmbraReviewScreenInstrumentedTest {
                 )
             }
         }
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Annulla").assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(1, cancelCalls) }
@@ -188,6 +191,7 @@ class OmbraReviewScreenInstrumentedTest {
                 )
             }
         }
+        composeRule.waitForIdle()
     }
 
     private fun singleEmailFixture(surface: String, decision: ReviewDecisionState): ReviewFixture {
