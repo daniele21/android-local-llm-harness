@@ -12,12 +12,11 @@ import io.github.daniele21.localllm.console.application.OmbraDocumentSourceRef
  * reference and never enters workflow state.
  */
 internal class OmbraPdfOpenDocumentCapability(private val sourceRegistry: OmbraDocumentSourceRegistry) {
-    fun createIntent(): Intent =
-        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = OmbraDocumentSourceRegistry.PDF_MIME_TYPE
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+    fun createIntent(): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = OmbraDocumentSourceRegistry.PDF_MIME_TYPE
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
 
     fun registerResult(uri: Uri?): OmbraDocumentSourceRef? {
         if (uri == null) return null
