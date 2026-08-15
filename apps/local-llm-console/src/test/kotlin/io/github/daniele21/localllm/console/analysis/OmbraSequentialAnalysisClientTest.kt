@@ -197,13 +197,12 @@ class OmbraSequentialAnalysisClientTest {
             planner = OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = 0)),
         )
 
-    private fun segment(text: String): DocumentSegment =
-        DocumentSegment(
-            id = SegmentId.fromIndices(0, 0),
-            pageIndex = 0,
-            blockIndex = 0,
-            normalizedText = text,
-        )
+    private fun segment(text: String): DocumentSegment = DocumentSegment(
+        id = SegmentId.fromIndices(0, 0),
+        pageIndex = 0,
+        blockIndex = 0,
+        normalizedText = text,
+    )
 
     private fun generousLimits(): ConsumerLimits = ConsumerLimits(20_000, 1, 20_000)
 
@@ -233,11 +232,7 @@ class OmbraSequentialAnalysisClientTest {
             onResult(Result.success(limits))
         }
 
-        override fun generate(
-            operationId: OmbraOperationId,
-            request: OmbraStructuredChunkRequest,
-            onResult: (Result<String>) -> Unit,
-        ) {
+        override fun generate(operationId: OmbraOperationId, request: OmbraStructuredChunkRequest, onResult: (Result<String>) -> Unit) {
             generatedOrdinals += request.ordinal
             generateBehavior(request, onResult)
         }
