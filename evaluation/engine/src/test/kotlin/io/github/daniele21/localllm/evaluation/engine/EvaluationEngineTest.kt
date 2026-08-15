@@ -15,6 +15,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationExecutionProfileRef
 import io.github.daniele21.localllm.evaluation.EvaluationModelIdentity
 import io.github.daniele21.localllm.evaluation.EvaluationModelLoadPolicy
 import io.github.daniele21.localllm.evaluation.EvaluationOutcome
+import io.github.daniele21.localllm.evaluation.EvaluationProgress
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
@@ -27,6 +28,9 @@ import io.github.daniele21.localllm.evaluation.NormalizedScore
 import io.github.daniele21.localllm.evaluation.SamplingPolicyId
 import io.github.daniele21.localllm.evaluation.SamplingPolicyRef
 import io.github.daniele21.localllm.evaluation.SamplingSelection
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -153,8 +157,58 @@ class EvaluationEngineTest {
 
         assertTrue(terminal is EvaluationEngineTerminal.Cancelled)
         assertEquals(listOf("case-a"), executed.map { it.value })
+        assertTrue(terminal.results.isEmpty())
         assertNull(engine.activeRun())
         assertFalse(engine.cancel(config.runId))
+    }
+
+    @Test
+    fun `active case cancellation interrupts execution and preserves attempted versus completed progress`() = runBlocking {
+        val enteredCase = CompletableDeferred<Unit>()
+        var activeCaseWasCancelled = false
+        val progress = mutableListOf<EvaluationProgress>()
+        val config = config(caseIds = listOf("case-a", "case-b", "case-c"))
+        val engine = EvaluationEngine(
+            preflight = successPreflight(),
+            modelPreparation = successPreparation(),
+            caseExecution = object : EvaluationCaseExecutionPort {
+                override suspend fun execute(
+                    config: EvaluationRunConfig,
+                    caseId: EvaluationCaseId,
+                ): EvaluationStepResult<EvaluationCaseResult> {
+                    check(caseId.value == "case-a") { "Cancellation must stop before later cases execute" }
+                    enteredCase.complete(Unit)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        activeCaseWasCancelled = true
+                    }
+                }
+            },
+        )
+
+        val running = async {
+            engine.run(
+                config,
+                object : EvaluationEngineObserver {
+                    override suspend fun onProgress(runId: EvaluationRunId, progressValue: EvaluationProgress) {
+                        progress += progressValue
+                    }
+                },
+            )
+        }
+        enteredCase.await()
+        assertTrue(engine.cancel(config.runId))
+        val terminal = running.await()
+
+        assertTrue(terminal is EvaluationEngineTerminal.Cancelled)
+        assertTrue(activeCaseWasCancelled)
+        assertTrue(terminal.results.isEmpty())
+        assertEquals(1, progress.last().attemptedCases)
+        assertEquals(0, progress.last().completedCases)
+        assertNull(progress.last().currentCaseId)
+        assertEquals(3, progress.last().totalCases)
+        assertNull(engine.activeRun())
     }
 
     private fun successPreflight() = object : EvaluationPreflightPort {
