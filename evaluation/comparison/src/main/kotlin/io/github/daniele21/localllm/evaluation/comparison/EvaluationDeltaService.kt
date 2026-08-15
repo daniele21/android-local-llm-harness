@@ -77,17 +77,11 @@ private fun qualityDeltas(
     right: PersistedEvaluationRun,
     assessment: EvaluationComparisonAssessment.Available,
 ): EvaluationDeltaFamily<EvaluationQualityDeltas> {
-    if (!assessment.compatibility.quality.compatible) {
-        return EvaluationDeltaFamily.Unavailable(EvaluationDeltaUnavailableReason.QUALITY_INCOMPATIBLE)
-    }
-    val leftQuality = left.summary.quality
-        ?: return EvaluationDeltaFamily.Unavailable(EvaluationDeltaUnavailableReason.QUALITY_SUMMARY_MISSING)
-    val rightQuality = right.summary.quality
-        ?: return EvaluationDeltaFamily.Unavailable(EvaluationDeltaUnavailableReason.QUALITY_SUMMARY_MISSING)
-    if (!leftQuality.sameShapeAs(rightQuality)) {
-        return EvaluationDeltaFamily.Unavailable(EvaluationDeltaUnavailableReason.QUALITY_SHAPE_MISMATCH)
-    }
+    val unavailableReason = qualityUnavailableReason(left, right, assessment)
+    if (unavailableReason != null) return EvaluationDeltaFamily.Unavailable(unavailableReason)
 
+    val leftQuality = checkNotNull(left.summary.quality)
+    val rightQuality = checkNotNull(right.summary.quality)
     val rightByCategory = rightQuality.categoryScores.associateBy { it.categoryId }
     val categoryDeltas = leftQuality.categoryScores.map { leftCategory ->
         val rightCategory = checkNotNull(rightByCategory[leftCategory.categoryId])
@@ -102,6 +96,17 @@ private fun qualityDeltas(
             categories = categoryDeltas,
         ),
     )
+}
+
+private fun qualityUnavailableReason(
+    left: PersistedEvaluationRun,
+    right: PersistedEvaluationRun,
+    assessment: EvaluationComparisonAssessment.Available,
+): EvaluationDeltaUnavailableReason? = when {
+    !assessment.compatibility.quality.compatible -> EvaluationDeltaUnavailableReason.QUALITY_INCOMPATIBLE
+    left.summary.quality == null || right.summary.quality == null -> EvaluationDeltaUnavailableReason.QUALITY_SUMMARY_MISSING
+    !left.summary.quality.sameShapeAs(right.summary.quality) -> EvaluationDeltaUnavailableReason.QUALITY_SHAPE_MISMATCH
+    else -> null
 }
 
 private fun EvaluationQualitySummary.sameShapeAs(other: EvaluationQualitySummary): Boolean {
