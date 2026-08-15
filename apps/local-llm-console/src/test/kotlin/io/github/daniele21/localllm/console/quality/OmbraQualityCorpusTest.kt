@@ -11,7 +11,7 @@ class OmbraQualityCorpusTest {
         val corpus = OmbraSyntheticQualityCorpus.load()
 
         assertEquals(1, corpus.identity.schemaVersion)
-        assertEquals("ombra-pii-synthetic-v1", corpus.identity.corpusVersion)
+        assertEquals("ombra-pii-synthetic-v2", corpus.identity.corpusVersion)
         assertEquals(OmbraSyntheticQualityCorpus.EXPECTED_SHA256, corpus.identity.sha256)
         assertEquals(OmbraBuiltInPiiDefinitions.VERSION, corpus.builtInDefinitionSetVersion)
     }
@@ -43,6 +43,24 @@ class OmbraQualityCorpusTest {
                 QualityCaseTag.NEAR_MISS in case.tags && case.expectedOccurrences.isEmpty() && case.selectedTypeIds.containsAll(builtInIds)
             },
         )
+    }
+
+    @Test
+    fun `every scored category has at least five positive exact occurrences`() {
+        val corpus = OmbraSyntheticQualityCorpus.load()
+        val requiredTypeIds =
+            OmbraBuiltInPiiDefinitions.all.mapTo(linkedSetOf()) { it.id.value } + corpus.customTypeIds
+        val positiveCountByType = corpus.cases
+            .flatMap(QualityCase::expectedOccurrences)
+            .groupingBy(QualityOccurrence::typeId)
+            .eachCount()
+
+        requiredTypeIds.forEach { typeId ->
+            assertTrue(
+                "Expected at least five positive occurrences for $typeId",
+                positiveCountByType.getOrDefault(typeId, 0) >= 5,
+            )
+        }
     }
 
     @Test
