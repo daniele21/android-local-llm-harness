@@ -100,21 +100,19 @@ data class OmbraStatusColors(
     val errorContainer: Color,
     val errorContent: Color,
 ) {
-    fun container(tone: OmbraStatusTone): Color =
-        when (tone) {
-            OmbraStatusTone.NEUTRAL -> neutralContainer
-            OmbraStatusTone.LOCAL_READY -> localReadyContainer
-            OmbraStatusTone.REVIEW -> reviewContainer
-            OmbraStatusTone.ERROR -> errorContainer
-        }
+    fun container(tone: OmbraStatusTone): Color = when (tone) {
+        OmbraStatusTone.NEUTRAL -> neutralContainer
+        OmbraStatusTone.LOCAL_READY -> localReadyContainer
+        OmbraStatusTone.REVIEW -> reviewContainer
+        OmbraStatusTone.ERROR -> errorContainer
+    }
 
-    fun content(tone: OmbraStatusTone): Color =
-        when (tone) {
-            OmbraStatusTone.NEUTRAL -> neutralContent
-            OmbraStatusTone.LOCAL_READY -> localReadyContent
-            OmbraStatusTone.REVIEW -> reviewContent
-            OmbraStatusTone.ERROR -> errorContent
-        }
+    fun content(tone: OmbraStatusTone): Color = when (tone) {
+        OmbraStatusTone.NEUTRAL -> neutralContent
+        OmbraStatusTone.LOCAL_READY -> localReadyContent
+        OmbraStatusTone.REVIEW -> reviewContent
+        OmbraStatusTone.ERROR -> errorContent
+    }
 }
 
 internal val OmbraLightStatusColors =
