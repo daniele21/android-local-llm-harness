@@ -112,20 +112,14 @@ class DatasetRegistryTest {
         }
     }
 
-    private fun identity(pack: InstalledEvaluationDatasetPack): String =
-        "${pack.manifest.datasetId.value}@${pack.manifest.version.value}"
+    private fun identity(pack: InstalledEvaluationDatasetPack): String = "${pack.manifest.datasetId.value}@${pack.manifest.version.value}"
 
     private data class RegistryFixture(
         val root: File,
         val installer: EvaluationDatasetInstaller,
         val registry: EvaluationDatasetRegistry,
     ) {
-        fun install(
-            datasetId: String,
-            version: String,
-            origin: EvaluationDatasetOrigin,
-            category: String,
-        ): File {
+        fun install(datasetId: String, version: String, origin: EvaluationDatasetOrigin, category: String): File {
             val cases = listOf(datasetCase("$datasetId-$version", category))
             val manifest = EvaluationDatasetManifestV1(
                 datasetId = EvaluationDatasetId(datasetId),
