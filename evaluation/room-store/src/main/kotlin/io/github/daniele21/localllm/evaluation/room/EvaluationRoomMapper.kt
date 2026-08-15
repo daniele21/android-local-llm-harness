@@ -32,8 +32,8 @@ import io.github.daniele21.localllm.evaluation.EvaluationReliabilitySummary
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
 import io.github.daniele21.localllm.evaluation.EvaluationRunIdentity
-import io.github.daniele21.localllm.evaluation.EvaluationRunSummary
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
+import io.github.daniele21.localllm.evaluation.EvaluationRunSummary
 import io.github.daniele21.localllm.evaluation.EvaluationRuntimeEnvironmentIdentity
 import io.github.daniele21.localllm.evaluation.EvaluationSemanticExecution
 import io.github.daniele21.localllm.evaluation.EvaluationSemanticExecutionIdentity
@@ -82,29 +82,28 @@ internal object EvaluationRoomMapper {
             )
         }
 
-    fun caseResultEntity(runId: EvaluationRunId, result: EvaluationCaseResult): EvaluationCaseResultEntity =
-        EvaluationCaseResultEntity(
-            runId = runId.value,
-            caseId = result.caseId.value,
-            categoryId = result.categoryId.value,
-            evaluatorType = result.evaluator.type.name,
-            evaluatorVersion = result.evaluator.version.value,
-            status = result.status.name,
-            outcomeScore = result.outcome?.score?.value,
-            outcomeCode = result.outcome?.code?.name,
-            requestId = result.requestId?.value,
-            timeToFirstTokenMs = result.metrics.timeToFirstTokenMs,
-            totalMs = result.metrics.totalMs,
-            prefillMs = result.metrics.prefillMs,
-            decodeMs = result.metrics.decodeMs,
-            inputTokens = result.metrics.inputTokens,
-            outputTokens = result.metrics.outputTokens,
-            decodeTokensPerSecond = result.metrics.decodeTokensPerSecond,
-            processPssBytes = result.metrics.processPssBytes,
-            availableMemoryBytes = result.metrics.availableMemoryBytes,
-            thermalStatus = result.metrics.thermalStatus,
-            failure = result.failure?.let(::failureEntity),
-        )
+    fun caseResultEntity(runId: EvaluationRunId, result: EvaluationCaseResult): EvaluationCaseResultEntity = EvaluationCaseResultEntity(
+        runId = runId.value,
+        caseId = result.caseId.value,
+        categoryId = result.categoryId.value,
+        evaluatorType = result.evaluator.type.name,
+        evaluatorVersion = result.evaluator.version.value,
+        status = result.status.name,
+        outcomeScore = result.outcome?.score?.value,
+        outcomeCode = result.outcome?.code?.name,
+        requestId = result.requestId?.value,
+        timeToFirstTokenMs = result.metrics.timeToFirstTokenMs,
+        totalMs = result.metrics.totalMs,
+        prefillMs = result.metrics.prefillMs,
+        decodeMs = result.metrics.decodeMs,
+        inputTokens = result.metrics.inputTokens,
+        outputTokens = result.metrics.outputTokens,
+        decodeTokensPerSecond = result.metrics.decodeTokensPerSecond,
+        processPssBytes = result.metrics.processPssBytes,
+        availableMemoryBytes = result.metrics.availableMemoryBytes,
+        thermalStatus = result.metrics.thermalStatus,
+        failure = result.failure?.let(::failureEntity),
+    )
 
     fun evaluatorParameterEntities(runId: EvaluationRunId, result: EvaluationCaseResult): List<EvaluationEvaluatorParameterEntity> =
         result.evaluator.parameters.toSortedMap().map { (key, value) ->
