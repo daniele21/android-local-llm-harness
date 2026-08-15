@@ -66,20 +66,13 @@ internal object PerformanceUiReducer {
         )
     }
 
-    fun applyDatasetState(
-        current: PerformanceState,
-        datasets: PerformanceDatasetState,
-    ): PerformanceState = current.copy(datasets = datasets)
+    fun applyDatasetState(current: PerformanceState, datasets: PerformanceDatasetState): PerformanceState =
+        current.copy(datasets = datasets)
 
-    fun applyHistoryState(
-        current: PerformanceState,
-        history: PerformanceHistoryState,
-    ): PerformanceState = current.copy(history = history)
+    fun applyHistoryState(current: PerformanceState, history: PerformanceHistoryState): PerformanceState = current.copy(history = history)
 
-    fun applyActiveRun(
-        current: PerformanceState,
-        activeRun: PerformanceActiveRunState?,
-    ): PerformanceState = current.copy(activeRun = activeRun)
+    fun applyActiveRun(current: PerformanceState, activeRun: PerformanceActiveRunState?): PerformanceState =
+        current.copy(activeRun = activeRun)
 
     private fun updateSetup(
         current: PerformanceState,
@@ -104,10 +97,7 @@ internal object PerformanceUiReducer {
         }
     }
 
-    private fun blockedStart(
-        current: PerformanceState,
-        reasons: List<PerformanceBlockReason>,
-    ): PerformanceReduction {
+    private fun blockedStart(current: PerformanceState, reasons: List<PerformanceBlockReason>): PerformanceReduction {
         val modelMissing = current.runSetup.model == null || PerformanceBlockReason.MODEL_REQUIRED in reasons
         return if (modelMissing) {
             reduction(current, effects = listOf(PerformanceEffect.NavigateToModels))
@@ -167,15 +157,10 @@ private fun performanceSampleAvailable(selection: PerformanceSampleSelection, ca
     if (caseCount == null) return true
     val requested = when (selection) {
         PerformanceSampleSelection.Smoke -> 20
-
         PerformanceSampleSelection.Quick -> 50
-
         PerformanceSampleSelection.Standard -> 100
-
         PerformanceSampleSelection.Extended -> 200
-
         PerformanceSampleSelection.All -> return true
-
         is PerformanceSampleSelection.Custom -> selection.count
     }
     return requested <= caseCount
