@@ -100,7 +100,7 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 | EVAL-D-03 | DONE | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
 | EVAL-D-04 | DONE | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
 | EVAL-D-05 | DONE | EVAL-D-02,EVAL-D-03,EVAL-D-04 | Implement staged app-private installation with atomic publication and rollback cleanup. |
-| EVAL-D-06 | IN PROGRESS | EVAL-D-05 | Implement dataset registry/discovery for built-in and user-imported installed packs. |
+| EVAL-D-06 | DONE | EVAL-D-05 | Implement dataset registry/discovery for built-in and user-imported installed packs. |
 | EVAL-D-07 | DONE | EVAL-C-04,EVAL-D-03 | Implement deterministic stratified sampling with stable tie-breaking and versioned policy. |
 | EVAL-D-08 | DONE | EVAL-D-07 | Implement 20/50/100/200 preset resolution, `All`, and bounded custom multiple-of-10 counts. |
 | EVAL-D-09 | DONE | EVAL-D-05,EVAL-D-08 | Add fixture packs and tests for malformed records, duplicate IDs, digest mismatch, rollback and deterministic sampling. |
@@ -137,14 +137,14 @@ EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-The parser, validator, canonical digest, atomic installer, deterministic sampling, preset resolution and reusable regression fixtures are integrated. EVAL-D-06 registry integration and EVAL-D-10 Android document import can proceed independently before converging at protected deletion in EVAL-D-11.
+The parser, validator, canonical digest, atomic installer, registry, deterministic sampling, preset resolution and reusable regression fixtures are integrated. EVAL-D-10 Android document import is the next dataset slice before protected deletion in EVAL-D-11.
 
 Public-source inventory EVAL-GP-01 is complete. EVAL-GP-02 license/attribution review can now proceed independently of Harness-owned authoring:
 
 - EVAL-GP-05 structured-output cases;
 - EVAL-GP-06 context-retrieval cases.
 
-GP-02/GP-03 remain independent of Harness-owned case authoring. D-06 and D-10 converge at D-11; D-12 closes the generic dataset documentation after deletion and import behavior are fixed.
+GP-02/GP-03 remain independent of Harness-owned case authoring. D-10 joins D-06 at D-11 protected deletion; D-12 closes the generic dataset documentation after D-09 and D-11.
 
 General Purpose v1 assembly is intentionally late: source/legal review, evaluator semantics and deterministic sampling must be stable before the 200-case digest is frozen.
 
