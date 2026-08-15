@@ -21,6 +21,7 @@ include(
     ":core:runtime-core",
     ":evaluation:contracts",
     ":evaluation:comparison",
+    ":evaluation:dataset-adapter",
     ":evaluation:datasets",
     ":evaluation:evaluators",
     ":evaluation:engine",
