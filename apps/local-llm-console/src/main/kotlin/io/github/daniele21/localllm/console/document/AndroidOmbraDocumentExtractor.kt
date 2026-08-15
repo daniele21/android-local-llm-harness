@@ -89,14 +89,13 @@ internal class AndroidOmbraDocumentExtractor(
 
     private suspend fun extract(source: OmbraDocumentSource): OmbraExtractedDocument = buildDocument(source, readPdf(source))
 
-    private suspend fun readPdf(source: OmbraDocumentSource): OmbraPdfReadResult =
-        try {
-            reader.read(source.uri)
-        } catch (exception: IOException) {
-            throw mapReaderFailure(exception)
-        } catch (_: SecurityException) {
-            throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
-        }
+    private suspend fun readPdf(source: OmbraDocumentSource): OmbraPdfReadResult = try {
+        reader.read(source.uri)
+    } catch (exception: IOException) {
+        throw mapReaderFailure(exception)
+    } catch (_: SecurityException) {
+        throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
+    }
 
     private fun buildDocument(source: OmbraDocumentSource, parsed: OmbraPdfReadResult): OmbraExtractedDocument {
         val documentFailure =
