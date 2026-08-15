@@ -15,7 +15,7 @@ This is the operational status ledger for model evaluation. Repository-level int
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, dataset-schema, persistence, compatibility, hashing and failure contracts with deterministic tests. |
-| EVAL-2 Dataset system | IN PROGRESS | D-01 manifest/canonical JSONL schema is frozen; D-02/D-03/D-04 are in active parser/validator/digest convergence before D-05/D-07 replay. |
+| EVAL-2 Dataset system | IN PROGRESS | D-01 through D-08 are integrated; D-09 regression fixtures and D-10 Android import are ready independently before protected deletion/documentation. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
 | EVAL-4 Evaluation runner | IN PROGRESS | R-01 lifecycle, R-02 controlled selected-model resolution and R-03 production preflight are integrated; R-04 model preparation and R-05 isolated per-case context are ready independently. |
 | EVAL-5 Persistence and comparison | IN PROGRESS | P-01 contracts, P-02 bounded in-memory parity and P-06 lifecycle persistence are integrated; P-03 Room design and P-08 comparison remain active. |
@@ -64,7 +64,8 @@ V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digest
 
 The following work can proceed concurrently unless it touches the same module-registration files:
 
-- `EVAL-D-02` / `EVAL-D-03` / `EVAL-D-04` — parser, full-pack validation and canonical digest convergence;
+- `EVAL-D-09` — reusable malformed/digest/rollback/sampling regression fixtures;
+- `EVAL-D-10` — Android document import into the canonical installation boundary;
 - `EVAL-GP-02` — public-source license, attribution and redistribution treatment review;
 - `EVAL-GP-05` — 20 Harness structured-output cases;
 - `EVAL-GP-06` — 20 Harness context-retrieval cases;
@@ -78,15 +79,14 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-U-13` — execution-profile selector and compatibility explanation;
 - `EVAL-V-03` — reusable evaluator golden/edge corpus.
 
-D-05 install and D-07 sampling already have implementation branches, but they remain child lanes until the corrected D-02/D-03/D-04 base is green and integrated.
+D-06 discovery now exposes only fully published, strictly decoded packs with deterministic filtering/order while malformed, incomplete, staging and identity-mismatched directories remain invisible.
 
 ## Parallel fan-out strategy
 
 ```text
-Dataset:      D-02 ─┐
-              D-03 ─┼─> D-05 install
-              D-04 ─┘
-                    └─> D-07 sampling -> D-08 presets
+Dataset:      D-01..D-08 DONE
+              D-09 fixtures
+              D-10 import ───> D-11 delete -> D-12 docs
 
 Runner:       R-01 DONE
               R-02 DONE
@@ -115,7 +115,7 @@ Module-registration files (`settings.gradle.kts`, CI module lists and `evaluatio
 
 ## Current blockers
 
-There is no external blocker for the active host-side lanes. The dataset child lanes are intentionally waiting on their corrected D-02/D-03/D-04 base gate rather than bypassing it.
+There is no external blocker for the active host-side lanes. Dataset fixtures and Android import can proceed independently before protected deletion joins import with the integrated registry.
 
 Potential later blockers are tracked as dependencies rather than hidden assumptions:
 
