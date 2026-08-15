@@ -11,10 +11,11 @@ This guide owns navigation and validation for model-evaluation implementation un
 
 ## Current ownership
 
-- `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility, persistence and failure contracts plus deterministic canonical hashing.
 - `evaluation/evaluators` owns the versioned evaluator registry and deterministic scorer implementations. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
+- `evaluation/in-memory-store` owns the deterministic privacy-safe in-memory implementation of `EvaluationResultRepository`. It is the parity reference for durable stores: run configuration is immutable, lifecycle transitions are validated, case results stay bounded to the selected sample set, history ordering is deterministic, active runs cannot be deleted, and retention applies only to terminal runs.
 
-Do not create dataset-store or persistence implementation modules until the corresponding workstream contains real behavior. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
+Do not add Room or other durable storage behavior to the in-memory module. Durable persistence belongs to its own implementation module and must preserve the same public repository semantics.
 
 ## Contract invariants
 
@@ -26,6 +27,7 @@ Do not create dataset-store or persistence implementation modules until the corr
 - Evaluator specs are declarative and bounded; they cannot name classes, scripts, URLs or executable code.
 - Failure contracts use bounded typed codes rather than arbitrary backend exception text.
 - Prompt, expected-answer and generated-answer content is not part of persistent run/result contracts.
+- Persistence implementations must not invent alternate lifecycle, ordering, deletion or retention semantics.
 
 ## Validation
 
@@ -40,5 +42,7 @@ For contract-only iteration run:
 ```
 
 For evaluator work run the equivalent scoped checks for `:evaluation:evaluators` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
+
+For in-memory persistence work run `:evaluation:in-memory-store:testDebugUnitTest` and `:evaluation:in-memory-store:lintDebug` together with repository-wide formatting/static-analysis/model-artifact guards.
 
 Because adding or changing the module list affects repository navigation and build configuration, also run the repository documentation/navigation guards and the applicable repository-wide gate before merge.
