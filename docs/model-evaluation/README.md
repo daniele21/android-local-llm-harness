@@ -49,11 +49,11 @@ The initial product support envelope remains the repository-reviewed Qwen3.5 den
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes deterministic identity, scoring, run, compatibility and failure contracts. |
 | EVAL-2 Dataset system | IN PROGRESS | Manifest/case wire schema v1 is frozen; parser, validation, digest, installation, sampling and import remain. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and v1 compatibility semantics are frozen. |
-| EVAL-4 Evaluation runner | READY | Fake-driven runner and controlled model-binding work can start independently. |
-| EVAL-5 Persistence and comparison | READY | Repository/query/retention contract is frozen; in-memory and Room persistence can start in parallel. |
-| EVAL-6 General Purpose v1 | READY | Exact source/license inventory can start after the dataset schema freeze while pack assembly remains later-gated. |
-| EVAL-7 Performance UI and custom import | READY | Performance UDF/navigation shell can start against fakes. |
-| EVAL-8 Validation and device evidence | PLANNED | Incremental deterministic evidence can progress; final Android/device gates remain late. |
+| EVAL-4 Evaluation runner | IN PROGRESS | R-01/R-02 are integrated and production preflight/runtime wiring is active. |
+| EVAL-5 Persistence and comparison | IN PROGRESS | Repository contract, in-memory parity and lifecycle persistence are integrated; Room/comparison work remains. |
+| EVAL-6 General Purpose v1 | IN PROGRESS | Exact public-source identities are pinned; license treatment and case curation remain. |
+| EVAL-7 Performance UI and custom import | IN PROGRESS | UDF state plus fake-driven reducer/ViewModel are integrated; connected UI/import remains. |
+| EVAL-8 Validation and device evidence | IN PROGRESS | Deterministic validation is active; final Android/device gates remain late. |
 
 Milestone state is owned by [`current-state.md`](current-state.md). Dependency order and parallel work are owned by [`roadmap.md`](roadmap.md).
 
@@ -66,6 +66,7 @@ Milestone state is owned by [`current-state.md`](current-state.md). Dependency o
 | Product behavior, scoring principles and non-goals | [`target.md`](target.md) |
 | Frozen evaluator type/version/parameter/score semantics | [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) |
 | Frozen manifest and canonical JSONL wire schema | [`dataset-schema-v1.md`](dataset-schema-v1.md) |
+| Pinned General Purpose public-source identities and revisions | [`general-purpose-source-inventory.md`](general-purpose-source-inventory.md) |
 | Target module boundaries and execution flow | [`architecture.md`](architecture.md) |
 | Contracts, evaluators, runner and persistence tasks | [`workstreams/evaluation-core.md`](workstreams/evaluation-core.md) |
 | Dataset packs, sampling, import and General Purpose v1 | [`workstreams/datasets.md`](workstreams/datasets.md) |
