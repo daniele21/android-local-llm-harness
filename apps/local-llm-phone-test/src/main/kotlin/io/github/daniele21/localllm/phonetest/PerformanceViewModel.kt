@@ -27,7 +27,9 @@ internal class PerformanceViewModel(
     }
 
     fun detachCommandSink(sink: PerformanceCommandSink) {
-        if (commandSink === sink) commandSink = null
+        if (commandSink === sink) {
+            commandSink = null
+        }
     }
 
     fun attachEffectSink(sink: PerformanceEffectSink) {
@@ -35,7 +37,9 @@ internal class PerformanceViewModel(
     }
 
     fun detachEffectSink(sink: PerformanceEffectSink) {
-        if (effectSink === sink) effectSink = null
+        if (effectSink === sink) {
+            effectSink = null
+        }
     }
 
     fun dispatch(intent: PerformanceIntent) {
