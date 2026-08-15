@@ -7,15 +7,15 @@ import io.github.daniele21.localllm.evaluation.EvaluationFailureStage
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.SamplingSelection
 
-interface EvaluationDatasetPreflight {
+fun interface EvaluationDatasetPreflight {
     fun validate(dataset: EvaluationDatasetIdentity, sampling: SamplingSelection): EvaluationFailure?
 }
 
-interface EvaluationEvaluatorPreflight {
+fun interface EvaluationEvaluatorPreflight {
     fun validate(dataset: EvaluationDatasetIdentity): EvaluationFailure?
 }
 
-interface EvaluationExecutionProfilePreflight {
+fun interface EvaluationExecutionProfilePreflight {
     fun validate(profile: EvaluationExecutionProfileRef, model: ResolvedEvaluationModel): EvaluationFailure?
 }
 
@@ -31,18 +31,16 @@ class EvaluationRunPreflight(
             is EvaluationModelResolution.Resolved -> resolution.model
         }
 
-        return firstFailure(
-            datasetPreflight.validate(config.dataset, config.sampling),
-            evaluatorPreflight.validate(config.dataset),
-            executionProfilePreflight.validate(config.executionProfile, resolvedModel),
-        )?.let(EvaluationStepResult::Failure) ?: EvaluationStepResult.Success(Unit)
+        datasetPreflight.validate(config.dataset, config.sampling)?.let { return failure(it) }
+        evaluatorPreflight.validate(config.dataset)?.let { return failure(it) }
+        executionProfilePreflight.validate(config.executionProfile, resolvedModel)?.let { return failure(it) }
+        return EvaluationStepResult.Success(Unit)
     }
 
-    private fun firstFailure(vararg failures: EvaluationFailure?): EvaluationFailure? = failures.firstOrNull { failure ->
-        failure != null
-    }?.also { failure ->
+    private fun failure(failure: EvaluationFailure): EvaluationStepResult.Failure {
         require(failure.stage == EvaluationFailureStage.PREFLIGHT) {
             "Evaluation preflight checks must return PREFLIGHT failures"
         }
+        return EvaluationStepResult.Failure(failure)
     }
 }
