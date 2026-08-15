@@ -46,12 +46,11 @@ internal object HarnessSharedRuntimeBindings {
                 contextSize = CONSOLE_CONTEXT_SIZE,
             )
         return resolved.copy(
-            binding =
-                AppModelBinding(
-                    applicationId = consoleApplicationId,
-                    useCaseId = consoleUseCaseId,
-                    useCaseProfileId = resolved.useCase.id,
-                ),
+            binding = AppModelBinding(
+                applicationId = consoleApplicationId,
+                useCaseId = consoleUseCaseId,
+                useCaseProfileId = resolved.useCase.id,
+            ),
         )
     }
 
@@ -73,12 +72,11 @@ internal object HarnessSharedRuntimeBindings {
             "OMBRA default preset must support JSON_SCHEMA"
         }
         return resolved.copy(
-            binding =
-                AppModelBinding(
-                    applicationId = consoleApplicationId,
-                    useCaseId = ombraUseCaseId,
-                    useCaseProfileId = useCase.id,
-                ),
+            binding = AppModelBinding(
+                applicationId = consoleApplicationId,
+                useCaseId = ombraUseCaseId,
+                useCaseProfileId = useCase.id,
+            ),
             useCase = useCase,
         )
     }
