@@ -39,8 +39,11 @@ internal interface OmbraAnalysisChunkClient {
 }
 
 internal enum class OmbraAnalysisChunkFailureCode {
+    HOST_UNAVAILABLE,
+    CAPABILITY_INCOMPATIBLE,
     GENERATION_FAILED,
     DISCONNECTED,
+    CANCELLED,
 }
 
 internal class OmbraAnalysisChunkException(val code: OmbraAnalysisChunkFailureCode) :
@@ -50,8 +53,11 @@ internal enum class OmbraAnalysisFailureCode {
     PLAN_REJECTED,
     INVALID_STRUCTURED_RESULT,
     INVALID_FINDINGS,
+    HOST_UNAVAILABLE,
+    CAPABILITY_INCOMPATIBLE,
     CHUNK_FAILED,
     DISCONNECTED,
+    CANCELLED,
 }
 
 internal class OmbraAnalysisException(val code: OmbraAnalysisFailureCode, val invalidFindingCount: Int = 0) :
@@ -207,12 +213,20 @@ internal class OmbraSequentialAnalysisClient(
         operation.onResult(Result.failure(failure))
     }
 
-    private fun mapChunkFailure(failure: Throwable): Throwable =
-        if (failure is OmbraAnalysisChunkException && failure.code == OmbraAnalysisChunkFailureCode.DISCONNECTED) {
-            OmbraAnalysisException(OmbraAnalysisFailureCode.DISCONNECTED)
-        } else {
-            OmbraAnalysisException(OmbraAnalysisFailureCode.CHUNK_FAILED)
-        }
+    private fun mapChunkFailure(failure: Throwable): Throwable {
+        val code =
+            (failure as? OmbraAnalysisChunkException)?.code
+                ?: return OmbraAnalysisException(OmbraAnalysisFailureCode.CHUNK_FAILED)
+        val mapped =
+            when (code) {
+                OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE -> OmbraAnalysisFailureCode.HOST_UNAVAILABLE
+                OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE -> OmbraAnalysisFailureCode.CAPABILITY_INCOMPATIBLE
+                OmbraAnalysisChunkFailureCode.DISCONNECTED -> OmbraAnalysisFailureCode.DISCONNECTED
+                OmbraAnalysisChunkFailureCode.CANCELLED -> OmbraAnalysisFailureCode.CANCELLED
+                OmbraAnalysisChunkFailureCode.GENERATION_FAILED -> OmbraAnalysisFailureCode.CHUNK_FAILED
+            }
+        return OmbraAnalysisException(mapped)
+    }
 
     private fun isActive(operationId: OmbraOperationId, operation: ActiveOperation): Boolean =
         operations[operationId] === operation && !operation.cancelled
