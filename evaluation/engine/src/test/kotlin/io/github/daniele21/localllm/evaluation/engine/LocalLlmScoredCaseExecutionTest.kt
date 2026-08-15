@@ -104,15 +104,12 @@ class LocalLlmScoredCaseExecutionTest {
         assertEquals(CASE_ID, result.failure.caseId)
     }
 
-    private fun execution(
-        client: LocalLlmClient,
-        case: EvaluationDatasetCaseV1,
-        requestFactory: EvaluationCaseGenerationRequestFactory,
-    ) = LocalLlmScoredCaseExecution(
-        client = client,
-        caseSource = EvaluationCaseDefinitionSource { _, caseId -> case.takeIf { it.id == caseId } },
-        requestFactory = requestFactory,
-    )
+    private fun execution(client: LocalLlmClient, case: EvaluationDatasetCaseV1, requestFactory: EvaluationCaseGenerationRequestFactory) =
+        LocalLlmScoredCaseExecution(
+            client = client,
+            caseSource = EvaluationCaseDefinitionSource { _, caseId -> case.takeIf { it.id == caseId } },
+            requestFactory = requestFactory,
+        )
 
     private fun case() = EvaluationDatasetCaseV1(
         id = CASE_ID,
@@ -142,8 +139,7 @@ class LocalLlmScoredCaseExecutionTest {
 
         override fun runtimeSnapshot() = RuntimeSnapshot(RuntimeState.READY, MODEL_DIGEST, 0, 0)
 
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId) =
-            PrepareResult(true, MODEL_DIGEST, "fixture")
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId) = PrepareResult(true, MODEL_DIGEST, "fixture")
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId) = SESSION_ID
 
