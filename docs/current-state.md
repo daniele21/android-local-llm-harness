@@ -58,11 +58,14 @@ CA-5 is active through OMBRA. The repository-side document pipeline is substanti
 - **OMB-5** — deterministic redaction, flattened PDF export and safe hidden/reveal projection through PRs #146/#157/#218;
 - **OMB-6A** — OMBRA themes/tokens and reusable task/review components through PRs #145/#200/#220;
 - **OMB-7A** — Compose Import -> Definitions -> Analysis -> Review-ready product flow through PR #232;
+- **OMB-7B** — Review decisions/reveal/navigation, `CreateDocument` export, zero-PII handling, legacy Console retirement and pure-consumer dependency cleanup through PR #235;
 - **OMB-8A** — deterministic synthetic quality corpus and exact-occurrence scorer through PR #223.
 
-The active product-closeout candidate is **OMB-7B / PR #235**: Review decisions/reveal/navigation, `CreateDocument` export, zero-PII flow and retirement of the legacy Console control-plane surfaces. Its cleanup descendant **PR #236** removes direct `models:model-store` and `observability:*` dependencies so `apps/local-llm-console` becomes a pure Consumer API reference app. This work is not part of the integrated `dev` baseline until the exact candidate head is green and merged.
+OMB-7B is now part of the integrated `dev` baseline. `apps/local-llm-console` no longer owns the retired Console model-management, observability, health, cache or raw inference surfaces and remains on public Consumer API/document/design-system boundaries.
 
-**OMB-6B** remains independently open and review-gated in PR #248: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** is also active only at the preparation level: corpus/scoring exists, while quality thresholds, representative model execution, physical evidence and release checks remain open.
+The active product-closeout lane is **OMB-7C / PR #250**: a clean post-OMB-7B replay of deterministic Compose review privacy/accessibility evidence plus separation of UI evidence from the heavyweight PDF runtime gate. It covers hidden/revealed semantics, unresolved-conflict export blocking, zero-PII export and 200% font-scale reachability. Broader import/analysis/export failure-state, cancellation/reset, adaptive/landscape and screenshot evidence remains follow-up OMB-7 work.
+
+**OMB-6B** remains independently open and review-gated in PR #248: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** is active at the preparation level: corpus/scoring exists, while accepted quality thresholds, representative model execution, physical evidence and release checks remain open.
 
 Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
@@ -76,11 +79,11 @@ This parallel capability does not replace the existing telemetry-derived benchma
 
 ## Open blockers
 
-### 1. OMBRA OMB-7B pure-consumer product closeout
+### 1. OMBRA OMB-7 product state-matrix closeout
 
-Close the exact-head OMB-7B gate before claiming CA-5 complete. The candidate must preserve the full local workflow while eliminating the retired Console model-management, observability, health, cache and raw inference dependencies. The reference app may depend on public contracts, the Binder Consumer client, its document/PDF implementation and the shared design system, but it must not regain direct runtime/model-control ownership.
+The pure-consumer product flow is integrated through OMB-7B / PR #235. The remaining repository-side OMB-7 gate is evidence and hardening rather than legacy Console removal.
 
-The current closeout also needs the remaining product state-matrix evidence: review/export failures, cancellation/reset, semantics, adaptive/large-font behavior and representative screenshots where owned by OMB-7. Final app identity remains gated separately by OMB-6B visual approval.
+PR #250 owns the current clean OMB-7C review-state evidence slice. Before OMB-7 can be marked complete, finish the remaining product state matrix: import/analysis/export failures, cancellation/reset, semantics, adaptive/large-font behavior and representative code-owned screenshots. Hidden PII must remain absent from semantics except during explicit reveal. Final app identity remains gated separately by OMB-6B visual approval.
 
 ### 2. OMB-6B final identity review
 
@@ -109,10 +112,11 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 
 ## Immediate next block
 
-1. finish the exact-head OMB-7B validation, fold the pure-consumer cleanup into PR #235 and integrate only after repository/PDF gates are green;
-2. keep OMB-6B final identity review/assets as an independent parallel lane; do not wire an unapproved launcher candidate into production;
-3. advance OMB-8 from the already-integrated corpus to accepted quality thresholds and representative two-APK/device evidence only after the product flow is stable;
-4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
+1. finish exact-head OMB-7C / PR #250 validation and integrate only when repository/UI/PDF evidence gates are green;
+2. continue the remaining OMB-7 state-matrix evidence as focused slices, keeping sensitive fixtures synthetic and code-owned;
+3. keep OMB-6B final identity review/assets as an independent parallel lane; do not wire an unapproved launcher candidate into production;
+4. advance OMB-8 from the integrated corpus toward a pre-registered acceptance policy, representative Qwen3.5 execution and two-APK/device evidence without inferring physical claims from CI;
+5. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
 Model-evaluation work may proceed in parallel when ownership is disjoint, without changing these OMBRA dependency and evidence gates.
 
