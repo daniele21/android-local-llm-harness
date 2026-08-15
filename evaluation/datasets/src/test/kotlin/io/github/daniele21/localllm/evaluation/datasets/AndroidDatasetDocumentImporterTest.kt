@@ -14,12 +14,12 @@ import io.github.daniele21.localllm.evaluation.EvaluatorSpec
 import io.github.daniele21.localllm.evaluation.EvaluatorType
 import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorRegistry
 import io.github.daniele21.localllm.evaluation.evaluators.ExactMatchEvaluator
-import java.io.ByteArrayInputStream
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 class AndroidDatasetDocumentImporterTest {
     @Test
