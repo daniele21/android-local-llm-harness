@@ -1,7 +1,7 @@
 # Evaluator semantics v1
 
 Status: active
-Document type: contract-reference
+Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.evaluators.v1
 Read when: authoring dataset evaluator specs, changing deterministic scoring behavior, or checking evaluator compatibility
