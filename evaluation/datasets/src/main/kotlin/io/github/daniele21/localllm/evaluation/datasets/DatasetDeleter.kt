@@ -54,10 +54,7 @@ class EvaluationDatasetDeleter(
         return deletePublishedPack(pack.directory)
     }
 
-    private suspend fun deletionRejection(
-        directory: File,
-        identity: EvaluationDatasetIdentity,
-    ): DatasetDeleteStatus? = when {
+    private suspend fun deletionRejection(directory: File, identity: EvaluationDatasetIdentity): DatasetDeleteStatus? = when {
         !directory.isOwnedBy(rootDirectory) -> DatasetDeleteStatus.IO_FAILURE
         activeUseProbe.isActive(identity) -> DatasetDeleteStatus.ACTIVE_RUN
         else -> null
