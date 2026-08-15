@@ -143,9 +143,9 @@ EVAL-E-08 defines quality aggregation only; runtime, resources and reliability r
 | --- | --- | --- | --- |
 | EVAL-R-01 | DONE | EVAL-C-05,EVAL-C-09 | Implement `EvaluationEngine` lifecycle/state machine against fake case source/evaluator/runtime interfaces. |
 | EVAL-R-02 | DONE | EVAL-C-06 | Define controlled evaluation binding/profile resolution for one selected installed supported artifact without mutating ordinary app bindings. |
-| EVAL-R-03 | READY | EVAL-R-02 | Implement full-run preflight for model installation/support, dataset compatibility, evaluator support and execution-profile validity. |
-| EVAL-R-04 | PLANNED | EVAL-R-01,EVAL-R-03 | Integrate model preparation and optional unscored warm-up with explicit run identity. |
-| EVAL-R-05 | PLANNED | EVAL-R-01,EVAL-R-03 | Implement isolated session/context lifecycle per scored case while preserving allowed warm model residency. |
+| EVAL-R-03 | DONE | EVAL-R-02 | Implement full-run preflight for model installation/support, dataset compatibility, evaluator support and execution-profile validity. |
+| EVAL-R-04 | READY | EVAL-R-01,EVAL-R-03 | Integrate model preparation and optional unscored warm-up with explicit run identity. |
+| EVAL-R-05 | READY | EVAL-R-01,EVAL-R-03 | Implement isolated session/context lifecycle per scored case while preserving allowed warm model residency. |
 | EVAL-R-06 | PLANNED | EVAL-R-05,EVAL-E-01 | Dispatch completed output to declared evaluator and create typed case result. |
 | EVAL-R-07 | PLANNED | EVAL-R-05 | Correlate each case with normal generation request ID and privacy-safe telemetry/resource metrics. |
 | EVAL-R-08 | PLANNED | EVAL-R-05 | Implement per-case timeout policy and typed timeout cleanup without leaving active decode/context ownership. |
@@ -154,9 +154,9 @@ EVAL-E-08 defines quality aggregation only; runtime, resources and reliability r
 | EVAL-R-11 | PLANNED | EVAL-R-04,EVAL-R-05,EVAL-R-08,EVAL-R-09 | Validate cleanup for completion, evaluator failure, runtime failure, timeout and cancellation. |
 | EVAL-R-12 | PLANNED | EVAL-R-10,EVAL-R-11 | Add deterministic runner integration tests using fake runtime, fake telemetry and fixed case order. |
 
-R-01 establishes single-run ownership, ordered case execution, warm-up state, progress, typed failure and between-phase/case cooperative cancellation. R-02 resolves only product-supplied supported model profiles to the exact installed verified artifact; it never mutates ordinary application bindings. Active-decode cancellation/timeout and production dataset/runtime wiring remain later R tasks.
+R-01 establishes single-run ownership, ordered case execution, warm-up state, progress, typed failure and between-phase/case cooperative cancellation. R-02 resolves only product-supplied supported model profiles to the exact installed verified artifact; it never mutates ordinary application bindings. R-03 adds deterministic production preflight with controlled model resolution first and fail-fast dataset, evaluator and execution-profile compatibility checks. Active-decode cancellation/timeout and production case execution remain later R tasks.
 
-EVAL-4 is now in progress. It closes only after production dataset access from EVAL-2 and evaluator implementations from EVAL-3 are integrated into EVAL-R-06/R-12.
+EVAL-4 is in progress. R-04 and R-05 can now proceed independently. The milestone closes only after production dataset access from EVAL-2 and evaluator implementations from EVAL-3 are integrated into EVAL-R-06/R-12.
 
 ## Task ledger — persistence and comparison
 
@@ -167,22 +167,22 @@ EVAL-4 is now in progress. It closes only after production dataset access from E
 | EVAL-P-03 | READY | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
 | EVAL-P-04 | PLANNED | EVAL-P-03 | Implement Room DAO/repository and database migration wiring without coupling telemetry schema ownership. |
 | EVAL-P-05 | PLANNED | EVAL-P-02,EVAL-P-04 | Add in-memory/Room parity tests for create, progress, terminal state, history, retention and deletion. |
-| EVAL-P-06 | READY | EVAL-R-01,EVAL-P-01 | Persist run lifecycle atomically enough to distinguish active, partial, cancelled, failed and completed runs after process restart. |
+| EVAL-P-06 | DONE | EVAL-R-01,EVAL-P-01 | Persist run lifecycle atomically enough to distinguish active, partial, cancelled, failed and completed runs after process restart. |
 | EVAL-P-07 | PLANNED | EVAL-R-06,EVAL-P-06 | Persist each completed case outcome without prompt/expected/generated text. |
 | EVAL-P-08 | READY | EVAL-C-07,EVAL-P-01 | Implement comparison service with typed quality/runtime compatibility checks. |
 | EVAL-P-09 | PLANNED | EVAL-P-08 | Implement valid category/aggregate deltas and runtime/resource deltas only when their compatibility level passes. |
 | EVAL-P-10 | PLANNED | EVAL-P-05,EVAL-P-07,EVAL-P-09 | Add restart, retention, privacy and incompatible-comparison integration tests. |
 
-P-02 is the behavioral reference implementation for persistence parity: immutable run configuration after create, valid lifecycle transitions, ordered case snapshots bounded to the selected sample set, deterministic filtered history, active-run delete protection and terminal-only retention. It persists no prompt, expected-answer or generated-answer text.
+P-02 is the behavioral reference implementation for persistence parity: immutable run configuration after create, valid lifecycle transitions, ordered case snapshots bounded to the selected sample set, deterministic filtered history, active-run delete protection and terminal-only retention. It persists no prompt, expected-answer or generated-answer text. P-06 now persists lifecycle and progress around `EvaluationEngine` through the repository contract while keeping Room and per-case persistence as separate responsibilities.
 
-EVAL-5 is now in progress. It closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner persists end-to-end results.
+EVAL-5 is in progress. It closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner persists end-to-end results.
 
 ## Parallel execution guidance
 
 The current fan-out is intentionally broad:
 
-- EVAL-R-03 can proceed from the integrated R-02 resolver while D-02/D-03/D-04 converge separately;
-- EVAL-P-03, EVAL-P-06 and EVAL-P-08 are independent after the integrated P-02 baseline and R-01 lifecycle;
+- EVAL-R-04 and EVAL-R-05 can proceed independently from the completed R-03 preflight while D-02/D-03/D-04 converge separately;
+- EVAL-P-03 and EVAL-P-08 are independent after the integrated P-02 baseline; P-06 lifecycle persistence is complete;
 - dataset parser/validator/digest/source lanes run independently in the dataset workstream;
 - the Performance UI shell can remain fake-driven until runner/persistence wiring lands.
 
