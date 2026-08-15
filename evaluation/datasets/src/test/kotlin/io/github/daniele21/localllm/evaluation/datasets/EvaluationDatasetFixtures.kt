@@ -58,10 +58,7 @@ internal object EvaluationDatasetFixtures {
         return DatasetFixturePack(manifest, cases)
     }
 
-    data class DatasetFixturePack(
-        val manifest: EvaluationDatasetManifestV1,
-        val cases: List<EvaluationDatasetCaseV1>,
-    ) {
+    data class DatasetFixturePack(val manifest: EvaluationDatasetManifestV1, val cases: List<EvaluationDatasetCaseV1>) {
         fun input(): InputStream = ByteArrayInputStream(
             cases.joinToString(separator = "") { EvaluationDatasetCanonicalJson.encodeCase(it) + "\n" }
                 .toByteArray(StandardCharsets.UTF_8),

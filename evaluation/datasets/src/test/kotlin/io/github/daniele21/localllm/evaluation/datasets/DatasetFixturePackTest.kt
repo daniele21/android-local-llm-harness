@@ -95,10 +95,8 @@ class DatasetFixturePackTest {
         assertTrue(!installer.stagingRoot().exists() || installer.stagingRoot().listFiles().orEmpty().isEmpty())
     }
 
-    private fun installedCases(
-        installer: EvaluationDatasetInstaller,
-        fixture: EvaluationDatasetFixtures.DatasetFixturePack,
-    ) = FileInputStream(installer.installedDirectory(fixture.manifest).resolve("cases.jsonl")).use(parser::parse)
+    private fun installedCases(installer: EvaluationDatasetInstaller, fixture: EvaluationDatasetFixtures.DatasetFixturePack) =
+        FileInputStream(installer.installedDirectory(fixture.manifest).resolve("cases.jsonl")).use(parser::parse)
 
     private fun installer(root: File) = EvaluationDatasetInstaller(
         rootDirectory = root,
@@ -106,10 +104,7 @@ class DatasetFixturePackTest {
         validator = EvaluationDatasetPackValidator(EvaluatorRegistry(listOf(ExactMatchEvaluator.REGISTRATION))),
     )
 
-    private fun assertNotPublished(
-        installer: EvaluationDatasetInstaller,
-        fixture: EvaluationDatasetFixtures.DatasetFixturePack,
-    ) {
+    private fun assertNotPublished(installer: EvaluationDatasetInstaller, fixture: EvaluationDatasetFixtures.DatasetFixturePack) {
         assertFalse(installer.installedDirectory(fixture.manifest).exists())
         assertTrue(!installer.stagingRoot().exists() || installer.stagingRoot().listFiles().orEmpty().isEmpty())
     }
