@@ -13,9 +13,7 @@ internal fun interface PerformanceEffectSink {
     fun accept(effect: PerformanceEffect)
 }
 
-internal class PerformanceViewModel(
-    initialState: PerformanceState = PerformanceState(),
-) : ViewModel() {
+internal class PerformanceViewModel(initialState: PerformanceState = PerformanceState()) : ViewModel() {
     private val mutableState = MutableStateFlow(initialState)
     private var commandSink: PerformanceCommandSink? = null
     private var effectSink: PerformanceEffectSink? = null
@@ -27,9 +25,7 @@ internal class PerformanceViewModel(
     }
 
     fun detachCommandSink(sink: PerformanceCommandSink) {
-        if (commandSink === sink) {
-            commandSink = null
-        }
+        if (commandSink === sink) commandSink = null
     }
 
     fun attachEffectSink(sink: PerformanceEffectSink) {
@@ -37,9 +33,7 @@ internal class PerformanceViewModel(
     }
 
     fun detachEffectSink(sink: PerformanceEffectSink) {
-        if (effectSink === sink) {
-            effectSink = null
-        }
+        if (effectSink === sink) effectSink = null
     }
 
     fun dispatch(intent: PerformanceIntent) {
