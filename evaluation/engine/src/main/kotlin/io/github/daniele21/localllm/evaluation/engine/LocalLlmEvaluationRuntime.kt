@@ -45,15 +45,10 @@ class FixedEvaluationRuntimeBindingSource(bindings: Collection<EvaluationRuntime
         bindingsByIdentity = bindings.associateBy { BindingKey(it.model, it.executionProfile) }
     }
 
-    override fun resolve(
-        model: EvaluationModelIdentity,
-        executionProfile: EvaluationExecutionProfileRef,
-    ): EvaluationRuntimeBinding? = bindingsByIdentity[BindingKey(model, executionProfile)]
+    override fun resolve(model: EvaluationModelIdentity, executionProfile: EvaluationExecutionProfileRef): EvaluationRuntimeBinding? =
+        bindingsByIdentity[BindingKey(model, executionProfile)]
 
-    private data class BindingKey(
-        val model: EvaluationModelIdentity,
-        val executionProfile: EvaluationExecutionProfileRef,
-    )
+    private data class BindingKey(val model: EvaluationModelIdentity, val executionProfile: EvaluationExecutionProfileRef)
 }
 
 fun interface EvaluationModelResidencyControl {
@@ -61,11 +56,7 @@ fun interface EvaluationModelResidencyControl {
 }
 
 fun interface EvaluationWarmupExecutionPort {
-    suspend fun execute(
-        config: EvaluationRunConfig,
-        binding: EvaluationRuntimeBinding,
-        sessionId: SessionId,
-    ): EvaluationStepResult<Unit>
+    suspend fun execute(config: EvaluationRunConfig, binding: EvaluationRuntimeBinding, sessionId: SessionId): EvaluationStepResult<Unit>
 }
 
 fun interface EvaluationScoredCaseExecutionPort {
@@ -121,10 +112,7 @@ class LocalLlmEvaluationRuntime(
         ) { sessionId -> warmupExecution.execute(config, binding, sessionId) }
     }
 
-    override suspend fun execute(
-        config: EvaluationRunConfig,
-        caseId: EvaluationCaseId,
-    ): EvaluationStepResult<EvaluationCaseResult> {
+    override suspend fun execute(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> {
         val binding = preparedBinding(config)
             ?: return runtimeFailure(EvaluationFailureStage.GENERATION, caseId)
         return withIsolatedSession(
@@ -216,11 +204,7 @@ class LocalLlmEvaluationRuntime(
 }
 
 fun interface EvaluationWarmupRequestFactory {
-    fun create(
-        config: EvaluationRunConfig,
-        binding: EvaluationRuntimeBinding,
-        sessionId: SessionId,
-    ): GenerationRequest
+    fun create(config: EvaluationRunConfig, binding: EvaluationRuntimeBinding, sessionId: SessionId): GenerationRequest
 }
 
 /** Executes exactly one normal generation and deliberately discards its output and metrics. */
@@ -228,11 +212,7 @@ class LocalLlmUnscoredWarmupExecution(
     private val client: LocalLlmClient,
     private val requestFactory: EvaluationWarmupRequestFactory,
 ) : EvaluationWarmupExecutionPort {
-    override suspend fun execute(
-        config: EvaluationRunConfig,
-        binding: EvaluationRuntimeBinding,
-        sessionId: SessionId,
-    ): EvaluationStepResult<Unit> {
+    override suspend fun execute(config: EvaluationRunConfig, binding: EvaluationRuntimeBinding, sessionId: SessionId): EvaluationStepResult<Unit> {
         val request = try {
             requestFactory.create(config, binding, sessionId)
         } catch (error: CancellationException) {
