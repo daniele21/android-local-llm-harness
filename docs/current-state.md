@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -48,7 +48,23 @@ The shared runtime is not production/release ready until the physical SR-6 evide
 
 CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, Binder lifecycle/generation adapters, deterministic privacy/compatibility coverage and packaged release-AAR compilation evidence.
 
-CA-5 is active through OMBRA. OMB-0 is integrated through PR #106 with the isolated PdfBox parser/export decision and runtime evidence. OMB-1A and OMB-1B are integrated through PRs #107 and #108, closing the pure domain/application-state gate with Android-independent models, immutable workflow state, focused reducer transitions, replaceable async ports, sensitive in-memory task storage and fake end-to-end orchestration. OMB-2 is now the active implementation block for production PDF import/extraction behind the application port. Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
+CA-5 is active through OMBRA. The repository-side document pipeline is substantially integrated:
+
+- **OMB-0** — isolated PdfBox parser/export decision and runtime evidence through PR #106;
+- **OMB-1** — pure domain/application workflow through PRs #107/#108;
+- **OMB-2** — production PDF picker, extraction, typed failures and source cleanup through PR #154;
+- **OMB-3** — deterministic prompt/schema/chunk planning and structured finding validation/orchestration through PRs #148/#202;
+- **OMB-4** — host-owned `document-pii-detection` policy and packaged Binder Consumer API analysis adapter through PRs #144/#210;
+- **OMB-5** — deterministic redaction, flattened PDF export and safe hidden/reveal projection through PRs #146/#157/#218;
+- **OMB-6A** — OMBRA themes/tokens and reusable task/review components through PRs #145/#200/#220;
+- **OMB-7A** — Compose Import -> Definitions -> Analysis -> Review-ready product flow through PR #232;
+- **OMB-8A** — deterministic synthetic quality corpus and exact-occurrence scorer through PR #223.
+
+The active product-closeout candidate is **OMB-7B / PR #235**: Review decisions/reveal/navigation, `CreateDocument` export, zero-PII flow and retirement of the legacy Console control-plane surfaces. Its cleanup descendant **PR #236** removes direct `models:model-store` and `observability:*` dependencies so `apps/local-llm-console` becomes a pure Consumer API reference app. This work is not part of the integrated `dev` baseline until the exact candidate head is green and merged.
+
+**OMB-6B** remains independently open and review-gated in PR #206: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** is also active only at the preparation level: corpus/scoring exists, while quality thresholds, representative model execution, physical evidence and release checks remain open.
+
+Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
 ### Model evaluation
 
@@ -60,31 +76,45 @@ This parallel capability does not replace the existing telemetry-derived benchma
 
 ## Open blockers
 
-### 1. OMBRA OMB-2 production PDF import and extraction
+### 1. OMBRA OMB-7B pure-consumer product closeout
 
-Complete the production extraction boundary before growing analysis or UI code. The active slice must keep raw URI/PDF ownership local to OMBRA, route extraction through the reviewed isolated PdfBox process, produce deterministic page/block source mapping, fail closed with typed outcomes and prove cancellation/resource cleanup. OMB-2 must also wire the PDF-only `OpenDocument` capability and prove that reset releases source capability state and sensitive task data.
+Close the exact-head OMB-7B gate before claiming CA-5 complete. The candidate must preserve the full local workflow while eliminating the retired Console model-management, observability, health, cache and raw inference dependencies. The reference app may depend on public contracts, the Binder Consumer client, its document/PDF implementation and the shared design system, but it must not regain direct runtime/model-control ownership.
 
-### 2. Physical Android evidence
+The current closeout also needs the remaining product state-matrix evidence: review/export failures, cancellation/reset, semantics, adaptive/large-font behavior and representative screenshots where owned by OMB-7. Final app identity remains gated separately by OMB-6B visual approval.
 
-Two device-dependent tracks remain open and can share a representative hardware session:
+### 2. OMB-6B final identity review
+
+PR #206 contains a review-gated symbol candidate and deterministic safety validator, not an approved production identity. Before OMBRA can claim final app identity:
+
+- approve or revise the symbol candidate;
+- freeze final wordmark/lockup decisions;
+- generate deterministic adaptive and monochrome launcher assets from approved vector masters;
+- add packaging checks without changing the accepted package/signing boundary.
+
+Do not infer visual approval from a green identity-candidate workflow.
+
+### 3. Physical Android evidence
+
+Three device-dependent tracks remain open and can share representative hardware sessions where appropriate:
 
 - **Q35-6** — run the controlled Qwen3.5 0.8B/2B tuning matrix, collect cold/warm timing, throughput, PSS, available-memory and thermal evidence, then select measured defaults;
-- **SR-6** — run release-like same-signer Binder evidence, invalid-signer denial, process-death/reconnect and matching Binder-vs-in-process overhead evidence.
+- **SR-6** — run release-like same-signer Binder evidence, invalid-signer denial, process-death/reconnect and matching Binder-vs-in-process overhead evidence;
+- **OMB-8** — run the OMBRA corpus and full two-APK import -> analysis -> review -> export/failure scenarios on the exact supported build, then record quality and privacy-safe release evidence.
 
-Do not promote Q35 profiles to `MEASURED`, publish the Binder client AAR or describe the shared host/public transport as production-ready from CI/emulator evidence alone.
+Do not promote Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
 
-### 3. Follow-on validation and product hardening
+### 4. Follow-on validation and product hardening
 
 After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation. Remaining phone work includes UDF completion, RAM warm-idle TTL policy, accessibility/responsive coverage and signed release evidence.
 
 ## Immediate next block
 
-1. complete OMB-2A production PDF source capability, extractor adapter, deterministic segmentation and emulator/resource-cleanup evidence;
-2. close the remaining OMB-2 picker/reset/typed-failure exit-gate work before starting OMB-3 analysis composition;
-3. keep OMB-4 real Consumer API integration behind the accepted OMBRA domain/extraction/composition boundaries;
+1. finish the exact-head OMB-7B validation, fold the pure-consumer cleanup into PR #235 and integrate only after repository/PDF gates are green;
+2. keep OMB-6B final identity review/assets as an independent parallel lane; do not wire an unapproved launcher candidate into production;
+3. advance OMB-8 from the already-integrated corpus to accepted quality thresholds and representative two-APK/device evidence only after the product flow is stable;
 4. keep Q35-6 and SR-6 physical evidence as the parallel release-readiness track.
 
-Model-evaluation work may proceed in parallel when ownership is disjoint, without changing this immediate OMBRA sequencing.
+Model-evaluation work may proceed in parallel when ownership is disjoint, without changing these OMBRA dependency and evidence gates.
 
 ## Source links
 
