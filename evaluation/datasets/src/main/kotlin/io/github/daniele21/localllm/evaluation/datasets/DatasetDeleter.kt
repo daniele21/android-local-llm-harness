@@ -49,11 +49,25 @@ class EvaluationDatasetDeleter(
 ) {
     suspend fun delete(datasetId: EvaluationDatasetId, version: EvaluationDatasetVersion): DatasetDeleteStatus {
         val pack = registry.find(datasetId, version) ?: return DatasetDeleteStatus.NOT_FOUND
-        if (!pack.directory.isOwnedBy(rootDirectory)) return DatasetDeleteStatus.IO_FAILURE
-        if (activeUseProbe.isActive(pack.manifest.identity())) return DatasetDeleteStatus.ACTIVE_RUN
-        if (!pack.directory.deleteRecursively()) return DatasetDeleteStatus.IO_FAILURE
-        cleanupEmptyDatasetDirectory(pack.directory.parentFile)
-        return DatasetDeleteStatus.DELETED
+        val rejection = deletionRejection(pack.directory, pack.manifest.identity())
+        if (rejection != null) return rejection
+        return deletePublishedPack(pack.directory)
+    }
+
+    private suspend fun deletionRejection(
+        directory: File,
+        identity: EvaluationDatasetIdentity,
+    ): DatasetDeleteStatus? = when {
+        !directory.isOwnedBy(rootDirectory) -> DatasetDeleteStatus.IO_FAILURE
+        activeUseProbe.isActive(identity) -> DatasetDeleteStatus.ACTIVE_RUN
+        else -> null
+    }
+
+    private fun deletePublishedPack(directory: File): DatasetDeleteStatus = if (directory.deleteRecursively()) {
+        cleanupEmptyDatasetDirectory(directory.parentFile)
+        DatasetDeleteStatus.DELETED
+    } else {
+        DatasetDeleteStatus.IO_FAILURE
     }
 }
 
