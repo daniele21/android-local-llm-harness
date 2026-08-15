@@ -26,7 +26,6 @@ import io.github.daniele21.localllm.console.pii.PiiTypeId
 import io.github.daniele21.localllm.console.presentation.OmbraFailureCode
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowStage
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowState
-import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState
 import io.github.daniele21.localllm.ui.designsystem.LocalOmbraSpacing
 import io.github.daniele21.localllm.ui.designsystem.OmbraDefinitionEditorSheet
 import io.github.daniele21.localllm.ui.designsystem.OmbraDefinitionEditorState
@@ -40,33 +39,6 @@ import io.github.daniele21.localllm.ui.designsystem.OmbraSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.OmbraStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.OmbraStatusTone
 import io.github.daniele21.localllm.ui.designsystem.OmbraTaskProgressStep
-
-internal data class OmbraHarnessUiStatus(val label: String, val tone: OmbraStatusTone, val analysisReady: Boolean)
-
-internal fun ombraHarnessUiStatus(state: SharedRuntimeConnectionState): OmbraHarnessUiStatus = when (state) {
-    SharedRuntimeConnectionState.CONNECTED ->
-        OmbraHarnessUiStatus("Harness connesso", OmbraStatusTone.LOCAL_READY, true)
-
-    SharedRuntimeConnectionState.BINDING,
-    SharedRuntimeConnectionState.NEGOTIATING,
-    -> OmbraHarnessUiStatus("Connessione a Harness", OmbraStatusTone.NEUTRAL, false)
-
-    SharedRuntimeConnectionState.PERMISSION_DENIED ->
-        OmbraHarnessUiStatus("Accesso a Harness negato", OmbraStatusTone.ERROR, false)
-
-    SharedRuntimeConnectionState.INCOMPATIBLE ->
-        OmbraHarnessUiStatus("Harness incompatibile", OmbraStatusTone.ERROR, false)
-
-    SharedRuntimeConnectionState.HOST_NOT_INSTALLED ->
-        OmbraHarnessUiStatus("Harness non disponibile", OmbraStatusTone.ERROR, false)
-
-    SharedRuntimeConnectionState.DISCONNECTED,
-    SharedRuntimeConnectionState.CONNECTION_LOST,
-    -> OmbraHarnessUiStatus("Harness disconnesso", OmbraStatusTone.REVIEW, false)
-
-    SharedRuntimeConnectionState.CLOSED ->
-        OmbraHarnessUiStatus("Harness non disponibile", OmbraStatusTone.NEUTRAL, false)
-}
 
 @Composable
 internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: () -> Unit) {
