@@ -34,11 +34,7 @@ enum class OmbraProgressState {
 }
 
 @Composable
-fun OmbraStatusBadge(
-    text: String,
-    tone: OmbraStatusTone,
-    modifier: Modifier = Modifier,
-) {
+fun OmbraStatusBadge(text: String, tone: OmbraStatusTone, modifier: Modifier = Modifier) {
     val colors = LocalOmbraStatusColors.current
     Surface(
         modifier = modifier,
@@ -56,12 +52,7 @@ fun OmbraStatusBadge(
 }
 
 @Composable
-fun OmbraTaskProgressStep(
-    title: String,
-    state: OmbraProgressState,
-    detail: String? = null,
-    modifier: Modifier = Modifier,
-) {
+fun OmbraTaskProgressStep(title: String, state: OmbraProgressState, detail: String? = null, modifier: Modifier = Modifier) {
     val tone =
         when (state) {
             OmbraProgressState.PENDING -> OmbraStatusTone.NEUTRAL
@@ -120,7 +111,8 @@ fun OmbraDefinitionSelectionRow(
 ) {
     Row(
         modifier =
-            modifier.fillMaxWidth()
+            modifier
+                .fillMaxWidth()
                 .heightIn(min = LocalOmbraSpacing.current.minimumTouchTarget)
                 .toggleable(
                     value = selected,
@@ -151,12 +143,7 @@ fun OmbraDefinitionSelectionRow(
 }
 
 @Composable
-fun OmbraReviewBanner(
-    title: String,
-    detail: String,
-    tone: OmbraStatusTone = OmbraStatusTone.REVIEW,
-    modifier: Modifier = Modifier,
-) {
+fun OmbraReviewBanner(title: String, detail: String, tone: OmbraStatusTone = OmbraStatusTone.REVIEW, modifier: Modifier = Modifier) {
     val colors = LocalOmbraStatusColors.current
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -179,11 +166,7 @@ fun OmbraReviewBanner(
  * The accessibility description is explicit and caller-localized so hidden PII never enters semantics.
  */
 @Composable
-fun OmbraRedactionPlaceholder(
-    placeholder: String,
-    hiddenContentDescription: String,
-    modifier: Modifier = Modifier,
-) {
+fun OmbraRedactionPlaceholder(placeholder: String, hiddenContentDescription: String, modifier: Modifier = Modifier) {
     Text(
         text = placeholder,
         modifier =
@@ -197,12 +180,7 @@ fun OmbraRedactionPlaceholder(
 }
 
 @Composable
-fun OmbraExportSummary(
-    acceptedLabel: String,
-    ignoredLabel: String,
-    pagesLabel: String,
-    modifier: Modifier = Modifier,
-) {
+fun OmbraExportSummary(acceptedLabel: String, ignoredLabel: String, pagesLabel: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
