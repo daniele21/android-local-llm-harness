@@ -272,10 +272,7 @@ internal object EvaluationRoomMapper {
         )
     }
 
-    private fun quality(
-        entity: EvaluationRunEntity,
-        categories: List<EvaluationCategoryScoreEntity>,
-    ): EvaluationQualitySummary? {
+    private fun quality(entity: EvaluationRunEntity, categories: List<EvaluationCategoryScoreEntity>): EvaluationQualitySummary? {
         if (!entity.qualityPresent) {
             require(entity.qualityAggregateScore == null && categories.isEmpty()) {
                 "Persisted quality rows exist while quality is absent"
@@ -337,8 +334,10 @@ internal object EvaluationRoomMapper {
     ): EvaluationSemanticExecution {
         val preset = when {
             entity.presetId == null && entity.presetVersion == null -> null
+
             entity.presetId != null && entity.presetVersion != null ->
                 InferencePresetRef(InferencePresetId(entity.presetId), entity.presetVersion)
+
             else -> error("Persisted inference preset identity is incomplete")
         }
         return EvaluationSemanticExecution(
@@ -392,10 +391,12 @@ internal object EvaluationRoomMapper {
         }
         val outcome = when {
             entity.outcomeScore == null && entity.outcomeCode == null -> null
+
             entity.outcomeScore != null && entity.outcomeCode != null -> EvaluationOutcome(
                 score = NormalizedScore(entity.outcomeScore),
                 code = EvaluatorOutcomeCode.valueOf(entity.outcomeCode),
             )
+
             else -> error("Persisted evaluator outcome is incomplete")
         }
         return EvaluationCaseResult(
