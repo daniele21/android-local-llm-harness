@@ -89,24 +89,26 @@ class EvaluationDatasetDocumentImporter(
         }
     }
 
-    private fun readCases(source: EvaluationDatasetDocumentSource): DatasetDocumentReadResult = try {
-        val input = source.open()
-            ?: return DatasetDocumentReadResult.Rejected(
+    private fun readCases(source: EvaluationDatasetDocumentSource): DatasetDocumentReadResult {
+        return try {
+            val input = source.open()
+                ?: return DatasetDocumentReadResult.Rejected(
+                    DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE),
+                )
+            DatasetDocumentReadResult.Success(input.use(parser::parse))
+        } catch (failure: EvaluationDatasetParseException) {
+            DatasetDocumentReadResult.Rejected(
+                DatasetDocumentImportResult.Rejected(
+                    code = DatasetDocumentImportRejectionCode.PARSE_FAILURE,
+                    parseLineNumber = failure.lineNumber,
+                    parseCode = failure.code,
+                ),
+            )
+        } catch (_: Exception) {
+            DatasetDocumentReadResult.Rejected(
                 DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE),
             )
-        DatasetDocumentReadResult.Success(input.use(parser::parse))
-    } catch (failure: EvaluationDatasetParseException) {
-        DatasetDocumentReadResult.Rejected(
-            DatasetDocumentImportResult.Rejected(
-                code = DatasetDocumentImportRejectionCode.PARSE_FAILURE,
-                parseLineNumber = failure.lineNumber,
-                parseCode = failure.code,
-            ),
-        )
-    } catch (_: Exception) {
-        DatasetDocumentReadResult.Rejected(
-            DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE),
-        )
+        }
     }
 
     private fun createManifest(
