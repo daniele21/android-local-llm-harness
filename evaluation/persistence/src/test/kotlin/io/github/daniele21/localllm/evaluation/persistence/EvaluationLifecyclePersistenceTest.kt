@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.evaluation.persistence
 
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.evaluation.EvaluationCaseId
+import io.github.daniele21.localllm.evaluation.EvaluationCaseResult
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetDigest
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetId
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetIdentity
@@ -22,6 +23,7 @@ import io.github.daniele21.localllm.evaluation.SamplingPolicyRef
 import io.github.daniele21.localllm.evaluation.SamplingSelection
 import io.github.daniele21.localllm.evaluation.engine.EvaluationCaseExecutionPort
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngine
+import io.github.daniele21.localllm.evaluation.engine.EvaluationEngineObserver
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngineTerminal
 import io.github.daniele21.localllm.evaluation.engine.EvaluationModelPreparationPort
 import io.github.daniele21.localllm.evaluation.engine.EvaluationPreflightPort
@@ -41,9 +43,9 @@ class EvaluationLifecyclePersistenceTest {
             code = EvaluationFailureCode.DATASET_DIGEST_MISMATCH,
         )
         val engine = EvaluationEngine(
-            preflight = EvaluationPreflightPort { EvaluationStepResult.Failure(failure) },
+            preflight = failingPreflight(failure),
             modelPreparation = unusedPreparation(),
-            caseExecution = EvaluationCaseExecutionPort { _, _ -> error("Case execution must not run") },
+            caseExecution = unusedCaseExecution(),
         )
         val repository = InMemoryEvaluationResultRepository()
         val times = ArrayDeque(listOf(1_000L, 2_000L))
@@ -72,9 +74,9 @@ class EvaluationLifecyclePersistenceTest {
             code = EvaluationFailureCode.INVALID_CONFIGURATION,
         )
         val engine = EvaluationEngine(
-            preflight = EvaluationPreflightPort { EvaluationStepResult.Failure(failure) },
+            preflight = failingPreflight(failure),
             modelPreparation = unusedPreparation(),
-            caseExecution = EvaluationCaseExecutionPort { _, _ -> error("Case execution must not run") },
+            caseExecution = unusedCaseExecution(),
         )
         val persistence = EvaluationLifecyclePersistence(
             repository = InMemoryEvaluationResultRepository(),
@@ -85,7 +87,7 @@ class EvaluationLifecyclePersistenceTest {
             engine = engine,
             config = config(),
             identity = null,
-            observer = object : io.github.daniele21.localllm.evaluation.engine.EvaluationEngineObserver {
+            observer = object : EvaluationEngineObserver {
                 override suspend fun onStateChanged(runId: EvaluationRunId, state: EvaluationRunState) {
                     states += state
                 }
@@ -102,10 +104,24 @@ class EvaluationLifecyclePersistenceTest {
         )
     }
 
-    private fun unusedPreparation() = object : EvaluationModelPreparationPort {
-        override suspend fun prepare(config: EvaluationRunConfig): EvaluationStepResult<Unit> = error("Preparation must not run")
+    private fun failingPreflight(failure: EvaluationFailure) = object : EvaluationPreflightPort {
+        override suspend fun validate(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
+            EvaluationStepResult.Failure(failure)
+    }
 
-        override suspend fun warmup(config: EvaluationRunConfig): EvaluationStepResult<Unit> = error("Warmup must not run")
+    private fun unusedPreparation() = object : EvaluationModelPreparationPort {
+        override suspend fun prepare(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
+            error("Preparation must not run")
+
+        override suspend fun warmup(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
+            error("Warmup must not run")
+    }
+
+    private fun unusedCaseExecution() = object : EvaluationCaseExecutionPort {
+        override suspend fun execute(
+            config: EvaluationRunConfig,
+            caseId: EvaluationCaseId,
+        ): EvaluationStepResult<EvaluationCaseResult> = error("Case execution must not run")
     }
 
     private fun config(): EvaluationRunConfig {
