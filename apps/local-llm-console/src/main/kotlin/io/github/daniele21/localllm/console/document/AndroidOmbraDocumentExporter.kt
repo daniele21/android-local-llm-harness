@@ -105,7 +105,13 @@ internal class AndroidOmbraDocumentExporter(
     }
 
     private fun exportNow(destination: OmbraExportDestination, request: OmbraExportRequest): OmbraExportReceipt {
-        val redactionPlan = when (val plan = OmbraRedactionPlanner.build(request.segments, request.definitions, request.reviewOccurrences)) {
+        val redactionPlan = when (
+            val plan = OmbraRedactionPlanner.build(
+                request.segments,
+                request.definitions,
+                request.reviewOccurrences,
+            )
+        ) {
             is OmbraRedactionPlanResult.Ready -> plan.plan
             is OmbraRedactionPlanResult.Blocked -> throw blockedPlanFailure(plan.code)
         }
@@ -144,7 +150,9 @@ internal class AndroidOmbraDocumentExporter(
     private fun blockedPlanFailure(code: OmbraRedactionPlanFailureCode): OmbraDocumentExportException {
         val exportCode = when (code) {
             OmbraRedactionPlanFailureCode.PENDING_DECISION -> OmbraDocumentExportFailureCode.REVIEW_INCOMPLETE
+
             OmbraRedactionPlanFailureCode.OVERLAP_CONFLICT -> OmbraDocumentExportFailureCode.REDACTION_CONFLICT
+
             OmbraRedactionPlanFailureCode.SOURCE_MISMATCH,
             OmbraRedactionPlanFailureCode.UNKNOWN_SEGMENT,
             OmbraRedactionPlanFailureCode.MISSING_DEFINITION,
