@@ -101,11 +101,11 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 sessionKinds = setOf(SessionKind.STATELESS),
                 defaultSessionKind = SessionKind.STATELESS,
                 limits =
-                    ConsumerLimits(
-                        maxInputCharacters = 32_768,
-                        maxConversationMessages = 128,
-                        maxJsonSchemaCharacters = 32_768,
-                    ),
+                ConsumerLimits(
+                    maxInputCharacters = 32_768,
+                    maxConversationMessages = 128,
+                    maxJsonSchemaCharacters = 32_768,
+                ),
             )
         val policies =
             listOf(
