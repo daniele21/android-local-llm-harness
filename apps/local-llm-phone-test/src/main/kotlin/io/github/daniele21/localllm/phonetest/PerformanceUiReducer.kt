@@ -86,11 +86,11 @@ internal object PerformanceUiReducer {
         transform: PerformanceRunSetupState.() -> PerformanceRunSetupState,
     ): PerformanceReduction {
         val updated = current.runSetup.transform()
-        return reduction(current.copy(runSetup = updated.copy(readiness = readiness(updated))))
+        return reduction(current.copy(runSetup = updated.copy(readiness = performanceReadiness(updated))))
     }
 
     private fun startRun(current: PerformanceState): PerformanceReduction {
-        val setup = current.runSetup.copy(readiness = readiness(current.runSetup))
+        val setup = current.runSetup.copy(readiness = performanceReadiness(current.runSetup))
         val state = current.copy(runSetup = setup)
         return when (val readiness = setup.readiness) {
             PerformanceRunReadiness.Ready -> reduction(
@@ -142,36 +142,6 @@ internal object PerformanceUiReducer {
         return reduction(current.copy(compare = current.compare.copy(selectedRunIds = updated)))
     }
 
-    private fun readiness(setup: PerformanceRunSetupState): PerformanceRunReadiness {
-        val reasons = buildList {
-            if (setup.model == null) add(PerformanceBlockReason.MODEL_REQUIRED)
-            if (setup.dataset == null) add(PerformanceBlockReason.DATASET_REQUIRED)
-            if (setup.executionProfile == null) add(PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED)
-            if (!sampleAvailable(setup.sampleSelection, setup.dataset?.caseCount)) {
-                add(PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE)
-            }
-        }
-        return if (reasons.isEmpty()) PerformanceRunReadiness.Ready else PerformanceRunReadiness.Blocked(reasons)
-    }
-
-    private fun sampleAvailable(selection: PerformanceSampleSelection, caseCount: Int?): Boolean {
-        if (caseCount == null) return true
-        val requested = when (selection) {
-            PerformanceSampleSelection.Smoke -> 20
-
-            PerformanceSampleSelection.Quick -> 50
-
-            PerformanceSampleSelection.Standard -> 100
-
-            PerformanceSampleSelection.Extended -> 200
-
-            PerformanceSampleSelection.All -> return true
-
-            is PerformanceSampleSelection.Custom -> selection.count
-        }
-        return requested <= caseCount
-    }
-
     private fun reduction(
         state: PerformanceState,
         effects: List<PerformanceEffect> = emptyList(),
@@ -179,4 +149,34 @@ internal object PerformanceUiReducer {
     ) = PerformanceReduction(state = state, effects = effects, commands = commands)
 
     private const val MAX_COMPARE_RUNS = 2
+}
+
+private fun performanceReadiness(setup: PerformanceRunSetupState): PerformanceRunReadiness {
+    val reasons = buildList {
+        if (setup.model == null) add(PerformanceBlockReason.MODEL_REQUIRED)
+        if (setup.dataset == null) add(PerformanceBlockReason.DATASET_REQUIRED)
+        if (setup.executionProfile == null) add(PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED)
+        if (!performanceSampleAvailable(setup.sampleSelection, setup.dataset?.caseCount)) {
+            add(PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE)
+        }
+    }
+    return if (reasons.isEmpty()) PerformanceRunReadiness.Ready else PerformanceRunReadiness.Blocked(reasons)
+}
+
+private fun performanceSampleAvailable(selection: PerformanceSampleSelection, caseCount: Int?): Boolean {
+    if (caseCount == null) return true
+    val requested = when (selection) {
+        PerformanceSampleSelection.Smoke -> 20
+
+        PerformanceSampleSelection.Quick -> 50
+
+        PerformanceSampleSelection.Standard -> 100
+
+        PerformanceSampleSelection.Extended -> 200
+
+        PerformanceSampleSelection.All -> return true
+
+        is PerformanceSampleSelection.Custom -> selection.count
+    }
+    return requested <= caseCount
 }
