@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,6 +29,7 @@ import io.github.daniele21.localllm.console.redaction.ReviewDecisionState
 import io.github.daniele21.localllm.console.redaction.ReviewOccurrence
 import io.github.daniele21.localllm.ui.designsystem.OmbraStatusTone
 import io.github.daniele21.localllm.ui.designsystem.OmbraTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -127,6 +129,48 @@ class OmbraReviewScreenInstrumentedTest {
         }
 
         composeRule.onNodeWithText("Esporta PDF").performScrollTo().assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test
+    fun reviewResetActionInvokesFreshDocumentBoundary() {
+        val fixture = singleEmailFixture("alice@example.test", ReviewDecisionState.ACCEPTED)
+        val presentation = (fixture.session.present() as OmbraReviewPresentationResult.Ready).model
+        var resetCalls = 0
+
+        composeRule.setContent {
+            OmbraTheme {
+                OmbraReviewScreen(
+                    state = OmbraReviewUiState.Ready(presentation, selectedIndex = 0),
+                    harness = ReadyHarness,
+                    onPrepareReview = {},
+                    onMove = {},
+                    onToggleReveal = {},
+                    onDecision = {},
+                    onExport = {},
+                    onReset = { resetCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Nuovo PDF").performClick()
+        composeRule.runOnIdle { assertEquals(1, resetCalls) }
+    }
+
+    @Test
+    fun exportProgressCancellationActionRemainsReachable() {
+        var cancelCalls = 0
+
+        composeRule.setContent {
+            OmbraTheme {
+                OmbraExportProgressScreen(
+                    harness = ReadyHarness,
+                    onCancel = { cancelCalls += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Annulla").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, cancelCalls) }
     }
 
     private fun setReviewContent(state: OmbraReviewUiState) {
