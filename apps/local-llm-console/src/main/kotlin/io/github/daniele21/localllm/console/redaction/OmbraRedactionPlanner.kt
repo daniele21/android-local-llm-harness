@@ -161,7 +161,7 @@ internal object OmbraPlaceholderKeys {
             .toSortedMap()
             .forEach { (baseKey, entries) ->
                 entries.sortedBy { it.key.value }.forEachIndexed { index, entry ->
-                    result[entry.key] = if (index == 0) baseKey else bounded("${baseKey}_${index + 1}")
+                    result[entry.key] = if (index == 0) baseKey else withCollisionSuffix(baseKey, index + 1)
                 }
             }
         return result
@@ -182,6 +182,12 @@ internal object OmbraPlaceholderKeys {
             }
         val collapsed = ascii.replace(Regex("_+"), "_").trim('_')
         return bounded(collapsed.ifEmpty { "PII" }.uppercase(Locale.ROOT))
+    }
+
+    private fun withCollisionSuffix(baseKey: String, ordinal: Int): String {
+        val suffix = "_$ordinal"
+        val prefix = baseKey.take((MAX_KEY_LENGTH - suffix.length).coerceAtLeast(1)).trimEnd('_')
+        return "$prefix$suffix"
     }
 
     private fun bounded(value: String): String = value.take(MAX_KEY_LENGTH).trimEnd('_').ifEmpty { "PII" }
