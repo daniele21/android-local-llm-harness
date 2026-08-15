@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime-consumer-api
 Canonical scope: shared-runtime.consumer-api.roadmap
 Read when: selecting the next consumer-API milestone or exit gate
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This roadmap owns implementation order. Detailed behavior stays in the focused consumer-API specifications; shared-runtime security and physical release gates remain in the SR roadmap.
 
@@ -22,7 +22,7 @@ CA-0 Boundary decisions
  -> CA-7 Release readiness
 ```
 
-SR-5/SR-6 and applicable Qwen3.5 physical evidence remain external dependencies for distribution.
+SR-5/SR-6 and applicable Qwen3.5 physical evidence remain external dependencies for distribution. Deterministic preparation may progress in parallel when ownership is disjoint, but CA-6/CA-7 completion still requires their explicit cross-boundary and physical exit gates.
 
 ## CA-0 — Boundary decisions
 
@@ -110,17 +110,26 @@ State: **IN PROGRESS**
 
 Goal: turn `apps/local-llm-console` into the pure OMBRA PDF/PII reference consumer defined by [`pii-redactor/`](pii-redactor/).
 
-Active slice: OMB-0 decisions and bounded parser/export technical spikes. Product implementation must follow the accepted OMBRA responsibility split rather than extending the legacy Console control plane.
+Integrated OMBRA foundation:
 
-Tasks:
+- OMB-0/1 established isolated PDF handling, pure domain/application state and deterministic cancellation/reset semantics;
+- OMB-2/3 implemented production PDF import/extraction, fixed structured analysis composition and source-validated findings;
+- OMB-4 integrated the host-owned `document-pii-detection` use case through the packaged Binder Consumer API without exposing model/artifact identity or raw tuning;
+- OMB-5 integrated deterministic review/redaction, hidden/reveal projection and flattened PDF export;
+- OMB-6A integrated the OMBRA design-system/task components;
+- OMB-7A integrated the Compose Import -> Definitions -> Analysis -> Review-ready product flow;
+- OMB-8A has already prepared a deterministic synthetic quality corpus/scorer, but that does not satisfy CA-6 physical validation.
 
-- remove local model/runtime/control-plane responsibilities and raw inference controls;
-- use host capabilities and deterministic defaults for `document-pii-detection`;
-- prove bounded text input, fixed `JSON_SCHEMA` output and typed terminal behavior in a real document workflow;
-- implement the OMBRA milestones without introducing application-specific SDK or AIDL contracts;
-- handle unavailable, denied, incompatible, disconnected and cancelled states.
+Active slice: **OMB-7B / PR #235**, with cleanup evidence developed in PR #236. The candidate wires review/export, removes the remaining legacy Console control-plane surfaces and removes direct `models:model-store` / `observability:*` dependencies from `apps/local-llm-console` so inference is consumed through public contracts and `BinderConsumerLocalLlmClient` only.
 
-Exit gate: OMBRA has no LLM runtime/model-management implementation, uses the packaged public client boundary and meets the OMB-7 exit gate in [`pii-redactor/roadmap.md`](pii-redactor/roadmap.md). OMB-8 validation/release work remains mapped to CA-6/CA-7.
+Tasks still owned by CA-5:
+
+- complete the exact-head OMB-7B repository/PDF product gate and integrate it into `dev`;
+- preserve typed unavailable, denied, incompatible, disconnected and cancelled states through the final UI flow;
+- complete the product-flow semantics/adaptive/screenshot state matrix owned by OMB-7;
+- finish OMB-6B approved identity integration before claiming the complete OMBRA app identity requirement.
+
+Exit gate: OMBRA has no LLM runtime/model-management/control-plane implementation, uses the packaged public client boundary and meets the OMB-7 exit gate in [`pii-redactor/roadmap.md`](pii-redactor/roadmap.md). OMB-8 quality/physical/release work remains mapped to CA-6/CA-7.
 
 ## CA-6 — Validation
 
@@ -128,7 +137,14 @@ State: **PLANNED**
 
 Owner: [`validation-and-rollout.md`](validation-and-rollout.md)
 
-Tasks: complete policy/security/privacy tests, old/new compatibility, packaged-AAR surface checks and two-APK physical scenarios for discovery, selection, reasoning, cancellation and invalid requests.
+Preparation note: OMB-8A / PR #223 has integrated a deterministic synthetic PII quality corpus and scorer. This is useful input to CA-6 but does not itself open or complete the cross-boundary validation milestone.
+
+Tasks:
+
+- complete policy/security/privacy tests across the packaged Consumer boundary;
+- repeat old/new compatibility and packaged-AAR surface checks on the release candidate;
+- execute representative two-APK physical scenarios for discovery, selection, reasoning policy, cancellation and invalid requests;
+- execute OMBRA quality/failure scenarios on supported reviewed Qwen3.5 artifacts and record privacy-safe evidence for the exact build.
 
 Exit gate: deterministic gates are green and representative physical evidence supports the exact claim.
 
@@ -136,7 +152,12 @@ Exit gate: deterministic gates are green and representative physical evidence su
 
 State: **PLANNED**
 
-Tasks: publish API reference, document SDK/protocol/capability/preset version relationships, validate shrinker/artifact metadata, add API compatibility checks when needed and complete public API/security/versioning review.
+Tasks:
+
+- publish API reference and document SDK/protocol/capability/preset version relationships;
+- validate shrinker/artifact metadata and add API compatibility checks when needed;
+- complete public API/security/versioning review;
+- require applicable SR-6, Qwen3.5 and OMBRA release evidence before distribution claims.
 
 Exit gate: packaged SDK and reference consumer satisfy shared-runtime release policy.
 
@@ -150,9 +171,9 @@ Exit gate: packaged SDK and reference consumer satisfy shared-runtime release po
 | CA-3 | Result/reasoning/public metrics |
 | CA-4 | Binder mapping and packaged SDK |
 | CA-5 | OMBRA pure-consumer migration and product UX |
-| CA-6 | Security, compatibility and device evidence |
+| CA-6 | Security, compatibility, quality and device evidence |
 | CA-7 | API reference/version/release |
 
 ## State rule
 
-`PLANNED` means consumers must not assume the behavior. Mark `IN PROGRESS` only after implementation begins and `DONE` only after the exit gate is integrated and tested. Physical evidence remains pending unless executed for the exact recorded identity.
+`PLANNED` means consumers must not assume the behavior. Mark `IN PROGRESS` only after implementation begins and `DONE` only after the exit gate is integrated and tested. Parallel preparation does not upgrade a downstream milestone. Physical evidence remains pending unless executed for the exact recorded identity.
