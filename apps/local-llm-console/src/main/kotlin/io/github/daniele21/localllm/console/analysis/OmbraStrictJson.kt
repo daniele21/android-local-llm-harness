@@ -209,10 +209,9 @@ private class OmbraJsonCursor(private val input: String) {
     fun substring(start: Int, end: Int): String = input.substring(start, end)
 }
 
-private fun isJsonWhitespace(character: Char?): Boolean =
-    when (character) {
-        ' ', '\n', '\r', '\t' -> true
-        else -> false
-    }
+private fun isJsonWhitespace(character: Char?): Boolean = when (character) {
+    ' ', '\n', '\r', '\t' -> true
+    else -> false
+}
 
 private fun failJson(code: OmbraJsonFailureCode = OmbraJsonFailureCode.INVALID_JSON): Nothing = throw OmbraJsonException(code)
