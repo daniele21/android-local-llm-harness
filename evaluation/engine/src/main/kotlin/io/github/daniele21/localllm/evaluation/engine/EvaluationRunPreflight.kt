@@ -8,10 +8,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.SamplingSelection
 
 fun interface EvaluationDatasetPreflight {
-    fun validate(
-        dataset: EvaluationDatasetIdentity,
-        sampling: SamplingSelection,
-    ): EvaluationFailure?
+    fun validate(dataset: EvaluationDatasetIdentity, sampling: SamplingSelection): EvaluationFailure?
 }
 
 fun interface EvaluationEvaluatorPreflight {
@@ -19,10 +16,7 @@ fun interface EvaluationEvaluatorPreflight {
 }
 
 fun interface EvaluationExecutionProfilePreflight {
-    fun validate(
-        profile: EvaluationExecutionProfileRef,
-        model: ResolvedEvaluationModel,
-    ): EvaluationFailure?
+    fun validate(profile: EvaluationExecutionProfileRef, model: ResolvedEvaluationModel): EvaluationFailure?
 }
 
 class EvaluationRunPreflight(
