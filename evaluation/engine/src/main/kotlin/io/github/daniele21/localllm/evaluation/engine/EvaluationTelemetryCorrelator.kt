@@ -9,9 +9,7 @@ fun interface EvaluationTelemetryCorrelationPort {
     fun metrics(requestId: RequestId): EvaluationCaseMetrics
 }
 
-class TelemetryRepositoryEvaluationCorrelator(
-    private val repository: TelemetryRepository,
-) : EvaluationTelemetryCorrelationPort {
+class TelemetryRepositoryEvaluationCorrelator(private val repository: TelemetryRepository) : EvaluationTelemetryCorrelationPort {
     override fun metrics(requestId: RequestId): EvaluationCaseMetrics {
         val run = repository.findRun(requestId) ?: return EvaluationCaseMetrics()
         return run.toEvaluationCaseMetrics()
