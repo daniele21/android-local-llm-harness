@@ -31,10 +31,11 @@ class EvaluationRunPreflight(
             is EvaluationModelResolution.Resolved -> resolution.model
         }
 
-        datasetPreflight.validate(config.dataset, config.sampling)?.let { return failure(it) }
-        evaluatorPreflight.validate(config.dataset)?.let { return failure(it) }
-        executionProfilePreflight.validate(config.executionProfile, resolvedModel)?.let { return failure(it) }
-        return EvaluationStepResult.Success(Unit)
+        val compatibilityFailure = datasetPreflight.validate(config.dataset, config.sampling)
+            ?: evaluatorPreflight.validate(config.dataset)
+            ?: executionProfilePreflight.validate(config.executionProfile, resolvedModel)
+
+        return compatibilityFailure?.let(::failure) ?: EvaluationStepResult.Success(Unit)
     }
 
     private fun failure(failure: EvaluationFailure): EvaluationStepResult.Failure {
