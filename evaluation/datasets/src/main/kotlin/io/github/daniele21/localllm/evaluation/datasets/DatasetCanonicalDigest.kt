@@ -26,10 +26,7 @@ object EvaluationDatasetContentDigester {
         return EvaluationDatasetDigest(digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) })
     }
 
-    fun verify(
-        manifest: EvaluationDatasetManifestV1,
-        cases: List<EvaluationDatasetCaseV1>,
-    ): DatasetDigestVerification {
+    fun verify(manifest: EvaluationDatasetManifestV1, cases: List<EvaluationDatasetCaseV1>): DatasetDigestVerification {
         val actual = digest(cases)
         return if (actual == manifest.contentDigest) {
             DatasetDigestVerification.Match
@@ -155,12 +152,19 @@ private fun StringBuilder.appendJsonString(value: String) {
     value.forEach { char ->
         when (char) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             '\b' -> append("\\b")
+
             '\u000C' -> append("\\f")
+
             '\n' -> append("\\n")
+
             '\r' -> append("\\r")
+
             '\t' -> append("\\t")
+
             else -> {
                 if (char.code < 0x20) {
                     append("\\u")

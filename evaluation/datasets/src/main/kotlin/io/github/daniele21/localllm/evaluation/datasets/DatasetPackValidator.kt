@@ -15,11 +15,7 @@ enum class DatasetValidationIssueCode {
     MIXED_CATEGORY_WEIGHT_POLICY,
 }
 
-data class DatasetValidationIssue(
-    val code: DatasetValidationIssueCode,
-    val caseId: EvaluationCaseId? = null,
-    val presetId: String? = null,
-)
+data class DatasetValidationIssue(val code: DatasetValidationIssueCode, val caseId: EvaluationCaseId? = null, val presetId: String? = null)
 
 sealed interface DatasetValidationResult {
     data object Valid : DatasetValidationResult
@@ -31,18 +27,12 @@ sealed interface DatasetValidationResult {
     }
 }
 
-class EvaluationDatasetPackValidator(
-    private val evaluatorRegistry: EvaluatorRegistry,
-    private val maxIssues: Int = DEFAULT_MAX_ISSUES,
-) {
+class EvaluationDatasetPackValidator(private val evaluatorRegistry: EvaluatorRegistry, private val maxIssues: Int = DEFAULT_MAX_ISSUES) {
     init {
         require(maxIssues > 0) { "Dataset validator issue bound must be positive" }
     }
 
-    fun validate(
-        manifest: EvaluationDatasetManifestV1,
-        cases: List<EvaluationDatasetCaseV1>,
-    ): DatasetValidationResult {
+    fun validate(manifest: EvaluationDatasetManifestV1, cases: List<EvaluationDatasetCaseV1>): DatasetValidationResult {
         val collector = ValidationIssueCollector(maxIssues)
         if (manifest.caseCount != cases.size) {
             collector.add(DatasetValidationIssue(DatasetValidationIssueCode.CASE_COUNT_MISMATCH))
@@ -96,10 +86,7 @@ class EvaluationDatasetPackValidator(
         }
     }
 
-    private fun validateWeightPolicy(
-        manifest: EvaluationDatasetManifestV1,
-        collector: ValidationIssueCollector,
-    ) {
+    private fun validateWeightPolicy(manifest: EvaluationDatasetManifestV1, collector: ValidationIssueCollector) {
         val weighted = manifest.categories.count { it.weight != null }
         if (weighted != 0 && weighted != manifest.categories.size) {
             collector.add(DatasetValidationIssue(DatasetValidationIssueCode.MIXED_CATEGORY_WEIGHT_POLICY))

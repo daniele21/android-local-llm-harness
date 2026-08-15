@@ -35,24 +35,17 @@ enum class DatasetParseErrorCode {
     UNSUPPORTED_SCHEMA,
 }
 
-class EvaluationDatasetParseException(
-    val lineNumber: Int,
-    val code: DatasetParseErrorCode,
-) : IllegalArgumentException("Evaluation dataset parse failure at line $lineNumber: $code")
+class EvaluationDatasetParseException(val lineNumber: Int, val code: DatasetParseErrorCode) :
+    IllegalArgumentException("Evaluation dataset parse failure at line $lineNumber: $code")
 
-data class EvaluationDatasetParserLimits(
-    val maxCases: Int = 10_000,
-    val maxLineBytes: Int = 1_048_576,
-) {
+data class EvaluationDatasetParserLimits(val maxCases: Int = 10_000, val maxLineBytes: Int = 1_048_576) {
     init {
         require(maxCases > 0) { "Dataset parser max cases must be positive" }
         require(maxLineBytes > 0) { "Dataset parser max line bytes must be positive" }
     }
 }
 
-class EvaluationDatasetJsonlParser(
-    private val limits: EvaluationDatasetParserLimits = EvaluationDatasetParserLimits(),
-) {
+class EvaluationDatasetJsonlParser(private val limits: EvaluationDatasetParserLimits = EvaluationDatasetParserLimits()) {
     fun parse(input: InputStream): List<EvaluationDatasetCaseV1> = buildList {
         parse(input) { case -> add(case) }
     }
@@ -82,10 +75,7 @@ class EvaluationDatasetJsonlParser(
 
 private data class RawJsonlLine(val number: Int, val bytes: ByteArray)
 
-private class LfJsonlLineReader(
-    private val input: InputStream,
-    private val maxLineBytes: Int,
-) {
+private class LfJsonlLineReader(private val input: InputStream, private val maxLineBytes: Int) {
     private var lineNumber = 0
     private var firstLine = true
 
@@ -99,7 +89,9 @@ private class LfJsonlLineReader(
                 }
 
                 CR_BYTE -> throw EvaluationDatasetParseException(lineNumber + 1, DatasetParseErrorCode.CR_LINE_ENDING)
+
                 LF_BYTE -> return finishLine(buffer.toByteArray())
+
                 else -> {
                     if (buffer.size() >= maxLineBytes) {
                         throw EvaluationDatasetParseException(lineNumber + 1, DatasetParseErrorCode.LINE_TOO_LONG)
@@ -217,12 +209,7 @@ private fun decodeOutput(value: JsonValue.ObjectValue, lineNumber: Int): Evaluat
     }
 }
 
-private fun requireFields(
-    value: JsonValue.ObjectValue,
-    required: Set<String>,
-    optional: Set<String>,
-    lineNumber: Int,
-) {
+private fun requireFields(value: JsonValue.ObjectValue, required: Set<String>, optional: Set<String>, lineNumber: Int) {
     val keys = value.fields.keys
     if (!keys.containsAll(required)) {
         throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.MISSING_FIELD)
@@ -232,9 +219,8 @@ private fun requireFields(
     }
 }
 
-private fun JsonValue.ObjectValue.requireString(name: String, lineNumber: Int): String =
-    (fields[name] as? JsonValue.StringValue)?.value
-        ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
+private fun JsonValue.ObjectValue.requireString(name: String, lineNumber: Int): String = (fields[name] as? JsonValue.StringValue)?.value
+    ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
 
 private fun JsonValue.ObjectValue.requireInt(name: String, lineNumber: Int): Int =
     (fields[name] as? JsonValue.NumberValue)?.value?.let { number ->
@@ -258,9 +244,8 @@ private fun JsonValue.ObjectValue.optionalObject(name: String, lineNumber: Int):
         ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
 }
 
-private fun JsonValue.ObjectValue.requireArray(name: String, lineNumber: Int): JsonValue.ArrayValue =
-    fields[name] as? JsonValue.ArrayValue
-        ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
+private fun JsonValue.ObjectValue.requireArray(name: String, lineNumber: Int): JsonValue.ArrayValue = fields[name] as? JsonValue.ArrayValue
+    ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
 
 private fun JsonValue.ObjectValue.optionalArray(name: String, lineNumber: Int): JsonValue.ArrayValue? {
     val value = fields[name] ?: return null
@@ -273,10 +258,9 @@ private fun JsonValue.ObjectValue.toStringMap(lineNumber: Int): Map<String, Stri
         ?: throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
 }
 
-private inline fun <reified T : Enum<T>> enumValue(raw: String, lineNumber: Int): T =
-    runCatching { enumValueOf<T>(raw) }.getOrElse {
-        throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
-    }
+private inline fun <reified T : Enum<T>> enumValue(raw: String, lineNumber: Int): T = runCatching { enumValueOf<T>(raw) }.getOrElse {
+    throw EvaluationDatasetParseException(lineNumber, DatasetParseErrorCode.INVALID_FIELD)
+}
 
 private inline fun <T> wrapInvalidField(lineNumber: Int, block: () -> T): T = try {
     block()

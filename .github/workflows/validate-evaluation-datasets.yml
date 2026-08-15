@@ -39,13 +39,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Apply repository formatter
-        continue-on-error: true
-        run: ./gradlew --no-configuration-cache spotlessApply
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: formatted-evaluation-datasets
-          path: evaluation/datasets/**/*.kt
-          if-no-files-found: error
-          retention-days: 1
+      - name: Validate evaluation dataset module
+        run: |
+          ./gradlew --no-configuration-cache \
+            spotlessCheck \
+            detekt \
+            verifyNoModelArtifacts \
+            :evaluation:datasets:testDebugUnitTest \
+            :evaluation:datasets:lintDebug \
+            :evaluation:datasets:compileDebugKotlin
