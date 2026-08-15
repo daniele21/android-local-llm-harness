@@ -66,34 +66,42 @@ internal class OmbraAnalysisChunkPlanner(private val policy: OmbraAnalysisPlanni
         segments.forEach { segment -> pending += PendingSegment.whole(segment) }
 
         while (pending.isNotEmpty()) {
-            val chunkSegments = mutableListOf<OmbraAnalysisSegmentData>()
-            var continueChunk = true
-            while (pending.isNotEmpty() && continueChunk) {
-                val candidate = pending.removeFirst()
-                val wholeCandidate = candidate.asAnalysisSegment()
-                when {
-                    fits(definitions, chunkSegments + wholeCandidate, limits) -> chunkSegments += wholeCandidate
-
-                    chunkSegments.isNotEmpty() -> {
-                        pending.addFirst(candidate)
-                        continueChunk = false
-                    }
-
-                    else -> {
-                        val split =
-                            largestFittingPrefix(candidate, definitions, limits)
-                                ?: return OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT)
-                        chunkSegments += split.head
-                        if (split.tail != null) pending.addFirst(split.tail)
-                    }
-                }
-            }
-
+            val chunkSegments =
+                buildNextChunk(pending, definitions, limits)
+                    ?: return OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT)
             val payload = OmbraAnalysisDataSerializer.serialize(definitions, chunkSegments)
             chunks += OmbraAnalysisChunk(ordinal = chunks.size, segments = chunkSegments, dataPayload = payload)
         }
 
         return OmbraChunkPlanResult.Planned(chunks)
+    }
+
+    private fun buildNextChunk(
+        pending: ArrayDeque<PendingSegment>,
+        definitions: List<PiiDefinition>,
+        limits: ConsumerLimits,
+    ): List<OmbraAnalysisSegmentData>? {
+        val chunkSegments = mutableListOf<OmbraAnalysisSegmentData>()
+        var continueChunk = true
+        while (pending.isNotEmpty() && continueChunk) {
+            val candidate = pending.removeFirst()
+            val wholeCandidate = candidate.asAnalysisSegment()
+            when {
+                fits(definitions, chunkSegments + wholeCandidate, limits) -> chunkSegments += wholeCandidate
+
+                chunkSegments.isNotEmpty() -> {
+                    pending.addFirst(candidate)
+                    continueChunk = false
+                }
+
+                else -> {
+                    val split = largestFittingPrefix(candidate, definitions, limits) ?: return null
+                    chunkSegments += split.head
+                    split.tail?.let(pending::addFirst)
+                }
+            }
+        }
+        return chunkSegments
     }
 
     private fun largestFittingPrefix(pending: PendingSegment, definitions: List<PiiDefinition>, limits: ConsumerLimits): SplitResult? {
