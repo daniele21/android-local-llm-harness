@@ -44,14 +44,15 @@ internal class OmbraStrictJsonReader(
     private fun parseValue(cursor: Cursor, depth: Int): OmbraJsonValue {
         if (depth > maxDepth) throw OmbraJsonException(OmbraJsonFailureCode.DEPTH_EXCEEDED)
         cursor.skipWhitespace()
-        return when (cursor.peek()) {
-            '{' -> parseObject(cursor, depth + 1)
-            '[' -> parseArray(cursor, depth + 1)
-            '"' -> OmbraJsonValue.StringValue(parseString(cursor))
-            't' -> parseLiteral(cursor, "true", OmbraJsonValue.BooleanValue(true))
-            'f' -> parseLiteral(cursor, "false", OmbraJsonValue.BooleanValue(false))
-            'n' -> parseLiteral(cursor, "null", OmbraJsonValue.NullValue)
-            '-', in '0'..'9' -> OmbraJsonValue.IntegerValue(parseInteger(cursor))
+        val next = cursor.peek()
+        return when {
+            next == '{' -> parseObject(cursor, depth + 1)
+            next == '[' -> parseArray(cursor, depth + 1)
+            next == '"' -> OmbraJsonValue.StringValue(parseString(cursor))
+            next == 't' -> parseLiteral(cursor, "true", OmbraJsonValue.BooleanValue(true))
+            next == 'f' -> parseLiteral(cursor, "false", OmbraJsonValue.BooleanValue(false))
+            next == 'n' -> parseLiteral(cursor, "null", OmbraJsonValue.NullValue)
+            next == '-' || (next != null && next in '0'..'9') -> OmbraJsonValue.IntegerValue(parseInteger(cursor))
             else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
         }
     }
@@ -154,7 +155,7 @@ internal class OmbraStrictJsonReader(
         val first = cursor.peek()
         when {
             first == '0' -> cursor.take()
-            first in '1'..'9' -> consumeDigits(cursor)
+            first != null && first in '1'..'9' -> consumeDigits(cursor)
             else -> throw OmbraJsonException(OmbraJsonFailureCode.INVALID_JSON)
         }
         if (cursor.peek() == '.' || cursor.peek() == 'e' || cursor.peek() == 'E') {
@@ -165,7 +166,11 @@ internal class OmbraStrictJsonReader(
     }
 
     private fun consumeDigits(cursor: Cursor) {
-        while (cursor.peek() in '0'..'9') cursor.take()
+        while (true) {
+            val next = cursor.peek()
+            if (next == null || next !in '0'..'9') return
+            cursor.take()
+        }
     }
 
     private fun parseLiteral(cursor: Cursor, literal: String, value: OmbraJsonValue): OmbraJsonValue {
