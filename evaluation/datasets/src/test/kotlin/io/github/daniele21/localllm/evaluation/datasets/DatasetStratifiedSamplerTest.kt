@@ -96,10 +96,7 @@ class DatasetStratifiedSamplerTest {
         sampler.rank(manifest, cases, seed = 0)
     }
 
-    private fun manifest(
-        cases: List<EvaluationDatasetCaseV1>,
-        categoryWeights: Map<String, Double>,
-    ): EvaluationDatasetManifestV1 {
+    private fun manifest(cases: List<EvaluationDatasetCaseV1>, categoryWeights: Map<String, Double>): EvaluationDatasetManifestV1 {
         val categories = cases.map { it.categoryId }.distinct().sortedBy { it.value }
         return EvaluationDatasetManifestV1(
             datasetId = EvaluationDatasetId("sampling-fixture"),
