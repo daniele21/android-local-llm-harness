@@ -24,7 +24,6 @@ class EvaluationTelemetryCorrelatorTest {
                 inputTokens = 40,
                 outputTokens = 12,
                 prefillMs = 20L,
-                decodeMs = 70L,
                 decodeTokensPerSecond = 18.5,
             ),
         )
@@ -34,7 +33,7 @@ class EvaluationTelemetryCorrelatorTest {
         assertEquals(31L, metrics.timeToFirstTokenMs)
         assertEquals(120L, metrics.totalMs)
         assertEquals(20L, metrics.prefillMs)
-        assertEquals(70L, metrics.decodeMs)
+        assertEquals(20L, metrics.decodeMs)
         assertEquals(40, metrics.inputTokens)
         assertEquals(12, metrics.outputTokens)
         assertEquals(18.5, metrics.decodeTokensPerSecond ?: -1.0, 0.0)
@@ -63,7 +62,7 @@ class EvaluationTelemetryCorrelatorTest {
     fun `zero measured durations are preserved exactly`() {
         val requestId = RequestId("request-2")
         val metrics = TelemetryRepositoryEvaluationCorrelator(
-            repositoryWith(run(requestId = requestId, prefillMs = 0L, decodeMs = 0L)),
+            repositoryWith(run(requestId = requestId, prefillMs = 0L)),
         ).metrics(requestId)
 
         assertEquals(0L, metrics.prefillMs)
@@ -81,7 +80,6 @@ class EvaluationTelemetryCorrelatorTest {
         inputTokens: Int? = null,
         outputTokens: Int? = null,
         prefillMs: Long? = null,
-        decodeMs: Long? = null,
         decodeTokensPerSecond: Double? = null,
     ) = GenerationRunRecord(
         requestId = requestId,
@@ -100,6 +98,6 @@ class EvaluationTelemetryCorrelatorTest {
         decodeTokensPerSecond = decodeTokensPerSecond,
         errorCode = null,
         prefillMs = prefillMs,
-        decodeMs = decodeMs,
+        decodeMs = prefillMs,
     )
 }
