@@ -164,16 +164,18 @@ EVAL-4 is in progress. R-06 through R-09 can now proceed from the completed prep
 | --- | --- | --- | --- |
 | EVAL-P-01 | DONE | EVAL-C-05,EVAL-C-07 | Define evaluation repository queries, retention and deletion contract. |
 | EVAL-P-02 | DONE | EVAL-P-01 | Implement bounded in-memory repository with deterministic ordering and test parity baseline. |
-| EVAL-P-03 | READY | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
-| EVAL-P-04 | PLANNED | EVAL-P-03 | Implement Room DAO/repository and database migration wiring without coupling telemetry schema ownership. |
+| EVAL-P-03 | DONE | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
+| EVAL-P-04 | READY | EVAL-P-03 | Implement Room DAO/repository and database migration wiring without coupling telemetry schema ownership. |
 | EVAL-P-05 | PLANNED | EVAL-P-02,EVAL-P-04 | Add in-memory/Room parity tests for create, progress, terminal state, history, retention and deletion. |
 | EVAL-P-06 | DONE | EVAL-R-01,EVAL-P-01 | Persist run lifecycle atomically enough to distinguish active, partial, cancelled, failed and completed runs after process restart. |
 | EVAL-P-07 | PLANNED | EVAL-R-06,EVAL-P-06 | Persist each completed case outcome without prompt/expected/generated text. |
-| EVAL-P-08 | READY | EVAL-C-07,EVAL-P-01 | Implement comparison service with typed quality/runtime compatibility checks. |
-| EVAL-P-09 | PLANNED | EVAL-P-08 | Implement valid category/aggregate deltas and runtime/resource deltas only when their compatibility level passes. |
+| EVAL-P-08 | DONE | EVAL-C-07,EVAL-P-01 | Implement comparison service with typed quality/runtime compatibility checks. |
+| EVAL-P-09 | READY | EVAL-P-08 | Implement valid category/aggregate deltas and runtime/resource deltas only when their compatibility level passes. |
 | EVAL-P-10 | PLANNED | EVAL-P-05,EVAL-P-07,EVAL-P-09 | Add restart, retention, privacy and incompatible-comparison integration tests. |
 
 P-02 is the behavioral reference implementation for persistence parity: immutable run configuration after create, valid lifecycle transitions, ordered case snapshots bounded to the selected sample set, deterministic filtered history, active-run delete protection and terminal-only retention. It persists no prompt, expected-answer or generated-answer text. P-06 now persists lifecycle and progress around `EvaluationEngine` through the repository contract while keeping Room and per-case persistence as separate responsibilities.
+
+P-03 adds a normalized Room entity graph for run configuration/identity, ordered sampled cases, aggregate summaries and privacy-safe case outcomes. Case-result rows are constrained to sampled-case rows, evaluator parameters are normalized, and no prompt, expected-answer or generated-answer field exists. DAO/repository/database ownership remains P-04. P-08 adds typed quality/runtime compatibility assessment, including typed unavailability when either persisted run has no resolved identity; numeric deltas remain P-09.
 
 EVAL-5 is in progress. It closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner persists end-to-end results.
 
@@ -181,8 +183,8 @@ EVAL-5 is in progress. It closes when EVAL-P-01 through EVAL-P-10 are `DONE` and
 
 The current fan-out is intentionally broad:
 
-- EVAL-R-06, EVAL-R-07, EVAL-R-08 and EVAL-R-09 can proceed from the isolated runtime boundary while D-02/D-03/D-04 converge separately;
-- EVAL-P-03 and EVAL-P-08 are independent after the integrated P-02 baseline; P-06 lifecycle persistence is complete;
+- EVAL-R-06, EVAL-R-07, EVAL-R-08 and EVAL-R-09 can proceed from the isolated runtime boundary while dataset/import work converges separately;
+- EVAL-P-04 Room repository wiring and EVAL-P-09 compatible delta calculation are independently ready after P-03/P-08; P-06 lifecycle persistence is complete;
 - dataset parser/validator/digest/source lanes run independently in the dataset workstream;
 - the Performance UI shell can remain fake-driven until runner/persistence wiring lands.
 
