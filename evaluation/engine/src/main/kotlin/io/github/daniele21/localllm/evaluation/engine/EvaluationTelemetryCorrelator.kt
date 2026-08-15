@@ -17,22 +17,14 @@ class TelemetryRepositoryEvaluationCorrelator(private val repository: TelemetryR
 }
 
 private fun GenerationRunRecord.toEvaluationCaseMetrics(): EvaluationCaseMetrics = EvaluationCaseMetrics(
-    ttftMs = timeToFirstTokenMs,
-    totalDurationMs = totalMs,
-    promptTokens = inputTokens,
-    completionTokens = outputTokens,
-    prefillTokensPerSecond = prefillTokensPerSecond(),
+    timeToFirstTokenMs = timeToFirstTokenMs,
+    totalMs = totalMs,
+    prefillMs = prefillMs,
+    decodeMs = decodeMs,
+    inputTokens = inputTokens,
+    outputTokens = outputTokens,
     decodeTokensPerSecond = decodeTokensPerSecond,
     processPssBytes = null,
     availableMemoryBytes = null,
     thermalStatus = null,
 )
-
-private fun GenerationRunRecord.prefillTokensPerSecond(): Double? {
-    val tokens = inputTokens ?: return null
-    val durationMs = prefillMs ?: return null
-    if (durationMs <= 0L) return null
-    return tokens.toDouble() * MILLIS_PER_SECOND / durationMs.toDouble()
-}
-
-private const val MILLIS_PER_SECOND = 1_000.0
