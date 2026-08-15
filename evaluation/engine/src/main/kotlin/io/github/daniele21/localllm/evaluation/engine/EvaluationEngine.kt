@@ -165,7 +165,6 @@ class EvaluationEngine(
             emitProgress(config, observer, attempted, results.size, caseId)
             when (val execution = caseExecution.execute(config, caseId)) {
                 is EvaluationStepResult.Failure -> return fail(config, observer, results, execution.failure)
-
                 is EvaluationStepResult.Success -> recordCaseResult(config, observer, caseId, execution.value, results, attempted)
             }
         }
