@@ -44,6 +44,7 @@ internal class IsolatedOmbraPdfTextReader(context: Context) : OmbraPdfTextReader
         val code =
             when {
                 "InvalidPasswordException" in message -> OmbraDocumentExtractionFailureCode.ENCRYPTED_PDF
+
                 "Unable to open PDF source" in message || "File URI has no path" in message ->
                     OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE
 
