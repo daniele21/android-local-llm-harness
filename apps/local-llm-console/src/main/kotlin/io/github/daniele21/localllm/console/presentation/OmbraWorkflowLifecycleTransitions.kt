@@ -66,6 +66,7 @@ internal object OmbraWorkflowLifecycleTransitions {
                     add(OmbraWorkflowEffect.CancelOperation(operation.id, operation.kind))
                 }
                 add(OmbraWorkflowEffect.ClearSensitiveTask)
+                add(OmbraWorkflowEffect.ReleaseDocumentSources)
             }
         return OmbraWorkflowTransition(
             state = OmbraWorkflowState(nextOperationOrdinal = state.nextOperationOrdinal),

@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.roadmap
 Read when: selecting the next OMBRA implementation slice, dependency or exit gate
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This roadmap owns implementation order and milestone state. Detailed behavior stays in the focused OMBRA specifications. Repository priority belongs in [`../../../current-state.md`](../../../current-state.md); generic Consumer API milestones remain in [`../roadmap.md`](../roadmap.md).
 
@@ -73,7 +73,7 @@ Exit gate: **PASSED**. A pure JVM test drives import metadata -> definitions -> 
 
 State: **IN PROGRESS**
 
-Active slice: **OMB-2A — PDF source capability, production extractor adapter and deterministic segment mapping**.
+Active slice: **OMB-2B — PDF picker, typed production failures, source lifecycle cleanup and exit-gate evidence**.
 
 Owner: [`detection-and-redaction.md`](detection-and-redaction.md)
 
@@ -86,24 +86,30 @@ Tasks:
 - add resource/page/byte bounds and typed encrypted/image-only/malformed outcomes;
 - add synthetic PDF generators/fixtures and extraction/cancellation tests.
 
-Current OMB-2A progress:
+Integrated OMB-2A baseline:
 
 - production `AndroidOmbraDocumentExtractor` adapts the reviewed isolated PdfBox reader to the asynchronous application port;
 - process-local `OmbraDocumentSourceRef` resolution keeps raw URI/display-name data outside reducer state and content-free debug surfaces;
 - deterministic page/block segmentation produces stable `DocumentSegment` identities and rejects unsupported control characters fail-closed;
 - extraction failures are mapped to typed, content-free application outcomes;
 - cancellation waits for coroutine/reader termination before acknowledging the operation;
-- the existing OMBRA PDF emulator suite now includes production-extractor device coverage in addition to parser isolation/runtime evidence.
+- the existing OMBRA PDF emulator suite includes production-extractor device coverage in addition to parser isolation/runtime evidence.
+
+Current OMB-2B progress:
+
+- a PDF-only `ACTION_OPEN_DOCUMENT` capability requests only transient read access, rejects non-content picker results and converts the selected URI immediately into an opaque process-local source reference;
+- no write or persistable URI permission is requested and no persistable grant is retained;
+- workflow reset and process recreation now release all document source capabilities in addition to clearing sensitive task state;
+- the production reader boundary maps encrypted, malformed, unreadable and unexpected parser failures to typed content-free outcomes while the extractor continues to map truncation to `LIMIT_EXCEEDED`;
+- instrumentation coverage exercises picker permissions/source release plus production generated, blank, encrypted, malformed, truncated and cancellation paths.
 
 Remaining before OMB-2 can be `DONE`:
 
-- exact-head repository/documentation validation for OMB-2A;
-- emulator evidence for the production extractor path, including generated PDF extraction, blank/image-only handling and cancellation cleanup;
-- complete picker wiring/least-privilege content-URI ownership needed by the OMB-2 exit gate;
-- verify malformed/encrypted/limit mapping through the production adapter rather than only the underlying parser spike;
-- prove reset releases source capabilities and retains no sensitive task data.
+- exact-head repository/documentation validation for OMB-2B;
+- exact-head OMBRA PDF emulator evidence covering the expanded production extractor and resource-cleanup paths;
+- integrate the slice into `dev` only after those gates are green.
 
-Exit gate: supported fixtures produce deterministic page-ordered segments; unsupported and cancelled inputs close all resources and retain no sensitive task data after reset.
+Exit gate: supported fixtures produce deterministic page-ordered segments; unsupported and cancelled inputs close all resources and retain no sensitive task data or source capability after reset.
 
 ## OMB-3 — Analysis composition and fake inference
 
@@ -217,7 +223,8 @@ Exit gate: the exact distributed build meets the OMBRA validation completion cri
 | OMB-0A | Target/architecture decisions and parser/export spike report in owning docs |
 | OMB-1A | Pure models, definitions and validation |
 | OMB-1B | Reducer, effects and fake application orchestrator |
-| OMB-2A | PDF picker/extractor and fixture generator |
+| OMB-2A | Production PDF extractor and deterministic segmentation |
+| OMB-2B | PDF picker, typed failure mapping and source lifecycle cleanup |
 | OMB-3A | Prompt/schema/chunk planner |
 | OMB-3B | Result validation, merge and fake analysis flow |
 | OMB-4A | Host use-case policy after parent capability slice |

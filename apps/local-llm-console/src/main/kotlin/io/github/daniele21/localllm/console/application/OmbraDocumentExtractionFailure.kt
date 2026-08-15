@@ -6,6 +6,7 @@ internal enum class OmbraDocumentExtractionFailureCode {
     SOURCE_NOT_FOUND,
     SOURCE_UNREADABLE,
     ENCRYPTED_PDF,
+    MALFORMED_PDF,
     IMAGE_ONLY_PDF,
     EMPTY_PDF,
     LIMIT_EXCEEDED,

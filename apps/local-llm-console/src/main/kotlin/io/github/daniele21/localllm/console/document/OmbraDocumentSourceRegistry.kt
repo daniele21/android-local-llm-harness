@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.console.document
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import io.github.daniele21.localllm.console.application.OmbraDocumentSourceCapabilityCleanup
 import io.github.daniele21.localllm.console.application.OmbraDocumentSourceRef
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -23,9 +24,11 @@ internal fun interface OmbraDocumentSourceResolver {
  * Process-local capability registry for one-shot document picker results.
  *
  * Raw Uri values never enter workflow state. The registry intentionally does not request or retain
- * persistable URI permissions; callers release capabilities after reset/process completion.
+ * persistable URI permissions; workflow reset/process recreation releases all registered sources.
  */
-internal class OmbraDocumentSourceRegistry(context: Context) : OmbraDocumentSourceResolver {
+internal class OmbraDocumentSourceRegistry(context: Context) :
+    OmbraDocumentSourceResolver,
+    OmbraDocumentSourceCapabilityCleanup {
     private val applicationContext = context.applicationContext
     private val nextOrdinal = AtomicLong(1)
     private val sources = ConcurrentHashMap<Long, OmbraDocumentSource>()
@@ -42,7 +45,9 @@ internal class OmbraDocumentSourceRegistry(context: Context) : OmbraDocumentSour
 
     fun release(sourceRef: OmbraDocumentSourceRef): Boolean = sources.remove(sourceRef.value) != null
 
-    fun clear() = sources.clear()
+    override fun releaseAll() = sources.clear()
+
+    fun clear() = releaseAll()
 
     private fun resolveDisplayName(uri: Uri): String {
         if (uri.scheme == "content") {

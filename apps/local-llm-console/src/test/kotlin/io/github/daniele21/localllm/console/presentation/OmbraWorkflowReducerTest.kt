@@ -118,6 +118,12 @@ class OmbraWorkflowReducerTest {
         assertEquals(9L, recreated.state.nextOperationOrdinal)
         assertEquals(OmbraWorkflowCounts(), recreated.state.counts)
         assertNull(recreated.state.sourceRef)
-        assertEquals(listOf(OmbraWorkflowEffect.ClearSensitiveTask), recreated.effects)
+        assertEquals(
+            listOf(
+                OmbraWorkflowEffect.ClearSensitiveTask,
+                OmbraWorkflowEffect.ReleaseDocumentSources,
+            ),
+            recreated.effects,
+        )
     }
 }
