@@ -66,10 +66,10 @@ internal class OmbraBinderAnalysisComposition private constructor(
                 BinderConsumerLocalLlmClient.create(
                     context = context.applicationContext,
                     hostConfig =
-                        SharedRuntimeHostConfig.create(
-                            BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
-                            BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
-                        ),
+                    SharedRuntimeHostConfig.create(
+                        BuildConfig.SHARED_RUNTIME_HOST_PACKAGE,
+                        BuildConfig.SHARED_RUNTIME_HOST_SERVICE,
+                    ),
                     clientBuildId = "ombra-${BuildConfig.VERSION_NAME}",
                 )
             return OmbraBinderAnalysisComposition(
