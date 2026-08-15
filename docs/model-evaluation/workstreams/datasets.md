@@ -96,15 +96,15 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
 | EVAL-D-01 | DONE | EVAL-C-02,EVAL-C-03 | Define versioned manifest and canonical JSONL case schemas from the shared contracts. |
-| EVAL-D-02 | READY | EVAL-D-01,EVAL-C-09 | Implement bounded streaming JSONL parser with typed line/field/schema errors. |
-| EVAL-D-03 | READY | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
-| EVAL-D-04 | READY | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
-| EVAL-D-05 | PLANNED | EVAL-D-02,EVAL-D-03,EVAL-D-04 | Implement staged app-private installation with atomic publication and rollback cleanup. |
-| EVAL-D-06 | PLANNED | EVAL-D-05 | Implement dataset registry/discovery for built-in and user-imported installed packs. |
-| EVAL-D-07 | PLANNED | EVAL-C-04,EVAL-D-03 | Implement deterministic stratified sampling with stable tie-breaking and versioned policy. |
-| EVAL-D-08 | PLANNED | EVAL-D-07 | Implement 20/50/100/200 preset resolution, `All`, and bounded custom multiple-of-10 counts. |
-| EVAL-D-09 | PLANNED | EVAL-D-05,EVAL-D-08 | Add fixture packs and tests for malformed records, duplicate IDs, digest mismatch, rollback and deterministic sampling. |
-| EVAL-D-10 | PLANNED | EVAL-D-05 | Implement Android document import adapter for canonical JSONL with generated local manifest metadata. |
+| EVAL-D-02 | DONE | EVAL-D-01,EVAL-C-09 | Implement bounded streaming JSONL parser with typed line/field/schema errors. |
+| EVAL-D-03 | DONE | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
+| EVAL-D-04 | DONE | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
+| EVAL-D-05 | DONE | EVAL-D-02,EVAL-D-03,EVAL-D-04 | Implement staged app-private installation with atomic publication and rollback cleanup. |
+| EVAL-D-06 | DONE | EVAL-D-05 | Implement dataset registry/discovery for built-in and user-imported installed packs. |
+| EVAL-D-07 | DONE | EVAL-C-04,EVAL-D-03 | Implement deterministic stratified sampling with stable tie-breaking and versioned policy. |
+| EVAL-D-08 | DONE | EVAL-D-07 | Implement 20/50/100/200 preset resolution, `All`, and bounded custom multiple-of-10 counts. |
+| EVAL-D-09 | READY | EVAL-D-05,EVAL-D-08 | Add fixture packs and tests for malformed records, duplicate IDs, digest mismatch, rollback and deterministic sampling. |
+| EVAL-D-10 | READY | EVAL-D-05 | Implement Android document import adapter for canonical JSONL with generated local manifest metadata. |
 | EVAL-D-11 | PLANNED | EVAL-D-06,EVAL-D-10 | Implement explicit dataset delete with protection against deleting a pack used by an active run. |
 | EVAL-D-12 | PLANNED | EVAL-D-09,EVAL-D-11 | Document custom JSONL schema, limits, privacy behavior and import failure semantics. |
 
@@ -135,18 +135,14 @@ EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-The schema freeze unlocks the independent generic dataset lanes:
-
-- EVAL-D-02 bounded parser;
-- EVAL-D-03 full-pack validator;
-- EVAL-D-04 canonical digest verification.
+The parser, validator, canonical digest, atomic installer, registry, deterministic sampling and preset resolution are integrated. EVAL-D-09 regression fixtures and EVAL-D-10 Android document import can proceed independently before import/deletion documentation converges.
 
 Public-source inventory EVAL-GP-01 is complete. EVAL-GP-02 license/attribution review can now proceed independently of Harness-owned authoring:
 
 - EVAL-GP-05 structured-output cases;
 - EVAL-GP-06 context-retrieval cases.
 
-D-02/D-03/D-04 converge at D-05 installation. GP-02/GP-03 remain independent of Harness-owned case authoring. Dataset storage D-05/D-06 and sampling D-07/D-08 proceed as separate implementation lanes after their prerequisites.
+GP-02/GP-03 remain independent of Harness-owned case authoring. D-09 and D-10 are independent; D-10 joins D-06 at D-11 protected deletion before D-12 closes the generic dataset documentation.
 
 General Purpose v1 assembly is intentionally late: source/legal review, evaluator semantics and deterministic sampling must be stable before the 200-case digest is frozen.
 
