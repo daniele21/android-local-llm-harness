@@ -26,53 +26,63 @@ internal sealed interface OmbraAnalysisParseResult {
 
 /** Converts untrusted model JSON into bounded raw candidates without granting source validity. */
 internal class OmbraAnalysisResultParser(private val jsonReader: OmbraStrictJsonReader = OmbraStrictJsonReader()) {
-    fun parse(input: String): OmbraAnalysisParseResult {
-        val root =
-            try {
-                jsonReader.parse(input)
-            } catch (_: OmbraJsonException) {
-                return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_JSON)
-            }
-        val rootObject =
-            root as? OmbraJsonValue.ObjectValue
-                ?: return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
-        if (rootObject.fields.keys != ROOT_FIELDS) {
-            return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
-        }
-        val schemaVersion =
-            (rootObject.fields["schemaVersion"] as? OmbraJsonValue.IntegerValue)?.value
-                ?: return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
-        if (schemaVersion != OmbraAnalysisProtocol.OUTPUT_SCHEMA_VERSION.toLong()) {
-            return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.UNSUPPORTED_SCHEMA)
-        }
-        val findingsValue =
-            rootObject.fields["findings"] as? OmbraJsonValue.ArrayValue
-                ?: return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
-        if (findingsValue.values.size > OmbraAnalysisProtocol.MAX_FINDINGS) {
-            return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.TOO_MANY_FINDINGS)
+    fun parse(input: String): OmbraAnalysisParseResult =
+        try {
+            OmbraAnalysisParseResult.Parsed(parseRoot(jsonReader.parse(input)))
+        } catch (_: OmbraJsonException) {
+            OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_JSON)
+        } catch (rejected: OmbraAnalysisResultRejected) {
+            OmbraAnalysisParseResult.Rejected(rejected.code)
         }
 
-        val findings = ArrayList<OmbraRawFinding>(findingsValue.values.size)
-        findingsValue.values.forEach { value ->
-            val finding =
-                parseFinding(value)
-                    ?: return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
-            if (!isFieldLengthValid(finding)) {
-                return OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.FIELD_TOO_LONG)
-            }
-            findings += finding
+    private fun parseRoot(root: OmbraJsonValue): OmbraParsedAnalysisResult {
+        val rootObject = requireObject(root)
+        requireExactFields(rootObject, ROOT_FIELDS)
+        val schemaVersion = requireInteger(rootObject, "schemaVersion")
+        if (schemaVersion != OmbraAnalysisProtocol.OUTPUT_SCHEMA_VERSION.toLong()) {
+            rejectAnalysisResult(OmbraAnalysisParseFailureCode.UNSUPPORTED_SCHEMA)
         }
-        return OmbraAnalysisParseResult.Parsed(OmbraParsedAnalysisResult(findings))
+        val findingValues = requireArray(rootObject, "findings")
+        if (findingValues.size > OmbraAnalysisProtocol.MAX_FINDINGS) {
+            rejectAnalysisResult(OmbraAnalysisParseFailureCode.TOO_MANY_FINDINGS)
+        }
+        return OmbraParsedAnalysisResult(findingValues.map(::parseFinding))
     }
 
-    private fun parseFinding(value: OmbraJsonValue): OmbraRawFinding? {
-        val objectValue = value as? OmbraJsonValue.ObjectValue ?: return null
-        if (objectValue.fields.keys != FINDING_FIELDS) return null
-        val typeId = (objectValue.fields["typeId"] as? OmbraJsonValue.StringValue)?.value ?: return null
-        val surface = (objectValue.fields["surface"] as? OmbraJsonValue.StringValue)?.value ?: return null
-        val segmentId = (objectValue.fields["segmentId"] as? OmbraJsonValue.StringValue)?.value ?: return null
-        if (typeId.isEmpty() || surface.isEmpty() || segmentId.isEmpty()) return null
-        return OmbraRawFinding(typeId = typeId, surface = surface, segmentId = segmentId)
+    private fun parseFinding(value: OmbraJsonValue): OmbraRawFinding {
+        val objectValue = requireObject(value)
+        requireExactFields(objectValue, FINDING_FIELDS)
+        val finding =
+            OmbraRawFinding(
+                typeId = requireNonEmptyString(objectValue, "typeId"),
+                surface = requireNonEmptyString(objectValue, "surface"),
+                segmentId = requireNonEmptyString(objectValue, "segmentId"),
+            )
+        if (!isFieldLengthValid(finding)) rejectAnalysisResult(OmbraAnalysisParseFailureCode.FIELD_TOO_LONG)
+        return finding
+    }
+
+    private fun requireObject(value: OmbraJsonValue): OmbraJsonValue.ObjectValue =
+        value as? OmbraJsonValue.ObjectValue ?: rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+
+    private fun requireExactFields(value: OmbraJsonValue.ObjectValue, expected: Set<String>) {
+        if (value.fields.keys != expected) rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+    }
+
+    private fun requireInteger(value: OmbraJsonValue.ObjectValue, field: String): Long =
+        (value.fields[field] as? OmbraJsonValue.IntegerValue)?.value
+            ?: rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+
+    private fun requireArray(value: OmbraJsonValue.ObjectValue, field: String): List<OmbraJsonValue> =
+        (value.fields[field] as? OmbraJsonValue.ArrayValue)?.values
+            ?: rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+
+    private fun requireNonEmptyString(value: OmbraJsonValue.ObjectValue, field: String): String {
+        val text =
+            (value.fields[field] as? OmbraJsonValue.StringValue)?.value
+                ?: rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+        if (text.isEmpty()) rejectAnalysisResult(OmbraAnalysisParseFailureCode.INVALID_SHAPE)
+        return text
     }
 
     private fun isFieldLengthValid(finding: OmbraRawFinding): Boolean = finding.typeId.length <= MAX_TYPE_ID_CHARACTERS &&
@@ -86,3 +96,7 @@ internal class OmbraAnalysisResultParser(private val jsonReader: OmbraStrictJson
         const val MAX_SEGMENT_ID_CHARACTERS = 32
     }
 }
+
+private class OmbraAnalysisResultRejected(val code: OmbraAnalysisParseFailureCode) : RuntimeException()
+
+private fun rejectAnalysisResult(code: OmbraAnalysisParseFailureCode): Nothing = throw OmbraAnalysisResultRejected(code)
