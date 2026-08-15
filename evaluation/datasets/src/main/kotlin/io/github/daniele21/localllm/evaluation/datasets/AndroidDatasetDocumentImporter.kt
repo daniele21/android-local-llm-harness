@@ -29,10 +29,7 @@ enum class DatasetDocumentImportRejectionCode {
 }
 
 sealed interface DatasetDocumentImportResult {
-    data class Imported(
-        val manifest: EvaluationDatasetManifestV1,
-        val directory: File,
-    ) : DatasetDocumentImportResult
+    data class Imported(val manifest: EvaluationDatasetManifestV1, val directory: File) : DatasetDocumentImportResult
 
     data class Rejected(
         val code: DatasetDocumentImportRejectionCode,
@@ -47,10 +44,8 @@ fun interface EvaluationDatasetDocumentSource {
     fun open(): InputStream?
 }
 
-class AndroidEvaluationDatasetDocumentSource(
-    private val contentResolver: ContentResolver,
-    private val uri: Uri,
-) : EvaluationDatasetDocumentSource {
+class AndroidEvaluationDatasetDocumentSource(private val contentResolver: ContentResolver, private val uri: Uri) :
+    EvaluationDatasetDocumentSource {
     override fun open(): InputStream? = contentResolver.openInputStream(uri)
 }
 
@@ -64,10 +59,7 @@ class EvaluationDatasetDocumentImporter(
     private val parser: EvaluationDatasetJsonlParser,
     private val installer: EvaluationDatasetInstaller,
 ) {
-    fun importDataset(
-        source: EvaluationDatasetDocumentSource,
-        metadata: EvaluationDatasetImportMetadata,
-    ): DatasetDocumentImportResult {
+    fun importDataset(source: EvaluationDatasetDocumentSource, metadata: EvaluationDatasetImportMetadata): DatasetDocumentImportResult {
         val readResult = readCases(source)
         if (readResult is DatasetDocumentReadResult.Rejected) return readResult.result
         val cases = (readResult as DatasetDocumentReadResult.Success).cases
@@ -79,6 +71,7 @@ class EvaluationDatasetDocumentImporter(
             ?: return DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.INVALID_METADATA)
         return when (val installed = installer.install(manifest, CanonicalCaseListInputStream(cases))) {
             is DatasetInstallResult.Installed -> DatasetDocumentImportResult.Imported(manifest, installed.directory)
+
             is DatasetInstallResult.Rejected -> DatasetDocumentImportResult.Rejected(
                 code = DatasetDocumentImportRejectionCode.INSTALL_REJECTED,
                 parseLineNumber = installed.parseLineNumber,
@@ -139,9 +132,7 @@ class EvaluationDatasetDocumentImporter(
     }
 }
 
-private class CanonicalCaseListInputStream(
-    cases: List<EvaluationDatasetCaseV1>,
-) : InputStream() {
+private class CanonicalCaseListInputStream(cases: List<EvaluationDatasetCaseV1>) : InputStream() {
     private val iterator = cases.iterator()
     private var current = ByteArrayInputStream(ByteArray(0))
 
