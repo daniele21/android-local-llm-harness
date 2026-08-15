@@ -67,6 +67,29 @@ class EvaluationDatasetJsonlParserTest {
     }
 
     @Test
+    fun fractionalSchemaVersionIsRejectedAsInvalidField() {
+        val fractional = validCaseLine().replace("\"schemaVersion\":1", "\"schemaVersion\":1.5")
+        val failure = assertThrows(EvaluationDatasetParseException::class.java) {
+            parser.parse(input(fractional))
+        }
+
+        assertEquals(DatasetParseErrorCode.INVALID_FIELD, failure.code)
+    }
+
+    @Test
+    fun fractionalMaxOutputTokensIsRejectedAsInvalidField() {
+        val fractional = validCaseLine().replace(
+            "\"metadata\":{\"source\":\"fixture\"}",
+            "\"output\":{\"responseFormat\":\"TEXT\",\"maxOutputTokens\":1.5},\"metadata\":{\"source\":\"fixture\"}",
+        )
+        val failure = assertThrows(EvaluationDatasetParseException::class.java) {
+            parser.parse(input(fractional))
+        }
+
+        assertEquals(DatasetParseErrorCode.INVALID_FIELD, failure.code)
+    }
+
+    @Test
     fun crlfIsRejectedInsteadOfSilentlyCanonicalized() {
         val failure = assertThrows(EvaluationDatasetParseException::class.java) {
             parser.parse(input(validCaseLine().removeSuffix("\n") + "\r\n"))
