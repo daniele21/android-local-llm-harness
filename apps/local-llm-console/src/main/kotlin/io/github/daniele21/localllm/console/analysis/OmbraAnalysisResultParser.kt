@@ -26,14 +26,13 @@ internal sealed interface OmbraAnalysisParseResult {
 
 /** Converts untrusted model JSON into bounded raw candidates without granting source validity. */
 internal class OmbraAnalysisResultParser(private val jsonReader: OmbraStrictJsonReader = OmbraStrictJsonReader()) {
-    fun parse(input: String): OmbraAnalysisParseResult =
-        try {
-            OmbraAnalysisParseResult.Parsed(parseRoot(jsonReader.parse(input)))
-        } catch (_: OmbraJsonException) {
-            OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_JSON)
-        } catch (rejected: OmbraAnalysisResultRejected) {
-            OmbraAnalysisParseResult.Rejected(rejected.code)
-        }
+    fun parse(input: String): OmbraAnalysisParseResult = try {
+        OmbraAnalysisParseResult.Parsed(parseRoot(jsonReader.parse(input)))
+    } catch (_: OmbraJsonException) {
+        OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_JSON)
+    } catch (rejected: OmbraAnalysisResultRejected) {
+        OmbraAnalysisParseResult.Rejected(rejected.code)
+    }
 
     private fun parseRoot(root: OmbraJsonValue): OmbraParsedAnalysisResult {
         val rootObject = requireObject(root)
