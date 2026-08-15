@@ -58,6 +58,26 @@ internal object OmbraWorkflowLifecycleTransitions {
         }
     }
 
+    fun returnToReview(state: OmbraWorkflowState): OmbraWorkflowTransition {
+        if (
+            state.stage != OmbraWorkflowStage.FAILED ||
+            state.failureCode != OmbraFailureCode.EXPORT_FAILED ||
+            state.retryTarget != OmbraRetryTarget.EXPORT
+        ) {
+            return OmbraWorkflowTransitionSupport.unchanged(state)
+        }
+        return OmbraWorkflowTransition(
+            state =
+            state.copy(
+                stage = OmbraWorkflowStage.REVIEW_READY,
+                activeOperation = null,
+                exportDestinationRef = null,
+                failureCode = null,
+                retryTarget = null,
+            ),
+        )
+    }
+
     fun reset(state: OmbraWorkflowState, cancelActive: Boolean): OmbraWorkflowTransition {
         val effects =
             buildList {

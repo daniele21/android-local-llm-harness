@@ -14,6 +14,8 @@ import io.github.daniele21.localllm.console.document.OmbraPdfOpenDocumentCapabil
 import io.github.daniele21.localllm.console.pii.PiiDefinition
 import io.github.daniele21.localllm.console.presentation.OmbraApplicationOrchestrator
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowState
+import io.github.daniele21.localllm.console.redaction.OccurrenceId
+import io.github.daniele21.localllm.console.redaction.ReviewDecisionState
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionObserver
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot
 import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState
@@ -52,6 +54,10 @@ internal class OmbraProductController(context: Context) : AutoCloseable {
 
     val workflow: StateFlow<OmbraWorkflowState> = workflowMutable.asStateFlow()
     val connection: StateFlow<SharedRuntimeConnectionSnapshot> = connectionMutable.asStateFlow()
+    val cancel: () -> Boolean = orchestrator::cancel
+    val retry: () -> Boolean = orchestrator::retry
+    val returnToReview: () -> Boolean = orchestrator::returnToReview
+    val reset: () -> Boolean = orchestrator::reset
 
     fun connectHarness() = analysis.connect()
 
@@ -70,11 +76,16 @@ internal class OmbraProductController(context: Context) : AutoCloseable {
         return orchestrator.startAnalysis()
     }
 
-    fun cancel(): Boolean = orchestrator.cancel()
+    fun setDecision(occurrenceId: OccurrenceId, decision: ReviewDecisionState): Boolean =
+        orchestrator.task.setDecision(occurrenceId, decision)
 
-    fun retry(): Boolean = orchestrator.retry()
-
-    fun reset(): Boolean = orchestrator.reset()
+    fun startExport(uri: Uri?): Boolean {
+        if (uri == null) return false
+        val destinationRef = runCatching { destinationRegistry.register(uri) }.getOrNull() ?: return false
+        val started = orchestrator.task.startExport(destinationRef)
+        if (!started) destinationRegistry.release(destinationRef)
+        return started
+    }
 
     override fun close() {
         taskStore.clear()
