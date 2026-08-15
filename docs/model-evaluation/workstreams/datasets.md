@@ -104,13 +104,15 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 | EVAL-D-07 | DONE | EVAL-C-04,EVAL-D-03 | Implement deterministic stratified sampling with stable tie-breaking and versioned policy. |
 | EVAL-D-08 | DONE | EVAL-D-07 | Implement 20/50/100/200 preset resolution, `All`, and bounded custom multiple-of-10 counts. |
 | EVAL-D-09 | DONE | EVAL-D-05,EVAL-D-08 | Add fixture packs and tests for malformed records, duplicate IDs, digest mismatch, rollback and deterministic sampling. |
-| EVAL-D-10 | READY | EVAL-D-05 | Implement Android document import adapter for canonical JSONL with generated local manifest metadata. |
-| EVAL-D-11 | PLANNED | EVAL-D-06,EVAL-D-10 | Implement explicit dataset delete with protection against deleting a pack used by an active run. |
+| EVAL-D-10 | DONE | EVAL-D-05 | Implement Android document import adapter for canonical JSONL with generated local manifest metadata. |
+| EVAL-D-11 | READY | EVAL-D-06,EVAL-D-10 | Implement explicit dataset delete with protection against deleting a pack used by an active run. |
 | EVAL-D-12 | PLANNED | EVAL-D-09,EVAL-D-11 | Document custom JSONL schema, limits, privacy behavior and import failure semantics. |
 
 EVAL-D-01 is satisfied by the typed v1 manifest/case contracts and tests in `evaluation/contracts` plus the frozen wire representation in [`../dataset-schema-v1.md`](../dataset-schema-v1.md).
 
 EVAL-D-09 is satisfied by reusable 200-case fixture construction plus integrated parser/validator/installer/sampler coverage for duplicate IDs, malformed records, digest mismatch, publication rollback and repeatable Standard sample identity across clean installs.
+
+EVAL-D-10 is satisfied by the Android `ContentResolver`/`Uri` document source adapter and the JVM-testable canonical importer in `evaluation/datasets`. Import reuses the bounded v1 parser, derives deterministic `USER_IMPORTED` manifest metadata and canonical content/category identity, then delegates validation/publication/rollback to the existing D-05 installer. It adds no alternate parser, storage path, executable import hook or network fetch behavior.
 
 EVAL-2 closes when EVAL-D-01 through EVAL-D-12 are `DONE` and the real evaluation engine can consume installed packs through the dataset contract.
 
@@ -137,14 +139,14 @@ EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-The parser, validator, canonical digest, atomic installer, registry, deterministic sampling, preset resolution and reusable regression fixtures are integrated. EVAL-D-10 Android document import is the next dataset slice before protected deletion in EVAL-D-11.
+The parser, validator, canonical digest, atomic installer, registry, deterministic sampling, preset resolution, reusable regression fixtures and Android canonical-document import are integrated. EVAL-D-11 protected deletion is now the next generic dataset slice; EVAL-D-12 follows after deletion semantics are frozen.
 
-Public-source inventory EVAL-GP-01 is complete. EVAL-GP-02 license/attribution review can now proceed independently of Harness-owned authoring:
+Public-source inventory EVAL-GP-01 is complete. EVAL-GP-02 license/attribution review can proceed independently of Harness-owned authoring:
 
 - EVAL-GP-05 structured-output cases;
 - EVAL-GP-06 context-retrieval cases.
 
-GP-02/GP-03 remain independent of Harness-owned case authoring. D-10 joins D-06 at D-11 protected deletion; D-12 closes the generic dataset documentation after D-09 and D-11.
+GP-02/GP-03 remain independent of Harness-owned case authoring. D-11 now joins the integrated registry with the canonical import boundary; D-12 closes the generic dataset documentation after D-09 and D-11.
 
 General Purpose v1 assembly is intentionally late: source/legal review, evaluator semantics and deterministic sampling must be stable before the 200-case digest is frozen.
 
