@@ -5,12 +5,14 @@ on:
   pull_request:
     paths:
       - scripts/verify_ombra_identity_candidate.py
+      - scripts/generate_ombra_android_identity.py
       - .github/workflows/ombra-identity.yml
       - docs/assets/consumer/ombra/master/**
   push:
     branches: [main, dev]
     paths:
       - scripts/verify_ombra_identity_candidate.py
+      - scripts/generate_ombra_android_identity.py
       - .github/workflows/ombra-identity.yml
       - docs/assets/consumer/ombra/master/**
 
@@ -30,3 +32,6 @@ jobs:
 
       - name: Verify review-gated OMBRA vector candidate
         run: python3 scripts/verify_ombra_identity_candidate.py
+
+      - name: Verify production launcher generation gate
+        run: python3 scripts/generate_ombra_android_identity.py
