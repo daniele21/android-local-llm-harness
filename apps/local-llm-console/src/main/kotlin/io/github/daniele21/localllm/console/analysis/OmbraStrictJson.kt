@@ -152,9 +152,10 @@ internal class OmbraStrictJsonReader(
     private fun parseInteger(cursor: OmbraJsonCursor): Long {
         val start = cursor.position
         cursor.consumeIf('-')
-        when (val first = cursor.peek()) {
-            '0' -> cursor.take()
-            in '1'..'9' -> cursor.consumeDigits()
+        val first = cursor.peek()
+        when {
+            first == '0' -> cursor.take()
+            first != null && first in '1'..'9' -> cursor.consumeDigits()
             else -> failJson()
         }
         when (cursor.peek()) {
@@ -197,7 +198,7 @@ private class OmbraJsonCursor(private val input: String) {
     }
 
     fun consumeDigits() {
-        while (peek()?.isDigit() == true) position += 1
+        while (peek()?.let { it in '0'..'9' } == true) position += 1
     }
 
     fun consumeLiteral(literal: String, value: OmbraJsonValue): OmbraJsonValue {
