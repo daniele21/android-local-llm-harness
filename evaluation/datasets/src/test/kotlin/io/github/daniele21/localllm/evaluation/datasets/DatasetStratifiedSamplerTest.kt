@@ -41,7 +41,7 @@ class DatasetStratifiedSamplerTest {
         val manifest = manifest(cases, categoryWeights = emptyMap())
 
         val first = sampler.rank(manifest, cases, seed = 1).orderedCaseIds
-        val repeated = sampler.rank(manifest, cases.shuffled(), seed = 1).orderedCaseIds
+        val repeated = sampler.rank(manifest, cases.reversed(), seed = 1).orderedCaseIds
         val second = sampler.rank(manifest, cases, seed = 2).orderedCaseIds
 
         assertEquals(first, repeated)
