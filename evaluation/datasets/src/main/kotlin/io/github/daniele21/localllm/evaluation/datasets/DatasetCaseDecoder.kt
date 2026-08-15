@@ -1,9 +1,9 @@
 package io.github.daniele21.localllm.evaluation.datasets
 
 import io.github.daniele21.localllm.evaluation.EVALUATION_DATASET_CASE_SCHEMA_VERSION
+import io.github.daniele21.localllm.evaluation.EvaluationCaseId
 import io.github.daniele21.localllm.evaluation.EvaluationCaseMessage
 import io.github.daniele21.localllm.evaluation.EvaluationCaseOutputContract
-import io.github.daniele21.localllm.evaluation.EvaluationCaseId
 import io.github.daniele21.localllm.evaluation.EvaluationCategoryId
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1
 import io.github.daniele21.localllm.evaluation.EvaluationExpectedAnswer
