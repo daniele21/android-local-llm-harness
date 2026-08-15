@@ -83,25 +83,23 @@ class EvaluatorV1CorpusTest {
     fun `instruction constraints reject invalid spec outside output corpus`() {
         InstructionConstraintsEvaluator().evaluate(
             generated = "answer",
-            spec =
-                EvaluatorSpec(
-                    type = EvaluatorType.INSTRUCTION_CONSTRAINTS,
-                    version = InstructionConstraintsEvaluator.VERSION,
-                    parameters = mapOf(
-                        InstructionConstraintsEvaluator.PARAM_CONSTRAINTS to "non_empty,non_empty",
-                        InstructionConstraintsEvaluator.PARAM_CASE to InstructionConstraintsEvaluator.CASE_SENSITIVE,
-                    ),
+            spec = EvaluatorSpec(
+                type = EvaluatorType.INSTRUCTION_CONSTRAINTS,
+                version = InstructionConstraintsEvaluator.VERSION,
+                parameters = mapOf(
+                    InstructionConstraintsEvaluator.PARAM_CONSTRAINTS to "non_empty,non_empty",
+                    InstructionConstraintsEvaluator.PARAM_CASE to InstructionConstraintsEvaluator.CASE_SENSITIVE,
                 ),
+            ),
         )
     }
 }
 
-private fun v1CorpusRegistrations() =
-    listOf(
-        ExactMatchEvaluator.REGISTRATION,
-        MultipleChoiceEvaluator.REGISTRATION,
-        NumericFinalAnswerEvaluator.REGISTRATION,
-        JsonFieldsEvaluator.REGISTRATION,
-        RegexFormatEvaluator.REGISTRATION,
-        InstructionConstraintsEvaluator.REGISTRATION,
-    )
+private fun v1CorpusRegistrations() = listOf(
+    ExactMatchEvaluator.REGISTRATION,
+    MultipleChoiceEvaluator.REGISTRATION,
+    NumericFinalAnswerEvaluator.REGISTRATION,
+    JsonFieldsEvaluator.REGISTRATION,
+    RegexFormatEvaluator.REGISTRATION,
+    InstructionConstraintsEvaluator.REGISTRATION,
+)

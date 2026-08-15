@@ -266,40 +266,39 @@ internal object EvaluatorV1Corpus {
         )
 }
 
-internal fun evaluateCorpusCase(fixture: EvaluatorV1CorpusCase): EvaluationOutcome =
-    when (fixture.spec.type) {
-        EvaluatorType.EXACT_MATCH ->
-            ExactMatchEvaluator().evaluate(
-                expected = requireNotNull(fixture.expected),
-                generated = fixture.generated,
-                spec = fixture.spec,
-            )
+internal fun evaluateCorpusCase(fixture: EvaluatorV1CorpusCase): EvaluationOutcome = when (fixture.spec.type) {
+    EvaluatorType.EXACT_MATCH ->
+        ExactMatchEvaluator().evaluate(
+            expected = requireNotNull(fixture.expected),
+            generated = fixture.generated,
+            spec = fixture.spec,
+        )
 
-        EvaluatorType.MULTIPLE_CHOICE ->
-            MultipleChoiceEvaluator().evaluate(
-                expectedLabel = requireNotNull(fixture.expected),
-                generated = fixture.generated,
-                spec = fixture.spec,
-            )
+    EvaluatorType.MULTIPLE_CHOICE ->
+        MultipleChoiceEvaluator().evaluate(
+            expectedLabel = requireNotNull(fixture.expected),
+            generated = fixture.generated,
+            spec = fixture.spec,
+        )
 
-        EvaluatorType.NUMERIC_FINAL_ANSWER ->
-            NumericFinalAnswerEvaluator().evaluate(
-                expected = requireNotNull(fixture.expected),
-                generated = fixture.generated,
-                spec = fixture.spec,
-            )
+    EvaluatorType.NUMERIC_FINAL_ANSWER ->
+        NumericFinalAnswerEvaluator().evaluate(
+            expected = requireNotNull(fixture.expected),
+            generated = fixture.generated,
+            spec = fixture.spec,
+        )
 
-        EvaluatorType.JSON_FIELDS ->
-            JsonFieldsEvaluator().evaluate(
-                expected = requireNotNull(fixture.expected),
-                generated = fixture.generated,
-                spec = fixture.spec,
-            )
+    EvaluatorType.JSON_FIELDS ->
+        JsonFieldsEvaluator().evaluate(
+            expected = requireNotNull(fixture.expected),
+            generated = fixture.generated,
+            spec = fixture.spec,
+        )
 
-        EvaluatorType.REGEX_FORMAT -> RegexFormatEvaluator().evaluate(fixture.generated, fixture.spec)
-        EvaluatorType.INSTRUCTION_CONSTRAINTS ->
-            InstructionConstraintsEvaluator().evaluate(fixture.generated, fixture.spec)
-    }
+    EvaluatorType.REGEX_FORMAT -> RegexFormatEvaluator().evaluate(fixture.generated, fixture.spec)
+    EvaluatorType.INSTRUCTION_CONSTRAINTS ->
+        InstructionConstraintsEvaluator().evaluate(fixture.generated, fixture.spec)
+}
 
 private fun exactMatchCase(
     id: String,
