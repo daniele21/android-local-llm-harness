@@ -138,10 +138,11 @@ data class EvaluationSampleCaseEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index(value = ["run_id"])],
+    indices = [Index(value = ["run_id"]), Index(value = ["run_id", "ordinal"], unique = true)],
 )
 data class EvaluationCategoryScoreEntity(
     @ColumnInfo(name = "run_id") val runId: String,
+    val ordinal: Int,
     @ColumnInfo(name = "category_id") val categoryId: String,
     val score: Double,
     @ColumnInfo(name = "scored_case_count") val scoredCaseCount: Int,
