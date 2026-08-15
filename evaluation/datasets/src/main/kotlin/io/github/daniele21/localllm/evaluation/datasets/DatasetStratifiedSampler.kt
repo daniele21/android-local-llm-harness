@@ -14,14 +14,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-class EvaluationStratifiedSampler(
-    val policy: SamplingPolicyRef = SamplingPolicyRef(POLICY_ID, POLICY_VERSION),
-) {
-    fun rank(
-        manifest: EvaluationDatasetManifestV1,
-        cases: List<EvaluationDatasetCaseV1>,
-        seed: Long,
-    ): StratifiedSamplingRanking {
+class EvaluationStratifiedSampler(val policy: SamplingPolicyRef = SamplingPolicyRef(POLICY_ID, POLICY_VERSION)) {
+    fun rank(manifest: EvaluationDatasetManifestV1, cases: List<EvaluationDatasetCaseV1>, seed: Long): StratifiedSamplingRanking {
         require(cases.isNotEmpty()) { "Sampling requires at least one case" }
         require(cases.size == manifest.caseCount) { "Sampling case count must match manifest" }
         require(cases.map { it.id }.distinct().size == cases.size) { "Sampling case IDs must be unique" }
@@ -118,11 +112,7 @@ data class StratifiedSamplingRanking(
     }
 }
 
-private data class RankedCandidate(
-    val caseId: EvaluationCaseId,
-    val categoryId: EvaluationCategoryId,
-    val virtualPosition: BigDecimal,
-)
+private data class RankedCandidate(val caseId: EvaluationCaseId, val categoryId: EvaluationCategoryId, val virtualPosition: BigDecimal)
 
 private fun ByteArray.toStableHex(): String = buildString(size * 2) {
     for (byte in this@toStableHex) {
