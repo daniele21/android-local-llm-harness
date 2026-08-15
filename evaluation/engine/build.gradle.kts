@@ -26,6 +26,7 @@ android {
 
 dependencies {
     api(project(":evaluation:contracts"))
+    implementation(project(":evaluation:evaluators"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
     implementation(project(":observability:contracts"))
