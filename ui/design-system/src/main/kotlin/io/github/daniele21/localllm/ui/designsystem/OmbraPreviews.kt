@@ -11,7 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 
 @Preview(name = "OMBRA components light", showBackground = true)
 @Composable
-private fun OmbraComponentsLightPreview() {
+internal fun OmbraComponentsLightPreview() {
     OmbraTheme(darkTheme = false) {
         OmbraComponentPreviewContent()
     }
@@ -19,7 +19,7 @@ private fun OmbraComponentsLightPreview() {
 
 @Preview(name = "OMBRA components dark", showBackground = true)
 @Composable
-private fun OmbraComponentsDarkPreview() {
+internal fun OmbraComponentsDarkPreview() {
     OmbraTheme(darkTheme = true) {
         OmbraComponentPreviewContent()
     }
