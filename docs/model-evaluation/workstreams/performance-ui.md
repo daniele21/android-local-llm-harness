@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.performance-ui
 Read when: implementing the connected Performance surface, benchmark run setup, history, dataset import or model comparison UX
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 ## Goal
 
@@ -186,16 +186,18 @@ PerformanceEffect
 
 Exact names should align with the existing app architecture conventions.
 
+U-01 freezes the Performance route vocabulary and typed state/intent/effect surface. It deliberately contains no fake results or production runner/storage assumptions. `Standard` is the setup default and custom counts must be positive multiples of 10; dataset-specific availability remains a connected-state concern.
+
 ## Task ledger — navigation and state shell
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-U-01 | READY | EVAL-C-05 | Define Performance route/navigation placement and state/effect contract consistent with phone-app architecture. |
-| EVAL-U-02 | PLANNED | EVAL-U-01 | Implement ViewModel/reducer using fake evaluation, dataset and history repositories. |
+| EVAL-U-01 | DONE | EVAL-C-05 | Define Performance route/navigation placement and state/effect contract consistent with phone-app architecture. |
+| EVAL-U-02 | READY | EVAL-U-01 | Implement ViewModel/reducer using fake evaluation, dataset and history repositories. |
 | EVAL-U-03 | PLANNED | EVAL-U-02 | Add top-level Performance entry and Run/Datasets/History/Compare subnavigation for compact/expanded shells. |
 | EVAL-U-04 | PLANNED | EVAL-U-02 | Add deterministic loading, empty, unavailable and error states before backend connection. |
 
-These tasks can now run in parallel with engine/storage implementation after EVAL-1.
+U-02 can now run in parallel with engine/storage implementation. Connected behavior remains gated by the owning domain tasks below.
 
 ## Task ledger — run configuration and execution
 
@@ -245,7 +247,7 @@ EVAL-7 closes when EVAL-U-01 through EVAL-U-33 and EVAL-U-40 through EVAL-U-44 a
 
 ## Parallel execution guidance
 
-EVAL-U-01 can start immediately. After EVAL-U-02 exists:
+EVAL-U-02 can proceed now using fake evaluation, dataset and history repositories. After it exists:
 
 - run-selector UI EVAL-U-10/U-12/U-13 can be built against fakes independently;
 - history/result presentation EVAL-U-20 onward can use fixture repositories while persistence is implemented;

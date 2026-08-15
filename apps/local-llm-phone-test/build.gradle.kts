@@ -138,6 +138,7 @@ dependencies {
 
     implementation(project(":core:contracts"))
     implementation(project(":core:runtime-core"))
+    implementation(project(":evaluation:contracts"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
     implementation(project(":models:model-catalog"))
