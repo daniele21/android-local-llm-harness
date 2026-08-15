@@ -11,7 +11,7 @@ class OmbraAnalysisResultParserTest {
     fun `valid fixed-schema response parses escaped source surface`() {
         val result =
             parser.parse(
-                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"alice\\\"x@example.test","segmentId":"p0001-b0001"}]}""",
+                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"alice\"x@example.test","segmentId":"p0001-b0001"}]}""",
             )
 
         val parsed = (result as OmbraAnalysisParseResult.Parsed).result
@@ -51,7 +51,7 @@ class OmbraAnalysisResultParserTest {
     fun `unpaired unicode surrogate is rejected`() {
         val result =
             parser.parse(
-                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"\\uD83D","segmentId":"p0001-b0001"}]}""",
+                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"\uD83D","segmentId":"p0001-b0001"}]}""",
             )
 
         assertEquals(OmbraAnalysisParseResult.Rejected(OmbraAnalysisParseFailureCode.INVALID_JSON), result)
@@ -61,10 +61,21 @@ class OmbraAnalysisResultParserTest {
     fun `valid surrogate pair is decoded`() {
         val result =
             parser.parse(
-                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"\\uD83D\\uDE00","segmentId":"p0001-b0001"}]}""",
+                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"\uD83D\uDE00","segmentId":"p0001-b0001"}]}""",
             )
 
         assertTrue(result is OmbraAnalysisParseResult.Parsed)
         assertEquals("😀", (result as OmbraAnalysisParseResult.Parsed).result.findings.single().surface)
+    }
+
+    @Test
+    fun `escaped backslash remains literal data`() {
+        val result =
+            parser.parse(
+                """{"schemaVersion":1,"findings":[{"typeId":"email","surface":"literal\\uD83D","segmentId":"p0001-b0001"}]}""",
+            )
+
+        assertTrue(result is OmbraAnalysisParseResult.Parsed)
+        assertEquals("literal\\uD83D", (result as OmbraAnalysisParseResult.Parsed).result.findings.single().surface)
     }
 }
