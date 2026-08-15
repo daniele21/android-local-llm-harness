@@ -99,7 +99,13 @@ internal class OmbraWorkflowEffectExecutor(
             emit(OmbraWorkflowAction.OperationFailed(effect.operationId, OmbraFailureCode.EXPORT_FAILED))
             return
         }
-        val request = OmbraExportRequest(descriptor, snapshot.segments, snapshot.reviewOccurrences)
+        val request =
+            OmbraExportRequest(
+                descriptor = descriptor,
+                segments = snapshot.segments,
+                definitions = snapshot.definitions,
+                reviewOccurrences = snapshot.reviewOccurrences,
+            )
         exporter.export(effect.operationId, effect.destinationRef, request) { result ->
             if (!isOperationActive(effect.operationId, OmbraOperationKind.EXPORT)) return@export
             result.fold(
