@@ -46,7 +46,7 @@ def local_name(tag: str) -> str:
 def validate_review_gate() -> None:
     require(REVIEW_INDEX.is_file(), f"Missing review index: {REVIEW_INDEX.relative_to(ROOT)}")
     content = REVIEW_INDEX.read_text(encoding="utf-8")
-    require("Status: review-required" in content, "OMBRA identity index must remain review-required")
+    require("Status: active" in content, "OMBRA identity index must use the active documentation lifecycle status")
     require("REVIEW REQUIRED" in content, "OMBRA symbol must remain explicitly REVIEW REQUIRED")
     require("Do not use this directory to claim OMB-6 identity completion" in content, "OMB-6 completion guard is missing")
 
