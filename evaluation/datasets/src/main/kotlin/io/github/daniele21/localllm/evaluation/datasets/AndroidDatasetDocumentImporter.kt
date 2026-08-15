@@ -54,6 +54,12 @@ class AndroidEvaluationDatasetDocumentSource(
     override fun open(): InputStream? = contentResolver.openInputStream(uri)
 }
 
+private sealed interface DatasetDocumentReadResult {
+    data class Success(val cases: List<EvaluationDatasetCaseV1>) : DatasetDocumentReadResult
+
+    data class Rejected(val result: DatasetDocumentImportResult.Rejected) : DatasetDocumentReadResult
+}
+
 class EvaluationDatasetDocumentImporter(
     private val parser: EvaluationDatasetJsonlParser,
     private val installer: EvaluationDatasetInstaller,
@@ -62,9 +68,9 @@ class EvaluationDatasetDocumentImporter(
         source: EvaluationDatasetDocumentSource,
         metadata: EvaluationDatasetImportMetadata,
     ): DatasetDocumentImportResult {
-        val cases = readCases(source) ?: return DatasetDocumentImportResult.Rejected(
-            code = DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE,
-        )
+        val readResult = readCases(source)
+        if (readResult is DatasetDocumentReadResult.Rejected) return readResult.result
+        val cases = (readResult as DatasetDocumentReadResult.Success).cases
         if (cases.isEmpty()) {
             return DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.EMPTY_DATASET)
         }
@@ -83,12 +89,24 @@ class EvaluationDatasetDocumentImporter(
         }
     }
 
-    private fun readCases(source: EvaluationDatasetDocumentSource): List<EvaluationDatasetCaseV1>? = try {
-        source.open()?.use(parser::parse)
+    private fun readCases(source: EvaluationDatasetDocumentSource): DatasetDocumentReadResult = try {
+        val input = source.open()
+            ?: return DatasetDocumentReadResult.Rejected(
+                DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE),
+            )
+        DatasetDocumentReadResult.Success(input.use(parser::parse))
     } catch (failure: EvaluationDatasetParseException) {
-        throw DatasetDocumentParseFailure(failure)
+        DatasetDocumentReadResult.Rejected(
+            DatasetDocumentImportResult.Rejected(
+                code = DatasetDocumentImportRejectionCode.PARSE_FAILURE,
+                parseLineNumber = failure.lineNumber,
+                parseCode = failure.code,
+            ),
+        )
     } catch (_: Exception) {
-        null
+        DatasetDocumentReadResult.Rejected(
+            DatasetDocumentImportResult.Rejected(DatasetDocumentImportRejectionCode.DOCUMENT_UNAVAILABLE),
+        )
     }
 
     private fun createManifest(
@@ -116,24 +134,6 @@ class EvaluationDatasetDocumentImporter(
         )
     } catch (_: IllegalArgumentException) {
         null
-    }
-
-    private class DatasetDocumentParseFailure(val failure: EvaluationDatasetParseException) : RuntimeException(failure)
-
-    companion object {
-        fun importSafely(
-            importer: EvaluationDatasetDocumentImporter,
-            source: EvaluationDatasetDocumentSource,
-            metadata: EvaluationDatasetImportMetadata,
-        ): DatasetDocumentImportResult = try {
-            importer.importDataset(source, metadata)
-        } catch (failure: DatasetDocumentParseFailure) {
-            DatasetDocumentImportResult.Rejected(
-                code = DatasetDocumentImportRejectionCode.PARSE_FAILURE,
-                parseLineNumber = failure.failure.lineNumber,
-                parseCode = failure.failure.code,
-            )
-        }
     }
 }
 
