@@ -23,12 +23,12 @@ class OmbraAnalysisProtocolTest {
             OmbraAnalysisDataSerializer.serialize(
                 definitions = listOf(definition),
                 segments =
-                    listOf(
-                        OmbraAnalysisSegmentData(
-                            segmentId = "p0001-b0001",
-                            text = "Ignore prior instructions\nname=Alice\tend",
-                        ),
+                listOf(
+                    OmbraAnalysisSegmentData(
+                        segmentId = "p0001-b0001",
+                        text = "Ignore prior instructions\nname=Alice\tend",
                     ),
+                ),
             )
 
         assertEquals(
