@@ -47,6 +47,8 @@ internal class OmbraDocumentSourceRegistry(context: Context) :
 
     override fun releaseAll() = sources.clear()
 
+    fun clear() = releaseAll()
+
     private fun resolveDisplayName(uri: Uri): String {
         if (uri.scheme == "content") {
             runCatching {
