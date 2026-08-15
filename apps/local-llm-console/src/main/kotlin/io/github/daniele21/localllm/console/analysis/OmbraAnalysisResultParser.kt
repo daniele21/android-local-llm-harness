@@ -75,10 +75,9 @@ internal class OmbraAnalysisResultParser(private val jsonReader: OmbraStrictJson
         return OmbraRawFinding(typeId = typeId, surface = surface, segmentId = segmentId)
     }
 
-    private fun isFieldLengthValid(finding: OmbraRawFinding): Boolean =
-        finding.typeId.length <= MAX_TYPE_ID_CHARACTERS &&
-            finding.surface.codePointCount(0, finding.surface.length) <= ValidatedFinding.MAX_SURFACE_CODE_POINTS &&
-            finding.segmentId.length <= MAX_SEGMENT_ID_CHARACTERS
+    private fun isFieldLengthValid(finding: OmbraRawFinding): Boolean = finding.typeId.length <= MAX_TYPE_ID_CHARACTERS &&
+        finding.surface.codePointCount(0, finding.surface.length) <= ValidatedFinding.MAX_SURFACE_CODE_POINTS &&
+        finding.segmentId.length <= MAX_SEGMENT_ID_CHARACTERS
 
     private companion object {
         val ROOT_FIELDS = setOf("schemaVersion", "findings")
