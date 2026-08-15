@@ -102,11 +102,15 @@ private fun qualityUnavailableReason(
     left: PersistedEvaluationRun,
     right: PersistedEvaluationRun,
     assessment: EvaluationComparisonAssessment.Available,
-): EvaluationDeltaUnavailableReason? = when {
-    !assessment.compatibility.quality.compatible -> EvaluationDeltaUnavailableReason.QUALITY_INCOMPATIBLE
-    left.summary.quality == null || right.summary.quality == null -> EvaluationDeltaUnavailableReason.QUALITY_SUMMARY_MISSING
-    !left.summary.quality.sameShapeAs(right.summary.quality) -> EvaluationDeltaUnavailableReason.QUALITY_SHAPE_MISMATCH
-    else -> null
+): EvaluationDeltaUnavailableReason? {
+    val leftQuality = left.summary.quality
+    val rightQuality = right.summary.quality
+    return when {
+        !assessment.compatibility.quality.compatible -> EvaluationDeltaUnavailableReason.QUALITY_INCOMPATIBLE
+        leftQuality == null || rightQuality == null -> EvaluationDeltaUnavailableReason.QUALITY_SUMMARY_MISSING
+        !leftQuality.sameShapeAs(rightQuality) -> EvaluationDeltaUnavailableReason.QUALITY_SHAPE_MISMATCH
+        else -> null
+    }
 }
 
 private fun EvaluationQualitySummary.sameShapeAs(other: EvaluationQualitySummary): Boolean {
