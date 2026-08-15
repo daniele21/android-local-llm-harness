@@ -191,7 +191,7 @@ State: **IN PROGRESS**
 
 Owner: [`ux-and-brand.md`](ux-and-brand.md)
 
-Integrated OMB-7A baseline — PR #232:
+Integrated OMB-7A — PR #232:
 
 - replaces the legacy Console entry point with Compose OMBRA Import -> Definitions/custom definitions -> local Analysis -> Review-ready flow;
 - keeps document/definitions/findings process-local and outside SavedState/routes;
@@ -199,7 +199,7 @@ Integrated OMB-7A baseline — PR #232:
 - wires the production PDF source capability and Consumer API Binder analysis composition;
 - surfaces real Harness connection state and adopts `OmbraTheme`/OMBRA app label.
 
-Active OMB-7B candidate — PR #235 plus its validated cleanup descendant #236:
+Integrated OMB-7B — PR #235:
 
 - wires safe Review projection, single-occurrence reveal, per-occurrence `Oscura`/`Ignora`, navigation and conflict blocking;
 - wires `CreateDocument("application/pdf")` export, including fresh-destination behavior after a failed export;
@@ -208,13 +208,22 @@ Active OMB-7B candidate — PR #235 plus its validated cleanup descendant #236:
 - removes direct `models:model-store` and `observability:*` dependencies from `apps/local-llm-console`, leaving the reference app on public contracts, Binder Consumer API, document/PDF dependencies and the shared design system;
 - keeps cancellation/reset/process-local cleanup semantics and the OMBRA PDF runtime gate intact.
 
+Active OMB-7C evidence slice — PR #250:
+
+- clean replay from the post-OMB-7B `dev` baseline;
+- asserts hidden review semantics do not expose source PII and explicit reveal exposes only the selected occurrence;
+- verifies unresolved overlap/conflict keeps export blocked and zero-PII review remains exportable;
+- verifies the accepted-review primary action remains reachable at 200% font scale;
+- adds a dedicated OMBRA UI emulator evidence workflow;
+- narrows the PDF runtime workflow trigger so UI-only instrumentation does not unnecessarily invoke the heavyweight document/PDF evidence lane.
+
 Remaining before OMB-7 can be `DONE`:
 
-- integrate the exact green OMB-7B head into `dev` after repository/documentation/PDF gates pass;
-- complete the remaining semantics/adaptive/large-font/screenshot state-matrix coverage owned by the product-flow exit gate;
+- integrate the exact green OMB-7C head after repository/UI/PDF gates pass;
+- complete import/analysis/export failure-state, cancellation/reset, adaptive/landscape and representative code-owned screenshot coverage;
 - integrate the final OMB-6B approved identity before claiming the complete app-label/theme/icon identity requirement.
 
-Exit gate: **OPEN**. `apps/local-llm-console` must be an integrated pure OMBRA reference consumer using only packaged inference contracts, document-domain/PDF dependencies and the shared design-system module, with the full product state matrix and approved identity covered.
+Exit gate: **OPEN**. `apps/local-llm-console` is already a pure OMBRA Consumer API reference app after OMB-7B; OMB-7 closes when the remaining product state matrix and approved identity evidence are integrated.
 
 ## OMB-8 — Quality, physical evidence and release
 
