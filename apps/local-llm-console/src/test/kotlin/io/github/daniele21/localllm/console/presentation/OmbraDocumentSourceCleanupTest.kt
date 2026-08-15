@@ -39,13 +39,12 @@ class OmbraDocumentSourceCleanupTest {
         assertEquals(OmbraWorkflowStage.IDLE, orchestrator.state.stage)
     }
 
-    private fun orchestrator(cleanup: RecordingCleanup): OmbraApplicationOrchestrator =
-        OmbraApplicationOrchestrator(
-            extractor = DeferredExtractor(),
-            analysisClient = NoOpAnalysisClient,
-            exporter = NoOpExporter,
-            sourceCapabilityCleanup = cleanup,
-        )
+    private fun orchestrator(cleanup: RecordingCleanup): OmbraApplicationOrchestrator = OmbraApplicationOrchestrator(
+        extractor = DeferredExtractor(),
+        analysisClient = NoOpAnalysisClient,
+        exporter = NoOpExporter,
+        sourceCapabilityCleanup = cleanup,
+    )
 
     private class RecordingCleanup : OmbraDocumentSourceCapabilityCleanup {
         var releaseCalls = 0
