@@ -16,10 +16,7 @@ data class EvaluationDatasetRegistryFilter(
     val categoryId: EvaluationCategoryId? = null,
 )
 
-data class InstalledEvaluationDatasetPack(
-    val manifest: EvaluationDatasetManifestV1,
-    val directory: File,
-)
+data class InstalledEvaluationDatasetPack(val manifest: EvaluationDatasetManifestV1, val directory: File)
 
 class EvaluationDatasetRegistry(private val rootDirectory: File) {
     fun discover(filter: EvaluationDatasetRegistryFilter = EvaluationDatasetRegistryFilter()): List<InstalledEvaluationDatasetPack> =
