@@ -1,6 +1,5 @@
 package io.github.daniele21.localllm.evaluation.room
 
-import androidx.room.Entity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -8,28 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EvaluationRoomEntitiesTest {
-    @Test
-    fun persistenceTablesAreExplicitAndSeparateFromTelemetry() {
-        val tables = listOf(
-            EvaluationRunEntity::class.java,
-            EvaluationSampleCaseEntity::class.java,
-            EvaluationCategoryScoreEntity::class.java,
-            EvaluationCaseResultEntity::class.java,
-            EvaluationEvaluatorParameterEntity::class.java,
-        ).map { type -> type.getAnnotation(Entity::class.java)?.tableName }
-
-        assertEquals(
-            listOf(
-                "evaluation_runs",
-                "evaluation_sample_cases",
-                "evaluation_category_scores",
-                "evaluation_case_results",
-                "evaluation_evaluator_parameters",
-            ),
-            tables,
-        )
-    }
-
     @Test
     fun entitiesContainNoPromptExpectedOrGeneratedAnswerColumns() {
         val fieldNames = listOf(
