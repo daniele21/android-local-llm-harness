@@ -3,11 +3,14 @@
 
 The default verification mode is intentionally safe for review branches: it proves that
 production generation remains blocked while the canonical symbol is REVIEW REQUIRED.
+The generated Android XML is additionally pinned to the exact reviewed SVG bytes so a
+later geometry edit fails closed until the generator is intentionally reconciled.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import sys
 from pathlib import Path
 
@@ -18,6 +21,7 @@ SYMBOL_MASTER = MASTER_DIR / "ombra-symbol.svg"
 APPROVED_STATUS = "**APPROVED**"
 REVIEW_REQUIRED_STATUS = "**REVIEW REQUIRED**"
 SYMBOL_ROW_TOKEN = "[`ombra-symbol.svg`](ombra-symbol.svg)"
+SUPPORTED_SYMBOL_SHA256 = "30d5adeadf05b1493eb589a1dd914807077996ff5371488664e657f52f0f1742"
 
 OUTPUTS = {
     ROOT / "apps/local-llm-console/src/main/res/drawable/ombra_launcher_foreground.xml": """<?xml version=\"1.0\" encoding=\"utf-8\"?>
@@ -80,14 +84,23 @@ def symbol_status() -> str:
     raise IdentityGenerationError("OMBRA symbol row is missing from the canonical identity index")
 
 
+def validate_supported_master() -> None:
+    if not SYMBOL_MASTER.is_file():
+        raise IdentityGenerationError("OMBRA symbol master is missing")
+    digest = hashlib.sha256(SYMBOL_MASTER.read_bytes()).hexdigest()
+    if digest != SUPPORTED_SYMBOL_SHA256:
+        raise IdentityGenerationError(
+            "OMBRA symbol geometry changed; reconcile and review the Android generator before production generation",
+        )
+
+
 def verify_gate() -> None:
     status = symbol_status()
+    validate_supported_master()
     if status == "REVIEW REQUIRED":
         print("OMBRA Android identity generation is correctly blocked: symbol is REVIEW REQUIRED.")
         return
-    if not SYMBOL_MASTER.is_file():
-        raise IdentityGenerationError("Approved symbol master is missing")
-    print("OMBRA symbol is explicitly APPROVED; production generation is unlocked.")
+    print("OMBRA symbol is explicitly APPROVED and matches the generator-pinned reviewed geometry.")
 
 
 def generate() -> None:
@@ -96,8 +109,7 @@ def generate() -> None:
         raise IdentityGenerationError(
             "Refusing to generate production Android identity: canonical symbol is not explicitly APPROVED",
         )
-    if not SYMBOL_MASTER.is_file():
-        raise IdentityGenerationError("Approved symbol master is missing")
+    validate_supported_master()
 
     for path, content in OUTPUTS.items():
         path.parent.mkdir(parents=True, exist_ok=True)
