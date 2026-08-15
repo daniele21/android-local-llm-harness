@@ -226,19 +226,16 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
         }
         return when (applicationId) {
             HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
-
             HarnessSharedRuntimeBindings.consoleApplicationId -> resolveConsoleConsumer(selected, useCaseId)
-
             else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
         }
     }
 
-    private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase =
-        when (useCaseId) {
-            HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
-            HarnessSharedRuntimeBindings.ombraUseCaseId -> HarnessSharedRuntimeBindings.resolveOmbra(model)
-            else -> error("Unknown useCaseId ${useCaseId.value}")
-        }
+    private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
+        HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
+        HarnessSharedRuntimeBindings.ombraUseCaseId -> HarnessSharedRuntimeBindings.resolveOmbra(model)
+        else -> error("Unknown useCaseId ${useCaseId.value}")
+    }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
