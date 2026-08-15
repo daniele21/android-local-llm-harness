@@ -1,7 +1,7 @@
 # Evaluation dataset wire schema v1
 
 Status: active
-Document type: contract-reference
+Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.datasets.schema-v1
 Read when: authoring, parsing, validating or importing evaluation dataset packs
