@@ -23,7 +23,7 @@ internal object OmbraAnalysisProtocol {
 
     val outputJsonSchema: String =
         """
-        {"$schema":"http://json-schema.org/draft-07/schema#","type":"object","additionalProperties":false,"required":["schemaVersion","findings"],"properties":{"schemaVersion":{"const":1},"findings":{"type":"array","maxItems":256,"items":{"type":"object","additionalProperties":false,"required":["typeId","surface","segmentId"],"properties":{"typeId":{"type":"string","minLength":1,"maxLength":64},"surface":{"type":"string","minLength":1,"maxLength":512},"segmentId":{"type":"string","pattern":"^p[0-9]{4}-b[0-9]{4}(-f[0-9]{4})?$"}}}}}}
+        {"${'$'}schema":"http://json-schema.org/draft-07/schema#","type":"object","additionalProperties":false,"required":["schemaVersion","findings"],"properties":{"schemaVersion":{"const":1},"findings":{"type":"array","maxItems":256,"items":{"type":"object","additionalProperties":false,"required":["typeId","surface","segmentId"],"properties":{"typeId":{"type":"string","minLength":1,"maxLength":64},"surface":{"type":"string","minLength":1,"maxLength":512},"segmentId":{"type":"string","pattern":"^p[0-9]{4}-b[0-9]{4}(-f[0-9]{4})?$"}}}}}}
         """.trimIndent()
 }
 
