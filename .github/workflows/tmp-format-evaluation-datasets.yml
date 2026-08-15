@@ -1,0 +1,32 @@
+name: Temporary format evaluation datasets
+
+on:
+  push:
+    branches: [agent/eval-dataset-wave3]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: chmod +x gradlew
+      - name: Apply repository formatting
+        run: ./gradlew --no-configuration-cache spotlessApply
+      - uses: actions/upload-artifact@v7
+        with:
+          name: formatted-evaluation-datasets
+          path: evaluation/datasets/**/*.kt
+          if-no-files-found: error
+          retention-days: 1
