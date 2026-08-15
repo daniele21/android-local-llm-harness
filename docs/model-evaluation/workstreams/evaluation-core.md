@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.core
 Read when: implementing model-evaluation contracts, deterministic evaluators, runtime orchestration, persistence or comparison logic
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 ## Goal
 
@@ -87,6 +87,8 @@ Persistent evaluation results use a separate repository from ordinary telemetry.
 
 Run/result retention is independently bounded. Removing evaluation history must not remove generation telemetry or dataset packs.
 
+`EvaluationResultRepository`, `EvaluationRunQuery`, `EvaluationRetentionPolicy`, `EvaluationRunDeleteStatus` and `EvaluationRetentionResult` already freeze the P-01 repository boundary in `evaluation/contracts`, with bounded query/retention tests. Concrete in-memory and Room implementations may now proceed independently.
+
 ## Task ledger — contracts and identity
 
 | ID | State | Depends on | Task |
@@ -101,7 +103,7 @@ Run/result retention is independently bounded. Removing evaluation history must 
 | EVAL-C-08 | DONE | EVAL-C-02,EVAL-C-06 | Implement canonical serialization/hash utilities with deterministic ordering and tests. |
 | EVAL-C-09 | DONE | EVAL-C-03,EVAL-C-05 | Define bounded validation/error taxonomy for preflight, evaluation, cancellation and partial persistence failures. |
 
-EVAL-1 is complete when this change passes the repository merge gates.
+EVAL-1 is complete.
 
 ## Task ledger — deterministic evaluators
 
@@ -116,9 +118,11 @@ EVAL-1 is complete when this change passes the repository merge gates.
 | EVAL-E-07 | DONE | EVAL-E-01,EVAL-E-06 | Implement instruction-constraint aggregation for declarative verifiable constraints. |
 | EVAL-E-08 | DONE | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-07 | Implement category and weighted suite score aggregation including zero-score failure semantics. |
 | EVAL-E-09 | DONE | EVAL-E-02,EVAL-E-03,EVAL-E-04,EVAL-E-05,EVAL-E-06,EVAL-E-07 | Add adversarial/malformed-output fixtures and deterministic golden tests for every evaluator version. |
-| EVAL-E-10 | READY | EVAL-E-08,EVAL-E-09 | Document evaluator semantics and freeze v1 behavior for dataset-pack compatibility. |
+| EVAL-E-10 | DONE | EVAL-E-08,EVAL-E-09 | Document evaluator semantics and freeze v1 behavior for dataset-pack compatibility. |
 
-EVAL-3 closes when EVAL-E-01 through EVAL-E-10 are `DONE`.
+[`../evaluator-semantics-v1.md`](../evaluator-semantics-v1.md) is the dataset-visible v1 compatibility freeze. Any behavior change that can change an existing case score requires a new evaluator version.
+
+EVAL-3 is complete.
 
 ### Quality aggregation v1
 
@@ -156,14 +160,14 @@ EVAL-4 may begin at EVAL-R-01/R-02. It closes only after production dataset acce
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-P-01 | READY | EVAL-C-05,EVAL-C-07 | Define evaluation repository queries, retention and deletion contract. |
-| EVAL-P-02 | PLANNED | EVAL-P-01 | Implement bounded in-memory repository with deterministic ordering and test parity baseline. |
-| EVAL-P-03 | PLANNED | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
+| EVAL-P-01 | DONE | EVAL-C-05,EVAL-C-07 | Define evaluation repository queries, retention and deletion contract. |
+| EVAL-P-02 | READY | EVAL-P-01 | Implement bounded in-memory repository with deterministic ordering and test parity baseline. |
+| EVAL-P-03 | READY | EVAL-P-01 | Design Room entities for run identity, aggregate summary and per-case privacy-safe outcome. |
 | EVAL-P-04 | PLANNED | EVAL-P-03 | Implement Room DAO/repository and database migration wiring without coupling telemetry schema ownership. |
 | EVAL-P-05 | PLANNED | EVAL-P-02,EVAL-P-04 | Add in-memory/Room parity tests for create, progress, terminal state, history, retention and deletion. |
 | EVAL-P-06 | PLANNED | EVAL-R-01,EVAL-P-01 | Persist run lifecycle atomically enough to distinguish active, partial, cancelled, failed and completed runs after process restart. |
 | EVAL-P-07 | PLANNED | EVAL-R-06,EVAL-P-06 | Persist each completed case outcome without prompt/expected/generated text. |
-| EVAL-P-08 | PLANNED | EVAL-C-07,EVAL-P-01 | Implement comparison service with typed quality/runtime compatibility checks. |
+| EVAL-P-08 | READY | EVAL-C-07,EVAL-P-01 | Implement comparison service with typed quality/runtime compatibility checks. |
 | EVAL-P-09 | PLANNED | EVAL-P-08 | Implement valid category/aggregate deltas and runtime/resource deltas only when their compatibility level passes. |
 | EVAL-P-10 | PLANNED | EVAL-P-05,EVAL-P-07,EVAL-P-09 | Add restart, retention, privacy and incompatible-comparison integration tests. |
 
@@ -171,9 +175,14 @@ EVAL-5 closes when EVAL-P-01 through EVAL-P-10 are `DONE` and the real runner pe
 
 ## Parallel execution guidance
 
-EVAL-1 unlocks independent dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes.
+The current fan-out is intentionally broad:
 
-Within the evaluator lane, EVAL-E-01 through EVAL-E-09 are integrated after this change. EVAL-E-10 is now ready and closes the evaluator v1 compatibility freeze. In persistence, EVAL-P-02 and EVAL-P-03/P-04 can run in parallel after EVAL-P-01.
+- EVAL-R-01 and EVAL-R-02 may proceed independently inside the engine boundary;
+- EVAL-P-02, EVAL-P-03 and EVAL-P-08 are independent after the P-01 contract freeze;
+- dataset parser/validator/digest/source lanes run independently in the dataset workstream;
+- the Performance UI shell can remain fake-driven until runner/persistence wiring lands.
+
+The runner should not absorb persistence, dataset-installation or UI responsibilities merely to reduce module count. Those boundaries are deliberate test seams.
 
 ## Completion gates
 

@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: model-evaluation
 Canonical scope: model-evaluation.state
 Read when: determining current model-evaluation progress, blockers or the next ready tasks
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 This is the operational status ledger for model evaluation. Repository-level integrated state and immediate sequencing remain in [`../current-state.md`](../current-state.md). Capability sequencing inside this feature is owned by [`roadmap.md`](roadmap.md); detailed acceptance criteria remain in the owning workstream specifications.
 
@@ -14,51 +14,81 @@ This is the operational status ledger for model evaluation. Repository-level int
 | Milestone | State | Current outcome |
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
-| EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, compatibility, hashing and failure contracts with deterministic tests. |
-| EVAL-2 Dataset system | READY | `EVAL-D-01` can define manifest/JSONL schemas from the frozen contracts. |
-| EVAL-3 Deterministic evaluators | IN PROGRESS | Registry, six deterministic scorers, v1 golden/adversarial coverage and suite quality aggregation are integrated; only the evaluator v1 compatibility freeze remains. |
-| EVAL-4 Evaluation runner | READY | `EVAL-R-01` and `EVAL-R-02` can progress independently against contracts/fakes. |
-| EVAL-5 Persistence and comparison | READY | `EVAL-P-01` can freeze repository/query/retention behavior. |
-| EVAL-6 General Purpose v1 | PLANNED | Source/license and pack assembly depend on dataset/evaluator foundations. |
-| EVAL-7 Performance UI/custom import | READY | `EVAL-U-01` can define the Performance UDF/navigation contract against fakes. |
-| EVAL-8 Validation/device evidence | PLANNED | `EVAL-V-01` is ready incrementally; final Android/device evidence remains late-gated. |
+| EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, dataset-schema, persistence, compatibility, hashing and failure contracts with deterministic tests. |
+| EVAL-2 Dataset system | IN PROGRESS | D-01 manifest/canonical JSONL schema is frozen; parser, validator and digest lanes are ready in parallel. |
+| EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
+| EVAL-4 Evaluation runner | READY | R-01 lifecycle engine and R-02 controlled model binding can progress independently. |
+| EVAL-5 Persistence and comparison | READY | P-01 repository/query/retention contract is already frozen; P-02, P-03 and P-08 are ready independently. |
+| EVAL-6 General Purpose v1 | READY | GP-01 public-source inventory plus GP-05/GP-06 Harness-owned case authoring can start independently. |
+| EVAL-7 Performance UI/custom import | READY | U-01 can define the Performance UDF/navigation contract against fakes. |
+| EVAL-8 Validation/device evidence | IN PROGRESS | V-01 identity/hash golden evidence is integrated; V-03 evaluator corpus is ready while final Android/device evidence remains late-gated. |
 
-## Integrated evaluator boundary
+## Frozen evaluator boundary
 
-`evaluation/evaluators` contains the versioned fail-closed registry and deterministic v1 scorer set:
+`evaluation/evaluators` now contains the fail-closed registry, all six v1 deterministic scorer families and quality aggregation. [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) freezes their dataset-visible type/version/parameter/scoring behavior.
 
-- normalized exact match with explicit case/whitespace policy;
-- multiple choice with bounded allowed-label extraction and ambiguity rejection;
-- locale-independent numeric final answer with declared bounded tolerance;
-- JSON-fields scoring with a strict bounded parser and transparent partial field score;
-- repository-defined regex/format checks only, without arbitrary user regex execution;
-- declarative instruction constraints with transparent satisfied/declared partial scoring and bounded format delegation.
+The quality boundary remains explicit:
 
-Every scorer exposes a versioned `EvaluatorRegistration`. `EvaluatorRegistry` remains composition-based rather than hardcoding a global scorer list; concrete evaluator composition belongs to the runner/factory integration. No evaluator uses an LLM judge or arbitrary executable code.
+- `SCORED` preserves exact evaluator score including partial values;
+- invalid output, timeout and runtime failure contribute quality `0`;
+- cancelled cases are excluded from quality denominators;
+- category scores are arithmetic means;
+- suite aggregation is either fully weighted with renormalization or fully unweighted;
+- runtime, resources and reliability remain separate result families.
 
-EVAL-E-09 adds deterministic golden fixtures for every scorer v1 plus registry composition, and adversarial fixtures for ambiguity, locale-dependent numeric text, duplicate JSON keys, out-of-pattern text, duplicate instruction constraints and unknown evaluator versions.
+EVAL-3 is complete. No v1 evaluator uses an LLM judge, arbitrary executable code or user-provided regular expressions.
 
-EVAL-E-08 adds deterministic category/suite quality aggregation. `SCORED` preserves the evaluator score including partial outcomes; invalid output, timeout and runtime failure contribute quality `0`; cancelled cases are excluded from quality denominators. Category scores are arithmetic means. Suite scores use normalized declared category weights when every scored category is weighted, otherwise an unweighted category mean; mixed weight declarations fail closed.
+## Frozen dataset and persistence foundations
+
+D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation.
+
+P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`: bounded history queries, retention policy/result, active-run-aware delete status and `EvaluationResultRepository` are already part of the frozen contracts.
+
+V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digests/fingerprints and proves equivalent clean run construction remains deterministic.
 
 ## Ready now
 
-These tasks are mutually independent unless the same developer/review capacity is shared:
+The following work can proceed concurrently unless it touches the same module-registration files:
 
-- `EVAL-D-01` — versioned manifest and canonical JSONL case schema;
-- `EVAL-E-10` — document/freeze evaluator v1 semantics for dataset-pack compatibility;
+- `EVAL-D-02` — bounded streaming JSONL parser;
+- `EVAL-D-03` — full-pack validator;
+- `EVAL-D-04` — canonical ordered content digest and manifest verification;
+- `EVAL-GP-01` — exact public benchmark source/version/provenance inventory;
+- `EVAL-GP-05` — 20 Harness structured-output cases;
+- `EVAL-GP-06` — 20 Harness context-retrieval cases;
 - `EVAL-R-01` — evaluation lifecycle engine against fakes;
-- `EVAL-R-02` — controlled selected-model evaluation binding/profile resolution;
-- `EVAL-P-01` — evaluation repository/query/retention contract;
+- `EVAL-R-02` — controlled supported-model evaluation binding/profile resolution;
+- `EVAL-P-02` — bounded in-memory result repository;
+- `EVAL-P-03` — Room entity design for privacy-safe evaluation persistence;
+- `EVAL-P-08` — typed comparison service;
 - `EVAL-U-01` — Performance navigation/UDF state/effect contract;
-- `EVAL-V-01` — identity/hash golden fixtures and cross-run deterministic serialization tests.
+- `EVAL-V-03` — reusable evaluator golden/edge corpus.
 
-EVAL-E-10 can close independently now that both aggregation and evaluator golden/adversarial coverage are integrated. Its completion closes the EVAL-3 milestone.
+## Parallel fan-out strategy
 
-## Parallel fan-out
+Wave 2 is deliberately split into independent convergence points:
 
-Dataset, evaluator, runner, persistence, UI-shell and deterministic-validation lanes may proceed concurrently.
+```text
+Dataset:      D-02 ─┐
+              D-03 ─┼─> D-05 install
+              D-04 ─┘
 
-General Purpose source/license inventory unlocks after `EVAL-D-01`; production runner scoring remains gated on dataset/evaluator implementations; connected history/compare remains gated on persistence; final runtime comparison evidence remains gated on Q35-6 measured profiles.
+Runner:       R-01 ─┐
+              R-02 ─┴─> R-03/R-04/R-05
+
+Persistence:  P-02 ─┐
+              P-03 ─┼─> parity / Room wiring
+              P-08  └─> comparison deltas
+
+General pack: GP-01 -> GP-02/GP-03
+              GP-05 ─┐
+              GP-06 ─┴─> later GP-07 assembly
+
+UI:           U-01 -> fake-driven run/history/compare states
+Validation:   V-03 independent evaluator evidence
+```
+
+Module-registration files (`settings.gradle.kts`, CI module lists and `evaluation/AGENTS.md`) are shared integration hotspots. Parallel branches may implement behavior independently, but replay/merge order must keep those files synchronized rather than resolving them by dropping one lane.
 
 ## External dependencies
 
