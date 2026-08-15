@@ -184,18 +184,18 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.RUNNING)
         val caseIds = config.sampling.orderedCaseIds
         var attempted = 0
-        emitProgress(attempted, results.size, null)
+        observer.emitProgress(config, attempted, results.size, null)
 
         for (caseId in caseIds) {
             if (cancelRequested.get()) return cancel(results)
 
             attempted += 1
-            emitProgress(attempted, results.size, caseId)
+            observer.emitProgress(config, attempted, results.size, caseId)
             val execution = try {
                 executeActiveCase(caseId)
             } catch (error: CancellationException) {
                 if (!cancelRequested.get()) throw error
-                emitProgress(attempted, results.size, null)
+                observer.emitProgress(config, attempted, results.size, null)
                 return cancel(results)
             }
             when (execution) {
@@ -233,7 +233,7 @@ private class EvaluationRunExecution(
         }
         results += result
         observer.onCaseResult(config.runId, result)
-        emitProgress(attempted, results.size, null)
+        observer.emitProgress(config, attempted, results.size, null)
     }
 
     private suspend fun cancellationIfRequested(results: List<EvaluationCaseResult>): EvaluationEngineTerminal.Cancelled? =
@@ -249,20 +249,25 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.CANCELLED)
         return EvaluationEngineTerminal.Cancelled(config.runId, results.toList())
     }
-
-    private suspend fun emitProgress(attempted: Int, completed: Int, currentCaseId: EvaluationCaseId?) {
-        observer.onProgress(
-            config.runId,
-            EvaluationProgress(
-                totalCases = config.sampling.orderedCaseIds.size,
-                attemptedCases = attempted,
-                completedCases = completed,
-                currentCaseId = currentCaseId,
-            ),
-        )
-    }
 }
 
 private suspend fun EvaluationEngineObserver.emitState(runId: EvaluationRunId, state: EvaluationRunState) {
     onStateChanged(runId, state)
+}
+
+private suspend fun EvaluationEngineObserver.emitProgress(
+    config: EvaluationRunConfig,
+    attempted: Int,
+    completed: Int,
+    currentCaseId: EvaluationCaseId?,
+) {
+    onProgress(
+        config.runId,
+        EvaluationProgress(
+            totalCases = config.sampling.orderedCaseIds.size,
+            attemptedCases = attempted,
+            completedCases = completed,
+            currentCaseId = currentCaseId,
+        ),
+    )
 }
