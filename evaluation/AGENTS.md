@@ -12,13 +12,15 @@ This guide owns navigation and validation for model-evaluation implementation un
 ## Current ownership
 
 - `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/comparison` owns typed quality/runtime compatibility assessment. It does not query persistence or calculate P-09 deltas.
 - `evaluation/evaluators` owns the versioned evaluator registry and deterministic scorer implementations. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
+- `evaluation/room-store` owns Room-specific privacy-safe evaluation-history schema. It remains separate from telemetry Room ownership; P-04 will add DAO/repository/database wiring.
 
 Do not create dataset-store or persistence implementation modules until the corresponding workstream contains real behavior. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
 
 ## Contract invariants
 
-- Depend only on lower-level public contracts required for stable value semantics; never depend on Compose, Room, `llama.cpp` implementation types or app state.
+- Depend only on lower-level public contracts required for stable value semantics; never depend on Compose, `llama.cpp` implementation types or app state. Room dependencies belong only in Room-owned implementation modules.
 - Dataset, sample-set, evaluator-set, semantic-execution and run identities are immutable and content/configuration-derived.
 - Canonical fingerprints use explicit field ordering and exact scalar representation; never depend on map or filesystem iteration order.
 - Quality identity excludes the selected model and physical device so supported models can be compared on identical semantic work.
@@ -37,6 +39,18 @@ For contract-only iteration run:
   :evaluation:contracts:compileDebugKotlin \
   :evaluation:contracts:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+```
+
+For persistence/comparison work run:
+
+```bash
+./gradlew :evaluation:comparison:testDebugUnitTest \
+  :evaluation:comparison:compileDebugKotlin \
+  :evaluation:comparison:lintDebug \
+  :evaluation:room-store:testDebugUnitTest \
+  :evaluation:room-store:compileDebugKotlin \
+  :evaluation:room-store:lintDebug
+./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
 ```
 
 For evaluator work run the equivalent scoped checks for `:evaluation:evaluators` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
