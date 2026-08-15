@@ -50,6 +50,18 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("evaluation:in-memory-store",))
 
+    def test_evaluation_comparison_and_room_store_select_registered_modules(self) -> None:
+        scope = classify_paths(
+            [
+                "evaluation/room-store/src/main/kotlin/EvaluationRoomEntities.kt",
+                "evaluation/comparison/src/main/kotlin/EvaluationCompatibilityService.kt",
+            ]
+        )
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:comparison", "evaluation:room-store"))
+
     def test_model_distribution_modules_are_selected_explicitly(self) -> None:
         scope = classify_paths(
             [
