@@ -14,10 +14,7 @@ internal sealed interface OmbraReviewUiState {
         }
     }
 
-    data class Ready(
-        val presentation: OmbraReviewPresentationModel,
-        val selectedIndex: Int,
-    ) : OmbraReviewUiState {
+    data class Ready(val presentation: OmbraReviewPresentationModel, val selectedIndex: Int) : OmbraReviewUiState {
         init {
             require(presentation.hidden.candidates.isNotEmpty()) { "Ready review state requires at least one candidate" }
             require(selectedIndex in presentation.hidden.candidates.indices) { "Review selection must reference a candidate" }
