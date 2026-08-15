@@ -65,12 +65,12 @@ class OmbraConsumerAnalysisChunkClientTest {
         client.generate(
             operationId = OmbraOperationId(2),
             request =
-                OmbraStructuredChunkRequest(
-                    ordinal = 0,
-                    instruction = "instruction",
-                    dataPayload = "{\"segments\":[]}",
-                    outputJsonSchema = "{\"type\":\"object\"}",
-                ),
+            OmbraStructuredChunkRequest(
+                ordinal = 0,
+                instruction = "instruction",
+                dataPayload = "{\"segments\":[]}",
+                outputJsonSchema = "{\"type\":\"object\"}",
+            ),
             onResult = { result = it },
         )
 
@@ -150,23 +150,19 @@ class OmbraConsumerAnalysisChunkClientTest {
         assertTrue(fake.generationCancelled)
     }
 
-    private fun adapter(
-        fake: FakeConsumerClient,
-        connected: () -> Boolean = { true },
-    ): OmbraConsumerAnalysisChunkClient =
+    private fun adapter(fake: FakeConsumerClient, connected: () -> Boolean = { true }): OmbraConsumerAnalysisChunkClient =
         OmbraConsumerAnalysisChunkClient(
             client = fake,
             lifecycleExecutor = Executor { command -> command.run() },
             transportConnected = connected,
         )
 
-    private fun validChunk(): OmbraStructuredChunkRequest =
-        OmbraStructuredChunkRequest(
-            ordinal = 0,
-            instruction = "instruction",
-            dataPayload = "{\"segments\":[]}",
-            outputJsonSchema = "{\"type\":\"object\"}",
-        )
+    private fun validChunk(): OmbraStructuredChunkRequest = OmbraStructuredChunkRequest(
+        ordinal = 0,
+        instruction = "instruction",
+        dataPayload = "{\"segments\":[]}",
+        outputJsonSchema = "{\"type\":\"object\"}",
+    )
 
     private class FakeConsumerClient(
         val capabilities: UseCaseCapabilities = validCapabilities(),
@@ -180,8 +176,7 @@ class OmbraConsumerAnalysisChunkClientTest {
         private var deferredListener: ConsumerGenerationListener? = null
         private var deferredRequestId: RequestId? = null
 
-        override fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult =
-            ConsumerCapabilityResult.Available(capabilities)
+        override fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult = ConsumerCapabilityResult.Available(capabilities)
 
         override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult {
             lastPrepareRequest = request
@@ -201,10 +196,7 @@ class OmbraConsumerAnalysisChunkClientTest {
         override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult =
             ConsumerSessionResult.Created(SessionId("session-1"))
 
-        override fun generate(
-            request: ConsumerGenerationRequest,
-            listener: ConsumerGenerationListener,
-        ): ConsumerGenerationStartResult {
+        override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
             lastGenerationRequest = request
             val handle = FakeHandle(request.requestId) {
                 generationCancelled = true
@@ -253,50 +245,44 @@ class OmbraConsumerAnalysisChunkClientTest {
         }
     }
 
-    private class FakeHandle(
-        override val requestId: RequestId,
-        private val onCancel: () -> Unit,
-    ) : ConsumerGenerationHandle {
+    private class FakeHandle(override val requestId: RequestId, private val onCancel: () -> Unit) : ConsumerGenerationHandle {
         override fun cancel() = onCancel()
     }
 
     companion object {
-        private fun validCapabilities(): UseCaseCapabilities =
-            UseCaseCapabilities(
-                useCaseId = UseCaseId("document-pii-detection"),
-                readiness = UseCaseReadiness.READY,
-                presets = emptyList(),
-                defaultPreset = null,
-                reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
-                outputConstraints = setOf(ConsumerOutputConstraintKind.JSON_SCHEMA),
-                defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-                sessionKinds = setOf(SessionKind.STATELESS),
-                defaultSessionKind = SessionKind.STATELESS,
-                limits = ConsumerLimits(8_192, 1, 8_192),
-                capabilityRevision = "ombra-test-r1",
-            )
+        private fun validCapabilities(): UseCaseCapabilities = UseCaseCapabilities(
+            useCaseId = UseCaseId("document-pii-detection"),
+            readiness = UseCaseReadiness.READY,
+            presets = emptyList(),
+            defaultPreset = null,
+            reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
+            outputConstraints = setOf(ConsumerOutputConstraintKind.JSON_SCHEMA),
+            defaultOutputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+            sessionKinds = setOf(SessionKind.STATELESS),
+            defaultSessionKind = SessionKind.STATELESS,
+            limits = ConsumerLimits(8_192, 1, 8_192),
+            capabilityRevision = "ombra-test-r1",
+        )
 
-        private fun executionIdentity(): ConsumerExecutionIdentity =
-            ConsumerExecutionIdentity(
-                useCaseId = UseCaseId("document-pii-detection"),
-                capabilityRevision = "ombra-test-r1",
-                preset = null,
-                reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-                outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-                sessionKind = SessionKind.STATELESS,
-            )
+        private fun executionIdentity(): ConsumerExecutionIdentity = ConsumerExecutionIdentity(
+            useCaseId = UseCaseId("document-pii-detection"),
+            capabilityRevision = "ombra-test-r1",
+            preset = null,
+            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+            outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+            sessionKind = SessionKind.STATELESS,
+        )
 
-        private fun metrics(): ConsumerInferenceMetrics =
-            ConsumerInferenceMetrics(
-                outputTokens = 1,
-                timeToFirstTokenMs = 1,
-                totalMs = 1,
-                decodeTokensPerSecond = 1.0,
-                inputTokens = 1,
-                reasoningTokens = 0,
-                answerTokens = 1,
-                queueMs = 0,
-                stopReason = ConsumerStopReason.GRAMMAR_COMPLETE,
-            )
+        private fun metrics(): ConsumerInferenceMetrics = ConsumerInferenceMetrics(
+            outputTokens = 1,
+            timeToFirstTokenMs = 1,
+            totalMs = 1,
+            decodeTokensPerSecond = 1.0,
+            inputTokens = 1,
+            reasoningTokens = 0,
+            answerTokens = 1,
+            queueMs = 0,
+            stopReason = ConsumerStopReason.GRAMMAR_COMPLETE,
+        )
     }
 }
