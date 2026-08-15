@@ -21,7 +21,7 @@ This is the operational status ledger for model evaluation. Repository-level int
 | EVAL-5 Persistence and comparison | IN PROGRESS | P-01 contracts, P-02 bounded in-memory parity and P-06 lifecycle persistence are integrated; P-03 Room design and P-08 comparison remain active. |
 | EVAL-6 General Purpose v1 | IN PROGRESS | GP-01 exact public-source inventory is complete; GP-02 license/attribution treatment and GP-05/GP-06 Harness-owned authoring are ready independently. |
 | EVAL-7 Performance UI/custom import | IN PROGRESS | U-01 state/effect vocabulary and U-02 fake-driven reducer/ViewModel are integrated; navigation/state rendering and connected selectors remain. |
-| EVAL-8 Validation/device evidence | IN PROGRESS | V-01 identity/hash golden evidence is integrated; V-03 evaluator corpus is ready while final Android/device evidence remains late-gated. |
+| EVAL-8 Validation/device evidence | IN PROGRESS | V-01 identity/hash evidence and the reusable V-03 six-scorer golden/edge corpus are integrated; final Android/device evidence remains late-gated. |
 
 ## Frozen evaluator boundary
 
@@ -58,7 +58,7 @@ P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`
 
 GP-01 is satisfied by [`general-purpose-source-inventory.md`](general-purpose-source-inventory.md), which pins immutable MMLU-Pro, IFEval, GSM8K and ARC Challenge source revisions plus stable provenance/source-record identity rules without authorizing redistribution.
 
-V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digests/fingerprints and proves equivalent clean run construction remains deterministic.
+V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digests/fingerprints and proves equivalent clean run construction remains deterministic. V-03 adds a reusable 24-case corpus covering golden, ambiguous, malformed and edge output shapes across all six frozen v1 scorers, with deterministic outcome, score and registry assertions.
 
 ## Ready or active now
 
@@ -76,7 +76,6 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-U-04` — deterministic loading/empty/unavailable/error states;
 - `EVAL-U-11` — installed supported-model selector;
 - `EVAL-U-13` — execution-profile selector and compatibility explanation;
-- `EVAL-V-03` — reusable evaluator golden/edge corpus.
 
 D-06 discovery now exposes only fully published, strictly decoded packs with deterministic filtering/order while malformed, incomplete, staging and identity-mismatched directories remain invisible. D-09 adds reusable fixture evidence for malformed records, duplicate IDs, digest mismatch, rollback cleanup and deterministic sampling.
 
@@ -100,7 +99,7 @@ General pack: GP-01 DONE -> GP-02 -> GP-03 -> GP-04
               GP-06 ─┴─> later GP-07 assembly
 
 UI:           U-01 DONE -> U-02 DONE -> U-03/U-04/U-11/U-13
-Validation:   V-03 independent evaluator evidence
+Validation:   V-03 DONE; remaining deterministic gates are dependency-bound
 ```
 
 Module-registration files (`settings.gradle.kts`, CI module lists and `evaluation/AGENTS.md`) remain shared integration hotspots. Parallel branches may implement behavior independently, but replay/merge order must keep those files synchronized rather than resolving them by dropping one lane.
