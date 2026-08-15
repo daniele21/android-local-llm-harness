@@ -116,8 +116,8 @@ EVAL-2 closes when EVAL-D-01 through EVAL-D-12 are `DONE` and the real evaluatio
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-GP-01 | READY | EVAL-D-01 | Inventory exact upstream dataset/version candidates and stable source identifiers for the four public benchmark families. |
-| EVAL-GP-02 | PLANNED | EVAL-GP-01 | Record license, attribution and redistribution requirements per source and choose bundle-vs-download treatment. |
+| EVAL-GP-01 | DONE | EVAL-D-01 | Inventory exact upstream dataset/version candidates and stable source identifiers for the four public benchmark families. |
+| EVAL-GP-02 | READY | EVAL-GP-01 | Record license, attribution and redistribution requirements per source and choose bundle-vs-download treatment. |
 | EVAL-GP-03 | PLANNED | EVAL-GP-02 | Block any source component whose redistribution/attribution path is not explicitly acceptable for the project. |
 | EVAL-GP-04 | PLANNED | EVAL-D-07,EVAL-GP-03 | Define deterministic category selection rules and freeze upstream source case IDs for the 160 public-derived cases. |
 | EVAL-GP-05 | READY | EVAL-E-05 | Author 20 Harness structured-output cases with deterministic expected JSON/field outcomes. |
@@ -129,23 +129,24 @@ EVAL-2 closes when EVAL-D-01 through EVAL-D-12 are `DONE` and the real evaluatio
 | EVAL-GP-11 | PLANNED | EVAL-D-06,EVAL-GP-10 | Integrate General Purpose v1 into built-in discovery/install flow without special-case runner behavior. |
 | EVAL-GP-12 | PLANNED | EVAL-GP-09,EVAL-GP-11 | Add reproducibility test proving identical pack digest and preset sample IDs across clean builds. |
 
+EVAL-GP-01 is satisfied by [`../general-purpose-source-inventory.md`](../general-purpose-source-inventory.md), which pins immutable candidate revisions, source locations and source-record identity rules without making any redistribution decision.
+
 EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-The schema freeze now unlocks four independent generic/source lanes:
+The schema freeze unlocks the independent generic dataset lanes:
 
 - EVAL-D-02 bounded parser;
 - EVAL-D-03 full-pack validator;
-- EVAL-D-04 canonical digest verification;
-- EVAL-GP-01 exact public-source inventory and provenance identifiers.
+- EVAL-D-04 canonical digest verification.
 
-Evaluator completion also unlocks Harness-owned authoring independently:
+Public-source inventory EVAL-GP-01 is complete. EVAL-GP-02 license/attribution review can now proceed independently of Harness-owned authoring:
 
 - EVAL-GP-05 structured-output cases;
 - EVAL-GP-06 context-retrieval cases.
 
-D-02/D-03/D-04 converge at D-05 installation. Public-source curation EVAL-GP-01 through EVAL-GP-04 remains independent of Harness-owned case authoring. Dataset storage D-05/D-06 and sampling D-07/D-08 proceed as separate implementation lanes after their prerequisites.
+D-02/D-03/D-04 converge at D-05 installation. GP-02/GP-03 remain independent of Harness-owned case authoring. Dataset storage D-05/D-06 and sampling D-07/D-08 proceed as separate implementation lanes after their prerequisites.
 
 General Purpose v1 assembly is intentionally late: source/legal review, evaluator semantics and deterministic sampling must be stable before the 200-case digest is frozen.
 
