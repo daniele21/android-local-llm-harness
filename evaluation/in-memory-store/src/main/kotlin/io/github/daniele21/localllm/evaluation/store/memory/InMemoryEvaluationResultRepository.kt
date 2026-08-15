@@ -41,12 +41,13 @@ class InMemoryEvaluationResultRepository(private val clock: () -> Long = System:
     }
 
     override suspend fun queryRuns(query: EvaluationRunQuery): List<EvaluationRunSummary> = synchronized(lock) {
+        val startedBeforeEpochMs = query.startedBeforeEpochMs
         runs.values.asSequence()
             .map { it.summary }
             .filter { query.states.isEmpty() || it.state in query.states }
             .filter { query.datasetId == null || it.config.dataset.id == query.datasetId }
             .filter { query.modelDigest == null || it.config.model.artifactDigest == query.modelDigest }
-            .filter { query.startedBeforeEpochMs == null || it.startedAtEpochMs < query.startedBeforeEpochMs }
+            .filter { startedBeforeEpochMs == null || it.startedAtEpochMs < startedBeforeEpochMs }
             .sortedWith(compareByDescending<EvaluationRunSummary> { it.startedAtEpochMs }.thenBy { it.runId.value })
             .take(query.limit)
             .toList()
@@ -64,15 +65,16 @@ class InMemoryEvaluationResultRepository(private val clock: () -> Long = System:
 
     override suspend fun applyRetention(policy: EvaluationRetentionPolicy): EvaluationRetentionResult = synchronized(lock) {
         val now = clock()
+        val maxAgeMs = policy.maxAgeMs
         val terminal = runs.values
             .filter { it.summary.state.isTerminal() }
             .sortedWith(compareByDescending<MutableStoredRun> { it.summary.startedAtEpochMs }.thenBy { it.summary.runId.value })
 
         val keepByCount = terminal.take(policy.maxTerminalRuns).map { it.summary.runId }.toSet()
-        val expiredByAge = if (policy.maxAgeMs == null) {
+        val expiredByAge = if (maxAgeMs == null) {
             emptySet()
         } else {
-            terminal.filter { now - it.summary.startedAtEpochMs >= policy.maxAgeMs }.map { it.summary.runId }.toSet()
+            terminal.filter { now - it.summary.startedAtEpochMs >= maxAgeMs }.map { it.summary.runId }.toSet()
         }
         val deleteIds = terminal.asSequence()
             .map { it.summary.runId }
