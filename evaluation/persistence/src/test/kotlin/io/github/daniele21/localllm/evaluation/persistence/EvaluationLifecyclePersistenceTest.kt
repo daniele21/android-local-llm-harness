@@ -105,23 +105,18 @@ class EvaluationLifecyclePersistenceTest {
     }
 
     private fun failingPreflight(failure: EvaluationFailure) = object : EvaluationPreflightPort {
-        override suspend fun validate(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
-            EvaluationStepResult.Failure(failure)
+        override suspend fun validate(config: EvaluationRunConfig): EvaluationStepResult<Unit> = EvaluationStepResult.Failure(failure)
     }
 
     private fun unusedPreparation() = object : EvaluationModelPreparationPort {
-        override suspend fun prepare(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
-            error("Preparation must not run")
+        override suspend fun prepare(config: EvaluationRunConfig): EvaluationStepResult<Unit> = error("Preparation must not run")
 
-        override suspend fun warmup(config: EvaluationRunConfig): EvaluationStepResult<Unit> =
-            error("Warmup must not run")
+        override suspend fun warmup(config: EvaluationRunConfig): EvaluationStepResult<Unit> = error("Warmup must not run")
     }
 
     private fun unusedCaseExecution() = object : EvaluationCaseExecutionPort {
-        override suspend fun execute(
-            config: EvaluationRunConfig,
-            caseId: EvaluationCaseId,
-        ): EvaluationStepResult<EvaluationCaseResult> = error("Case execution must not run")
+        override suspend fun execute(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> =
+            error("Case execution must not run")
     }
 
     private fun config(): EvaluationRunConfig {
