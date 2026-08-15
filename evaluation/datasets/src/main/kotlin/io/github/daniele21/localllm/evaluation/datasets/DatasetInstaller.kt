@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.evaluation.datasets
 
+import io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetManifestV1
 import java.io.BufferedWriter
 import java.io.File
@@ -33,6 +34,12 @@ sealed interface DatasetInstallResult {
     ) : DatasetInstallResult
 }
 
+private sealed interface ParsedDatasetCases {
+    data class Success(val cases: List<EvaluationDatasetCaseV1>) : ParsedDatasetCases
+
+    data class Rejected(val result: DatasetInstallResult.Rejected) : ParsedDatasetCases
+}
+
 class EvaluationDatasetInstaller(
     private val rootDirectory: File,
     private val parser: EvaluationDatasetJsonlParser,
@@ -44,51 +51,70 @@ class EvaluationDatasetInstaller(
             return DatasetInstallResult.Rejected(DatasetInstallRejectionCode.ALREADY_INSTALLED)
         }
 
-        val cases = try {
-            parser.parse(casesInput)
-        } catch (failure: EvaluationDatasetParseException) {
-            return DatasetInstallResult.Rejected(
-                code = DatasetInstallRejectionCode.PARSE_FAILURE,
-                parseLineNumber = failure.lineNumber,
-                parseCode = failure.code,
-            )
-        }
+        val parsed = parseCases(casesInput)
+        if (parsed is ParsedDatasetCases.Rejected) return parsed.result
+        val cases = (parsed as ParsedDatasetCases.Success).cases
 
-        when (val validation = validator.validate(manifest, cases)) {
-            is DatasetValidationResult.Invalid -> return DatasetInstallResult.Rejected(
-                code = DatasetInstallRejectionCode.VALIDATION_FAILURE,
-                validationIssues = validation.issues,
-            )
-
-            DatasetValidationResult.Valid -> Unit
-        }
-
-        if (EvaluationDatasetContentDigester.verify(manifest, cases) !is DatasetDigestVerification.Match) {
-            return DatasetInstallResult.Rejected(DatasetInstallRejectionCode.DIGEST_MISMATCH)
-        }
+        validate(manifest, cases)?.let { rejection -> return rejection }
 
         val stagingDirectory = File(stagingRoot(), UUID.randomUUID().toString())
-        return try {
-            requireDirectory(stagingDirectory)
-            writeUtf8AndSync(
-                File(stagingDirectory, MANIFEST_FILE_NAME),
-                EvaluationDatasetManifestCanonicalJson.encode(manifest) + "\n",
-            )
-            writeCasesAndSync(File(stagingDirectory, CASES_FILE_NAME), cases)
-            publishAtomically(stagingDirectory, finalDirectory)
-            DatasetInstallResult.Installed(finalDirectory)
-        } catch (_: AtomicMoveNotSupportedException) {
-            stagingDirectory.deleteRecursively()
-            DatasetInstallResult.Rejected(DatasetInstallRejectionCode.ATOMIC_PUBLICATION_UNAVAILABLE)
-        } catch (_: Exception) {
-            stagingDirectory.deleteRecursively()
-            DatasetInstallResult.Rejected(DatasetInstallRejectionCode.IO_FAILURE)
-        }
+        return publish(manifest, cases, stagingDirectory, finalDirectory)
     }
 
     fun installedDirectory(manifest: EvaluationDatasetManifestV1): File = finalDirectory(manifest)
 
     internal fun stagingRoot(): File = File(rootDirectory, STAGING_DIRECTORY_NAME)
+
+    private fun parseCases(casesInput: InputStream): ParsedDatasetCases = try {
+        ParsedDatasetCases.Success(parser.parse(casesInput))
+    } catch (failure: EvaluationDatasetParseException) {
+        ParsedDatasetCases.Rejected(
+            DatasetInstallResult.Rejected(
+                code = DatasetInstallRejectionCode.PARSE_FAILURE,
+                parseLineNumber = failure.lineNumber,
+                parseCode = failure.code,
+            ),
+        )
+    }
+
+    private fun validate(
+        manifest: EvaluationDatasetManifestV1,
+        cases: List<EvaluationDatasetCaseV1>,
+    ): DatasetInstallResult.Rejected? {
+        val validation = validator.validate(manifest, cases)
+        if (validation is DatasetValidationResult.Invalid) {
+            return DatasetInstallResult.Rejected(
+                code = DatasetInstallRejectionCode.VALIDATION_FAILURE,
+                validationIssues = validation.issues,
+            )
+        }
+        if (EvaluationDatasetContentDigester.verify(manifest, cases) !is DatasetDigestVerification.Match) {
+            return DatasetInstallResult.Rejected(DatasetInstallRejectionCode.DIGEST_MISMATCH)
+        }
+        return null
+    }
+
+    private fun publish(
+        manifest: EvaluationDatasetManifestV1,
+        cases: List<EvaluationDatasetCaseV1>,
+        stagingDirectory: File,
+        finalDirectory: File,
+    ): DatasetInstallResult = try {
+        requireDirectory(stagingDirectory)
+        writeUtf8AndSync(
+            File(stagingDirectory, MANIFEST_FILE_NAME),
+            EvaluationDatasetManifestCanonicalJson.encode(manifest) + "\n",
+        )
+        writeCasesAndSync(File(stagingDirectory, CASES_FILE_NAME), cases)
+        publishAtomically(stagingDirectory, finalDirectory)
+        DatasetInstallResult.Installed(finalDirectory)
+    } catch (_: AtomicMoveNotSupportedException) {
+        stagingDirectory.deleteRecursively()
+        DatasetInstallResult.Rejected(DatasetInstallRejectionCode.ATOMIC_PUBLICATION_UNAVAILABLE)
+    } catch (_: Exception) {
+        stagingDirectory.deleteRecursively()
+        DatasetInstallResult.Rejected(DatasetInstallRejectionCode.IO_FAILURE)
+    }
 
     private fun finalDirectory(manifest: EvaluationDatasetManifestV1): File = File(
         File(rootDirectory, storageSegment(manifest.datasetId.value)),
@@ -107,7 +133,7 @@ class EvaluationDatasetInstaller(
         )
     }
 
-    private fun writeCasesAndSync(file: File, cases: List<io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1>) {
+    private fun writeCasesAndSync(file: File, cases: List<EvaluationDatasetCaseV1>) {
         FileOutputStream(file).use { output ->
             BufferedWriter(OutputStreamWriter(output, StandardCharsets.UTF_8)).use { writer ->
                 cases.forEach { case ->
