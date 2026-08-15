@@ -69,11 +69,7 @@ class DeterministicEvaluationCaseScorer(
 
         EvaluatorType.REGEX_FORMAT -> regexFormatEvaluator.evaluate(generated, case.evaluator)
 
-        EvaluatorType.INSTRUCTION_CONSTRAINTS -> instructionConstraintsEvaluator.evaluate(
-            case.expected.value,
-            generated,
-            case.evaluator,
-        )
+        EvaluatorType.INSTRUCTION_CONSTRAINTS -> instructionConstraintsEvaluator.evaluate(generated, case.evaluator)
     }
 
     private fun evaluatorFailure(
