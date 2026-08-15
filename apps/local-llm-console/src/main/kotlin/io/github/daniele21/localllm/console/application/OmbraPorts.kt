@@ -26,14 +26,19 @@ internal data class OmbraAnalysisRequest(val segments: List<DocumentSegment>, va
 internal data class OmbraExportRequest(
     val descriptor: DocumentDescriptor,
     val segments: List<DocumentSegment>,
+    val definitions: List<PiiDefinition>,
     val reviewOccurrences: List<ReviewOccurrence>,
 ) {
     init {
         require(segments.isNotEmpty()) { "Export requires document segments" }
+        require(definitions.isNotEmpty() || reviewOccurrences.isEmpty()) {
+            "Export with findings requires active definitions"
+        }
     }
 
     override fun toString(): String =
-        "OmbraExportRequest(pageCount=${descriptor.pageCount}, segmentCount=${segments.size}, reviewCount=${reviewOccurrences.size})"
+        "OmbraExportRequest(pageCount=${descriptor.pageCount}, segmentCount=${segments.size}, " +
+            "definitionCount=${definitions.size}, reviewCount=${reviewOccurrences.size})"
 }
 
 /**
