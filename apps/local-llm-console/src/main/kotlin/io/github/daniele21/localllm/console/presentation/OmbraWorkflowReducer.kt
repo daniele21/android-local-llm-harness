@@ -50,33 +50,51 @@ internal data class OmbraWorkflowTransition(val state: OmbraWorkflowState, val e
 /** Routes actions to small transition groups; transition behavior remains pure and Android-free. */
 internal object OmbraWorkflowReducer {
     fun reduce(state: OmbraWorkflowState, action: OmbraWorkflowAction): OmbraWorkflowTransition = when (action) {
+        is OmbraWorkflowAction.StartImport,
+        is OmbraWorkflowAction.DefinitionsStored,
+        OmbraWorkflowAction.StartAnalysis,
+        is OmbraWorkflowAction.StartExport,
+        -> reduceStart(state, action)
+
+        is OmbraWorkflowAction.ExtractionSucceeded,
+        is OmbraWorkflowAction.AnalysisSucceeded,
+        is OmbraWorkflowAction.ExportSucceeded,
+        is OmbraWorkflowAction.OperationFailed,
+        -> reduceCompletion(state, action)
+
+        OmbraWorkflowAction.CancelRequested,
+        is OmbraWorkflowAction.CancellationAcknowledged,
+        OmbraWorkflowAction.RetryRequested,
+        OmbraWorkflowAction.ReturnToReviewRequested,
+        OmbraWorkflowAction.ResetRequested,
+        OmbraWorkflowAction.ProcessRecreated,
+        -> reduceLifecycle(state, action)
+    }
+
+    private fun reduceStart(state: OmbraWorkflowState, action: OmbraWorkflowAction): OmbraWorkflowTransition = when (action) {
         is OmbraWorkflowAction.StartImport -> OmbraWorkflowStartTransitions.startImport(state, action)
-
-        is OmbraWorkflowAction.ExtractionSucceeded -> OmbraWorkflowCompletionTransitions.extractionSucceeded(state, action)
-
         is OmbraWorkflowAction.DefinitionsStored -> OmbraWorkflowStartTransitions.definitionsStored(state, action)
-
         OmbraWorkflowAction.StartAnalysis -> OmbraWorkflowStartTransitions.startAnalysis(state)
-
-        is OmbraWorkflowAction.AnalysisSucceeded -> OmbraWorkflowCompletionTransitions.analysisSucceeded(state, action)
-
         is OmbraWorkflowAction.StartExport -> OmbraWorkflowStartTransitions.startExport(state, action)
+        else -> error("Action does not belong to the start transition group")
+    }
 
+    private fun reduceCompletion(state: OmbraWorkflowState, action: OmbraWorkflowAction): OmbraWorkflowTransition = when (action) {
+        is OmbraWorkflowAction.ExtractionSucceeded -> OmbraWorkflowCompletionTransitions.extractionSucceeded(state, action)
+        is OmbraWorkflowAction.AnalysisSucceeded -> OmbraWorkflowCompletionTransitions.analysisSucceeded(state, action)
         is OmbraWorkflowAction.ExportSucceeded -> OmbraWorkflowCompletionTransitions.exportSucceeded(state, action)
-
         is OmbraWorkflowAction.OperationFailed -> OmbraWorkflowCompletionTransitions.operationFailed(state, action)
+        else -> error("Action does not belong to the completion transition group")
+    }
 
+    private fun reduceLifecycle(state: OmbraWorkflowState, action: OmbraWorkflowAction): OmbraWorkflowTransition = when (action) {
         OmbraWorkflowAction.CancelRequested -> OmbraWorkflowLifecycleTransitions.cancel(state)
-
         is OmbraWorkflowAction.CancellationAcknowledged ->
             OmbraWorkflowLifecycleTransitions.cancellationAcknowledged(state, action)
-
         OmbraWorkflowAction.RetryRequested -> OmbraWorkflowLifecycleTransitions.retry(state)
-
         OmbraWorkflowAction.ReturnToReviewRequested -> OmbraWorkflowLifecycleTransitions.returnToReview(state)
-
         OmbraWorkflowAction.ResetRequested -> OmbraWorkflowLifecycleTransitions.reset(state, cancelActive = true)
-
         OmbraWorkflowAction.ProcessRecreated -> OmbraWorkflowLifecycleTransitions.reset(state, cancelActive = false)
+        else -> error("Action does not belong to the lifecycle transition group")
     }
 }
