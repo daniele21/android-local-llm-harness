@@ -89,12 +89,18 @@ internal object OmbraWorkflowReducer {
 
     private fun reduceLifecycle(state: OmbraWorkflowState, action: OmbraWorkflowAction): OmbraWorkflowTransition = when (action) {
         OmbraWorkflowAction.CancelRequested -> OmbraWorkflowLifecycleTransitions.cancel(state)
+
         is OmbraWorkflowAction.CancellationAcknowledged ->
             OmbraWorkflowLifecycleTransitions.cancellationAcknowledged(state, action)
+
         OmbraWorkflowAction.RetryRequested -> OmbraWorkflowLifecycleTransitions.retry(state)
+
         OmbraWorkflowAction.ReturnToReviewRequested -> OmbraWorkflowLifecycleTransitions.returnToReview(state)
+
         OmbraWorkflowAction.ResetRequested -> OmbraWorkflowLifecycleTransitions.reset(state, cancelActive = true)
+
         OmbraWorkflowAction.ProcessRecreated -> OmbraWorkflowLifecycleTransitions.reset(state, cancelActive = false)
+
         else -> error("Action does not belong to the lifecycle transition group")
     }
 }
