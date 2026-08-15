@@ -3,7 +3,6 @@
 package io.github.daniele21.localllm.ui.designsystem
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -20,8 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -121,15 +122,19 @@ fun OmbraDefinitionSelectionRow(
         modifier =
             modifier.fillMaxWidth()
                 .heightIn(min = LocalOmbraSpacing.current.minimumTouchTarget)
-                .clickable(enabled = enabled) { onSelectedChange(!selected) }
-                .padding(vertical = LocalOmbraSpacing.current.sm),
+                .toggleable(
+                    value = selected,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onSelectedChange,
+                ).padding(vertical = LocalOmbraSpacing.current.sm),
         horizontalArrangement = Arrangement.spacedBy(LocalOmbraSpacing.current.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Checkbox(
             checked = selected,
             enabled = enabled,
-            onCheckedChange = onSelectedChange,
+            onCheckedChange = null,
         )
         Column(
             modifier = Modifier.weight(1f),
