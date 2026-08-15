@@ -41,10 +41,7 @@ class EvaluationCompatibilityService {
     }
 }
 
-private fun qualityMismatches(
-    left: EvaluationRunIdentity,
-    right: EvaluationRunIdentity,
-): Set<QualityMismatchReason> = buildSet {
+private fun qualityMismatches(left: EvaluationRunIdentity, right: EvaluationRunIdentity): Set<QualityMismatchReason> = buildSet {
     if (left.dataset.digest != right.dataset.digest) add(QualityMismatchReason.DATASET_DIGEST)
     if (left.sampleSetDigest != right.sampleSetDigest) add(QualityMismatchReason.SAMPLE_SET)
     if (left.evaluatorSetDigest != right.evaluatorSetDigest) add(QualityMismatchReason.EVALUATOR_SET)
