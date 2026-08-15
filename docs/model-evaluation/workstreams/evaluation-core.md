@@ -149,16 +149,20 @@ EVAL-E-08 defines quality aggregation only; runtime, resources and reliability r
 | EVAL-R-06 | DONE | EVAL-R-05,EVAL-E-01 | Dispatch completed output to declared evaluator and create typed case result. |
 | EVAL-R-07 | DONE | EVAL-R-05 | Correlate each case with normal generation request ID and privacy-safe telemetry/resource metrics. |
 | EVAL-R-08 | DONE | EVAL-R-05 | Implement per-case timeout policy and typed timeout cleanup without leaving active decode/context ownership. |
-| EVAL-R-09 | READY | EVAL-R-01,EVAL-R-05 | Implement cooperative run cancellation including active case cancellation and unattempted-case accounting. |
-| EVAL-R-10 | READY | EVAL-R-06,EVAL-R-07 | Implement incremental progress and aggregate quality/runtime/resource/reliability summary calculation. |
-| EVAL-R-11 | PLANNED | EVAL-R-04,EVAL-R-05,EVAL-R-08,EVAL-R-09 | Validate cleanup for completion, evaluator failure, runtime failure, timeout and cancellation. |
+| EVAL-R-09 | DONE | EVAL-R-01,EVAL-R-05 | Implement cooperative run cancellation including active case cancellation and unattempted-case accounting. |
+| EVAL-R-10 | IN PROGRESS | EVAL-R-06,EVAL-R-07 | Implement incremental progress and aggregate quality/runtime/resource/reliability summary calculation. |
+| EVAL-R-11 | READY | EVAL-R-04,EVAL-R-05,EVAL-R-08,EVAL-R-09 | Validate cleanup for completion, evaluator failure, runtime failure, timeout and cancellation. |
 | EVAL-R-12 | PLANNED | EVAL-R-10,EVAL-R-11 | Add deterministic runner integration tests using fake runtime, fake telemetry and fixed case order. |
 
 R-01 establishes single-run ownership, ordered case execution, warm-up state, progress, typed failure and between-phase/case cooperative cancellation. R-02 resolves only product-supplied supported model profiles to the exact installed verified artifact; it never mutates ordinary application bindings. R-03 adds deterministic production preflight with controlled model resolution first and fail-fast dataset, evaluator and execution-profile compatibility checks. R-04/R-05 add exact runtime binding, explicit load-policy preparation, one optional unscored generation through the normal client path and a fresh stateless session/context closed around each scored case while preserving model residency.
 
-R-06 executes scored cases through the normal `LocalLlmClient.generate` path and dispatches terminal output to the frozen deterministic evaluator registry. R-07 enriches completed cases through the exact generation `requestId`; unavailable telemetry stays unavailable rather than becoming synthetic zero. R-08 enforces immutable per-case timeout around active generation, cancels the active handle when the timeout fires, emits typed `TIMEOUT` results and preserves ordinary coroutine cancellation for R-09 rather than misclassifying it.
+R-06 executes scored cases through the normal `LocalLlmClient.generate` path and dispatches terminal output to the frozen deterministic evaluator registry. R-07 enriches completed cases through the exact generation `requestId`; unavailable telemetry stays unavailable rather than becoming synthetic zero. R-08 enforces immutable per-case timeout around active generation, cancels the active handle when the timeout fires, emits typed `TIMEOUT` results and preserves ordinary coroutine cancellation rather than misclassifying it.
 
-EVAL-4 is in progress. R-09 and R-10 can now proceed independently from the integrated R-01 through R-08 foundation. R-11/R-12 then close terminal-path cleanup, aggregate evidence and deterministic integration, including production dataset consumption rather than a duplicate dataset parser inside the engine.
+R-09 extends cooperative cancellation through the active scored case: the engine owns one child job for the active case, `cancel(runId)` cancels that job, coroutine cancellation reaches the R-08 generation-handle boundary, and the final progress snapshot records an interrupted active case as attempted but not completed while later sample members remain unattempted. External parent cancellation is still rethrown unless the engine's own cancellation flag was set.
+
+R-10 now has an integrated deterministic aggregation domain in `EvaluationRunAggregator`: frozen quality aggregation plus metric-specific median/p95/sample counts, memory distributions, thermal counts and reliability accounting. It remains `IN PROGRESS` until the production composition supplies canonical dataset category definitions and wires the aggregation result into the `AGGREGATING` terminal path.
+
+EVAL-4 is in progress. R-11 is now ready from the completed timeout/cancellation ownership boundary. R-10 production wiring and R-11 can proceed in parallel; R-12 follows when both close.
 
 ## Task ledger — persistence and comparison
 
@@ -187,10 +191,10 @@ EVAL-5 is in progress. P-04 integration unlocks P-05 parity; P-10 then joins dur
 
 The current fan-out is intentionally broad:
 
-- EVAL-R-09 active cancellation and EVAL-R-10 aggregate summaries can proceed independently from the integrated R-01 through R-08 runner foundation;
+- EVAL-R-10 production aggregation wiring and EVAL-R-11 terminal-path cleanup evidence can proceed independently from the integrated R-01 through R-09 runner foundation;
 - EVAL-P-04 Room repository wiring remains the persistence critical lane; P-05 becomes ready only after P-04 is integrated;
 - P-07 case persistence and P-09 comparison deltas are already integrated and can feed later P-10 evidence;
-- the generic dataset mechanism is stable through D-12 while General Purpose source/content work advances separately;
+- the generic dataset mechanism is stable through D-12 while the production dataset-to-runner adapter and General Purpose source/content work advance separately;
 - the Performance UI shell can remain fake-driven until runner/persistence wiring lands.
 
 The runner should not absorb persistence, dataset-installation or UI responsibilities merely to reduce module count. Those boundaries are deliberate test seams.
