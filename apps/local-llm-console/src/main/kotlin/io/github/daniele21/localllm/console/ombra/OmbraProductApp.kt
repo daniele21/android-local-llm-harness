@@ -123,7 +123,7 @@ internal fun OmbraProductApp(viewModel: OmbraProductViewModel, onPickDocument: (
                     harness = harness,
                     extractionComplete = workflow.activeOperation?.kind != OmbraOperationKind.EXTRACTION,
                     analysisComplete = false,
-                    onCancel = {},
+                    onCancel = { false },
                 )
             }
         }
