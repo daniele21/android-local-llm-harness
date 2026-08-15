@@ -88,16 +88,7 @@ val OmbraShapes =
     )
 
 @Immutable
-data class OmbraSpacing(
-    val xxs: Dp,
-    val xs: Dp,
-    val sm: Dp,
-    val md: Dp,
-    val lg: Dp,
-    val xl: Dp,
-    val xxl: Dp,
-    val minimumTouchTarget: Dp,
-)
+data class OmbraSpacing(val xxs: Dp, val xs: Dp, val sm: Dp, val md: Dp, val lg: Dp, val xl: Dp, val xxl: Dp, val minimumTouchTarget: Dp)
 
 internal val DefaultOmbraSpacing =
     OmbraSpacing(
