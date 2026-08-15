@@ -154,7 +154,7 @@ class OmbraReviewScreenInstrumentedTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Nuovo PDF").performScrollTo().performClick()
+        composeRule.onNodeWithText("Nuovo PDF").assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(1, resetCalls) }
     }
 
