@@ -1,8 +1,10 @@
 package io.github.daniele21.localllm.console.document
 
 import android.net.Uri
+import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import io.github.daniele21.localllm.console.application.OmbraDocumentExtractionException
 import io.github.daniele21.localllm.console.application.OmbraDocumentExtractionFailureCode
 import io.github.daniele21.localllm.console.application.OmbraDocumentSourceRef
@@ -67,6 +69,71 @@ class AndroidOmbraDocumentExtractorInstrumentedTest {
             extractor.close()
             registry.clear()
             sourceFile.delete()
+        }
+    }
+
+    @Test
+    fun encryptedPdfMapsThroughProductionAdapterToTypedFailure() {
+        runBlocking {
+            val sourceFile = File(context.cacheDir, "ombra-encrypted-extractor.pdf")
+            val encoded =
+                InstrumentationRegistry.getInstrumentation().context.assets.open("encrypted-ombra-fixture.pdf.b64").bufferedReader().use {
+                    it.readText()
+                }
+            sourceFile.writeBytes(Base64.decode(encoded, Base64.DEFAULT))
+            val registry = OmbraDocumentSourceRegistry(context)
+            val sourceRef = registry.register(Uri.fromFile(sourceFile))
+            val extractor = AndroidOmbraDocumentExtractor(context, registry)
+
+            val failure = awaitExtraction(extractor, OmbraOperationId(4), sourceRef).exceptionOrNull()
+
+            assertTrue(failure is OmbraDocumentExtractionException)
+            assertEquals(OmbraDocumentExtractionFailureCode.ENCRYPTED_PDF, (failure as OmbraDocumentExtractionException).code)
+            extractor.close()
+            registry.clear()
+            sourceFile.delete()
+        }
+    }
+
+    @Test
+    fun malformedPdfMapsThroughProductionAdapterToTypedFailure() {
+        runBlocking {
+            val sourceFile = File(context.cacheDir, "ombra-malformed-extractor.pdf")
+            sourceFile.writeBytes("%PDF-1.7\nthis is not a complete PDF".toByteArray())
+            val registry = OmbraDocumentSourceRegistry(context)
+            val sourceRef = registry.register(Uri.fromFile(sourceFile))
+            val extractor = AndroidOmbraDocumentExtractor(context, registry)
+
+            val failure = awaitExtraction(extractor, OmbraOperationId(5), sourceRef).exceptionOrNull()
+
+            assertTrue(failure is OmbraDocumentExtractionException)
+            assertEquals(OmbraDocumentExtractionFailureCode.MALFORMED_PDF, (failure as OmbraDocumentExtractionException).code)
+            extractor.close()
+            registry.clear()
+            sourceFile.delete()
+        }
+    }
+
+    @Test
+    fun truncatedReaderResultMapsToLimitExceededAtProductionAdapter() {
+        runBlocking {
+            val sourceRef = OmbraDocumentSourceRef(6)
+            val resolver = OmbraDocumentSourceResolver { OmbraDocumentSource(Uri.parse("file:///limit.pdf"), "limit.pdf") }
+            val reader =
+                OmbraPdfTextReader {
+                    OmbraPdfReadResult(
+                        pageCount = 2,
+                        pages = listOf(OmbraPdfPageText(pageIndex = 0, text = "bounded text")),
+                        truncated = true,
+                    )
+                }
+            val extractor = AndroidOmbraDocumentExtractor(resolver, reader)
+
+            val failure = awaitExtraction(extractor, OmbraOperationId(6), sourceRef).exceptionOrNull()
+
+            assertTrue(failure is OmbraDocumentExtractionException)
+            assertEquals(OmbraDocumentExtractionFailureCode.LIMIT_EXCEEDED, (failure as OmbraDocumentExtractionException).code)
+            extractor.close()
         }
     }
 
