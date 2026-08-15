@@ -15,17 +15,17 @@ This is the operational status ledger for model evaluation. Repository-level int
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, dataset-schema, persistence, compatibility, hashing and failure contracts with deterministic tests. |
-| EVAL-2 Dataset system | IN PROGRESS | D-01 manifest/canonical JSONL schema is frozen; parser, validator and digest lanes are ready in parallel. |
+| EVAL-2 Dataset system | IN PROGRESS | D-01 manifest/canonical JSONL schema is frozen; D-02/D-03/D-04 remain the active parser/validator/digest convergence lanes. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
-| EVAL-4 Evaluation runner | READY | R-01 lifecycle engine and R-02 controlled model binding can progress independently. |
-| EVAL-5 Persistence and comparison | READY | P-01 repository/query/retention contract is already frozen; P-02, P-03 and P-08 are ready independently. |
-| EVAL-6 General Purpose v1 | READY | GP-01 public-source inventory plus GP-05/GP-06 Harness-owned case authoring can start independently. |
-| EVAL-7 Performance UI/custom import | READY | U-01 can define the Performance UDF/navigation contract against fakes. |
+| EVAL-4 Evaluation runner | IN PROGRESS | R-01 fake-driven lifecycle engine and R-02 controlled selected-model resolution are integrated; R-03 production preflight is the next ready runner task. |
+| EVAL-5 Persistence and comparison | IN PROGRESS | P-01 contracts and P-02 bounded in-memory parity repository are integrated; P-03 Room design, P-08 comparison and P-06 lifecycle persistence can progress independently. |
+| EVAL-6 General Purpose v1 | READY | GP-01 public-source inventory plus GP-05/GP-06 Harness-owned case authoring can progress independently. |
+| EVAL-7 Performance UI/custom import | IN PROGRESS | U-01 freezes Run/Datasets/History/Compare state/effect vocabulary; U-02 fake-driven reducer/ViewModel is now ready. |
 | EVAL-8 Validation/device evidence | IN PROGRESS | V-01 identity/hash golden evidence is integrated; V-03 evaluator corpus is ready while final Android/device evidence remains late-gated. |
 
 ## Frozen evaluator boundary
 
-`evaluation/evaluators` now contains the fail-closed registry, all six v1 deterministic scorer families and quality aggregation. [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) freezes their dataset-visible type/version/parameter/scoring behavior.
+`evaluation/evaluators` contains the fail-closed registry, all six v1 deterministic scorer families and quality aggregation. [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) freezes their dataset-visible type/version/parameter/scoring behavior.
 
 The quality boundary remains explicit:
 
@@ -38,11 +38,21 @@ The quality boundary remains explicit:
 
 EVAL-3 is complete. No v1 evaluator uses an LLM judge, arbitrary executable code or user-provided regular expressions.
 
+## Integrated Wave 2 foundation
+
+The integrated Wave 2 foundation adds three concrete implementation seams without prematurely connecting production dataset/runtime behavior:
+
+- `evaluation/engine` owns R-01 single-run lifecycle/progress/cancellation against injected ports plus R-02 controlled resolution of exactly one supported installed model artifact;
+- `evaluation/in-memory-store` owns the P-02 deterministic parity implementation of `EvaluationResultRepository`, including lifecycle validation, active-run deletion protection and bounded terminal retention;
+- the phone Performance shell owns U-01 typed Run/Datasets/History/Compare state, intents and effects, with Standard as the default sample preset and Custom restricted to positive multiples of 10.
+
+R-01/R-02 do not claim active-decode timeout/cancellation or production dataset/evaluator/runtime wiring. P-02 does not claim Room persistence. U-01 does not claim connected Compose behavior.
+
 ## Frozen dataset and persistence foundations
 
 D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation.
 
-P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`: bounded history queries, retention policy/result, active-run-aware delete status and `EvaluationResultRepository` are already part of the frozen contracts.
+P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`: bounded history queries, retention policy/result, active-run-aware delete status and `EvaluationResultRepository` are part of the frozen contracts. P-02 now provides the in-memory behavioral baseline that later Room parity must match.
 
 V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digests/fingerprints and proves equivalent clean run construction remains deterministic.
 
@@ -56,39 +66,39 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-GP-01` — exact public benchmark source/version/provenance inventory;
 - `EVAL-GP-05` — 20 Harness structured-output cases;
 - `EVAL-GP-06` — 20 Harness context-retrieval cases;
-- `EVAL-R-01` — evaluation lifecycle engine against fakes;
-- `EVAL-R-02` — controlled supported-model evaluation binding/profile resolution;
-- `EVAL-P-02` — bounded in-memory result repository;
+- `EVAL-R-03` — production preflight for selected model/dataset/evaluator/execution compatibility;
 - `EVAL-P-03` — Room entity design for privacy-safe evaluation persistence;
+- `EVAL-P-06` — persist run lifecycle states against the frozen repository boundary;
 - `EVAL-P-08` — typed comparison service;
-- `EVAL-U-01` — Performance navigation/UDF state/effect contract;
+- `EVAL-U-02` — fake-driven Performance ViewModel/reducer;
 - `EVAL-V-03` — reusable evaluator golden/edge corpus.
 
 ## Parallel fan-out strategy
 
-Wave 2 is deliberately split into independent convergence points:
+Wave 2 now fans out from implemented foundations:
 
 ```text
 Dataset:      D-02 ─┐
               D-03 ─┼─> D-05 install
               D-04 ─┘
 
-Runner:       R-01 ─┐
-              R-02 ─┴─> R-03/R-04/R-05
+Runner:       R-01 DONE
+              R-02 DONE -> R-03 -> R-04/R-05
 
-Persistence:  P-02 ─┐
-              P-03 ─┼─> parity / Room wiring
-              P-08  └─> comparison deltas
+Persistence:  P-02 DONE ─┐
+              P-03 ──────┼─> P-04/P-05 parity
+              P-06 ──────┘
+              P-08 ─────────> P-09 comparison deltas
 
 General pack: GP-01 -> GP-02/GP-03
               GP-05 ─┐
               GP-06 ─┴─> later GP-07 assembly
 
-UI:           U-01 -> fake-driven run/history/compare states
+UI:           U-01 DONE -> U-02 -> fake-driven run/history/compare states
 Validation:   V-03 independent evaluator evidence
 ```
 
-Module-registration files (`settings.gradle.kts`, CI module lists and `evaluation/AGENTS.md`) are shared integration hotspots. Parallel branches may implement behavior independently, but replay/merge order must keep those files synchronized rather than resolving them by dropping one lane.
+Module-registration files (`settings.gradle.kts`, CI module lists and `evaluation/AGENTS.md`) remain shared integration hotspots. Parallel branches may implement behavior independently, but replay/merge order must keep those files synchronized rather than resolving them by dropping one lane.
 
 ## External dependencies
 

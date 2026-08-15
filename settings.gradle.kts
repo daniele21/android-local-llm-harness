@@ -21,6 +21,8 @@ include(
     ":core:runtime-core",
     ":evaluation:contracts",
     ":evaluation:evaluators",
+    ":evaluation:engine",
+    ":evaluation:in-memory-store",
     ":models:model-profile",
     ":models:model-store",
     ":models:model-catalog",

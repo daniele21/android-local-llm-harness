@@ -29,6 +29,27 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("core:runtime-core",))
 
+    def test_evaluator_change_selects_only_evaluator_module(self) -> None:
+        scope = classify_paths(["evaluation/evaluators/src/main/kotlin/ExactMatchEvaluator.kt"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:evaluators",))
+
+    def test_evaluation_engine_change_selects_only_engine_module(self) -> None:
+        scope = classify_paths(["evaluation/engine/src/main/kotlin/EvaluationEngine.kt"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:engine",))
+
+    def test_evaluation_memory_store_change_selects_only_store_module(self) -> None:
+        scope = classify_paths(["evaluation/in-memory-store/src/main/kotlin/InMemoryEvaluationResultRepository.kt"])
+        self.assertTrue(scope.android)
+        self.assertFalse(scope.native)
+        self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("evaluation:in-memory-store",))
+
     def test_model_distribution_modules_are_selected_explicitly(self) -> None:
         scope = classify_paths(
             [
@@ -50,11 +71,7 @@ class DetectCiScopeTest(unittest.TestCase):
         )
 
     def test_binder_contract_change_selects_transport_module(self) -> None:
-        scope = classify_paths(
-            [
-                "transports/android-binder-contract/src/main/kotlin/ProtocolModels.kt",
-            ]
-        )
+        scope = classify_paths(["transports/android-binder-contract/src/main/kotlin/ProtocolModels.kt"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
@@ -68,11 +85,7 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("transports:android-binder-contract",))
 
     def test_host_service_change_selects_integration_module(self) -> None:
-        scope = classify_paths(
-            [
-                "integrations/android-service-host/src/main/kotlin/CallerAuthorization.kt",
-            ]
-        )
+        scope = classify_paths(["integrations/android-service-host/src/main/kotlin/CallerAuthorization.kt"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
@@ -99,15 +112,10 @@ class DetectCiScopeTest(unittest.TestCase):
                 "core/runtime-core/src/main/kotlin/Runtime.kt",
             ]
         )
-        self.assertEqual(
-            scope.modules,
-            ("core:runtime-core", "observability:health-engine"),
-        )
+        self.assertEqual(scope.modules, ("core:runtime-core", "observability:health-engine"))
 
     def test_mixed_documentation_and_core_code_runs_android_only(self) -> None:
-        scope = classify_paths(
-            ["README.md", "core/runtime-core/src/main/kotlin/Runtime.kt"]
-        )
+        scope = classify_paths(["README.md", "core/runtime-core/src/main/kotlin/Runtime.kt"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
@@ -121,18 +129,14 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("all",))
 
     def test_evaluation_contract_change_runs_all_android_modules(self) -> None:
-        scope = classify_paths(
-            ["evaluation/contracts/src/main/kotlin/EvaluationRunConfig.kt"]
-        )
+        scope = classify_paths(["evaluation/contracts/src/main/kotlin/EvaluationRunConfig.kt"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("all",))
 
     def test_observability_contract_change_runs_all_android_modules(self) -> None:
-        scope = classify_paths(
-            ["observability/contracts/src/main/kotlin/Telemetry.kt"]
-        )
+        scope = classify_paths(["observability/contracts/src/main/kotlin/Telemetry.kt"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
@@ -167,9 +171,7 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("all",))
 
     def test_manifest_change_in_known_module_selects_that_module(self) -> None:
-        scope = classify_paths(
-            ["apps/local-llm-console/src/main/AndroidManifest.xml"]
-        )
+        scope = classify_paths(["apps/local-llm-console/src/main/AndroidManifest.xml"])
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertTrue(scope.packaging)
