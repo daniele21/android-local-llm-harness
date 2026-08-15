@@ -32,8 +32,10 @@ import io.github.daniele21.localllm.evaluation.EvaluationFailureCode
 import io.github.daniele21.localllm.evaluation.EvaluationFailureStage
 import io.github.daniele21.localllm.evaluation.EvaluationMessageRole
 import io.github.daniele21.localllm.evaluation.EvaluationModelIdentity
+import io.github.daniele21.localllm.evaluation.EvaluationModelLoadPolicy
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
+import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
 import io.github.daniele21.localllm.evaluation.EvaluatorOutcomeCode
 import io.github.daniele21.localllm.evaluation.EvaluatorSpec
 import io.github.daniele21.localllm.evaluation.EvaluatorType
@@ -43,7 +45,6 @@ import io.github.daniele21.localllm.evaluation.SamplingSelection
 import io.github.daniele21.localllm.evaluation.evaluators.ExactMatchEvaluator
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalLlmScoredCaseExecutionTest {
@@ -182,6 +183,8 @@ class LocalLlmScoredCaseExecutionTest {
                 orderedCaseIds = listOf(CASE_ID),
             ),
             executionProfile = EvaluationExecutionProfileRef(EvaluationExecutionProfileId("direct"), 1),
+            loadPolicy = EvaluationModelLoadPolicy.PRESERVE_CURRENT_RESIDENCY,
+            warmupPolicy = EvaluationWarmupPolicy.NONE,
             caseTimeoutMs = 30_000,
         )
         val BINDING = EvaluationRuntimeBinding(APPLICATION_ID, USE_CASE_ID, CONFIG.model, CONFIG.executionProfile)
