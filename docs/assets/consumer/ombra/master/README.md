@@ -1,13 +1,13 @@
 # OMBRA vector identity candidates
 
-Status: review-required
+Status: active
 Document type: asset-index
 Owner: OMBRA design system
 Canonical scope: shared-runtime.consumer-api.pii-redactor.identity
 Read when: reviewing or generating OMBRA product identity assets
 Last reviewed: 2026-08-15
 
-This directory contains manually recreated vector candidates derived from the approved OMBRA design contract. It intentionally does **not** auto-trace the raster brand board.
+This directory contains manually recreated vector candidates derived from the approved OMBRA design contract. It intentionally does **not** auto-trace the raster brand board. The document lifecycle is active; the symbol itself remains **REVIEW REQUIRED** and is not approved for production identity use.
 
 ## Current candidate
 
