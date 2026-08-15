@@ -28,4 +28,5 @@ dependencies {
     api(project(":evaluation:contracts"))
     api(project(":evaluation:evaluators"))
     testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.android)
 }
