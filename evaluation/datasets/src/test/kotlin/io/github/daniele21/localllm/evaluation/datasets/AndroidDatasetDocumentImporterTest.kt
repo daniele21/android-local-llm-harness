@@ -12,10 +12,8 @@ import io.github.daniele21.localllm.evaluation.EvaluationExpectedAnswerKind
 import io.github.daniele21.localllm.evaluation.EvaluationMessageRole
 import io.github.daniele21.localllm.evaluation.EvaluatorSpec
 import io.github.daniele21.localllm.evaluation.EvaluatorType
-import io.github.daniele21.localllm.evaluation.EvaluatorVersion
-import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorKey
-import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorRegistration
 import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorRegistry
+import io.github.daniele21.localllm.evaluation.evaluators.ExactMatchEvaluator
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -105,13 +103,7 @@ class AndroidDatasetDocumentImporterTest {
         val root = Files.createTempDirectory("evaluation-import-test").toFile()
         try {
             val parser = EvaluationDatasetJsonlParser()
-            val registry = EvaluatorRegistry(
-                listOf(
-                    EvaluatorRegistration(
-                        EvaluatorKey(EvaluatorType.EXACT_MATCH, EvaluatorVersion(1)),
-                    ),
-                ),
-            )
+            val registry = EvaluatorRegistry(listOf(ExactMatchEvaluator.REGISTRATION))
             val installer = EvaluationDatasetInstaller(
                 rootDirectory = root,
                 parser = parser,
@@ -134,7 +126,14 @@ class AndroidDatasetDocumentImporterTest {
         categoryId = EvaluationCategoryId(category),
         messages = listOf(EvaluationCaseMessage(EvaluationMessageRole.USER, "Question for $id")),
         expected = EvaluationExpectedAnswer(EvaluationExpectedAnswerKind.TEXT, "answer"),
-        evaluator = EvaluatorSpec(EvaluatorType.EXACT_MATCH, EvaluatorVersion(1)),
+        evaluator = EvaluatorSpec(
+            type = EvaluatorType.EXACT_MATCH,
+            version = ExactMatchEvaluator.VERSION,
+            parameters = mapOf(
+                ExactMatchEvaluator.PARAM_CASE to ExactMatchEvaluator.CASE_SENSITIVE,
+                ExactMatchEvaluator.PARAM_WHITESPACE to ExactMatchEvaluator.WHITESPACE_EXACT,
+            ),
+        ),
     )
 
     private fun jsonl(cases: List<EvaluationDatasetCaseV1>): String = cases.joinToString(separator = "", transform = { case ->
