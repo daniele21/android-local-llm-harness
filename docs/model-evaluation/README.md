@@ -66,6 +66,7 @@ Milestone state is owned by [`current-state.md`](current-state.md). Dependency o
 | Product behavior, scoring principles and non-goals | [`target.md`](target.md) |
 | Frozen evaluator type/version/parameter/score semantics | [`evaluator-semantics-v1.md`](evaluator-semantics-v1.md) |
 | Frozen manifest and canonical JSONL wire schema | [`dataset-schema-v1.md`](dataset-schema-v1.md) |
+| Pinned General Purpose public-source identities and revisions | [`general-purpose-source-inventory.md`](general-purpose-source-inventory.md) |
 | Target module boundaries and execution flow | [`architecture.md`](architecture.md) |
 | Contracts, evaluators, runner and persistence tasks | [`workstreams/evaluation-core.md`](workstreams/evaluation-core.md) |
 | Dataset packs, sampling, import and General Purpose v1 | [`workstreams/datasets.md`](workstreams/datasets.md) |
