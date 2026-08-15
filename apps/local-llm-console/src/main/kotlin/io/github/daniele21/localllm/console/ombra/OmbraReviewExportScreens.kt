@@ -138,11 +138,11 @@ private fun OmbraReviewCandidate(
         category = candidate.typeLabel,
         positionLabel = "Occorrenza ${candidate.position} di ${candidate.total}",
         value =
-            if (revealed == null) {
-                OmbraFindingDisplayValue.Hidden(candidate.placeholder, "Valore nascosto")
-            } else {
-                OmbraFindingDisplayValue.Revealed(revealed.surface, "Contenuto sensibile rivelato")
-            },
+        if (revealed == null) {
+            OmbraFindingDisplayValue.Hidden(candidate.placeholder, "Valore nascosto")
+        } else {
+            OmbraFindingDisplayValue.Revealed(revealed.surface, "Contenuto sensibile rivelato")
+        },
         decision = candidate.decision.toDesignDecision(),
         decisionLabel = candidate.decision.toDecisionLabel(),
         acceptLabel = "Oscura",
@@ -192,9 +192,9 @@ internal fun OmbraExportSuccessScreen(receipt: OmbraExportReceipt?, onReset: () 
             OmbraReviewBanner(
                 title = "Esportazione completata",
                 detail =
-                    receipt?.let { value ->
-                        "${value.pageCount} pagine · ${value.byteCount} byte scritti localmente."
-                    } ?: "Il PDF è stato creato localmente.",
+                receipt?.let { value ->
+                    "${value.pageCount} pagine · ${value.byteCount} byte scritti localmente."
+                } ?: "Il PDF è stato creato localmente.",
                 tone = OmbraStatusTone.LOCAL_READY,
             )
             OmbraPrimaryButton(text = "Proteggi un altro documento", onClick = onReset)
@@ -206,34 +206,31 @@ internal fun OmbraExportSuccessScreen(receipt: OmbraExportReceipt?, onReset: () 
 private fun OmbraReviewContent(innerPadding: PaddingValues, content: @Composable () -> Unit) {
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(LocalOmbraSpacing.current.md),
+        Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .verticalScroll(rememberScrollState())
+            .padding(LocalOmbraSpacing.current.md),
         verticalArrangement = Arrangement.spacedBy(LocalOmbraSpacing.current.md),
     ) {
         content()
     }
 }
 
-private fun ReviewDecisionState.toDesignDecision(): OmbraFindingDecision =
-    when (this) {
-        ReviewDecisionState.PENDING -> OmbraFindingDecision.UNDECIDED
-        ReviewDecisionState.ACCEPTED -> OmbraFindingDecision.ACCEPTED
-        ReviewDecisionState.IGNORED -> OmbraFindingDecision.IGNORED
-    }
+private fun ReviewDecisionState.toDesignDecision(): OmbraFindingDecision = when (this) {
+    ReviewDecisionState.PENDING -> OmbraFindingDecision.UNDECIDED
+    ReviewDecisionState.ACCEPTED -> OmbraFindingDecision.ACCEPTED
+    ReviewDecisionState.IGNORED -> OmbraFindingDecision.IGNORED
+}
 
-private fun ReviewDecisionState.toDecisionLabel(): String =
-    when (this) {
-        ReviewDecisionState.PENDING -> "Da decidere"
-        ReviewDecisionState.ACCEPTED -> "Da oscurare"
-        ReviewDecisionState.IGNORED -> "Da lasciare visibile"
-    }
+private fun ReviewDecisionState.toDecisionLabel(): String = when (this) {
+    ReviewDecisionState.PENDING -> "Da decidere"
+    ReviewDecisionState.ACCEPTED -> "Da oscurare"
+    ReviewDecisionState.IGNORED -> "Da lasciare visibile"
+}
 
-private fun OmbraFindingDecision.toDomainDecision(): ReviewDecisionState =
-    when (this) {
-        OmbraFindingDecision.UNDECIDED -> ReviewDecisionState.PENDING
-        OmbraFindingDecision.ACCEPTED -> ReviewDecisionState.ACCEPTED
-        OmbraFindingDecision.IGNORED -> ReviewDecisionState.IGNORED
-    }
+private fun OmbraFindingDecision.toDomainDecision(): ReviewDecisionState = when (this) {
+    OmbraFindingDecision.UNDECIDED -> ReviewDecisionState.PENDING
+    OmbraFindingDecision.ACCEPTED -> ReviewDecisionState.ACCEPTED
+    OmbraFindingDecision.IGNORED -> ReviewDecisionState.IGNORED
+}
