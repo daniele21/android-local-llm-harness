@@ -1,0 +1,53 @@
+name: Validate evaluation persistence
+
+on:
+  pull_request:
+    paths:
+      - "evaluation/comparison/**"
+      - "evaluation/room-store/**"
+      - "evaluation/contracts/**"
+      - "settings.gradle.kts"
+      - ".github/workflows/validate-evaluation-persistence.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "evaluation/comparison/**"
+      - "evaluation/room-store/**"
+      - "evaluation/contracts/**"
+      - "settings.gradle.kts"
+      - ".github/workflows/validate-evaluation-persistence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+      - name: Validate comparison and Room schema modules
+        run: |
+          ./gradlew --no-configuration-cache \
+            spotlessCheck \
+            detekt \
+            verifyNoModelArtifacts \
+            :evaluation:comparison:testDebugUnitTest \
+            :evaluation:comparison:lintDebug \
+            :evaluation:comparison:compileDebugKotlin \
+            :evaluation:room-store:testDebugUnitTest \
+            :evaluation:room-store:lintDebug \
+            :evaluation:room-store:compileDebugKotlin
