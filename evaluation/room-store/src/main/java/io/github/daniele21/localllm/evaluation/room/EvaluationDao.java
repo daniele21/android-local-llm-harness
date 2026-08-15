@@ -57,6 +57,9 @@ public interface EvaluationDao {
                     + "WHERE run_id = :runId AND case_id = :caseId")
     int sampleCaseCount(String runId, String caseId);
 
+    @Query("SELECT COUNT(*) FROM evaluation_runs")
+    int runCount();
+
     @RawQuery
     List<EvaluationRunEntity> queryRuns(SupportSQLiteQuery query);
 
