@@ -15,12 +15,12 @@ import io.github.daniele21.localllm.evaluation.EvaluationFailure
 import io.github.daniele21.localllm.evaluation.EvaluationFailureCode
 import io.github.daniele21.localllm.evaluation.EvaluationFailureStage
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
-import java.util.concurrent.CancellationException
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
 
 fun interface EvaluationCaseDefinitionSource {
     fun load(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationDatasetCaseV1?
