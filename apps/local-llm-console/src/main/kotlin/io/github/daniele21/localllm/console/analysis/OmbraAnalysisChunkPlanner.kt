@@ -147,11 +147,10 @@ internal class OmbraAnalysisChunkPlanner(private val policy: OmbraAnalysisPlanni
     private data class SplitResult(val head: OmbraAnalysisSegmentData, val tail: PendingSegment?)
 
     private data class PendingSegment(val baseId: String, val text: String, val fragmentOrdinal: Int, val forceFragmentId: Boolean) {
-        fun asAnalysisSegment(): OmbraAnalysisSegmentData =
-            OmbraAnalysisSegmentData(
-                segmentId = if (forceFragmentId) fragmentId(fragmentOrdinal) else baseId,
-                text = text,
-            )
+        fun asAnalysisSegment(): OmbraAnalysisSegmentData = OmbraAnalysisSegmentData(
+            segmentId = if (forceFragmentId) fragmentId(fragmentOrdinal) else baseId,
+            text = text,
+        )
 
         fun fragment(prefix: String): OmbraAnalysisSegmentData =
             OmbraAnalysisSegmentData(segmentId = fragmentId(fragmentOrdinal), text = prefix)
@@ -159,13 +158,12 @@ internal class OmbraAnalysisChunkPlanner(private val policy: OmbraAnalysisPlanni
         private fun fragmentId(ordinal: Int): String = "$baseId-f${ordinal.toString().padStart(4, '0')}"
 
         companion object {
-            fun whole(segment: DocumentSegment): PendingSegment =
-                PendingSegment(
-                    baseId = segment.id.value,
-                    text = segment.normalizedText,
-                    fragmentOrdinal = 1,
-                    forceFragmentId = false,
-                )
+            fun whole(segment: DocumentSegment): PendingSegment = PendingSegment(
+                baseId = segment.id.value,
+                text = segment.normalizedText,
+                fragmentOrdinal = 1,
+                forceFragmentId = false,
+            )
         }
     }
 }
