@@ -53,25 +53,8 @@ internal object OmbraRedactionPlanner {
         val definitionById = definitions.associateBy(PiiDefinition::id)
         val segmentById = segments.associateBy(DocumentSegment::id)
         val segmentOrder = segments.withIndex().associate { it.value.id to it.index }
-
-        if (reviewOccurrences.any { it.decision == ReviewDecisionState.PENDING }) {
-            return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.PENDING_DECISION)
-        }
-        if (reviewOccurrences.map(ReviewOccurrence::id).distinct().size != reviewOccurrences.size) {
-            return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.DUPLICATE_OCCURRENCE)
-        }
-        if (reviewOccurrences.any { it.id.typeId !in definitionById }) {
-            return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.MISSING_DEFINITION)
-        }
-        if (reviewOccurrences.any { it.id.source.segmentId !in segmentById }) {
-            return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.UNKNOWN_SEGMENT)
-        }
-        if (reviewOccurrences.any { occurrence ->
-                !matchesSource(occurrence, requireNotNull(segmentById[occurrence.id.source.segmentId]))
-            }
-        ) {
-            return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.SOURCE_MISMATCH)
-        }
+        val inputFailure = validateInputs(reviewOccurrences, definitionById, segmentById)
+        if (inputFailure != null) return OmbraRedactionPlanResult.Blocked(inputFailure)
 
         val accepted =
             reviewOccurrences
@@ -122,20 +105,51 @@ internal object OmbraRedactionPlanner {
         )
     }
 
+    private fun validateInputs(
+        reviewOccurrences: List<ReviewOccurrence>,
+        definitionById: Map<PiiTypeId, PiiDefinition>,
+        segmentById: Map<SegmentId, DocumentSegment>,
+    ): OmbraRedactionPlanFailureCode? = when {
+        reviewOccurrences.any { it.decision == ReviewDecisionState.PENDING } ->
+            OmbraRedactionPlanFailureCode.PENDING_DECISION
+
+        reviewOccurrences.map(ReviewOccurrence::id).distinct().size != reviewOccurrences.size ->
+            OmbraRedactionPlanFailureCode.DUPLICATE_OCCURRENCE
+
+        reviewOccurrences.any { it.id.typeId !in definitionById } ->
+            OmbraRedactionPlanFailureCode.MISSING_DEFINITION
+
+        reviewOccurrences.any { it.id.source.segmentId !in segmentById } ->
+            OmbraRedactionPlanFailureCode.UNKNOWN_SEGMENT
+
+        reviewOccurrences.any { occurrence ->
+            !matchesSource(occurrence, requireNotNull(segmentById[occurrence.id.source.segmentId]))
+        } -> OmbraRedactionPlanFailureCode.SOURCE_MISMATCH
+
+        else -> null
+    }
+
     private fun matchesSource(occurrence: ReviewOccurrence, segment: DocumentSegment): Boolean {
         val range = occurrence.id.source.range
         if (range.endExclusive > segment.normalizedText.length) return false
         return segment.normalizedText.substring(range.startInclusive, range.endExclusive) == occurrence.surface
     }
 
-    private fun countAcceptedOverlapConflicts(accepted: List<ReviewOccurrence>): Int {
+    private fun countAcceptedOverlapConflicts(accepted: List<ReviewOccurrence>): Int =
+        accepted.groupBy { it.id.source.segmentId }.values.sumOf(::countGroupOverlapConflicts)
+
+    private fun countGroupOverlapConflicts(group: List<ReviewOccurrence>): Int {
         var conflicts = 0
-        accepted.groupBy { it.id.source.segmentId }.values.forEach { group ->
-            for (leftIndex in group.indices) {
-                for (rightIndex in leftIndex + 1 until group.size) {
-                    if (group[leftIndex].id.source.range.overlaps(group[rightIndex].id.source.range)) conflicts += 1
-                }
-            }
+        for (leftIndex in group.indices) {
+            conflicts += countLaterOverlaps(group, leftIndex)
+        }
+        return conflicts
+    }
+
+    private fun countLaterOverlaps(group: List<ReviewOccurrence>, leftIndex: Int): Int {
+        var conflicts = 0
+        for (rightIndex in leftIndex + 1 until group.size) {
+            if (group[leftIndex].id.source.range.overlaps(group[rightIndex].id.source.range)) conflicts += 1
         }
         return conflicts
     }
