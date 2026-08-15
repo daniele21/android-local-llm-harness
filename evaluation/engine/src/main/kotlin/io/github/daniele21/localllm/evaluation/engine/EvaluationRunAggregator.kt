@@ -113,9 +113,7 @@ private fun reliabilitySummary(totalCases: Int, caseResults: List<EvaluationCase
     )
 }
 
-private fun List<EvaluationCaseResult>.metricDistribution(
-    selector: (EvaluationCaseMetrics) -> Double?,
-): EvaluationMetricDistribution {
+private fun List<EvaluationCaseResult>.metricDistribution(selector: (EvaluationCaseMetrics) -> Double?): EvaluationMetricDistribution {
     val values = mapNotNull { selector(it.metrics) }
     return EvaluationMetricDistribution(
         median = values.median(),
