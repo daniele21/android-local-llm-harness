@@ -128,21 +128,23 @@ class DatasetInstallerTest {
             .toByteArray(StandardCharsets.UTF_8),
     )
 
-    private fun manifest(cases: List<EvaluationDatasetCaseV1>, declaredCategory: String = cases.first().categoryId.value) =
-        EvaluationDatasetManifestV1(
-            datasetId = EvaluationDatasetId("fixture-pack"),
-            version = EvaluationDatasetVersion("1.0.0"),
-            displayName = "Fixture pack",
-            origin = EvaluationDatasetOrigin.USER_IMPORTED,
-            caseCount = cases.size,
-            contentDigest = EvaluationDatasetContentDigester.digest(cases),
-            categories = listOf(
-                EvaluationDatasetCategoryDefinition(
-                    id = EvaluationCategoryId(declaredCategory),
-                    displayName = "Reasoning",
-                ),
+    private fun manifest(
+        cases: List<EvaluationDatasetCaseV1>,
+        declaredCategory: String = cases.first().categoryId.value,
+    ) = EvaluationDatasetManifestV1(
+        datasetId = EvaluationDatasetId("fixture-pack"),
+        version = EvaluationDatasetVersion("1.0.0"),
+        displayName = "Fixture pack",
+        origin = EvaluationDatasetOrigin.USER_IMPORTED,
+        caseCount = cases.size,
+        contentDigest = EvaluationDatasetContentDigester.digest(cases),
+        categories = listOf(
+            EvaluationDatasetCategoryDefinition(
+                id = EvaluationCategoryId(declaredCategory),
+                displayName = "Reasoning",
             ),
-        )
+        ),
+    )
 
     private fun case(id: String, category: String) = EvaluationDatasetCaseV1(
         id = EvaluationCaseId(id),
