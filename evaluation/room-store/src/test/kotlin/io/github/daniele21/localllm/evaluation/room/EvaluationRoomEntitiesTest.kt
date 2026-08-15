@@ -24,8 +24,19 @@ class EvaluationRoomEntitiesTest {
             EvaluationEvaluatorParameterEntity::class.java,
         ).flatMap { type -> type.declaredFields.map { field -> field.name.lowercase() } }
 
-        listOf("prompt", "expectedanswer", "generatedanswer", "generatedtext", "messagecontent").forEach { forbidden ->
-            assertFalse("Forbidden persisted content field: $forbidden", fieldNames.any { forbidden in it })
+        val forbiddenContentFields = setOf(
+            "prompt",
+            "prompttext",
+            "expectedanswer",
+            "expectedtext",
+            "generatedanswer",
+            "generatedtext",
+            "messagecontent",
+            "outputtext",
+            "responsetext",
+        )
+        forbiddenContentFields.forEach { forbidden ->
+            assertFalse("Forbidden persisted content field: $forbidden", forbidden in fieldNames)
         }
     }
 
