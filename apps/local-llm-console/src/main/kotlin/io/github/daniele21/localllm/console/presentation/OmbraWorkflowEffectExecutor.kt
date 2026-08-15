@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.console.application.OmbraAnalysisClient
 import io.github.daniele21.localllm.console.application.OmbraAnalysisRequest
 import io.github.daniele21.localllm.console.application.OmbraDocumentExporter
 import io.github.daniele21.localllm.console.application.OmbraDocumentExtractor
+import io.github.daniele21.localllm.console.application.OmbraDocumentSourceCapabilityCleanup
 import io.github.daniele21.localllm.console.application.OmbraExportRequest
 import io.github.daniele21.localllm.console.application.OmbraSensitiveTaskStore
 
@@ -15,6 +16,7 @@ internal class OmbraWorkflowEffectExecutor(
     private val analysisClient: OmbraAnalysisClient,
     private val exporter: OmbraDocumentExporter,
     private val taskStore: OmbraSensitiveTaskStore,
+    private val sourceCapabilityCleanup: OmbraDocumentSourceCapabilityCleanup,
 ) {
     fun execute(effect: OmbraWorkflowEffect, isOperationActive: OmbraOperationGuard, emit: (OmbraWorkflowAction) -> Unit) {
         when (effect) {
@@ -23,6 +25,7 @@ internal class OmbraWorkflowEffectExecutor(
             is OmbraWorkflowEffect.ExportTask -> executeExport(effect, isOperationActive, emit)
             is OmbraWorkflowEffect.CancelOperation -> executeCancellation(effect, emit)
             OmbraWorkflowEffect.ClearSensitiveTask -> taskStore.clear()
+            OmbraWorkflowEffect.ReleaseDocumentSources -> sourceCapabilityCleanup.releaseAll()
         }
     }
 
