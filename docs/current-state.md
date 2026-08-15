@@ -62,7 +62,7 @@ CA-5 is active through OMBRA. The repository-side document pipeline is substanti
 
 The active product-closeout candidate is **OMB-7B / PR #235**: Review decisions/reveal/navigation, `CreateDocument` export, zero-PII flow and retirement of the legacy Console control-plane surfaces. Its cleanup descendant **PR #236** removes direct `models:model-store` and `observability:*` dependencies so `apps/local-llm-console` becomes a pure Consumer API reference app. This work is not part of the integrated `dev` baseline until the exact candidate head is green and merged.
 
-**OMB-6B** remains independently open and review-gated in PR #206: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** is also active only at the preparation level: corpus/scoring exists, while quality thresholds, representative model execution, physical evidence and release checks remain open.
+**OMB-6B** remains independently open and review-gated in PR #248: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** is also active only at the preparation level: corpus/scoring exists, while quality thresholds, representative model execution, physical evidence and release checks remain open.
 
 Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
@@ -84,7 +84,7 @@ The current closeout also needs the remaining product state-matrix evidence: rev
 
 ### 2. OMB-6B final identity review
 
-PR #206 contains a review-gated symbol candidate and deterministic safety validator, not an approved production identity. Before OMBRA can claim final app identity:
+PR #248 contains a review-gated symbol candidate and deterministic safety validator, not an approved production identity. Before OMBRA can claim final app identity:
 
 - approve or revise the symbol candidate;
 - freeze final wordmark/lockup decisions;
