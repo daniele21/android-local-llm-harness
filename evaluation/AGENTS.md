@@ -15,6 +15,7 @@ This guide owns navigation and validation for model-evaluation implementation un
 - `evaluation/evaluators` owns the versioned evaluator registry, deterministic scorer implementations and quality aggregation. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
 - `evaluation/engine` owns fake-friendly evaluation lifecycle orchestration and controlled resolution of one explicitly selected supported installed model. It does not own production dataset installation, persistence, telemetry storage or UI state.
 - `evaluation/in-memory-store` owns the deterministic privacy-safe in-memory implementation of `EvaluationResultRepository`. It is the parity reference for durable stores: run configuration is immutable, lifecycle transitions are validated, case results stay bounded to the selected sample set, history ordering is deterministic, active runs cannot be deleted, and retention applies only to terminal runs.
+- `evaluation/persistence` owns runner-to-repository lifecycle persistence orchestration. It creates and advances privacy-safe run summaries around `EvaluationEngine` without making storage part of the engine; durable repository implementation remains a separate module and per-case persistence remains separately owned.
 
 Do not add Room or other durable storage behavior to the in-memory module. Durable persistence belongs to its own implementation module and must preserve the same public repository semantics. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
 
@@ -31,6 +32,7 @@ Do not add Room or other durable storage behavior to the in-memory module. Durab
 - `evaluation/engine` may resolve only curated product-supplied model profiles and verified local artifacts; it must not create or mutate ordinary application model bindings.
 - R-01 cooperative cancellation between phases/cases is only a lifecycle foundation. Active decode cancellation, timeout cleanup and unattempted-case accounting remain R-08/R-09 after isolated per-case runtime ownership exists.
 - Persistence implementations must not invent alternate lifecycle, ordering, deletion or retention semantics.
+- `evaluation/persistence` may observe and persist lifecycle/progress, but it must not absorb Room ownership, runner execution logic or prompt/output content.
 
 ## Validation
 
@@ -49,5 +51,7 @@ For evaluator work run the equivalent scoped checks for `:evaluation:evaluators`
 For engine work run the equivalent scoped checks for `:evaluation:engine`, including unit tests and lint. Runner tests must use fake preflight/model-preparation/case-execution ports until the owning runner tasks explicitly integrate production dataset/runtime boundaries.
 
 For in-memory persistence work run `:evaluation:in-memory-store:testDebugUnitTest` and `:evaluation:in-memory-store:lintDebug` together with repository-wide formatting/static-analysis/model-artifact guards.
+
+For lifecycle persistence work run `:evaluation:persistence:compileDebugKotlin`, `:evaluation:persistence:testDebugUnitTest` and `:evaluation:persistence:lintDebug` together with repository-wide formatting/static-analysis/model-artifact and navigation guards.
 
 Because adding or changing the module list affects repository navigation and build configuration, also run the repository documentation/navigation guards, CI-scope script tests and the applicable repository-wide gate before merge.
