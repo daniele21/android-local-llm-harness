@@ -296,6 +296,7 @@ internal fun evaluateCorpusCase(fixture: EvaluatorV1CorpusCase): EvaluationOutco
         )
 
     EvaluatorType.REGEX_FORMAT -> RegexFormatEvaluator().evaluate(fixture.generated, fixture.spec)
+
     EvaluatorType.INSTRUCTION_CONSTRAINTS ->
         InstructionConstraintsEvaluator().evaluate(fixture.generated, fixture.spec)
 }
