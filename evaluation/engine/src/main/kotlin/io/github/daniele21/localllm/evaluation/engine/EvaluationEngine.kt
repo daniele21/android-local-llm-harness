@@ -10,12 +10,12 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
-import java.util.concurrent.CancellationException
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 sealed interface EvaluationStepResult<out T> {
     data class Success<T>(val value: T) : EvaluationStepResult<T>
