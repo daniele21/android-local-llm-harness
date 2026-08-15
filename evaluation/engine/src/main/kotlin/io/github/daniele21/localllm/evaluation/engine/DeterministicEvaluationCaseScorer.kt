@@ -60,10 +60,15 @@ class DeterministicEvaluationCaseScorer(
 
     private fun evaluate(case: EvaluationDatasetCaseV1, generated: String): EvaluationOutcome = when (case.evaluator.type) {
         EvaluatorType.EXACT_MATCH -> exactMatchEvaluator.evaluate(case.expected.value, generated, case.evaluator)
+
         EvaluatorType.MULTIPLE_CHOICE -> multipleChoiceEvaluator.evaluate(case.expected.value, generated, case.evaluator)
+
         EvaluatorType.NUMERIC_FINAL_ANSWER -> numericFinalAnswerEvaluator.evaluate(case.expected.value, generated, case.evaluator)
+
         EvaluatorType.JSON_FIELDS -> jsonFieldsEvaluator.evaluate(case.expected.value, generated, case.evaluator)
+
         EvaluatorType.REGEX_FORMAT -> regexFormatEvaluator.evaluate(generated, case.evaluator)
+
         EvaluatorType.INSTRUCTION_CONSTRAINTS -> instructionConstraintsEvaluator.evaluate(
             case.expected.value,
             generated,
