@@ -26,13 +26,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-enum class OmbraProgressState {
-    PENDING,
-    ACTIVE,
-    COMPLETE,
-    ERROR,
-}
-
 @Composable
 fun OmbraStatusBadge(text: String, tone: OmbraStatusTone, modifier: Modifier = Modifier) {
     val colors = LocalOmbraStatusColors.current
