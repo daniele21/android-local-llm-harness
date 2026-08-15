@@ -15,10 +15,7 @@ internal sealed interface PerformanceCommand {
 
     data class CancelRun(val runId: EvaluationRunId) : PerformanceCommand
 
-    data class DeleteDataset(
-        val id: EvaluationDatasetId,
-        val version: EvaluationDatasetVersion,
-    ) : PerformanceCommand
+    data class DeleteDataset(val id: EvaluationDatasetId, val version: EvaluationDatasetVersion) : PerformanceCommand
 
     data class OpenRun(val runId: EvaluationRunId) : PerformanceCommand
 
@@ -32,22 +29,33 @@ internal sealed interface PerformanceCommand {
 internal object PerformanceUiReducer {
     fun reduce(current: PerformanceState, intent: PerformanceIntent): PerformanceReduction = when (intent) {
         is PerformanceIntent.SelectSection -> reduction(current.copy(selectedSection = intent.section))
+
         is PerformanceIntent.SelectModel -> updateSetup(current) { copy(model = intent.model) }
+
         is PerformanceIntent.SelectDataset -> updateSetup(current) { copy(dataset = intent.dataset) }
+
         is PerformanceIntent.SelectSample -> updateSetup(current) { copy(sampleSelection = intent.selection) }
+
         is PerformanceIntent.SelectExecutionProfile -> updateSetup(current) { copy(executionProfile = intent.profile) }
+
         PerformanceIntent.StartRun -> startRun(current)
+
         PerformanceIntent.CancelRun -> cancelRun(current)
+
         PerformanceIntent.ImportDataset -> reduction(current, effects = listOf(PerformanceEffect.OpenDocumentPicker))
+
         is PerformanceIntent.DeleteDataset -> reduction(
             current,
             commands = listOf(PerformanceCommand.DeleteDataset(intent.id, intent.version)),
         )
+
         is PerformanceIntent.OpenRun -> reduction(
             current,
             commands = listOf(PerformanceCommand.OpenRun(intent.runId)),
         )
+
         is PerformanceIntent.SelectCompareRun -> selectCompareRun(current, intent.runId)
+
         PerformanceIntent.Refresh -> reduction(
             current,
             commands = listOf(
@@ -58,14 +66,20 @@ internal object PerformanceUiReducer {
         )
     }
 
-    fun applyDatasetState(current: PerformanceState, datasets: PerformanceDatasetState): PerformanceState =
-        current.copy(datasets = datasets)
+    fun applyDatasetState(
+        current: PerformanceState,
+        datasets: PerformanceDatasetState,
+    ): PerformanceState = current.copy(datasets = datasets)
 
-    fun applyHistoryState(current: PerformanceState, history: PerformanceHistoryState): PerformanceState =
-        current.copy(history = history)
+    fun applyHistoryState(
+        current: PerformanceState,
+        history: PerformanceHistoryState,
+    ): PerformanceState = current.copy(history = history)
 
-    fun applyActiveRun(current: PerformanceState, activeRun: PerformanceActiveRunState?): PerformanceState =
-        current.copy(activeRun = activeRun)
+    fun applyActiveRun(
+        current: PerformanceState,
+        activeRun: PerformanceActiveRunState?,
+    ): PerformanceState = current.copy(activeRun = activeRun)
 
     private fun updateSetup(
         current: PerformanceState,
@@ -83,7 +97,9 @@ internal object PerformanceUiReducer {
                 state,
                 commands = listOf(PerformanceCommand.StartRun(setup)),
             )
+
             PerformanceRunReadiness.Incomplete -> blockedStart(state, emptyList())
+
             is PerformanceRunReadiness.Blocked -> blockedStart(state, readiness.reasons)
         }
     }
@@ -115,7 +131,9 @@ internal object PerformanceUiReducer {
         val selected = current.compare.selectedRunIds
         val updated = when {
             runId in selected -> selected - runId
+
             selected.size < MAX_COMPARE_RUNS -> selected + runId
+
             else -> return reduction(
                 current,
                 effects = listOf(PerformanceEffect.ShowMessage("Compare supports two selected runs in v1")),
@@ -140,10 +158,15 @@ internal object PerformanceUiReducer {
         if (caseCount == null) return true
         val requested = when (selection) {
             PerformanceSampleSelection.Smoke -> 20
+
             PerformanceSampleSelection.Quick -> 50
+
             PerformanceSampleSelection.Standard -> 100
+
             PerformanceSampleSelection.Extended -> 200
+
             PerformanceSampleSelection.All -> return true
+
             is PerformanceSampleSelection.Custom -> selection.count
         }
         return requested <= caseCount
