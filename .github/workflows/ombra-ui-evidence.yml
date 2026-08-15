@@ -131,13 +131,22 @@ jobs:
         run: |
           set -euo pipefail
           package_name="io.github.daniele21.localllm.console.debug"
+          main_activity="io.github.daniele21.localllm.console.MainActivity"
           evidence_dir="$RUNNER_TEMP/ombra-ui-screenshots"
           mkdir -p "$evidence_dir"
 
+          # connectedDebugAndroidTest may uninstall the target APK after instrumentation.
+          # Reinstall the exact branch build when needed, then clear app state so screenshots
+          # always start from OMBRA's content-free Import screen.
+          if ! adb shell pm path "$package_name" | grep -q '^package:'; then
+            ./gradlew :apps:local-llm-console:installDebug
+          fi
+          adb shell pm clear "$package_name" >/dev/null
+
           adb shell settings put system accelerometer_rotation 0
           adb shell settings put system user_rotation 0
-          adb shell am force-stop "$package_name"
-          adb shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 >/dev/null
+          adb shell am start -W -S -n "$package_name/$main_activity" >/dev/null
+          adb shell pidof "$package_name" >/dev/null
           sleep 2
           adb exec-out screencap -p > "$evidence_dir/import-portrait.png"
 
@@ -149,6 +158,8 @@ jobs:
           adb shell settings put system accelerometer_rotation 1
           test -s "$evidence_dir/import-portrait.png"
           test -s "$evidence_dir/import-landscape.png"
+          file "$evidence_dir/import-portrait.png" | grep -q 'PNG image data'
+          file "$evidence_dir/import-landscape.png" | grep -q 'PNG image data'
 
       - name: Upload privacy-safe UI evidence
         if: always()
