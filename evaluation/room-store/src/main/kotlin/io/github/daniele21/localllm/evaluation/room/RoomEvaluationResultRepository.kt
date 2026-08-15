@@ -165,7 +165,7 @@ private fun EvaluationRunQuery.toSqlQuery(): SimpleSQLiteQuery {
         sql.append(" AND state IN (")
         sql.append(orderedStates.joinToString(",") { "?" })
         sql.append(')')
-        args += orderedStates.map { it.name }
+        args.addAll(orderedStates.map { it.name })
     }
     datasetId?.let {
         sql.append(" AND config_dataset_id = ?")
