@@ -208,11 +208,13 @@ fun interface EvaluationWarmupRequestFactory {
 }
 
 /** Executes exactly one normal generation and deliberately discards its output and metrics. */
-class LocalLlmUnscoredWarmupExecution(
-    private val client: LocalLlmClient,
-    private val requestFactory: EvaluationWarmupRequestFactory,
-) : EvaluationWarmupExecutionPort {
-    override suspend fun execute(config: EvaluationRunConfig, binding: EvaluationRuntimeBinding, sessionId: SessionId): EvaluationStepResult<Unit> {
+class LocalLlmUnscoredWarmupExecution(private val client: LocalLlmClient, private val requestFactory: EvaluationWarmupRequestFactory) :
+    EvaluationWarmupExecutionPort {
+    override suspend fun execute(
+        config: EvaluationRunConfig,
+        binding: EvaluationRuntimeBinding,
+        sessionId: SessionId,
+    ): EvaluationStepResult<Unit> {
         val request = try {
             requestFactory.create(config, binding, sessionId)
         } catch (error: CancellationException) {

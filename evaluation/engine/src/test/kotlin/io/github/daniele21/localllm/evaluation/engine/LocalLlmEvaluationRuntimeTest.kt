@@ -225,10 +225,8 @@ class LocalLlmEvaluationRuntimeTest {
         )
     }
 
-    private class FakeClient(
-        var loadedModel: ModelDigest? = null,
-        private val prepareDigest: ModelDigest = SELECTED_DIGEST,
-    ) : LocalLlmClient {
+    private class FakeClient(var loadedModel: ModelDigest? = null, private val prepareDigest: ModelDigest = SELECTED_DIGEST) :
+        LocalLlmClient {
         val events = mutableListOf<String>()
         val activeSessions = linkedSetOf<SessionId>()
         val createdOptions = mutableListOf<SessionOptions>()
@@ -250,11 +248,7 @@ class LocalLlmEvaluationRuntimeTest {
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
             createSession(applicationId, useCaseId, SessionOptions())
 
-        override fun createSession(
-            applicationId: ApplicationId,
-            useCaseId: UseCaseId,
-            options: SessionOptions,
-        ): SessionId {
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId {
             nextSession += 1
             val sessionId = SessionId("session-$nextSession")
             activeSessions += sessionId
