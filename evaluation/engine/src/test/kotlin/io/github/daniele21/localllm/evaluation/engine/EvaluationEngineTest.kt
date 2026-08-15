@@ -166,7 +166,7 @@ class EvaluationEngineTest {
     fun `active case cancellation interrupts execution and preserves attempted versus completed progress`() = runBlocking {
         val enteredCase = CompletableDeferred<Unit>()
         var activeCaseWasCancelled = false
-        val progress = mutableListOf<EvaluationProgress>()
+        val progressSnapshots = mutableListOf<EvaluationProgress>()
         val config = config(caseIds = listOf("case-a", "case-b", "case-c"))
         val engine = EvaluationEngine(
             preflight = successPreflight(),
@@ -191,8 +191,8 @@ class EvaluationEngineTest {
             engine.run(
                 config,
                 object : EvaluationEngineObserver {
-                    override suspend fun onProgress(runId: EvaluationRunId, progressValue: EvaluationProgress) {
-                        progress += progressValue
+                    override suspend fun onProgress(runId: EvaluationRunId, progress: EvaluationProgress) {
+                        progressSnapshots += progress
                     }
                 },
             )
@@ -204,10 +204,10 @@ class EvaluationEngineTest {
         assertTrue(terminal is EvaluationEngineTerminal.Cancelled)
         assertTrue(activeCaseWasCancelled)
         assertTrue(terminal.results.isEmpty())
-        assertEquals(1, progress.last().attemptedCases)
-        assertEquals(0, progress.last().completedCases)
-        assertNull(progress.last().currentCaseId)
-        assertEquals(3, progress.last().totalCases)
+        assertEquals(1, progressSnapshots.last().attemptedCases)
+        assertEquals(0, progressSnapshots.last().completedCases)
+        assertNull(progressSnapshots.last().currentCaseId)
+        assertEquals(3, progressSnapshots.last().totalCases)
         assertNull(engine.activeRun())
     }
 
