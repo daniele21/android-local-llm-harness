@@ -52,9 +52,9 @@ CA-5 is active through OMBRA. OMB-0 is integrated through PR #106 with the isola
 
 ### Model evaluation
 
-EVAL-0 and EVAL-1 are complete. `evaluation/contracts` is the concrete backend-independent boundary for dataset/case/evaluator/sampling/run/result value semantics, deterministic SHA-256 identity, compatibility reasons and bounded evaluation failures. It depends on `core/contracts` and does not introduce a second runtime, model store, telemetry path or persistence implementation.
+EVAL-0, EVAL-1 and EVAL-3 are complete. `evaluation/contracts` is the concrete backend-independent boundary for dataset/case/evaluator/sampling/run/result value semantics, deterministic SHA-256 identity, compatibility reasons and bounded evaluation failures. `evaluation/evaluators` freezes the six deterministic v1 scorer families and suite aggregation without an external LLM judge. These modules do not introduce a second runtime, model store, telemetry path or persistence implementation.
 
-EVAL-1 unlocks independent host-side work on dataset schema (`EVAL-D-01`), evaluator registry (`EVAL-E-01`), fake-driven runner plus controlled evaluation binding (`EVAL-R-01/R-02`), persistence contract (`EVAL-P-01`), Performance UDF shell (`EVAL-U-01`) and deterministic identity evidence (`EVAL-V-01`). Canonical state and dependency routing: [`model-evaluation/README.md`](model-evaluation/README.md).
+The dataset lane has integrated schema, bounded parsing, validation, canonical digest, atomic installation, stratified sampling, preset resolution and reusable regression fixtures (`EVAL-D-01` through `D-05`, `D-07` through `D-09`). `EVAL-D-06` registry integration and `EVAL-D-10` Android document import are the next independent slices. Runner preparation/case isolation, Room persistence/comparison and connected Performance UI continue in parallel. Canonical state and dependency routing: [`model-evaluation/README.md`](model-evaluation/README.md).
 
 This parallel capability does not replace the existing telemetry-derived benchmark engine and does not change the current OMBRA-focused repository sequencing.
 
