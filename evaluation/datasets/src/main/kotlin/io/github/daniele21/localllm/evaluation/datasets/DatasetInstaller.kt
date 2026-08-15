@@ -45,10 +45,7 @@ class EvaluationDatasetInstaller(
     private val parser: EvaluationDatasetJsonlParser,
     private val validator: EvaluationDatasetPackValidator,
 ) {
-    fun install(
-        manifest: EvaluationDatasetManifestV1,
-        casesInput: InputStream,
-    ): DatasetInstallResult {
+    fun install(manifest: EvaluationDatasetManifestV1, casesInput: InputStream): DatasetInstallResult {
         val finalDirectory = finalDirectory(manifest)
         if (finalDirectory.exists()) {
             return DatasetInstallResult.Rejected(DatasetInstallRejectionCode.ALREADY_INSTALLED)
@@ -80,10 +77,7 @@ class EvaluationDatasetInstaller(
         )
     }
 
-    private fun validate(
-        manifest: EvaluationDatasetManifestV1,
-        cases: List<EvaluationDatasetCaseV1>,
-    ): DatasetInstallResult.Rejected? {
+    private fun validate(manifest: EvaluationDatasetManifestV1, cases: List<EvaluationDatasetCaseV1>): DatasetInstallResult.Rejected? {
         val validation = validator.validate(manifest, cases)
         if (validation is DatasetValidationResult.Invalid) {
             return DatasetInstallResult.Rejected(
@@ -136,10 +130,7 @@ class EvaluationDatasetInstaller(
         )
     }
 
-    private fun writeCasesAndSync(
-        file: File,
-        cases: List<EvaluationDatasetCaseV1>,
-    ) {
+    private fun writeCasesAndSync(file: File, cases: List<EvaluationDatasetCaseV1>) {
         FileOutputStream(file).use { output ->
             BufferedWriter(OutputStreamWriter(output, StandardCharsets.UTF_8)).use { writer ->
                 cases.forEach { case ->
@@ -256,12 +247,19 @@ private fun StringBuilder.appendJsonString(value: String) {
     value.forEach { char ->
         when (char) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             '\b' -> append("\\b")
+
             '\u000C' -> append("\\f")
+
             '\n' -> append("\\n")
+
             '\r' -> append("\\r")
+
             '\t' -> append("\\t")
+
             else -> if (char.code < 0x20) {
                 append("\\u")
                 append(char.code.toString(16).padStart(4, '0'))
