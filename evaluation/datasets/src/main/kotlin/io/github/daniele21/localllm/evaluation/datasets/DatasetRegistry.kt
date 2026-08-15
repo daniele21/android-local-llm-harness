@@ -40,20 +40,27 @@ class EvaluationDatasetRegistry(private val rootDirectory: File) {
         discover(EvaluationDatasetRegistryFilter(datasetId = datasetId, version = version)).singleOrNull()
 
     private fun readPublishedPack(versionDirectory: File): InstalledEvaluationDatasetPack? {
+        val manifest = readManifest(versionDirectory) ?: return null
+        val datasetDirectory = versionDirectory.parentFile ?: return null
+        if (!matchesStoredIdentity(datasetDirectory, versionDirectory, manifest)) return null
+        return InstalledEvaluationDatasetPack(manifest = manifest, directory = versionDirectory)
+    }
+
+    private fun readManifest(versionDirectory: File): EvaluationDatasetManifestV1? {
         val manifestFile = File(versionDirectory, MANIFEST_FILE_NAME)
         val casesFile = File(versionDirectory, CASES_FILE_NAME)
         if (!manifestFile.isFile || !casesFile.isFile) return null
-
-        val manifest = runCatching {
+        return runCatching {
             EvaluationDatasetManifestDecoder.decode(manifestFile.readText(StandardCharsets.UTF_8))
-        }.getOrNull() ?: return null
-
-        val datasetDirectory = versionDirectory.parentFile ?: return null
-        if (datasetDirectory.name != storageSegment(manifest.datasetId.value)) return null
-        if (versionDirectory.name != storageSegment(manifest.version.value)) return null
-
-        return InstalledEvaluationDatasetPack(manifest = manifest, directory = versionDirectory)
+        }.getOrNull()
     }
+
+    private fun matchesStoredIdentity(
+        datasetDirectory: File,
+        versionDirectory: File,
+        manifest: EvaluationDatasetManifestV1,
+    ): Boolean = datasetDirectory.name == storageSegment(manifest.datasetId.value) &&
+        versionDirectory.name == storageSegment(manifest.version.value)
 
     private fun EvaluationDatasetRegistryFilter.matches(manifest: EvaluationDatasetManifestV1): Boolean =
         (datasetId == null || datasetId == manifest.datasetId) &&
