@@ -38,7 +38,7 @@ public interface EvaluationDao {
     @Query("SELECT * FROM evaluation_sample_cases WHERE run_id = :runId ORDER BY ordinal ASC")
     List<EvaluationSampleCaseEntity> sampleCases(String runId);
 
-    @Query("SELECT * FROM evaluation_category_scores WHERE run_id = :runId ORDER BY category_id ASC")
+    @Query("SELECT * FROM evaluation_category_scores WHERE run_id = :runId ORDER BY ordinal ASC")
     List<EvaluationCategoryScoreEntity> categoryScores(String runId);
 
     @Query(
