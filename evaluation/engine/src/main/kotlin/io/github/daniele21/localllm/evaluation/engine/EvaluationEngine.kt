@@ -205,14 +205,10 @@ private class EvaluationRunExecution(
         emitProgress(attempted, results.size, null)
     }
 
-    private suspend fun cancellationIfRequested(
-        results: List<EvaluationCaseResult>,
-    ): EvaluationEngineTerminal.Cancelled? = if (cancelRequested.get()) cancel(results) else null
+    private suspend fun cancellationIfRequested(results: List<EvaluationCaseResult>): EvaluationEngineTerminal.Cancelled? =
+        if (cancelRequested.get()) cancel(results) else null
 
-    private suspend fun fail(
-        results: List<EvaluationCaseResult>,
-        failure: EvaluationFailure,
-    ): EvaluationEngineTerminal.Failed {
+    private suspend fun fail(results: List<EvaluationCaseResult>, failure: EvaluationFailure): EvaluationEngineTerminal.Failed {
         emitState(EvaluationRunState.FAILED)
         return EvaluationEngineTerminal.Failed(config.runId, results.toList(), failure)
     }
