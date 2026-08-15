@@ -23,6 +23,7 @@ include(
     ":evaluation:evaluators",
     ":evaluation:engine",
     ":evaluation:in-memory-store",
+    ":evaluation:persistence",
     ":models:model-profile",
     ":models:model-store",
     ":models:model-catalog",
