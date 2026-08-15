@@ -50,6 +50,20 @@ jobs:
       - name: Room schema compile
         run: ./gradlew --no-configuration-cache :evaluation:room-store:compileDebugKotlin
       - name: Room schema tests
+        id: room_tests
+        continue-on-error: true
         run: ./gradlew --no-configuration-cache :evaluation:room-store:testDebugUnitTest
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evaluation-room-test-report
+          path: |
+            evaluation/room-store/build/test-results/testDebugUnitTest/**
+            evaluation/room-store/build/reports/tests/testDebugUnitTest/**
+          if-no-files-found: warn
+          retention-days: 1
+      - name: Require Room schema tests
+        if: steps.room_tests.outcome != 'success'
+        run: exit 1
       - name: Room schema lint
         run: ./gradlew --no-configuration-cache :evaluation:room-store:lintDebug
