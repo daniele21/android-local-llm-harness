@@ -87,6 +87,27 @@ class LocalLlmScoredCaseExecutionTest {
     }
 
     @Test
+    fun `case timeout cancels active generation and returns typed timeout result`() = runBlocking {
+        val client = FakeClient(null)
+        val execution = execution(client)
+
+        val result = execution.execute(
+            CONFIG.copy(caseTimeoutMs = 20),
+            CASE_ID,
+            BINDING,
+            SESSION_ID,
+        ) as EvaluationStepResult.Success
+
+        assertEquals(EvaluationCaseStatus.TIMEOUT, result.value.status)
+        assertEquals(EvaluationFailureStage.GENERATION, result.value.failure?.stage)
+        assertEquals(EvaluationFailureCode.CASE_TIMEOUT, result.value.failure?.code)
+        assertEquals(CASE_ID, result.value.failure?.caseId)
+        assertEquals(REQUEST_ID, result.value.requestId)
+        assertEquals(true, client.cancelCalled)
+        assertNull(result.value.outcome)
+    }
+
+    @Test
     fun `request identity mismatch fails before generation`() = runBlocking {
         val client = FakeClient(null)
         val execution = LocalLlmScoredCaseExecution(
@@ -169,6 +190,7 @@ class LocalLlmScoredCaseExecutionTest {
 
     private class FakeClient(private val terminal: GenerationEvent?) : LocalLlmClient {
         var generatedRequest: GenerationRequest? = null
+        var cancelCalled: Boolean = false
 
         override fun runtimeSnapshot() = RuntimeSnapshot(RuntimeState.READY, MODEL_DIGEST, 0, 0)
 
@@ -182,7 +204,9 @@ class LocalLlmScoredCaseExecutionTest {
             return object : GenerationHandle {
                 override val requestId = request.requestId
 
-                override fun cancel() = Unit
+                override fun cancel() {
+                    cancelCalled = true
+                }
             }
         }
 
