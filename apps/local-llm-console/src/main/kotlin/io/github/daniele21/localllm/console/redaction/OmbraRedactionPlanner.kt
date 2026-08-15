@@ -175,7 +175,9 @@ internal object OmbraPlaceholderKeys {
                             character.code in 'a'.code..'z'.code ||
                             character.isDigit() ->
                             append(character.uppercaseChar())
+
                         Character.getType(character) == Character.NON_SPACING_MARK.toInt() -> Unit
+
                         else -> append('_')
                     }
                 }
