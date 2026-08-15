@@ -118,15 +118,17 @@ class RoomEvaluationResultRepository internal constructor(
 
     companion object {
         const val DEFAULT_DATABASE_NAME: String = "local-llm-evaluation.db"
-        private val MIGRATIONS: Array<Migration> = emptyArray()
+        private val MIGRATIONS: List<Migration> = emptyList()
 
         fun open(context: Context, databaseName: String = DEFAULT_DATABASE_NAME): RoomEvaluationResultRepository {
             require(databaseName.isNotBlank()) { "Evaluation database name must not be blank" }
-            val database = Room.databaseBuilder(
+            val builder = Room.databaseBuilder(
                 context.applicationContext,
                 EvaluationDatabase::class.java,
                 databaseName,
-            ).addMigrations(*MIGRATIONS).build()
+            )
+            MIGRATIONS.forEach { migration -> builder.addMigrations(migration) }
+            val database = builder.build()
             return RoomEvaluationResultRepository(
                 dao = database.evaluationDao(),
                 closeDatabase = database::close,
