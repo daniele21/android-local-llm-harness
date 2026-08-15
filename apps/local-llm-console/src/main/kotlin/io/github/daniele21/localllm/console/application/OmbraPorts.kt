@@ -36,9 +36,8 @@ internal data class OmbraExportRequest(
         }
     }
 
-    override fun toString(): String =
-        "OmbraExportRequest(pageCount=${descriptor.pageCount}, segmentCount=${segments.size}, " +
-            "definitionCount=${definitions.size}, reviewCount=${reviewOccurrences.size})"
+    override fun toString(): String = "OmbraExportRequest(pageCount=${descriptor.pageCount}, segmentCount=${segments.size}, " +
+        "definitionCount=${definitions.size}, reviewCount=${reviewOccurrences.size})"
 }
 
 /**
