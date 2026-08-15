@@ -1,5 +1,12 @@
 # General Purpose v1 — Harness-owned source fragments
 
+Status: active
+Document type: feature-specification
+Owner: model-evaluation
+Canonical scope: model-evaluation.general-purpose-harness-cases
+Read when: reviewing or changing the project-authored General Purpose v1 structured-output and context-retrieval cases
+Last reviewed: 2026-08-15
+
 This directory contains the two synthetic Harness-owned authoring lanes that can be completed before the public-derived benchmark subset and final 200-case pack are frozen.
 
 - `harness-structured-output.jsonl`: 20 GP-05 cases using `JSON_FIELDS` v1 with deterministic expected JSON objects.
