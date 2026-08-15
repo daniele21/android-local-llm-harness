@@ -247,6 +247,7 @@ jobs:
             core:runtime-core
             evaluation:contracts
             evaluation:evaluators
+            evaluation:in-memory-store
             models:model-profile
             models:model-store
             models:model-catalog
@@ -279,8 +280,6 @@ jobs:
           for module in "${selected_modules[@]}"; do
             [[ -n "$module" ]] || continue
             if [[ "$module" == "apps:shared-runtime-client-consumer-fixture" ]]; then
-              # This fixture has no debug unit-test variant. Its SR-6 behavior is compiled
-              # as release instrumentation below when packaging validation is enabled.
               tasks+=(":${module}:lintDebug")
             else
               tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
@@ -308,8 +307,6 @@ jobs:
               :apps:local-llm-phone-test:assembleDebug
             )
           else
-            # Compile the downstream applications to catch API integration
-            # breakages without constructing APKs or native packages.
             tasks+=(
               :apps:local-llm-console:compileInternalKotlin
               :apps:shared-runtime-client-consumer-fixture:compileDebugKotlin
