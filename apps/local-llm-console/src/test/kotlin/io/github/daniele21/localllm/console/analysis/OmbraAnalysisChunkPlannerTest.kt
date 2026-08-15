@@ -109,8 +109,7 @@ class OmbraAnalysisChunkPlannerTest {
         assertEquals(OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT), result)
     }
 
-    private fun planner(templateReserve: Int): OmbraAnalysisChunkPlanner =
-        OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = templateReserve))
+    private fun planner(templateReserve: Int): OmbraAnalysisChunkPlanner = OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = templateReserve))
 
     private fun generousLimits(): ConsumerLimits = ConsumerLimits(20_000, 1, 20_000)
 
