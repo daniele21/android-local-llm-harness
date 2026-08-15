@@ -46,21 +46,9 @@ class EvaluationCaseResultPersistenceTest {
         val persistedResult = runtimeFailureResult(CASE_A)
         val observed = mutableListOf<EvaluationCaseResult>()
         val engine = EvaluationEngine(
-            preflight = EvaluationPreflightPort { EvaluationStepResult.Success(Unit) },
+            preflight = successfulPreflight(),
             modelPreparation = successfulPreparation(),
-            caseExecution = EvaluationCaseExecutionPort { _, caseId ->
-                if (caseId == CASE_A) {
-                    EvaluationStepResult.Success(persistedResult)
-                } else {
-                    EvaluationStepResult.Failure(
-                        EvaluationFailure(
-                            stage = EvaluationFailureStage.GENERATION,
-                            code = EvaluationFailureCode.RUNTIME_FAILURE,
-                            caseId = caseId,
-                        ),
-                    )
-                }
-            },
+            caseExecution = firstCaseSucceedsThenFails(persistedResult),
         )
         val persistence = EvaluationLifecyclePersistence(
             repository = repository,
@@ -84,10 +72,31 @@ class EvaluationCaseResultPersistenceTest {
         assertEquals(listOf(persistedResult), observed)
     }
 
+    private fun successfulPreflight() = object : EvaluationPreflightPort {
+        override suspend fun validate(config: EvaluationRunConfig): EvaluationStepResult<Unit> = EvaluationStepResult.Success(Unit)
+    }
+
     private fun successfulPreparation() = object : EvaluationModelPreparationPort {
         override suspend fun prepare(config: EvaluationRunConfig): EvaluationStepResult<Unit> = EvaluationStepResult.Success(Unit)
 
         override suspend fun warmup(config: EvaluationRunConfig): EvaluationStepResult<Unit> = EvaluationStepResult.Success(Unit)
+    }
+
+    private fun firstCaseSucceedsThenFails(persistedResult: EvaluationCaseResult) = object : EvaluationCaseExecutionPort {
+        override suspend fun execute(
+            config: EvaluationRunConfig,
+            caseId: EvaluationCaseId,
+        ): EvaluationStepResult<EvaluationCaseResult> = if (caseId == CASE_A) {
+            EvaluationStepResult.Success(persistedResult)
+        } else {
+            EvaluationStepResult.Failure(
+                EvaluationFailure(
+                    stage = EvaluationFailureStage.GENERATION,
+                    code = EvaluationFailureCode.RUNTIME_FAILURE,
+                    caseId = caseId,
+                ),
+            )
+        }
     }
 
     private fun runtimeFailureResult(caseId: EvaluationCaseId) = EvaluationCaseResult(
