@@ -97,8 +97,8 @@ internal data class QualityCorpus(
 }
 
 internal object OmbraSyntheticQualityCorpus {
-    const val RESOURCE_PATH = "ombra-quality/v1/corpus.tsv"
-    const val EXPECTED_SHA256 = "92f427b48bcdf39fc52dfbb4da902520d07070ce232a5f87bcac99f26ac4b483"
+    const val RESOURCE_PATH = "ombra-quality/v2/corpus.tsv"
+    const val EXPECTED_SHA256 = "a04f79dec42ee4208e4db27512664cc20f66cc863fd80ae4fcdc1019a2f37a5f"
 
     fun load(): QualityCorpus {
         val bytes = requireNotNull(javaClass.classLoader?.getResourceAsStream(RESOURCE_PATH)) {
