@@ -18,6 +18,7 @@ internal class OmbraApplicationOrchestrator(
     exporter: OmbraDocumentExporter,
     taskStore: OmbraSensitiveTaskStore = InMemoryOmbraSensitiveTaskStore(),
     sourceCapabilityCleanup: OmbraDocumentSourceCapabilityCleanup = NoOpOmbraDocumentSourceCapabilityCleanup,
+    private val onStateChanged: (OmbraWorkflowState) -> Unit = {},
 ) {
     private val effectExecutor =
         OmbraWorkflowEffectExecutor(
@@ -54,6 +55,7 @@ internal class OmbraApplicationOrchestrator(
         val transition = OmbraWorkflowReducer.reduce(state, action)
         val changed = transition.state != state || transition.effects.isNotEmpty()
         state = transition.state
+        if (changed) onStateChanged(state)
         transition.effects.forEach { effect ->
             effectExecutor.execute(
                 effect = effect,
