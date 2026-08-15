@@ -92,7 +92,7 @@ class DatasetSamplePresetResolverTest {
         dataset = EvaluationDatasetIdentity(
             id = EvaluationDatasetId("fixture"),
             version = EvaluationDatasetVersion("1"),
-            digest = EvaluationDatasetDigest("a".repeat(64)),
+            contentDigest = EvaluationDatasetDigest("a".repeat(64)),
         ),
         policy = SamplingPolicyRef(SamplingPolicyId("stratified-prefix"), 1),
         seed = 42,
