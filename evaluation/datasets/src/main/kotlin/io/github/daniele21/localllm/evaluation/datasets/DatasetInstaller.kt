@@ -150,10 +150,6 @@ class EvaluationDatasetInstaller(
         }
     }
 
-    private fun requireDirectory(directory: File) {
-        check(directory.isDirectory || directory.mkdirs()) { "Unable to create dataset directory" }
-    }
-
     private companion object {
         const val MANIFEST_FILE_NAME = "manifest.json"
         const val CASES_FILE_NAME = "cases.jsonl"
@@ -164,6 +160,10 @@ class EvaluationDatasetInstaller(
 private fun storageSegment(value: String): String = Base64.getUrlEncoder()
     .withoutPadding()
     .encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+
+private fun requireDirectory(directory: File) {
+    check(directory.isDirectory || directory.mkdirs()) { "Unable to create dataset directory" }
+}
 
 internal object EvaluationDatasetManifestCanonicalJson {
     fun encode(manifest: EvaluationDatasetManifestV1): String = buildString {
