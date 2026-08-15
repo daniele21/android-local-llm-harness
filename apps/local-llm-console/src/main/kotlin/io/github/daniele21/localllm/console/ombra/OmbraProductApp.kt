@@ -23,9 +23,9 @@ import io.github.daniele21.localllm.console.application.OmbraSensitiveTaskSnapsh
 import io.github.daniele21.localllm.console.pii.PiiDefinitionDraft
 import io.github.daniele21.localllm.console.pii.PiiDefinitionValidation
 import io.github.daniele21.localllm.console.pii.PiiTypeId
-import io.github.daniele21.localllm.console.presentation.OmbraFailureCode
+import io.github.daniele21.localllm.console.presentation.OmbraFailurePrimaryAction
+import io.github.daniele21.localllm.console.presentation.OmbraFailureProjector
 import io.github.daniele21.localllm.console.presentation.OmbraOperationKind
-import io.github.daniele21.localllm.console.presentation.OmbraRetryTarget
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowStage
 import io.github.daniele21.localllm.console.presentation.OmbraWorkflowState
 import io.github.daniele21.localllm.ui.designsystem.LocalOmbraSpacing
@@ -326,7 +326,7 @@ private fun OmbraFailureScreen(
     onReturnToReview: () -> Boolean,
     onReset: () -> Boolean,
 ) {
-    val message = failureMessage(workflow.failureCode)
+    val presentation = OmbraFailureProjector.project(workflow)
     OmbraScaffold(title = "OMBRA", stepLabel = "Operazione non completata") { innerPadding ->
         OmbraScrollableContent(innerPadding = innerPadding) {
             Text(
@@ -336,10 +336,10 @@ private fun OmbraFailureScreen(
             OmbraStatusBadge(text = harness.label, tone = harness.tone)
             OmbraReviewBanner(
                 title = "Riprova in sicurezza",
-                detail = message,
+                detail = presentation.detail,
                 tone = OmbraStatusTone.ERROR,
             )
-            if (workflow.retryTarget == OmbraRetryTarget.EXPORT) {
+            if (presentation.primaryAction == OmbraFailurePrimaryAction.RETURN_TO_REVIEW) {
                 OmbraPrimaryButton(text = "Torna alla revisione", onClick = { onReturnToReview() })
             } else {
                 OmbraPrimaryButton(text = "Riprova", onClick = { onRetry() })
@@ -362,17 +362,4 @@ private fun OmbraScrollableContent(innerPadding: PaddingValues, content: @Compos
     ) {
         content()
     }
-}
-
-private fun failureMessage(code: OmbraFailureCode?): String = when (code) {
-    OmbraFailureCode.EXTRACTION_FAILED ->
-        "Il PDF non può essere letto in modo affidabile. Puoi riprovare o scegliere un nuovo documento."
-
-    OmbraFailureCode.ANALYSIS_FAILED ->
-        "L’analisi locale non ha prodotto un risultato valido. Nessun risultato parziale viene usato."
-
-    OmbraFailureCode.EXPORT_FAILED ->
-        "L’export non è stato completato. Il file parziale viene rimosso e non viene usato come risultato."
-
-    null -> "L’operazione è stata interrotta senza produrre un risultato utilizzabile."
 }
