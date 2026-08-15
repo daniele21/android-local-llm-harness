@@ -153,21 +153,19 @@ class OmbraRedactionPlannerTest {
         assertTrue(plan.replacements.isEmpty())
     }
 
-    private fun segment(text: String): DocumentSegment =
-        DocumentSegment(
-            id = SegmentId.fromIndices(pageIndex = 0, blockIndex = 0),
-            pageIndex = 0,
-            blockIndex = 0,
-            normalizedText = text,
-        )
+    private fun segment(text: String): DocumentSegment = DocumentSegment(
+        id = SegmentId.fromIndices(pageIndex = 0, blockIndex = 0),
+        pageIndex = 0,
+        blockIndex = 0,
+        normalizedText = text,
+    )
 
-    private fun definition(id: String, label: String): PiiDefinition =
-        PiiDefinition(
-            id = PiiTypeId.parse(id),
-            label = label,
-            definition = "Synthetic definition for $label",
-            source = PiiDefinitionSource.CUSTOM,
-        )
+    private fun definition(id: String, label: String): PiiDefinition = PiiDefinition(
+        id = PiiTypeId.parse(id),
+        label = label,
+        definition = "Synthetic definition for $label",
+        source = PiiDefinitionSource.CUSTOM,
+    )
 
     private fun occurrence(
         segment: DocumentSegment,
@@ -188,10 +186,9 @@ class OmbraRedactionPlannerTest {
         start: Int,
         end: Int,
         decision: ReviewDecisionState,
-    ): ReviewOccurrence =
-        ReviewOccurrence(
-            id = OccurrenceId(typeId, SourceOccurrence(segment.id, SourceRange(start, end))),
-            surface = surface,
-            decision = decision,
-        )
+    ): ReviewOccurrence = ReviewOccurrence(
+        id = OccurrenceId(typeId, SourceOccurrence(segment.id, SourceRange(start, end))),
+        surface = surface,
+        decision = decision,
+    )
 }
