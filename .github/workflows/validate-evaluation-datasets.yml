@@ -39,12 +39,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-      - name: Validate evaluation dataset module
-        run: |
-          ./gradlew --no-configuration-cache \
-            spotlessCheck \
-            detekt \
-            verifyNoModelArtifacts \
-            :evaluation:datasets:testDebugUnitTest \
-            :evaluation:datasets:lintDebug \
-            :evaluation:datasets:compileDebugKotlin
+      - name: Spotless
+        run: ./gradlew --no-configuration-cache spotlessCheck
+      - name: Detekt
+        run: ./gradlew --no-configuration-cache detekt
+      - name: Model artifact guard
+        run: ./gradlew --no-configuration-cache verifyNoModelArtifacts
+      - name: Dataset compile
+        run: ./gradlew --no-configuration-cache :evaluation:datasets:compileDebugKotlin
+      - name: Dataset tests
+        run: ./gradlew --no-configuration-cache :evaluation:datasets:testDebugUnitTest
+      - name: Dataset lint
+        run: ./gradlew --no-configuration-cache :evaluation:datasets:lintDebug
