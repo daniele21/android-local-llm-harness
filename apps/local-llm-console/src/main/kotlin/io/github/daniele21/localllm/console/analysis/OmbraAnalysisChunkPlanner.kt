@@ -71,22 +71,20 @@ internal class OmbraAnalysisChunkPlanner(private val policy: OmbraAnalysisPlanni
             while (pending.isNotEmpty() && continueChunk) {
                 val candidate = pending.removeFirst()
                 val wholeCandidate = candidate.asAnalysisSegment()
-                if (fits(definitions, chunkSegments + wholeCandidate, limits)) {
-                    chunkSegments += wholeCandidate
-                    continue
+                when {
+                    fits(definitions, chunkSegments + wholeCandidate, limits) -> chunkSegments += wholeCandidate
+                    chunkSegments.isNotEmpty() -> {
+                        pending.addFirst(candidate)
+                        continueChunk = false
+                    }
+                    else -> {
+                        val split =
+                            largestFittingPrefix(candidate, definitions, limits)
+                                ?: return OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT)
+                        chunkSegments += split.head
+                        if (split.tail != null) pending.addFirst(split.tail)
+                    }
                 }
-
-                if (chunkSegments.isNotEmpty()) {
-                    pending.addFirst(candidate)
-                    continueChunk = false
-                    continue
-                }
-
-                val split =
-                    largestFittingPrefix(candidate, definitions, limits)
-                        ?: return OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT)
-                chunkSegments += split.head
-                if (split.tail != null) pending.addFirst(split.tail)
             }
 
             val payload = OmbraAnalysisDataSerializer.serialize(definitions, chunkSegments)
