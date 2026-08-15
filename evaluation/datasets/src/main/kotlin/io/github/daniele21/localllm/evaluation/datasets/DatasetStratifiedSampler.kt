@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.evaluation.datasets
 import io.github.daniele21.localllm.evaluation.EvaluationCaseId
 import io.github.daniele21.localllm.evaluation.EvaluationCategoryId
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetCaseV1
+import io.github.daniele21.localllm.evaluation.EvaluationDatasetIdentity
 import io.github.daniele21.localllm.evaluation.EvaluationDatasetManifestV1
 import io.github.daniele21.localllm.evaluation.SamplingPolicyId
 import io.github.daniele21.localllm.evaluation.SamplingPolicyRef
@@ -38,7 +39,7 @@ class EvaluationStratifiedSampler(
             .toSortedMap(compareBy(EvaluationCategoryId::value))
             .flatMap { (categoryId, categoryCases) ->
                 val category = requireNotNull(categories[categoryId])
-                val weight = category.weight?.let { BigDecimal.valueOf(it) } ?: BigDecimal.ONE
+                val weight = category.weight?.let(BigDecimal::valueOf) ?: BigDecimal.ONE
                 val rankedCases = categoryCases.sortedWith(
                     compareBy<EvaluationDatasetCaseV1> {
                         stableCaseRank(manifest, seed, categoryId, it.id)
@@ -74,11 +75,11 @@ class EvaluationStratifiedSampler(
     ): String {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(manifest.contentDigest.sha256.toByteArray(StandardCharsets.US_ASCII))
-        digest.update(0)
+        digest.update(0.toByte())
         digest.update(ByteBuffer.allocate(Long.SIZE_BYTES).putLong(seed).array())
-        digest.update(0)
+        digest.update(0.toByte())
         digest.update(categoryId.value.toByteArray(StandardCharsets.UTF_8))
-        digest.update(0)
+        digest.update(0.toByte())
         digest.update(caseId.value.toByteArray(StandardCharsets.UTF_8))
         return digest.digest().toStableHex()
     }
@@ -96,7 +97,7 @@ class EvaluationStratifiedSampler(
 }
 
 data class StratifiedSamplingRanking(
-    val dataset: io.github.daniele21.localllm.evaluation.EvaluationDatasetIdentity,
+    val dataset: EvaluationDatasetIdentity,
     val policy: SamplingPolicyRef,
     val seed: Long,
     val orderedCaseIds: List<EvaluationCaseId>,
