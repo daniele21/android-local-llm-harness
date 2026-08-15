@@ -102,33 +102,57 @@ class EvaluationEngine(
     private suspend fun executeClaimed(config: EvaluationRunConfig, observer: EvaluationEngineObserver): EvaluationEngineTerminal {
         val results = mutableListOf<EvaluationCaseResult>()
         emitState(config, observer, EvaluationRunState.CREATED)
+
+        validatePhase(config, observer, results)?.let { return it }
+        prepareModelPhase(config, observer, results)?.let { return it }
+        warmupPhase(config, observer, results)?.let { return it }
+
+        return executeCases(config, observer, results)
+    }
+
+    private suspend fun validatePhase(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        results: List<EvaluationCaseResult>,
+    ): EvaluationEngineTerminal? {
         emitState(config, observer, EvaluationRunState.VALIDATING)
-
-        when (val validation = preflight.validate(config)) {
-            is EvaluationStepResult.Failure -> return fail(config, observer, results, validation.failure)
-            is EvaluationStepResult.Success -> Unit
+        return when (val validation = preflight.validate(config)) {
+            is EvaluationStepResult.Failure -> fail(config, observer, results, validation.failure)
+            is EvaluationStepResult.Success -> cancellationIfRequested(config, observer, results)
         }
+    }
 
-        if (cancelRequested.get()) return cancel(config, observer, results)
-
+    private suspend fun prepareModelPhase(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        results: List<EvaluationCaseResult>,
+    ): EvaluationEngineTerminal? {
         emitState(config, observer, EvaluationRunState.PREPARING_MODEL)
-        when (val preparation = modelPreparation.prepare(config)) {
-            is EvaluationStepResult.Failure -> return fail(config, observer, results, preparation.failure)
-            is EvaluationStepResult.Success -> Unit
+        return when (val preparation = modelPreparation.prepare(config)) {
+            is EvaluationStepResult.Failure -> fail(config, observer, results, preparation.failure)
+            is EvaluationStepResult.Success -> cancellationIfRequested(config, observer, results)
         }
+    }
 
-        if (cancelRequested.get()) return cancel(config, observer, results)
+    private suspend fun warmupPhase(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        results: List<EvaluationCaseResult>,
+    ): EvaluationEngineTerminal? {
+        if (config.warmupPolicy != EvaluationWarmupPolicy.ONE_UNSCORED_GENERATION) return null
 
-        if (config.warmupPolicy == EvaluationWarmupPolicy.ONE_UNSCORED_GENERATION) {
-            emitState(config, observer, EvaluationRunState.WARMING_UP)
-            when (val warmup = modelPreparation.warmup(config)) {
-                is EvaluationStepResult.Failure -> return fail(config, observer, results, warmup.failure)
-                is EvaluationStepResult.Success -> Unit
-            }
+        emitState(config, observer, EvaluationRunState.WARMING_UP)
+        return when (val warmup = modelPreparation.warmup(config)) {
+            is EvaluationStepResult.Failure -> fail(config, observer, results, warmup.failure)
+            is EvaluationStepResult.Success -> cancellationIfRequested(config, observer, results)
         }
+    }
 
-        if (cancelRequested.get()) return cancel(config, observer, results)
-
+    private suspend fun executeCases(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        results: MutableList<EvaluationCaseResult>,
+    ): EvaluationEngineTerminal {
         emitState(config, observer, EvaluationRunState.RUNNING)
         val caseIds = config.sampling.orderedCaseIds
         var attempted = 0
@@ -142,14 +166,7 @@ class EvaluationEngine(
             when (val execution = caseExecution.execute(config, caseId)) {
                 is EvaluationStepResult.Failure -> return fail(config, observer, results, execution.failure)
 
-                is EvaluationStepResult.Success -> {
-                    require(execution.value.caseId == caseId) {
-                        "Evaluation case execution result ID must match requested case ID"
-                    }
-                    results += execution.value
-                    observer.onCaseResult(config.runId, execution.value)
-                    emitProgress(config, observer, attempted, results.size, null)
-                }
+                is EvaluationStepResult.Success -> recordCaseResult(config, observer, caseId, execution.value, results, attempted)
             }
         }
 
@@ -157,6 +174,28 @@ class EvaluationEngine(
         emitState(config, observer, EvaluationRunState.COMPLETED)
         return EvaluationEngineTerminal.Completed(config.runId, results.toList())
     }
+
+    private suspend fun recordCaseResult(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        requestedCaseId: EvaluationCaseId,
+        result: EvaluationCaseResult,
+        results: MutableList<EvaluationCaseResult>,
+        attempted: Int,
+    ) {
+        require(result.caseId == requestedCaseId) {
+            "Evaluation case execution result ID must match requested case ID"
+        }
+        results += result
+        observer.onCaseResult(config.runId, result)
+        emitProgress(config, observer, attempted, results.size, null)
+    }
+
+    private suspend fun cancellationIfRequested(
+        config: EvaluationRunConfig,
+        observer: EvaluationEngineObserver,
+        results: List<EvaluationCaseResult>,
+    ): EvaluationEngineTerminal.Cancelled? = if (cancelRequested.get()) cancel(config, observer, results) else null
 
     private suspend fun fail(
         config: EvaluationRunConfig,
