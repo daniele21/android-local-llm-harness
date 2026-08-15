@@ -22,6 +22,7 @@ data class EvaluationRunEntity(
     @Embedded(prefix = "identity_") val identity: EvaluationRunIdentityEntity?,
     val state: String,
     @Embedded(prefix = "progress_") val progress: EvaluationProgressEntity,
+    @ColumnInfo(name = "quality_present") val qualityPresent: Boolean,
     @ColumnInfo(name = "quality_aggregate_score") val qualityAggregateScore: Double?,
     @Embedded(prefix = "reliability_") val reliability: EvaluationReliabilityEntity?,
     @ColumnInfo(name = "started_at_epoch_ms") val startedAtEpochMs: Long,
