@@ -10,7 +10,12 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 sealed interface EvaluationStepResult<out T> {
     data class Success<T>(val value: T) : EvaluationStepResult<T>
@@ -62,6 +67,7 @@ class EvaluationEngine(
 ) {
     private val ownershipLock = Any()
     private val cancelRequested = AtomicBoolean(false)
+    private val activeCaseJob = AtomicReference<Job?>(null)
 
     @Volatile
     private var activeRunId: EvaluationRunId? = null
@@ -89,6 +95,7 @@ class EvaluationEngine(
                 modelPreparation = modelPreparation,
                 caseExecution = caseExecution,
                 cancelRequested = cancelRequested,
+                activeCaseJob = activeCaseJob,
             ).execute()
         } finally {
             release(config.runId)
@@ -100,6 +107,7 @@ class EvaluationEngine(
             false
         } else {
             cancelRequested.set(true)
+            activeCaseJob.get()?.cancel(CancellationException("Evaluation run cancellation requested"))
             true
         }
     }
@@ -111,6 +119,7 @@ class EvaluationEngine(
             false
         } else {
             activeRunId = runId
+            activeCaseJob.set(null)
             cancelRequested.set(false)
             true
         }
@@ -118,6 +127,7 @@ class EvaluationEngine(
 
     private fun release(runId: EvaluationRunId) = synchronized(ownershipLock) {
         if (activeRunId == runId) {
+            activeCaseJob.getAndSet(null)?.cancel()
             activeRunId = null
             cancelRequested.set(false)
         }
@@ -131,6 +141,7 @@ private class EvaluationRunExecution(
     private val modelPreparation: EvaluationModelPreparationPort,
     private val caseExecution: EvaluationCaseExecutionPort,
     private val cancelRequested: AtomicBoolean,
+    private val activeCaseJob: AtomicReference<Job?>,
 ) {
     suspend fun execute(): EvaluationEngineTerminal {
         val results = mutableListOf<EvaluationCaseResult>()
@@ -180,7 +191,14 @@ private class EvaluationRunExecution(
 
             attempted += 1
             emitProgress(attempted, results.size, caseId)
-            when (val execution = caseExecution.execute(config, caseId)) {
+            val execution = try {
+                executeActiveCase(caseId)
+            } catch (error: CancellationException) {
+                if (!cancelRequested.get()) throw error
+                emitProgress(attempted, results.size, null)
+                return cancel(results)
+            }
+            when (execution) {
                 is EvaluationStepResult.Failure -> return fail(results, execution.failure)
                 is EvaluationStepResult.Success -> recordCaseResult(caseId, execution.value, results, attempted)
             }
@@ -189,6 +207,19 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.AGGREGATING)
         observer.emitState(config.runId, EvaluationRunState.COMPLETED)
         return EvaluationEngineTerminal.Completed(config.runId, results.toList())
+    }
+
+    private suspend fun executeActiveCase(caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> = coroutineScope {
+        val job = async { caseExecution.execute(config, caseId) }
+        check(activeCaseJob.compareAndSet(null, job)) { "Evaluation engine already owns an active case job" }
+        try {
+            if (cancelRequested.get()) {
+                job.cancel(CancellationException("Evaluation run cancellation requested"))
+            }
+            job.await()
+        } finally {
+            activeCaseJob.compareAndSet(job, null)
+        }
     }
 
     private suspend fun recordCaseResult(
