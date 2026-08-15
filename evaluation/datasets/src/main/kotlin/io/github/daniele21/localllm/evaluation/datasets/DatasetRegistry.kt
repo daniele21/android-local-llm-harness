@@ -55,12 +55,9 @@ class EvaluationDatasetRegistry(private val rootDirectory: File) {
         }.getOrNull()
     }
 
-    private fun matchesStoredIdentity(
-        datasetDirectory: File,
-        versionDirectory: File,
-        manifest: EvaluationDatasetManifestV1,
-    ): Boolean = datasetDirectory.name == storageSegment(manifest.datasetId.value) &&
-        versionDirectory.name == storageSegment(manifest.version.value)
+    private fun matchesStoredIdentity(datasetDirectory: File, versionDirectory: File, manifest: EvaluationDatasetManifestV1): Boolean =
+        datasetDirectory.name == storageSegment(manifest.datasetId.value) &&
+            versionDirectory.name == storageSegment(manifest.version.value)
 
     private fun EvaluationDatasetRegistryFilter.matches(manifest: EvaluationDatasetManifestV1): Boolean =
         (datasetId == null || datasetId == manifest.datasetId) &&
