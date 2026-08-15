@@ -12,6 +12,7 @@ This guide owns navigation and validation for model-evaluation implementation un
 ## Current ownership
 
 - `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility and failure contracts plus deterministic canonical hashing.
+- `evaluation/datasets` owns bounded canonical JSONL parsing, pack-level semantic validation and ordered content-digest verification. It does not install packs, sample cases or execute inference.
 - `evaluation/evaluators` owns the versioned evaluator registry and deterministic scorer implementations. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
 
 Do not create dataset-store or persistence implementation modules until the corresponding workstream contains real behavior. New evaluation modules must have concrete ownership, tests and an explicit navigation entry before they are registered in Gradle.
@@ -37,6 +38,15 @@ For contract-only iteration run:
   :evaluation:contracts:compileDebugKotlin \
   :evaluation:contracts:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+```
+
+For dataset work run:
+
+```bash
+./gradlew :evaluation:datasets:testDebugUnitTest \
+  :evaluation:datasets:compileDebugKotlin \
+  :evaluation:datasets:lintDebug
+./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
 ```
 
 For evaluator work run the equivalent scoped checks for `:evaluation:evaluators` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
