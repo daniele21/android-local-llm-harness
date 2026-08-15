@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: model-evaluation
 Canonical scope: model-evaluation.datasets
 Read when: implementing evaluation dataset formats, storage, sampling, import or the built-in General Purpose pack
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-15
 
 ## Goal
 
@@ -15,7 +15,7 @@ This workstream owns both the generic dataset mechanism and the initial built-in
 
 ## Dataset pack contract
 
-Canonical installed form is conceptually:
+Canonical installed form is:
 
 ```text
 <datasetId>/<version>/
@@ -23,6 +23,8 @@ Canonical installed form is conceptually:
   cases.jsonl
   optional source/license metadata
 ```
+
+`evaluation/contracts/DatasetSchemaContracts.kt` owns bounded value semantics. [`../dataset-schema-v1.md`](../dataset-schema-v1.md) freezes the v1 manifest and JSONL wire field names, enum encodings, optional/default rules and fail-closed schema behavior.
 
 A pack is valid only when all records validate and the canonical ordered case content matches the manifest digest. Publication to the active dataset registry is atomic.
 
@@ -93,10 +95,10 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-D-01 | READY | EVAL-C-02,EVAL-C-03 | Define versioned manifest and canonical JSONL case schemas from the shared contracts. |
-| EVAL-D-02 | PLANNED | EVAL-D-01,EVAL-C-09 | Implement bounded streaming JSONL parser with typed line/field/schema errors. |
-| EVAL-D-03 | PLANNED | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
-| EVAL-D-04 | PLANNED | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
+| EVAL-D-01 | DONE | EVAL-C-02,EVAL-C-03 | Define versioned manifest and canonical JSONL case schemas from the shared contracts. |
+| EVAL-D-02 | READY | EVAL-D-01,EVAL-C-09 | Implement bounded streaming JSONL parser with typed line/field/schema errors. |
+| EVAL-D-03 | READY | EVAL-D-01,EVAL-E-01 | Implement full-pack validator for IDs, categories, evaluator specs, weights and supported schema versions. |
+| EVAL-D-04 | READY | EVAL-D-01,EVAL-C-08 | Implement canonical ordered content digest and manifest/digest verification. |
 | EVAL-D-05 | PLANNED | EVAL-D-02,EVAL-D-03,EVAL-D-04 | Implement staged app-private installation with atomic publication and rollback cleanup. |
 | EVAL-D-06 | PLANNED | EVAL-D-05 | Implement dataset registry/discovery for built-in and user-imported installed packs. |
 | EVAL-D-07 | PLANNED | EVAL-C-04,EVAL-D-03 | Implement deterministic stratified sampling with stable tie-breaking and versioned policy. |
@@ -106,18 +108,20 @@ V1 evaluates answer retrieval, not long-context model maximum claims. Case metad
 | EVAL-D-11 | PLANNED | EVAL-D-06,EVAL-D-10 | Implement explicit dataset delete with protection against deleting a pack used by an active run. |
 | EVAL-D-12 | PLANNED | EVAL-D-09,EVAL-D-11 | Document custom JSONL schema, limits, privacy behavior and import failure semantics. |
 
+EVAL-D-01 is satisfied by the typed v1 manifest/case contracts and tests in `evaluation/contracts` plus the frozen wire representation in [`../dataset-schema-v1.md`](../dataset-schema-v1.md).
+
 EVAL-2 closes when EVAL-D-01 through EVAL-D-12 are `DONE` and the real evaluation engine can consume installed packs through the dataset contract.
 
 ## Task ledger — General Purpose v1
 
 | ID | State | Depends on | Task |
 | --- | --- | --- | --- |
-| EVAL-GP-01 | PLANNED | EVAL-D-01 | Inventory exact upstream dataset/version candidates and stable source identifiers for the four public benchmark families. |
+| EVAL-GP-01 | READY | EVAL-D-01 | Inventory exact upstream dataset/version candidates and stable source identifiers for the four public benchmark families. |
 | EVAL-GP-02 | PLANNED | EVAL-GP-01 | Record license, attribution and redistribution requirements per source and choose bundle-vs-download treatment. |
 | EVAL-GP-03 | PLANNED | EVAL-GP-02 | Block any source component whose redistribution/attribution path is not explicitly acceptable for the project. |
 | EVAL-GP-04 | PLANNED | EVAL-D-07,EVAL-GP-03 | Define deterministic category selection rules and freeze upstream source case IDs for the 160 public-derived cases. |
-| EVAL-GP-05 | PLANNED | EVAL-E-05 | Author 20 Harness structured-output cases with deterministic expected JSON/field outcomes. |
-| EVAL-GP-06 | PLANNED | EVAL-E-02,EVAL-E-06 | Author 20 Harness context-retrieval cases with deterministic target answers and distractors. |
+| EVAL-GP-05 | READY | EVAL-E-05 | Author 20 Harness structured-output cases with deterministic expected JSON/field outcomes. |
+| EVAL-GP-06 | READY | EVAL-E-02,EVAL-E-06 | Author 20 Harness context-retrieval cases with deterministic target answers and distractors. |
 | EVAL-GP-07 | PLANNED | EVAL-GP-04,EVAL-GP-05,EVAL-GP-06 | Assemble the 200-case canonical pack and calculate immutable dataset digest. |
 | EVAL-GP-08 | PLANNED | EVAL-D-08,EVAL-GP-07 | Freeze nested 20/50/100/200 preset membership with category proportions matching the declared policy. |
 | EVAL-GP-09 | PLANNED | EVAL-E-08,EVAL-GP-08 | Validate category weights, aggregate score math and zero/failure semantics using synthetic model-output fixtures. |
@@ -129,13 +133,19 @@ EVAL-6 closes when EVAL-GP-01 through EVAL-GP-12 are `DONE`.
 
 ## Parallel execution guidance
 
-EVAL-D-01 is now ready. After it fixes the schema, EVAL-D-02 parsing, EVAL-D-04 digesting and EVAL-GP-01 source inventory can proceed in parallel.
+The schema freeze now unlocks four independent generic/source lanes:
 
-After evaluator semantics are available:
+- EVAL-D-02 bounded parser;
+- EVAL-D-03 full-pack validator;
+- EVAL-D-04 canonical digest verification;
+- EVAL-GP-01 exact public-source inventory and provenance identifiers.
 
-- EVAL-GP-05 and EVAL-GP-06 can be authored independently;
-- public-source curation EVAL-GP-01 through EVAL-GP-04 can continue independently of Harness-owned case authoring;
-- dataset storage EVAL-D-05/D-06 and sampling EVAL-D-07/D-08 can proceed as separate implementation lanes after their prerequisites.
+Evaluator completion also unlocks Harness-owned authoring independently:
+
+- EVAL-GP-05 structured-output cases;
+- EVAL-GP-06 context-retrieval cases.
+
+D-02/D-03/D-04 converge at D-05 installation. Public-source curation EVAL-GP-01 through EVAL-GP-04 remains independent of Harness-owned case authoring. Dataset storage D-05/D-06 and sampling D-07/D-08 proceed as separate implementation lanes after their prerequisites.
 
 General Purpose v1 assembly is intentionally late: source/legal review, evaluator semantics and deterministic sampling must be stable before the 200-case digest is frozen.
 
