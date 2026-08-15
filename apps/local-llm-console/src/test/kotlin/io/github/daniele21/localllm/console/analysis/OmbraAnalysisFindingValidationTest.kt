@@ -106,10 +106,10 @@ class OmbraAnalysisFindingValidationTest {
         val second =
             OmbraChunkFindingValidation(
                 findings =
-                listOf(
-                    ValidatedFinding(email.id, "Alice", listOf(exact)),
-                    ValidatedFinding(name.id, "Alice X", listOf(overlap)),
-                ),
+                    listOf(
+                        ValidatedFinding(email.id, "Alice", listOf(exact)),
+                        ValidatedFinding(name.id, "Alice X", listOf(overlap)),
+                    ),
                 invalidFindingCount = 1,
                 issueCounts = mapOf(OmbraFindingValidationIssue.SOURCE_SURFACE_NOT_FOUND to 1),
             )
@@ -131,13 +131,12 @@ class OmbraAnalysisFindingValidationTest {
             source = PiiDefinitionSource.BUILT_IN,
         )
 
-    private fun segment(text: String, blockIndex: Int = 0): DocumentSegment =
-        DocumentSegment(
-            id = SegmentId.fromIndices(0, blockIndex),
-            pageIndex = 0,
-            blockIndex = blockIndex,
-            normalizedText = text,
-        )
+    private fun segment(text: String, blockIndex: Int = 0): DocumentSegment = DocumentSegment(
+        id = SegmentId.fromIndices(0, blockIndex),
+        pageIndex = 0,
+        blockIndex = blockIndex,
+        normalizedText = text,
+    )
 
     private fun chunk(segmentId: String, text: String, ordinal: Int = 0): OmbraAnalysisChunk =
         OmbraAnalysisChunk(
