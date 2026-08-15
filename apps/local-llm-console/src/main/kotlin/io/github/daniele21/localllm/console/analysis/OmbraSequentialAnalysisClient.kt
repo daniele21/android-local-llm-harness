@@ -20,9 +20,8 @@ internal data class OmbraStructuredChunkRequest(
         require(outputJsonSchema.isNotEmpty()) { "Analysis output schema must not be empty" }
     }
 
-    override fun toString(): String =
-        "OmbraStructuredChunkRequest(ordinal=$ordinal, instructionLength=${instruction.length}, " +
-            "dataPayload=<redacted>, outputJsonSchemaLength=${outputJsonSchema.length})"
+    override fun toString(): String = "OmbraStructuredChunkRequest(ordinal=$ordinal, instructionLength=${instruction.length}, " +
+        "dataPayload=<redacted>, outputJsonSchemaLength=${outputJsonSchema.length})"
 }
 
 /**
@@ -32,11 +31,7 @@ internal data class OmbraStructuredChunkRequest(
 internal interface OmbraAnalysisChunkClient {
     fun prepare(operationId: OmbraOperationId, onResult: (Result<ConsumerLimits>) -> Unit)
 
-    fun generate(
-        operationId: OmbraOperationId,
-        request: OmbraStructuredChunkRequest,
-        onResult: (Result<String>) -> Unit,
-    )
+    fun generate(operationId: OmbraOperationId, request: OmbraStructuredChunkRequest, onResult: (Result<String>) -> Unit)
 
     fun cancel(operationId: OmbraOperationId, onCancelled: () -> Unit)
 
@@ -59,10 +54,8 @@ internal enum class OmbraAnalysisFailureCode {
     DISCONNECTED,
 }
 
-internal class OmbraAnalysisException(
-    val code: OmbraAnalysisFailureCode,
-    val invalidFindingCount: Int = 0,
-) : RuntimeException("OMBRA analysis failed: $code") {
+internal class OmbraAnalysisException(val code: OmbraAnalysisFailureCode, val invalidFindingCount: Int = 0) :
+    RuntimeException("OMBRA analysis failed: $code") {
     init {
         require(invalidFindingCount >= 0) { "Invalid finding count must be non-negative" }
     }
@@ -82,11 +75,7 @@ internal class OmbraSequentialAnalysisClient(
 ) : OmbraAnalysisClient {
     private val operations = ConcurrentHashMap<OmbraOperationId, ActiveOperation>()
 
-    override fun analyze(
-        operationId: OmbraOperationId,
-        request: OmbraAnalysisRequest,
-        onResult: (Result<List<ValidatedFinding>>) -> Unit,
-    ) {
+    override fun analyze(operationId: OmbraOperationId, request: OmbraAnalysisRequest, onResult: (Result<List<ValidatedFinding>>) -> Unit) {
         val operation = ActiveOperation(request, onResult)
         check(operations.putIfAbsent(operationId, operation) == null) { "Duplicate OMBRA analysis operation ID" }
 
@@ -154,12 +143,7 @@ internal class OmbraSequentialAnalysisClient(
         }
     }
 
-    private fun handleChunkOutput(
-        operationId: OmbraOperationId,
-        operation: ActiveOperation,
-        chunk: OmbraAnalysisChunk,
-        output: String,
-    ) {
+    private fun handleChunkOutput(operationId: OmbraOperationId, operation: ActiveOperation, chunk: OmbraAnalysisChunk, output: String) {
         when (val parsed = parser.parse(output)) {
             is OmbraAnalysisParseResult.Rejected -> {
                 completeFailure(
@@ -233,10 +217,7 @@ internal class OmbraSequentialAnalysisClient(
     private fun isActive(operationId: OmbraOperationId, operation: ActiveOperation): Boolean =
         operations[operationId] === operation && !operation.cancelled
 
-    private class ActiveOperation(
-        val request: OmbraAnalysisRequest,
-        val onResult: (Result<List<ValidatedFinding>>) -> Unit,
-    ) {
+    private class ActiveOperation(val request: OmbraAnalysisRequest, val onResult: (Result<List<ValidatedFinding>>) -> Unit) {
         @Volatile
         var cancelled: Boolean = false
         var chunks: List<OmbraAnalysisChunk> = emptyList()
