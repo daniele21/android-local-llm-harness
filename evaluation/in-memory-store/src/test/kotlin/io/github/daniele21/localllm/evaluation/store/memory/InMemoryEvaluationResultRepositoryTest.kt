@@ -21,13 +21,13 @@ import io.github.daniele21.localllm.evaluation.EvaluationWarmupPolicy
 import io.github.daniele21.localllm.evaluation.SamplingPolicyId
 import io.github.daniele21.localllm.evaluation.SamplingPolicyRef
 import io.github.daniele21.localllm.evaluation.SamplingSelection
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.startCoroutine
 
 class InMemoryEvaluationResultRepositoryTest {
     @Test
