@@ -261,18 +261,13 @@ private class ActiveConsumerGeneration(val requestId: RequestId, val onResult: (
     var handle: ConsumerGenerationHandle? = null
 }
 
-private fun executionMatches(
-    execution: ConsumerExecutionIdentity,
-    operation: ConsumerOperation,
-    useCaseId: UseCaseId,
-): Boolean =
-    listOf(
-        execution.useCaseId == useCaseId,
-        execution.capabilityRevision == operation.capabilityRevision,
-        execution.reasoningMode == EffectiveConsumerReasoningMode.DISABLED,
-        execution.outputConstraint == ConsumerOutputConstraintKind.JSON_SCHEMA,
-        execution.sessionKind == SessionKind.STATELESS,
-    ).all { it }
+private fun executionMatches(execution: ConsumerExecutionIdentity, operation: ConsumerOperation, useCaseId: UseCaseId): Boolean = listOf(
+    execution.useCaseId == useCaseId,
+    execution.capabilityRevision == operation.capabilityRevision,
+    execution.reasoningMode == EffectiveConsumerReasoningMode.DISABLED,
+    execution.outputConstraint == ConsumerOutputConstraintKind.JSON_SCHEMA,
+    execution.sessionKind == SessionKind.STATELESS,
+).all { it }
 
 private fun requestFits(request: OmbraStructuredChunkRequest, limits: ConsumerLimits): Boolean =
     composeInput(request).length <= limits.maxInputCharacters && request.outputJsonSchema.length <= limits.maxJsonSchemaCharacters
