@@ -60,7 +60,7 @@ class DeterministicEvaluationCaseScorerTest {
                     version = MultipleChoiceEvaluator.VERSION,
                     parameters = mapOf(
                         MultipleChoiceEvaluator.PARAM_LABELS to "A,B,C,D",
-                        MultipleChoiceEvaluator.PARAM_CASE_SENSITIVE to MultipleChoiceEvaluator.CASE_SENSITIVE,
+                        MultipleChoiceEvaluator.PARAM_CASE to MultipleChoiceEvaluator.CASE_SENSITIVE,
                     ),
                 ),
             ),
