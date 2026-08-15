@@ -33,11 +33,8 @@ enum class DatasetSampleUnavailableReason {
 sealed interface DatasetSampleResolution {
     data class Resolved(val selection: SamplingSelection) : DatasetSampleResolution
 
-    data class Unavailable(
-        val reason: DatasetSampleUnavailableReason,
-        val requestedCount: Int,
-        val availableCount: Int,
-    ) : DatasetSampleResolution {
+    data class Unavailable(val reason: DatasetSampleUnavailableReason, val requestedCount: Int, val availableCount: Int) :
+        DatasetSampleResolution {
         init {
             require(requestedCount > availableCount) {
                 "Unavailable sample resolution requires requested count to exceed available count"
