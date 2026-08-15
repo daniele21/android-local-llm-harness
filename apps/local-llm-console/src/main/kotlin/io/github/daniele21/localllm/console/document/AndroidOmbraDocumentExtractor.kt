@@ -26,13 +26,35 @@ internal fun interface OmbraPdfTextReader {
 internal class IsolatedOmbraPdfTextReader(context: Context) : OmbraPdfTextReader {
     private val parser = OmbraPdfParserSpike(context)
 
-    override suspend fun read(uri: Uri): OmbraPdfReadResult {
+    override suspend fun read(uri: Uri): OmbraPdfReadResult = try {
         val parsed = parser.extractText(uri)
-        return OmbraPdfReadResult(
+        OmbraPdfReadResult(
             pageCount = parsed.pageCount,
             pages = parsed.pages.map { page -> OmbraPdfPageText(page.pageIndex, page.text) },
             truncated = parsed.truncated,
         )
+    } catch (exception: IOException) {
+        throw mapParserFailure(exception)
+    } catch (_: SecurityException) {
+        throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
+    }
+
+    private fun mapParserFailure(exception: IOException): OmbraDocumentExtractionException {
+        val message = exception.message.orEmpty()
+        val code =
+            when {
+                "InvalidPasswordException" in message -> OmbraDocumentExtractionFailureCode.ENCRYPTED_PDF
+                "Unable to open PDF source" in message || "File URI has no path" in message ->
+                    OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE
+
+                "Isolated PDF parser failed: IOException" in message ||
+                    "InvalidPDF" in message ||
+                    "ParseException" in message ->
+                    OmbraDocumentExtractionFailureCode.MALFORMED_PDF
+
+                else -> OmbraDocumentExtractionFailureCode.PARSER_FAILED
+            }
+        return OmbraDocumentExtractionException(code)
     }
 }
 
@@ -91,8 +113,10 @@ internal class AndroidOmbraDocumentExtractor(
 
     private suspend fun readPdf(source: OmbraDocumentSource): OmbraPdfReadResult = try {
         reader.read(source.uri)
-    } catch (exception: IOException) {
-        throw mapReaderFailure(exception)
+    } catch (exception: OmbraDocumentExtractionException) {
+        throw exception
+    } catch (_: IOException) {
+        throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.PARSER_FAILED)
     } catch (_: SecurityException) {
         throw OmbraDocumentExtractionException(OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE)
     }
@@ -114,16 +138,5 @@ internal class AndroidOmbraDocumentExtractor(
             descriptor = DocumentDescriptor(displayName = source.displayName, pageCount = parsed.pageCount),
             segments = segments,
         )
-    }
-
-    private fun mapReaderFailure(exception: IOException): OmbraDocumentExtractionException {
-        val message = exception.message.orEmpty()
-        val code =
-            when {
-                "InvalidPasswordException" in message -> OmbraDocumentExtractionFailureCode.ENCRYPTED_PDF
-                "Unable to open PDF source" in message -> OmbraDocumentExtractionFailureCode.SOURCE_UNREADABLE
-                else -> OmbraDocumentExtractionFailureCode.PARSER_FAILED
-            }
-        return OmbraDocumentExtractionException(code)
     }
 }
