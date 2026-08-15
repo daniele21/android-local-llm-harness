@@ -26,11 +26,7 @@ internal data class OmbraRenderedSegment(val segmentId: SegmentId, val text: Str
     override fun toString(): String = "OmbraRenderedSegment(segmentId=$segmentId, text=<redacted>)"
 }
 
-internal data class OmbraRedactionReplacement(
-    val occurrenceId: OccurrenceId,
-    val sourceSurface: String,
-    val placeholder: String,
-) {
+internal data class OmbraRedactionReplacement(val occurrenceId: OccurrenceId, val sourceSurface: String, val placeholder: String) {
     override fun toString(): String =
         "OmbraRedactionReplacement(occurrenceId=$occurrenceId, sourceSurface=<redacted>, placeholder=$placeholder)"
 }
@@ -70,7 +66,10 @@ internal object OmbraRedactionPlanner {
         if (reviewOccurrences.any { it.id.source.segmentId !in segmentById }) {
             return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.UNKNOWN_SEGMENT)
         }
-        if (reviewOccurrences.any { occurrence -> !matchesSource(occurrence, requireNotNull(segmentById[occurrence.id.source.segmentId])) }) {
+        if (reviewOccurrences.any { occurrence ->
+                !matchesSource(occurrence, requireNotNull(segmentById[occurrence.id.source.segmentId]))
+            }
+        ) {
             return OmbraRedactionPlanResult.Blocked(OmbraRedactionPlanFailureCode.SOURCE_MISMATCH)
         }
 
@@ -141,13 +140,12 @@ internal object OmbraRedactionPlanner {
         return conflicts
     }
 
-    private fun sourceComparator(segmentOrder: Map<SegmentId, Int>): Comparator<ReviewOccurrence> =
-        compareBy<ReviewOccurrence>(
-            { segmentOrder.getValue(it.id.source.segmentId) },
-            { it.id.source.range.startInclusive },
-            { it.id.source.range.endExclusive },
-            { it.id.typeId.value },
-        )
+    private fun sourceComparator(segmentOrder: Map<SegmentId, Int>): Comparator<ReviewOccurrence> = compareBy<ReviewOccurrence>(
+        { segmentOrder.getValue(it.id.source.segmentId) },
+        { it.id.source.range.startInclusive },
+        { it.id.source.range.endExclusive },
+        { it.id.typeId.value },
+    )
 }
 
 internal object OmbraPlaceholderKeys {
@@ -173,7 +171,9 @@ internal object OmbraPlaceholderKeys {
             buildString {
                 decomposed.forEach { character ->
                     when {
-                        character.code in 'A'.code..'Z'.code || character.code in 'a'.code..'z'.code || character.isDigit() ->
+                        character.code in 'A'.code..'Z'.code ||
+                            character.code in 'a'.code..'z'.code ||
+                            character.isDigit() ->
                             append(character.uppercaseChar())
                         Character.getType(character) == Character.NON_SPACING_MARK.toInt() -> Unit
                         else -> append('_')
