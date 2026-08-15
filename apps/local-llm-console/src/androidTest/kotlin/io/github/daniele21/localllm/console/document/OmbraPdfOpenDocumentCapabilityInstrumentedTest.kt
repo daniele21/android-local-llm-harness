@@ -39,9 +39,10 @@ class OmbraPdfOpenDocumentCapabilityInstrumentedTest {
         val sourceRef = capability.registerResult(uri)
 
         assertNotNull(sourceRef)
-        assertEquals(uri, registry.resolve(requireNotNull(sourceRef))?.uri)
+        val registeredSourceRef = requireNotNull(sourceRef)
+        assertEquals(uri, registry.resolve(registeredSourceRef)?.uri)
         registry.releaseAll()
-        assertNull(registry.resolve(sourceRef))
+        assertNull(registry.resolve(registeredSourceRef))
     }
 
     @Test
