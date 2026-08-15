@@ -174,7 +174,7 @@ Integrated through PRs #145, #200 and #220:
 
 State: **IN PROGRESS — REVIEW GATED**
 
-PR #206 contains the validated tooling/candidate lane but remains open and deliberately does not approve the symbol, final wordmark/lockup or production launcher. The candidate remains `REVIEW REQUIRED`.
+PR #248 is the clean replay of the validated tooling/candidate lane and remains open. It deliberately does not approve the symbol, final wordmark/lockup or production launcher; the candidate remains `REVIEW REQUIRED`.
 
 Remaining:
 
