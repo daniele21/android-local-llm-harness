@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package io.github.daniele21.localllm.evaluation.evaluators
 
 import io.github.daniele21.localllm.evaluation.EvaluationOutcome
