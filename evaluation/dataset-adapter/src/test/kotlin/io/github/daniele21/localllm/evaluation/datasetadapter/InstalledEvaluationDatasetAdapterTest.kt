@@ -37,12 +37,12 @@ import io.github.daniele21.localllm.evaluation.datasets.EvaluationDatasetPackVal
 import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorKey
 import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorRegistration
 import io.github.daniele21.localllm.evaluation.evaluators.EvaluatorRegistry
-import java.io.ByteArrayInputStream
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 class InstalledEvaluationDatasetAdapterTest {
     @Test
