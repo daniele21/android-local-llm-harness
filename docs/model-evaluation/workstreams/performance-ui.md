@@ -11,6 +11,8 @@ Last reviewed: 2026-08-15
 
 Expose model evaluation as a connected developer workflow in `apps/local-llm-phone-test` without mixing semantic model quality with the existing Diagnostics runtime-regression controls.
 
+[`../performance-ui-visual-spec.md`](../performance-ui-visual-spec.md) is the implementation-level visual and interaction specification for adapting the reviewed Performance mockups to the existing Harness shell, design system, adaptive behavior and accessibility rules.
+
 The target top-level information architecture is:
 
 ```text
