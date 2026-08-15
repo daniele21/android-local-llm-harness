@@ -77,10 +77,10 @@ fun OmbraTaskProgressStep(title: String, state: OmbraProgressState, detail: Stri
         Text(
             text = stateMarker,
             modifier =
-                Modifier.widthIn(min = 28.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(colors.container(tone))
-                    .padding(horizontal = LocalOmbraSpacing.current.xs, vertical = LocalOmbraSpacing.current.xxs),
+            Modifier.widthIn(min = 28.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(colors.container(tone))
+                .padding(horizontal = LocalOmbraSpacing.current.xs, vertical = LocalOmbraSpacing.current.xxs),
             color = colors.content(tone),
             style = MaterialTheme.typography.labelLarge,
         )
@@ -111,15 +111,15 @@ fun OmbraDefinitionSelectionRow(
 ) {
     Row(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = LocalOmbraSpacing.current.minimumTouchTarget)
-                .toggleable(
-                    value = selected,
-                    enabled = enabled,
-                    role = Role.Checkbox,
-                    onValueChange = onSelectedChange,
-                ).padding(vertical = LocalOmbraSpacing.current.sm),
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = LocalOmbraSpacing.current.minimumTouchTarget)
+            .toggleable(
+                value = selected,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = onSelectedChange,
+            ).padding(vertical = LocalOmbraSpacing.current.sm),
         horizontalArrangement = Arrangement.spacedBy(LocalOmbraSpacing.current.sm),
         verticalAlignment = Alignment.Top,
     ) {
@@ -170,10 +170,10 @@ fun OmbraRedactionPlaceholder(placeholder: String, hiddenContentDescription: Str
     Text(
         text = placeholder,
         modifier =
-            modifier.clearAndSetSemantics { contentDescription = hiddenContentDescription }
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = LocalOmbraSpacing.current.xs, vertical = LocalOmbraSpacing.current.xxs),
+        modifier.clearAndSetSemantics { contentDescription = hiddenContentDescription }
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(horizontal = LocalOmbraSpacing.current.xs, vertical = LocalOmbraSpacing.current.xxs),
         color = MaterialTheme.colorScheme.onPrimary,
         style = MaterialTheme.typography.labelMedium.copy(fontFamily = OmbraFontFamilies.Placeholder),
     )
