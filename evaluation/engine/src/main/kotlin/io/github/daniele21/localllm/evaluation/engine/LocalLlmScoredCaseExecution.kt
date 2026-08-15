@@ -59,6 +59,7 @@ class LocalLlmScoredCaseExecution(
                         )
 
                         is GenerationEvent.Failed -> generationFailure(caseId)
+
                         else -> null
                     }
                     if (result != null && terminal.compareAndSet(false, true)) {
@@ -94,10 +95,9 @@ class LocalLlmScoredCaseExecution(
         null
     }
 
-    private fun GenerationRequest.matches(binding: EvaluationRuntimeBinding, sessionId: SessionId): Boolean =
-        this.sessionId == sessionId &&
-            applicationId == binding.applicationId &&
-            useCaseId == binding.useCaseId
+    private fun GenerationRequest.matches(binding: EvaluationRuntimeBinding, sessionId: SessionId): Boolean = this.sessionId == sessionId &&
+        applicationId == binding.applicationId &&
+        useCaseId == binding.useCaseId
 }
 
 private fun generationFailure(caseId: EvaluationCaseId): EvaluationStepResult.Failure = EvaluationStepResult.Failure(
