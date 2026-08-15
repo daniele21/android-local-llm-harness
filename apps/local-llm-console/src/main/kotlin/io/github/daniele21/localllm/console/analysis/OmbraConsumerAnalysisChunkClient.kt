@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
 import io.github.daniele21.localllm.contracts.ConsumerContentType
 import io.github.daniele21.localllm.contracts.ConsumerErrorCode
+import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.ConsumerFailure
 import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
 import io.github.daniele21.localllm.contracts.ConsumerGenerationHandle
@@ -22,8 +23,8 @@ import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode
 import io.github.daniele21.localllm.contracts.RequestId
-import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseCapabilities
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.contracts.UseCaseReadiness
@@ -124,14 +125,14 @@ internal class OmbraConsumerAnalysisChunkClient(
             onCancelled()
             return
         }
-        val active = synchronized(operation) {
+        val cancelState = synchronized(operation) {
             operation.cancelled = true
             operation.cancelAcknowledgement = onCancelled
-            operation.activeGeneration
+            CancelState(operation.activeGeneration, operation.preparing)
         }
         when {
-            active != null -> active.handle?.cancel()
-            operation.preparing -> Unit
+            cancelState.active != null -> cancelState.active.handle?.cancel()
+            cancelState.preparing -> Unit
             else -> closeCancelledOperation(operationId, operation)
         }
     }
@@ -149,15 +150,16 @@ internal class OmbraConsumerAnalysisChunkClient(
     private fun prepareOnExecutor(operationId: OmbraOperationId, operation: ConsumerOperation) {
         val outcome = runCatching { prepareConsumerSession() }
         val prepared = outcome.getOrNull()
-        synchronized(operation) {
+        val cancelled = synchronized(operation) {
             operation.preparing = false
             if (prepared != null) {
                 operation.sessionId = prepared.sessionId
                 operation.limits = prepared.limits
                 operation.capabilityRevision = prepared.capabilityRevision
             }
+            operation.cancelled
         }
-        if (operation.cancelled) {
+        if (cancelled) {
             prepared?.sessionId?.let { runCatching { client.closeSession(it) } }
             operations.remove(operationId, operation)
             takeCancellationAcknowledgement(operation)?.invoke()
@@ -270,10 +272,10 @@ internal class OmbraConsumerAnalysisChunkClient(
             }
 
             is ConsumerGenerationEvent.Completed -> {
-                val valid = event.surfacedReasoning.isNullOrEmpty() && executionMatches(event.execution, operation)
+                val valid = event.result.surfacedReasoning.isNullOrEmpty() && executionMatches(event.result.execution, operation)
                 val result =
                     if (valid) {
-                        Result.success(event.answer)
+                        Result.success(event.result.answer)
                     } else {
                         Result.failure(chunkFailure(OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE))
                     }
@@ -308,10 +310,7 @@ internal class OmbraConsumerAnalysisChunkClient(
         takeCancellationAcknowledgement(operation)?.invoke()
     }
 
-    private fun executionMatches(
-        execution: io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity,
-        operation: ConsumerOperation,
-    ): Boolean =
+    private fun executionMatches(execution: ConsumerExecutionIdentity, operation: ConsumerOperation): Boolean =
         execution.useCaseId == useCaseId &&
             execution.capabilityRevision == operation.capabilityRevision &&
             execution.reasoningMode == EffectiveConsumerReasoningMode.DISABLED &&
@@ -327,25 +326,11 @@ internal class OmbraConsumerAnalysisChunkClient(
 
     private fun mapConsumerFailure(failure: ConsumerFailure): OmbraAnalysisChunkFailureCode =
         when (failure.code) {
-            ConsumerErrorCode.MODEL_UNAVAILABLE,
-            ConsumerErrorCode.PREPARE_FAILED,
-            -> OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE
-
+            ConsumerErrorCode.MODEL_UNAVAILABLE -> OmbraAnalysisChunkFailureCode.HOST_UNAVAILABLE
             ConsumerErrorCode.CANCELLED -> OmbraAnalysisChunkFailureCode.CANCELLED
             ConsumerErrorCode.RUNTIME_FAILURE -> disconnectedOrGenerationFailure()
             ConsumerErrorCode.CAPABILITY_INCOMPATIBLE -> disconnectedOrCapabilityFailure()
-            ConsumerErrorCode.INVALID_INPUT,
-            ConsumerErrorCode.USE_CASE_NOT_ALLOWED,
-            ConsumerErrorCode.STALE_CAPABILITY,
-            ConsumerErrorCode.PRESET_NOT_ALLOWED,
-            ConsumerErrorCode.REASONING_NOT_ALLOWED,
-            ConsumerErrorCode.REASONING_REQUIRED,
-            ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
-            ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
-            ConsumerErrorCode.PREPARED_SELECTION_STALE,
-            ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
-            ConsumerErrorCode.SESSION_NOT_FOUND,
-            -> OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
+            ConsumerErrorCode.INVALID_INPUT -> OmbraAnalysisChunkFailureCode.CAPABILITY_INCOMPATIBLE
         }
 
     private fun disconnectedOrCapabilityFailure(): OmbraAnalysisChunkFailureCode =
@@ -368,6 +353,8 @@ private data class PreparedConsumerOperation(
     val limits: ConsumerLimits,
     val capabilityRevision: String,
 )
+
+private data class CancelState(val active: ActiveConsumerGeneration?, val preparing: Boolean)
 
 private class ConsumerOperation(val onPrepared: (Result<ConsumerLimits>) -> Unit) {
     var preparing: Boolean = true
