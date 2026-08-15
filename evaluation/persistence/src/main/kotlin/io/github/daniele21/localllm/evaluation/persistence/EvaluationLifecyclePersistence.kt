@@ -4,8 +4,8 @@ import io.github.daniele21.localllm.evaluation.EvaluationCaseResult
 import io.github.daniele21.localllm.evaluation.EvaluationProgress
 import io.github.daniele21.localllm.evaluation.EvaluationResultRepository
 import io.github.daniele21.localllm.evaluation.EvaluationRunConfig
-import io.github.daniele21.localllm.evaluation.EvaluationRunIdentity
 import io.github.daniele21.localllm.evaluation.EvaluationRunId
+import io.github.daniele21.localllm.evaluation.EvaluationRunIdentity
 import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.EvaluationRunSummary
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngine
@@ -16,10 +16,7 @@ fun interface EvaluationClock {
     fun nowEpochMs(): Long
 }
 
-class EvaluationLifecyclePersistence(
-    private val repository: EvaluationResultRepository,
-    private val clock: EvaluationClock,
-) {
+class EvaluationLifecyclePersistence(private val repository: EvaluationResultRepository, private val clock: EvaluationClock) {
     suspend fun run(
         engine: EvaluationEngine,
         config: EvaluationRunConfig,
@@ -58,26 +55,23 @@ class EvaluationLifecyclePersistence(
     }
 }
 
-private fun initialSummary(
-    config: EvaluationRunConfig,
-    identity: EvaluationRunIdentity?,
-    startedAtEpochMs: Long,
-): EvaluationRunSummary = EvaluationRunSummary(
-    runId = config.runId,
-    config = config,
-    identity = identity,
-    state = EvaluationRunState.CREATED,
-    progress = EvaluationProgress(
-        totalCases = config.sampling.orderedCaseIds.size,
-        attemptedCases = 0,
-        completedCases = 0,
-    ),
-    quality = null,
-    reliability = null,
-    startedAtEpochMs = startedAtEpochMs,
-    completedAtEpochMs = null,
-    failure = null,
-)
+private fun initialSummary(config: EvaluationRunConfig, identity: EvaluationRunIdentity?, startedAtEpochMs: Long): EvaluationRunSummary =
+    EvaluationRunSummary(
+        runId = config.runId,
+        config = config,
+        identity = identity,
+        state = EvaluationRunState.CREATED,
+        progress = EvaluationProgress(
+            totalCases = config.sampling.orderedCaseIds.size,
+            attemptedCases = 0,
+            completedCases = 0,
+        ),
+        quality = null,
+        reliability = null,
+        startedAtEpochMs = startedAtEpochMs,
+        completedAtEpochMs = null,
+        failure = null,
+    )
 
 private fun terminalSummary(
     current: EvaluationRunSummary,
