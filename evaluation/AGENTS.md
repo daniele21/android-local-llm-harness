@@ -12,6 +12,7 @@ This guide owns navigation and validation for model-evaluation implementation un
 ## Current ownership
 
 - `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility, persistence-interface and failure contracts plus deterministic canonical hashing.
+- `evaluation/datasets` owns bounded canonical JSONL parsing, pack-level semantic validation and ordered content-digest verification. It does not install packs, sample cases or execute inference.
 - `evaluation/evaluators` owns the versioned evaluator registry, deterministic scorer implementations and quality aggregation. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
 - `evaluation/engine` owns fake-friendly evaluation lifecycle orchestration and controlled resolution of one explicitly selected supported installed model. It does not own production dataset installation, persistence, telemetry storage or UI state.
 - `evaluation/in-memory-store` owns the deterministic privacy-safe in-memory implementation of `EvaluationResultRepository`. It is the parity reference for durable stores: run configuration is immutable, lifecycle transitions are validated, case results stay bounded to the selected sample set, history ordering is deterministic, active runs cannot be deleted, and retention applies only to terminal runs.
@@ -24,6 +25,9 @@ Do not add Room or other durable storage behavior to the in-memory module. Durab
 - Depend only on lower-level public contracts required for stable value semantics; never make `evaluation/contracts` depend on Compose, Room or `llama.cpp` implementation types.
 - Dataset, sample-set, evaluator-set, semantic-execution and run identities are immutable and content/configuration-derived.
 - Canonical fingerprints use explicit field ordering and exact scalar representation; never depend on map or filesystem iteration order.
+- Dataset JSONL parsing is bounded and fail-closed: malformed UTF-8, CRLF, missing LF termination, duplicate/unknown fields, unsupported schemas and non-integral integer fields are rejected rather than normalized silently.
+- Dataset content digests are calculated over canonical ordered case content, not filesystem order, raw source formatting or map iteration order.
+- Dataset prompts, expected answers and source metadata remain dataset content and must not leak into ordinary telemetry, logs or diagnostic export.
 - Quality identity excludes the selected model and physical device so supported models can be compared on identical semantic work.
 - Runtime compatibility adds device/runtime/tuning/load/warm-up identity without collapsing those dimensions into quality.
 - Evaluator specs are declarative and bounded; they cannot name classes, scripts, URLs or executable code.
@@ -44,6 +48,15 @@ For contract-only iteration run:
   :evaluation:contracts:compileDebugKotlin \
   :evaluation:contracts:lintDebug
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
+```
+
+For dataset work run:
+
+```bash
+./gradlew :evaluation:datasets:testDebugUnitTest \
+  :evaluation:datasets:compileDebugKotlin \
+  :evaluation:datasets:lintDebug
+./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
 ```
 
 For evaluator work run the equivalent scoped checks for `:evaluation:evaluators` in addition to repository-wide `spotlessCheck`, `detekt` and `verifyNoModelArtifacts`.
