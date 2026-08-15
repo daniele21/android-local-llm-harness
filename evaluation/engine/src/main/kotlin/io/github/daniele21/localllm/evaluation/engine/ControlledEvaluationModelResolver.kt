@@ -41,19 +41,19 @@ class ControlledEvaluationModelResolver(private val supportedModels: SupportedEv
         else -> resolveSupported(identity, profile)
     }
 
-    private fun resolveSupported(
-        identity: EvaluationModelIdentity,
-        profile: GgufModelProfile,
-    ): EvaluationModelResolution {
+    private fun resolveSupported(identity: EvaluationModelIdentity, profile: GgufModelProfile): EvaluationModelResolution {
         val stored = modelStore.find(identity.artifactDigest)
         return when {
             profile.artifact.digest != identity.artifactDigest -> rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
+
             identity.quantization != null && profile.artifact.quantization != identity.quantization -> {
                 rejected(EvaluationFailureCode.MODEL_UNSUPPORTED)
             }
+
             stored == null || !stored.verified || stored.digest != identity.artifactDigest -> {
                 rejected(EvaluationFailureCode.MODEL_NOT_INSTALLED)
             }
+
             else -> EvaluationModelResolution.Resolved(
                 ResolvedEvaluationModel(
                     identity = identity,
