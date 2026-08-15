@@ -109,15 +109,15 @@ class OmbraAnalysisChunkPlannerTest {
         assertEquals(OmbraChunkPlanResult.Rejected(OmbraChunkPlanFailureCode.INPUT_OVERHEAD_EXCEEDS_LIMIT), result)
     }
 
-    private fun planner(templateReserve: Int): OmbraAnalysisChunkPlanner = OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = templateReserve))
+    private fun planner(templateReserve: Int): OmbraAnalysisChunkPlanner =
+        OmbraAnalysisChunkPlanner(OmbraAnalysisPlanningPolicy(templateOverheadCharacters = templateReserve))
 
     private fun generousLimits(): ConsumerLimits = ConsumerLimits(20_000, 1, 20_000)
 
-    private fun segment(blockIndex: Int, text: String): DocumentSegment =
-        DocumentSegment(
-            id = SegmentId.fromIndices(0, blockIndex),
-            pageIndex = 0,
-            blockIndex = blockIndex,
-            normalizedText = text,
-        )
+    private fun segment(blockIndex: Int, text: String): DocumentSegment = DocumentSegment(
+        id = SegmentId.fromIndices(0, blockIndex),
+        pageIndex = 0,
+        blockIndex = blockIndex,
+        normalizedText = text,
+    )
 }
