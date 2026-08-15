@@ -15,9 +15,9 @@ This is the operational status ledger for model evaluation. Repository-level int
 | --- | --- | --- |
 | EVAL-0 Plan and architecture | DONE | Scope, ownership, dependency graph and maintenance rules are documented. |
 | EVAL-1 Contracts and identity | DONE | `evaluation/contracts` freezes v1 identity, scoring, run, dataset-schema, persistence, compatibility, hashing and failure contracts with deterministic tests. |
-| EVAL-2 Dataset system | IN PROGRESS | D-01 through D-09 are integrated; D-10 Android import is ready before protected deletion/documentation. |
+| EVAL-2 Dataset system | IN PROGRESS | D-01 through D-10 are integrated; D-11 protected deletion is ready before D-12 closes generic dataset documentation. |
 | EVAL-3 Deterministic evaluators | DONE | Registry, six deterministic scorer families, suite aggregation, golden/adversarial coverage and evaluator v1 compatibility semantics are frozen. |
-| EVAL-4 Evaluation runner | IN PROGRESS | R-01 lifecycle, R-02 controlled selected-model resolution and R-03 production preflight are integrated; R-04 model preparation and R-05 isolated per-case context are ready independently. |
+| EVAL-4 Evaluation runner | IN PROGRESS | R-01 through R-05 are integrated: controlled preflight, explicit model preparation/unscored warm-up and isolated stateless session/context ownership now precede scorer, telemetry, timeout and active-cancellation wiring. |
 | EVAL-5 Persistence and comparison | IN PROGRESS | P-01 contracts, P-02 bounded in-memory parity and P-06 lifecycle persistence are integrated; P-03 Room design and P-08 comparison remain active. |
 | EVAL-6 General Purpose v1 | IN PROGRESS | GP-01 exact public-source inventory is complete; GP-02 license/attribution treatment and GP-05/GP-06 Harness-owned authoring are ready independently. |
 | EVAL-7 Performance UI/custom import | IN PROGRESS | U-01 state/effect vocabulary and U-02 fake-driven reducer/ViewModel are integrated; navigation/state rendering and connected selectors remain. |
@@ -40,19 +40,20 @@ EVAL-3 is complete. No v1 evaluator uses an LLM judge, arbitrary executable code
 
 ## Integrated implementation foundations
 
-The integrated implementation foundation now includes five concrete seams without prematurely coupling production dataset/runtime behavior:
+The integrated implementation foundation now includes six concrete seams without prematurely coupling production dataset/runtime behavior:
 
-- `evaluation/engine` owns R-01 single-run lifecycle/progress/cancellation, R-02 controlled resolution of exactly one supported installed model artifact and R-03 deterministic production preflight across model, dataset, evaluator and execution-profile compatibility;
+- `evaluation/datasets` owns D-01 through D-10, including bounded canonical parsing, validation, digest, atomic install, discovery, deterministic sampling/presets, reusable regression fixtures and Android canonical-document import through the existing installer;
+- `evaluation/engine` owns R-01 single-run lifecycle/progress/cancellation, R-02 controlled resolution of exactly one supported installed model artifact, R-03 deterministic production preflight, R-04 normal-path model preparation/unscored warm-up and R-05 fresh stateless session/context ownership per scored case;
 - `evaluation/in-memory-store` owns the P-02 deterministic parity implementation of `EvaluationResultRepository`, including lifecycle validation, active-run deletion protection and bounded terminal retention;
 - `evaluation/persistence` owns P-06 lifecycle/progress persistence around `EvaluationEngine` without absorbing Room or per-case persistence ownership;
 - the phone Performance shell owns U-01 typed Run/Datasets/History/Compare state, intents and effects;
 - U-02 adds the fake-driven pure reducer and `StateFlow` ViewModel used by later connected Performance surfaces.
 
-R-01/R-02/R-03 do not claim model preparation, isolated case execution, active-decode timeout/cancellation or production case/evaluator/telemetry wiring. P-06 does not claim P-07 per-case outcome persistence. U-02 does not claim connected Compose behavior.
+R-01 through R-05 do not claim evaluator dispatch, telemetry correlation, per-case timeout, active-decode cancellation or production dataset-to-generation wiring. D-10 does not claim protected deletion or alternate CSV/Excel formats. P-06 does not claim P-07 per-case outcome persistence. U-02 does not claim connected Compose behavior.
 
 ## Frozen dataset, persistence and source foundations
 
-D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation.
+D-01 is satisfied by `DatasetSchemaContracts.kt`, its contract tests and [`dataset-schema-v1.md`](dataset-schema-v1.md), which fixes the manifest and JSONL wire representation. D-10 extends the same canonical boundary to Android-selected documents without creating an alternate parser or publication path.
 
 P-01 is satisfied by `PersistenceContracts.kt` and `PersistenceContractsTest.kt`; P-02 provides the in-memory behavioral baseline and P-06 now persists lifecycle/progress through that repository boundary.
 
@@ -64,12 +65,14 @@ V-01 is satisfied by `EvaluationIdentityGoldenTest`, which pins stable v1 digest
 
 The following work can proceed concurrently unless it touches the same module-registration files:
 
-- `EVAL-D-10` — Android document import into the canonical installation boundary;
+- `EVAL-D-11` — protected deletion for installed packs with active-run protection;
 - `EVAL-GP-02` — public-source license, attribution and redistribution treatment review;
 - `EVAL-GP-05` — 20 Harness structured-output cases;
 - `EVAL-GP-06` — 20 Harness context-retrieval cases;
-- `EVAL-R-04` — production model preparation plus optional unscored warm-up;
-- `EVAL-R-05` — isolated session/context lifecycle per scored case;
+- `EVAL-R-06` — dispatch completed output to the declared deterministic evaluator;
+- `EVAL-R-07` — correlate normal request identity with privacy-safe telemetry;
+- `EVAL-R-08` — enforce typed per-case timeout and cleanup;
+- `EVAL-R-09` — extend cooperative cancellation through active case execution;
 - `EVAL-P-03` — Room entity design for privacy-safe evaluation persistence;
 - `EVAL-P-08` — typed comparison service;
 - `EVAL-U-03` — top-level Performance navigation and subnavigation;
@@ -77,17 +80,17 @@ The following work can proceed concurrently unless it touches the same module-re
 - `EVAL-U-11` — installed supported-model selector;
 - `EVAL-U-13` — execution-profile selector and compatibility explanation;
 
-D-06 discovery now exposes only fully published, strictly decoded packs with deterministic filtering/order while malformed, incomplete, staging and identity-mismatched directories remain invisible. D-09 adds reusable fixture evidence for malformed records, duplicate IDs, digest mismatch, rollback cleanup and deterministic sampling.
+D-06 discovery exposes only fully published, strictly decoded packs with deterministic filtering/order while malformed, incomplete, staging and identity-mismatched directories remain invisible. D-09 supplies reusable regression evidence. D-10 now imports Android-selected canonical JSONL into that same publication boundary and fails closed with typed document, parse, metadata and install outcomes.
 
 ## Parallel fan-out strategy
 
 ```text
-Dataset:      D-01..D-09 DONE
-              D-10 import ───> D-11 delete -> D-12 docs
+Dataset:      D-01..D-10 DONE
+              D-11 delete -> D-12 docs
 
 Runner:       R-01 DONE
               R-02 DONE
-              R-03 DONE -> R-04/R-05
+              R-03 DONE -> R-04/R-05 DONE -> R-06/R-07/R-08/R-09
 
 Persistence:  P-02 DONE
               P-06 DONE
@@ -112,7 +115,7 @@ Module-registration files (`settings.gradle.kts`, CI module lists and `evaluatio
 
 ## Current blockers
 
-There is no external blocker for the active host-side lanes. Android import is ready before protected deletion joins import with the integrated registry.
+There is no external blocker for the active host-side lanes. Protected deletion can now join the integrated registry with the canonical Android import boundary.
 
 Potential later blockers are tracked as dependencies rather than hidden assumptions:
 
