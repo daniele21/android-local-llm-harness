@@ -96,10 +96,9 @@ class EvaluationDatasetJsonlParserTest {
 
     private fun input(value: String) = ByteArrayInputStream(value.toByteArray(Charsets.UTF_8))
 
-    private fun validCaseLine(): String =
-        """{"schemaVersion":1,"id":"case-001","categoryId":"reasoning","messages":[""" +
-            """{"role":"USER","content":"Answer alpha"}],"expected":{"kind":"TEXT","value":"alpha"},""" +
-            """"evaluator":{"type":"EXACT_MATCH","version":1,"parameters":{"case":"sensitive","whitespace":"trim"}},""" +
-            """"metadata":{"source":"fixture"}}""" +
-            "\n"
+    private fun validCaseLine(): String = """{"schemaVersion":1,"id":"case-001","categoryId":"reasoning","messages":[""" +
+        """{"role":"USER","content":"Answer alpha"}],"expected":{"kind":"TEXT","value":"alpha"},""" +
+        """"evaluator":{"type":"EXACT_MATCH","version":1,"parameters":{"case":"sensitive","whitespace":"trim"}},""" +
+        """"metadata":{"source":"fixture"}}""" +
+        "\n"
 }
