@@ -20,6 +20,7 @@ include(
     ":core:contracts",
     ":core:runtime-core",
     ":evaluation:contracts",
+    ":evaluation:datasets",
     ":evaluation:evaluators",
     ":models:model-profile",
     ":models:model-store",
