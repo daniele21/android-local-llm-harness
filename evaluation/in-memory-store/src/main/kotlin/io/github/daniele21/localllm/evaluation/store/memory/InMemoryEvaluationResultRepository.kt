@@ -11,9 +11,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunState
 import io.github.daniele21.localllm.evaluation.EvaluationRunSummary
 import io.github.daniele21.localllm.evaluation.PersistedEvaluationRun
 
-class InMemoryEvaluationResultRepository(
-    private val clock: () -> Long = System::currentTimeMillis,
-) : EvaluationResultRepository {
+class InMemoryEvaluationResultRepository(private val clock: () -> Long = System::currentTimeMillis) : EvaluationResultRepository {
     private val lock = Any()
     private val runs = linkedMapOf<EvaluationRunId, MutableStoredRun>()
 
@@ -111,7 +109,8 @@ class InMemoryEvaluationResultRepository(
     private companion object {
         val ALLOWED_TRANSITIONS: Map<EvaluationRunState, Set<EvaluationRunState>> = mapOf(
             EvaluationRunState.CREATED to setOf(EvaluationRunState.VALIDATING, EvaluationRunState.CANCELLING, EvaluationRunState.FAILED),
-            EvaluationRunState.VALIDATING to setOf(EvaluationRunState.PREPARING_MODEL, EvaluationRunState.CANCELLING, EvaluationRunState.FAILED),
+            EvaluationRunState.VALIDATING to
+                setOf(EvaluationRunState.PREPARING_MODEL, EvaluationRunState.CANCELLING, EvaluationRunState.FAILED),
             EvaluationRunState.PREPARING_MODEL to setOf(
                 EvaluationRunState.WARMING_UP,
                 EvaluationRunState.RUNNING,
