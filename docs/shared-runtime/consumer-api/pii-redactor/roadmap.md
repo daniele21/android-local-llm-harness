@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: apps/local-llm-console
 Canonical scope: shared-runtime.consumer-api.pii-redactor.roadmap
 Read when: selecting the next OMBRA implementation slice, dependency or exit gate
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-16
 
 This roadmap owns implementation order and milestone state. Detailed behavior stays in the focused OMBRA specifications. Repository priority belongs in [`../../../current-state.md`](../../../current-state.md); generic Consumer API milestones remain in [`../roadmap.md`](../roadmap.md).
 
@@ -26,7 +26,7 @@ OMB-3 -> OMB-8A deterministic quality-corpus preparation     [parallel preparati
 (OMB-7 + OMB-6B + OMB-8A) -> OMB-8B quality, physical evidence and release
 ```
 
-Work may proceed in parallel only when ownership is disjoint. OMB-6B visual identity does not block OMB-7A/7B product-flow implementation, but it still gates final product identity/release closure. OMB-8A may prepare deterministic quality evidence once finding semantics are stable; it does not satisfy OMB-8 quality thresholds, physical evidence or release gates. The real inference path must never bypass unmet parent Consumer API gates.
+Work may proceed in parallel only when ownership is disjoint. OMB-6B visual identity does not block repository-side OMB-7 product-flow/evidence implementation, but it still gates final OMB-7 product identity and release closure. OMB-8A may prepare deterministic quality evidence once finding semantics are stable; the integrated corpus and pre-registered policy still do not satisfy supported-model quality claims, physical evidence or release gates. The real inference path must never bypass unmet parent Consumer API gates.
 
 ## OMB-0 — Decisions and technical spikes
 
@@ -183,11 +183,11 @@ Remaining:
 - generate deterministic adaptive/monochrome launcher assets and packaging checks from approved masters;
 - integrate final identity without changing the approved package/signing boundary.
 
-Exit gate: **OPEN** until approved vector masters and generated Android identity are deterministic and integrated. OMB-6A is sufficient for OMB-7 product-flow implementation; OMB-6B remains a final identity/release dependency.
+Exit gate: **OPEN** until approved vector masters and generated Android identity are deterministic and integrated. OMB-6A was sufficient for repository-side OMB-7 work; OMB-6B is now the remaining OMB-7 closure dependency and remains a release dependency.
 
 ## OMB-7 — Compose product flow and Console retirement
 
-State: **IN PROGRESS**
+State: **IN PROGRESS — REPOSITORY-SIDE EVIDENCE COMPLETE, IDENTITY GATED**
 
 Owner: [`ux-and-brand.md`](ux-and-brand.md)
 
@@ -208,7 +208,7 @@ Integrated OMB-7B — PR #235:
 - removes direct `models:model-store` and `observability:*` dependencies from `apps/local-llm-console`, leaving the reference app on public contracts, Binder Consumer API, document/PDF dependencies and the shared design system;
 - keeps cancellation/reset/process-local cleanup semantics and the OMBRA PDF runtime gate intact.
 
-Active OMB-7C evidence slice — PR #250:
+Integrated OMB-7C review/privacy/accessibility evidence — PR #250:
 
 - clean replay from the post-OMB-7B `dev` baseline;
 - asserts hidden review semantics do not expose source PII and explicit reveal exposes only the selected occurrence;
@@ -217,13 +217,20 @@ Active OMB-7C evidence slice — PR #250:
 - adds a dedicated OMBRA UI emulator evidence workflow;
 - narrows the PDF runtime workflow trigger so UI-only instrumentation does not unnecessarily invoke the heavyweight document/PDF evidence lane.
 
+Integrated final repository-side product evidence — PR #259:
+
+- extends the Compose instrumentation matrix with explicit Review reset coverage;
+- verifies the export-progress cancellation action remains reachable and invokes the cancellation boundary;
+- runs the privacy/review/accessibility matrix in portrait and landscape on the API 35 emulator;
+- captures representative code-owned Import-screen screenshots in portrait and landscape;
+- uploads only privacy-safe synthetic/empty UI evidence;
+- merged only after exact-head repository validation and OMBRA UI state evidence were both green.
+
 Remaining before OMB-7 can be `DONE`:
 
-- integrate the exact green OMB-7C head after repository/UI/PDF gates pass;
-- complete import/analysis/export failure-state, cancellation/reset, adaptive/landscape and representative code-owned screenshot coverage;
-- integrate the final OMB-6B approved identity before claiming the complete app-label/theme/icon identity requirement.
+- integrate the final OMB-6B approved production identity, including deterministic adaptive/monochrome launcher assets and packaging checks.
 
-Exit gate: **OPEN**. `apps/local-llm-console` is already a pure OMBRA Consumer API reference app after OMB-7B; OMB-7 closes when the remaining product state matrix and approved identity evidence are integrated.
+Exit gate: **OPEN ONLY ON OMB-6B IDENTITY**. The pure OMBRA Consumer API app flow and repository-side product state/evidence matrix are integrated through PR #259. Emulator evidence is not physical OMB-8 release evidence, and OMB-7 must not be marked `DONE` until OMB-6B is approved and integrated.
 
 ## OMB-8 — Quality, physical evidence and release
 
@@ -231,23 +238,35 @@ State: **IN PROGRESS**
 
 Owner: [`validation-and-rollout.md`](validation-and-rollout.md)
 
-Integrated preparation — OMB-8A / PR #223:
+Integrated quality-corpus preparation — OMB-8A:
 
-- versioned SHA-256-frozen synthetic quality corpus;
-- all built-in PII types plus one custom type;
-- positive, zero-PII, repeated, overlapping, near-miss, injection-like and Italian-text cases;
-- deterministic exact-occurrence TP/FP/FN, precision, recall and F1 scoring with per-type and structured-completion metrics.
+- PR #223 introduced the versioned SHA-256-frozen synthetic quality corpus and deterministic exact-occurrence scorer;
+- PR #253 preserves the historical v1 corpus and makes `ombra-pii-synthetic-v2` the active corpus;
+- corpus v2 contains 32 fully synthetic cases and guarantees at least five positive exact occurrences for every built-in PII category plus the custom category;
+- v2 includes positive, zero-PII, repeated, overlap, near-miss, injection-like, Unicode/Italian punctuation and category-focused variations;
+- the active corpus identity is SHA-256-pinned and regression-tested together with the minimum per-category support floor.
+
+Integrated pre-registered quality policy — OMB-8B / PR #252:
+
+- policy v1 is pinned to the exact active `ombra-pii-synthetic-v2` identity/hash and all seven required categories;
+- aggregate gates are precision >= 0.90, recall >= 0.98 and F1 >= 0.94;
+- per-category gates are precision >= 0.80, recall >= 0.90 and F1 >= 0.85;
+- structured completion must be >= 0.98, invalid finding rate <= 0.02 and invalid result rate = 0.00;
+- the gate fails closed on corpus identity mismatch, missing required categories or threshold failures and returns deterministic typed failure reasons;
+- replay regression proves `policy.corpusIdentity` equals the active corpus loader identity and the policy required-type set equals the active built-in-plus-custom type set;
+- the policy was replayed on the exact post-#253 `dev` baseline and merged only after exact-head Android/repository and documentation validation passed.
 
 Remaining:
 
-- execute the corpus on the supported reviewed Qwen3.5 artifacts and accept quality thresholds/category claims;
+- execute the exact active corpus on each reviewed supported Qwen3.5 artifact/configuration and evaluate results against policy v1 before any model/category support claim;
+- preserve exact artifact, preset, corpus and policy identity in quality evidence and do not lower policy v1 to fit observed results;
 - complete privacy/security, parser dependency, public-copy and packaged-APK reviews;
 - execute physical same-signer two-APK import/analysis/review/export and failure scenarios;
 - verify output independently on the exact distributed build and capture privacy-safe evidence;
 - finalize API/app version, release notes, shrinker, signing and compatibility documentation together with applicable CA-6/CA-7/SR prerequisites.
 
-Exit gate: **OPEN**. The exact distributed build must meet OMBRA validation completion criteria and applicable Consumer API/SR prerequisites. The merged corpus alone is preparation evidence and introduces no legal compliance or guaranteed-detection claim.
+Exit gate: **OPEN**. Corpus v2 and policy v1 are deterministic preparation/acceptance infrastructure, not proof that a reviewed model passes them. The exact distributed build must meet the pre-registered quality policy, OMBRA physical validation completion criteria and applicable Consumer API/SR prerequisites before support/release claims.
 
 ## State rule
 
-Mark a milestone `IN PROGRESS` only after its first implementation slice begins and `DONE` only when the stated exit gate is integrated and tested. Parallel preparation may start when ownership is disjoint, but it never upgrades a downstream physical/release claim. A generated visual board, emulator screenshot, synthetic corpus or successful fake model does not complete a physical, quality or release gate.
+Mark a milestone `IN PROGRESS` only after its first implementation slice begins and `DONE` only when the stated exit gate is integrated and tested. Parallel preparation may start when ownership is disjoint, but it never upgrades a downstream physical/release claim. A generated visual board, emulator screenshot, synthetic corpus, registered policy or successful fake model does not complete a physical, quality or release gate.
