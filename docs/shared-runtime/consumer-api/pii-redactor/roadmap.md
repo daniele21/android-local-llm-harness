@@ -71,112 +71,144 @@ Exit gate: **PASSED**. A pure JVM test drives import metadata -> definitions -> 
 
 ## OMB-2 — PDF import and extraction
 
-State: **IN PROGRESS**
+State: **DONE**
 
-Active slice: **OMB-2B — PDF picker, typed production failures, source lifecycle cleanup and exit-gate evidence**.
+Integrated through OMB-2A / PR #131 and OMB-2B / PR #154. PR #154 passed exact-head Documentation validation, repository Validate and the dedicated OMBRA PDF runtime emulator workflow before squash integration into `dev`.
 
 Owner: [`detection-and-redaction.md`](detection-and-redaction.md)
 
-Tasks:
-
-- integrate the reviewed isolated PDF reader behind the `OmbraDocumentExtractor` application port;
-- wire `OpenDocument` with PDF MIME filtering and least-privilege URI handling;
-- keep raw Android `Uri` values behind process-local source capabilities rather than workflow state;
-- implement metadata inspection, page/block normalization and stable source mapping;
-- add resource/page/byte bounds and typed encrypted/image-only/malformed outcomes;
-- add synthetic PDF generators/fixtures and extraction/cancellation tests.
-
-Integrated OMB-2A baseline:
+Completed boundary:
 
 - production `AndroidOmbraDocumentExtractor` adapts the reviewed isolated PdfBox reader to the asynchronous application port;
 - process-local `OmbraDocumentSourceRef` resolution keeps raw URI/display-name data outside reducer state and content-free debug surfaces;
 - deterministic page/block segmentation produces stable `DocumentSegment` identities and rejects unsupported control characters fail-closed;
-- extraction failures are mapped to typed, content-free application outcomes;
-- cancellation waits for coroutine/reader termination before acknowledging the operation;
-- the existing OMBRA PDF emulator suite includes production-extractor device coverage in addition to parser isolation/runtime evidence.
+- a PDF-only `ACTION_OPEN_DOCUMENT` capability requests transient read access only, rejects non-content picker results and converts the selected URI immediately into an opaque process-local source reference;
+- no write or persistable source-URI permission is requested or retained;
+- production failures map encrypted, malformed, unreadable, image-only, empty and bounded/truncated inputs to typed content-free outcomes;
+- cancellation waits for coroutine/reader termination before acknowledgement;
+- workflow reset and process recreation release document source capabilities and clear sensitive task state;
+- generated, blank/image-only, encrypted, malformed, truncated/limit and cancellation paths are covered through the production adapter and runtime emulator suite.
 
-Current OMB-2B progress:
-
-- a PDF-only `ACTION_OPEN_DOCUMENT` capability requests only transient read access, rejects non-content picker results and converts the selected URI immediately into an opaque process-local source reference;
-- no write or persistable URI permission is requested and no persistable grant is retained;
-- workflow reset and process recreation now release all document source capabilities in addition to clearing sensitive task state;
-- the production reader boundary maps encrypted, malformed, unreadable and unexpected parser failures to typed content-free outcomes while the extractor continues to map truncation to `LIMIT_EXCEEDED`;
-- instrumentation coverage exercises picker permissions/source release plus production generated, blank, encrypted, malformed, truncated and cancellation paths.
-
-Remaining before OMB-2 can be `DONE`:
-
-- exact-head repository/documentation validation for OMB-2B;
-- exact-head OMBRA PDF emulator evidence covering the expanded production extractor and resource-cleanup paths;
-- integrate the slice into `dev` only after those gates are green.
-
-Exit gate: supported fixtures produce deterministic page-ordered segments; unsupported and cancelled inputs close all resources and retain no sensitive task data or source capability after reset.
+Exit gate: **PASSED**. Supported fixtures produce deterministic page-ordered segments; unsupported and cancelled inputs close resources and no sensitive task data or source capability survives reset/process recreation.
 
 ## OMB-3 — Analysis composition and fake inference
 
-State: **PLANNED**
+State: **IN PROGRESS**
+
+Active slice: **OMB-3B — bounded result parsing, source validation, deterministic merge and fake analysis flow**.
 
 Owner: [`detection-and-redaction.md`](detection-and-redaction.md)
 
-Tasks:
+Integrated OMB-3A baseline through PR #148:
 
-- version the stable instruction and data serialization;
-- implement capability-aware sequential chunk planning;
-- add the fixed JSON schema and bounded parser;
-- validate selected type, segment membership and exact source surface;
-- implement deterministic merge, deduplication and overlap conflicts;
-- test injection-like documents and malformed/hostile result fixtures;
-- complete fake-client orchestration for success, partial failure, cancellation and disconnect.
+- versioned application-owned instruction and fixed JSON Schema;
+- deterministic definition/document serialization;
+- capability-aware sequential chunk planning using public `ConsumerLimits`;
+- whole-block preservation and Unicode code-point-safe fragmentation with stable fragment IDs;
+- fail-closed schema/input-overhead handling;
+- focused ordering, fragmentation, Unicode, limit and deterministic-serialization JVM coverage.
+
+Current OMB-3B work:
+
+- PR #156 is the clean replay from current `dev` for the result-validation portion;
+- bounded dependency-free JSON parsing rejects duplicate keys, trailing prose, unsupported shapes/versions and unsafe Unicode;
+- submitted fragment IDs are deterministically mapped back to normalized source offsets;
+- returned type IDs must be selected, segment IDs must belong to the actual submitted chunk and surfaces must match exact source substrings before `ValidatedFinding` creation;
+- exact occurrences are derived locally rather than trusted from model output;
+- exact duplicates are collapsed and cross-type overlaps become explicit conflicts rather than automatic replacements;
+- hostile JSON, invented/unselected findings, fragment mapping, deduplication and overlap fixtures are covered in focused JVM tests.
+
+Remaining before OMB-3 can be `DONE`:
+
+- exact-head repository validation for the clean OMB-3B replay;
+- sequential fake-client orchestration across all planned chunks;
+- explicit success, incomplete/invalid-result, partial failure, cancellation and disconnect orchestration coverage;
+- prove the OMB-3 exit gate end-to-end from synthetic document + definitions through fake structured outputs into a validated redaction plan.
 
 Exit gate: synthetic documents round-trip through a fake structured-output client into a validated redaction plan; invented/unselected findings can never become replacements.
 
 ## OMB-4 — Harness use case and Consumer API integration
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Dependencies: accepted/implemented parent CA-0, CA-1, CA-2, CA-3 and CA-4 slices applicable to discovery, defaults, output constraint, result and Binder mapping.
 
-Tasks:
+Integrated OMB-4A baseline through PR #144:
 
-- add one host-owned `document-pii-detection` application/use-case policy reusing existing model resolution;
-- advertise only the reviewed default logical model/preset, `STATELESS` and `JSON_SCHEMA` capabilities initially;
-- keep reasoning disabled/not surfaced and enforce bounded input/schema limits;
-- replace OMBRA's direct/raw `LocalLlmClient` playground control with the packaged consumer facade;
-- map typed host/connection/capability failures to application outcomes;
-- add in-process, Binder, compatibility and same-signer tests.
+- host-owned `document-pii-detection` use-case identity;
+- host-selected curated Qwen3.5 artifact rather than consumer model identity;
+- fixed reviewed `qwen35-json` preset;
+- `JSON_SCHEMA`, `STATELESS` and reasoning-not-supported policy;
+- conservative public input/schema/message limits;
+- least-privilege package authorization and pure JVM policy coverage.
+
+Remaining OMB-4B work:
+
+- implement the packaged Consumer API adapter behind `OmbraAnalysisClient` after the accepted OMB-3 validation boundary;
+- run capability discovery -> prepare -> stateless session -> sequential generate -> terminal result -> close;
+- map unavailable/disconnected/incompatible/cancelled host outcomes to typed OMBRA application failures;
+- add in-process, Binder, compatibility and same-signer PII use-case coverage;
+- keep raw tuning, consumer model identity and AIDL types out of OMBRA.
 
 Exit gate: the packaged client completes discover -> prepare -> sequential generate -> terminal result -> close for the PII use case without consumer-provided identity, raw tuning or AIDL types.
 
 ## OMB-5 — Review, redaction and PDF export
 
-State: **PLANNED**
+State: **IN PROGRESS**
+
+Active slice: **OMB-5B — normalized PDF export and independent verification**.
 
 Owner: [`detection-and-redaction.md`](detection-and-redaction.md)
 
-Tasks:
+Integrated OMB-5A baseline through PR #146:
 
-- implement accepted/ignored/conflict decisions and deterministic placeholder numbering;
-- build normalized hidden/reveal preview models with no hidden semantics leakage;
-- implement highest-offset-first replacement;
-- integrate the reviewed flattened-PDF writer and `CreateDocument` destination flow;
-- verify accepted values absent, placeholders present and ignored values retained in generated fixtures;
-- cover destination denial, partial write, cancellation and cleanup.
+- review decisions are validated against normalized source before replacement;
+- pending decisions, unknown sources/definitions, duplicate occurrences and source mismatch fail closed;
+- accepted exact/partial overlaps become explicit conflicts;
+- placeholder keys are bounded, sanitized, collision-safe and numbered deterministically by accepted source order;
+- replacement is applied highest-offset-first while ignored values are preserved;
+- zero-finding export remains valid;
+- focused JVM coverage proves ordering, offset stability, conflicts, mismatch, pending review, key collisions and zero findings.
+
+Current OMB-5B work:
+
+- PR #157 adds an opaque process-local export destination capability and PDF-only `ACTION_CREATE_DOCUMENT` boundary;
+- export requests carry active definitions needed by the deterministic OMB-5A planner;
+- the production exporter rebuilds normalized page text and writes a newly generated flattened PDF through the reviewed writer rather than copying source-PDF objects/bytes;
+- incomplete review, conflicts/source mismatch, destination failures and writer failures map to content-free typed outcomes;
+- failure/cancellation paths delete partial output best-effort and release destination capabilities;
+- instrumentation independently re-parses generated output to assert accepted values absent, placeholders present and ignored values retained.
+
+Remaining before OMB-5 can be `DONE`:
+
+- exact-head repository and PDF instrumentation validation for OMB-5B;
+- complete cancellation/partial-output cleanup evidence on the production exporter boundary;
+- integrate the validated slice into `dev`.
 
 Exit gate: a synthetic source becomes a newly generated, independently verifiable PDF; no accepted value or source attachment remains recoverable from output.
 
 ## OMB-6 — Design system and identity
 
-State: **PLANNED**
+State: **IN PROGRESS**
 
 Owner: [`ux-and-brand.md`](ux-and-brand.md)
 
-Tasks:
+Integrated OMB-6A baseline through PR #145:
 
-- add separate OMBRA light/dark color schemes, typography, shapes and semantic tones in `ui/design-system`;
-- verify contrast, 48 dp targets and offline font policy;
-- implement reusable OMBRA task, definition, progress, redaction, review and export primitives;
-- recreate symbol, wordmark and lockup as reviewed vector masters;
-- add deterministic adaptive/monochrome launcher generation and packaging checks;
-- add component previews aligned with the brand board.
+- dedicated OMBRA light/dark Material 3 color schemes;
+- semantic status tones;
+- deterministic offline typography fallback, reviewed spacing/shapes and 48 dp minimum target token;
+- standalone `OmbraTheme` without changing the existing Harness theme;
+- contrast and token contract JVM coverage.
+
+Remaining OMB-6 work:
+
+- reusable OMBRA task, definition, progress, redaction, review and export primitives/previews;
+- reviewed vector masters for symbol, wordmark and lockup;
+- deterministic adaptive/monochrome launcher generation and packaging checks;
+- final component preview/accessibility matrix.
+
+The repository currently retains the reviewed brand kit as a raster reference board, not an approved vector master. OMB-6B must therefore recreate/approve the vector source deliberately rather than infer a release identity silently from the PNG board.
 
 Exit gate: screens need no local palette/type/shape constants; vector masters and generated Android identity are deterministic; accessibility token tests and light/dark previews pass.
 
