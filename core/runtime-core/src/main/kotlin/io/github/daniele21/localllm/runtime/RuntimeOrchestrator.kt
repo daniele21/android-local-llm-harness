@@ -54,6 +54,7 @@ class RuntimeOrchestrator(
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
     private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
+    private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
     seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
     telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
     epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
@@ -612,19 +613,38 @@ class RuntimeOrchestrator(
             throw BackendException("MODEL_INTEGRITY", verification.detail)
         }
 
+        current?.let { backend.unloadModel(it.handle) }
+        loadedModel = null
+        admitModelLoad(resolved, schedulerSnapshot)
+
         if (!backendInitialized) {
             backend.initialize()
             backendInitialized = true
         }
-        current?.let { backend.unloadModel(it.handle) }
-        loadedModel = null
-
         val loaded = LoadedModelDescriptor(
             profileId = resolved.model.id,
             handle = backend.loadModel(stored, resolved.model),
         )
         loadedModel = loaded
         return loaded
+    }
+
+    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
+        val planner = memoryAwareModelLoadPlanner ?: return
+        val decision = planner.plan(
+            MemoryAwareModelLoadRequest(
+                modelProfileId = resolved.model.id,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = false,
+                    residentContexts = 0,
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
+        )
+        if (decision is MemoryAwareModelLoadDecision.Reject) {
+            throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
+        }
     }
 
     private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {
