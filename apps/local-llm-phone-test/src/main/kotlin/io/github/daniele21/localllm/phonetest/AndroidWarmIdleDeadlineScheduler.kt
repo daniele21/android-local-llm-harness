@@ -2,10 +2,8 @@ package io.github.daniele21.localllm.phonetest
 
 import android.os.Handler
 
-internal class AndroidWarmIdleDeadlineScheduler(
-    private val handler: Handler,
-    private val clock: WarmIdleEpochClock,
-) : WarmIdleDeadlineScheduler {
+internal class AndroidWarmIdleDeadlineScheduler(private val handler: Handler, private val clock: WarmIdleEpochClock) :
+    WarmIdleDeadlineScheduler {
     private var pending: Runnable? = null
 
     override fun schedule(deadlineEpochMs: Long, task: () -> Unit) {
