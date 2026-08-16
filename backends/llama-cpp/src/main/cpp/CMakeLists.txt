@@ -44,7 +44,7 @@ add_library(
     generation_output_buffer.cpp
     generation_sampler.cpp
     reasoning_transition.cpp
-    llama_jni_entry.cpp
+    llama_jni.cpp
 )
 
 target_compile_definitions(
