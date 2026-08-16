@@ -24,8 +24,8 @@ This file owns concise workstream state. Repository-wide status remains in [`cur
 | --- | --- | --- | --- |
 | RA-0 Architecture fitness | DONE | Canonical module inventory, dependency/native guards and normal JNI translation-unit linkage are integrated with zero verifier exceptions | Keep guards green |
 | RA-1 Backend SPI/fake | DONE | `core:backend-spi`, store-neutral model source, llama.cpp adapter isolation and deterministic fake are integrated | Expand through RA-10 |
-| RA-2 Runtime kernel | PARTIAL | `GenerationPlanningPolicy` is integrated as the first stateless extraction; session lifecycle ownership is now explicit, while model/context/resource ownership remains in `RuntimeOrchestrator` | Continue state-preserving decomposition only where ownership is already clear |
-| RA-3 Lifecycle/state machines | PARTIAL | `SessionLifecycle` now authoritatively owns per-session request admission, close intent and release reservation; drain, idempotent close and release-retry behavior are integration-tested | Formalize remaining generation/cancellation transitions and converge with the separate residency lifecycle path without duplicating scheduler or residency ownership |
+| RA-2 Runtime kernel | PARTIAL | `GenerationPlanningPolicy` is integrated as the first stateless extraction; session and generation lifecycle ownership are now explicit, while model/context/resource ownership remains in `RuntimeOrchestrator` | Continue state-preserving decomposition only where ownership is already clear |
+| RA-3 Lifecycle/state machines | PARTIAL | `SessionLifecycle` owns request admission/close/release reservation and `GenerationLifecycle` owns cancellation intent/terminal-once; `SingleDecodeScheduler` remains authoritative for queued/running decode | Converge model residency/load/unload through one runtime residency lifecycle without duplicating memory or warm-idle policy ownership |
 | RA-4 Failure/recovery | PARTIAL | Typed failures/recovery exist in several paths | Recovery matrix + deterministic fault/race injection after RA-3 |
 | RA-5 Scheduling/backpressure | PARTIAL | Single decode, priority/FIFO, bounded queue admission/rejection, queued/running cancellation and scheduler close-race handling are integrated | Fairness/starvation, cancellation latency and slow/dead-consumer streaming semantics after RA-3 |
 | RA-6 Shared runtime | PARTIAL | Negotiation, epochs, reconnect and client-death cleanup already exist | Operation idempotency/deadlines if required + real process-death evidence after RA-3/4/5 |
@@ -40,12 +40,12 @@ This file owns concise workstream state. Repository-wide status remains in [`cur
 
 The two violations that triggered tranche 1 are closed: `runtime-core -> backends:llama-cpp` was removed through RA-1 and [ADR 0014](adr/0014-backend-spi-boundary.md); the `llama_jni_entry.cpp -> #include "llama_jni.cpp"` pattern was removed through RA-0. `scripts/verify_architecture.py` now carries zero intended dependency or `.cpp`-include exceptions.
 
-RA-0/RA-1 are stable baseline. RA-2 may continue internal decomposition. RA-3 now has authoritative per-session admission/close/release ownership, but must still formalize the remaining generation/cancellation lifecycle and converge with residency before RA-4/RA-5 behavior changes that depend on those transitions.
+RA-0/RA-1 are stable baseline. RA-2 may continue internal decomposition. RA-3 now has authoritative per-session admission/close/release ownership and authoritative per-generation cancellation/terminal ownership. The remaining major lifecycle gap is model residency/load/unload convergence with the existing memory and warm-idle path before RA-4/RA-5 behavior changes that depend on those transitions.
 
 ## Current parallel work
 
-- **Architecture:** continue RA-2 only through state-preserving extractions; use the integrated RA-3 session lifecycle as the ownership boundary rather than creating a second mutable runtime owner.
-- **Lifecycle:** extend RA-3 to the remaining generation/cancellation transitions while leaving decode queue authority in `SingleDecodeScheduler` and residency authority in the existing memory/residency path.
+- **Architecture:** continue RA-2 only through state-preserving extractions; use the integrated RA-3 lifecycle boundaries rather than creating another mutable runtime owner.
+- **Lifecycle:** converge RA-3 model residency/load/unload around the model handle already owned by `RuntimeOrchestrator`; leave decode queue authority in `SingleDecodeScheduler`, warm-idle timing in `WarmIdleResidencyController` and admission/pressure policy in the memory-management path.
 - **Quality:** define RA-10 fixture ownership only when the same conformance contract has fake and llama.cpp consumers.
 - **Observability/identity:** make RA-7/RA-9 changes additive to existing stores/fingerprints.
 - **Security:** handle dependency trust, workflow action trust and release provenance as separate RA-11 slices.
@@ -55,13 +55,17 @@ RA-0/RA-1 are stable baseline. RA-2 may continue internal decomposition. RA-3 no
 
 ### RA-2A — Runtime ownership
 
-`GenerationPlanningPolicy` is integrated for effective configuration, output constraints, context sizing and reasoning control. `SessionLifecycle` now owns per-session request admission, close intent, active-request drain and release reservation. `RuntimeOrchestrator` still owns the session registry, loaded model/context handles, physical resource release, memory-pressure coordination and generation orchestration. Further RA-2 extraction must preserve those ownership boundaries until the corresponding RA-3 state is explicit.
+`GenerationPlanningPolicy` is integrated for effective configuration, output constraints, context sizing and reasoning control. `SessionLifecycle` owns per-session request admission, close intent, active-request drain and release reservation. `GenerationLifecycle` owns accepted-request cancellation intent and terminal-once delivery. `RuntimeOrchestrator` still owns the session registry, loaded model/context handles, physical resource release, memory-pressure coordination and generation orchestration. Further RA-2 extraction must preserve those ownership boundaries until the corresponding RA-3 state is explicit.
 
 ### RA-3B — Authoritative session lifecycle
 
 The previous `SessionDescriptor.activeRequests`, `closing` and `released` atomics have been replaced by one `SessionLifecycle`. `generate()` acquires through the lifecycle; `closeSession()`, runtime shutdown and critical-memory cleanup converge on the same close/release transitions; terminal request cleanup drains through `releaseRequest()`; physical release is reserved once through `tryBeginRelease()`. If physical context release fails, the lifecycle rolls back from `RELEASING` to `CLOSING` so cleanup can be retried without losing the session. Integration tests cover close-during-generation, rejection of new work after close intent, exactly-once release after drain and release-failure retry.
 
-This closes duplicate session close/request/release ownership, not RA-3 as a whole. `SingleDecodeScheduler` remains authoritative for queued/active decode state, and the memory/residency path remains authoritative for residency. The next lifecycle slice must formalize only semantics that are not already owned by those components.
+### RA-3C — Authoritative generation cancellation lifecycle
+
+The previous `RequestLifecycle.cancelRequested` and separate terminal atomic have been replaced by one `GenerationLifecycle` with `OPEN -> CANCELLING -> TERMINAL`. It owns only cancellation intent and terminal-once delivery. `GenerationHandle.cancel()`, queued cancellation, running cancellation, planning/context cancellation checks, streaming and terminal delivery all converge on that same state machine. Repeated or post-terminal cancellation is idempotent, and direct transition tests cover cancellation intent plus exactly-once terminal reservation.
+
+`SingleDecodeScheduler` deliberately remains the sole owner of queued/running decode state. RA-3 therefore does not create a second scheduling state machine. Likewise, `WarmIdleResidencyController` owns warm-idle timing/demand policy and `RuntimeMemoryPolicy` owns pressure decisions; neither currently owns the loaded model handle. The remaining RA-3 slice should formalize model residency around the handle already owned by `RuntimeOrchestrator`, keeping artifact installation in `ModelStore` and backend initialization as a distinct lifecycle concern.
 
 ### RA-5A — Scheduler
 
