@@ -26,10 +26,7 @@ data class RuntimeResourceState(
     val thermalState: RuntimeThermalState = RuntimeThermalState.NOMINAL,
 )
 
-data class ExecutionWorkload(
-    val requestedContextTokens: Int,
-    val interactive: Boolean = true,
-) {
+data class ExecutionWorkload(val requestedContextTokens: Int, val interactive: Boolean = true) {
     init {
         require(requestedContextTokens > 0) { "Requested context tokens must be positive" }
     }
@@ -85,11 +82,7 @@ class DeviceAwareExecutionPlanner(private val policyVersion: Int = CURRENT_POLIC
         )
     }
 
-    private fun selectContextTokens(
-        model: GgufModelProfile,
-        requested: Int,
-        resources: RuntimeResourceState,
-    ): Int {
+    private fun selectContextTokens(model: GgufModelProfile, requested: Int, resources: RuntimeResourceState): Int {
         val approved = model.runtimeCapabilities.approvedContextTiers
             .filter { it <= requested && it <= model.contextSize }
             .ifEmpty { listOf(requested) }
@@ -103,9 +96,11 @@ class DeviceAwareExecutionPlanner(private val policyVersion: Int = CURRENT_POLIC
 
     private fun pressureLevel(resources: RuntimeResourceState): Int = when {
         resources.memoryPressure == RuntimeMemoryPressure.LOW_MEMORY || resources.thermalState == RuntimeThermalState.SEVERE -> 2
+
         resources.memoryPressure == RuntimeMemoryPressure.BACKGROUND ||
             resources.memoryPressure == RuntimeMemoryPressure.UI_HIDDEN ||
             resources.thermalState == RuntimeThermalState.ELEVATED -> 1
+
         else -> 0
     }
 
