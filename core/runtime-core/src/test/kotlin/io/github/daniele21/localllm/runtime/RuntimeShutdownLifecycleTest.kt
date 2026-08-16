@@ -82,8 +82,11 @@ private class ShutdownRuntimeFixture {
     }
     val backend = BlockingShutdownBackend()
     private val resolved = resolvedUseCase()
+    private val registry = object : ModelProfileRegistry {
+        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = resolved
+    }
     val runtime = RuntimeOrchestrator(
-        registry = ModelProfileRegistry { _, _ -> resolved },
+        registry = registry,
         modelStore = ShutdownModelStore(modelFile, digest),
         backend = backend,
     )
@@ -218,8 +221,7 @@ private class BlockingShutdownBackend : InferenceBackend {
             try {
                 releaseGeneration.await()
             } catch (_: InterruptedException) {
-                // Runtime shutdown interrupts the scheduler worker. The fake deliberately keeps
-                // the backend call alive so the test proves deferred cleanup after close() returns.
+                // Keep the backend call alive so the test proves deferred cleanup after close() returns.
             }
         }
     }
