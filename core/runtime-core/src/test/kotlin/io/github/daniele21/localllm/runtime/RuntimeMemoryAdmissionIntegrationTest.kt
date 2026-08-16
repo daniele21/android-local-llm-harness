@@ -96,27 +96,26 @@ class RuntimeMemoryAdmissionIntegrationTest {
         fixture.close()
     }
 
-    private fun memoryPlanner(
-        observationSource: RuntimeMemoryObservationSource,
-        peakBytes: Long,
-    ): MemoryAwareContextPlanner = MemoryAwareContextPlanner(
-        observationSource = observationSource,
-        costEstimator = ContextMemoryCostEstimator { modelProfileId, contextTokens ->
-            MemoryCostEstimate(
-                residentBytes = peakBytes / 2,
-                peakIncrementalBytes = peakBytes,
-                source = MemoryCostSource.CANDIDATE,
-                profileId = "$modelProfileId-$contextTokens",
-            )
-        },
-        admissionController = MemoryAdmissionController(
-            RuntimeMemoryBudget(
-                minimumAvailableBytes = 128,
-                safetyReserveBytes = 128,
-                maxResidentContexts = 4,
+    private fun memoryPlanner(observationSource: RuntimeMemoryObservationSource, peakBytes: Long): MemoryAwareContextPlanner {
+        return MemoryAwareContextPlanner(
+            observationSource = observationSource,
+            costEstimator = ContextMemoryCostEstimator { modelProfileId, contextTokens ->
+                MemoryCostEstimate(
+                    residentBytes = peakBytes / 2,
+                    peakIncrementalBytes = peakBytes,
+                    source = MemoryCostSource.CANDIDATE,
+                    profileId = "$modelProfileId-$contextTokens",
+                )
+            },
+            admissionController = MemoryAdmissionController(
+                RuntimeMemoryBudget(
+                    minimumAvailableBytes = 128,
+                    safetyReserveBytes = 128,
+                    maxResidentContexts = 4,
+                ),
             ),
-        ),
-    )
+        )
+    }
 }
 
 private class MemoryAdmissionRuntimeFixture(planner: MemoryAwareContextPlanner) {
