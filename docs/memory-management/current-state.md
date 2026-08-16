@@ -4,73 +4,90 @@ Status: active
 Document type: workstream-state
 Owner: runtime-memory
 Canonical scope: memory-management.current-state
-Read when: determining what memory-management behavior is already integrated, open or next
+Read when: checking what memory-management behavior is integrated versus still evidence-gated
 Last reviewed: 2026-08-16
 
-Repository operational state remains owned by [`../current-state.md`](../current-state.md); this source tracks only the memory-management workstream.
+The repository-wide status owner remains [`../current-state.md`](../current-state.md). This page narrows that state to memory governance and must not be used to claim physical-device readiness that has not been measured.
 
-## Integrated baseline
+## Current baseline
 
-The current `dev` baseline already provides the lifecycle foundation needed for a stronger governor:
+The runtime now has explicit ownership and bounds rather than relying on single-decode serialization as a proxy for memory safety:
 
-- opaque native model/context handles and RAII cleanup in the llama.cpp backend;
-- one loaded model and one active decode by default;
-- explicit session-owned context lifecycle;
-- smallest-approved context tier selection based on prompt/output capacity;
-- Android `UI_HIDDEN`, background and low-memory callbacks mapped to runtime actions;
-- critical-pressure cancellation and deferred resource release;
-- resource snapshots for process PSS, native heap, Java heap, available memory, low-memory and thermal state;
-- Qwen3.5 tuning evidence schema that already captures process PSS and device memory/thermal dimensions;
-- shared-runtime host composition that avoids loading one model copy per consumer process.
+- opaque backend handles and native RAII own model/context release mechanics;
+- `SessionLifecycle` is authoritative for request admission, close intent, drain and release reservation;
+- runtime shutdown converges active cancellation into context release, model unload and backend shutdown;
+- one loaded model remains the default runtime invariant;
+- `SingleDecodeScheduler` bounds active + queued work, with capacity recovered on completion/cancellation and a close-race regression covered;
+- the Android service host already bounds connections, sessions and per-consumer outstanding requests;
+- Android low-memory/trim callbacks and resource snapshots remain the platform pressure/measurement inputs.
 
-This means the main gap is not basic release mechanics. It is quantitative governance before allocation and bounded residency across multiple sessions/consumers.
+## Integrated memory governor
 
-## Confirmed gaps
+`core/runtime-core` contains one backend-neutral admission model:
 
-### Shutdown convergence
+- `RuntimeMemoryObservation` preserves nullable PSS, native heap, Java heap, available-memory and low-memory signals;
+- `RuntimeMemoryBudget` owns available-memory floor, safety reserve, optional PSS ceiling and resident-context limit;
+- `MemoryAdmissionController` makes overflow-safe typed decisions for `MODEL` and `CONTEXT` resources;
+- `MemoryAwareContextPlanner` evaluates approved context tiers without going below prompt/output capacity;
+- `MemoryAwareModelLoadPlanner` gates cold/switch model loads;
+- both model and context allocation paths run admission before the corresponding native allocation;
+- context rejection reaches the public typed `MEMORY_BUDGET_EXCEEDED` configuration error;
+- model-load rejection occurs before backend initialization/native load and remains a typed internal admission failure at the prepare boundary.
 
-`RuntimeOrchestrator.close()` can initiate cancellation while an active request still owns a session/context. Final resource release occurs asynchronously through the request terminal path. The current deferred-unload state is not designed as a permanent shutdown-pending state, so shutdown convergence needs an explicit regression-safe finalization contract.
+A reusable context or already-loaded compatible model is not re-admitted because no new allocation is occurring.
 
-### Resident contexts
+## Cost evidence
 
-Single decode bounds active compute but does not by itself bound the number of session contexts kept resident. Multiple sessions can therefore retain context/recurrent state simultaneously even though only one request decodes at a time.
+Context and model-load cost registries are identity-bound to exact model profile/digest and backend ID/revision, and preserve provenance:
 
-### Proactive admission
+- `THEORETICAL` — static/conservative input;
+- `CANDIDATE` — calibrated but not approved physical evidence;
+- `MEASURED` — reviewed representative-device evidence for compatible composition.
 
-The runtime does not currently evaluate projected memory headroom before model/context materialization. Android low-memory callbacks react after the platform reports pressure; they are not an admission-control substitute.
+No numeric production `MEASURED` profiles are committed yet. Qwen3.5 recurrent/linear-attention state is therefore not approximated as a pure KV-cache formula for certification.
 
-### Queue bounds
+## Android composition and residency
 
-The decode scheduler serializes work through a priority queue. Outstanding queued requests need explicit configured limits so prompts/listeners/lifecycle objects cannot grow without bound under load.
+The phone-test composition adapts the canonical Android `ResourceSnapshotProvider` into `RuntimeMemoryObservation` without reversing module dependencies.
 
-### Shared-runtime warm residency
+Warm shared-runtime residency is bounded by policy:
 
-The process-scoped runtime intentionally supports warm reuse, but an explicit last-consumer warm-idle TTL remains open. Process liveness must not imply indefinite model residency.
+- Binder disconnect is only a demand-absent signal;
+- reconnect/rebind cancels pending release;
+- TTL expiry delegates to `unloadIdleModel()` and reschedules when the runtime is still busy;
+- critical platform pressure overrides normal TTL behavior;
+- service destruction does not redefine process-scoped runtime ownership.
 
-### Memory regressions
+The current 60-second phone-test TTL is a labelled candidate, not a device-calibrated claim.
 
-Resource snapshots exist and physical Q35 evidence records memory, but generic benchmark regression policy still focuses on latency/throughput. Peak and residual memory need independent comparison semantics.
+## Observability and regression
 
-## First implementation wave
+The observability path now includes:
 
-Four independent branches start from `dev`:
+- a bounded `MemoryWindowRecorder` over canonical `ResourceSnapshot` samples;
+- PSS baseline/peak/residual and minimum-available-memory summarization;
+- independent PASS/WARN/FAIL memory regression evaluation;
+- typed `memory.admission` structured logs for governor allow/downshift/reject decisions, without prompt or generated-content fields.
 
-- `agent/mm-shutdown-lifecycle` — MEM-1 shutdown convergence;
-- `agent/mm-budget-foundation` — MEM-2 neutral budget/admission primitives;
-- `agent/mm-shared-runtime-ttl` — MEM-4 shared-runtime warm-idle policy;
-- `agent/mm-memory-benchmarks` — MEM-5 resource-window regression mathematics.
+The regression evaluator currently thresholds PSS peak/residual and available-memory floor. Native-heap and thermal signals remain available raw evidence and may be added to policy only when their interpretation is defined.
 
-The documentation branch is `agent/memory-management-plan`.
+## Remaining gap: representative-device evidence
 
-## Immediate next block
+No repository/JVM/emulator test can close the remaining milestones. MEM-7 and MEM-8 require controlled physical runs that capture at least:
 
-1. integrate the documentation plan so the memory workstream has a canonical owner;
-2. validate and merge MEM-1/MEM-2/MEM-4/MEM-5 independently;
-3. branch MEM-3 from the updated `dev` and wire memory admission into model/context materialization;
-4. branch MEM-6 after MEM-1 to add scheduler and resident-context bounds without lifecycle merge conflicts;
-5. use Q35-6 physical runs to calibrate conservative memory-cost profiles;
-6. close MEM-8 only with representative cancellation, pressure, recovery and soak evidence.
+1. cold baseline;
+2. model-load peak and warm residency;
+3. context-create peaks for approved tiers;
+4. generation peak/minimum available memory;
+5. post-context-close and post-model-unload recovery;
+6. repeated-cycle residual trend;
+7. cancellation and critical-pressure cleanup;
+8. warm-idle disconnect/reconnect behavior;
+9. model switch/reload and overload recovery;
+10. thermal state for the controlled run identity.
 
-## Evidence status
+Only evidence that preserves exact artifact/backend/harness/device/runtime identity may promote a cost record to `MEASURED` or support a safe-tier/readiness claim.
 
-No new physical-device memory claim is made by this workstream yet. Existing Q35 tuning infrastructure can collect the needed PSS/available-memory/thermal evidence, but measured defaults and memory certification remain pending representative device execution.
+## Next gate
+
+Software milestones MEM-0 through MEM-6 are complete. MEM-7 is partial because the capture/admission/profile infrastructure exists but physical calibration has not been executed. MEM-8 remains planned until that evidence plus lifecycle/soak scenarios pass the certification matrix.
