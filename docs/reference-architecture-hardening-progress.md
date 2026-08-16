@@ -9,119 +9,73 @@ Last reviewed: 2026-08-16
 
 Canonical target: [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md)
 
-This tracker owns concise workstream state only. Repository-wide baseline/blockers/next work remain in [`current-state.md`](current-state.md); capability outcomes remain in [`roadmap.md`](roadmap.md). Every implementation slice starts from the latest green `dev` available when it begins and must be replayed/refreshed before merge when a dependency lands in parallel.
+This file owns concise workstream state. Repository-wide status remains in [`current-state.md`](current-state.md), capability outcomes in [`roadmap.md`](roadmap.md), and detailed target/dependencies in the canonical plan. Implementation slices start from the latest green `dev` and are refreshed when parallel dependencies land.
 
 ## Status legend
 
-- `DONE`: target behavior, automated acceptance and required evidence/docs are integrated.
-- `PARTIAL`: meaningful target work exists, but architecture, tests or evidence remain.
-- `DEVICE`: implementation/automation are integrated; representative device evidence remains.
+- `DONE`: target behavior, required automation and documentation are integrated.
+- `PARTIAL`: meaningful target work exists, but implementation or evidence remains.
+- `DEVICE`: automation is integrated; representative-device evidence remains.
 - `PENDING`: focused target work has not started.
 
 ## Milestone status
 
-| ID | Status | Current boundary | Remaining gate | Depends on |
-| --- | --- | --- | --- | --- |
-| RA-0 Architecture fitness | DONE | Canonical Gradle inventory, executable dependency/native guards and normal JNI translation-unit linkage are integrated; verifier carries zero debt exceptions | Keep rules green as later modules/source boundaries change | None |
-| RA-1 Backend SPI/fake | DONE | `core:backend-spi`, store-neutral `BackendModelSource`, llama.cpp adapter isolation and deterministic fake are integrated; runtime-core has no concrete backend dependency | Expand into RA-10 conformance coverage as lifecycle/failure semantics mature | RA-0 |
-| RA-2 Runtime kernel | PARTIAL | RA-2A mapped state ownership; first stateless generation-planning extraction is implemented and validated while all mutable lifecycle state remains in `RuntimeOrchestrator` | Integrate the validated slice, then choose the next stateless/coordinator extraction without creating a second lifecycle owner | RA-0, RA-1 |
-| RA-3 Lifecycle/state machines | PARTIAL | load/generate/cancel/release/shutdown and pressure behavior exist, with one mutable runtime owner retained through RA-2 | Formal code/test transition tables, ownership matrix, idempotent terminals and one residency path | RA-2 state-owner boundary |
-| RA-4 Failure/recovery | PARTIAL | Typed privacy-safe failures/recovery exist in several paths | Cross-layer recovery matrix + deterministic fault/race injection | RA-1, RA-3 |
-| RA-5 Scheduling/backpressure | PARTIAL | Single active decode, priority/FIFO sequencing and queued/running cancellation exist | Replace unbounded waiting admission with explicit capacity/rejection; then cover fairness, slow-consumer/backpressure and cancellation latency | RA-3 |
-| RA-6 Shared runtime | PARTIAL | Version/capability negotiation, connection epochs, explicit reconnect, client-death cleanup and idempotent connect/close are already implemented/tested | Define operation-level idempotency/deadlines if required and add real service-process death/reconnect/resource-cleanup evidence after RA-3/4/5 | RA-3/4/5 |
-| RA-7 Observability | PARTIAL | Request-correlated telemetry covers queue, prepare, TTFT/prefill/decode/total and effective generation metadata | Add only missing lifecycle/recovery correlation: session/execution identity, cleanup/unload/recovery/cancel latency and request-resource joins | RA-0; continuous |
-| RA-8 Device policy | PARTIAL | Compatibility, profiles, memory/thermal capture and tuning work exist | Pure versioned planner using validated device/model/resource inputs | RA-7 + evidence |
-| RA-9 Execution identity | PARTIAL | Artifact identity, benchmark execution fingerprints and rich evaluation semantic/runtime identities already exist | Reconcile overlapping identity ownership/versioning before introducing any shared execution identity; no parallel identity store | RA-0 |
-| RA-10 Backend testkit | PARTIAL | Deterministic SPI fake plus native/JNI/simulated acceptance are integrated | Choose a genuinely reusable fixture owner and run one conformance suite against fake and llama.cpp; expand later with RA-3/4/5 cases | RA-1 |
-| RA-11 Security/provenance | PARTIAL | llama.cpp pin, Gradle wrapper checksum, secure download, signing/versioning, packaging and privacy rules exist | Gradle dependency verification, immutable CI action pinning and SBOM/provenance/release metadata in separate reviewable slices | RA-0 |
-| RA-12 Certification | PENDING | Existing evidence tooling covers several gates | Cumulative architecture/resilience/packaging/device evidence | Applicable RA-1..11 |
+| ID | Status | Current boundary | Next gate |
+| --- | --- | --- | --- |
+| RA-0 Architecture fitness | DONE | Canonical module inventory, dependency/native guards and normal JNI translation-unit linkage are integrated with zero verifier exceptions | Keep guards green |
+| RA-1 Backend SPI/fake | DONE | `core:backend-spi`, store-neutral model source, llama.cpp adapter isolation and deterministic fake are integrated | Expand through RA-10 |
+| RA-2 Runtime kernel | PARTIAL | First stateless generation-planning extraction is implemented/validated; mutable lifecycle state remains in `RuntimeOrchestrator` | Integrate slice; choose next state-preserving extraction |
+| RA-3 Lifecycle/state machines | PARTIAL | Lifecycle behavior exists under one mutable owner | Formal transitions, ownership, idempotent terminals and residency path |
+| RA-4 Failure/recovery | PARTIAL | Typed failures/recovery exist in several paths | Recovery matrix + deterministic fault/race injection after RA-3 |
+| RA-5 Scheduling/backpressure | PARTIAL | Single decode, priority/FIFO and cancellation exist | Bounded admission/rejection, fairness, slow-consumer and cancellation-latency semantics after RA-3 |
+| RA-6 Shared runtime | PARTIAL | Negotiation, epochs, reconnect and client-death cleanup already exist | Operation idempotency/deadlines if required + real process-death evidence after RA-3/4/5 |
+| RA-7 Observability | PARTIAL | Rich request-correlated runtime telemetry exists | Session/execution identity, cleanup/recovery/cancel latency and request-resource joins |
+| RA-8 Device policy | PARTIAL | Compatibility plus memory/thermal evidence exists | Pure versioned execution planner after RA-7 evidence is reliable |
+| RA-9 Execution identity | PARTIAL | Artifact, benchmark and evaluation identities already exist | Reconcile/version ownership; no parallel identity store |
+| RA-10 Backend testkit | PARTIAL | Deterministic fake plus native/JNI/simulated tests exist | Shared conformance fixture with fake + llama.cpp consumers |
+| RA-11 Security/provenance | PARTIAL | llama.cpp/wrapper pins, secure download, signing and privacy controls exist | Dependency verification, immutable action pins, SBOM/provenance in separate slices |
+| RA-12 Certification | PENDING | Evidence infrastructure exists | Cumulative automated + representative-device certification |
 
-## Closed baseline architecture debt
+## Closed baseline debt
 
-The two concrete violations that triggered the first tranche are closed and regression-guarded:
+The two violations that triggered tranche 1 are closed: `runtime-core -> backends:llama-cpp` was removed through RA-1 and [ADR 0014](adr/0014-backend-spi-boundary.md); the `llama_jni_entry.cpp -> #include "llama_jni.cpp"` pattern was removed through RA-0. `scripts/verify_architecture.py` now carries zero intended dependency or `.cpp`-include exceptions.
 
-- `runtime-core -> backends:llama-cpp` was removed through RA-1 and the backend boundary recorded in [ADR 0014](adr/0014-backend-spi-boundary.md);
-- `llama_jni_entry.cpp -> #include "llama_jni.cpp"` was removed through RA-0 by deleting the redundant entry source and compiling the JNI implementation normally.
+RA-0/RA-1 are stable baseline. RA-2 may continue internal decomposition; RA-3 must formalize mutable lifecycle semantics before RA-4/RA-5 behavior changes.
 
-`scripts/verify_architecture.py` now carries zero intended dependency exceptions and zero intended `.cpp`-include exceptions. Any recurrence must fail CI rather than become implicit debt.
+## Current parallel work
 
-## Dependency routing
+- **Architecture:** integrate RA-2 planning, then map the next extraction against RA-3 transitions without creating a second mutable runtime owner.
+- **Quality:** define RA-10 fixture ownership only when the same conformance contract has fake and llama.cpp consumers.
+- **Observability/identity:** make RA-7/RA-9 changes additive to existing stores/fingerprints.
+- **Security:** handle dependency trust, workflow action trust and release provenance as separate RA-11 slices.
+- **Memory:** continue residency/pressure/warm-idle work; converge through RA-3/5/7/8.
 
-```text
-RA-0 DONE -> RA-1 DONE -> RA-10
-              \-> RA-4 <- RA-3
-RA-2 ----------------> RA-3 -> RA-5
-                         \-> memory/residency integration
-RA-7 -> RA-8
-RA-9
-RA-11
-RA-3 + RA-4 + RA-5 -> RA-6
-applicable RA-1..11 -> RA-12
-```
+## Verified findings
 
-RA-0 and RA-1 are stable baseline. RA-2 may continue internal decomposition, but RA-3 is the point where mutable lifecycle/state semantics become explicit; RA-4/RA-5 behavior changes should consume those semantics rather than race ahead of them.
+### RA-2A — Runtime ownership
 
-## Parallel lanes
+`RuntimeOrchestrator` still owns sessions, scheduler, loaded model/context, deferred unload, memory pressure and generation lifecycle. The first slice extracts only `GenerationPlanningPolicy` for effective configuration, output constraints, context sizing and reasoning control, with focused pure tests. Session/context/residency/cancellation/cleanup state stays centralized. The next extraction must preserve this until RA-3 formalizes lifecycle ownership.
 
-| Lane | Current work | Integration constraint |
-| --- | --- | --- |
-| A Architecture core | Integrate first RA-2 planning slice; identify next state-preserving extraction; prepare RA-3 transition/ownership model | Do not create a second mutable runtime owner |
-| B Quality/resilience | Design RA-10 fixture ownership on the integrated SPI | RA-4/5 cases later consume RA-3 semantics |
-| C Observability/device | RA-7 additive correlation design; RA-8 planner design can follow | Measured RA-8 waits for reliable resource/device evidence |
-| D Identity/security | RA-9 identity reconciliation + RA-11 supply-chain slices | Reuse existing owners/stores and version fingerprints explicitly |
-| E Shared runtime | RA-6 gap list is narrowed; no protocol refactor now | Behavior changes wait for RA-3/4/5 |
-| Existing memory | Residency/pressure/warm-idle continues | Converge through RA-3/5/7/8 |
+### RA-5A — Scheduler
 
-## Current implementation block
+`SingleDecodeScheduler` already has one active decode, priority with FIFO sequencing, queued/running cancellation, `cancelAll()` and close. Its waiting structure is an unbounded `PriorityBlockingQueue`; RA-5 therefore needs explicit capacity and typed rejection, then fairness/starvation, cancellation-latency and slow-consumer/backpressure coverage. Simultaneous decode remains deferred.
 
-1. **RA-2 first extraction:** integrate validated stateless generation planning while keeping session/model/context/scheduler/memory ownership in `RuntimeOrchestrator`.
-2. **RA-2/RA-3 boundary:** map the next extraction against explicit model/session/generation/resource transitions before moving mutable ownership.
-3. **RA-10 seed:** choose a reusable conformance-fixture boundary that can exercise both deterministic fake and llama.cpp rather than creating a nominal testkit used by one module.
-4. **RA-7/RA-9 reconciliation:** design the minimum additive correlation/execution identity changes against existing observability, benchmark and evaluation identities before persistence changes.
-5. **RA-11 supply chain:** add dependency verification, immutable action references and provenance independently so each trust boundary remains reviewable.
+### RA-6A — Shared runtime
 
-## Verified discovery and implementation outcomes
+Binder already provides major/minor and feature negotiation, typed incompatibility, connection epochs, typed connection loss, explicit reconnect and idempotent `connect()`/`close()`. The service host links clients to death and cleans requests, sessions, consumers, death links, dispatchers and ledger state. Remaining work is operation-level replay/idempotency only if needed, deadlines where justified, and real service-process death/reconnect evidence after RA-3/4/5.
 
-### RA-2A — Runtime ownership and first extraction
+### RA-7A / RA-9A — Telemetry and identity
 
-`RuntimeOrchestrator` owns mutable runtime state, session descriptors, scheduler coordination, loaded model/context ownership, integrity-cache integration, deferred unload state, memory-pressure behavior and generation execution. Its generation path also owned configuration resolution/validation, output constraints, reasoning control and context-size selection.
+Telemetry already records request/app/use-case/model identity, queue/load/TTFT/prefill/decode/total timings, tokens/throughput, effective generation settings, context/prompt/template data and stop/planning timings. Missing correlation is mainly session/execution identity, cleanup/unload/recovery, cancellation latency and request-to-resource joins.
 
-The first implementation slice therefore extracts only **stateless generation planning** into `GenerationPlanningPolicy`: effective generation configuration, output-constraint support, context-size choice and reasoning-control derivation. Focused pure tests cover seed resolution, request overrides, raw-completion/thinking rejection, output constraints, auto context sizing and reasoning support. Session acquisition/release, model residency, context materialization, scheduler mutation, cancellation, memory pressure and terminal cleanup remain in one authoritative runtime owner.
+Identity already exists at artifact, benchmark and evaluation semantic/runtime/run levels. RA-9 must reconcile/version these contracts; a general execution identity must be additive and reused rather than becoming a fourth store.
 
-The next RA-2 slice must preserve that property. Prefer another stateless/coordinator responsibility before any SessionManager-style state split; RA-3 should first formalize lifecycle ownership and legal transitions.
+### RA-10A / RA-11A — Testkit and supply chain
 
-### RA-5A — Scheduler gap confirmed
+The deterministic fake already supports controlled failures, blocking, streaming, cancellation and release accounting, but no established shared test-fixture convention was found. Do not create a nominal testkit module without two real consumers.
 
-`SingleDecodeScheduler` already provides one active decode, explicit priorities, FIFO ordering inside a priority, queued/running cancellation, `cancelAll()` and close behavior. Its waiting structure is currently an unbounded `PriorityBlockingQueue`, so queue admission is not bounded. RA-5 should add explicit capacity and typed admission/rejection after RA-3 stabilizes lifecycle semantics, then cover fairness/starvation, cancellation latency and stream/consumer backpressure without enabling simultaneous decode.
+The Gradle wrapper checksum and llama.cpp revision are pinned. Verified remaining supply-chain gaps are missing Gradle dependency-verification metadata, mutable major-version GitHub Action references and no current SBOM/provenance artifact.
 
-### RA-6A — Shared-runtime gap narrowed
+## Update rule
 
-The Binder boundary already has major/minor protocol-range negotiation, feature negotiation and closed incompatibility behavior. The client has explicit connection states, connection epochs that ignore stale callbacks, typed connection loss, idempotent `connect()`/`close()` and tested explicit reconnect. The service host links client binders to death and cleans requests, sessions, consumers, death links, dispatchers and ledger state when a client dies.
-
-Therefore RA-6 must not rebuild these foundations. Remaining hardening is narrower: decide whether duplicate external operations need replay/idempotency semantics instead of current rejection, propagate deadlines where a real requirement exists, and add end-to-end evidence for actual service-process death/reconnect/resource cleanup after RA-3/4/5 settle runtime semantics.
-
-### RA-7A — Existing telemetry versus missing correlation
-
-Existing telemetry records request ID, application/use-case, model digest, queue/load/TTFT/prefill/decode/total timing, tokens/throughput, effective preset and sampling values, context/prompt size, chat-template identity, stop reason and planning/context-creation timings. Missing target coverage is narrower than initially assumed: session/execution identity correlation, explicit cleanup/unload/recovery phases, cancellation latency and a defined request/run-to-resource-snapshot join. Extend existing owners; do not create another telemetry store.
-
-### RA-9A — Identity overlap to reconcile
-
-The repository already has immutable model-artifact digest, `BenchmarkExecutionIdentity`, and evaluation semantic/runtime/run fingerprints. Evaluation already carries model profile/quantization, backend revision, device/API/ABI, harness build identity, runtime tuning profile, load/warmup policy and semantic generation settings. RA-9 must first define ownership/versioning between these layers; silently changing fingerprint composition would invalidate comparisons. Any general runtime execution identity should be additive/versioned and reused by benchmark/evaluation rather than creating a fourth competing store.
-
-### RA-10A — Testkit ownership constraint
-
-The integrated deterministic runtime fake already supports controlled load/context/generation failure, blocking, streaming, cancellation and release accounting. The repository does not currently expose an obvious shared `testFixtures`/testkit convention. Do not create a new module merely because the target names a testkit: first define a fixture boundary with at least two real consumers, then make fake and llama.cpp conformance use the same contract suite.
-
-### RA-11A — Supply-chain baseline
-
-The Gradle wrapper distribution is SHA-256 pinned and the llama.cpp revision has an explicit repository guard. Verified gaps include absence of Gradle dependency-verification metadata, mutable major-version GitHub Action references in workflows, and no current SBOM/provenance artifact found in the repository. Address dependency trust, workflow trust and release provenance independently so each change remains auditable and reversible.
-
-## Memory coordination
-
-Current memory work continues: keep one residency owner; represent unload causes explicitly; let scheduler state become authoritative for idle decisions; use existing resource/telemetry owners; treat device PSS/thermal data as evidence rather than universal thresholds; migrate through RA-3/RA-5 contracts without unnecessary user-visible change.
-
-## Update and completion rule
-
-On status/blocker/dependency/next-slice change, update this tracker in the same change. Update `current-state.md` only for repository-wide operational state, `roadmap.md` only for capability outcomes, the target only for intent/acceptance changes, and `architecture.md`/ADR only for durable boundaries/decisions.
-
-A milestone is `DONE` only after integration into `dev`, targeted acceptance, applicable regression guards, failure/cancel/cleanup coverage, required docs, cumulative green `dev`, and required physical evidence. Use `DEVICE` when implementation is integrated but representative hardware evidence remains. The workstream closes only after RA-12 removes/owns all P0 exceptions and demonstrates the reference-grade properties.
+Update this tracker with state/blocker/next-slice changes; update `current-state.md` only for repository-wide state, `roadmap.md` only for capability outcomes, and architecture/ADRs only for durable boundaries. A milestone becomes `DONE` only after integration, targeted regression coverage, required docs, cumulative green `dev` and any required device evidence.
