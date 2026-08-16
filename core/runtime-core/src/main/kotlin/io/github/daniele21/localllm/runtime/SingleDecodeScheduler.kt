@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.runtime
 import io.github.daniele21.localllm.contracts.RequestId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.PriorityBlockingQueue
+import java.util.concurrent.Semaphore
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -24,13 +25,24 @@ interface DecodeTaskHandle {
     fun cancel(): Boolean
 }
 
+class DecodeQueueCapacityExceededException(val capacity: Int) :
+    IllegalStateException(
+        "Decode scheduler capacity of $capacity outstanding request(s) is exhausted",
+    )
+
 class SingleDecodeScheduler(
     threadFactory: ThreadFactory = ThreadFactory { runnable ->
         Thread(runnable, "local-llm-decode").apply { isDaemon = true }
     },
+    private val maxOutstandingRequests: Int = DEFAULT_MAX_OUTSTANDING_REQUESTS,
 ) : AutoCloseable {
+    init {
+        require(maxOutstandingRequests > 0) { "Maximum outstanding decode requests must be positive" }
+    }
+
     private val queue = PriorityBlockingQueue<ScheduledWork>()
     private val works = ConcurrentHashMap<RequestId, ScheduledWork>()
+    private val capacity = Semaphore(maxOutstandingRequests, true)
     private val sequence = AtomicLong(0)
     private val closed = AtomicBoolean(false)
     private val activeRequest = AtomicReference<RequestId?>(null)
@@ -45,6 +57,9 @@ class SingleDecodeScheduler(
         onQueued: (position: Int) -> Unit = {},
     ): DecodeSubmission {
         check(!closed.get()) { "Decode scheduler is closed" }
+        if (!capacity.tryAcquire()) {
+            throw DecodeQueueCapacityExceededException(maxOutstandingRequests)
+        }
         val work = ScheduledWork(
             requestId = requestId,
             priority = priority,
@@ -53,19 +68,25 @@ class SingleDecodeScheduler(
             onQueuedCancellation = onQueuedCancellation,
             onRunningCancellation = onRunningCancellation,
         )
-        check(works.putIfAbsent(requestId, work) == null) {
-            "A decode request with ID ${requestId.value} is already scheduled"
-        }
+        return try {
+            check(works.putIfAbsent(requestId, work) == null) {
+                "A decode request with ID ${requestId.value} is already scheduled"
+            }
 
-        val position = queue.count { candidate -> candidate.compareTo(work) <= 0 } + 1
-        runCatching { onQueued(position) }
-            .onFailure { works.remove(requestId, work) }
-            .getOrThrow()
-        queue.put(work)
-        return DecodeSubmission(
-            queuePosition = position,
-            handle = SchedulerHandle(requestId, this),
-        )
+            val position = queue.count { candidate -> candidate.compareTo(work) <= 0 } + 1
+            runCatching { onQueued(position) }
+                .onFailure { works.remove(requestId, work) }
+                .getOrThrow()
+            queue.put(work)
+            DecodeSubmission(
+                queuePosition = position,
+                handle = SchedulerHandle(requestId, this),
+            )
+        } catch (error: Throwable) {
+            works.remove(requestId, work)
+            work.releaseCapacity(capacity)
+            throw error
+        }
     }
 
     fun cancel(requestId: RequestId): Boolean {
@@ -80,6 +101,7 @@ class SingleDecodeScheduler(
             queue.remove(work) -> {
                 works.remove(requestId, work)
                 work.notifyQueuedCancellation()
+                work.releaseCapacity(capacity)
             }
 
             work.started.get() -> work.onRunningCancellation()
@@ -119,9 +141,11 @@ class SingleDecodeScheduler(
         if (work.cancelled.get()) {
             works.remove(work.requestId, work)
             work.notifyQueuedCancellation()
+            work.releaseCapacity(capacity)
             return
         }
         if (!work.started.compareAndSet(false, true)) {
+            work.releaseCapacity(capacity)
             return
         }
 
@@ -133,8 +157,9 @@ class SingleDecodeScheduler(
                 work.task()
             }
         } finally {
-            activeRequest.set(null)
             works.remove(work.requestId, work)
+            work.releaseCapacity(capacity)
+            activeRequest.set(null)
         }
     }
 
@@ -149,6 +174,7 @@ class SingleDecodeScheduler(
         val cancelled = AtomicBoolean(false)
         val started = AtomicBoolean(false)
         private val queuedCancellationNotified = AtomicBoolean(false)
+        private val capacityReleased = AtomicBoolean(false)
 
         override fun compareTo(other: ScheduledWork): Int {
             val priorityComparison = priority.rank.compareTo(other.priority.rank)
@@ -160,9 +186,19 @@ class SingleDecodeScheduler(
                 onQueuedCancellation()
             }
         }
+
+        fun releaseCapacity(capacity: Semaphore) {
+            if (capacityReleased.compareAndSet(false, true)) {
+                capacity.release()
+            }
+        }
     }
 
     private class SchedulerHandle(override val requestId: RequestId, private val scheduler: SingleDecodeScheduler) : DecodeTaskHandle {
         override fun cancel(): Boolean = scheduler.cancel(requestId)
+    }
+
+    private companion object {
+        const val DEFAULT_MAX_OUTSTANDING_REQUESTS = 64
     }
 }
