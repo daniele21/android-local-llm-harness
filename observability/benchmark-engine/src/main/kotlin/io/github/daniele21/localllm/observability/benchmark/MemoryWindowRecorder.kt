@@ -4,10 +4,7 @@ import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.ResourceSnapshotProvider
 import java.util.ArrayDeque
 
-class MemoryWindowRecorder(
-    private val provider: ResourceSnapshotProvider,
-    private val maximumSamples: Int = DEFAULT_MAXIMUM_SAMPLES,
-) {
+class MemoryWindowRecorder(private val provider: ResourceSnapshotProvider, private val maximumSamples: Int = DEFAULT_MAXIMUM_SAMPLES) {
     init {
         require(maximumSamples > 0) { "Maximum memory-window sample count must be positive" }
     }
