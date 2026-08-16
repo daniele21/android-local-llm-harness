@@ -58,6 +58,22 @@ class MemoryAwareContextPlanner(
 
         val observation = observationSource.observe()
             ?: return MemoryAwareContextDecision.Reject(MemoryAwareContextRejectReason.MEMORY_OBSERVATION_UNAVAILABLE)
+        val evaluation = evaluateCandidates(request, candidates, observation)
+        return evaluation.allowed ?: if (!evaluation.sawEstimate) {
+            MemoryAwareContextDecision.Reject(MemoryAwareContextRejectReason.MEMORY_COST_ESTIMATE_UNAVAILABLE)
+        } else {
+            MemoryAwareContextDecision.Reject(
+                reason = MemoryAwareContextRejectReason.MEMORY_BUDGET_REJECTED,
+                admissionReason = evaluation.lastAdmissionReject,
+            )
+        }
+    }
+
+    private fun evaluateCandidates(
+        request: MemoryAwareContextRequest,
+        candidates: List<Int>,
+        observation: RuntimeMemoryObservation,
+    ): CandidateEvaluation {
         var sawEstimate = false
         var lastAdmissionReject: MemoryAdmissionRejectReason? = null
 
@@ -74,22 +90,30 @@ class MemoryAwareContextPlanner(
                     ),
                 )
             ) {
-                MemoryAdmissionDecision.Allow -> return MemoryAwareContextDecision.Allow(
-                    contextTokens = contextTokens,
-                    downshifted = contextTokens != request.requestedContextTokens,
-                    estimate = estimate,
+                MemoryAdmissionDecision.Allow -> return CandidateEvaluation(
+                    allowed = MemoryAwareContextDecision.Allow(
+                        contextTokens = contextTokens,
+                        downshifted = contextTokens != request.requestedContextTokens,
+                        estimate = estimate,
+                    ),
+                    sawEstimate = true,
+                    lastAdmissionReject = lastAdmissionReject,
                 )
 
                 is MemoryAdmissionDecision.Reject -> lastAdmissionReject = admission.reason
             }
         }
 
-        if (!sawEstimate) {
-            return MemoryAwareContextDecision.Reject(MemoryAwareContextRejectReason.MEMORY_COST_ESTIMATE_UNAVAILABLE)
-        }
-        return MemoryAwareContextDecision.Reject(
-            reason = MemoryAwareContextRejectReason.MEMORY_BUDGET_REJECTED,
-            admissionReason = lastAdmissionReject,
+        return CandidateEvaluation(
+            allowed = null,
+            sawEstimate = sawEstimate,
+            lastAdmissionReject = lastAdmissionReject,
         )
     }
+
+    private data class CandidateEvaluation(
+        val allowed: MemoryAwareContextDecision.Allow?,
+        val sawEstimate: Boolean,
+        val lastAdmissionReject: MemoryAdmissionRejectReason?,
+    )
 }
