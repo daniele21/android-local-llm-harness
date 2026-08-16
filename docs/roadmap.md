@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-16
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
@@ -23,6 +23,7 @@ The repository remains not production-ready until representative physical-device
 | Qwen3.5-only product transition | Planned | Non-destructive support migration, compatibility, tuning, validation and certification |
 | Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
 | Model RAM residency and warm-idle eviction | Planned | Product controls, TTL implementation and tests |
+| Reference-grade architecture hardening | Planned | Enforced backend/lifecycle/failure/scheduling boundaries, conformance tests and cumulative device evidence |
 | Native Android SDK integration | Planned | Stable consumer adapter over the embedded contracts |
 | Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
 | Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
@@ -171,7 +172,21 @@ The shared service is not part of Harness 0.5.0.
 
 The progressive-disclosure target, architecture, milestone order and focused workstreams are defined in [`shared-runtime/README.md`](shared-runtime/README.md). That plan does not remove the embedded physical-evidence gate or make the service application-consumable today.
 
-## 8. Deferred capabilities
+## 8. Reference-grade architecture hardening
+
+Planned cross-cutting work makes existing architecture intent executable and independently testable without replacing capability-specific owners.
+
+Remaining outcomes:
+
+- enforce dependency direction and normal native translation-unit linkage, then isolate a minimal backend SPI with deterministic fake coverage;
+- converge runtime state ownership, lifecycle transitions, failure/recovery and bounded scheduler/backpressure semantics;
+- standardize correlation, reproducible execution identity and evidence-driven device policy while reusing existing observability, ModelStore and memory owners;
+- harden shared-runtime ownership/death semantics, backend conformance and security/build provenance;
+- certify the cumulative architecture with automated and representative physical-device evidence.
+
+Detailed milestone IDs, dependencies, parallel lanes and exit gates are owned by [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md); concise state belongs in [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md). Existing RAM-residency work remains separate and integrates through the lifecycle/scheduler/resource seams defined there.
+
+## 9. Deferred capabilities
 
 Deferred until the CPU embedded path and release evidence are stable:
 
