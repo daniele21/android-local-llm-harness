@@ -5,10 +5,7 @@ import io.github.daniele21.localllm.models.GgufModelProfile
 
 internal data class FakeBackendChunk(val text: String, val generatedTokens: Int)
 
-internal data class FakeBackendFailure(
-    val code: String,
-    val message: String,
-)
+internal data class FakeBackendFailure(val code: String, val message: String)
 
 internal class DeterministicFakeInferenceBackend(
     override val id: String = "deterministic-fake",
@@ -134,8 +131,5 @@ internal class DeterministicFakeInferenceBackend(
         override val loadDurationMs: Long = 1,
     ) : BackendModelHandle
 
-    private data class FakeContextHandle(
-        override val model: BackendModelHandle,
-        override val contextSize: Int,
-    ) : BackendContextHandle
+    private data class FakeContextHandle(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 }
