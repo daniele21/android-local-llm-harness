@@ -52,6 +52,10 @@ data class GenerationRunRecord(
     val stopReason: StopReason? = null,
     val promptPlanningMs: Long? = null,
     val contextCreationMs: Long? = null,
+    val backendId: String? = null,
+    val backendRevision: String? = null,
+    val modelProfileId: String? = null,
+    val executionPolicyVersion: Int? = null,
 )
 
 enum class RunStatus {
@@ -119,18 +123,32 @@ fun interface ResourceSnapshotProvider {
     fun snapshot(): ResourceSnapshot
 }
 
-data class BenchmarkExecutionIdentity(val fingerprint: String) {
+data class BenchmarkExecutionIdentity(
+    val fingerprint: String,
+    val schemaVersion: Int = LEGACY_SCHEMA_VERSION,
+) {
     init {
         require(FINGERPRINT_PATTERN.matches(fingerprint)) { "Benchmark execution fingerprint must be SHA-256" }
+        require(schemaVersion > 0) { "Benchmark execution identity version must be positive" }
     }
 
     companion object {
+        const val LEGACY_SCHEMA_VERSION = 1
+        const val CURRENT_SCHEMA_VERSION = 2
         private val FINGERPRINT_PATTERN = Regex("[0-9a-f]{64}")
 
-        fun fromFingerprint(fingerprint: String): BenchmarkExecutionIdentity = BenchmarkExecutionIdentity(fingerprint.lowercase())
+        fun fromFingerprint(
+            fingerprint: String,
+            schemaVersion: Int = LEGACY_SCHEMA_VERSION,
+        ): BenchmarkExecutionIdentity = BenchmarkExecutionIdentity(fingerprint.lowercase(), schemaVersion)
 
         fun fromRun(run: GenerationRunRecord): BenchmarkExecutionIdentity {
             val canonical = listOf(
+                value(CURRENT_SCHEMA_VERSION),
+                value(run.backendId),
+                value(run.backendRevision),
+                value(run.modelProfileId),
+                value(run.executionPolicyVersion),
                 value(run.contextSize),
                 value(run.promptTokenCount),
                 value(run.presetId?.value),
@@ -153,7 +171,7 @@ data class BenchmarkExecutionIdentity(val fingerprint: String) {
             val digest = java.security.MessageDigest.getInstance("SHA-256")
                 .digest(canonical.toByteArray(Charsets.UTF_8))
                 .joinToString("") { byte -> "%02x".format(byte) }
-            return BenchmarkExecutionIdentity(digest)
+            return BenchmarkExecutionIdentity(digest, CURRENT_SCHEMA_VERSION)
         }
 
         private fun value(value: Any?): String = value?.toString() ?: "~"
@@ -179,7 +197,7 @@ data class BenchmarkKey(
             useCaseId.value,
             modelDigest.sha256,
             modelLoadKind.name,
-            executionIdentity.fingerprint,
+            "v${executionIdentity.schemaVersion}:${executionIdentity.fingerprint}",
         ).joinToString("|")
 
     fun matches(run: GenerationRunRecord): Boolean = run.applicationId == applicationId &&
