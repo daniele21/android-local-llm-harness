@@ -120,6 +120,52 @@ class RuntimeTelemetryTest {
     }
 
     @Test
+    fun `backend failure telemetry records classification and recovery without private details`() {
+        val repository = InMemoryTelemetryRepository()
+        val telemetry = RuntimeTelemetry(repository, SequenceEpochClock(20L, 21L, 22L, 23L, 24L))
+        val request = request(input = "private prompt")
+        val decision = RuntimeFailurePolicy.forFamily(RuntimeFailureFamily.GENERATION)
+
+        telemetry.queued(request, ModelDigest("d".repeat(64)))
+        telemetry.started(request.requestId)
+        telemetry.failed(
+            requestId = request.requestId,
+            error = LocalLlmError.NativeRuntime("stable public failure"),
+            decision = decision,
+            backendCode = "decode_failed",
+        )
+
+        val failureLog = repository.recentLogs().first { it.event == "generation.failed" }
+        assertEquals("NATIVE_RUNTIME", failureLog.fields["errorCode"])
+        assertEquals("GENERATION", failureLog.fields["failureFamily"])
+        assertEquals("TERMINAL_REQUEST", failureLog.fields["recovery"])
+        assertEquals("0", failureLog.fields["automaticRetryLimit"])
+        assertEquals("DECODE_FAILED", failureLog.fields["backendCode"])
+        assertFalse(failureLog.fields.values.any { it.contains("private prompt") })
+        assertFalse(failureLog.fields.values.any { it.contains("stable public failure") })
+    }
+
+    @Test
+    fun `unsafe backend code is omitted from telemetry fields`() {
+        val repository = InMemoryTelemetryRepository()
+        val telemetry = RuntimeTelemetry(repository, SequenceEpochClock(30L, 31L, 32L, 33L, 34L))
+        val request = request(input = "ignored")
+
+        telemetry.queued(request, ModelDigest("e".repeat(64)))
+        telemetry.failed(
+            requestId = request.requestId,
+            error = LocalLlmError.NativeRuntime("stable"),
+            decision = RuntimeFailurePolicy.forFamily(RuntimeFailureFamily.INVARIANT),
+            backendCode = "private/path/or free form detail",
+        )
+
+        val failureLog = repository.recentLogs().first { it.event == "generation.failed" }
+        assertFalse(failureLog.fields.containsKey("backendCode"))
+        assertEquals("INVARIANT", failureLog.fields["failureFamily"])
+        assertEquals("DEGRADE_RUNTIME", failureLog.fields["recovery"])
+    }
+
+    @Test
     fun `telemetry storage failures never fail runtime instrumentation`() {
         val telemetry = RuntimeTelemetry(
             ThrowingTelemetryRepository,
