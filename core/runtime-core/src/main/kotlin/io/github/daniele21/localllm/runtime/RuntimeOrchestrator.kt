@@ -175,13 +175,13 @@ class RuntimeOrchestrator(
                 priority = priorityResolver(request),
                 task = { executeGeneration(request, session, lifecycle, enqueuedAt) },
                 onQueuedCancellation = {
-                    lifecycle.cancelRequested.set(true)
+                    lifecycle.requestCancellation()
                     val cancellation = LocalLlmError.Cancelled("Generation cancelled before execution")
                     runtimeTelemetry.failed(request.requestId, cancellation)
                     lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
                 },
                 onRunningCancellation = {
-                    lifecycle.cancelRequested.set(true)
+                    lifecycle.requestCancellation()
                     runCatching { backend.cancel(request.requestId.value) }
                 },
                 onQueued = { position ->
@@ -269,7 +269,7 @@ class RuntimeOrchestrator(
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
-        if (lifecycle.cancelRequested.get()) {
+        if (lifecycle.isCancellationRequested()) {
             val cancellation = LocalLlmError.Cancelled()
             runtimeTelemetry.failed(request.requestId, cancellation)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
@@ -310,7 +310,7 @@ class RuntimeOrchestrator(
             )
             lifecycle.ensureNotCancelled()
             val contextResult = materializeContext(session, contextPlan)
-            if (lifecycle.cancelRequested.get()) {
+            if (lifecycle.isCancellationRequested()) {
                 releaseCancelledMaterialization(session, contextResult)
                 throw GenerationCancelledException()
             }
@@ -405,7 +405,7 @@ class RuntimeOrchestrator(
             )
             lifecycle.ensureNotCancelled()
             val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->
-                if (lifecycle.cancelRequested.get()) {
+                if (lifecycle.isCancellationRequested()) {
                     false
                 } else {
                     firstTokenAt.compareAndSet(0, clock.nowNanos())
@@ -414,15 +414,15 @@ class RuntimeOrchestrator(
                     streamParser.accept(text).forEach { emitParsedChunk(it, generatedTokens) }
                     val guardReason = generationGuard.observe(text, generatedTokens)
                     if (guardReason != null) guardStopReason.compareAndSet(null, guardReason)
-                    guardReason == null && !lifecycle.cancelRequested.get()
+                    guardReason == null && !lifecycle.isCancellationRequested()
                 }
             }
-            if (!lifecycle.cancelRequested.get()) {
+            if (!lifecycle.isCancellationRequested()) {
                 streamParser.finish().forEach { emitParsedChunk(it, lastGeneratedTokens) }
             }
 
             val guardReason = guardStopReason.get()
-            if (lifecycle.cancelRequested.get()) {
+            if (lifecycle.isCancellationRequested()) {
                 val cancellation = LocalLlmError.Cancelled()
                 runtimeTelemetry.failed(request.requestId, cancellation)
                 lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
@@ -816,21 +816,24 @@ class RuntimeOrchestrator(
 private class GenerationCancelledException : RuntimeException()
 
 private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
-    val cancelRequested = AtomicBoolean(false)
-    private val terminal = AtomicBoolean(false)
+    private val generationLifecycle = GenerationLifecycle()
+
+    fun requestCancellation(): Boolean = generationLifecycle.requestCancellation()
+
+    fun isCancellationRequested(): Boolean = generationLifecycle.isCancellationRequested()
 
     fun emit(event: GenerationEvent) {
-        if (!terminal.get()) {
+        if (!generationLifecycle.isTerminal()) {
             runCatching { listener.onEvent(event) }
         }
     }
 
     fun ensureNotCancelled() {
-        if (cancelRequested.get()) throw GenerationCancelledException()
+        if (generationLifecycle.isCancellationRequested()) throw GenerationCancelledException()
     }
 
     fun finish(event: GenerationEvent) {
-        if (!terminal.compareAndSet(false, true)) {
+        if (!generationLifecycle.tryFinish()) {
             return
         }
         try {
@@ -847,8 +850,9 @@ private class RuntimeGenerationHandle(
     private val lifecycle: RequestLifecycle,
 ) : GenerationHandle {
     override fun cancel() {
-        lifecycle.cancelRequested.set(true)
-        schedulerHandle.cancel()
+        if (lifecycle.requestCancellation()) {
+            schedulerHandle.cancel()
+        }
     }
 }
 
