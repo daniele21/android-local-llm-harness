@@ -11,43 +11,58 @@ This is the entry point for repository-wide memory-management work. It covers ru
 
 ## Objective
 
-Move the Harness from lifecycle-safe, reactive memory cleanup to a bounded and measurable resource governor that can answer three questions before expensive work starts:
+The Harness now has the software control plane needed to answer three questions before expensive work starts:
 
 1. what memory is already resident;
 2. what the requested model/context operation is expected to cost;
-3. whether the device has enough safe headroom to admit, downshift or reject the operation.
+3. whether the device has enough safe headroom to allow, downshift or reject the operation.
 
-The existing invariants remain: one loaded model, one active decode by default, opaque native ownership, explicit session/context lifecycle, and fail-safe cleanup on cancellation or pressure.
+The remaining work is evidence, not a second architecture: representative-device calibration must populate reviewed `MEASURED` cost profiles and prove recovery/headroom behavior before device-safety claims are made.
 
 ## Status at a glance
 
 | Milestone | State | Meaning |
 | --- | --- | --- |
-| MEM-0 Plan and ownership | ACTIVE | Canonical target, architecture, roadmap and workstream routing are being established. |
-| MEM-1 Shutdown finalization | PLANNED | Close/cancellation must deterministically converge to context release, model unload and backend shutdown. |
-| MEM-2 Budget foundation | PLANNED | Add backend-neutral memory observations, estimates, limits and admission outcomes. |
-| MEM-3 Runtime admission | PLANNED | Gate model/context materialization before unsafe allocations and support policy-driven context downshift. |
-| MEM-4 Shared-runtime residency | PLANNED | Bound warm-idle residency with explicit TTL and disconnect semantics. |
-| MEM-5 Memory regression evidence | PLANNED | Treat peak/residual memory as benchmark and validation signals alongside latency and throughput. |
-| MEM-6 Queue/backpressure bounds | PLANNED | Bound outstanding work globally and per consumer before Java-heap growth becomes unbounded. |
-| MEM-7 Device calibration | PLANNED | Derive versioned memory-cost evidence from representative physical-device runs. |
-| MEM-8 Certification gate | PLANNED | Require cleanup, headroom and recovery evidence before memory-management readiness claims. |
+| MEM-0 Plan and ownership | DONE | Canonical target, architecture, roadmap and workstream routing are integrated. |
+| MEM-1 Shutdown finalization | DONE | Session drain, context release, model unload and backend shutdown converge deterministically. |
+| MEM-2 Budget foundation | DONE | Backend-neutral observations, estimates, budgets, residency snapshots and typed admission reasons are integrated. |
+| MEM-3 Runtime admission | DONE | Model/context materialization is gated before native allocation; context downshift and privacy-safe decision telemetry are integrated. |
+| MEM-4 Shared-runtime residency | DONE | Warm-idle residency is bounded by explicit TTL policy without making Binder lifetime the resource owner. |
+| MEM-5 Memory regression evidence | DONE | Bounded resource windows and independent PSS/available-memory regression evaluation are integrated. |
+| MEM-6 Queue/backpressure bounds | DONE | Outstanding decode work, resident contexts and per-consumer host requests have explicit bounds. |
+| MEM-7 Device calibration | PARTIAL | Android observation adapters plus context/model cost registries exist; representative physical `MEASURED` profiles are still missing. |
+| MEM-8 Certification gate | PLANNED | Physical cleanup, headroom, reconnect, pressure and soak evidence must close the readiness gate. |
 
-## Parallel delivery model
+## Integrated software control loop
 
-The first wave is intentionally split by file ownership so it can progress in parallel:
+```text
+Android ResourceSnapshot
+        |
+RuntimeMemoryObservation
+        |
+MemoryCostProfile + RuntimeResidencySnapshot
+        |
+MemoryAdmissionController
+        |
+ALLOW / DOWNSHIFT / REJECT
+        |
+RuntimeOrchestrator
+        |
+backend model/context allocation
+        |
+bounded evidence window + regression evaluation
+```
 
-- **Lane A — MEM-1:** runtime shutdown finalization and cleanup tests;
-- **Lane B — MEM-2:** new budget/admission domain primitives and unit tests;
-- **Lane C — MEM-4:** shared-runtime warm-idle TTL policy and host tests;
-- **Lane D — MEM-5:** memory regression mathematics over existing resource snapshots.
+Model and context cost lookups are identity-bound and provenance-aware. No production `MEASURED` value is inferred from GGUF file size, model name or a pure-KV formula.
 
-The second wave integrates these foundations:
+## Remaining delivery
 
-- **MEM-3** depends on MEM-1 and MEM-2 because `RuntimeOrchestrator` becomes the admission boundary;
-- **MEM-6** follows MEM-1 because scheduler shutdown and queue-bound changes touch the same lifecycle owner;
-- **MEM-7** depends on MEM-3/MEM-5 plus Q35-6 physical tuning evidence;
-- **MEM-8** closes only after representative Q35-7/SR-6 lifecycle and device evidence.
+The software lanes MEM-0 through MEM-6 are complete. The remaining sequence is hardware-gated:
+
+- **MEM-7:** run the controlled Qwen3.5/device matrix, capture model-load/context-tier peaks and recovery windows, then publish versioned `MEASURED` profiles only for exact compatible identities;
+- **MEM-8:** exercise cancellation, critical pressure, warm-idle expiry, model switch/reload, overload and repeated-cycle soak, then promote readiness only when cleanup/headroom/recovery evidence passes.
+
+A repository or emulator test may validate policy semantics and Android wiring, but it cannot promote MEM-7 or MEM-8 by itself.
 
 ## What to read
 
@@ -65,10 +80,10 @@ The second wave integrates these foundations:
 ## Ownership boundaries
 
 - `core/runtime-core` owns runtime memory policy, residency decisions, admission and backpressure.
-- `backends/llama-cpp` owns native model/context lifetime and backend-specific memory mechanics; it does not decide product admission policy.
+- `backends/llama-cpp` owns native model/context lifetime and backend-specific allocation mechanics; it does not decide product admission policy.
 - `observability` owns measurement contracts, resource snapshots, bounded retention and regression mathematics.
 - runtime-owning apps/services compose Android probes and residency policy without moving domain logic into UI/service classes.
-- `docs/qwen35` owns model-family-specific measured tuning inputs; this workstream consumes those measurements but does not duplicate Qwen3.5 runtime tuning.
+- `docs/qwen35` owns model-family-specific physical tuning inputs; this workstream consumes those measurements but does not duplicate model tuning policy.
 
 ## Readiness rule
 
