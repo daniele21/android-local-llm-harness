@@ -19,6 +19,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
 | What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
 | What is the reference-grade architecture hardening target and current workstream state? | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), then [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
+| How is runtime memory residency, admission, pressure handling and validation governed? | [`memory-management/README.md`](memory-management/README.md) |
 | What is the Qwen3.5-only product status and plan? | [`qwen35/README.md`](qwen35/README.md) |
 | How are model quality and dataset-based performance evaluated? | [`model-evaluation/README.md`](model-evaluation/README.md) |
 | What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
@@ -36,6 +37,7 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`implementation-plan.md`](implementation-plan.md) — repository target overview and focused-spec routing
 - [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md) — cross-cutting reference-grade architecture target, milestones and dependency sequencing
 - [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) — concise architecture-hardening workstream state and next slice
+- [`memory-management/README.md`](memory-management/README.md) — runtime memory ownership, residency, budgeting, admission, pressure response and validation workstream
 - [`architecture.md`](architecture.md) — current dependency and ownership boundaries
 - [`adr/README.md`](adr/README.md) — accepted durable decisions
 - [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
