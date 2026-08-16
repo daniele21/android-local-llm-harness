@@ -34,18 +34,20 @@ internal class DeterministicFakeInferenceBackend(
     var loadFailure: FakeBackendFailure? = null
     var generationFailure: FakeBackendFailure? = null
     var cancellationAccepted: Boolean = true
-    var generationOutcome: BackendGenerationOutcome = BackendGenerationOutcome.Completed(
-        BackendGenerationMetrics(
-            inputTokens = 4,
-            outputTokens = 2,
-            promptDurationMs = 2,
-            generationDurationMs = 4,
-        ),
-    )
-    var chunks: List<FakeBackendChunk> = listOf(
-        FakeBackendChunk("deterministic ", 1),
-        FakeBackendChunk("response", 2),
-    )
+    var generationOutcome: BackendGenerationOutcome =
+        BackendGenerationOutcome.Completed(
+            BackendGenerationMetrics(
+                inputTokens = 4,
+                outputTokens = 2,
+                promptDurationMs = 2,
+                generationDurationMs = 4,
+            ),
+        )
+    var chunks: List<FakeBackendChunk> =
+        listOf(
+            FakeBackendChunk("deterministic ", 1),
+            FakeBackendChunk("response", 2),
+        )
 
     override fun initialize() {
         initializeCalls += 1
