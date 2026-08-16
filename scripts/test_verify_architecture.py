@@ -68,16 +68,8 @@ class ArchitectureFitnessTest(unittest.TestCase):
         messages = evaluate_cpp_include_violations((violation,))
         self.assertTrue(any("implementation .cpp include is forbidden" in message for message in messages))
 
-    def test_known_cpp_debt_is_allowed(self) -> None:
-        violation = CppIncludeViolation(
-            "backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp",
-            "llama_jni.cpp",
-        )
-        self.assertEqual(evaluate_cpp_include_violations((violation,)), ())
-
-    def test_removed_cpp_debt_requires_exception_cleanup(self) -> None:
-        messages = evaluate_cpp_include_violations(())
-        self.assertTrue(any("stale native architecture exception" in message for message in messages))
+    def test_empty_cpp_exception_set_has_no_stale_debt(self) -> None:
+        self.assertEqual(evaluate_cpp_include_violations(()), ())
 
     def test_third_party_cpp_is_not_scanned(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
