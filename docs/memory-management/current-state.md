@@ -7,6 +7,8 @@ Canonical scope: memory-management.current-state
 Read when: determining what memory-management behavior is already integrated, open or next
 Last reviewed: 2026-08-16
 
+Repository operational state remains owned by [`../current-state.md`](../current-state.md); this source tracks only the memory-management workstream.
+
 ## Integrated baseline
 
 The current `dev` baseline already provides the lifecycle foundation needed for a stronger governor:
