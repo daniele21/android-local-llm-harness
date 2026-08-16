@@ -74,7 +74,7 @@ jobs:
       - name: Verify coding-agent navigation
         run: python3 scripts/verify-agent-navigation.py
 
-      - name: Check repository scripts
+      - name: Check repository scripts and architecture
         shell: bash
         run: |
           while IFS= read -r -d '' script; do
@@ -83,6 +83,10 @@ jobs:
           python3 -m py_compile scripts/*.py
           python3 scripts/test_check_pr_base.py
           python3 scripts/test_detect_ci_scope.py
+          python3 scripts/test_gradle_module_inventory.py
+          python3 scripts/test_verify_architecture.py
+          python3 scripts/gradle_module_inventory.py >/dev/null
+          python3 scripts/verify_architecture.py
           bash scripts/test-verify-llama-cpp-pin.sh
           bash scripts/run-device-e2e.sh --help >/dev/null
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
@@ -241,36 +245,11 @@ jobs:
             gradle_args+=(--profile)
           fi
 
-          all_modules=(
-            core:contracts
-            core:runtime-core
-            evaluation:contracts
-            evaluation:comparison
-            evaluation:evaluators
-            evaluation:engine
-            evaluation:in-memory-store
-            evaluation:room-store
-            models:model-profile
-            models:model-store
-            models:model-catalog
-            models:model-download
-            models:model-install
-            backends:llama-cpp
-            observability:contracts
-            observability:in-memory-store
-            observability:room-store
-            observability:health-engine
-            observability:android-resource-probe
-            observability:benchmark-engine
-            transports:in-process
-            transports:android-binder-contract
-            transports:android-binder-client
-            integrations:android-service-host
-            apps:local-llm-console
-            apps:shared-runtime-client-consumer-fixture
-            apps:device-test-runner
-            apps:local-llm-phone-test
-          )
+          mapfile -t all_modules < <(python3 scripts/gradle_module_inventory.py)
+          if [[ "${#all_modules[@]}" -eq 0 ]]; then
+            echo "Canonical Gradle module inventory is empty" >&2
+            exit 1
+          fi
 
           if [[ "$GRADLE_MODULES" == "all" ]]; then
             selected_modules=("${all_modules[@]}")
