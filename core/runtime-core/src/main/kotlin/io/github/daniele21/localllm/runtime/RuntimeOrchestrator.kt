@@ -54,6 +54,7 @@ class RuntimeOrchestrator(
     private val clock: MonotonicClock = MonotonicClock(System::nanoTime),
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
+    private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
     seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
     telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
     epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
@@ -300,7 +301,7 @@ class RuntimeOrchestrator(
                 resolvedUseCase = session.resolved,
                 capabilities = capabilities,
             )
-            val requestedContextSize = generationPlanning.resolveContextSize(
+            val contextPlan = generationPlanning.planContextSize(
                 resolvedUseCase = session.resolved,
                 options = session.options,
                 promptTokenCount = promptPlan.tokenCount,
@@ -309,7 +310,7 @@ class RuntimeOrchestrator(
                 preference = resolved.contextPreference,
             )
             lifecycle.ensureNotCancelled()
-            val contextResult = materializeContext(session, requestedContextSize)
+            val contextResult = materializeContext(session, contextPlan)
             if (lifecycle.cancelRequested.get()) {
                 releaseCancelledMaterialization(session, contextResult)
                 throw GenerationCancelledException()
@@ -487,8 +488,9 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun materializeContext(session: SessionDescriptor, requestedContextSize: Int): ContextMaterialization =
+    private fun materializeContext(session: SessionDescriptor, contextPlan: ContextPlanningResult): ContextMaterialization =
         synchronized(resourceLock) {
+            val requestedContextSize = contextPlan.requestedContextTokens
             val current = session.context
             val capabilities = session.resolved.model.runtimeCapabilities
             val statelessReuse = session.resolved.useCase.cachePolicy.reuseStatelessContext &&
@@ -507,14 +509,55 @@ class RuntimeOrchestrator(
                 backend.releaseContext(current)
                 session.context = null
             }
+            val admittedContextSize = resolveMemoryAwareContextSize(session, contextPlan)
             val startedAt = clock.nowNanos()
             val created = backend.createContext(
                 model = session.model,
                 profile = session.resolved.model,
-                configuration = BackendContextConfiguration(requestedContextSize),
+                configuration = BackendContextConfiguration(admittedContextSize),
             )
             session.context = created
             ContextMaterialization(created, nanosToMillis(clock.nowNanos() - startedAt), created = true)
+        }
+
+    private fun resolveMemoryAwareContextSize(session: SessionDescriptor, contextPlan: ContextPlanningResult): Int {
+        val planner = memoryAwareContextPlanner ?: return contextPlan.requestedContextTokens
+        val schedulerSnapshot = scheduler.snapshot()
+        val decision = planner.plan(
+            MemoryAwareContextRequest(
+                modelProfileId = session.resolved.model.id,
+                requestedContextTokens = contextPlan.requestedContextTokens,
+                minimumContextTokens = contextPlan.minimumRequiredTokens,
+                approvedContextTiers = contextPlan.memoryEligibleContextTiers,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = loadedModel != null,
+                    residentContexts = sessions.values.count { it.context != null },
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
+        )
+        return when (decision) {
+            is MemoryAwareContextDecision.Allow -> decision.contextTokens
+
+            is MemoryAwareContextDecision.Reject -> throw GenerationPlanningException(
+                ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                memoryAdmissionFailureMessage(contextPlan, decision),
+            )
+        }
+    }
+
+    private fun memoryAdmissionFailureMessage(contextPlan: ContextPlanningResult, decision: MemoryAwareContextDecision.Reject): String =
+        buildString {
+            append("Memory admission rejected context ")
+            append(contextPlan.requestedContextTokens)
+            append(" tokens: ")
+            append(decision.reason.name)
+            decision.admissionReason?.let { reason ->
+                append(" (")
+                append(reason.name)
+                append(')')
+            }
         }
 
     private fun releaseCancelledMaterialization(session: SessionDescriptor, materialization: ContextMaterialization) {
