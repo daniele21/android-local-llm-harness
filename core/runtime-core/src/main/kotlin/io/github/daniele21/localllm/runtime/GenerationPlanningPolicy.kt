@@ -39,16 +39,15 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
         val thinkingMode = request.overrides.thinkingMode ?: defaults.thinkingMode
         val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty
         val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN
-        validateGenerationValues(
-            maxOutputTokens,
-            temperature,
-            topP,
-            topK,
-            minP,
-            presencePenalty,
-            repeatPenalty,
-            repeatLastN,
-        )
+        val generationValuesValid = outputAndTemperatureValid(maxOutputTokens, temperature) &&
+            samplingValuesValid(topP, topK, minP) &&
+            penaltyValuesValid(presencePenalty, repeatPenalty, repeatLastN)
+        if (!generationValuesValid) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Generation settings are outside the supported bounds",
+            )
+        }
 
         val seedPolicy = request.overrides.requestedSeedPolicy() ?: defaults.seedPolicy
         val effectiveSeed = when (seedPolicy) {
@@ -208,27 +207,6 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
             closeMarker = closeMarker,
             forcedCloseText = forcedCloseText,
         )
-    }
-
-    private fun validateGenerationValues(
-        maxOutputTokens: Int,
-        temperature: Float,
-        topP: Float,
-        topK: Int,
-        minP: Float,
-        presencePenalty: Float,
-        repeatPenalty: Float,
-        repeatLastN: Int,
-    ) {
-        val valid = outputAndTemperatureValid(maxOutputTokens, temperature) &&
-            samplingValuesValid(topP, topK, minP) &&
-            penaltyValuesValid(presencePenalty, repeatPenalty, repeatLastN)
-        if (!valid) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Generation settings are outside the supported bounds",
-            )
-        }
     }
 
     private fun outputAndTemperatureValid(maxOutputTokens: Int, temperature: Float): Boolean =
