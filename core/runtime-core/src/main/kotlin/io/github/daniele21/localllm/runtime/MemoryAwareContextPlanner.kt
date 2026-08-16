@@ -34,16 +34,10 @@ enum class MemoryAwareContextRejectReason {
 }
 
 sealed interface MemoryAwareContextDecision {
-    data class Allow(
-        val contextTokens: Int,
-        val downshifted: Boolean,
-        val estimate: MemoryCostEstimate,
-    ) : MemoryAwareContextDecision
+    data class Allow(val contextTokens: Int, val downshifted: Boolean, val estimate: MemoryCostEstimate) : MemoryAwareContextDecision
 
-    data class Reject(
-        val reason: MemoryAwareContextRejectReason,
-        val admissionReason: MemoryAdmissionRejectReason? = null,
-    ) : MemoryAwareContextDecision
+    data class Reject(val reason: MemoryAwareContextRejectReason, val admissionReason: MemoryAdmissionRejectReason? = null) :
+        MemoryAwareContextDecision
 }
 
 class MemoryAwareContextPlanner(
