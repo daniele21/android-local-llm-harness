@@ -53,15 +53,82 @@ class DeterministicFakeInferenceBackendTest {
         assertEquals(1, backend.releaseContextCalls)
         assertEquals(1, backend.unloadCalls)
         assertEquals(1, backend.shutdownCalls)
+    }
 
-        backend.generationFailure = FakeBackendFailure("TEST_FAILURE", "controlled failure")
-        val secondModel = backend.loadModel(stored, profile)
-        val secondContext = backend.createContext(secondModel, profile, BackendContextConfiguration(512))
-        val failure = runCatching {
-            backend.generate(secondContext, generationRequest("prompt")) { _, _ -> true }
-        }.exceptionOrNull()
+    @Test
+    fun `fake injects deterministic failures at lifecycle boundaries`() {
+        val backend = DeterministicFakeInferenceBackend()
+        val profile = profile()
+        val stored = StoredModel(profile.artifact.digest, File("fake.gguf"), 4, verified = true)
+
+        backend.initializeFailure = FakeBackendFailure("INIT_FAILURE", "initialize")
+        assertBackendFailure("INIT_FAILURE") { backend.initialize() }
+        backend.initializeFailure = null
+        backend.initialize()
+
+        backend.loadFailure = FakeBackendFailure("LOAD_FAILURE", "load")
+        assertBackendFailure("LOAD_FAILURE") { backend.loadModel(stored, profile) }
+        backend.loadFailure = null
+        val model = backend.loadModel(stored, profile)
+
+        backend.promptPlanningFailure = FakeBackendFailure("PROMPT_FAILURE", "prompt")
+        assertBackendFailure("PROMPT_FAILURE") {
+            backend.planPrompt(
+                model,
+                BackendPromptPlanningRequest(
+                    input = GenerationInput.RawCompletion("hello"),
+                    systemPrompt = null,
+                    chatTemplatePolicy = profile.chatTemplatePolicy,
+                ),
+            )
+        }
+        backend.promptPlanningFailure = null
+
+        backend.contextCreationFailure = FakeBackendFailure("CONTEXT_CREATE_FAILURE", "context")
+        assertBackendFailure("CONTEXT_CREATE_FAILURE") {
+            backend.createContext(model, profile, BackendContextConfiguration(512))
+        }
+        backend.contextCreationFailure = null
+        val context = backend.createContext(model, profile, BackendContextConfiguration(512))
+
+        backend.contextReleaseFailure = FakeBackendFailure("CONTEXT_RELEASE_FAILURE", "release")
+        assertBackendFailure("CONTEXT_RELEASE_FAILURE") { backend.releaseContext(context) }
+        backend.contextReleaseFailure = null
+
+        backend.cancellationFailure = FakeBackendFailure("CANCEL_FAILURE", "cancel")
+        assertBackendFailure("CANCEL_FAILURE") { backend.cancel("request-1") }
+        backend.cancellationFailure = null
+
+        backend.unloadFailure = FakeBackendFailure("UNLOAD_FAILURE", "unload")
+        assertBackendFailure("UNLOAD_FAILURE") { backend.unloadModel(model) }
+    }
+
+    @Test
+    fun `fake can fail generation deterministically after a configured chunk boundary`() {
+        val backend = DeterministicFakeInferenceBackend()
+        val profile = profile()
+        val stored = StoredModel(profile.artifact.digest, File("fake.gguf"), 4, verified = true)
+        backend.initialize()
+        val model = backend.loadModel(stored, profile)
+        val context = backend.createContext(model, profile, BackendContextConfiguration(512))
+        backend.generationFailure = FakeBackendFailure("TOKEN_N_FAILURE", "after first chunk")
+        backend.generationFailureAfterChunks = 1
+        val emitted = mutableListOf<String>()
+
+        assertBackendFailure("TOKEN_N_FAILURE") {
+            backend.generate(context, generationRequest("prompt")) { text, _ ->
+                emitted += text
+                true
+            }
+        }
+
+        assertEquals(listOf("deterministic "), emitted)
+    }
+
+    private fun assertBackendFailure(expectedCode: String, block: () -> Unit) {
+        val failure = runCatching(block).exceptionOrNull()
         assertTrue(failure is BackendException)
-        assertEquals("TEST_FAILURE", (failure as BackendException).code)
+        assertEquals(expectedCode, (failure as BackendException).code)
     }
 
     private fun generationRequest(prompt: String) = BackendGenerationRequest(
