@@ -539,6 +539,7 @@ class RuntimeOrchestrator(
         )
         return when (decision) {
             is MemoryAwareContextDecision.Allow -> decision.contextTokens
+
             is MemoryAwareContextDecision.Reject -> throw GenerationPlanningException(
                 ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
                 memoryAdmissionFailureMessage(contextPlan, decision),
@@ -546,20 +547,18 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun memoryAdmissionFailureMessage(
-        contextPlan: ContextPlanningResult,
-        decision: MemoryAwareContextDecision.Reject,
-    ): String = buildString {
-        append("Memory admission rejected context ")
-        append(contextPlan.requestedContextTokens)
-        append(" tokens: ")
-        append(decision.reason.name)
-        decision.admissionReason?.let { reason ->
-            append(" (")
-            append(reason.name)
-            append(')')
+    private fun memoryAdmissionFailureMessage(contextPlan: ContextPlanningResult, decision: MemoryAwareContextDecision.Reject): String =
+        buildString {
+            append("Memory admission rejected context ")
+            append(contextPlan.requestedContextTokens)
+            append(" tokens: ")
+            append(decision.reason.name)
+            decision.admissionReason?.let { reason ->
+                append(" (")
+                append(reason.name)
+                append(')')
+            }
         }
-    }
 
     private fun releaseCancelledMaterialization(session: SessionDescriptor, materialization: ContextMaterialization) {
         if (!materialization.created) return
