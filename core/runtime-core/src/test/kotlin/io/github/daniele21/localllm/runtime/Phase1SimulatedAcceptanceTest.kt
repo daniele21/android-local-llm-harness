@@ -20,7 +20,6 @@ import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseProfile
 import io.github.daniele21.localllm.store.FileSystemModelStore
-import io.github.daniele21.localllm.store.StoredModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -242,9 +241,9 @@ private class SimulatedAcceptanceBackend : InferenceBackend {
         shutdownCalls += 1
     }
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
-        return SimulatedAcceptanceModel(storedModel.digest, profile.id)
+        return SimulatedAcceptanceModel(source.digest, profile.id)
     }
 
     override fun unloadModel(model: BackendModelHandle) {
