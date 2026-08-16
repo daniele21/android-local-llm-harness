@@ -156,10 +156,7 @@ private data class ShutdownModelHandle(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class ShutdownContextHandle(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class ShutdownContextHandle(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class BlockingShutdownBackend : InferenceBackend {
     override val id: String = "shutdown-fake"
