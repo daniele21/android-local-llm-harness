@@ -2,19 +2,13 @@ package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ModelDigest
 
-data class ContextMemoryRuntimeIdentity(
-    val backendId: String,
-    val backendRevision: String?,
-) {
+data class ContextMemoryRuntimeIdentity(val backendId: String, val backendRevision: String?) {
     init {
         require(backendId.isNotBlank()) { "Backend ID must not be blank" }
     }
 }
 
-data class ContextMemoryModelIdentity(
-    val modelProfileId: String,
-    val modelDigest: ModelDigest,
-) {
+data class ContextMemoryModelIdentity(val modelProfileId: String, val modelDigest: ModelDigest) {
     init {
         require(modelProfileId.isNotBlank()) { "Model profile ID must not be blank" }
     }
@@ -68,9 +62,5 @@ class ContextMemoryCostProfileEstimator(
 
     private fun MemoryCostSource.isAtLeast(required: MemoryCostSource): Boolean = ordinal >= required.ordinal
 
-    private data class ProfileKey(
-        val model: ContextMemoryModelIdentity,
-        val runtime: ContextMemoryRuntimeIdentity,
-        val contextTokens: Int,
-    )
+    private data class ProfileKey(val model: ContextMemoryModelIdentity, val runtime: ContextMemoryRuntimeIdentity, val contextTokens: Int)
 }
