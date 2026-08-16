@@ -121,7 +121,7 @@ class SingleDecodeScheduler(
         if (!closed.compareAndSet(false, true)) {
             return
         }
-        queue.toList().forEach { work -> cancel(work.requestId) }
+        queue.forEach { work -> cancel(work.requestId) }
         worker.interrupt()
     }
 
