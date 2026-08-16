@@ -173,6 +173,7 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - Backend implementations never own model-store integrity, installation or selection policy.
 - Large payloads will not cross the future Binder boundary inline.
 - State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
+- Per-session request admission, close intent and release reservation are owned by `SessionLifecycle`; `RuntimeOrchestrator` owns the session registry, backend handles and physical resource release.
 - Cancellation and partial failures must leave the runtime recoverable.
 
 ## Modularity and maintainability
