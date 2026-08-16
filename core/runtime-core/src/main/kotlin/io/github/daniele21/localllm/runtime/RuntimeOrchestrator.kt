@@ -32,7 +32,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -154,7 +153,7 @@ class RuntimeOrchestrator(
                 LocalLlmError.Configuration("Generation request does not match its session binding"),
             )
         }
-        if (!session.acquireRequest()) {
+        if (!session.lifecycle.tryAcquireRequest()) {
             return failImmediately(
                 request.requestId,
                 listener,
@@ -206,8 +205,8 @@ class RuntimeOrchestrator(
 
     override fun closeSession(sessionId: SessionId) {
         val session = sessions[sessionId] ?: return
-        session.closing.set(true)
-        if (session.activeRequests.get() == 0) {
+        session.lifecycle.beginClose()
+        if (session.lifecycle.isReleaseReady()) {
             releaseSession(session)
         }
     }
@@ -256,8 +255,8 @@ class RuntimeOrchestrator(
         scheduler.snapshot().activeRequest?.let(scheduler::cancel)
         scheduler.close()
         sessions.values.forEach { session ->
-            session.closing.set(true)
-            if (session.activeRequests.get() == 0) {
+            session.lifecycle.beginClose()
+            if (session.lifecycle.isReleaseReady()) {
                 releaseSession(session)
             }
         }
@@ -689,15 +688,13 @@ class RuntimeOrchestrator(
     }
 
     private fun releaseSessionRequest(session: SessionDescriptor) {
-        val remaining = session.activeRequests.decrementAndGet()
-        check(remaining >= 0) { "Session request count became negative" }
-        if (remaining == 0 && session.closing.get()) {
+        if (session.lifecycle.releaseRequest()) {
             releaseSession(session)
         }
     }
 
     private fun releaseSession(session: SessionDescriptor) {
-        if (!session.released.compareAndSet(false, true)) {
+        if (!session.lifecycle.tryBeginRelease()) {
             return
         }
         val release = runCatching {
@@ -708,19 +705,20 @@ class RuntimeOrchestrator(
             }
         }
         if (release.isFailure) {
-            session.released.set(false)
+            session.lifecycle.releaseFailed()
             state.set(RuntimeState.DEGRADED)
             release.getOrThrow()
         }
+        session.lifecycle.releaseSucceeded()
         attemptDeferredModelUnload(ignoreActiveGeneration = false)
     }
 
     private fun releaseForCriticalMemory(action: RuntimeMemoryAction): RuntimeMemoryResult {
         deferredModelUnload.set(true)
-        sessions.values.forEach { session -> session.closing.set(true) }
+        sessions.values.forEach { session -> session.lifecycle.beginClose() }
         val cancelled = scheduler.cancelAll()
         sessions.values.forEach { session ->
-            if (session.activeRequests.get() == 0) {
+            if (session.lifecycle.isReleaseReady()) {
                 releaseSession(session)
             }
         }
@@ -809,18 +807,8 @@ class RuntimeOrchestrator(
         val modelLoadDurationMs: Long?,
         val modelLoadKind: ModelLoadKind,
         @Volatile var context: BackendContextHandle? = null,
-        val activeRequests: AtomicInteger = AtomicInteger(0),
-        val closing: AtomicBoolean = AtomicBoolean(false),
-        val released: AtomicBoolean = AtomicBoolean(false),
-    ) {
-        fun acquireRequest(): Boolean {
-            if (closing.get()) return false
-            activeRequests.incrementAndGet()
-            if (!closing.get()) return true
-            activeRequests.decrementAndGet()
-            return false
-        }
-    }
+        val lifecycle: SessionLifecycle = SessionLifecycle(),
+    )
 
     private data class ContextMaterialization(val context: BackendContextHandle, val creationMs: Long?, val created: Boolean)
 }
