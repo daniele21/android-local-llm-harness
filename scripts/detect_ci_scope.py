@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Iterable, Sequence
 
+from gradle_module_inventory import load_gradle_modules
+
 ZERO_SHA = "0" * 40
 
 DOC_ONLY_PATHS = {
@@ -32,7 +34,11 @@ FORCE_ALL_PATHS = {
     ".github/workflows/package.yml",
     ".github/workflows/validate.yml",
     "scripts/detect_ci_scope.py",
+    "scripts/gradle_module_inventory.py",
     "scripts/test_detect_ci_scope.py",
+    "scripts/test_gradle_module_inventory.py",
+    "scripts/test_verify_architecture.py",
+    "scripts/verify_architecture.py",
 }
 
 NATIVE_PATHS = {
@@ -77,34 +83,9 @@ PACKAGING_SUFFIXES = (
     ".gradle.kts",
 )
 
-GRADLE_MODULES = (
-    "core:contracts",
-    "core:runtime-core",
-    "evaluation:contracts",
-    "evaluation:comparison",
-    "evaluation:evaluators",
-    "evaluation:engine",
-    "evaluation:in-memory-store",
-    "evaluation:room-store",
-    "models:model-profile",
-    "models:model-store",
-    "models:model-catalog",
-    "models:model-download",
-    "models:model-install",
-    "backends:llama-cpp",
-    "observability:contracts",
-    "observability:in-memory-store",
-    "observability:room-store",
-    "observability:health-engine",
-    "observability:android-resource-probe",
-    "observability:benchmark-engine",
-    "transports:in-process",
-    "transports:android-binder-contract",
-    "integrations:android-service-host",
-    "apps:local-llm-console",
-    "apps:device-test-runner",
-    "apps:local-llm-phone-test",
-)
+# settings.gradle.kts is the canonical project inventory. Keeping this derived
+# prevents validation scope from silently omitting newly registered modules.
+GRADLE_MODULES = load_gradle_modules()
 MODULE_PREFIXES = tuple(
     (module.replace(":", "/") + "/", module) for module in GRADLE_MODULES
 )
