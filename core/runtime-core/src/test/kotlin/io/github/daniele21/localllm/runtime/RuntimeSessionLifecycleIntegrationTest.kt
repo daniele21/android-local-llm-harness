@@ -60,7 +60,7 @@ class RuntimeSessionLifecycleIntegrationTest {
             GenerationListener { event -> rejected += event },
         )
         assertTrue(rejected.single() is GenerationEvent.Failed)
-        assertEquals(1, delegate.generateCalls)
+        assertEquals(1, backend.generateCalls.get())
 
         backend.allowCompletion.countDown()
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
@@ -107,12 +107,14 @@ class RuntimeSessionLifecycleIntegrationTest {
 private class BlockingInferenceBackend(private val delegate: DeterministicFakeInferenceBackend) : InferenceBackend by delegate {
     val started = CountDownLatch(1)
     val allowCompletion = CountDownLatch(1)
+    val generateCalls = AtomicInteger(0)
 
     override fun generate(
         context: BackendContextHandle,
         request: BackendGenerationRequest,
         onChunk: (text: String, generatedTokens: Int) -> Boolean,
     ): BackendGenerationOutcome {
+        generateCalls.incrementAndGet()
         started.countDown()
         check(allowCompletion.await(2, TimeUnit.SECONDS)) { "Timed out waiting to release blocked generation" }
         return delegate.generate(context, request, onChunk)
