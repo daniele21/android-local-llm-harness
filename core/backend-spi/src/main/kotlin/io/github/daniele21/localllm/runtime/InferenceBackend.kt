@@ -10,11 +10,7 @@ import io.github.daniele21.localllm.models.ChatTemplatePolicy
 import io.github.daniele21.localllm.models.GgufModelProfile
 import java.io.File
 
-data class BackendModelSource(
-    val digest: ModelDigest,
-    val file: File,
-    val sizeBytes: Long,
-) {
+data class BackendModelSource(val digest: ModelDigest, val file: File, val sizeBytes: Long) {
     init {
         require(sizeBytes >= 0) { "Model source size must not be negative" }
     }
