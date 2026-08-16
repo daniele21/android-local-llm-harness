@@ -472,9 +472,14 @@ class RuntimeOrchestrator(
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: BackendException) {
-            val failure = error.toPublicError()
-            runtimeTelemetry.failed(request.requestId, failure)
-            lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
+            val resolution = RuntimeFailurePolicy.resolveBackendFailure(error)
+            runtimeTelemetry.failed(
+                requestId = request.requestId,
+                error = resolution.publicError,
+                decision = resolution.decision,
+                backendCode = resolution.backendCode,
+            )
+            lifecycle.finish(GenerationEvent.Failed(request.requestId, resolution.publicError))
         } catch (error: Throwable) {
             val failure = LocalLlmError.NativeRuntime(error.message ?: "Unexpected local inference failure")
             runtimeTelemetry.failed(request.requestId, failure)
@@ -590,23 +595,6 @@ class RuntimeOrchestrator(
     private fun SeedPolicy.toType(): SeedPolicyType = when (this) {
         SeedPolicy.Random -> SeedPolicyType.RANDOM
         is SeedPolicy.Fixed -> SeedPolicyType.FIXED
-    }
-
-    private fun BackendException.toPublicError(): LocalLlmError {
-        val reason = when (code) {
-            "CHAT_TEMPLATE_UNAVAILABLE" -> ConfigurationErrorCode.CHAT_TEMPLATE_UNAVAILABLE
-            "CHAT_TEMPLATE_UNSUPPORTED" -> ConfigurationErrorCode.CHAT_TEMPLATE_UNSUPPORTED
-            "TOKENIZATION_FAILED" -> ConfigurationErrorCode.PROMPT_TOKENIZATION_FAILED
-            "CONTEXT_OVERFLOW" -> ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED
-            "OUTPUT_CONSTRAINT_UNSUPPORTED" -> ConfigurationErrorCode.OUTPUT_CONSTRAINT_UNSUPPORTED
-            "INVALID_OUTPUT_CONSTRAINT" -> ConfigurationErrorCode.INVALID_OUTPUT_CONSTRAINT
-            else -> null
-        }
-        return if (reason == null) {
-            LocalLlmError.NativeRuntime("$code: ${message.orEmpty()}")
-        } else {
-            LocalLlmError.Configuration(message.orEmpty(), reason)
-        }
     }
 
     private fun ensureModelLoaded(resolved: ResolvedUseCase): ResidentModel {
