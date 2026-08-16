@@ -5,7 +5,7 @@ Document type: architecture
 Owner: repository
 Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-16
 
 ![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, runtime and model boundaries, observability, and future shared host](assets/architecture.png)
 
@@ -26,12 +26,22 @@ Native app / Capacitor plugin
       |       |
       |    Model store
       |       |
-      +--- llama.cpp JNI ---> GGUF
+      |  verified StoredModel
+      |       |
+      |  BackendModelSource
+      |       |
+      +--> Backend SPI
+              |
+       llama.cpp adapter
+              |
+          JNI / C++ ---> GGUF
 ```
 
 The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change. The future deployment and workstream routing are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
 
-Runtime orchestration depends only on `observability/contracts`. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+Runtime orchestration depends on `core:backend-spi` for backend-neutral execution operations and on `observability/contracts` for telemetry. It does not depend on a concrete inference backend. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+
+The backend SPI is store-neutral. Runtime/model-store code resolves and verifies an installed artifact, then adapts it to `BackendModelSource` immediately before loading. Backend implementations do not own installation, integrity policy or model selection. This dependency boundary is recorded in [ADR 0014](adr/0014-backend-spi-boundary.md).
 
 ## Product support envelope
 
@@ -105,6 +115,8 @@ FileSystemModelStore
         |
 RuntimeOrchestrator
         |
+Backend SPI
+        |
 LlamaCppInferenceBackend
         |
 JNI / llama.cpp
@@ -157,6 +169,8 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - Prompt/output persistence is disabled by default.
 - Telemetry failures are non-fatal to inference.
 - Native handles are never exposed outside the backend module.
+- Runtime core never selects or imports a concrete backend implementation.
+- Backend implementations never own model-store integrity, installation or selection policy.
 - Large payloads will not cross the future Binder boundary inline.
 - State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
 - Cancellation and partial failures must leave the runtime recoverable.
@@ -168,29 +182,36 @@ The codebase must remain modular, extensible and independently testable without 
 Dependencies follow this direction:
 
 ```text
-apps / integrations
+apps / integrations / composition roots
         |
      transports
         |
- core contracts + runtime orchestration
+ core contracts + runtime-core
+        |              \
+        |               +--> model-profile + model-store + observability contracts
         |
- model profiles + model store + observability contracts
+ core/backend-spi
         |
- backend interfaces
+ concrete backend implementations
         |
- llama.cpp Kotlin bridge / JNI / C++ implementation
+ llama.cpp Kotlin bridge / JNI / C++
 ```
 
-Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
+Runtime core depends inward on the backend SPI. Concrete backends depend on the SPI and are selected only by composition roots; runtime core does not depend outward on them. Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
 
 The main ownership boundaries are:
 
 ```text
 core/contracts
-    public contracts and backend-independent DTOs
+    public application/consumer contracts and backend-independent DTOs
+
+core/backend-spi
+    internal backend-neutral model-source, capability, prompt, context,
+    generation, cancellation and backend-error contracts
 
 core/runtime-core
-    orchestration, sessions, scheduling, lifecycle and telemetry emission
+    orchestration, model verification/adaptation, sessions, scheduling,
+    lifecycle, recovery policy and telemetry emission
 
 models/model-profile
     model, use-case and application binding configuration
@@ -199,7 +220,7 @@ models/model-store
     artifact storage, identity and integrity
 
 backends/llama-cpp
-    Kotlin/JNI/C++ implementation specific to llama.cpp
+    InferenceBackend implementation plus Kotlin/JNI/C++ llama.cpp adaptation
 
 observability/contracts
     stable telemetry, log, health, retention and query contracts
@@ -211,13 +232,13 @@ observability/room-store
     Android Room schema, persistence, retention and database lifecycle
 
 transports
-    in-process communication now and Binder later
+    in-process and Binder communication; no runtime policy ownership
 
 integrations
     thin native Android and Capacitor adapters
 
 apps
-    developer console, sample applications and isolated device validation surfaces
+    composition roots, developer surfaces and isolated device validation
 ```
 
 A new module is justified only when it owns a real responsibility, creates a necessary dependency boundary, provides actual reuse, isolates a platform or third-party dependency, or needs an independent testing/release boundary.
