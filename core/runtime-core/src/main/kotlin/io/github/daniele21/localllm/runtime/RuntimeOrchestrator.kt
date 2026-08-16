@@ -260,6 +260,7 @@ class RuntimeOrchestrator(
         if (!closed.compareAndSet(false, true)) {
             return
         }
+        deferredModelUnload.set(true)
         scheduler.snapshot().activeRequest?.let(scheduler::cancel)
         scheduler.close()
         sessions.values.forEach { session ->
@@ -268,19 +269,11 @@ class RuntimeOrchestrator(
                 releaseSession(session)
             }
         }
-        synchronized(resourceLock) {
-            if (sessions.isEmpty()) {
-                loadedModel?.let { backend.unloadModel(it.handle) }
-                loadedModel = null
-                if (backendInitialized) {
-                    backend.shutdown()
-                    backendInitialized = false
-                }
-            }
-        }
-        deferredModelUnload.set(false)
+        val finalized = attemptDeferredModelUnload(ignoreActiveGeneration = false)
         integrityCache.clear()
-        state.set(RuntimeState.IDLE)
+        if (!finalized) {
+            state.set(RuntimeState.DEGRADED)
+        }
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
@@ -932,7 +925,7 @@ class RuntimeOrchestrator(
     }
 
     private fun attemptDeferredModelUnload(ignoreActiveGeneration: Boolean): Boolean {
-        if (!deferredModelUnload.get()) return false
+        if (!deferredModelUnload.get() && !closed.get()) return false
         return synchronized(resourceLock) {
             val schedulerSnapshot = scheduler.snapshot()
             val activeBlocksUnload = !ignoreActiveGeneration && schedulerSnapshot.activeRequest != null
@@ -942,6 +935,10 @@ class RuntimeOrchestrator(
 
             loadedModel?.let { backend.unloadModel(it.handle) }
             loadedModel = null
+            if (closed.get() && backendInitialized) {
+                backend.shutdown()
+                backendInitialized = false
+            }
             deferredModelUnload.set(false)
             state.set(RuntimeState.IDLE)
             true
