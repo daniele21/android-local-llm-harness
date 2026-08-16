@@ -123,9 +123,7 @@ class RuntimeModelResidencyIntegrationTest {
     }
 }
 
-private class UnloadFailOnceBackend(
-    private val delegate: DeterministicFakeInferenceBackend,
-) : InferenceBackend by delegate {
+private class UnloadFailOnceBackend(private val delegate: DeterministicFakeInferenceBackend) : InferenceBackend by delegate {
     val unloadAttempts = AtomicInteger(0)
 
     override fun unloadModel(model: BackendModelHandle) {
@@ -136,9 +134,7 @@ private class UnloadFailOnceBackend(
     }
 }
 
-private class RecordingResidencyBackend(
-    private val delegate: DeterministicFakeInferenceBackend,
-) : InferenceBackend by delegate {
+private class RecordingResidencyBackend(private val delegate: DeterministicFakeInferenceBackend) : InferenceBackend by delegate {
     val events = mutableListOf<String>()
 
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
@@ -170,12 +166,11 @@ private class ModelResidencyRuntimeFixture(backend: InferenceBackend) {
     private val primary = resolvedUseCase(primaryUseCaseId, "residency-profile-a", primaryDigest)
     private val secondary = resolvedUseCase(secondaryUseCaseId, "residency-profile-b", secondaryDigest)
     private val registry = object : ModelProfileRegistry {
-        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
-            when (useCaseId) {
-                primaryUseCaseId -> primary
-                secondaryUseCaseId -> secondary
-                else -> error("Unknown use case ${useCaseId.value}")
-            }
+        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
+            primaryUseCaseId -> primary
+            secondaryUseCaseId -> secondary
+            else -> error("Unknown use case ${useCaseId.value}")
+        }
     }
     val runtime = RuntimeOrchestrator(
         registry = registry,
@@ -227,10 +222,7 @@ private class ModelResidencyRuntimeFixture(backend: InferenceBackend) {
     }
 }
 
-private class ResidencyModelStore(
-    private val file: File,
-    private val digests: Set<ModelDigest>,
-) : ModelStore {
+private class ResidencyModelStore(private val file: File, private val digests: Set<ModelDigest>) : ModelStore {
     override fun find(digest: ModelDigest): StoredModel? = if (digest in digests) {
         StoredModel(digest, file, file.length(), verified = true)
     } else {
