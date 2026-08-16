@@ -89,6 +89,59 @@ class SingleDecodeSchedulerTest {
     }
 
     @Test
+    fun `priority fairness window bounds starvation under sustained interactive traffic`() {
+        val scheduler = SingleDecodeScheduler(priorityFairnessWindow = 4)
+        val firstStarted = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val completed = CountDownLatch(13)
+        val order = Collections.synchronizedList(mutableListOf<String>())
+
+        scheduler.submit(
+            RequestId("active"),
+            DecodePriority.FOREGROUND,
+            task = {
+                firstStarted.countDown()
+                releaseFirst.await()
+                order += "active"
+                completed.countDown()
+            },
+            onQueuedCancellation = {},
+            onRunningCancellation = {},
+        )
+        assertTrue(firstStarted.await(2, TimeUnit.SECONDS))
+
+        scheduler.submit(
+            RequestId("background"),
+            DecodePriority.BACKGROUND,
+            task = {
+                order += "background"
+                completed.countDown()
+            },
+            onQueuedCancellation = {},
+            onRunningCancellation = {},
+        )
+        repeat(11) { index ->
+            scheduler.submit(
+                RequestId("interactive-$index"),
+                DecodePriority.USER_INTERACTIVE,
+                task = {
+                    order += "interactive-$index"
+                    completed.countDown()
+                },
+                onQueuedCancellation = {},
+                onRunningCancellation = {},
+            )
+        }
+
+        releaseFirst.countDown()
+
+        assertTrue(completed.await(3, TimeUnit.SECONDS))
+        assertEquals(listOf("active", "interactive-0", "interactive-1", "background"), order.take(4))
+        assertTrue(order.indexOf("background") < order.indexOf("interactive-2"))
+        scheduler.close()
+    }
+
+    @Test
     fun `queued task can be cancelled without execution`() {
         val scheduler = SingleDecodeScheduler()
         val firstStarted = CountDownLatch(1)
