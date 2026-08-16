@@ -35,9 +35,11 @@ class SingleDecodeScheduler(
         Thread(runnable, "local-llm-decode").apply { isDaemon = true }
     },
     private val maxOutstandingRequests: Int = DEFAULT_MAX_OUTSTANDING_REQUESTS,
+    private val priorityFairnessWindow: Long = DEFAULT_PRIORITY_FAIRNESS_WINDOW,
 ) : AutoCloseable {
     init {
         require(maxOutstandingRequests > 0) { "Maximum outstanding decode requests must be positive" }
+        require(priorityFairnessWindow > 0) { "Priority fairness window must be positive" }
     }
 
     private val queue = PriorityBlockingQueue<ScheduledWork>()
@@ -64,6 +66,7 @@ class SingleDecodeScheduler(
             requestId = requestId,
             priority = priority,
             sequence = sequence.getAndIncrement(),
+            fairnessWindow = priorityFairnessWindow,
             task = task,
             onQueuedCancellation = onQueuedCancellation,
             onRunningCancellation = onRunningCancellation,
@@ -167,16 +170,20 @@ class SingleDecodeScheduler(
         val requestId: RequestId,
         val priority: DecodePriority,
         val sequence: Long,
+        fairnessWindow: Long,
         val task: () -> Unit,
         val onQueuedCancellation: () -> Unit,
         val onRunningCancellation: () -> Unit,
     ) : Comparable<ScheduledWork> {
         val cancelled = AtomicBoolean(false)
         val started = AtomicBoolean(false)
+        private val admissionWindow = sequence / fairnessWindow
         private val queuedCancellationNotified = AtomicBoolean(false)
         private val capacityReleased = AtomicBoolean(false)
 
         override fun compareTo(other: ScheduledWork): Int {
+            val windowComparison = admissionWindow.compareTo(other.admissionWindow)
+            if (windowComparison != 0) return windowComparison
             val priorityComparison = priority.rank.compareTo(other.priority.rank)
             return if (priorityComparison != 0) priorityComparison else sequence.compareTo(other.sequence)
         }
@@ -200,5 +207,6 @@ class SingleDecodeScheduler(
 
     private companion object {
         const val DEFAULT_MAX_OUTSTANDING_REQUESTS = 64
+        const val DEFAULT_PRIORITY_FAIRNESS_WINDOW = 8L
     }
 }
