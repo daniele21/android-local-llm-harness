@@ -35,49 +35,54 @@ jobs:
               constructor_anchor + '    private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,\n',
           )
 
-          initialize_block = '''        if (!backendInitialized) {
-              backend.initialize()
-              backendInitialized = true
-          }
-          '''.replace('              ', '    ')
+          initialize_block = (
+              '        if (!backendInitialized) {\n'
+              '            backend.initialize()\n'
+              '            backendInitialized = true\n'
+              '        }\n'
+          )
           assert text.count(initialize_block) == 1, 'backend initialization block changed'
           text = text.replace(initialize_block, '')
 
-          load_anchor = '        current?.let { backend.unloadModel(it.handle) }\n        loadedModel = null\n\n        val loaded = LoadedModelDescriptor(\n'
+          load_anchor = (
+              '        current?.let { backend.unloadModel(it.handle) }\n'
+              '        loadedModel = null\n\n'
+              '        val loaded = LoadedModelDescriptor(\n'
+          )
           assert text.count(load_anchor) == 1, 'model load admission insertion point changed'
-          replacement = '''        current?.let { backend.unloadModel(it.handle) }
-          loadedModel = null
-          admitModelLoad(resolved, schedulerSnapshot)
-
-          if (!backendInitialized) {
-              backend.initialize()
-              backendInitialized = true
-          }
-          val loaded = LoadedModelDescriptor(
-          '''.replace('          ', '        ', 1)
+          replacement = (
+              '        current?.let { backend.unloadModel(it.handle) }\n'
+              '        loadedModel = null\n'
+              '        admitModelLoad(resolved, schedulerSnapshot)\n\n'
+              '        if (!backendInitialized) {\n'
+              '            backend.initialize()\n'
+              '            backendInitialized = true\n'
+              '        }\n'
+              '        val loaded = LoadedModelDescriptor(\n'
+          )
           text = text.replace(load_anchor, replacement)
 
           helper_anchor = '    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {'
           assert text.count(helper_anchor) == 1, 'model load helper insertion point changed'
-          helper = '''    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
-              val planner = memoryAwareModelLoadPlanner ?: return
-              val decision = planner.plan(
-                  MemoryAwareModelLoadRequest(
-                      modelProfileId = resolved.model.id,
-                      residency = RuntimeResidencySnapshot(
-                          modelLoaded = false,
-                          residentContexts = 0,
-                          activeGeneration = schedulerSnapshot.activeRequest != null,
-                          queuedGenerations = schedulerSnapshot.queuedRequests,
-                      ),
-                  ),
-              )
-              if (decision is MemoryAwareModelLoadDecision.Reject) {
-                  throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
-              }
-          }
-
-          '''.replace('              ', '        ')
+          helper = (
+              '    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {\n'
+              '        val planner = memoryAwareModelLoadPlanner ?: return\n'
+              '        val decision = planner.plan(\n'
+              '            MemoryAwareModelLoadRequest(\n'
+              '                modelProfileId = resolved.model.id,\n'
+              '                residency = RuntimeResidencySnapshot(\n'
+              '                    modelLoaded = false,\n'
+              '                    residentContexts = 0,\n'
+              '                    activeGeneration = schedulerSnapshot.activeRequest != null,\n'
+              '                    queuedGenerations = schedulerSnapshot.queuedRequests,\n'
+              '                ),\n'
+              '            ),\n'
+              '        )\n'
+              '        if (decision is MemoryAwareModelLoadDecision.Reject) {\n'
+              '            throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)\n'
+              '        }\n'
+              '    }\n\n'
+          )
           text = text.replace(helper_anchor, helper + helper_anchor)
           path.write_text(text)
           PY
