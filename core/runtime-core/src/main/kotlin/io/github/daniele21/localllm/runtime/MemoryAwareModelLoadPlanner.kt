@@ -23,6 +23,23 @@ sealed interface MemoryAwareModelLoadDecision {
         MemoryAwareModelLoadDecision
 }
 
+class ModelLoadMemoryAdmissionException(
+    val modelProfileId: String,
+    val decision: MemoryAwareModelLoadDecision.Reject,
+) : IllegalStateException(
+    buildString {
+        append("Memory admission rejected model ")
+        append(modelProfileId)
+        append(": ")
+        append(decision.reason.name)
+        decision.admissionReason?.let { reason ->
+            append(" (")
+            append(reason.name)
+            append(')')
+        }
+    },
+)
+
 class MemoryAwareModelLoadPlanner(
     private val observationSource: RuntimeMemoryObservationSource,
     private val costEstimator: ModelMemoryCostEstimator,
