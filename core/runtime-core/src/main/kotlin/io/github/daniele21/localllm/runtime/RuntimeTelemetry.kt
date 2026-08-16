@@ -182,12 +182,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
-    fun failed(
-        requestId: RequestId,
-        error: LocalLlmError,
-        decision: RuntimeFailureDecision? = null,
-        backendCode: String? = null,
-    ) {
+    fun failed(requestId: RequestId, error: LocalLlmError, decision: RuntimeFailureDecision? = null, backendCode: String? = null) {
         val current = activeRuns.remove(requestId)
         if (current == null) {
             rejected(requestId, error, decision, backendCode)
@@ -208,12 +203,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
-    fun rejected(
-        requestId: RequestId,
-        error: LocalLlmError,
-        decision: RuntimeFailureDecision? = null,
-        backendCode: String? = null,
-    ) {
+    fun rejected(requestId: RequestId, error: LocalLlmError, decision: RuntimeFailureDecision? = null, backendCode: String? = null) {
         log(
             level = if (error.code == "CANCELLED") LogLevel.INFO else LogLevel.WARN,
             event = "generation.rejected",
