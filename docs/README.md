@@ -5,7 +5,7 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating the canonical owner of repository documentation or changing documentation governance
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-16
 
 Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
 
@@ -18,6 +18,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | What is integrated, blocked or next? | [`current-state.md`](current-state.md) |
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
 | What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
+| What is the reference-grade architecture hardening target and current workstream state? | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), then [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
 | What is the Qwen3.5-only product status and plan? | [`qwen35/README.md`](qwen35/README.md) |
 | How are model quality and dataset-based performance evaluated? | [`model-evaluation/README.md`](model-evaluation/README.md) |
 | What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
@@ -33,6 +34,8 @@ Use this index to locate a source, not as a mandatory reading list.
 ### Architecture, delivery and API
 
 - [`implementation-plan.md`](implementation-plan.md) — repository target overview and focused-spec routing
+- [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md) — cross-cutting reference-grade architecture target, milestones and dependency sequencing
+- [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) — concise architecture-hardening workstream state and next slice
 - [`architecture.md`](architecture.md) — current dependency and ownership boundaries
 - [`adr/README.md`](adr/README.md) — accepted durable decisions
 - [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
