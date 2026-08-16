@@ -1,0 +1,96 @@
+name: Apply model-load admission wiring
+
+on:
+  push:
+    branches:
+      - agent/mm-model-load-admission
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/mm-model-load-admission
+      - name: Apply exact runtime wiring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt')
+          text = path.read_text()
+
+          constructor_old = '''    private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
+              private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
+              seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },'''.replace('              ', '')
+          constructor_new = '''    private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
+              private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
+              private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
+              seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },'''.replace('              ', '')
+          assert text.count(constructor_old) == 1, 'constructor admission insertion point changed'
+          text = text.replace(constructor_old, constructor_new)
+
+          load_old = '''        current?.let { backend.unloadModel(it.handle) }
+              loadedModel = null
+
+              val loaded = LoadedModelDescriptor('''.replace('              ', '')
+          load_new = '''        current?.let { backend.unloadModel(it.handle) }
+              loadedModel = null
+              admitModelLoad(resolved, schedulerSnapshot)
+
+              val loaded = LoadedModelDescriptor('''.replace('              ', '')
+          assert text.count(load_old) == 1, 'model load admission insertion point changed'
+          text = text.replace(load_old, load_new)
+
+          helper_anchor = '''    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {'''
+          helper = '''    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
+              val planner = memoryAwareModelLoadPlanner ?: return
+              val decision = planner.plan(
+                  MemoryAwareModelLoadRequest(
+                      modelProfileId = resolved.model.id,
+                      residency = RuntimeResidencySnapshot(
+                          modelLoaded = false,
+                          residentContexts = 0,
+                          activeGeneration = schedulerSnapshot.activeRequest != null,
+                          queuedGenerations = schedulerSnapshot.queuedRequests,
+                      ),
+                  ),
+              )
+              if (decision is MemoryAwareModelLoadDecision.Reject) {
+                  throw IllegalStateException(modelLoadAdmissionFailureMessage(resolved, decision))
+              }
+          }
+
+          private fun modelLoadAdmissionFailureMessage(
+              resolved: ResolvedUseCase,
+              decision: MemoryAwareModelLoadDecision.Reject,
+          ): String = buildString {
+              append("Memory admission rejected model ")
+              append(resolved.model.id)
+              append(": ")
+              append(decision.reason.name)
+              decision.admissionReason?.let { reason ->
+                  append(" (")
+                  append(reason.name)
+                  append(')')
+              }
+          }
+
+          '''.replace('          private', '    private').replace('              ', '        ')
+          assert text.count(helper_anchor) == 1, 'model load helper insertion point changed'
+          text = text.replace(helper_anchor, helper + helper_anchor)
+          path.write_text(text)
+          PY
+      - name: Remove branch-scoped patch workflow
+        run: git rm .github/workflows/mm-model-load-wiring.yml
+      - name: Commit runtime wiring
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt .github/workflows/mm-model-load-wiring.yml
+          git commit -m 'feat(runtime): gate native model load on memory admission'
+          git push origin HEAD:agent/mm-model-load-admission
