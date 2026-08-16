@@ -124,6 +124,36 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
+    fun memoryAdmission(
+        resource: MemoryAdmissionResource,
+        outcome: MemoryAdmissionOutcome,
+        estimate: MemoryCostEstimate? = null,
+        decisionReason: String? = null,
+        admissionReason: MemoryAdmissionRejectReason? = null,
+        requestedContextTokens: Int? = null,
+        effectiveContextTokens: Int? = null,
+    ) {
+        log(
+            level = if (outcome == MemoryAdmissionOutcome.REJECT) LogLevel.WARN else LogLevel.INFO,
+            event = "memory.admission",
+            requestId = null,
+            fields = buildMap {
+                put("resource", resource.name)
+                put("outcome", outcome.name)
+                decisionReason?.let { put("decisionReason", it) }
+                admissionReason?.let { put("admissionReason", it.name) }
+                estimate?.let {
+                    put("profileId", it.profileId)
+                    put("source", it.source.name)
+                    put("residentBytes", it.residentBytes.toString())
+                    put("peakIncrementalBytes", it.peakIncrementalBytes.toString())
+                }
+                requestedContextTokens?.let { put("requestedContextTokens", it.toString()) }
+                effectiveContextTokens?.let { put("effectiveContextTokens", it.toString()) }
+            },
+        )
+    }
+
     fun completed(requestId: RequestId, metrics: GenerationMetrics) {
         val current = activeRuns.remove(requestId) ?: return
         val updated = current.copy(
@@ -186,7 +216,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         safely { repository.recordRun(run) }
     }
 
-    private fun log(level: LogLevel, event: String, requestId: RequestId, fields: Map<String, String> = emptyMap()) {
+    private fun log(level: LogLevel, event: String, requestId: RequestId?, fields: Map<String, String> = emptyMap()) {
         safely {
             repository.appendLog(
                 StructuredLog(
