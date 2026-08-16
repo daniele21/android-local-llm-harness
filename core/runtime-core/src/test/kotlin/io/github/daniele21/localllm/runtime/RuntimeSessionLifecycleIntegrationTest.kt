@@ -104,9 +104,7 @@ class RuntimeSessionLifecycleIntegrationTest {
     }
 }
 
-private class BlockingInferenceBackend(
-    private val delegate: DeterministicFakeInferenceBackend,
-) : InferenceBackend by delegate {
+private class BlockingInferenceBackend(private val delegate: DeterministicFakeInferenceBackend) : InferenceBackend by delegate {
     val started = CountDownLatch(1)
     val allowCompletion = CountDownLatch(1)
 
@@ -121,9 +119,7 @@ private class BlockingInferenceBackend(
     }
 }
 
-private class ReleaseFailOnceBackend(
-    private val delegate: DeterministicFakeInferenceBackend,
-) : InferenceBackend by delegate {
+private class ReleaseFailOnceBackend(private val delegate: DeterministicFakeInferenceBackend) : InferenceBackend by delegate {
     val releaseAttempts = AtomicInteger(0)
 
     override fun releaseContext(context: BackendContextHandle) {
@@ -216,10 +212,7 @@ private class RuntimeSessionLifecycleFixture(backend: InferenceBackend) {
     }
 }
 
-private class SessionLifecycleModelStore(
-    private val file: File,
-    private val digest: ModelDigest,
-) : ModelStore {
+private class SessionLifecycleModelStore(private val file: File, private val digest: ModelDigest) : ModelStore {
     override fun find(digest: ModelDigest): StoredModel? = if (digest == this.digest) {
         StoredModel(digest, file, file.length(), verified = true)
     } else {
