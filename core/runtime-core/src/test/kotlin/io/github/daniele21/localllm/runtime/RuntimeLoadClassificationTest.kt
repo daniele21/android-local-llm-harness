@@ -167,9 +167,9 @@ private class LoadClassificationBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
-        return LoadClassificationModel(storedModel.digest, profile.id)
+        return LoadClassificationModel(source.digest, profile.id)
     }
 
     override fun unloadModel(model: BackendModelHandle) = Unit
