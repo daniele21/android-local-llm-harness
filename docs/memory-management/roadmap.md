@@ -9,214 +9,196 @@ Last reviewed: 2026-08-16
 
 ## Delivery principle
 
-Memory work is split into small vertical slices with explicit owners. Parallel branches must avoid overlapping lifecycle files unless one branch is intentionally based on another. Repository tests prove policy and cleanup semantics; physical-device evidence is required before measured memory-safety claims.
+Memory governance is split into backend-neutral policy, platform composition, observability and physical evidence. Repository tests may close deterministic software milestones; only representative-device evidence may close measured calibration or certification claims.
 
-## Dependency graph
+## Current dependency graph
 
 ```text
-MEM-0 plan
-  |
-  +----------------+----------------+----------------+
-  |                |                |                |
-MEM-1 lifecycle  MEM-2 budget     MEM-4 TTL       MEM-5 regressions
-  |                |                |                |
-  +-------+--------+                |                |
-          v                         |                |
-       MEM-3 admission              |                |
-          |                         |                |
-          +------------+------------+                |
-                       v                             |
-                    MEM-6 bounds                     |
-                       |                             |
-                       +-------------+---------------+
-                                     v
-                                  MEM-7 device calibration
-                                     |
-                                     v
-                                  MEM-8 certification
+MEM-0 plan/ownership ........ DONE
+   |
+   +--> MEM-1 lifecycle ..... DONE
+   +--> MEM-2 budget ........ DONE
+   +--> MEM-4 warm TTL ...... DONE
+   +--> MEM-5 regressions ... DONE
+          |          |
+          +--> MEM-3 admission .... DONE
+                    |
+                    +--> MEM-6 bounds .... DONE
+                              |
+                              +--> MEM-7 calibration .... PARTIAL
+                                         |
+                                         +--> MEM-8 certification .... PLANNED
 ```
 
-MEM-6 may start after MEM-1 lands because both change scheduler/runtime lifecycle behavior. MEM-7 also depends on Q35-6 physical tuning evidence. MEM-8 consumes Q35-7 and SR-6 evidence where those flows exercise the same runtime.
+Q35 physical tuning evidence feeds MEM-7. Relevant Q35/SR physical lifecycle evidence feeds MEM-8. No emulator or repository-only run can promote those two milestones to DONE.
 
 ## Milestones
 
 ### MEM-0 — Plan and ownership
 
-State: ACTIVE
+State: DONE
 
-Deliverables:
+Integrated:
 
-- canonical memory-management index, target, architecture and roadmap;
-- focused lifecycle, budgeting, shared-runtime residency and validation specifications;
-- repository documentation routing;
-- explicit first-wave PR ownership and dependency plan.
+- canonical memory-management index, target, architecture, roadmap and workstream specifications;
+- repository documentation routing and ownership boundaries;
+- explicit separation of runtime policy, backend mechanics, observability, Android composition and Qwen-specific physical tuning.
 
-Exit gate: the workstream is navigable from `docs/README.md` and current repository state without duplicating Q35 or observability ownership.
+Exit gate: satisfied.
 
 ### MEM-1 — Shutdown finalization
 
-State: PLANNED
+State: DONE
 Priority: P0
 Owner: `core/runtime-core`
 
-Deliverables:
+Integrated:
 
-- make shutdown a persistent pending state until all sessions/requests are drained;
-- guarantee eventual model unload and backend shutdown when close races active cancellation;
-- keep repeated close calls idempotent;
-- add deterministic regression coverage for close-during-generation and reuse/terminal invariants.
+- persistent shutdown intent across active cancellation/drain;
+- eventual context release, model unload and backend shutdown;
+- authoritative `SessionLifecycle` for request admission, close intent, drain and release reservation;
+- retry-safe physical release and idempotent close behavior;
+- deterministic close-during-generation/release-failure regression coverage.
 
-Exit gate: no test path can leave a model/backend resident after final shutdown convergence.
+Exit gate: satisfied by repository lifecycle tests; physical recovery behavior remains part of MEM-8.
 
 ### MEM-2 — Memory-budget foundation
 
-State: PLANNED
+State: DONE
 Priority: P0/P1
 Owner: `core/runtime-core`
 
-Deliverables:
+Integrated:
 
-- backend-neutral memory observation value object;
-- configured budget/headroom policy;
-- cost estimate and provenance model;
-- resident-resource snapshot;
-- typed admission decision and reason codes;
-- deterministic controller tests for allow/reject/unknown/critical-pressure cases.
+- backend-neutral `RuntimeMemoryObservation`;
+- `RuntimeMemoryBudget`, `MemoryCostEstimate` provenance and `RuntimeResidencySnapshot`;
+- overflow-safe `MemoryAdmissionController` for model/context resources;
+- typed allow/reject reasons including low-memory, headroom, PSS and resident-context limits;
+- fail-closed behavior for required unknown observations.
 
-Exit gate: admission mathematics is unit-testable without Android, llama.cpp or observability storage.
+Exit gate: satisfied without Android or llama.cpp dependencies.
 
 ### MEM-3 — Runtime admission and context downshift
 
-State: PLANNED
+State: DONE
 Priority: P1
 Owner: `core/runtime-core`
 Depends on: MEM-1, MEM-2
 
-Deliverables:
+Integrated:
 
-- gate model/context materialization through the admission controller;
-- adapt existing context tier selection to memory headroom without violating required token capacity;
-- expose typed resource rejection;
-- record admission outcome/reason without prompts or generated content;
-- preserve one-model/one-decode invariants.
+- context admission immediately before native `createContext()`;
+- model-load admission after old-model release and before backend initialization/native load;
+- approved-tier context downshift without violating prompt/output minimum capacity;
+- typed context `MEMORY_BUDGET_EXCEEDED` failure and typed model-load admission failure;
+- warm model/context reuse without unnecessary re-admission;
+- structured `memory.admission` ALLOW/DOWNSHIFT/REJECT telemetry with no prompt/generated content;
+- integration tests proving reject paths perform zero forbidden native allocation calls.
 
-Exit gate: unsafe context allocation is rejected or safely downshifted before JNI allocation.
+Exit gate: satisfied for software semantics. Safe production thresholds remain evidence-gated by MEM-7.
 
 ### MEM-4 — Shared-runtime warm-idle residency
 
-State: PLANNED
+State: DONE
 Priority: P1
-Owner: shared-runtime host composition / phone-test composition
+Owner: shared-runtime host / phone-test composition
 
-Deliverables:
+Integrated:
 
-- explicit warm-idle state and TTL policy after the last bound consumer disconnects;
-- immediate release on configured critical pressure;
-- cancellation of pending expiry when a consumer reconnects;
-- no model load merely from observing/binding the service;
-- deterministic clock/scheduler tests.
+- explicit warm-idle TTL coordination;
+- Binder disconnect treated as demand absence, not resource ownership;
+- reconnect/rebind cancellation of pending expiry;
+- idle unload delegated to the process-owned runtime and rescheduled while busy;
+- critical pressure override and deterministic injected clock/scheduler tests.
 
-Exit gate: shared runtime cannot retain a warm idle model indefinitely solely because the process remains alive.
+Exit gate: satisfied for bounded residency semantics. The current candidate TTL is tuned only after MEM-7/8 evidence.
 
 ### MEM-5 — Memory regression evidence
 
-State: PLANNED
+State: DONE
 Priority: P1
 Owner: `observability`
 
-Deliverables:
+Integrated:
 
-- bounded resource-window summarization for baseline/peak/residual PSS and available-memory floor;
-- memory regression policy separate from latency/throughput thresholds;
-- typed PASS/WARN/FAIL comparison output;
-- no fabricated metrics when snapshots are unavailable;
-- docs linking resource evidence to benchmark/tuning identity.
+- bounded `MemoryWindowRecorder` over canonical resource snapshots;
+- baseline/peak/residual PSS and minimum-available-memory summarization;
+- independent memory regression policy and typed PASS/WARN/FAIL output;
+- WARN behavior for insufficient/missing comparable measurements;
+- regression evaluation independent from throughput/latency outcomes.
 
-Exit gate: a configuration with materially worse memory behavior can fail a memory comparison even when throughput improves.
+Exit gate: satisfied for software capture/comparison. Representative baselines are still physical evidence.
 
 ### MEM-6 — Queue and resident-context bounds
 
-State: PLANNED
+State: DONE
 Priority: P1/P2
-Owner: `core/runtime-core`, consumer capability policy
+Owner: `core/runtime-core`, shared host boundary
 Depends on: MEM-1, MEM-3
 
-Deliverables:
+Integrated:
 
-- global queued-work maximum;
-- per-consumer outstanding-work limit on the shared boundary;
-- resident-context cap enforced before context creation;
-- typed backpressure rejection and queue telemetry;
-- cancellation/close semantics remain deterministic at all limits.
+- global decode capacity with default maximum 64 outstanding active + queued requests;
+- atomic capacity reservation/release across completion, cancellation, enqueue failure and shutdown;
+- typed `DecodeQueueCapacityExceededException`;
+- resident-context maximum enforced by memory admission before context creation;
+- shared-host quotas for connections, sessions and outstanding requests per consumer (`8/8/16` defaults);
+- scheduler close-race regression coverage.
 
-Exit gate: prompts/listeners/session contexts cannot grow without an explicit configured bound.
+Exit gate: satisfied: queued work, consumer requests and resident contexts all have explicit configured bounds.
 
 ### MEM-7 — Physical calibration and memory-cost profiles
 
-State: PLANNED
+State: PARTIAL
 Priority: P1
 Owner: Q35 evidence + runtime-memory consumption
-Depends on: MEM-3, MEM-5, Q35-6
+Depends on: MEM-3, MEM-5, Q35 physical tuning
 
-Deliverables:
+Software already integrated:
 
-- derive model/context/batch memory deltas from representative physical-device runs;
-- distinguish theoretical, candidate and measured profiles;
-- bind measured costs to exact artifact/backend/runtime identity;
-- record peak PSS, minimum available memory, thermal ceiling and post-release residual;
-- choose conservative safety margins from evidence rather than a universal hard-coded percentage.
+- Android `ResourceSnapshotProvider` to `RuntimeMemoryObservation` adapter;
+- identity-bound context cost registry;
+- identity-bound model-load cost registry;
+- `THEORETICAL` / `CANDIDATE` / `MEASURED` provenance gates;
+- fail-closed profile lookup by exact model profile/digest and backend ID/revision.
 
-Exit gate: supported Qwen3.5 tiers have reviewable memory-cost evidence for target device classes.
+Physical work still required:
+
+- capture cold/model/context/generation/recovery windows on representative devices;
+- preserve exact artifact/backend/harness/device/runtime identity;
+- derive reviewed model/context costs and conservative safety reserve;
+- promote only compatible records to `MEASURED`;
+- identify supported safe context tiers and thermal/headroom envelope.
+
+Exit gate: not satisfied until representative physical measurements exist.
 
 ### MEM-8 — Memory certification gate
 
 State: PLANNED
 Priority: P1
-Depends on: MEM-1 through MEM-7 plus relevant Q35-7/SR-6 device evidence
+Depends on: MEM-1 through MEM-7 plus relevant Q35/SR device evidence
 
-Deliverables:
+Required physical scenarios:
 
-- repeated load/generate/cancel/close/reload soak cycles;
-- memory-pressure recovery and runtime-reuse evidence;
-- residual-memory trend check after release;
-- queue/admission overload scenarios;
-- release checklist language that prevents emulator-only memory-readiness claims.
+- repeated load/generate/release/reload cycles;
+- cancellation during active work;
+- critical memory-pressure cleanup and recovery generation;
+- warm-idle expiry plus disconnect/reconnect;
+- model switch/reload;
+- queue/admission overload;
+- residual-memory plateau/trend and minimum available-memory checks;
+- thermal observation under the exact supported build identity.
 
-Exit gate: the exact supported build has representative evidence that memory use remains bounded, cleanup converges, and the runtime recovers after pressure/cancellation.
+Exit gate: the supported build has representative evidence that memory use remains bounded, cleanup converges and the runtime recovers after pressure/cancellation.
 
-## First-wave PR layout
+## Remaining execution order
 
-The initial branches are intentionally independent:
-
-| Branch | Milestone | Primary paths | Can merge independently? |
-| --- | --- | --- | --- |
-| `agent/mm-shutdown-lifecycle` | MEM-1 | `core/runtime-core` lifecycle/tests | Yes |
-| `agent/mm-budget-foundation` | MEM-2 | new runtime memory policy files/tests | Yes |
-| `agent/mm-memory-benchmarks` | MEM-5 | `observability/benchmark-engine` + tests | Yes |
-| `agent/mm-shared-runtime-ttl` | MEM-4 | runtime-host app/service composition + tests | Yes |
-
-`agent/memory-management-plan` owns documentation only and may merge before or alongside the first wave.
-
-## Integration waves
-
-### Wave 1 — independent foundations
-
-Merge MEM-1, MEM-2, MEM-4 and MEM-5 in any order after their own gates pass.
-
-### Wave 2 — governor integration
-
-Create a fresh branch from the then-current `dev` for MEM-3. After MEM-1 is integrated, create MEM-6 from current `dev` so scheduler/backpressure changes do not conflict with shutdown hardening.
-
-### Wave 3 — evidence-backed calibration
-
-Run Q35-6 with resource evidence, derive reviewed memory-cost profiles, then validate MEM-3/MEM-6 behavior on device.
-
-### Wave 4 — certification
-
-Combine Q35-7 lifecycle validation, SR-6 shared-runtime process/reconnect cases and memory soak evidence into MEM-8 readiness gates.
+1. Run MEM-7 controlled physical calibration for supported Qwen3.5/device identities.
+2. Review and version `MEASURED` model/context cost records and safety margins.
+3. Replay admission/downshift behavior against those exact records on device.
+4. Run the MEM-8 lifecycle/pressure/reconnect/overload/soak matrix.
+5. Promote readiness only after evidence is attached to the exact supported build identity.
 
 ## Validation expectations
 
-Each code PR runs the narrowest module gate plus direct consumers. Shared public contracts or multi-module changes use the repository-wide Android gate. JNI changes additionally run native host tests. No first-wave PR requires JNI changes.
-
-Physical evidence is explicitly pending until executed on representative hardware.
+Software changes continue to use scoped module tests plus repository guards/Android validation. JNI changes additionally require native host/packaging validation. Physical evidence remains a separate release gate and must never be inferred from emulator survival or a single successful allocation.

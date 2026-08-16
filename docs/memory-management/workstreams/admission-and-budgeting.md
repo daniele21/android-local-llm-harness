@@ -23,25 +23,25 @@ Unknown is distinct from zero.
 
 ### Budget
 
-A `RuntimeMemoryBudget` expresses configured limits. Candidate fields include:
+A `RuntimeMemoryBudget` expresses configured limits:
 
 - minimum available system memory after admission;
-- process PSS ceiling when a device/profile uses one;
+- optional process PSS ceiling;
 - safety reserve bytes;
 - maximum resident contexts;
 - whether an observation is mandatory for proactive admission.
 
-The policy does not hard-code one universal percentage of device RAM. Device-class/profile defaults are selected from measured evidence.
+The policy does not hard-code one universal percentage of device RAM. Device/profile defaults are selected from measured evidence.
 
 ### Cost estimate
 
 A `MemoryCostEstimate` describes expected resident and peak incremental bytes for one operation. It records provenance:
 
-- `THEORETICAL` — derived from static/model metadata or conservative formula;
-- `CANDIDATE` — calibrated but not yet approved as representative device evidence;
+- `THEORETICAL` — derived from static/model metadata or conservative analysis;
+- `CANDIDATE` — calibrated but not yet approved as representative-device evidence;
 - `MEASURED` — reviewed physical-device evidence for the matching identity.
 
-An estimate never claims byte-perfect allocator ownership.
+Context and model-load registries bind estimates to exact model profile/digest and backend ID/revision. No registry entry is promoted to `MEASURED` from model name or GGUF file size alone.
 
 ### Residency
 
@@ -49,23 +49,22 @@ A `RuntimeResidencySnapshot` reports current policy-relevant state such as loade
 
 ## Admission reasons
 
-Reject/downshift outcomes use typed reason codes suitable for telemetry and UI mapping without exception text. Expected reasons include:
+Reject/downshift outcomes use typed reason codes suitable for telemetry and UI mapping without exception text. Reasons include:
 
-- platform reports low memory;
+- platform low-memory signal;
 - available-memory floor would be crossed;
-- configured process-resident ceiling would be crossed;
+- configured process PSS ceiling would be crossed;
 - resident-context limit reached;
 - required cost profile unavailable under fail-closed policy;
 - observation unavailable under fail-closed policy;
-- no lower approved context tier satisfies both capacity and memory constraints.
+- no lower approved context tier satisfies both capacity and memory constraints;
+- overflow-safe arithmetic cannot prove a safe bound.
 
 ## Context admission
 
-Context planning first calculates required token capacity using the existing prompt/output/safety-reserve rule. It then evaluates approved tiers from smallest sufficient to larger candidates.
+Token planning first calculates required capacity from prompt + output + safety reserve, then exposes approved memory-eligible tiers.
 
-Memory downshift is therefore not token truncation. If the requested/preferred tier is too expensive, the runtime may choose a smaller approved tier only when that tier still satisfies required capacity.
-
-Example:
+Memory downshift is not token truncation. If the preferred tier is too expensive, the planner evaluates smaller approved tiers only while they still satisfy required capacity.
 
 ```text
 required token capacity = 1800
@@ -77,37 +76,46 @@ preferred tier = 4096
 result = DOWNSHIFT(2048)
 ```
 
-If required capacity is 3500, a 2048 tier is never offered as a memory fallback.
+If required capacity is 3500, a 2048 tier is never offered as fallback.
+
+Admission runs only when a new native context is required. Reusing an existing compatible context does not re-run policy because it does not allocate another context.
 
 ## Model admission
 
-The model path is evaluated before loading. The one-model invariant remains and model switching cannot occur while sessions/requests are active.
+The one-model invariant remains and model switching cannot occur while sessions/requests are active.
 
-Model file size may be used as one conservative signal but is not treated as resident-memory truth. Reviewed physical measurements can replace coarse candidate estimates for supported profiles.
+For a cold/switch load, any previous model is released first, then model admission runs against post-unload residency before backend initialization and native `loadModel()`. A compatible already-loaded model returns through the warm fast path without re-admission.
+
+The model cost registry does not treat GGUF file size as resident-memory truth. Representative measurements populate versioned cost records for exact compatible runtime identities.
 
 ## Safety reserve
 
 Safety reserve protects memory not owned by the model/context estimate: Android/framework activity, allocator variation, transient prefill/workspace, Binder/UI activity and measurement error.
 
-The reserve is configuration/evidence, not an undocumented magic number. It must be present in the effective memory profile/diagnostic output used for evidence.
+The reserve is configuration/evidence, not an undocumented magic number. It must be present in the effective memory profile/diagnostic output used for physical evidence.
 
 ## Observability
 
-Admission emits only bounded, non-sensitive fields:
+Configured governor decisions emit bounded `memory.admission` structured logs with:
 
 - operation/resource kind;
 - requested/effective context tier when applicable;
-- decision;
-- reason code;
-- observed byte counters that are already safe resource metrics;
-- cost-profile identity/provenance.
+- ALLOW/DOWNSHIFT/REJECT outcome;
+- typed decision/admission reason;
+- cost-profile identity/provenance and resident/peak estimate when available.
 
-Prompts, generated output and document content never enter memory telemetry.
+Prompts, generated output and document content never enter memory telemetry. Policy-level admission events do not require a request identifier.
 
 ## Validation
 
-Unit coverage includes exact boundary values, overflow-safe byte arithmetic, nullable observations, low-memory override, resident-context limits and measured/candidate profile handling.
+Unit coverage includes exact boundary values, overflow-safe arithmetic, nullable observations, low-memory override, resident-context limits and profile provenance/identity handling.
 
-Integration coverage later verifies that a rejected admission does not call backend `loadModel`/`createContext`, and that a downshift invokes backend creation exactly once with the effective tier.
+Integration coverage verifies that:
 
-Physical validation checks admission against measured PSS/available-memory behavior on representative devices. A successful allocation that happened to survive is not evidence that a rejected policy was too conservative; policy tuning uses repeated controlled measurements.
+- rejected context admission performs zero backend context creation/generation calls;
+- reusable contexts do not re-run admission;
+- rejected model admission performs zero backend initialization/native model-load calls;
+- a warm compatible model does not re-run model admission;
+- downshift can materialize only an approved tier that still satisfies token capacity.
+
+Physical validation must still compare policy decisions with measured PSS/available-memory behavior on representative devices. A successful allocation that happened to survive is not evidence that a rejected policy was too conservative; tuning uses repeated controlled measurements.
