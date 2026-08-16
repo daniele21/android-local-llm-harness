@@ -96,8 +96,8 @@ class RuntimeMemoryAdmissionIntegrationTest {
         fixture.close()
     }
 
-    private fun memoryPlanner(observationSource: RuntimeMemoryObservationSource, peakBytes: Long): MemoryAwareContextPlanner {
-        return MemoryAwareContextPlanner(
+    private fun memoryPlanner(observationSource: RuntimeMemoryObservationSource, peakBytes: Long): MemoryAwareContextPlanner =
+        MemoryAwareContextPlanner(
             observationSource = observationSource,
             costEstimator = ContextMemoryCostEstimator { modelProfileId, contextTokens ->
                 MemoryCostEstimate(
@@ -115,7 +115,6 @@ class RuntimeMemoryAdmissionIntegrationTest {
                 ),
             ),
         )
-    }
 }
 
 private class MemoryAdmissionRuntimeFixture(planner: MemoryAwareContextPlanner) {
