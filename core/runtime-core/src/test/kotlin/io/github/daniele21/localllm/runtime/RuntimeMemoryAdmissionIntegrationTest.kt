@@ -27,6 +27,7 @@ import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -96,6 +97,51 @@ class RuntimeMemoryAdmissionIntegrationTest {
         fixture.close()
     }
 
+    @Test
+    fun `model load rejection happens before backend initialization and native load`() {
+        val fixture = MemoryAdmissionRuntimeFixture(
+            modelLoadPlanner = modelLoadPlanner(
+                observationSource = RuntimeMemoryObservationSource {
+                    RuntimeMemoryObservation(availableMemoryBytes = 256, lowMemory = false)
+                },
+                peakBytes = 1_024,
+            ),
+        )
+
+        val result = fixture.runtime.prepare(fixture.applicationId, fixture.useCaseId)
+
+        assertFalse(result.ready)
+        assertTrue(result.detail.contains(MemoryAwareModelLoadRejectReason.MEMORY_BUDGET_REJECTED.name))
+        assertTrue(result.detail.contains(MemoryAdmissionRejectReason.AVAILABLE_MEMORY_FLOOR.name))
+        assertEquals(0, fixture.backend.initializeCalls)
+        assertEquals(0, fixture.backend.loadCalls)
+        fixture.close()
+    }
+
+    @Test
+    fun `warm loaded model does not rerun model memory admission`() {
+        val observations = AtomicInteger(0)
+        val fixture = MemoryAdmissionRuntimeFixture(
+            modelLoadPlanner = modelLoadPlanner(
+                observationSource = RuntimeMemoryObservationSource {
+                    if (observations.incrementAndGet() == 1) {
+                        RuntimeMemoryObservation(availableMemoryBytes = 8_192, lowMemory = false)
+                    } else {
+                        null
+                    }
+                },
+                peakBytes = 128,
+            ),
+        )
+
+        assertTrue(fixture.runtime.prepare(fixture.applicationId, fixture.useCaseId).ready)
+        assertTrue(fixture.runtime.prepare(fixture.applicationId, fixture.useCaseId).ready)
+        assertEquals(1, observations.get())
+        assertEquals(1, fixture.backend.initializeCalls)
+        assertEquals(1, fixture.backend.loadCalls)
+        fixture.close()
+    }
+
     private fun memoryPlanner(observationSource: RuntimeMemoryObservationSource, peakBytes: Long): MemoryAwareContextPlanner =
         MemoryAwareContextPlanner(
             observationSource = observationSource,
@@ -107,17 +153,36 @@ class RuntimeMemoryAdmissionIntegrationTest {
                     profileId = "$modelProfileId-$contextTokens",
                 )
             },
-            admissionController = MemoryAdmissionController(
-                RuntimeMemoryBudget(
-                    minimumAvailableBytes = 128,
-                    safetyReserveBytes = 128,
-                    maxResidentContexts = 4,
-                ),
-            ),
+            admissionController = admissionController(),
         )
+
+    private fun modelLoadPlanner(observationSource: RuntimeMemoryObservationSource, peakBytes: Long): MemoryAwareModelLoadPlanner =
+        MemoryAwareModelLoadPlanner(
+            observationSource = observationSource,
+            costEstimator = ModelMemoryCostEstimator { modelProfileId ->
+                MemoryCostEstimate(
+                    residentBytes = peakBytes / 2,
+                    peakIncrementalBytes = peakBytes,
+                    source = MemoryCostSource.CANDIDATE,
+                    profileId = "$modelProfileId-load",
+                )
+            },
+            admissionController = admissionController(),
+        )
+
+    private fun admissionController(): MemoryAdmissionController = MemoryAdmissionController(
+        RuntimeMemoryBudget(
+            minimumAvailableBytes = 128,
+            safetyReserveBytes = 128,
+            maxResidentContexts = 4,
+        ),
+    )
 }
 
-private class MemoryAdmissionRuntimeFixture(planner: MemoryAwareContextPlanner) {
+private class MemoryAdmissionRuntimeFixture(
+    planner: MemoryAwareContextPlanner? = null,
+    modelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
+) {
     val applicationId = ApplicationId("memory-app")
     val useCaseId = UseCaseId("memory-use-case")
     private val digest = ModelDigest("e".repeat(64))
@@ -135,6 +200,7 @@ private class MemoryAdmissionRuntimeFixture(planner: MemoryAwareContextPlanner) 
         modelStore = MemoryAdmissionModelStore(modelFile, digest),
         backend = backend,
         memoryAwareContextPlanner = planner,
+        memoryAwareModelLoadPlanner = modelLoadPlanner,
     )
 
     fun request(id: String, sessionId: SessionId): GenerationRequest = GenerationRequest(
