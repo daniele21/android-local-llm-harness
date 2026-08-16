@@ -47,10 +47,7 @@ internal object RuntimeFailurePolicy {
         recovery = defaultRecovery(family),
     )
 
-    fun classifyBackendCode(
-        code: String,
-        fallbackFamily: RuntimeFailureFamily = RuntimeFailureFamily.GENERATION,
-    ): RuntimeFailureDecision {
+    fun classifyBackendCode(code: String, fallbackFamily: RuntimeFailureFamily = RuntimeFailureFamily.GENERATION): RuntimeFailureDecision {
         val normalized = code.trim().uppercase()
         val classified = BACKEND_CODE_DECISIONS[normalized]
         return classified ?: forFamily(fallbackFamily)
@@ -69,18 +66,18 @@ internal object RuntimeFailurePolicy {
         -> RuntimeRecoveryConsequence.TERMINAL_REQUEST
 
         RuntimeFailureFamily.RESOURCE_PRESSURE -> RuntimeRecoveryConsequence.RELEASE_RESOURCES
+
         RuntimeFailureFamily.TRANSPORT -> RuntimeRecoveryConsequence.RECONNECT_TRANSPORT
+
         RuntimeFailureFamily.INVARIANT -> RuntimeRecoveryConsequence.DEGRADE_RUNTIME
     }
 
-    private fun backendDecision(
-        family: RuntimeFailureFamily,
-        configurationError: ConfigurationErrorCode? = null,
-    ): RuntimeFailureDecision = RuntimeFailureDecision(
-        family = family,
-        recovery = defaultRecovery(family),
-        configurationError = configurationError,
-    )
+    private fun backendDecision(family: RuntimeFailureFamily, configurationError: ConfigurationErrorCode? = null): RuntimeFailureDecision =
+        RuntimeFailureDecision(
+            family = family,
+            recovery = defaultRecovery(family),
+            configurationError = configurationError,
+        )
 
     private val BACKEND_CODE_DECISIONS = mapOf(
         "MODEL_UNAVAILABLE" to backendDecision(RuntimeFailureFamily.STORAGE_INTEGRITY),
