@@ -2,7 +2,6 @@ package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.models.GgufModelProfile
-import io.github.daniele21.localllm.store.StoredModel
 
 internal data class FakeBackendChunk(val text: String, val generatedTokens: Int)
 
@@ -56,11 +55,11 @@ internal class DeterministicFakeInferenceBackend(
         shutdownCalls += 1
     }
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
         loadFailure?.let { throw BackendException(it.code, it.message) }
-        require(storedModel.digest == profile.artifact.digest) { "Fake backend model/profile digest mismatch" }
-        return FakeModelHandle(storedModel.digest, profile.id)
+        require(source.digest == profile.artifact.digest) { "Fake backend model/profile digest mismatch" }
+        return FakeModelHandle(source.digest, profile.id)
     }
 
     override fun unloadModel(model: BackendModelHandle) {
