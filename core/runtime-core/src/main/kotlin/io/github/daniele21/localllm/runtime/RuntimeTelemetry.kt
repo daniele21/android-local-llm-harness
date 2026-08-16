@@ -212,19 +212,16 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
-    private fun failureFields(
-        error: LocalLlmError,
-        decision: RuntimeFailureDecision?,
-        backendCode: String?,
-    ): Map<String, String> = buildMap {
-        put("errorCode", error.code)
-        decision?.let {
-            put("failureFamily", it.family.name)
-            put("recovery", it.recovery.name)
-            put("automaticRetryLimit", it.automaticRetryLimit.toString())
+    private fun failureFields(error: LocalLlmError, decision: RuntimeFailureDecision?, backendCode: String?): Map<String, String> =
+        buildMap {
+            put("errorCode", error.code)
+            decision?.let {
+                put("failureFamily", it.family.name)
+                put("recovery", it.recovery.name)
+                put("automaticRetryLimit", it.automaticRetryLimit.toString())
+            }
+            safeBackendCode(backendCode)?.let { put("backendCode", it) }
         }
-        safeBackendCode(backendCode)?.let { put("backendCode", it) }
-    }
 
     private fun safeBackendCode(code: String?): String? {
         val normalized = code?.trim()?.uppercase()?.takeIf(String::isNotBlank) ?: return null
