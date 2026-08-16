@@ -10,10 +10,7 @@ internal enum class SessionLifecycleState {
     CLOSED,
 }
 
-internal data class SessionLifecycleSnapshot(
-    val state: SessionLifecycleState,
-    val activeRequests: Int,
-)
+internal data class SessionLifecycleSnapshot(val state: SessionLifecycleState, val activeRequests: Int)
 
 /**
  * Owns the request-count and close/release transition contract for one runtime session.
@@ -67,8 +64,7 @@ internal class SessionLifecycle {
         }
     }
 
-    fun isReleaseReady(): Boolean =
-        state.get() == SessionLifecycleState.CLOSING && activeRequests.get() == 0
+    fun isReleaseReady(): Boolean = state.get() == SessionLifecycleState.CLOSING && activeRequests.get() == 0
 
     /** Reserves the one resource-release attempt allowed while the session is drained. */
     fun tryBeginRelease(): Boolean {
