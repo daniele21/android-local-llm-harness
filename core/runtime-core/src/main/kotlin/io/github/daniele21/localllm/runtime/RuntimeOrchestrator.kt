@@ -67,18 +67,16 @@ class RuntimeOrchestrator(
     private val deferredModelUnload = AtomicBoolean(false)
     private val runtimeTelemetry = RuntimeTelemetry(telemetryRepository, epochClock)
     private val generationPlanning = GenerationPlanningPolicy(seedSource)
+    private val modelResidency = ModelResidencyLifecycle()
 
     @Volatile
     private var backendInitialized = false
-
-    @Volatile
-    private var loadedModel: LoadedModelDescriptor? = null
 
     override fun runtimeSnapshot(): RuntimeSnapshot {
         val schedulerSnapshot = scheduler.snapshot()
         return RuntimeSnapshot(
             state = state.get(),
-            loadedModel = loadedModel?.handle?.digest,
+            loadedModel = modelResidency.residentModelOrNull()?.handle?.digest,
             activeSessions = sessions.size,
             queuedRequests = schedulerSnapshot.queuedRequests,
         )
@@ -116,7 +114,7 @@ class RuntimeOrchestrator(
         val resolved = registry.resolve(applicationId, useCaseId)
         return synchronized(resourceLock) {
             val requestedDigest = resolved.model.artifact.digest
-            val warm = loadedModel?.let { current ->
+            val warm = modelResidency.reusableModelOrNull()?.let { current ->
                 current.handle.digest == requestedDigest && current.profileId == resolved.model.id
             } == true
             val model = ensureModelLoaded(resolved)
@@ -215,7 +213,7 @@ class RuntimeOrchestrator(
     fun memoryResourceSnapshot(): RuntimeMemoryResourceSnapshot {
         val schedulerSnapshot = scheduler.snapshot()
         return RuntimeMemoryResourceSnapshot(
-            modelLoaded = loadedModel != null,
+            modelLoaded = modelResidency.hasResidentModel(),
             activeSessions = sessions.size,
             activeGeneration = schedulerSnapshot.activeRequest != null,
             queuedGenerations = schedulerSnapshot.queuedRequests,
@@ -241,9 +239,9 @@ class RuntimeOrchestrator(
         if (sessions.isNotEmpty() || schedulerSnapshot.activeRequest != null || schedulerSnapshot.queuedRequests != 0) {
             return@synchronized false
         }
-        val model = loadedModel ?: return@synchronized false
-        backend.unloadModel(model.handle)
-        loadedModel = null
+        if (!unloadResidentModel()) {
+            return@synchronized false
+        }
         state.set(RuntimeState.IDLE)
         true
     }
@@ -530,7 +528,7 @@ class RuntimeOrchestrator(
                 minimumContextTokens = contextPlan.minimumRequiredTokens,
                 approvedContextTiers = contextPlan.memoryEligibleContextTiers,
                 residency = RuntimeResidencySnapshot(
-                    modelLoaded = loadedModel != null,
+                    modelLoaded = modelResidency.hasResidentModel(),
                     residentContexts = sessions.values.count { it.context != null },
                     activeGeneration = schedulerSnapshot.activeRequest != null,
                     queuedGenerations = schedulerSnapshot.queuedRequests,
@@ -592,11 +590,11 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun ensureModelLoaded(resolved: ResolvedUseCase): LoadedModelDescriptor {
+    private fun ensureModelLoaded(resolved: ResolvedUseCase): ResidentModel {
         check(!closed.get()) { "Runtime is closed" }
         validateRuntimeCapabilities(resolved)
         val requestedDigest = resolved.model.artifact.digest
-        val current = loadedModel
+        val current = modelResidency.reusableModelOrNull()
         if (current != null && current.handle.digest == requestedDigest && current.profileId == resolved.model.id) {
             return current
         }
@@ -613,20 +611,40 @@ class RuntimeOrchestrator(
             throw BackendException("MODEL_INTEGRITY", verification.detail)
         }
 
-        current?.let { backend.unloadModel(it.handle) }
-        loadedModel = null
+        if (current != null) {
+            check(unloadResidentModel()) { "Unable to unload current model before switching" }
+        }
         admitModelLoad(resolved, schedulerSnapshot)
 
         if (!backendInitialized) {
             backend.initialize()
             backendInitialized = true
         }
-        val loaded = LoadedModelDescriptor(
-            profileId = resolved.model.id,
-            handle = backend.loadModel(stored, resolved.model),
-        )
-        loadedModel = loaded
-        return loaded
+
+        modelResidency.beginLoad(resolved.model.id, requestedDigest)
+        return try {
+            val loaded = ResidentModel(
+                profileId = resolved.model.id,
+                handle = backend.loadModel(stored, resolved.model),
+            )
+            modelResidency.loadSucceeded(loaded)
+            loaded
+        } catch (error: Throwable) {
+            modelResidency.loadFailed()
+            throw error
+        }
+    }
+
+    private fun unloadResidentModel(): Boolean {
+        val resident = modelResidency.beginUnload() ?: return false
+        return try {
+            backend.unloadModel(resident.handle)
+            modelResidency.unloadSucceeded()
+            true
+        } catch (error: Throwable) {
+            modelResidency.unloadFailed()
+            throw error
+        }
     }
 
     private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
@@ -763,8 +781,7 @@ class RuntimeOrchestrator(
                 return@synchronized false
             }
 
-            loadedModel?.let { backend.unloadModel(it.handle) }
-            loadedModel = null
+            unloadResidentModel()
             if (closed.get() && backendInitialized) {
                 backend.shutdown()
                 backendInitialized = false
@@ -814,8 +831,6 @@ class RuntimeOrchestrator(
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
-
-    private data class LoadedModelDescriptor(val profileId: String, val handle: BackendModelHandle)
 
     private data class SessionDescriptor(
         val id: SessionId,
