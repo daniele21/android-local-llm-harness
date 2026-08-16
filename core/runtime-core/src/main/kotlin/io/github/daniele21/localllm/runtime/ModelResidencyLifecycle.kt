@@ -43,8 +43,11 @@ internal class ModelResidencyLifecycle {
         while (true) {
             when (state.get()) {
                 ModelResidencyState.EMPTY -> return false
+
                 ModelResidencyState.LOADING -> error("Model unload cannot start while loading")
+
                 ModelResidencyState.UNLOADING -> return false
+
                 ModelResidencyState.RESIDENT -> {
                     if (state.compareAndSet(ModelResidencyState.RESIDENT, ModelResidencyState.UNLOADING)) {
                         return true
