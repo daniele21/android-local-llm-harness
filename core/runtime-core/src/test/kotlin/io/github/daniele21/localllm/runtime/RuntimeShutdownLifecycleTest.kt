@@ -173,8 +173,8 @@ private class BlockingShutdownBackend : InferenceBackend {
         shutdownCalls += 1
     }
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle =
-        ShutdownModelHandle(storedModel.digest, profile.id)
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
+        ShutdownModelHandle(source.digest, profile.id)
 
     override fun unloadModel(model: BackendModelHandle) {
         unloadCalls += 1
