@@ -35,11 +35,7 @@ internal data class RuntimeFailureDecision(
     }
 }
 
-internal data class RuntimeFailureResolution(
-    val decision: RuntimeFailureDecision,
-    val publicError: LocalLlmError,
-    val backendCode: String,
-)
+internal data class RuntimeFailureResolution(val decision: RuntimeFailureDecision, val publicError: LocalLlmError, val backendCode: String)
 
 /**
  * Stable internal recovery policy for runtime/backend failures.
@@ -86,12 +82,19 @@ internal object RuntimeFailurePolicy {
             )
 
             RuntimeFailureFamily.COMPATIBILITY -> LocalLlmError.NativeRuntime("Local model/runtime compatibility check failed")
+
             RuntimeFailureFamily.LOAD_INITIALIZATION -> LocalLlmError.NativeRuntime("Local model initialization failed")
+
             RuntimeFailureFamily.CONTEXT -> LocalLlmError.NativeRuntime("Local inference context failed")
+
             RuntimeFailureFamily.GENERATION -> LocalLlmError.NativeRuntime("Local generation failed")
+
             RuntimeFailureFamily.CANCELLATION -> LocalLlmError.NativeRuntime("Local cancellation failed")
+
             RuntimeFailureFamily.RESOURCE_PRESSURE -> LocalLlmError.NativeRuntime("Local inference resources are unavailable")
+
             RuntimeFailureFamily.TRANSPORT -> LocalLlmError.NativeRuntime("Local runtime transport is unavailable")
+
             RuntimeFailureFamily.INVARIANT -> LocalLlmError.NativeRuntime("Local runtime entered an invalid state")
         }
     }
