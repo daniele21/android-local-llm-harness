@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
+import io.github.daniele21.localllm.contracts.LocalLlmError
 
 internal enum class RuntimeFailureFamily {
     STORAGE_INTEGRITY,
@@ -34,6 +35,12 @@ internal data class RuntimeFailureDecision(
     }
 }
 
+internal data class RuntimeFailureResolution(
+    val decision: RuntimeFailureDecision,
+    val publicError: LocalLlmError,
+    val backendCode: String,
+)
+
 /**
  * Stable internal recovery policy for runtime/backend failures.
  *
@@ -48,10 +55,48 @@ internal object RuntimeFailurePolicy {
     )
 
     fun classifyBackendCode(code: String, fallbackFamily: RuntimeFailureFamily = RuntimeFailureFamily.GENERATION): RuntimeFailureDecision {
-        val normalized = code.trim().uppercase()
+        val normalized = normalizeBackendCode(code)
         val classified = BACKEND_CODE_DECISIONS[normalized]
         return classified ?: forFamily(fallbackFamily)
     }
+
+    fun resolveBackendFailure(
+        error: BackendException,
+        fallbackFamily: RuntimeFailureFamily = RuntimeFailureFamily.GENERATION,
+    ): RuntimeFailureResolution {
+        val backendCode = normalizeBackendCode(error.code)
+        val decision = classifyBackendCode(backendCode, fallbackFamily)
+        return RuntimeFailureResolution(
+            decision = decision,
+            publicError = publicError(decision, error.message),
+            backendCode = backendCode,
+        )
+    }
+
+    private fun publicError(decision: RuntimeFailureDecision, backendMessage: String?): LocalLlmError {
+        decision.configurationError?.let { reason ->
+            return LocalLlmError.Configuration(
+                message = backendMessage?.takeIf(String::isNotBlank) ?: "Generation configuration is unsupported",
+                reason = reason,
+            )
+        }
+        return when (decision.family) {
+            RuntimeFailureFamily.STORAGE_INTEGRITY -> LocalLlmError.ModelUnavailable(
+                "Requested model is unavailable or failed integrity verification",
+            )
+
+            RuntimeFailureFamily.COMPATIBILITY -> LocalLlmError.NativeRuntime("Local model/runtime compatibility check failed")
+            RuntimeFailureFamily.LOAD_INITIALIZATION -> LocalLlmError.NativeRuntime("Local model initialization failed")
+            RuntimeFailureFamily.CONTEXT -> LocalLlmError.NativeRuntime("Local inference context failed")
+            RuntimeFailureFamily.GENERATION -> LocalLlmError.NativeRuntime("Local generation failed")
+            RuntimeFailureFamily.CANCELLATION -> LocalLlmError.NativeRuntime("Local cancellation failed")
+            RuntimeFailureFamily.RESOURCE_PRESSURE -> LocalLlmError.NativeRuntime("Local inference resources are unavailable")
+            RuntimeFailureFamily.TRANSPORT -> LocalLlmError.NativeRuntime("Local runtime transport is unavailable")
+            RuntimeFailureFamily.INVARIANT -> LocalLlmError.NativeRuntime("Local runtime entered an invalid state")
+        }
+    }
+
+    private fun normalizeBackendCode(code: String): String = code.trim().uppercase()
 
     private fun defaultRecovery(family: RuntimeFailureFamily): RuntimeRecoveryConsequence = when (family) {
         RuntimeFailureFamily.STORAGE_INTEGRITY,
