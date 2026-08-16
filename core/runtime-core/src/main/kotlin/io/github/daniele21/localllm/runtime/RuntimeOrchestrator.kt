@@ -538,12 +538,30 @@ class RuntimeOrchestrator(
             ),
         )
         return when (decision) {
-            is MemoryAwareContextDecision.Allow -> decision.contextTokens
+            is MemoryAwareContextDecision.Allow -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = if (decision.downshifted) MemoryAdmissionOutcome.DOWNSHIFT else MemoryAdmissionOutcome.ALLOW,
+                    estimate = decision.estimate,
+                    requestedContextTokens = contextPlan.requestedContextTokens,
+                    effectiveContextTokens = decision.contextTokens,
+                )
+                decision.contextTokens
+            }
 
-            is MemoryAwareContextDecision.Reject -> throw GenerationPlanningException(
-                ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
-                memoryAdmissionFailureMessage(contextPlan, decision),
-            )
+            is MemoryAwareContextDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                    requestedContextTokens = contextPlan.requestedContextTokens,
+                )
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    memoryAdmissionFailureMessage(contextPlan, decision),
+                )
+            }
         }
     }
 
@@ -642,8 +660,22 @@ class RuntimeOrchestrator(
                 ),
             ),
         )
-        if (decision is MemoryAwareModelLoadDecision.Reject) {
-            throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
+        when (decision) {
+            is MemoryAwareModelLoadDecision.Allow -> runtimeTelemetry.memoryAdmission(
+                resource = MemoryAdmissionResource.MODEL,
+                outcome = MemoryAdmissionOutcome.ALLOW,
+                estimate = decision.estimate,
+            )
+
+            is MemoryAwareModelLoadDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.MODEL,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                )
+                throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
+            }
         }
     }
 
