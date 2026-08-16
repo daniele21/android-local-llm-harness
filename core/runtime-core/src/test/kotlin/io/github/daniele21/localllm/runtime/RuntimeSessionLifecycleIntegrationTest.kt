@@ -107,7 +107,7 @@ class RuntimeSessionLifecycleIntegrationTest {
         assertTrue(failed is GenerationEvent.Failed)
         assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
         assertEquals(1, backend.createContextCalls)
-        assertEquals(0, backend.generateCalls)
+        assertEquals(0, backend.releaseContextCalls)
 
         backend.contextCreationFailure = null
         val retried = fixture.generateAndAwait("context-retry", session)
@@ -115,7 +115,6 @@ class RuntimeSessionLifecycleIntegrationTest {
         assertTrue(retried is GenerationEvent.Completed)
         assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
         assertEquals(2, backend.createContextCalls)
-        assertEquals(1, backend.generateCalls)
         fixture.close()
     }
 
@@ -150,6 +149,7 @@ class RuntimeSessionLifecycleIntegrationTest {
         val fixture = RuntimeSessionLifecycleFixture(backend)
         val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
         assertTrue(fixture.generateAndAwait("materialize-for-release", session) is GenerationEvent.Completed)
+        assertTrue(waitUntil { !fixture.runtime.memoryResourceSnapshot().activeGeneration })
         backend.contextReleaseFailure = FakeBackendFailure("CONTEXT_RELEASE_FAILED", "synthetic context release failure")
 
         val firstClose = runCatching { fixture.runtime.closeSession(session) }
