@@ -182,10 +182,15 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
-    fun failed(requestId: RequestId, error: LocalLlmError) {
+    fun failed(
+        requestId: RequestId,
+        error: LocalLlmError,
+        decision: RuntimeFailureDecision? = null,
+        backendCode: String? = null,
+    ) {
         val current = activeRuns.remove(requestId)
         if (current == null) {
-            rejected(requestId, error)
+            rejected(requestId, error, decision, backendCode)
             return
         }
         val status = if (error.code == "CANCELLED") RunStatus.CANCELLED else RunStatus.FAILED
@@ -199,17 +204,43 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             level = if (status == RunStatus.CANCELLED) LogLevel.INFO else LogLevel.ERROR,
             event = if (status == RunStatus.CANCELLED) "generation.cancelled" else "generation.failed",
             requestId = requestId,
-            fields = mapOf("errorCode" to error.code),
+            fields = failureFields(error, decision, backendCode),
         )
     }
 
-    fun rejected(requestId: RequestId, error: LocalLlmError) {
+    fun rejected(
+        requestId: RequestId,
+        error: LocalLlmError,
+        decision: RuntimeFailureDecision? = null,
+        backendCode: String? = null,
+    ) {
         log(
             level = if (error.code == "CANCELLED") LogLevel.INFO else LogLevel.WARN,
             event = "generation.rejected",
             requestId = requestId,
-            fields = mapOf("errorCode" to error.code),
+            fields = failureFields(error, decision, backendCode),
         )
+    }
+
+    private fun failureFields(
+        error: LocalLlmError,
+        decision: RuntimeFailureDecision?,
+        backendCode: String?,
+    ): Map<String, String> = buildMap {
+        put("errorCode", error.code)
+        decision?.let {
+            put("failureFamily", it.family.name)
+            put("recovery", it.recovery.name)
+            put("automaticRetryLimit", it.automaticRetryLimit.toString())
+        }
+        safeBackendCode(backendCode)?.let { put("backendCode", it) }
+    }
+
+    private fun safeBackendCode(code: String?): String? {
+        val normalized = code?.trim()?.uppercase()?.takeIf(String::isNotBlank) ?: return null
+        return normalized.takeIf { value ->
+            value.length <= MAX_BACKEND_CODE_LENGTH && value.all { it == '_' || it.isDigit() || it in 'A'..'Z' }
+        }
     }
 
     private fun persist(run: GenerationRunRecord) {
@@ -247,5 +278,9 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
 
     private inline fun safely(operation: () -> Unit) {
         runCatching(operation)
+    }
+
+    private companion object {
+        const val MAX_BACKEND_CODE_LENGTH = 64
     }
 }
