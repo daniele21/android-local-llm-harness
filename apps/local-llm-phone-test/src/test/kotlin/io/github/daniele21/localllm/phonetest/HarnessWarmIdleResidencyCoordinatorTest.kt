@@ -75,10 +75,7 @@ class HarnessWarmIdleResidencyCoordinatorTest {
     }
 }
 
-private class WarmIdleFixture(
-    resourcesResident: Boolean,
-    private val unloadSucceeds: Boolean = true,
-) {
+private class WarmIdleFixture(resourcesResident: Boolean, private val unloadSucceeds: Boolean = true) {
     var nowEpochMs = 1_000L
     private var resident = resourcesResident
     var unloadCalls = 0
