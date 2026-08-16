@@ -22,70 +22,65 @@ This file owns concise workstream state. Repository-wide status remains in [`cur
 
 | ID | Status | Current boundary | Next gate |
 | --- | --- | --- | --- |
-| RA-0 Architecture fitness | DONE | Canonical module inventory, dependency/native guards and normal JNI translation-unit linkage are integrated with zero verifier exceptions | Keep guards green |
-| RA-1 Backend SPI/fake | DONE | `core:backend-spi`, store-neutral model source, llama.cpp adapter isolation and deterministic fake are integrated | Expand through RA-10 |
-| RA-2 Runtime kernel | PARTIAL | `GenerationPlanningPolicy` is integrated as the first stateless extraction; session and generation lifecycle ownership are now explicit, while model/context/resource ownership remains in `RuntimeOrchestrator` | Continue state-preserving decomposition only where ownership is already clear |
-| RA-3 Lifecycle/state machines | PARTIAL | `SessionLifecycle` owns request admission/close/release reservation and `GenerationLifecycle` owns cancellation intent/terminal-once; `SingleDecodeScheduler` remains authoritative for queued/running decode | Converge model residency/load/unload through one runtime residency lifecycle without duplicating memory or warm-idle policy ownership |
-| RA-4 Failure/recovery | PARTIAL | Typed failures/recovery exist in several paths | Recovery matrix + deterministic fault/race injection after RA-3 |
-| RA-5 Scheduling/backpressure | PARTIAL | Single decode, priority/FIFO, bounded queue admission/rejection, queued/running cancellation and scheduler close-race handling are integrated | Fairness/starvation, cancellation latency and slow/dead-consumer streaming semantics after RA-3 |
-| RA-6 Shared runtime | PARTIAL | Negotiation, epochs, reconnect and client-death cleanup already exist | Operation idempotency/deadlines if required + real process-death evidence after RA-3/4/5 |
-| RA-7 Observability | PARTIAL | Rich request-correlated runtime telemetry exists | Session/execution identity, cleanup/recovery/cancel latency and request-resource joins |
-| RA-8 Device policy | PARTIAL | Compatibility plus memory/thermal evidence exists | Pure versioned execution planner after RA-7 evidence is reliable |
-| RA-9 Execution identity | PARTIAL | Artifact, benchmark and evaluation identities already exist | Reconcile/version ownership; no parallel identity store |
+| RA-0 Architecture fitness | DONE | Module/dependency/native guards integrated with zero verifier exceptions | Keep guards green |
+| RA-1 Backend SPI/fake | DONE | Backend-neutral SPI, store-neutral source, llama.cpp isolation and deterministic fake integrated | Expand through RA-10 |
+| RA-2 Runtime kernel | PARTIAL | Stateless generation planning extracted; lifecycle ownership explicit while orchestration/context ownership remains centralized | Continue only state-preserving extractions |
+| RA-3 Lifecycle/state machines | DONE | Session, generation and physical model-residency transitions have explicit non-overlapping owners and integration coverage | RA-4/RA-5 consume these boundaries |
+| RA-4 Failure/recovery | PARTIAL | Typed failures/recovery exist in several paths | Recovery matrix + deterministic fault/race injection |
+| RA-5 Scheduling/backpressure | PARTIAL | Single decode, priority/FIFO, bounded queue/rejection, cancellation and close-race handling integrated | Fairness, cancellation latency, slow/dead-consumer semantics |
+| RA-6 Shared runtime | PARTIAL | Negotiation, epochs, reconnect and client-death cleanup exist | Idempotency/deadlines if required + process-death evidence after RA-4/5 |
+| RA-7 Observability | PARTIAL | Rich request-correlated telemetry exists | Session/execution identity, cleanup/recovery/cancel latency joins |
+| RA-8 Device policy | PARTIAL | Compatibility plus memory/thermal evidence exists | Pure versioned planner after reliable RA-7/device evidence |
+| RA-9 Execution identity | PARTIAL | Artifact, benchmark and evaluation identities exist | Reconcile/version ownership; no parallel identity store |
 | RA-10 Backend testkit | PARTIAL | Deterministic fake plus native/JNI/simulated tests exist | Shared conformance fixture with fake + llama.cpp consumers |
-| RA-11 Security/provenance | PARTIAL | llama.cpp/wrapper pins, secure download, signing and privacy controls exist | Dependency verification, immutable action pins, SBOM/provenance in separate slices |
+| RA-11 Security/provenance | PARTIAL | llama.cpp/wrapper pins, secure download, signing and privacy controls exist | Dependency verification, immutable action pins, SBOM/provenance |
 | RA-12 Certification | PENDING | Evidence infrastructure exists | Cumulative automated + representative-device certification |
 
-## Closed baseline debt
+## Baseline and current work
 
-The two violations that triggered tranche 1 are closed: `runtime-core -> backends:llama-cpp` was removed through RA-1 and [ADR 0014](adr/0014-backend-spi-boundary.md); the `llama_jni_entry.cpp -> #include "llama_jni.cpp"` pattern was removed through RA-0. `scripts/verify_architecture.py` now carries zero intended dependency or `.cpp`-include exceptions.
+RA-0/RA-1 baseline debt is closed: the runtime-to-concrete-backend dependency and `.cpp` implementation include were removed, and the architecture verifier has zero intended exceptions.
 
-RA-0/RA-1 are stable baseline. RA-2 may continue internal decomposition. RA-3 now has authoritative per-session admission/close/release ownership and authoritative per-generation cancellation/terminal ownership. The remaining major lifecycle gap is model residency/load/unload convergence with the existing memory and warm-idle path before RA-4/RA-5 behavior changes that depend on those transitions.
+RA-3 is closed. `SessionLifecycle` owns request admission, close intent, active-request drain and release reservation. `GenerationLifecycle` owns accepted-request cancellation intent and terminal-once delivery. `ModelResidencyLifecycle` owns the physical resident model handle and load/unload state. `SingleDecodeScheduler` remains the sole owner of queued/running decode state. Session context remains a single session-owned handle serialized through `resourceLock`; failure/race injection for context create/release belongs to RA-4, not another state machine.
 
-## Current parallel work
-
-- **Architecture:** continue RA-2 only through state-preserving extractions; use the integrated RA-3 lifecycle boundaries rather than creating another mutable runtime owner.
-- **Lifecycle:** converge RA-3 model residency/load/unload around the model handle already owned by `RuntimeOrchestrator`; leave decode queue authority in `SingleDecodeScheduler`, warm-idle timing in `WarmIdleResidencyController` and admission/pressure policy in the memory-management path.
-- **Quality:** define RA-10 fixture ownership only when the same conformance contract has fake and llama.cpp consumers.
-- **Observability/identity:** make RA-7/RA-9 changes additive to existing stores/fingerprints.
-- **Security:** handle dependency trust, workflow action trust and release provenance as separate RA-11 slices.
-- **Memory:** continue residency/pressure/warm-idle and measured-cost work; context-memory admission is already wired before native context creation and Android memory observations are adapted at composition boundaries.
+Current lanes:
+- **RA-2:** continue state-preserving decomposition only where the closed lifecycle boundaries remain intact.
+- **RA-4:** define internal failure families/recovery consequences, then add deterministic injection across load/context/generation/cancel/release/unload.
+- **RA-5:** finish fairness/starvation, cancellation latency and bounded slow/dead-consumer behavior.
+- **RA-7/9:** extend existing telemetry/identity stores rather than creating parallel owners.
+- **RA-10/11:** add real cross-backend conformance and supply-chain mechanisms only where evidence justifies them.
+- **Memory:** software admission, warm-idle, cost-profile and observation foundations are integrated; device calibration remains a hardware gate.
 
 ## Verified findings
 
-### RA-2A — Runtime ownership
+### RA-2 — Runtime ownership
 
-`GenerationPlanningPolicy` is integrated for effective configuration, output constraints, context sizing and reasoning control. `SessionLifecycle` owns per-session request admission, close intent, active-request drain and release reservation. `GenerationLifecycle` owns accepted-request cancellation intent and terminal-once delivery. `RuntimeOrchestrator` still owns the session registry, loaded model/context handles, physical resource release, memory-pressure coordination and generation orchestration. Further RA-2 extraction must preserve those ownership boundaries until the corresponding RA-3 state is explicit.
+`GenerationPlanningPolicy` owns stateless configuration/context-sizing/reasoning planning. `RuntimeOrchestrator` keeps the session registry, session context handles, backend-operation serialization, memory-pressure coordination and generation orchestration. Lifecycle-specific state is delegated to the explicit RA-3 owners.
 
-### RA-3B — Authoritative session lifecycle
+### RA-3 — Completion evidence
 
-The previous `SessionDescriptor.activeRequests`, `closing` and `released` atomics have been replaced by one `SessionLifecycle`. `generate()` acquires through the lifecycle; `closeSession()`, runtime shutdown and critical-memory cleanup converge on the same close/release transitions; terminal request cleanup drains through `releaseRequest()`; physical release is reserved once through `tryBeginRelease()`. If physical context release fails, the lifecycle rolls back from `RELEASING` to `CLOSING` so cleanup can be retried without losing the session. Integration tests cover close-during-generation, rejection of new work after close intent, exactly-once release after drain and release-failure retry.
+Session lifecycle replaces the previous `activeRequests`, `closing` and `released` atomics and covers close-during-generation, post-close rejection, exactly-once release and release-failure retry. Generation lifecycle replaces separate cancellation/terminal atomics with `OPEN -> CANCELLING -> TERMINAL`; queued/running remains scheduler-owned.
 
-### RA-3C — Authoritative generation cancellation lifecycle
+Model residency uses `NOT_RESIDENT -> LOADING -> RESIDENT -> UNLOADING -> NOT_RESIDENT` and owns the single resident handle. Load failure returns to `NOT_RESIDENT`; unload failure restores `RESIDENT` with the same handle. Model replacement preserves: artifact verification -> old-model unload -> model-load memory admission -> backend initialization -> load reservation -> native load -> publication. Tests cover load/unload rollback and retry, switch ordering, physical-handle visibility during unload and unload-before-shutdown idempotency.
 
-The previous `RequestLifecycle.cancelRequested` and separate terminal atomic have been replaced by one `GenerationLifecycle` with `OPEN -> CANCELLING -> TERMINAL`. It owns only cancellation intent and terminal-once delivery. `GenerationHandle.cancel()`, queued cancellation, running cancellation, planning/context cancellation checks, streaming and terminal delivery all converge on that same state machine. Repeated or post-terminal cancellation is idempotent, and direct transition tests cover cancellation intent plus exactly-once terminal reservation.
+`ModelStore` still owns installation/integrity; memory planners own admission; warm-idle/pressure policy decide when to evict; the scheduler owns decode activity. The context exit audit found one context-handle owner with serialized mutation and no justified parallel state machine.
 
-`SingleDecodeScheduler` deliberately remains the sole owner of queued/running decode state. RA-3 therefore does not create a second scheduling state machine. Likewise, `WarmIdleResidencyController` owns warm-idle timing/demand policy and `RuntimeMemoryPolicy` owns pressure decisions; neither currently owns the loaded model handle. The remaining RA-3 slice should formalize model residency around the handle already owned by `RuntimeOrchestrator`, keeping artifact installation in `ModelStore` and backend initialization as a distinct lifecycle concern.
+The exit gate is satisfied by transition/unit tests, integration teardown/rollback coverage and cumulative green `dev@30a0f60dcbe3fe699013b5bde35acb90b2a25356` across repository guards, Android validation and native host tests.
 
-### RA-5A — Scheduler
+### RA-5 — Scheduler
 
-`SingleDecodeScheduler` already enforces one active decode, priority with FIFO sequencing, bounded waiting admission with deterministic rejection, queued/running cancellation, `cancelAll()` and close. The scheduler close path has regression coverage for the concurrent queue-drain race. RA-5 therefore no longer needs a basic capacity primitive; remaining work is fairness/starvation policy, queued/active cancellation latency evidence, and bounded streaming/slow-or-dead-consumer backpressure semantics. Simultaneous decode remains deferred.
+`SingleDecodeScheduler` enforces one active decode, priority/FIFO sequencing, bounded waiting admission with deterministic rejection, queued/running cancellation, `cancelAll()` and close. Remaining work is fairness/starvation policy, cancellation-latency evidence and bounded streaming/backpressure behavior. Simultaneous decode remains deferred.
 
-### RA-6A — Shared runtime
+### RA-6 — Shared runtime
 
-Binder already provides major/minor and feature negotiation, typed incompatibility, connection epochs, typed connection loss, explicit reconnect and idempotent `connect()`/`close()`. The service host links clients to death and cleans requests, sessions, consumers, death links, dispatchers and ledger state. Remaining work is operation-level replay/idempotency only if needed, deadlines where justified, and real service-process death/reconnect evidence after RA-3/4/5.
+Binder already provides version/feature negotiation, typed incompatibility, connection epochs/loss, reconnect and client-death cleanup. Remaining work is operation replay/idempotency only if needed, deadlines where justified, and physical service-process death/reconnect evidence after RA-4/5.
 
-### RA-7A / RA-9A — Telemetry and identity
+### RA-7 / RA-9 — Telemetry and identity
 
-Telemetry already records request/app/use-case/model identity, queue/load/TTFT/prefill/decode/total timings, tokens/throughput, effective generation settings, context/prompt/template data and stop/planning timings. Missing correlation is mainly session/execution identity, cleanup/unload/recovery, cancellation latency and request-to-resource joins.
+Telemetry already covers request/app/use-case/model identity and major generation timings/settings. Remaining correlation is mainly session/execution identity, cleanup/unload/recovery, cancellation latency and request-resource joins. Artifact, benchmark and evaluation identities already exist; RA-9 must reconcile/reuse them rather than add a fourth store.
 
-Identity already exists at artifact, benchmark and evaluation semantic/runtime/run levels. RA-9 must reconcile/version these contracts; a general execution identity must be additive and reused rather than becoming a fourth store.
+### RA-10 / RA-11 — Testkit and supply chain
 
-### RA-10A / RA-11A — Testkit and supply chain
-
-The deterministic fake already supports controlled failures, blocking, streaming, cancellation and release accounting, but no established shared test-fixture convention was found. Do not create a nominal testkit module without two real consumers.
-
-The Gradle wrapper checksum and llama.cpp revision are pinned. Verified remaining supply-chain gaps are missing Gradle dependency-verification metadata, mutable major-version GitHub Action references and no current SBOM/provenance artifact.
+The deterministic fake supports controlled failures, blocking, streaming, cancellation and release accounting; create shared conformance fixtures only when both fake and llama.cpp consume them. Gradle wrapper and llama.cpp revision are pinned; remaining supply-chain gaps include dependency-verification metadata, immutable action references and SBOM/provenance.
 
 ## Update rule
 
