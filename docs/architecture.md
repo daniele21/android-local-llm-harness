@@ -172,9 +172,10 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - Runtime core never selects or imports a concrete backend implementation.
 - Backend implementations never own model-store integrity, installation or selection policy.
 - Large payloads will not cross the future Binder boundary inline.
-- State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
-- Per-session request admission, close intent and release reservation are owned by `SessionLifecycle`; `RuntimeOrchestrator` owns the session registry, backend handles and physical resource release.
+- Physical backend operations and lifecycle transitions are serialized by `RuntimeOrchestrator`; lifecycle-specific state/handle ownership remains with the explicit owner below.
+- Per-session request admission, close intent and release reservation are owned by `SessionLifecycle`; the session descriptor is the single context-handle owner and `RuntimeOrchestrator` serializes physical context creation/release.
 - Per-generation cancellation intent and terminal-once delivery are owned by `GenerationLifecycle`; `SingleDecodeScheduler` remains authoritative for queued and active decode state.
+- Physical model residency state and the single resident model handle are owned by `ModelResidencyLifecycle`; `ModelStore` owns installation/integrity, memory policy decides admission/eviction demand, and `RuntimeOrchestrator` serializes native load/unload calls around the residency transitions.
 - Cancellation and partial failures must leave the runtime recoverable.
 
 ## Modularity and maintainability
@@ -213,7 +214,8 @@ core/backend-spi
 
 core/runtime-core
     orchestration, model verification/adaptation, sessions, scheduling,
-    lifecycle, recovery policy and telemetry emission
+    explicit session/generation/model-residency lifecycle ownership,
+    recovery policy and telemetry emission
 
 models/model-profile
     model, use-case and application binding configuration
