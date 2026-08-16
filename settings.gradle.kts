@@ -18,6 +18,7 @@ rootProject.name = "android-local-llm-harness"
 
 include(
     ":core:contracts",
+    ":core:backend-spi",
     ":core:runtime-core",
     ":evaluation:contracts",
     ":evaluation:comparison",

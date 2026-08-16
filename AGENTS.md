@@ -37,6 +37,7 @@ Do not load every plan for a local change. README, BRANCHING, current state and 
 ## Non-negotiable invariants
 
 - Keep public contracts independent from Android UI, Capacitor and `llama.cpp` types.
+- Keep backend-neutral execution contracts in `core/backend-spi`; runtime core must not depend on concrete `backends:*` implementations.
 - Never expose native pointers, backend structures or backend-owned handles outside the backend module.
 - Keep runtime orchestration independent from transport and persistence implementations.
 - Resolve models explicitly through `applicationId + useCaseId`; never silently select or substitute a model.
@@ -58,14 +59,15 @@ Start from the domain owner, then inspect direct consumers and tests before edit
 | Change | Start here | Inspect next |
 | --- | --- | --- |
 | Public request, session, generation, metric or error contract | `core/contracts` | runtime, transports, observability and app consumers |
-| Runtime lifecycle, queueing, memory pressure or residency | `core/runtime-core` | backend, model store, transport and runtime-owning apps |
+| Backend-neutral model source, capability, prompt/context/generation or cancellation contract | `core/backend-spi` | runtime-core, concrete backends and deterministic fakes |
+| Runtime lifecycle, queueing, memory pressure or residency | `core/runtime-core` | backend SPI, model store, transport and runtime-owning apps |
 | Model profile, use case or application binding | `models/model-profile` | runtime resolution, installer and app registries |
 | Installed GGUF import, verification or removal | `models/model-store` | runtime ownership, installer and model UI |
 | Catalog, targeting or compatibility | `models/model-catalog` | downloader, installer and phone UI |
 | Remote transfer and verified holding | `models/model-download` | catalog input, installer and app orchestration |
 | Verified installation and inspection | `models/model-install` | model store, backend inspector and phone UI |
 | Model-evaluation identity, evaluator, sampling, run or compatibility contract | `evaluation/contracts` | focused evaluation workstream, then engine/store/UI consumers |
-| JNI, native generation or GGUF inspection | `backends/llama-cpp` | runtime adapter, installer and device validation |
+| llama.cpp adapter, JNI, native generation or GGUF inspection | `backends/llama-cpp` | backend SPI, installer and device validation |
 | Telemetry or query contracts | `observability/contracts` | all stores, engines and presenters |
 | Persistence or migration | matching observability/evaluation store | contracts, engines, migration tests and UI queries |
 | Health, resources or benchmarks | matching observability engine | contracts, stores and Diagnostics UI |

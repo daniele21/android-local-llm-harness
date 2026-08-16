@@ -44,18 +44,13 @@ class ArchitectureFitnessTest(unittest.TestCase):
             )
             self.assertEqual(find_dependency_violations(root, ("core:runtime-core",)), ())
 
-    def test_unexpected_core_backend_dependency_fails(self) -> None:
-        violation = DependencyViolation("core:contracts", "backends:new", "api")
-        messages = evaluate_dependency_violations((violation,))
-        self.assertTrue(any("core:contracts -> backends:new" in message for message in messages))
-
-    def test_known_dependency_debt_is_allowed(self) -> None:
+    def test_any_core_backend_dependency_fails_without_exception(self) -> None:
         violation = DependencyViolation("core:runtime-core", "backends:llama-cpp", "implementation")
-        self.assertEqual(evaluate_dependency_violations((violation,)), ())
+        messages = evaluate_dependency_violations((violation,))
+        self.assertTrue(any("core:runtime-core -> backends:llama-cpp" in message for message in messages))
 
-    def test_removed_dependency_debt_requires_exception_cleanup(self) -> None:
-        messages = evaluate_dependency_violations(())
-        self.assertTrue(any("stale architecture exception" in message for message in messages))
+    def test_empty_dependency_exception_set_has_no_stale_debt(self) -> None:
+        self.assertEqual(evaluate_dependency_violations(()), ())
 
     def test_cpp_implementation_include_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

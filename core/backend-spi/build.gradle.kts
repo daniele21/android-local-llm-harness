@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.daniele21.localllm.runtime"
+    namespace = "io.github.daniele21.localllm.backend.spi"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
 
@@ -26,11 +26,7 @@ android {
 
 dependencies {
     api(project(":core:contracts"))
-    api(project(":core:backend-spi"))
-    implementation(project(":models:model-profile"))
-    implementation(project(":models:model-store"))
-    implementation(project(":observability:contracts"))
+    api(project(":models:model-profile"))
 
-    testImplementation(project(":observability:in-memory-store"))
     testImplementation(libs.junit4)
 }

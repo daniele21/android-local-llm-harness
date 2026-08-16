@@ -8,7 +8,13 @@ import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.ChatTemplatePolicy
 import io.github.daniele21.localllm.models.GgufModelProfile
-import io.github.daniele21.localllm.store.StoredModel
+import java.io.File
+
+data class BackendModelSource(val digest: ModelDigest, val file: File, val sizeBytes: Long) {
+    init {
+        require(sizeBytes >= 0) { "Model source size must not be negative" }
+    }
+}
 
 interface BackendModelHandle {
     val digest: ModelDigest
@@ -100,7 +106,7 @@ interface InferenceBackend {
 
     fun initialize()
     fun shutdown()
-    fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle
+    fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle
     fun unloadModel(model: BackendModelHandle)
     fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities
     fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan

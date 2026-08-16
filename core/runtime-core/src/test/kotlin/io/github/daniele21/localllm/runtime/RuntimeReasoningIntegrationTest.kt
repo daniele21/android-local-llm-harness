@@ -202,8 +202,8 @@ private class ReasoningBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle =
-        ReasoningBackendModel(storedModel.digest, profile.id)
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
+        ReasoningBackendModel(source.digest, profile.id)
 
     override fun unloadModel(model: BackendModelHandle) = Unit
 

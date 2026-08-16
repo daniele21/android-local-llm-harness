@@ -541,9 +541,9 @@ private class FakeInferenceBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
-        return FakeBackendModel(storedModel.digest, profile.id)
+        return FakeBackendModel(source.digest, profile.id)
     }
 
     override fun unloadModel(model: BackendModelHandle) {

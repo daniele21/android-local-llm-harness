@@ -20,7 +20,6 @@ import io.github.daniele21.localllm.llamacpp.NativeStreamingResult
 import io.github.daniele21.localllm.llamacpp.RuntimeInitializationResult
 import io.github.daniele21.localllm.llamacpp.StreamingCancelResult
 import io.github.daniele21.localllm.models.GgufModelProfile
-import io.github.daniele21.localllm.store.StoredModel
 import java.io.File
 
 @Suppress("TooManyFunctions")
@@ -48,11 +47,14 @@ class LlamaCppInferenceBackend(
         }
     }
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
-        require(storedModel.digest == profile.artifact.digest) {
-            "Stored model digest does not match profile ${profile.id}"
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
+        require(source.digest == profile.artifact.digest) {
+            "Backend model source digest does not match profile ${profile.id}"
         }
-        return when (val result = lifecycleBridge.loadModel(storedModel.file, profile)) {
+        require(source.sizeBytes == profile.artifact.sizeBytes) {
+            "Backend model source size does not match profile ${profile.id}"
+        }
+        return when (val result = lifecycleBridge.loadModel(source.file, profile)) {
             is ModelLoadResult.Success -> LlamaBackendModel(result.model)
             is ModelLoadResult.Failure -> throw result.error.asBackendException()
         }

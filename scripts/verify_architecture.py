@@ -18,9 +18,7 @@ _CPP_IMPLEMENTATION_INCLUDE = re.compile(r'^\s*#\s*include\s*["<]([^">]+\.cpp)["
 
 # Temporary debt is explicit and self-expiring: when an owning slice removes the
 # violation, this verifier fails until the stale exception is deleted here too.
-KNOWN_DEPENDENCY_EXCEPTIONS: Mapping[tuple[str, str], str] = {
-    ("core:runtime-core", "backends:llama-cpp"): "RA-1 backend dependency inversion",
-}
+KNOWN_DEPENDENCY_EXCEPTIONS: Mapping[tuple[str, str], str] = {}
 KNOWN_CPP_INCLUDE_EXCEPTIONS: Mapping[tuple[str, str], str] = {
     (
         "backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp",
