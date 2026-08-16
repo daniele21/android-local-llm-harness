@@ -20,7 +20,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Apply exact admission telemetry wiring
+      - name: Apply scoped admission telemetry wiring
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -28,15 +28,15 @@ jobs:
           path = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt')
           text = path.read_text()
 
-          context_old = '''        return when (decision) {
-              is MemoryAwareContextDecision.Allow -> decision.contextTokens
-
-              is MemoryAwareContextDecision.Reject -> throw GenerationPlanningException(
-                  ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
-                  memoryAdmissionFailureMessage(contextPlan, decision),
-              )
-          }
-          '''.replace('              ', '    ')
+          context_function = '    private fun resolveMemoryAwareContextSize(session: SessionDescriptor, contextPlan: ContextPlanningResult): Int {'
+          context_next = '    private fun memoryAdmissionFailureMessage('
+          assert text.count(context_function) == 1 and text.count(context_next) == 1, 'context admission scope changed'
+          scope_start = text.index(context_function)
+          scope_end = text.index(context_next, scope_start)
+          scope = text[scope_start:scope_end]
+          decision_start = scope.index('        return when (decision) {')
+          decision_end_marker = '\n    }\n\n'
+          decision_end = scope.index(decision_end_marker, decision_start) + len('\n    }')
           context_new = '''        return when (decision) {
               is MemoryAwareContextDecision.Allow -> {
                   runtimeTelemetry.memoryAdmission(
@@ -62,15 +62,18 @@ jobs:
                       memoryAdmissionFailureMessage(contextPlan, decision),
                   )
               }
-          }
-          '''.replace('              ', '    ')
-          assert text.count(context_old) == 1, 'context admission block changed'
-          text = text.replace(context_old, context_new)
+          }'''.replace('              ', '    ')
+          scope = scope[:decision_start] + context_new + scope[decision_end:]
+          text = text[:scope_start] + scope + text[scope_end:]
 
-          model_old = '''        if (decision is MemoryAwareModelLoadDecision.Reject) {
-              throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
-          }
-          '''.replace('              ', '    ')
+          model_function = '    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {'
+          model_next = '    private fun validateRuntimeCapabilities('
+          assert text.count(model_function) == 1 and text.count(model_next) == 1, 'model admission scope changed'
+          scope_start = text.index(model_function)
+          scope_end = text.index(model_next, scope_start)
+          scope = text[scope_start:scope_end]
+          decision_start = scope.index('        if (decision is MemoryAwareModelLoadDecision.Reject) {')
+          decision_end = scope.index('\n    }\n\n', decision_start) + len('\n    }')
           model_new = '''        when (decision) {
               is MemoryAwareModelLoadDecision.Allow -> runtimeTelemetry.memoryAdmission(
                   resource = MemoryAdmissionResource.MODEL,
@@ -87,10 +90,10 @@ jobs:
                   )
                   throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
               }
-          }
-          '''.replace('              ', '    ')
-          assert text.count(model_old) == 1, 'model admission block changed'
-          text = text.replace(model_old, model_new)
+          }'''.replace('              ', '    ')
+          scope = scope[:decision_start] + model_new + scope[decision_end:]
+          text = text[:scope_start] + scope + text[scope_end:]
+
           path.write_text(text)
           PY
       - name: Apply canonical Kotlin formatting
