@@ -28,6 +28,7 @@ import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.store.ModelStore
+import io.github.daniele21.localllm.store.StoredModel
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadLocalRandom
@@ -621,6 +622,11 @@ class RuntimeOrchestrator(
             backendInitialized = true
         }
 
+        return loadResidentModel(stored, resolved)
+    }
+
+    private fun loadResidentModel(stored: StoredModel, resolved: ResolvedUseCase): ResidentModel {
+        val requestedDigest = resolved.model.artifact.digest
         modelResidency.beginLoad(resolved.model.id, requestedDigest)
         return try {
             val loaded = ResidentModel(
