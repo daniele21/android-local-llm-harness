@@ -110,16 +110,14 @@ class MemoryAwareContextPlannerTest {
         assertEquals("model-a", observedProfileId)
     }
 
-    private fun request(
-        modelProfileId: String = "model-profile",
-        minimumTokens: Int = 1_500,
-    ): MemoryAwareContextRequest = MemoryAwareContextRequest(
-        modelProfileId = modelProfileId,
-        requestedContextTokens = 8_192,
-        minimumContextTokens = minimumTokens,
-        approvedContextTiers = listOf(1_024, 2_048, 4_096, 8_192),
-        residency = residency,
-    )
+    private fun request(modelProfileId: String = "model-profile", minimumTokens: Int = 1_500): MemoryAwareContextRequest =
+        MemoryAwareContextRequest(
+            modelProfileId = modelProfileId,
+            requestedContextTokens = 8_192,
+            minimumContextTokens = minimumTokens,
+            approvedContextTiers = listOf(1_024, 2_048, 4_096, 8_192),
+            residency = residency,
+        )
 
     private fun planner(availableBytes: Long, costs: Map<Int, Long>): MemoryAwareContextPlanner = MemoryAwareContextPlanner(
         observationSource = RuntimeMemoryObservationSource {
