@@ -28,8 +28,15 @@ internal class DeterministicFakeInferenceBackend(
     var cancelCalls = 0
         private set
 
+    var initializeFailure: FakeBackendFailure? = null
     var loadFailure: FakeBackendFailure? = null
+    var unloadFailure: FakeBackendFailure? = null
+    var promptPlanningFailure: FakeBackendFailure? = null
+    var contextCreationFailure: FakeBackendFailure? = null
+    var contextReleaseFailure: FakeBackendFailure? = null
     var generationFailure: FakeBackendFailure? = null
+    var generationFailureAfterChunks: Int? = null
+    var cancellationFailure: FakeBackendFailure? = null
     var cancellationAccepted: Boolean = true
     var generationOutcome: BackendGenerationOutcome =
         BackendGenerationOutcome.Completed(
@@ -48,6 +55,7 @@ internal class DeterministicFakeInferenceBackend(
 
     override fun initialize() {
         initializeCalls += 1
+        initializeFailure?.throwBackendException()
     }
 
     override fun shutdown() {
@@ -56,7 +64,7 @@ internal class DeterministicFakeInferenceBackend(
 
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
-        loadFailure?.let { throw BackendException(it.code, it.message) }
+        loadFailure?.throwBackendException()
         require(source.digest == profile.artifact.digest) { "Fake backend model/profile digest mismatch" }
         return FakeModelHandle(source.digest, profile.id)
     }
@@ -64,6 +72,7 @@ internal class DeterministicFakeInferenceBackend(
     override fun unloadModel(model: BackendModelHandle) {
         require(model is FakeModelHandle) { "Model handle was not created by deterministic fake" }
         unloadCalls += 1
+        unloadFailure?.throwBackendException()
     }
 
     override fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities {
@@ -77,6 +86,7 @@ internal class DeterministicFakeInferenceBackend(
 
     override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan {
         require(model is FakeModelHandle) { "Model handle was not created by deterministic fake" }
+        promptPlanningFailure?.throwBackendException()
         return fakePromptPlan(request)
     }
 
@@ -88,12 +98,14 @@ internal class DeterministicFakeInferenceBackend(
         require(model is FakeModelHandle) { "Model handle was not created by deterministic fake" }
         require(model.profileId == profile.id) { "Fake backend context profile mismatch" }
         createContextCalls += 1
+        contextCreationFailure?.throwBackendException()
         return FakeContextHandle(model, configuration.contextSize)
     }
 
     override fun releaseContext(context: BackendContextHandle) {
         require(context is FakeContextHandle) { "Context handle was not created by deterministic fake" }
         releaseContextCalls += 1
+        contextReleaseFailure?.throwBackendException()
     }
 
     override fun generate(
@@ -103,8 +115,10 @@ internal class DeterministicFakeInferenceBackend(
     ): BackendGenerationOutcome {
         require(context is FakeContextHandle) { "Context handle was not created by deterministic fake" }
         generateCalls += 1
-        generationFailure?.let { throw BackendException(it.code, it.message) }
-        for (chunk in chunks) {
+        if (generationFailureAfterChunks == null) {
+            generationFailure?.throwBackendException()
+        }
+        for ((index, chunk) in chunks.withIndex()) {
             if (!onChunk(chunk.text, chunk.generatedTokens)) {
                 return BackendGenerationOutcome.Cancelled(
                     BackendGenerationMetrics(
@@ -115,6 +129,9 @@ internal class DeterministicFakeInferenceBackend(
                     ),
                 )
             }
+            if (generationFailureAfterChunks == index + 1) {
+                generationFailure?.throwBackendException()
+            }
         }
         return generationOutcome
     }
@@ -122,8 +139,11 @@ internal class DeterministicFakeInferenceBackend(
     override fun cancel(requestId: String): Boolean {
         require(requestId.isNotBlank()) { "Request ID must not be blank" }
         cancelCalls += 1
+        cancellationFailure?.throwBackendException()
         return cancellationAccepted
     }
+
+    private fun FakeBackendFailure.throwBackendException(): Nothing = throw BackendException(code, message)
 
     private data class FakeModelHandle(
         override val digest: ModelDigest,
