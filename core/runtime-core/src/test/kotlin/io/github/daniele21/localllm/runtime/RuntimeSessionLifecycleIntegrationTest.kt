@@ -94,6 +94,78 @@ class RuntimeSessionLifecycleIntegrationTest {
         fixture.close()
     }
 
+    @Test
+    fun `context creation failure is request scoped and the same session can retry`() {
+        val backend = DeterministicFakeInferenceBackend().apply {
+            contextCreationFailure = FakeBackendFailure("CONTEXT_CREATE_FAILED", "synthetic context creation failure")
+        }
+        val fixture = RuntimeSessionLifecycleFixture(backend)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+
+        val failed = fixture.generateAndAwait("context-failure", session)
+
+        assertTrue(failed is GenerationEvent.Failed)
+        assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(1, backend.createContextCalls)
+        assertEquals(0, backend.generateCalls)
+
+        backend.contextCreationFailure = null
+        val retried = fixture.generateAndAwait("context-retry", session)
+
+        assertTrue(retried is GenerationEvent.Completed)
+        assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(2, backend.createContextCalls)
+        assertEquals(1, backend.generateCalls)
+        fixture.close()
+    }
+
+    @Test
+    fun `generation failure is request scoped and the same session can retry`() {
+        val backend = DeterministicFakeInferenceBackend().apply {
+            generationFailure = FakeBackendFailure("GENERATION_FAILED", "synthetic generation failure")
+            generationFailureAfterChunks = 1
+        }
+        val fixture = RuntimeSessionLifecycleFixture(backend)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+
+        val failed = fixture.generateAndAwait("generation-failure", session)
+
+        assertTrue(failed is GenerationEvent.Failed)
+        assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(1, backend.generateCalls)
+
+        backend.generationFailure = null
+        backend.generationFailureAfterChunks = null
+        val retried = fixture.generateAndAwait("generation-retry", session)
+
+        assertTrue(retried is GenerationEvent.Completed)
+        assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(2, backend.generateCalls)
+        fixture.close()
+    }
+
+    @Test
+    fun `context release failure retains session ownership until cleanup retry succeeds`() {
+        val backend = DeterministicFakeInferenceBackend()
+        val fixture = RuntimeSessionLifecycleFixture(backend)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        assertTrue(fixture.generateAndAwait("materialize-for-release", session) is GenerationEvent.Completed)
+        backend.contextReleaseFailure = FakeBackendFailure("CONTEXT_RELEASE_FAILED", "synthetic context release failure")
+
+        val firstClose = runCatching { fixture.runtime.closeSession(session) }
+
+        assertTrue(firstClose.isFailure)
+        assertEquals(1, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(1, backend.releaseContextCalls)
+
+        backend.contextReleaseFailure = null
+        fixture.runtime.closeSession(session)
+
+        assertEquals(0, fixture.runtime.runtimeSnapshot().activeSessions)
+        assertEquals(2, backend.releaseContextCalls)
+        fixture.close()
+    }
+
     private fun waitUntil(timeoutMs: Long = 2_000, condition: () -> Boolean): Boolean {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (System.nanoTime() < deadline) {
