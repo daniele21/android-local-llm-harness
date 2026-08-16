@@ -14,8 +14,8 @@ Read these sources according to the change:
 | --- | --- | --- |
 | Backend-neutral execution contract | `../../core/backend-spi` | [`api-usage.md`](../../docs/api-usage.md), [ADR 0014](../../docs/adr/0014-backend-spi-boundary.md) |
 | llama.cpp Kotlin/backend contract adaptation | `src/main/kotlin` | [`architecture.md`](../../docs/architecture.md), `../../core/backend-spi` |
-| JNI entry points, UTF conversion and output buffering | `src/main/cpp/llama_jni_entry.cpp`, `llama_jni.cpp`, `generation_output_buffer.*` | [`definition-of-done.md`](../../docs/definition-of-done.md), native tests under `src/test-native` |
-| Native model/context/cancellation ownership | Registry headers and generation implementation | [`architecture.md`](../../docs/architecture.md), native tests under `src/test-native` |
+| JNI entry points, UTF conversion and output buffering | `src/main/cpp/llama_jni.cpp`, `generation_output_buffer.*` | [`definition-of-done.md`](../../docs/definition-of-done.md), native tests under `src/test-native` |
+| Native model/context/cancellation ownership | `llama_jni.cpp`, registry headers and focused generation helpers | [`architecture.md`](../../docs/architecture.md), native tests under `src/test-native` |
 | GGUF metadata inspection | `gguf_metadata.*` and Kotlin inspector adapter | [`model-installation.md`](../../docs/model-installation.md), [ADR 0007](../../docs/adr/0007-explicit-verified-download-installation.md) |
 | CMake, ABI or packaged libraries | `src/main/cpp/CMakeLists.txt`, module Gradle file | [`device-e2e-testing.md`](../../docs/device-e2e-testing.md), packaging verification script |
 | Upstream revision | `third_party/llama.cpp` pin and verification scripts | Repository root guide, upstream release notes and affected benchmarks |
