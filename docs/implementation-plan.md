@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: repository
 Canonical scope: target.repository
 Read when: a change affects repository-wide product behavior, phase boundaries or acceptance criteria
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-16
 
 This document defines the repository-level target and routes work to the focused specification that owns each behavior. It intentionally avoids repeating module contracts, implementation status or release evidence.
 
@@ -55,6 +55,7 @@ catalog release
 | Concern | Canonical source |
 | --- | --- |
 | Dependency direction and current module ownership | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
+| Reference-grade architecture hardening target and sequencing | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md) |
 | Qwen3.5 product envelope and specialization sequence | [`qwen35/README.md`](qwen35/README.md) and [ADR 0011](adr/0011-qwen35-only-product-support.md) |
 | Public embedded assembly and lifecycle | [`api-usage.md`](api-usage.md) |
 | Model distribution and installation routing | [`model-catalog-download-plan.md`](model-catalog-download-plan.md) |
@@ -113,6 +114,8 @@ Every coherent implementation slice must satisfy the applicable criteria below.
 ## Delivery direction
 
 The current embedded Android boundary is the only active runtime path. Native Android SDK and Capacitor adapters may build on it after the embedded API and release gates are stable. A shared Android service remains deferred until measurements demonstrate that cross-application artifact or RAM deduplication justifies Binder lifecycle complexity. Its progressive-disclosure execution plan is [`shared-runtime/README.md`](shared-runtime/README.md); that plan does not make the deployment active or release-ready.
+
+Cross-cutting hardening toward a reference-grade local-AI architecture is owned by [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md); its tracker does not replace capability-specific plans or the repository operational ledger.
 
 Current integration status belongs only in [`current-state.md`](current-state.md). Capability sequencing belongs in [`roadmap.md`](roadmap.md). Harness 0.5.0 release evidence belongs in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
