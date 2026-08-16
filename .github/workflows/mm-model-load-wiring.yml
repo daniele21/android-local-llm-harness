@@ -28,34 +28,23 @@ jobs:
           path = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt')
           text = path.read_text()
 
-          constructor_old = """    private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
-              private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
-              seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
-          """.replace('              ', '    ')
-          constructor_new = """    private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
-              private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
-              private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
-              seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
-          """.replace('              ', '    ')
-          assert text.count(constructor_old) == 1, 'constructor admission insertion point changed'
-          text = text.replace(constructor_old, constructor_new)
+          constructor_anchor = '    private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,\n'
+          assert text.count(constructor_anchor) == 1, 'constructor admission insertion point changed'
+          text = text.replace(
+              constructor_anchor,
+              constructor_anchor + '    private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,\n',
+          )
 
-          load_old = """        current?.let { backend.unloadModel(it.handle) }
-          loadedModel = null
+          load_anchor = '        loadedModel = null\n\n        val loaded = LoadedModelDescriptor(\n'
+          assert text.count(load_anchor) == 1, 'model load admission insertion point changed'
+          text = text.replace(
+              load_anchor,
+              '        loadedModel = null\n        admitModelLoad(resolved, schedulerSnapshot)\n\n        val loaded = LoadedModelDescriptor(\n',
+          )
 
-          val loaded = LoadedModelDescriptor(
-          """
-          load_new = """        current?.let { backend.unloadModel(it.handle) }
-          loadedModel = null
-          admitModelLoad(resolved, schedulerSnapshot)
-
-          val loaded = LoadedModelDescriptor(
-          """
-          assert text.count(load_old) == 1, 'model load admission insertion point changed'
-          text = text.replace(load_old, load_new)
-
-          helper_anchor = "    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {"
-          helper = """    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
+          helper_anchor = '    private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {'
+          assert text.count(helper_anchor) == 1, 'model load helper insertion point changed'
+          helper = '''    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
               val planner = memoryAwareModelLoadPlanner ?: return
               val decision = planner.plan(
                   MemoryAwareModelLoadRequest(
@@ -73,8 +62,7 @@ jobs:
               }
           }
 
-          """.replace('              ', '        ')
-          assert text.count(helper_anchor) == 1, 'model load helper insertion point changed'
+          '''.replace('              ', '        ')
           text = text.replace(helper_anchor, helper + helper_anchor)
           path.write_text(text)
           PY
