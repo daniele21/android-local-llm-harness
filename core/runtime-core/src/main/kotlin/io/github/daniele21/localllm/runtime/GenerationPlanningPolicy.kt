@@ -114,7 +114,6 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
         }
     }
 
-    @Suppress("ThrowsCount")
     fun resolveContextSize(
         resolvedUseCase: ResolvedUseCase,
         options: SessionOptions,
@@ -122,7 +121,24 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
         maxOutputTokens: Int,
         capabilities: BackendModelCapabilities,
         preference: ContextPreference,
-    ): Int {
+    ): Int = planContextSize(
+        resolvedUseCase = resolvedUseCase,
+        options = options,
+        promptTokenCount = promptTokenCount,
+        maxOutputTokens = maxOutputTokens,
+        capabilities = capabilities,
+        preference = preference,
+    ).requestedContextTokens
+
+    @Suppress("ThrowsCount")
+    fun planContextSize(
+        resolvedUseCase: ResolvedUseCase,
+        options: SessionOptions,
+        promptTokenCount: Int,
+        maxOutputTokens: Int,
+        capabilities: BackendModelCapabilities,
+        preference: ContextPreference,
+    ): ContextPlanningResult {
         if (promptTokenCount <= 0 || capabilities.maximumContextTokens <= 0) {
             throw GenerationPlanningException(
                 ConfigurationErrorCode.PROMPT_TOKENIZATION_FAILED,
@@ -158,18 +174,34 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
                         "Prompt and output require $required tokens but the manual context is ${policy.tokens}",
                     )
                 }
-                policy.tokens
+                ContextPlanningResult(
+                    requestedContextTokens = policy.tokens,
+                    minimumRequiredTokens = required,
+                    memoryEligibleContextTiers = listOf(policy.tokens),
+                )
             }
 
-            ContextPolicy.Auto -> ContextSizeSelector.selectAuto(
-                required = required,
-                maximum = maximum,
-                preferredMinimum = preference.preferredTokens,
-                candidateSizes = approvedTiers,
-            ) ?: throw GenerationPlanningException(
-                ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
-                "No supported context size can contain the requested prompt and output",
-            )
+            ContextPolicy.Auto -> {
+                val selected = ContextSizeSelector.selectAuto(
+                    required = required,
+                    maximum = maximum,
+                    preferredMinimum = preference.preferredTokens,
+                    candidateSizes = approvedTiers,
+                ) ?: throw GenerationPlanningException(
+                    ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
+                    "No supported context size can contain the requested prompt and output",
+                )
+                ContextPlanningResult(
+                    requestedContextTokens = selected,
+                    minimumRequiredTokens = required,
+                    memoryEligibleContextTiers = approvedTiers
+                        .asSequence()
+                        .distinct()
+                        .filter { it in required..selected }
+                        .sorted()
+                        .toList(),
+                )
+            }
         }
     }
 
@@ -231,6 +263,12 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
         const val MIN_CONTROLLED_THINKING_OUTPUT_TOKENS = 16
     }
 }
+
+internal data class ContextPlanningResult(
+    val requestedContextTokens: Int,
+    val minimumRequiredTokens: Int,
+    val memoryEligibleContextTiers: List<Int>,
+)
 
 internal data class ResolvedRequestConfiguration(
     val preset: InferencePreset?,
