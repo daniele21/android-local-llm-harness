@@ -16,15 +16,10 @@ _PRODUCTION_PROJECT_DEPENDENCY = re.compile(
 )
 _CPP_IMPLEMENTATION_INCLUDE = re.compile(r'^\s*#\s*include\s*["<]([^">]+\.cpp)[">]', re.MULTILINE)
 
-# Temporary debt is explicit and self-expiring: when an owning slice removes the
-# violation, this verifier fails until the stale exception is deleted here too.
+# Architecture exceptions must remain empty. If temporary debt is ever admitted,
+# name it explicitly here and remove the exception in the owning cleanup slice.
 KNOWN_DEPENDENCY_EXCEPTIONS: Mapping[tuple[str, str], str] = {}
-KNOWN_CPP_INCLUDE_EXCEPTIONS: Mapping[tuple[str, str], str] = {
-    (
-        "backends/llama-cpp/src/main/cpp/llama_jni_entry.cpp",
-        "llama_jni.cpp",
-    ): "RA-0 native translation-unit cleanup",
-}
+KNOWN_CPP_INCLUDE_EXCEPTIONS: Mapping[tuple[str, str], str] = {}
 
 
 @dataclass(frozen=True, order=True)
