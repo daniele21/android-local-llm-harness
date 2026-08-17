@@ -1,0 +1,117 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.daniele21.localllm",
+    "module": "android-binder-contract",
+    "version": "0.1.0-alpha.3",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "io.github.daniele21.localllm",
+          "module": "core-contracts",
+          "version": {
+            "requires": "0.1.0-alpha.3"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "android-binder-contract-0.1.0-alpha.3.aar",
+          "url": "android-binder-contract-0.1.0-alpha.3.aar",
+          "size": 234132,
+          "sha512": "3e84a6cda2881fd0489f145eb253daf1129bd7dfc12df5ad27f26510e1b25574b77798e03434aeac91a819dfd4b6326c777c9ed18684ae240aea45b88eb5bbd4",
+          "sha256": "3333d48feb5553d64ca4fe810802efab6cb532126c6a7635ab4ced78ebc44d0f",
+          "sha1": "105eb6b6fc18b531abe1113bf9beb4f86eeb6b0d",
+          "md5": "7b7d045117060b08cefed522b92e97f1"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-parcelize-runtime",
+          "version": {
+            "requires": "2.2.10"
+          }
+        },
+        {
+          "group": "io.github.daniele21.localllm",
+          "module": "core-contracts",
+          "version": {
+            "requires": "0.1.0-alpha.3"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "android-binder-contract-0.1.0-alpha.3.aar",
+          "url": "android-binder-contract-0.1.0-alpha.3.aar",
+          "size": 234132,
+          "sha512": "3e84a6cda2881fd0489f145eb253daf1129bd7dfc12df5ad27f26510e1b25574b77798e03434aeac91a819dfd4b6326c777c9ed18684ae240aea45b88eb5bbd4",
+          "sha256": "3333d48feb5553d64ca4fe810802efab6cb532126c6a7635ab4ced78ebc44d0f",
+          "sha1": "105eb6b6fc18b531abe1113bf9beb4f86eeb6b0d",
+          "md5": "7b7d045117060b08cefed522b92e97f1"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "android-binder-contract-0.1.0-alpha.3-sources.jar",
+          "url": "android-binder-contract-0.1.0-alpha.3-sources.jar",
+          "size": 44000,
+          "sha512": "4bd36401a4b5ad447a17748e7ba83be2914a91bef2d6a12f1ca8f42e67558312c5027b33c6e4e46d04fdf8c2d03aed3dc97ef84c1e069fb1657ab79fda4e9400",
+          "sha256": "57cff975b8ed7a70bf8a54306961084abef46abb8a8db6eec850a5e855665fed",
+          "sha1": "36b450dba41257947e4105768642c9aef5b3a248",
+          "md5": "35aaaa750227f4f16aa6ba0d6b27c198"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.daniele21.localllm",
+    "module": "core-contracts",
+    "version": "0.1.0-alpha.3",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "core-contracts-0.1.0-alpha.3.aar",
+          "url": "core-contracts-0.1.0-alpha.3.aar",
+          "size": 155251,
+          "sha512": "e2d59d17a2f93355cf4d1a778109f8ede2819175ec06484d23deecab579fac57f2444351da02c15e565b83953a3223084ed1f6804a8a356034e87777457c95c3",
+          "sha256": "0cc527e8080b6e097339c2ad6e7457c06414d83b5a47f8977aa4b9dd45f85391",
+          "sha1": "4c23535820c63a94bb6231994dcb7044a76a7a03",
+          "md5": "4dc5f54c7b5e0cbc079def1f63ca36cf"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "core-contracts-0.1.0-alpha.3.aar",
+          "url": "core-contracts-0.1.0-alpha.3.aar",
+          "size": 155251,
+          "sha512": "e2d59d17a2f93355cf4d1a778109f8ede2819175ec06484d23deecab579fac57f2444351da02c15e565b83953a3223084ed1f6804a8a356034e87777457c95c3",
+          "sha256": "0cc527e8080b6e097339c2ad6e7457c06414d83b5a47f8977aa4b9dd45f85391",
+          "sha1": "4c23535820c63a94bb6231994dcb7044a76a7a03",
+          "md5": "4dc5f54c7b5e0cbc079def1f63ca36cf"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "core-contracts-0.1.0-alpha.3-sources.jar",
+          "url": "core-contracts-0.1.0-alpha.3-sources.jar",
+          "size": 8540,
+          "sha512": "c5c1bc819a2e4037689bb6b113acadfd70e723d64d557b55168a9036312ef891c1344f56f776ea7f5e817e04e10930863183837f88819ce3a98ed2cdf5acbd42",
+          "sha256": "c4bea917143b0c28e4d8afb7e854c172cf0f69019bbdc0b41f0582a9b04bd026",
+          "sha1": "53fcad741c419f2aae66dffdad426cfa61d0082b",
+          "md5": "f4b099ba301400ec351edd628e553526"
+        }
+      ]
+    }
+  ]
+}
