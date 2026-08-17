@@ -9,7 +9,10 @@ on:
       - 'transports/android-binder-client/**'
       - 'samples/external-consumer-android/**'
       - 'scripts/verify-consumer-sdk-publication.sh'
+      - 'scripts/dump-consumer-sdk-abi.sh'
+      - 'scripts/verify-consumer-sdk-abi.sh'
       - 'docs/shared-runtime/consumer-android-sdk.md'
+      - 'docs/shared-runtime/consumer-sdk-public-abi.txt'
   push:
     branches:
       - dev
@@ -20,6 +23,9 @@ on:
       - 'transports/android-binder-client/**'
       - 'samples/external-consumer-android/**'
       - 'scripts/verify-consumer-sdk-publication.sh'
+      - 'scripts/dump-consumer-sdk-abi.sh'
+      - 'scripts/verify-consumer-sdk-abi.sh'
+      - 'docs/shared-runtime/consumer-sdk-public-abi.txt'
 
 permissions:
   contents: read
@@ -52,6 +58,16 @@ jobs:
           CONSUMER_SDK_VERSION: 0.1.0-ci.${{ github.run_id }}
         run: bash scripts/verify-consumer-sdk-publication.sh
 
+      - name: Generate public ABI evidence
+        env:
+          CONSUMER_SDK_VERSION: 0.1.0-ci.${{ github.run_id }}
+        run: bash scripts/dump-consumer-sdk-abi.sh
+
+      - name: Verify frozen ABI baseline
+        if: ${{ !contains(hashFiles('docs/shared-runtime/consumer-sdk-public-abi.txt'), '') }}
+        continue-on-error: true
+        run: bash scripts/verify-consumer-sdk-abi.sh
+
       - name: Upload SDK publication evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,5 +76,6 @@ jobs:
           path: |
             build/consumer-sdk-repository/build-manifest.txt
             build/consumer-sdk-repository/SHA256SUMS
+            build/consumer-sdk-repository/public-abi.txt
           if-no-files-found: warn
           retention-days: 7
