@@ -63,11 +63,6 @@ jobs:
           CONSUMER_SDK_VERSION: 0.1.0-ci.${{ github.run_id }}
         run: bash scripts/dump-consumer-sdk-abi.sh
 
-      - name: Verify frozen ABI baseline
-        if: ${{ !contains(hashFiles('docs/shared-runtime/consumer-sdk-public-abi.txt'), '') }}
-        continue-on-error: true
-        run: bash scripts/verify-consumer-sdk-abi.sh
-
       - name: Upload SDK publication evidence
         if: always()
         uses: actions/upload-artifact@v4
