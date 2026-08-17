@@ -1,7 +1,11 @@
 # Consumer Android SDK publication
 
-Status: implementation in progress
-Owner: Harness shared-runtime boundary
+Status: active
+Document type: feature-specification
+Owner: shared-runtime-client
+Canonical scope: shared-runtime.consumer-android-sdk
+Read when: publishing, versioning, validating or consuming the external Android Consumer SDK artifact
+Last reviewed: 2026-08-17
 
 ## Public dependency
 
