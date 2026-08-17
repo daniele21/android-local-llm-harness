@@ -1,4 +1,5 @@
 import org.gradle.api.provider.Provider
+import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -22,9 +23,15 @@ class BuiltInKotlinParcelizePlugin : KotlinCompilerPluginSupportPlugin {
 
 plugins {
     alias(libs.plugins.android.library)
+    id("maven-publish")
 }
 
 apply<BuiltInKotlinParcelizePlugin>()
+
+val consumerSdkVersion = providers.gradleProperty("consumerSdkVersion").orElse("0.1.0-SNAPSHOT")
+
+group = "io.github.daniele21.localllm"
+version = consumerSdkVersion.get()
 
 android {
     namespace = "io.github.daniele21.localllm.transport.binder.contract"
@@ -40,6 +47,12 @@ android {
         aidl = true
     }
 
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -50,6 +63,23 @@ android {
         abortOnError = true
         htmlReport = true
         sarifReport = true
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "consumerSdk"
+            url = uri(rootProject.layout.buildDirectory.dir("consumer-sdk-repository"))
+        }
+    }
+    publications {
+        register<MavenPublication>("release") {
+            groupId = project.group.toString()
+            artifactId = "android-binder-contract"
+            version = project.version.toString()
+            afterEvaluate { from(components["release"]) }
+        }
     }
 }
 
