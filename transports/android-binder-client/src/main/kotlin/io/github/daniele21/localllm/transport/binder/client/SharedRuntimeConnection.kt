@@ -152,72 +152,36 @@ internal class SharedRuntimeConnection(
         result: RegistrationResultParcel,
         epoch: Long,
     ) {
-        if (!registrationCallbackIsCurrent(epoch)) return
-        val token = validateRegisteredConsumer(service, negotiated, result, epoch) ?: return
-        synchronized(lock) {
-            if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) return
-            registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, token, epoch)
+        val callbackIsCurrent = synchronized(lock) {
+            epoch == connectionEpoch && current.state == SharedRuntimeConnectionState.NEGOTIATING
         }
-        transitionForEpoch(
-            epoch = epoch,
-            state = SharedRuntimeConnectionState.CONNECTED,
-            negotiatedMinor = negotiated.minor,
-            enabledFeatures = negotiated.enabledFeatures,
-        )
-    }
+        if (!callbackIsCurrent) return
 
-    private fun validateRegisteredConsumer(
-        service: SharedRuntimeRemoteService,
-        negotiated: NegotiatedProtocol,
-        result: RegistrationResultParcel,
-        epoch: Long,
-    ): ClientTokenParcel? {
-        result.error?.let { error ->
-            handleRegistrationError(error.code, error.safeMessage, epoch)
-            return null
-        }
-        if (!isValidRegistration(result, negotiated)) {
-            failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, "Host returned an invalid registration result")
-            return null
-        }
-        if (!consumerAccessGranted(service, epoch)) return null
-        return requireNotNull(result.clientToken)
-    }
-
-    private fun handleRegistrationError(code: String, detail: String, epoch: Long) {
-        when (code) {
-            WireErrorCodes.PROTOCOL_INCOMPATIBLE,
-            WireErrorCodes.FEATURE_UNAVAILABLE,
-            -> failConnection(epoch, SharedRuntimeConnectionState.INCOMPATIBLE, detail)
-
-            WireErrorCodes.CLIENT_NOT_REGISTERED -> {
-                failConnection(epoch, SharedRuntimeConnectionState.PERMISSION_DENIED, detail)
+        when (val validation = validateRegisteredConsumer(service, negotiated, result)) {
+            is RegisteredConsumerValidation.Ready -> {
+                val published = synchronized(lock) {
+                    if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) {
+                        false
+                    } else {
+                        registeredEndpoint = RegisteredSharedRuntimeEndpoint(service, validation.token, epoch)
+                        true
+                    }
+                }
+                if (!published) return
+                transitionForEpoch(
+                    epoch = epoch,
+                    state = SharedRuntimeConnectionState.CONNECTED,
+                    negotiatedMinor = negotiated.minor,
+                    enabledFeatures = negotiated.enabledFeatures,
+                )
             }
 
-            else -> connectionLost(detail, epoch)
+            is RegisteredConsumerValidation.Rejected -> {
+                failConnection(epoch, validation.state, validation.detail)
+            }
+
+            is RegisteredConsumerValidation.Lost -> connectionLost(validation.detail, epoch)
         }
-    }
-
-    private fun consumerAccessGranted(service: SharedRuntimeRemoteService, epoch: Long): Boolean = try {
-        // Registration and feature negotiation are not sufficient proof that the caller may use
-        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
-        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
-        service.consumer
-        true
-    } catch (error: SecurityException) {
-        failConnection(
-            epoch,
-            SharedRuntimeConnectionState.PERMISSION_DENIED,
-            error.message ?: "Host denied Consumer API access",
-        )
-        false
-    } catch (error: RemoteException) {
-        connectionLost(error.message ?: "Consumer API handshake failed", epoch)
-        false
-    }
-
-    private fun registrationCallbackIsCurrent(epoch: Long): Boolean = synchronized(lock) {
-        epoch == connectionEpoch && current.state == SharedRuntimeConnectionState.NEGOTIATING
     }
 
     private fun failConnection(epoch: Long, state: SharedRuntimeConnectionState, detail: String?) {
@@ -296,6 +260,56 @@ internal class SharedRuntimeConnection(
             SharedRuntimeConnectionState.NEGOTIATING,
             SharedRuntimeConnectionState.CONNECTED,
         )
+    }
+}
+
+private sealed interface RegisteredConsumerValidation {
+    data class Ready(val token: ClientTokenParcel) : RegisteredConsumerValidation
+
+    data class Rejected(
+        val state: SharedRuntimeConnectionState,
+        val detail: String,
+    ) : RegisteredConsumerValidation
+
+    data class Lost(val detail: String) : RegisteredConsumerValidation
+}
+
+private fun validateRegisteredConsumer(
+    service: SharedRuntimeRemoteService,
+    negotiated: NegotiatedProtocol,
+    result: RegistrationResultParcel,
+): RegisteredConsumerValidation {
+    result.error?.let { error ->
+        return when (error.code) {
+            WireErrorCodes.PROTOCOL_INCOMPATIBLE,
+            WireErrorCodes.FEATURE_UNAVAILABLE,
+            -> RegisteredConsumerValidation.Rejected(SharedRuntimeConnectionState.INCOMPATIBLE, error.safeMessage)
+
+            WireErrorCodes.CLIENT_NOT_REGISTERED ->
+                RegisteredConsumerValidation.Rejected(SharedRuntimeConnectionState.PERMISSION_DENIED, error.safeMessage)
+
+            else -> RegisteredConsumerValidation.Lost(error.safeMessage)
+        }
+    }
+    if (!isValidRegistration(result, negotiated)) {
+        return RegisteredConsumerValidation.Rejected(
+            SharedRuntimeConnectionState.INCOMPATIBLE,
+            "Host returned an invalid registration result",
+        )
+    }
+    return try {
+        // Registration and feature negotiation are not sufficient proof that the caller may use
+        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
+        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
+        service.consumer
+        RegisteredConsumerValidation.Ready(requireNotNull(result.clientToken))
+    } catch (error: SecurityException) {
+        RegisteredConsumerValidation.Rejected(
+            SharedRuntimeConnectionState.PERMISSION_DENIED,
+            error.message ?: "Host denied Consumer API access",
+        )
+    } catch (error: RemoteException) {
+        RegisteredConsumerValidation.Lost(error.message ?: "Consumer API handshake failed")
     }
 }
 
