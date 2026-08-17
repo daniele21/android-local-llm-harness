@@ -11,6 +11,8 @@ import androidx.core.content.pm.PackageInfoCompat
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.ResourceSnapshot
+import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
+import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import java.time.Instant
 import java.util.Locale
 
@@ -33,11 +35,21 @@ internal object HarnessDiagnosticsExport {
         val repository = graph.telemetryRepository
         val model = graph.selectedModel
         val runtime = graph.runtimeSnapshot()
+        val executionProfile = model?.let { selected ->
+            runCatching { resolvedPhonePlaygroundUseCase(selected).model }.getOrNull()
+        }
+        val resourceCapture = runCatching {
+            ResourceSnapshotRecorder(
+                AndroidResourceSnapshotProvider(context),
+                repository,
+            ).capture()
+        }
         val runs = repository.recentRuns(RUN_LIMIT)
         val health = repository.healthResults()
         val resources = repository.recentResourceSnapshots(RESOURCE_LIMIT)
         val baselines = repository.benchmarkBaselines()
         val baselineHistory = repository.benchmarkBaselineHistory(BENCHMARK_HISTORY_LIMIT)
+        val benchmarkState = HarnessBenchmarkSource(repository) { model }.snapshot()
         val logs = HarnessLogSource(repository).snapshot(limit = LOG_LIMIT)
         val memoryInfo = ActivityManager.MemoryInfo().also { info ->
             (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(info)
@@ -55,6 +67,7 @@ internal object HarnessDiagnosticsExport {
             appendLine("package=${context.packageName}")
             appendLine("versionName=${packageInfo?.versionName ?: "Unavailable"}")
             appendLine("versionCode=${packageInfo?.let(PackageInfoCompat::getLongVersionCode) ?: 0L}")
+            appendLine("buildType=${BuildConfig.BUILD_TYPE}")
             appendLine()
 
             appendLine("[device]")
@@ -63,6 +76,7 @@ internal object HarnessDiagnosticsExport {
             appendLine("androidRelease=${Build.VERSION.RELEASE.safeToken()}")
             appendLine("androidApi=${Build.VERSION.SDK_INT}")
             appendLine("abis=${Build.SUPPORTED_ABIS.joinToString().safeToken()}")
+            appendLine("availableProcessors=${Runtime.getRuntime().availableProcessors()}")
             appendLine("totalRamBytes=${memoryInfo.totalMem}")
             appendLine("availableRamBytes=${memoryInfo.availMem}")
             appendLine("lowMemory=${memoryInfo.lowMemory}")
@@ -82,8 +96,34 @@ internal object HarnessDiagnosticsExport {
             }
             appendLine()
 
+            appendLine("[execution-profile]")
+            if (executionProfile == null) {
+                appendLine("available=false")
+            } else {
+                appendLine("available=true")
+                appendLine("profileId=${executionProfile.id.safeToken()}")
+                appendLine("contextSize=${executionProfile.contextSize}")
+                appendLine("batchSize=${executionProfile.batchSize}")
+                appendLine("microBatchSize=${executionProfile.microBatchSize}")
+                appendLine("cpuThreads=${executionProfile.cpuThreads}")
+                appendLine("batchThreads=${executionProfile.batchThreads}")
+                appendLine("gpuLayers=${executionProfile.gpuLayers}")
+                appendLine("useMmap=${executionProfile.useMmap}")
+                appendLine("useMlock=${executionProfile.useMlock}")
+                appendLine("flashAttention=${executionProfile.flashAttention}")
+            }
+            appendLine()
+
             appendLine("[runtime]")
-            appendLine("snapshot=${runtime?.toString()?.safeValue() ?: "Unavailable"}")
+            if (runtime == null) {
+                appendLine("available=false")
+            } else {
+                appendLine("available=true")
+                appendLine("state=${runtime.state.name}")
+                appendLine("loadedModel=${runtime.loadedModel?.sha256 ?: "None"}")
+                appendLine("activeSessions=${runtime.activeSessions}")
+                appendLine("queuedRequests=${runtime.queuedRequests}")
+            }
             appendLine()
 
             appendLine("[generation-runs]")
@@ -92,6 +132,7 @@ internal object HarnessDiagnosticsExport {
             appendLine()
 
             appendLine("[resources]")
+            appendLine("freshCapture=${if (resourceCapture.isSuccess) "captured" else "unavailable"}")
             appendLine("count=${resources.size}")
             resources.forEachIndexed { index, resource -> appendResource(index, resource) }
             appendLine()
@@ -102,6 +143,20 @@ internal object HarnessDiagnosticsExport {
                 appendLine(
                     "health[$index] id=${result.id.safeToken()} status=${result.status.name} " +
                         "durationMs=${result.durationMs} detail=${result.detail.safeValue()}",
+                )
+            }
+            appendLine()
+
+            appendLine("[benchmark-readiness]")
+            appendLine("eligibleKeys=${benchmarkState.eligibleKeys}")
+            appendLine("sourceError=${benchmarkState.sourceError?.safeValue() ?: "None"}")
+            benchmarkState.readiness.forEachIndexed { index, readiness ->
+                appendLine(
+                    "readiness[$index] useCase=${readiness.useCase.safeToken()} loadKind=${readiness.loadKind.safeToken()} " +
+                        "baselineSamples=${readiness.baselineSamples}/${readiness.baselineRequired} " +
+                        "comparisonSamples=${readiness.comparisonSamples}/${readiness.comparisonRequired} " +
+                        "baselineCaptured=${readiness.baselineCaptured} captureReady=${readiness.captureReady} " +
+                        "comparisonReady=${readiness.comparisonReady} detail=${readiness.detail.safeValue()}",
                 )
             }
             appendLine()
