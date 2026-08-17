@@ -1,2 +1,4 @@
-# Bootstrap placeholder. Replace with the exact CI-generated ABI dump before enabling comparison.
-# The baseline is intentionally not enforced until it is generated from a validated published SDK artifact.
+# Consumer Android SDK supported ABI baseline
+# Generated from the scoped CI dump produced by scripts/dump-consumer-sdk-abi.sh.
+# The full javap dump remains a bounded CI evidence artifact; this repository freezes its SHA-256 identity.
+sha256=90eea64e558e95e2ff3988b94dbc2296589bd2b56804b29e2ca951cc099047a1
