@@ -4,7 +4,7 @@ import android.app.ActivityManager
 import android.os.Build
 import io.github.daniele21.localllm.models.GgufModelProfile
 
-internal class DiagnosticsIdentitySections(
+internal class HarnessDiagnosticsIdentitySections(
     private val packageName: String,
     private val versionName: String?,
     private val versionCode: Long?,
