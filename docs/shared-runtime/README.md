@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: shared-runtime
 Canonical scope: shared-runtime.routing
 Read when: locating the shared Binder runtime objective, milestone order or owning workstream
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-17
 
 This is the progressive-disclosure entry point for exposing local generation from one Android APK to another. Integrated state remains owned by [`../current-state.md`](../current-state.md); detailed milestone truth remains in [`roadmap.md`](roadmap.md).
 
@@ -38,6 +38,8 @@ Start here, then open only the source that owns the current question.
 | Deployment shape, module boundaries, identity and lifecycle | [`architecture.md`](architecture.md) |
 | Milestone order, dependencies, PR slicing and exit gates | [`roadmap.md`](roadmap.md) |
 | Application-facing boundary: model/preset choice, reasoning, metrics and consumer API | [`consumer-api/README.md`](consumer-api/README.md) |
+| External Android SDK publication, Maven coordinates and standalone consumer verification | [`consumer-android-sdk.md`](consumer-android-sdk.md) |
+| RedactGuard cross-repository ownership and cutover gates | [`workstreams/redactguard-cross-repo-extraction.md`](workstreams/redactguard-cross-repo-extraction.md) |
 | AIDL methods, wire DTOs, event semantics and compatibility | [`workstreams/protocol-v1.md`](workstreams/protocol-v1.md) |
 | Host authorization, runtime composition and client cleanup | [`workstreams/host-service.md`](workstreams/host-service.md) |
 | Client binding, adapter behavior and console integration | [`workstreams/client-sdk.md`](workstreams/client-sdk.md) |
