@@ -26,8 +26,19 @@ import io.github.daniele21.localllm.transport.binder.contract.RegistrationResult
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
 internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmService) : SharedRuntimeRemoteService {
-    override val consumer: ConsumerSharedRuntimeRemoteService =
+    /**
+     * The Consumer API is intentionally resolved lazily.
+     *
+     * A newly installed client can bind to an older Harness host whose AIDL surface predates
+     * `consumerApi`. Touching that transaction from the service-connected callback would happen
+     * before protocol/feature negotiation and could escape as a Binder failure on the main thread.
+     * Keeping this lazy lets [SharedRuntimeConnection] negotiate `protocolInfo` and the required
+     * consumer feature first, so an older host becomes the typed INCOMPATIBLE state instead of a
+     * process-level startup failure.
+     */
+    override val consumer: ConsumerSharedRuntimeRemoteService by lazy {
         AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi)
+    }
 
     override fun protocolInfo(): ProtocolInfoParcel = delegate.protocolInfo
 
