@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/consumer-sdk.yml'
+      - '.github/workflows/publish-consumer-sdk.yml'
       - 'core/contracts/**'
       - 'transports/android-binder-contract/**'
       - 'transports/android-binder-client/**'
@@ -13,11 +14,13 @@ on:
       - 'scripts/verify-consumer-sdk-abi.sh'
       - 'docs/shared-runtime/consumer-android-sdk.md'
       - 'docs/shared-runtime/consumer-sdk-public-abi.txt'
+      - 'docs/shared-runtime/consumer-sdk-version.txt'
   push:
     branches:
       - dev
     paths:
       - '.github/workflows/consumer-sdk.yml'
+      - '.github/workflows/publish-consumer-sdk.yml'
       - 'core/contracts/**'
       - 'transports/android-binder-contract/**'
       - 'transports/android-binder-client/**'
@@ -26,6 +29,7 @@ on:
       - 'scripts/dump-consumer-sdk-abi.sh'
       - 'scripts/verify-consumer-sdk-abi.sh'
       - 'docs/shared-runtime/consumer-sdk-public-abi.txt'
+      - 'docs/shared-runtime/consumer-sdk-version.txt'
 
 permissions:
   contents: read
