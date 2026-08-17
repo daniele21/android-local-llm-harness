@@ -223,23 +223,28 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
 
     private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
+
         HarnessSharedRuntimeBindings.ombraUseCaseId ->
             HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.consoleApplicationId)
+
         else -> throw IllegalArgumentException("Unknown useCaseId ${useCaseId.value}")
     }
 
     private fun resolveRedactGuardConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessSharedRuntimeBindings.ombraUseCaseId ->
             HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.redactGuardApplicationId)
+
         else -> throw IllegalArgumentException("Unknown RedactGuard useCaseId ${useCaseId.value}")
     }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
+
         HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId -> resolvedPhoneUseCase(
             model = model,
             maxOutputTokens = VALIDATION_MAX_OUTPUT_TOKENS,
         )
+
         else -> error("Unknown useCaseId ${useCaseId.value}")
     }
 
