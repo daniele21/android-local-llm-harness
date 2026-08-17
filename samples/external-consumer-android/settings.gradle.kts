@@ -6,10 +6,14 @@ pluginManagement {
     }
 }
 
-dependencyResolutionManagement {
+val consumerSdkRepositoryUrl =
+    providers.gradleProperty("consumerSdkRepositoryUrl")
+        .orElse("../../build/consumer-sdk-repository")
+
+ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven { url = uri("../../build/consumer-sdk-repository") }
+        maven { url = uri(consumerSdkRepositoryUrl.get()) }
         google()
         mavenCentral()
     }
