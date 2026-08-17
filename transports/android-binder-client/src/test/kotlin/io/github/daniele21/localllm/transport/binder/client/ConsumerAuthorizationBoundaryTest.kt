@@ -48,10 +48,7 @@ class ConsumerAuthorizationBoundaryTest {
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = true
 
-        override fun bind(
-            hostConfig: SharedRuntimeHostConfig,
-            callbacks: SharedRuntimeBindingCallbacks,
-        ): SharedRuntimeBindResult {
+        override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
             this.callbacks = callbacks
             return SharedRuntimeBindResult.STARTED
         }
@@ -66,9 +63,7 @@ class ConsumerAuthorizationBoundaryTest {
         }
     }
 
-    private class DenyingConsumerAccessService(
-        delegate: SharedRuntimeRemoteService,
-    ) : SharedRuntimeRemoteService by delegate {
+    private class DenyingConsumerAccessService(delegate: SharedRuntimeRemoteService) : SharedRuntimeRemoteService by delegate {
         override val consumer: ConsumerSharedRuntimeRemoteService
             get() = throw SecurityException("Caller is not authorized")
     }
