@@ -1,0 +1,117 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.daniele21.localllm",
+    "module": "consumer-android",
+    "version": "0.1.0-alpha.2",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "io.github.daniele21.localllm",
+          "module": "core-contracts",
+          "version": {
+            "requires": "0.1.0-alpha.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "consumer-android-0.1.0-alpha.2.aar",
+          "url": "consumer-android-0.1.0-alpha.2.aar",
+          "size": 135832,
+          "sha512": "f265785a09c48e08ff16bc110977525afa9aa11f0155be54bcad60bfadcc4f970b4296990786b1efd1cb334389def702bff0df61490544c41d76208ada518bde",
+          "sha256": "20732271036053d8f7f65335b939c49174f5cae68afe0fcc17db5de064776e65",
+          "sha1": "6ddb010bad37a52c685ad9be60ef38dac38402f9",
+          "md5": "c3c9a1892857a3c2e9272ac0a0c286a9"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "io.github.daniele21.localllm",
+          "module": "android-binder-contract",
+          "version": {
+            "requires": "0.1.0-alpha.2"
+          }
+        },
+        {
+          "group": "io.github.daniele21.localllm",
+          "module": "core-contracts",
+          "version": {
+            "requires": "0.1.0-alpha.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "consumer-android-0.1.0-alpha.2.aar",
+          "url": "consumer-android-0.1.0-alpha.2.aar",
+          "size": 135832,
+          "sha512": "f265785a09c48e08ff16bc110977525afa9aa11f0155be54bcad60bfadcc4f970b4296990786b1efd1cb334389def702bff0df61490544c41d76208ada518bde",
+          "sha256": "20732271036053d8f7f65335b939c49174f5cae68afe0fcc17db5de064776e65",
+          "sha1": "6ddb010bad37a52c685ad9be60ef38dac38402f9",
+          "md5": "c3c9a1892857a3c2e9272ac0a0c286a9"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "consumer-android-0.1.0-alpha.2-sources.jar",
+          "url": "consumer-android-0.1.0-alpha.2-sources.jar",
+          "size": 22121,
+          "sha512": "881a8fabb399d06f58fe7ee79d0aead14521f970485655535623346aa84a1539315ef325378ab6a3134f97e8663bf11667d82ba52e0df9b727f4e99ca92df206",
+          "sha256": "64667efca531763968489dfcac4d47ffa990a061099a28157602b3f851407676",
+          "sha1": "2d52d49e1a3f2d7c22bb66efb7151478d71dc514",
+          "md5": "db4c2f09f6a4b6c3cbfe252e0856ae64"
+        }
+      ]
+    }
+  ]
+}
