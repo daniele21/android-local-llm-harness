@@ -28,21 +28,13 @@ import io.github.daniele21.localllm.store.FileSystemModelStore
 import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
 import java.io.File
 
-/**
- * Process-scoped owner of the embedded Harness runtime and observability sources.
- *
- * Constructing the graph never loads a GGUF model. The host-selected model lives in the single
- * binding registry; a runtime is created only by an explicit prepare/inference action. Telemetry
- * is process-scoped and in-memory; prompts and generated output are never stored.
- */
+/** Process-scoped owner of the embedded Harness runtime and observability sources. */
 internal class HarnessRuntimeGraph private constructor(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
     private val lock = Any()
     private val registry = HarnessPhoneBindingRegistry()
 
-    val modelStore = FileSystemModelStore(
-        File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY),
-    )
+    val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
 
     val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
         TelemetryRetentionPolicy(
@@ -77,41 +69,42 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         },
     )
 
-    /**
-     * Stable service-facing facade over the same in-process client used by the host graph.
-     * Obtaining or observing it does not create a runtime or select/load a model.
-     */
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
     val consumerClientFactory: (ApplicationId) -> ConsumerLocalLlmClient = { applicationId ->
-        require(applicationId == HarnessSharedRuntimeBindings.consoleApplicationId) {
-            "Consumer API is not configured for applicationId ${applicationId.value}"
-        }
-        val legacyConsolePolicy =
-            ConsumerUseCasePolicy(
-                applicationId = applicationId,
-                useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
-                revision = "shared-console-consumer-v1",
-                exposedPresets = emptySet(),
-                defaultPreset = null,
-                reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
-                outputConstraints = setOf(ConsumerOutputConstraintKind.TEXT),
-                defaultOutputConstraint = ConsumerOutputConstraintKind.TEXT,
-                sessionKinds = setOf(SessionKind.STATELESS),
-                defaultSessionKind = SessionKind.STATELESS,
-                limits =
-                ConsumerLimits(
-                    maxInputCharacters = 32_768,
-                    maxConversationMessages = 128,
-                    maxJsonSchemaCharacters = 32_768,
-                ),
-            )
         val policies =
-            listOf(
-                legacyConsolePolicy,
-                HarnessOmbraConsumerPolicy.create(applicationId),
-            )
+            when (applicationId) {
+                HarnessSharedRuntimeBindings.consoleApplicationId -> {
+                    val legacyConsolePolicy =
+                        ConsumerUseCasePolicy(
+                            applicationId = applicationId,
+                            useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
+                            revision = "shared-console-consumer-v1",
+                            exposedPresets = emptySet(),
+                            defaultPreset = null,
+                            reasoning = ConsumerReasoningCapability.NOT_SUPPORTED,
+                            outputConstraints = setOf(ConsumerOutputConstraintKind.TEXT),
+                            defaultOutputConstraint = ConsumerOutputConstraintKind.TEXT,
+                            sessionKinds = setOf(SessionKind.STATELESS),
+                            defaultSessionKind = SessionKind.STATELESS,
+                            limits =
+                            ConsumerLimits(
+                                maxInputCharacters = 32_768,
+                                maxConversationMessages = 128,
+                                maxJsonSchemaCharacters = 32_768,
+                            ),
+                        )
+                    listOf(legacyConsolePolicy, HarnessOmbraConsumerPolicy.create(applicationId))
+                }
+
+                HarnessSharedRuntimeBindings.redactGuardApplicationId ->
+                    listOf(HarnessOmbraConsumerPolicy.create(applicationId))
+
+                else -> throw IllegalArgumentException(
+                    "Consumer API is not configured for applicationId ${applicationId.value}",
+                )
+            }
         val capabilityPolicy =
             ConsumerCapabilityPolicyService(
                 profileRegistry = registry,
@@ -167,9 +160,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         if (runtime != null) return
 
         val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
-        require(nativeLibraryDirectory.isDirectory) {
-            "Native library directory is unavailable"
-        }
+        require(nativeLibraryDirectory.isDirectory) { "Native library directory is unavailable" }
         val orchestrator = RuntimeOrchestrator(
             registry = registry,
             modelStore = modelStore,
@@ -221,30 +212,34 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
         }
 
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        val selected = synchronized(lock) {
-            requireNotNull(model) { "No model selected" }
-        }
+        val selected = synchronized(lock) { requireNotNull(model) { "No model selected" } }
         return when (applicationId) {
             HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
             HarnessSharedRuntimeBindings.consoleApplicationId -> resolveConsoleConsumer(selected, useCaseId)
+            HarnessSharedRuntimeBindings.redactGuardApplicationId -> resolveRedactGuardConsumer(selected, useCaseId)
             else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
         }
     }
 
     private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
-        HarnessSharedRuntimeBindings.ombraUseCaseId -> HarnessSharedRuntimeBindings.resolveOmbra(model)
+        HarnessSharedRuntimeBindings.ombraUseCaseId ->
+            HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.consoleApplicationId)
         else -> throw IllegalArgumentException("Unknown useCaseId ${useCaseId.value}")
+    }
+
+    private fun resolveRedactGuardConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
+        HarnessSharedRuntimeBindings.ombraUseCaseId ->
+            HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.redactGuardApplicationId)
+        else -> throw IllegalArgumentException("Unknown RedactGuard useCaseId ${useCaseId.value}")
     }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
         HarnessRuntimePurpose.PLAYGROUND.useCaseId -> resolvedPhonePlaygroundUseCase(model)
-
         HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId -> resolvedPhoneUseCase(
             model = model,
             maxOutputTokens = VALIDATION_MAX_OUTPUT_TOKENS,
         )
-
         else -> error("Unknown useCaseId ${useCaseId.value}")
     }
 
