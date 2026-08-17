@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Public consumer API backed by an authenticated shared-runtime Binder connection. */
 class BinderConsumerLocalLlmClient
-internal constructor(
+private constructor(
     private val connection: SharedRuntimeConnection,
     private val lifecycle: BinderConsumerLifecycleAdapter,
     private val generation: BinderConsumerGenerationAdapter,
