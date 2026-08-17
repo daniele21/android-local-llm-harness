@@ -175,6 +175,25 @@ internal class SharedRuntimeConnection(
             return
         }
 
+        // Registration and feature negotiation are not sufficient proof that the caller may use
+        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
+        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED so a
+        // SecurityException is converted into a typed, recoverable state instead of escaping from
+        // an Android Binder callback or the consumer's first operation.
+        try {
+            service.consumer
+        } catch (error: SecurityException) {
+            failConnection(
+                epoch,
+                SharedRuntimeConnectionState.PERMISSION_DENIED,
+                error.message ?: "Host denied Consumer API access",
+            )
+            return
+        } catch (error: RemoteException) {
+            connectionLost(error.message ?: "Consumer API handshake failed", epoch)
+            return
+        }
+
         val token = requireNotNull(result.clientToken)
         synchronized(lock) {
             if (epoch != connectionEpoch || current.state != SharedRuntimeConnectionState.NEGOTIATING) return
