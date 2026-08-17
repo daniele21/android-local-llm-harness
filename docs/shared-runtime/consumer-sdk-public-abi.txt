@@ -1,0 +1,2 @@
+# Bootstrap placeholder. Replace with the exact CI-generated ABI dump before enabling comparison.
+# The baseline is intentionally not enforced until it is generated from a validated published SDK artifact.
