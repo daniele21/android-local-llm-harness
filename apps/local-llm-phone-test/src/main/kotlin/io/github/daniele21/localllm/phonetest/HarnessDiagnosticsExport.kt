@@ -209,12 +209,7 @@ internal object HarnessDiagnosticsExport {
         appendLine()
     }
 
-    private fun StringBuilder.appendRuntimeSection(
-        state: String?,
-        loadedModel: String?,
-        activeSessions: Int?,
-        queuedRequests: Int?,
-    ) {
+    private fun StringBuilder.appendRuntimeSection(state: String?, loadedModel: String?, activeSessions: Int?, queuedRequests: Int?) {
         appendLine("[runtime]")
         appendLine("available=${state != null}")
         appendLine("state=${state.asSafeOrUnavailable()}")
