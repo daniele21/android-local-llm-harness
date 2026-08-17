@@ -92,7 +92,6 @@ class AidlSharedRuntimeRemoteServiceTest {
     ) { _, method, _ ->
         when (method.name) {
             "asBinder" -> null
-
             else -> throw AssertionError("Consumer delegate should not be invoked by endpoint construction: ${method.name}")
         }
     } as IConsumerLocalLlmService
