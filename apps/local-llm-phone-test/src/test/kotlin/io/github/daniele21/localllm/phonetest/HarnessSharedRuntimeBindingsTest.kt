@@ -18,10 +18,11 @@ class HarnessSharedRuntimeBindingsTest {
     }
 
     @Test
-    fun `release host external clients include exact packaged evidence consumer`() {
+    fun `release host external clients include console redactguard and packaged evidence consumer`() {
         assertEquals(
             setOf(
                 HarnessSharedRuntimeBindings.CONSOLE_RELEASE_PACKAGE,
+                HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
                 HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE,
             ),
             HarnessSharedRuntimeBindings.externalClientPackages(debugHost = false),
@@ -44,11 +45,16 @@ class HarnessSharedRuntimeBindingsTest {
     }
 
     @Test
-    fun `debug host does not authorize release evidence consumer`() {
+    fun `debug host external clients include exact redactguard debug identity without release evidence consumer`() {
         val packages = HarnessSharedRuntimeBindings.externalClientPackages(debugHost = true)
 
-        assertEquals(HarnessSharedRuntimeBindings.consolePackages(debugHost = true), packages)
+        assertEquals(
+            HarnessSharedRuntimeBindings.consolePackages(debugHost = true) +
+                HarnessSharedRuntimeBindings.redactGuardPackages(debugHost = true),
+            packages,
+        )
         assertFalse(HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE in packages)
+        assertFalse(HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE in packages)
     }
 
     @Test
