@@ -5,7 +5,7 @@ import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import java.time.Instant
 
-internal class DiagnosticsTelemetrySections(
+internal class HarnessDiagnosticsTelemetrySections(
     private val repository: TelemetryRepository,
     selectedModel: ImportedPhoneModel?,
     private val freshResourceCaptureSucceeded: Boolean,
