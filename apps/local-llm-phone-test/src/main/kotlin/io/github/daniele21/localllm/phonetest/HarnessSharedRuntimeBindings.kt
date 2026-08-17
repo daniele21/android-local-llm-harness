@@ -10,12 +10,16 @@ import io.github.daniele21.localllm.models.ResolvedUseCase
 
 /** Host-owned identities and fixed use-case bindings for external shared-runtime clients. */
 internal object HarnessSharedRuntimeBindings {
+    /** Temporary legacy identity retained only through the RedactGuard cross-repository cutover. */
     val consoleApplicationId = ApplicationId("local-llm-console")
 
-    /** Legacy surface retained only until OMB-7 removes the raw Console playground. */
+    /** Independent product identity used by daniele21/redactguard-android. */
+    val redactGuardApplicationId = ApplicationId("redactguard")
+
+    /** Legacy surface retained only until the in-repo Console/OMBRA consumer is removed. */
     val consoleUseCaseId = UseCaseId("console-inference-playground")
 
-    /** OMB-4 host-owned PII-analysis use case. Consumers never provide model identity. */
+    /** Host-owned PII-analysis use case. Consumers never provide model identity. */
     val ombraUseCaseId = UseCaseId("document-pii-detection")
     val ombraDefaultPreset =
         InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
@@ -23,9 +27,13 @@ internal object HarnessSharedRuntimeBindings {
     const val CONSOLE_RELEASE_PACKAGE = "io.github.daniele21.localllm.console"
     const val CONSOLE_DEBUG_PACKAGE = "io.github.daniele21.localllm.console.debug"
     const val CONSOLE_INTERNAL_PACKAGE = "io.github.daniele21.localllm.console.internal"
+    const val REDACTGUARD_RELEASE_PACKAGE = "io.github.daniele21.redactguard"
+    const val REDACTGUARD_DEBUG_PACKAGE = "io.github.daniele21.redactguard.debug"
     const val SR6_RELEASE_CONSUMER_PACKAGE = "io.github.daniele21.localllm.consumerfixture"
 
     val consoleUseCases: Set<UseCaseId> = setOf(consoleUseCaseId, ombraUseCaseId)
+    val redactGuardUseCases: Set<UseCaseId> = setOf(ombraUseCaseId)
+    val piiConsumerApplicationIds: Set<ApplicationId> = setOf(consoleApplicationId, redactGuardApplicationId)
 
     fun consolePackages(debugHost: Boolean): Set<String> = if (debugHost) {
         setOf(CONSOLE_DEBUG_PACKAGE, CONSOLE_INTERNAL_PACKAGE)
@@ -33,8 +41,15 @@ internal object HarnessSharedRuntimeBindings {
         setOf(CONSOLE_RELEASE_PACKAGE)
     }
 
-    fun externalClientPackages(debugHost: Boolean): Set<String> =
-        consolePackages(debugHost) + if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
+    fun redactGuardPackages(debugHost: Boolean): Set<String> = if (debugHost) {
+        setOf(REDACTGUARD_DEBUG_PACKAGE)
+    } else {
+        setOf(REDACTGUARD_RELEASE_PACKAGE)
+    }
+
+    fun externalClientPackages(debugHost: Boolean): Set<String> = consolePackages(debugHost) +
+        redactGuardPackages(debugHost) +
+        if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
@@ -54,7 +69,10 @@ internal object HarnessSharedRuntimeBindings {
         )
     }
 
-    fun resolveOmbra(model: ImportedPhoneModel): ResolvedUseCase {
+    fun resolveOmbra(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
+        require(applicationId in piiConsumerApplicationIds) {
+            "document-pii-detection is not configured for applicationId ${applicationId.value}"
+        }
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
@@ -73,7 +91,7 @@ internal object HarnessSharedRuntimeBindings {
         }
         return resolved.copy(
             binding = AppModelBinding(
-                applicationId = consoleApplicationId,
+                applicationId = applicationId,
                 useCaseId = ombraUseCaseId,
                 useCaseProfileId = useCase.id,
             ),

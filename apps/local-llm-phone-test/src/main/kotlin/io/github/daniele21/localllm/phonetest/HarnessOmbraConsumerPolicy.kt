@@ -7,15 +7,15 @@ import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 
-/** Fixed OMB-4 host policy for the OMBRA reference consumer. */
+/** Fixed host policy for the document PII reference use case. */
 internal object HarnessOmbraConsumerPolicy {
     const val REVISION = "ombra-document-pii-v1"
     const val MAX_INPUT_CHARACTERS = 12_000
     const val MAX_JSON_SCHEMA_CHARACTERS = 4_096
 
     fun create(applicationId: ApplicationId): ConsumerUseCasePolicy {
-        require(applicationId == HarnessSharedRuntimeBindings.consoleApplicationId) {
-            "OMBRA policy is restricted to the OMBRA application identity"
+        require(applicationId in HarnessSharedRuntimeBindings.piiConsumerApplicationIds) {
+            "document-pii-detection policy is not configured for applicationId ${applicationId.value}"
         }
         return ConsumerUseCasePolicy(
             applicationId = applicationId,

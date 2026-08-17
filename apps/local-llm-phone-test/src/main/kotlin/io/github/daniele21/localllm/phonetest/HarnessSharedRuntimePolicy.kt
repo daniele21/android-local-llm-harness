@@ -28,6 +28,15 @@ internal object HarnessSharedRuntimePolicy {
                     acceptedSigningCertificates = acceptedSigningCertificates,
                 )
             }
+        val redactGuardClients =
+            HarnessSharedRuntimeBindings.redactGuardPackages(BuildConfig.DEBUG).map { packageName ->
+                AuthorizedClientPolicy(
+                    packageName = packageName,
+                    applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+                    allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
+                    acceptedSigningCertificates = acceptedSigningCertificates,
+                )
+            }
         val releaseEvidenceClient =
             if (BuildConfig.DEBUG) {
                 emptyList()
@@ -41,7 +50,7 @@ internal object HarnessSharedRuntimePolicy {
                     ),
                 )
             }
-        return listOf(internal) + consoleClients + releaseEvidenceClient
+        return listOf(internal) + consoleClients + redactGuardClients + releaseEvidenceClient
     }
 
     @Suppress("DEPRECATION")

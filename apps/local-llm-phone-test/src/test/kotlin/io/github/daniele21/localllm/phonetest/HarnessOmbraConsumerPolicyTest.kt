@@ -6,12 +6,13 @@ import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.models.OutputMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessOmbraConsumerPolicyTest {
     @Test
-    fun `ombra binding is host-owned json-schema use case`() {
+    fun `legacy ombra binding remains host-owned json-schema use case during migration`() {
         val model = curatedModel()
         val resolved = HarnessSharedRuntimeBindings.resolveOmbra(model)
 
@@ -26,9 +27,26 @@ class HarnessOmbraConsumerPolicyTest {
     }
 
     @Test
-    fun `ombra capability policy exposes only constrained defaults`() {
-        val policy = HarnessOmbraConsumerPolicy.create(HarnessSharedRuntimeBindings.consoleApplicationId)
+    fun `redactguard binding uses independent application identity with same host-owned pii preset`() {
+        val model = curatedModel()
+        val resolved =
+            HarnessSharedRuntimeBindings.resolveOmbra(
+                model,
+                HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            )
 
+        assertEquals(HarnessSharedRuntimeBindings.redactGuardApplicationId, resolved.binding.applicationId)
+        assertEquals(HarnessSharedRuntimeBindings.ombraUseCaseId, resolved.binding.useCaseId)
+        assertEquals(model.digest, resolved.model.artifact.digest)
+        assertEquals(OutputMode.JSON_SCHEMA, resolved.useCase.outputMode)
+        assertEquals(HarnessSharedRuntimeBindings.ombraDefaultPreset, resolved.useCase.defaultPreset)
+    }
+
+    @Test
+    fun `pii capability policy exposes only constrained defaults for redactguard`() {
+        val policy = HarnessOmbraConsumerPolicy.create(HarnessSharedRuntimeBindings.redactGuardApplicationId)
+
+        assertEquals(HarnessSharedRuntimeBindings.redactGuardApplicationId, policy.applicationId)
         assertEquals(HarnessSharedRuntimeBindings.ombraUseCaseId, policy.useCaseId)
         assertEquals(setOf(HarnessSharedRuntimeBindings.ombraDefaultPreset), policy.exposedPresets)
         assertEquals(HarnessSharedRuntimeBindings.ombraDefaultPreset, policy.defaultPreset)
@@ -43,26 +61,39 @@ class HarnessOmbraConsumerPolicyTest {
     }
 
     @Test
-    fun `phone binding registry resolves both legacy console and ombra without consumer model selection`() {
+    fun `phone binding registry restricts redactguard to document pii detection`() {
         val registry = HarnessPhoneBindingRegistry()
         val model = curatedModel()
         registry.selectedModel = model
 
-        val legacy =
+        val redactGuard =
             registry.resolve(
-                HarnessSharedRuntimeBindings.consoleApplicationId,
-                HarnessSharedRuntimeBindings.consoleUseCaseId,
-            )
-        val ombra =
-            registry.resolve(
-                HarnessSharedRuntimeBindings.consoleApplicationId,
+                HarnessSharedRuntimeBindings.redactGuardApplicationId,
                 HarnessSharedRuntimeBindings.ombraUseCaseId,
             )
 
-        assertEquals(model.digest, legacy.model.artifact.digest)
-        assertEquals(model.digest, ombra.model.artifact.digest)
-        assertEquals(HarnessSharedRuntimeBindings.consoleUseCaseId, legacy.binding.useCaseId)
-        assertEquals(HarnessSharedRuntimeBindings.ombraUseCaseId, ombra.binding.useCaseId)
+        assertEquals(model.digest, redactGuard.model.artifact.digest)
+        assertEquals(HarnessSharedRuntimeBindings.redactGuardApplicationId, redactGuard.binding.applicationId)
+        assertEquals(HarnessSharedRuntimeBindings.ombraUseCaseId, redactGuard.binding.useCaseId)
+        assertThrows(IllegalArgumentException::class.java) {
+            registry.resolve(
+                HarnessSharedRuntimeBindings.redactGuardApplicationId,
+                HarnessSharedRuntimeBindings.consoleUseCaseId,
+            )
+        }
+    }
+
+    @Test
+    fun `target package sets are exact by build type`() {
+        assertEquals(
+            setOf(HarnessSharedRuntimeBindings.REDACTGUARD_DEBUG_PACKAGE),
+            HarnessSharedRuntimeBindings.redactGuardPackages(debugHost = true),
+        )
+        assertEquals(
+            setOf(HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE),
+            HarnessSharedRuntimeBindings.redactGuardPackages(debugHost = false),
+        )
+        assertEquals(setOf(HarnessSharedRuntimeBindings.ombraUseCaseId), HarnessSharedRuntimeBindings.redactGuardUseCases)
     }
 
     private fun curatedModel(): ImportedPhoneModel {
