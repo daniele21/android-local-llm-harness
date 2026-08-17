@@ -144,7 +144,7 @@ data class BenchmarkExecutionIdentity(val fingerprint: String) {
                 floatValue(run.repeatPenalty),
                 value(run.repeatLastN),
                 value(run.seedPolicy?.name),
-                value(run.effectiveSeed),
+                value(run.effectiveSeed.takeIf { run.seedPolicy == SeedPolicyType.FIXED }),
                 value(run.maxOutputTokens),
                 value(run.chatTemplateId),
                 value(run.chatTemplateSource?.name),
