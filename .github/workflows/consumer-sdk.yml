@@ -63,6 +63,9 @@ jobs:
           CONSUMER_SDK_VERSION: 0.1.0-ci.${{ github.run_id }}
         run: bash scripts/dump-consumer-sdk-abi.sh
 
+      - name: Verify supported ABI baseline
+        run: bash scripts/verify-consumer-sdk-abi.sh
+
       - name: Upload SDK publication evidence
         if: always()
         uses: actions/upload-artifact@v4
