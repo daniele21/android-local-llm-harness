@@ -47,10 +47,9 @@ internal object HarnessSharedRuntimeBindings {
         setOf(REDACTGUARD_RELEASE_PACKAGE)
     }
 
-    fun externalClientPackages(debugHost: Boolean): Set<String> =
-        consolePackages(debugHost) +
-            redactGuardPackages(debugHost) +
-            if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
+    fun externalClientPackages(debugHost: Boolean): Set<String> = consolePackages(debugHost) +
+        redactGuardPackages(debugHost) +
+        if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
@@ -70,10 +69,7 @@ internal object HarnessSharedRuntimeBindings {
         )
     }
 
-    fun resolveOmbra(
-        model: ImportedPhoneModel,
-        applicationId: ApplicationId = consoleApplicationId,
-    ): ResolvedUseCase {
+    fun resolveOmbra(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
         require(applicationId in piiConsumerApplicationIds) {
             "document-pii-detection is not configured for applicationId ${applicationId.value}"
         }
