@@ -5,18 +5,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.widget.Toast
 import androidx.core.content.pm.PackageInfoCompat
-import io.github.daniele21.localllm.models.GgufModelProfile
-import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
-import io.github.daniele21.localllm.observability.ResourceSnapshot
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.android.AndroidResourceSnapshotProvider
 import io.github.daniele21.localllm.observability.android.ResourceSnapshotRecorder
 import java.time.Instant
-import java.util.Locale
 
 /**
  * Builds one bounded, privacy-safe diagnostic snapshot that can be copied or shared by a user.
@@ -26,10 +21,6 @@ import java.util.Locale
  * telemetry contracts and logs are projected through [HarnessLogSource]'s allowlisted safe fields.
  */
 internal object HarnessDiagnosticsExport {
-    private const val RUN_LIMIT = 200
-    private const val LOG_LIMIT = 250
-    private const val RESOURCE_LIMIT = 200
-    private const val BENCHMARK_HISTORY_LIMIT = 100
     private const val REPORT_SCHEMA = "harness-diagnostics-v1"
 
     fun build(context: Context): String {
@@ -40,33 +31,30 @@ internal object HarnessDiagnosticsExport {
         val executionProfile = model?.let { selected ->
             runCatching { resolvedPhonePlaygroundUseCase(selected).model }.getOrNull()
         }
-        val resourceCaptureSucceeded = captureFreshResource(context, repository)
-        val benchmarkState = HarnessBenchmarkSource(repository) { model }.snapshot()
-        val memoryInfo = currentMemoryInfo(context)
         val packageInfo = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+        val resourceCaptureSucceeded = captureFreshResource(context, repository)
+        val identitySections = DiagnosticsIdentitySections(
+            packageName = context.packageName,
+            versionName = packageInfo?.versionName,
+            versionCode = packageInfo?.let(PackageInfoCompat::getLongVersionCode),
+            memoryInfo = currentMemoryInfo(context),
+            model = model,
+            executionProfile = executionProfile,
+            runtimeState = runtime?.state?.name,
+            loadedModel = runtime?.loadedModel?.sha256,
+            activeSessions = runtime?.activeSessions,
+            queuedRequests = runtime?.queuedRequests,
+        )
+        val telemetrySections = DiagnosticsTelemetrySections(
+            repository = repository,
+            selectedModel = model,
+            freshResourceCaptureSucceeded = resourceCaptureSucceeded,
+        )
 
         return buildString {
             appendHeader()
-            appendAppSection(
-                packageName = context.packageName,
-                versionName = packageInfo?.versionName,
-                versionCode = packageInfo?.let(PackageInfoCompat::getLongVersionCode),
-            )
-            appendDeviceSection(memoryInfo)
-            appendModelSection(model)
-            appendExecutionProfileSection(executionProfile)
-            appendRuntimeSection(
-                state = runtime?.state?.name,
-                loadedModel = runtime?.loadedModel?.sha256,
-                activeSessions = runtime?.activeSessions,
-                queuedRequests = runtime?.queuedRequests,
-            )
-            appendRunsSection(repository)
-            appendResourcesSection(repository, resourceCaptureSucceeded)
-            appendHealthSection(repository)
-            appendBenchmarkReadinessSection(benchmarkState)
-            appendBenchmarkBaselinesSection(repository)
-            appendLogsSection(repository)
+            identitySections.appendTo(this)
+            telemetrySections.appendTo(this)
         }
     }
 
@@ -149,193 +137,4 @@ internal object HarnessDiagnosticsExport {
         appendLine("privacy=prompt/output/uri/path/backend-message excluded")
         appendLine()
     }
-
-    private fun StringBuilder.appendAppSection(packageName: String, versionName: String?, versionCode: Long?) {
-        appendLine("[app]")
-        appendLine("package=$packageName")
-        appendLine("versionName=${versionName.asSafeOrUnavailable()}")
-        appendLine("versionCode=${versionCode.orUnavailable()}")
-        appendLine("buildType=${BuildConfig.BUILD_TYPE}")
-        appendLine()
-    }
-
-    private fun StringBuilder.appendDeviceSection(memoryInfo: ActivityManager.MemoryInfo) {
-        appendLine("[device]")
-        appendLine("manufacturer=${Build.MANUFACTURER.safeToken()}")
-        appendLine("model=${Build.MODEL.safeToken()}")
-        appendLine("androidRelease=${Build.VERSION.RELEASE.safeToken()}")
-        appendLine("androidApi=${Build.VERSION.SDK_INT}")
-        appendLine("abis=${Build.SUPPORTED_ABIS.joinToString().safeToken()}")
-        appendLine("availableProcessors=${Runtime.getRuntime().availableProcessors()}")
-        appendLine("totalRamBytes=${memoryInfo.totalMem}")
-        appendLine("availableRamBytes=${memoryInfo.availMem}")
-        appendLine("lowMemory=${memoryInfo.lowMemory}")
-        appendLine("memoryThresholdBytes=${memoryInfo.threshold}")
-        appendLine()
-    }
-
-    private fun StringBuilder.appendModelSection(model: ImportedPhoneModel?) {
-        appendLine("[model]")
-        if (model == null) {
-            appendLine("selected=false")
-        } else {
-            appendLine("selected=true")
-            appendLine("digest=${model.digest.sha256}")
-            appendLine("fileName=${model.fileName.safeToken()}")
-            appendLine("sizeBytes=${model.sizeBytes}")
-            appendLine("architecture=${model.architecture.safeToken()}")
-            appendLine("quantization=${model.quantization.safeToken()}")
-        }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendExecutionProfileSection(profile: GgufModelProfile?) {
-        appendLine("[execution-profile]")
-        if (profile == null) {
-            appendLine("available=false")
-        } else {
-            appendLine("available=true")
-            appendLine("profileId=${profile.id.safeToken()}")
-            appendLine("contextSize=${profile.contextSize}")
-            appendLine("batchSize=${profile.batchSize}")
-            appendLine("microBatchSize=${profile.microBatchSize}")
-            appendLine("cpuThreads=${profile.cpuThreads}")
-            appendLine("batchThreads=${profile.batchThreads}")
-            appendLine("gpuLayers=${profile.gpuLayers}")
-            appendLine("useMmap=${profile.useMmap}")
-            appendLine("useMlock=${profile.useMlock}")
-            appendLine("flashAttention=${profile.flashAttention}")
-        }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendRuntimeSection(state: String?, loadedModel: String?, activeSessions: Int?, queuedRequests: Int?) {
-        appendLine("[runtime]")
-        appendLine("available=${state != null}")
-        appendLine("state=${state.asSafeOrUnavailable()}")
-        appendLine("loadedModel=${loadedModel.asSafeOrNone()}")
-        appendLine("activeSessions=${activeSessions.orUnavailable()}")
-        appendLine("queuedRequests=${queuedRequests.orUnavailable()}")
-        appendLine()
-    }
-
-    private fun StringBuilder.appendRunsSection(repository: TelemetryRepository) {
-        val runs = repository.recentRuns(RUN_LIMIT)
-        appendLine("[generation-runs]")
-        appendLine("count=${runs.size}")
-        runs.forEachIndexed { index, run -> appendLine(renderRun(index, run)) }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendResourcesSection(repository: TelemetryRepository, freshCaptureSucceeded: Boolean) {
-        val resources = repository.recentResourceSnapshots(RESOURCE_LIMIT)
-        appendLine("[resources]")
-        appendLine("freshCapture=${if (freshCaptureSucceeded) "captured" else "unavailable"}")
-        appendLine("count=${resources.size}")
-        resources.forEachIndexed { index, resource -> appendResource(index, resource) }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendHealthSection(repository: TelemetryRepository) {
-        val health = repository.healthResults()
-        appendLine("[health]")
-        appendLine("count=${health.size}")
-        health.forEachIndexed { index, result ->
-            appendLine(
-                "health[$index] id=${result.id.safeToken()} status=${result.status.name} " +
-                    "durationMs=${result.durationMs} detail=${result.detail.safeValue()}",
-            )
-        }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendBenchmarkReadinessSection(state: BenchmarkUiState) {
-        appendLine("[benchmark-readiness]")
-        appendLine("eligibleKeys=${state.eligibleKeys}")
-        appendLine("sourceError=${state.sourceError.asSafeOrNone()}")
-        state.readiness.forEachIndexed { index, readiness ->
-            appendLine(
-                "readiness[$index] useCase=${readiness.useCase.safeToken()} loadKind=${readiness.loadKind.safeToken()} " +
-                    "baselineSamples=${readiness.baselineSamples}/${readiness.baselineRequired} " +
-                    "comparisonSamples=${readiness.comparisonSamples}/${readiness.comparisonRequired} " +
-                    "baselineCaptured=${readiness.baselineCaptured} captureReady=${readiness.captureReady} " +
-                    "comparisonReady=${readiness.comparisonReady} detail=${readiness.detail.safeValue()}",
-            )
-        }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendBenchmarkBaselinesSection(repository: TelemetryRepository) {
-        val baselines = repository.benchmarkBaselines()
-        val history = repository.benchmarkBaselineHistory(BENCHMARK_HISTORY_LIMIT)
-        appendLine("[benchmark-baselines]")
-        appendLine("activeCount=${baselines.size}")
-        baselines.forEachIndexed { index, baseline -> appendBaseline("baseline", index, baseline) }
-        appendLine("historyCount=${history.size}")
-        history.forEachIndexed { index, baseline -> appendBaseline("history", index, baseline) }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendLogsSection(repository: TelemetryRepository) {
-        val logs = HarnessLogSource(repository).snapshot(limit = LOG_LIMIT)
-        appendLine("[structured-logs]")
-        appendLine("count=${logs.logs.size}")
-        appendLine("sourceError=${logs.sourceError.asSafeOrNone()}")
-        logs.logs.forEachIndexed { index, log ->
-            append("log[$index] time=${Instant.ofEpochMilli(log.timestampEpochMs)}")
-            append(" level=${log.level.safeToken()}")
-            append(" component=${log.component.safeToken()}")
-            append(" event=${log.event.safeToken()}")
-            append(" request=${log.requestIdPrefix.safeToken()}")
-            if (log.fields.isNotEmpty()) {
-                append(" fields=")
-                append(log.fields.joinToString(",") { "${it.name.safeToken()}=${it.value.safeValue()}" })
-            }
-            appendLine()
-        }
-    }
-
-    private fun StringBuilder.appendResource(index: Int, resource: ResourceSnapshot) {
-        appendLine(
-            "resource[$index] time=${Instant.ofEpochMilli(resource.timestampEpochMs)} " +
-                "pssBytes=${resource.processPssBytes.orUnavailable()} " +
-                "nativeHeapBytes=${resource.nativeHeapBytes.orUnavailable()} " +
-                "javaHeapBytes=${resource.javaHeapUsedBytes.orUnavailable()} " +
-                "availableMemoryBytes=${resource.availableMemoryBytes.orUnavailable()} " +
-                "lowMemory=${resource.lowMemory.orUnavailable()} thermal=${resource.thermalStatus.name}",
-        )
-    }
-
-    private fun StringBuilder.appendBaseline(prefix: String, index: Int, baseline: BenchmarkBaseline) {
-        appendLine(
-            "$prefix[$index] app=${baseline.key.applicationId.value.safeToken()} " +
-                "useCase=${baseline.key.useCaseId.value.safeToken()} " +
-                "model=${baseline.key.modelDigest.sha256.take(12)}… loadKind=${baseline.key.modelLoadKind.name} " +
-                "execution=${baseline.key.executionIdentity.fingerprint.take(16)}… samples=${baseline.sampleCount} " +
-                "captured=${Instant.ofEpochMilli(baseline.capturedAtEpochMs)} " +
-                "medianTtftMs=${baseline.medianTimeToFirstTokenMs.asDecimalOrUnavailable()} " +
-                "p95TtftMs=${baseline.p95TimeToFirstTokenMs.asDecimalOrUnavailable()} " +
-                "medianTotalMs=${baseline.medianTotalMs.asDecimalOrUnavailable()} " +
-                "p95TotalMs=${baseline.p95TotalMs.asDecimalOrUnavailable()} " +
-                "medianDecodeTokPerSec=${baseline.medianDecodeTokensPerSecond.asDecimalOrUnavailable()}",
-        )
-    }
-
-    private fun Any?.orUnavailable(): String = this?.toString() ?: "Unavailable"
-
-    private fun Long?.asInstantOrUnavailable(): String = this?.let(Instant::ofEpochMilli)?.toString() ?: "Unavailable"
-
-    private fun Double?.asDecimalOrUnavailable(): String = this?.let { "%.3f".format(Locale.ROOT, it) } ?: "Unavailable"
-
-    private fun String?.asSafeOrUnavailable(): String = this?.safeToken() ?: "Unavailable"
-
-    private fun String?.asSafeOrNone(): String = this?.safeToken() ?: "None"
-
-    private fun String.safeToken(): String = replace(CONTROL_CHARACTERS, " ").trim().take(MAX_TOKEN_LENGTH)
-
-    private fun String.safeValue(): String = replace(CONTROL_CHARACTERS, " ").trim().take(MAX_VALUE_LENGTH)
-
-    private val CONTROL_CHARACTERS = Regex("[\\p{Cntrl}&&[^\\n\\t]]|[\\n\\t]+")
-    private const val MAX_TOKEN_LENGTH = 128
-    private const val MAX_VALUE_LENGTH = 512
 }
