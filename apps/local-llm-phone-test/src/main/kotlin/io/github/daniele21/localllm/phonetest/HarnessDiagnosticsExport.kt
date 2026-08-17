@@ -33,7 +33,7 @@ internal object HarnessDiagnosticsExport {
         }
         val packageInfo = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
         val resourceCaptureSucceeded = captureFreshResource(context, repository)
-        val identitySections = DiagnosticsIdentitySections(
+        val identitySections = HarnessDiagnosticsIdentitySections(
             packageName = context.packageName,
             versionName = packageInfo?.versionName,
             versionCode = packageInfo?.let(PackageInfoCompat::getLongVersionCode),
@@ -45,7 +45,7 @@ internal object HarnessDiagnosticsExport {
             activeSessions = runtime?.activeSessions,
             queuedRequests = runtime?.queuedRequests,
         )
-        val telemetrySections = DiagnosticsTelemetrySections(
+        val telemetrySections = HarnessDiagnosticsTelemetrySections(
             repository = repository,
             selectedModel = model,
             freshResourceCaptureSucceeded = resourceCaptureSucceeded,
