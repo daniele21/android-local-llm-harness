@@ -10,7 +10,7 @@ val consumerSdkRepositoryUrl =
     providers.gradleProperty("consumerSdkRepositoryUrl")
         .orElse("../../build/consumer-sdk-repository")
 
- dependencyResolutionManagement {
+dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         maven { url = uri(consumerSdkRepositoryUrl.get()) }
