@@ -1,7 +1,7 @@
 # RedactGuard cross-repository extraction
 
 Status: active
-Document type: coordinated workstream bridge
+Document type: feature-specification
 Owner: shared-runtime
 Canonical scope: shared-runtime.redactguard-cross-repo-extraction
 Read when: coordinating Harness-owned SDK, identity, security, validation or cutover work for the external RedactGuard application
