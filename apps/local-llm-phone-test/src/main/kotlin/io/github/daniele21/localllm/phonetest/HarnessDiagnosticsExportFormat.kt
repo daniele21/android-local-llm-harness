@@ -3,7 +3,7 @@ package io.github.daniele21.localllm.phonetest
 import java.time.Instant
 import java.util.Locale
 
-private val diagnosticControlCharacters = Regex("[\\p{Cntrl}&&[^\\n\\t]]|[\\n\\t]+")
+private val DIAGNOSTIC_CONTROL_CHARACTERS = Regex("[\\p{Cntrl}&&[^\\n\\t]]|[\\n\\t]+")
 private const val diagnosticMaxTokenLength = 128
 private const val diagnosticMaxValueLength = 512
 
@@ -18,11 +18,11 @@ internal fun String?.asSafeOrUnavailable(): String = this?.safeToken() ?: "Unava
 internal fun String?.asSafeOrNone(): String = this?.safeToken() ?: "None"
 
 internal fun String.safeToken(): String =
-    replace(diagnosticControlCharacters, " ")
+    replace(DIAGNOSTIC_CONTROL_CHARACTERS, " ")
         .trim()
         .take(diagnosticMaxTokenLength)
 
 internal fun String.safeValue(): String =
-    replace(diagnosticControlCharacters, " ")
+    replace(DIAGNOSTIC_CONTROL_CHARACTERS, " ")
         .trim()
         .take(diagnosticMaxValueLength)
