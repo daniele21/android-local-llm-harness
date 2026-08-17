@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.widget.Toast
+import androidx.core.content.pm.PackageInfoCompat
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.ResourceSnapshot
@@ -53,7 +54,7 @@ internal object HarnessDiagnosticsExport {
             appendLine("[app]")
             appendLine("package=${context.packageName}")
             appendLine("versionName=${packageInfo?.versionName ?: "Unavailable"}")
-            appendLine("versionCode=${packageInfo?.longVersionCode ?: 0L}")
+            appendLine("versionCode=${packageInfo?.let(PackageInfoCompat::getLongVersionCode) ?: 0L}")
             appendLine()
 
             appendLine("[device]")
@@ -87,7 +88,7 @@ internal object HarnessDiagnosticsExport {
 
             appendLine("[generation-runs]")
             appendLine("count=${runs.size}")
-            runs.forEachIndexed { index, run -> appendRun(index, run) }
+            runs.forEachIndexed { index, run -> appendLine(renderRun(index, run)) }
             appendLine()
 
             appendLine("[resources]")
@@ -139,19 +140,20 @@ internal object HarnessDiagnosticsExport {
 
     fun share(context: Context) {
         val report = build(context)
-        context.startActivity(
-            Intent.createChooser(
-                Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "Harness diagnostics")
-                    putExtra(Intent.EXTRA_TEXT, report)
-                },
-                "Export diagnostics",
-            ),
+        val chooser = Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Harness diagnostics")
+                putExtra(Intent.EXTRA_TEXT, report)
+            },
+            "Export diagnostics",
         )
+        if (context !is android.app.Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
     }
 
-    private fun StringBuilder.appendRun(index: Int, run: GenerationRunRecord) {
+    /** Deterministic, content-free projection of one run for export and unit coverage. */
+    internal fun renderRun(index: Int, run: GenerationRunRecord): String = buildString {
         append("run[$index]")
         append(" request=${run.requestId.value.take(12)}…")
         append(" app=${run.applicationId.value.safeToken()}")
@@ -188,7 +190,6 @@ internal object HarnessDiagnosticsExport {
         append(" seedPolicy=${run.seedPolicy?.name ?: "Unavailable"}")
         append(" stopReason=${run.stopReason?.name ?: "Unavailable"}")
         append(" errorCode=${run.errorCode?.safeToken() ?: "None"}")
-        appendLine()
     }
 
     private fun StringBuilder.appendResource(index: Int, resource: ResourceSnapshot) {
