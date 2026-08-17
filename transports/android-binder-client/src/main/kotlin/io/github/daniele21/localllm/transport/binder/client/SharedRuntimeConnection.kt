@@ -266,10 +266,7 @@ internal class SharedRuntimeConnection(
 private sealed interface RegisteredConsumerValidation {
     data class Ready(val token: ClientTokenParcel) : RegisteredConsumerValidation
 
-    data class Rejected(
-        val state: SharedRuntimeConnectionState,
-        val detail: String,
-    ) : RegisteredConsumerValidation
+    data class Rejected(val state: SharedRuntimeConnectionState, val detail: String) : RegisteredConsumerValidation
 
     data class Lost(val detail: String) : RegisteredConsumerValidation
 }
