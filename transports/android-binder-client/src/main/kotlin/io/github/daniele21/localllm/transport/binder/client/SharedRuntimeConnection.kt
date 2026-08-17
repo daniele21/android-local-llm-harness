@@ -198,24 +198,23 @@ internal class SharedRuntimeConnection(
         }
     }
 
-    private fun consumerAccessGranted(service: SharedRuntimeRemoteService, epoch: Long): Boolean =
-        try {
-            // Registration and feature negotiation are not sufficient proof that the caller may use
-            // the Consumer API. Older hosts can expose the feature while enforcing package/signature
-            // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
-            service.consumer
-            true
-        } catch (error: SecurityException) {
-            failConnection(
-                epoch,
-                SharedRuntimeConnectionState.PERMISSION_DENIED,
-                error.message ?: "Host denied Consumer API access",
-            )
-            false
-        } catch (error: RemoteException) {
-            connectionLost(error.message ?: "Consumer API handshake failed", epoch)
-            false
-        }
+    private fun consumerAccessGranted(service: SharedRuntimeRemoteService, epoch: Long): Boolean = try {
+        // Registration and feature negotiation are not sufficient proof that the caller may use
+        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
+        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
+        service.consumer
+        true
+    } catch (error: SecurityException) {
+        failConnection(
+            epoch,
+            SharedRuntimeConnectionState.PERMISSION_DENIED,
+            error.message ?: "Host denied Consumer API access",
+        )
+        false
+    } catch (error: RemoteException) {
+        connectionLost(error.message ?: "Consumer API handshake failed", epoch)
+        false
+    }
 
     private fun registrationCallbackIsCurrent(epoch: Long): Boolean = synchronized(lock) {
         epoch == connectionEpoch && current.state == SharedRuntimeConnectionState.NEGOTIATING
