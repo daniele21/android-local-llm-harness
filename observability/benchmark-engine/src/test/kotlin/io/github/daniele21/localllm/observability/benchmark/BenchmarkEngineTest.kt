@@ -88,6 +88,63 @@ class BenchmarkEngineTest {
     }
 
     @Test
+    fun `random effective seed does not fragment baseline identity`() {
+        val repository = InMemoryTelemetryRepository()
+        val first = run(
+            "random-0",
+            10,
+            100,
+            50.0,
+            1L,
+            seedPolicy = SeedPolicyType.RANDOM,
+            effectiveSeed = 100L,
+        )
+        val randomKey = BenchmarkKey.fromRun(first)
+        repository.recordRun(first)
+        repeat(4) { index ->
+            repository.recordRun(
+                run(
+                    "random-${index + 1}",
+                    10,
+                    100,
+                    50.0,
+                    index.toLong() + 2,
+                    seedPolicy = SeedPolicyType.RANDOM,
+                    effectiveSeed = 200L + index,
+                ),
+            )
+        }
+
+        val result = BenchmarkBaselineRecorder(repository, policy, BenchmarkEpochClock { 100L }).capture(randomKey)
+        val baseline = (result as BenchmarkCaptureResult.Captured).baseline
+
+        assertEquals(5, baseline.sampleCount)
+        assertTrue(
+            randomKey.matches(
+                run(
+                    "random-comparison",
+                    10,
+                    100,
+                    50.0,
+                    101L,
+                    seedPolicy = SeedPolicyType.RANDOM,
+                    effectiveSeed = 999L,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `fixed effective seed remains part of execution identity`() {
+        val fixedKey = BenchmarkKey.fromRun(
+            run("fixed-1", 10, 100, 50.0, 1L, effectiveSeed = 7L),
+        )
+
+        assertFalse(fixedKey.matches(run("fixed-2", 10, 100, 50.0, 2L, effectiveSeed = 8L)))
+        assertTrue(fixedKey.matches(run("fixed-3", 10, 100, 50.0, 3L, effectiveSeed = 7L)))
+    }
+
+    @Test
     fun `passes when post baseline metrics stay within policy`() {
         val repository = baselineRepository()
         listOf(
@@ -190,6 +247,8 @@ class BenchmarkEngineTest {
         loadKind: ModelLoadKind = ModelLoadKind.WARM,
         contextSize: Int = 2_048,
         thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
+        seedPolicy: SeedPolicyType = SeedPolicyType.FIXED,
+        effectiveSeed: Long = 20260307L,
     ): GenerationRunRecord = GenerationRunRecord(
         requestId = RequestId(id),
         applicationId = applicationId,
@@ -217,8 +276,8 @@ class BenchmarkEngineTest {
         thinkingMode = thinkingMode,
         repeatPenalty = 1.0f,
         repeatLastN = 64,
-        seedPolicy = SeedPolicyType.FIXED,
-        effectiveSeed = 20260307L,
+        seedPolicy = seedPolicy,
+        effectiveSeed = effectiveSeed,
         maxOutputTokens = 64,
         contextSize = contextSize,
         promptTokenCount = 10,
