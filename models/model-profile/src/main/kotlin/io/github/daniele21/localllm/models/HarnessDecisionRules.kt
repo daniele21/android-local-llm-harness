@@ -224,8 +224,8 @@ private fun specFor(condition: HarnessDecisionCondition): DecisionSpec =
                 ),
                 action = HarnessDecisionAction.INSPECT_MODEL_CONFLICT,
                 evidence = mapOf(
-                    "requestedModelDigest" to condition.requestedModelDigest.value,
-                    "residentModelDigest" to condition.residentModelDigest.value,
+                    "requestedModelDigest" to condition.requestedModelDigest.sha256,
+                    "residentModelDigest" to condition.residentModelDigest.sha256,
                 ),
             )
         }
@@ -243,7 +243,7 @@ private fun specFor(condition: HarnessDecisionCondition): DecisionSpec =
                 action = HarnessDecisionAction.REVIEW_MEMORY_PRESSURE,
                 evidence = buildMap {
                     put("outcome", condition.outcome.name)
-                    condition.modelDigest?.let { put("modelDigest", it.value) }
+                    condition.modelDigest?.let { put("modelDigest", it.sha256) }
                 },
             )
         }
@@ -307,7 +307,7 @@ private fun boundModelUnavailableSpec(condition: HarnessDecisionCondition.BoundM
         action = HarnessDecisionAction.REPAIR_PRESET,
         evidence = buildMap {
             put("problem", condition.problem.name)
-            condition.modelDigest?.let { put("modelDigest", it.value) }
+            condition.modelDigest?.let { put("modelDigest", it.sha256) }
         },
     )
 
