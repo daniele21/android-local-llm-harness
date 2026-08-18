@@ -108,10 +108,7 @@ class PresetSuggestionServiceTest {
         )
     }
 
-    private fun useCase(
-        minimumContextTokens: Int = 4_096,
-        reasoningSupported: Boolean = false,
-    ): UseCaseDefinition = UseCaseDefinition(
+    private fun useCase(minimumContextTokens: Int = 4_096, reasoningSupported: Boolean = false): UseCaseDefinition = UseCaseDefinition(
         useCaseId = UseCaseId("document-pii-detection"),
         displayName = "Document PII detection",
         description = "Detect configured PII in documents",
