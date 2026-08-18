@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -69,6 +70,9 @@ internal object TelemetryEntityMapper {
         stopReason = run.stopReason?.name
         promptPlanningMs = run.promptPlanningMs
         contextCreationMs = run.contextCreationMs
+        sessionId = run.sessionId?.value
+        useCaseRevision = run.useCaseRevision
+        bindingRevision = run.bindingRevision
     }
 
     fun runRecord(entity: TelemetryEntities.GenerationRunEntity): GenerationRunRecord = GenerationRunRecord(
@@ -111,6 +115,9 @@ internal object TelemetryEntityMapper {
         stopReason = entity.stopReason?.let(StopReason::valueOf),
         promptPlanningMs = entity.promptPlanningMs,
         contextCreationMs = entity.contextCreationMs,
+        sessionId = entity.sessionId?.let(::SessionId),
+        useCaseRevision = entity.useCaseRevision,
+        bindingRevision = entity.bindingRevision,
     )
 
     fun logEntity(log: StructuredLog): TelemetryEntities.StructuredLogEntity = TelemetryEntities.StructuredLogEntity().apply {
