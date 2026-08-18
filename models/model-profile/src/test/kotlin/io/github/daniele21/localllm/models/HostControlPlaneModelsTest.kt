@@ -14,7 +14,9 @@ class HostControlPlaneModelsTest {
     @Test
     fun `published custom preset is exposed without concrete model metadata`() {
         val configuration = configuration(
-            presets = listOf(preset("quality", 3, PresetCreationSource.CUSTOM, PresetLifecycleState.PUBLISHED)),
+            presets = listOf(
+                preset("quality", 3, PresetCreationSource.CUSTOM, PresetLifecycleState.PUBLISHED),
+            ),
             exposures = listOf(PresetExposure(BINDING_ID, "quality", 3, isDefault = true)),
         )
 
@@ -27,7 +29,9 @@ class HostControlPlaneModelsTest {
     fun `draft preset cannot be exposed to a consumer`() {
         val result = runCatching {
             configuration(
-                presets = listOf(preset("draft", 1, PresetCreationSource.CUSTOM, PresetLifecycleState.DRAFT)),
+                presets = listOf(
+                    preset("draft", 1, PresetCreationSource.CUSTOM, PresetLifecycleState.DRAFT),
+                ),
                 exposures = listOf(PresetExposure(BINDING_ID, "draft", 1, isDefault = true)),
             )
         }
@@ -56,7 +60,9 @@ class HostControlPlaneModelsTest {
     @Test
     fun `configuration may intentionally expose no preset`() {
         val configuration = configuration(
-            presets = listOf(preset("quality", 1, PresetCreationSource.CUSTOM, PresetLifecycleState.PUBLISHED)),
+            presets = listOf(
+                preset("quality", 1, PresetCreationSource.CUSTOM, PresetLifecycleState.PUBLISHED),
+            ),
             exposures = emptyList(),
         )
 
