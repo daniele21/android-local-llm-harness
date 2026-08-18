@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.models.controlplane.room;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
@@ -9,6 +10,7 @@ public final class HostControlPlaneEntities {
 
     @Entity(tableName = "hcp_applications", primaryKeys = {"application_id"})
     public static final class ApplicationEntity {
+        @NonNull
         @ColumnInfo(name = "application_id")
         public final String applicationId;
 
@@ -31,7 +33,7 @@ public final class HostControlPlaneEntities {
         public final long lastSeenAtEpochMs;
 
         public ApplicationEntity(
-                String applicationId,
+                @NonNull String applicationId,
                 String packageName,
                 String signerSha256,
                 String displayName,
@@ -50,6 +52,7 @@ public final class HostControlPlaneEntities {
 
     @Entity(tableName = "hcp_use_case_revisions", primaryKeys = {"use_case_id", "revision"})
     public static final class UseCaseEntity {
+        @NonNull
         @ColumnInfo(name = "use_case_id")
         public final String useCaseId;
 
@@ -86,7 +89,7 @@ public final class HostControlPlaneEntities {
         public final String state;
 
         public UseCaseEntity(
-                String useCaseId,
+                @NonNull String useCaseId,
                 int revision,
                 String displayName,
                 String description,
@@ -113,9 +116,11 @@ public final class HostControlPlaneEntities {
 
     @Entity(tableName = "hcp_preset_revisions", primaryKeys = {"use_case_id", "preset_id", "revision"})
     public static final class PresetEntity {
+        @NonNull
         @ColumnInfo(name = "use_case_id")
         public final String useCaseId;
 
+        @NonNull
         @ColumnInfo(name = "preset_id")
         public final String presetId;
 
@@ -161,8 +166,8 @@ public final class HostControlPlaneEntities {
         public final boolean enableDeterministicResultCache;
 
         public PresetEntity(
-                String useCaseId,
-                String presetId,
+                @NonNull String useCaseId,
+                @NonNull String presetId,
                 int revision,
                 String displayName,
                 String description,
@@ -196,6 +201,7 @@ public final class HostControlPlaneEntities {
 
     @Entity(tableName = "hcp_binding_revisions", primaryKeys = {"binding_id", "revision"})
     public static final class BindingEntity {
+        @NonNull
         @ColumnInfo(name = "binding_id")
         public final String bindingId;
 
@@ -211,7 +217,12 @@ public final class HostControlPlaneEntities {
         @ColumnInfo(name = "enabled")
         public final boolean enabled;
 
-        public BindingEntity(String bindingId, int revision, String applicationId, String useCaseId, boolean enabled) {
+        public BindingEntity(
+                @NonNull String bindingId,
+                int revision,
+                String applicationId,
+                String useCaseId,
+                boolean enabled) {
             this.bindingId = bindingId;
             this.revision = revision;
             this.applicationId = applicationId;
@@ -224,12 +235,14 @@ public final class HostControlPlaneEntities {
             tableName = "hcp_preset_exposures",
             primaryKeys = {"binding_id", "binding_revision", "preset_id", "preset_revision"})
     public static final class ExposureEntity {
+        @NonNull
         @ColumnInfo(name = "binding_id")
         public final String bindingId;
 
         @ColumnInfo(name = "binding_revision")
         public final int bindingRevision;
 
+        @NonNull
         @ColumnInfo(name = "preset_id")
         public final String presetId;
 
@@ -240,9 +253,9 @@ public final class HostControlPlaneEntities {
         public final boolean isDefault;
 
         public ExposureEntity(
-                String bindingId,
+                @NonNull String bindingId,
                 int bindingRevision,
-                String presetId,
+                @NonNull String presetId,
                 int presetRevision,
                 boolean isDefault) {
             this.bindingId = bindingId;
