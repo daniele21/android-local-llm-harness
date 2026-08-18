@@ -94,6 +94,19 @@ target_include_directories(
 target_link_libraries(generation_sampler_test PRIVATE llama)
 
 add_executable(
+    prepared_prompt_cache_test
+    prepared_prompt_cache_test.cpp
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp/prepared_prompt_cache.cpp"
+)
+target_include_directories(
+    prepared_prompt_cache_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+)
+
+target_link_libraries(prepared_prompt_cache_test PRIVATE Threads::Threads)
+
+add_executable(
     reasoning_transition_test
     reasoning_transition_test.cpp
     "${CMAKE_CURRENT_LIST_DIR}/../main/cpp/reasoning_transition.cpp"
@@ -109,4 +122,5 @@ add_test(NAME gguf_metadata_test COMMAND gguf_metadata_test)
 add_test(NAME native_cancellation_registry_test COMMAND native_cancellation_registry_test)
 add_test(NAME generation_output_buffer_test COMMAND generation_output_buffer_test)
 add_test(NAME generation_sampler_test COMMAND generation_sampler_test)
+add_test(NAME prepared_prompt_cache_test COMMAND prepared_prompt_cache_test)
 add_test(NAME reasoning_transition_test COMMAND reasoning_transition_test)
