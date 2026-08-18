@@ -35,8 +35,7 @@ class ActivationResidencyInferenceBackendTest {
         val delegate = RecordingBackend()
         val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
         val handle = TestModelHandle(digest)
-        val acquired = coordinator.acquire(request(), retainModelWarmMs = 30_000)
-            as ActivationResidencyResult.Success
+        val acquired = coordinator.acquire(request(), retainModelWarmMs = 30_000) as ActivationResidencyResult.Success
         coordinator.release(acquired.value.activationId, acquired.value.ownerId)
 
         backend.unloadModel(handle)
@@ -44,9 +43,10 @@ class ActivationResidencyInferenceBackendTest {
         assertTrue(delegate.unloaded)
     }
 
-    private fun coordinator(): ActivationResidencyCoordinator = ActivationResidencyCoordinator(
-        UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId("activation-1") }),
-    )
+    private fun coordinator(): ActivationResidencyCoordinator =
+        ActivationResidencyCoordinator(
+            UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId("activation-1") }),
+        )
 
     private fun request(): UseCaseActivationRequest = UseCaseActivationRequest(
         ownerId = ActivationOwnerId("owner-a"),
@@ -66,21 +66,25 @@ private data class TestModelHandle(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
+@Suppress("TooManyFunctions")
 private class RecordingBackend : InferenceBackend {
     override val id = "recording"
     var unloaded = false
 
     override fun initialize() = Unit
+
     override fun shutdown() = Unit
-    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
-        error("Not used")
+
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle = error("Not used")
 
     override fun unloadModel(model: BackendModelHandle) {
         unloaded = true
     }
 
     override fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities = error("Not used")
+
     override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan = error("Not used")
+
     override fun createContext(
         model: BackendModelHandle,
         profile: GgufModelProfile,
@@ -88,6 +92,7 @@ private class RecordingBackend : InferenceBackend {
     ): BackendContextHandle = error("Not used")
 
     override fun releaseContext(context: BackendContextHandle) = Unit
+
     override fun generate(
         context: BackendContextHandle,
         request: BackendGenerationRequest,
