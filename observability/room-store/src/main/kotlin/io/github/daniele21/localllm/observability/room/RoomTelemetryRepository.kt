@@ -6,11 +6,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
+import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.DeveloperDashboardSnapshot
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
+import io.github.daniele21.localllm.observability.InferenceSessionRecord
 import io.github.daniele21.localllm.observability.ResourceSnapshot
+import io.github.daniele21.localllm.observability.SessionTelemetryRepository
+import io.github.daniele21.localllm.observability.SessionTelemetryRetentionPolicy
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
@@ -25,8 +29,11 @@ class RoomTelemetryRepository internal constructor(
     private val dao: TelemetryDao,
     private val retention: TelemetryRetentionPolicy,
     private val executor: ExecutorService,
+    private val sessionDao: SessionTelemetryDao = NoOpSessionTelemetryDao,
+    private val sessionRetention: SessionTelemetryRetentionPolicy = SessionTelemetryRetentionPolicy(),
     private val closeDatabase: () -> Unit = {},
 ) : TelemetryRepository,
+    SessionTelemetryRepository,
     AutoCloseable {
     private val closed = AtomicBoolean(false)
 
@@ -35,6 +42,15 @@ class RoomTelemetryRepository internal constructor(
             dao.upsertRunWithRetention(
                 TelemetryEntityMapper.runEntity(run),
                 retention.maxRuns,
+            )
+        }
+    }
+
+    override fun recordSession(session: InferenceSessionRecord) {
+        executeAsync {
+            sessionDao.upsertSessionWithRetention(
+                SessionTelemetryEntityMapper.sessionEntity(session),
+                sessionRetention.maxSessions,
             )
         }
     }
@@ -79,6 +95,14 @@ class RoomTelemetryRepository internal constructor(
 
     override fun findRun(requestId: RequestId): GenerationRunRecord? = executeBlocking {
         dao.findRun(requestId.value)?.let(TelemetryEntityMapper::runRecord)
+    }
+
+    override fun recentSessions(limit: Int): List<InferenceSessionRecord> = executeBlocking {
+        sessionDao.recentSessions(requirePositiveLimit(limit)).map(SessionTelemetryEntityMapper::sessionRecord)
+    }
+
+    override fun findSession(sessionId: SessionId): InferenceSessionRecord? = executeBlocking {
+        sessionDao.findSession(sessionId.value)?.let(SessionTelemetryEntityMapper::sessionRecord)
     }
 
     override fun recentLogs(limit: Int, requestId: RequestId?): List<StructuredLog> = executeBlocking {
@@ -332,10 +356,50 @@ class RoomTelemetryRepository internal constructor(
             }
         }
 
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN session_id TEXT")
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN use_case_revision INTEGER")
+                database.execSQL("ALTER TABLE generation_runs ADD COLUMN binding_revision INTEGER")
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_generation_runs_session_id ON generation_runs(session_id)",
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS inference_sessions (" +
+                        "session_id TEXT NOT NULL PRIMARY KEY, " +
+                        "application_id TEXT NOT NULL, " +
+                        "use_case_id TEXT NOT NULL, " +
+                        "model_digest TEXT NOT NULL, " +
+                        "session_kind TEXT NOT NULL, " +
+                        "created_at_epoch_ms INTEGER NOT NULL, " +
+                        "closed_at_epoch_ms INTEGER, " +
+                        "status TEXT NOT NULL, " +
+                        "close_reason TEXT, " +
+                        "preset_id TEXT, " +
+                        "preset_version INTEGER, " +
+                        "use_case_revision INTEGER, " +
+                        "binding_revision INTEGER)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_inference_sessions_created_at_epoch_ms " +
+                        "ON inference_sessions(created_at_epoch_ms)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_inference_sessions_application_id_use_case_id " +
+                        "ON inference_sessions(application_id, use_case_id)",
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_inference_sessions_model_digest " +
+                        "ON inference_sessions(model_digest)",
+                )
+            }
+        }
+
         fun open(
             context: Context,
             databaseName: String = DEFAULT_DATABASE_NAME,
             retention: TelemetryRetentionPolicy = TelemetryRetentionPolicy(),
+            sessionRetention: SessionTelemetryRetentionPolicy = SessionTelemetryRetentionPolicy(),
         ): RoomTelemetryRepository {
             require(databaseName.isNotBlank()) { "Telemetry database name must not be blank" }
             val database = Room.databaseBuilder(
@@ -350,6 +414,7 @@ class RoomTelemetryRepository internal constructor(
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             ).build()
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "local-llm-telemetry-store").apply { isDaemon = true }
@@ -358,8 +423,20 @@ class RoomTelemetryRepository internal constructor(
                 dao = database.telemetryDao(),
                 retention = retention,
                 executor = executor,
+                sessionDao = database.sessionTelemetryDao(),
+                sessionRetention = sessionRetention,
                 closeDatabase = database::close,
             )
         }
     }
+}
+
+private object NoOpSessionTelemetryDao : SessionTelemetryDao {
+    override fun upsertSession(session: TelemetryEntities.InferenceSessionEntity) = Unit
+
+    override fun recentSessions(limit: Int): List<TelemetryEntities.InferenceSessionEntity> = emptyList()
+
+    override fun findSession(sessionId: String): TelemetryEntities.InferenceSessionEntity? = null
+
+    override fun trimSessions(maxRows: Int) = Unit
 }
