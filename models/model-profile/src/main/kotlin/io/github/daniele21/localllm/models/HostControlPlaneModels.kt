@@ -27,7 +27,9 @@ data class RegisteredApplication(
         require(displayName.isNotBlank()) { "Application display name must not be blank" }
         require(SHA256_PATTERN.matches(signerSha256)) { "Application signer identity must be SHA-256" }
         require(firstSeenAtEpochMs >= 0) { "Application first-seen timestamp must not be negative" }
-        require(lastSeenAtEpochMs >= firstSeenAtEpochMs) { "Application last-seen timestamp must not precede first-seen" }
+        require(lastSeenAtEpochMs >= firstSeenAtEpochMs) {
+            "Application last-seen timestamp must not precede first-seen"
+        }
     }
 }
 
@@ -155,8 +157,12 @@ data class HostControlPlaneConfiguration(
     val exposures: List<PresetExposure>,
 ) {
     init {
-        require(binding.applicationId == application.applicationId) { "Binding application does not match registered application" }
-        require(binding.useCaseId == useCase.useCaseId) { "Binding use case does not match use-case definition" }
+        require(binding.applicationId == application.applicationId) {
+            "Binding application does not match registered application"
+        }
+        require(binding.useCaseId == useCase.useCaseId) {
+            "Binding use case does not match use-case definition"
+        }
         require(presets.all { it.useCaseId == useCase.useCaseId }) { "Preset belongs to another use case" }
         require(exposures.all { it.bindingId == binding.bindingId }) { "Preset exposure belongs to another binding" }
         require(exposures.map { it.presetId to it.presetRevision }.distinct().size == exposures.size) {
