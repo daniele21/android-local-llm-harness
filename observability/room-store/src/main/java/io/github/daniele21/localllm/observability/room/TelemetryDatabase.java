@@ -6,13 +6,14 @@ import androidx.room.RoomDatabase;
 @Database(
         entities = {
             TelemetryEntities.GenerationRunEntity.class,
+            TelemetryEntities.InferenceSessionEntity.class,
             TelemetryEntities.StructuredLogEntity.class,
             TelemetryEntities.HealthCheckEntity.class,
             TelemetryEntities.ResourceSnapshotEntity.class,
             TelemetryEntities.BenchmarkBaselineEntity.class,
             TelemetryEntities.BenchmarkBaselineHistoryEntity.class
         },
-        version = 8,
+        version = 9,
         exportSchema = true)
 public abstract class TelemetryDatabase extends RoomDatabase {
     public abstract TelemetryDao telemetryDao();
