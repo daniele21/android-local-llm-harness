@@ -188,7 +188,9 @@ private fun specFor(condition: HarnessDecisionCondition): DecisionSpec = when (c
     }
 
     is HarnessDecisionCondition.ConfigurationUnavailable -> configurationUnavailableSpec(condition)
+
     is HarnessDecisionCondition.BoundModelUnavailable -> boundModelUnavailableSpec(condition)
+
     is HarnessDecisionCondition.BrokenPreset -> {
         spec(
             category = HarnessDecisionCategory.ACTION_REQUIRED,
