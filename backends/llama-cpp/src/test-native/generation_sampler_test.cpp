@@ -5,6 +5,8 @@
 
 namespace {
 
+constexpr std::int32_t kFixtureVocabularySize = 1024;
+
 void assert_sampler_name(llama_sampler* chain, int index, const char* expected) {
     llama_sampler* sampler = llama_sampler_chain_get(chain, index);
     assert(sampler != nullptr);
@@ -23,7 +25,9 @@ int main() {
         1.5F,
         1.0F,
         64,
-        42
+        42,
+        {},
+        kFixtureVocabularySize
     );
     assert(sampled != nullptr);
     assert(llama_sampler_chain_n(sampled.get()) == 6);
@@ -43,7 +47,9 @@ int main() {
         2.0F,
         1.0F,
         64,
-        42
+        42,
+        {},
+        kFixtureVocabularySize
     );
     assert(sampled_without_min_p != nullptr);
     assert(llama_sampler_chain_n(sampled_without_min_p.get()) == 5);
@@ -62,7 +68,9 @@ int main() {
         0.0F,
         1.0F,
         64,
-        42
+        42,
+        {},
+        kFixtureVocabularySize
     );
     assert(greedy != nullptr);
     assert(llama_sampler_chain_n(greedy.get()) == 2);
