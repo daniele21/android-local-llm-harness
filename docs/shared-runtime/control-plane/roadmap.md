@@ -59,24 +59,24 @@ Harness administration UI can begin against fakes once its domain contracts exis
 
 | Task | State | Dependency | Deliverable |
 | --- | --- | --- | --- |
-| HCP-0 | IN PROGRESS | — | ADR 0015 + canonical plan integrated/green |
-| HCP-1 | IN PROGRESS | HCP-0 | registered-application domain |
-| HCP-2 | IN PROGRESS | HCP-0 | Harness-managed use-case domain |
-| HCP-3 | PLANNED | HCP-2 | deterministic suggested preset service |
-| HCP-4 | IN PROGRESS | HCP-2 | custom/published preset domain |
-| HCP-5 | IN PROGRESS | HCP-3/4 | immutable preset revision/publishing semantics |
-| HCP-6 | IN PROGRESS | HCP-1/2 | application/use-case binding |
-| HCP-7 | IN PROGRESS | HCP-4/5/6 | per-application preset exposure |
+| HCP-0 | DONE | — | ADR 0015 + canonical plan integrated/green |
+| HCP-1 | DONE | HCP-0 | registered-application domain |
+| HCP-2 | DONE | HCP-0 | Harness-managed use-case domain |
+| HCP-3 | IN PROGRESS | HCP-2 | deterministic suggested preset service |
+| HCP-4 | DONE | HCP-2 | custom/published preset domain |
+| HCP-5 | DONE | HCP-3/4 | immutable preset revision/publishing semantics foundation; suggestion acceptance remains HCP-3 |
+| HCP-6 | DONE | HCP-1/2 | application/use-case binding |
+| HCP-7 | DONE | HCP-4/5/6 | per-application preset exposure |
 | HCP-8 | PLANNED | HCP-1..7 | persistent control-plane store |
 | HCP-9 | PLANNED | HCP-8 | deterministic execution resolver |
-| HCP-10 | IN PROGRESS | HCP-0 | structured decision-event contract |
-| HCP-11 | PLANNED | HCP-10 | decision rules/deduplication |
+| HCP-10 | DONE | HCP-0 | structured decision-event contract |
+| HCP-11 | IN PROGRESS | HCP-10 | decision rules/deduplication |
 | HCP-12 | PLANNED | HCP-10/11 | Android notification projection |
 | HCP-13 | PLANNED | HCP-10/11 | persistent Decision Center |
 | HCP-14 | IN PROGRESS | HCP-0 | session/run observability identity |
 | HCP-15 | IN PROGRESS | HCP-14 | Room session/run history + migration |
 | HCP-16 | PLANNED | HCP-14 | runtime-first unified instrumentation |
-| HCP-17 | IN PROGRESS | HCP-0; HCP-9 for final wiring | activation lease contract/ownership |
+| HCP-17 | DONE | HCP-0; HCP-9 for final wiring | activation lease contract/ownership |
 | HCP-18 | PLANNED | HCP-9/17 | lease-aware residency/warm retention |
 | HCP-19 | PLANNED | HCP-6/7/9 | assigned-use-case discovery |
 | HCP-20 | PLANNED | HCP-7/9 | published/custom preset discovery |
@@ -88,17 +88,23 @@ Harness administration UI can begin against fakes once its domain contracts exis
 | HCP-26 | PLANNED | HCP-15/16 | unified Sessions/Inference UI |
 | HCP-27 | PLANNED | all cutover prerequisites | remove hardcoded consumer binding/global-model dependency |
 
-`IN PROGRESS` reflects active branches/PRs only; no behavior is assumed integrated until merged into `dev` with its exit gate green.
+`IN PROGRESS` reflects active branches/PRs only; no behavior is assumed integrated until merged into `dev` with its exit gate green. `DONE` means the scoped deliverable in this roadmap is integrated into `dev`; later dependent wiring may still consume it.
+
+## Integrated foundation and active convergence
+
+The control-plane domain for HCP-1/2/4/5/6/7, the structured decision-event contract HCP-10 and the activation lease contract HCP-17 are integrated in `dev`. The runtime lifecycle integration test now waits for terminal cleanup before asserting physical release, removing a pre-existing race that obscured independent HCP validation.
+
+Current independent convergence lanes are HCP-3 suggested presets, HCP-11 decision rules and HCP-14 session observability. HCP-15 has a clean replacement branch stacked on the current HCP-14 candidate so Room migration work can continue without reviving the obsolete pre-baseline stack. RedactGuard's false single-preset assumption has been removed in its own repository; final assigned-use-case discovery and activation still wait for HCP-19 through HCP-21.
 
 ## Parallel lanes now
 
 The current independent implementation lanes are:
 
-- **Configuration:** HCP-1/2/4/5/6/7 domain foundation, then HCP-3 and HCP-8/9.
-- **Decisions:** HCP-10 contract, then HCP-11 rules independently of Android notification wiring.
-- **Observability:** HCP-14 contract; HCP-15 Room persistence and HCP-16 runtime instrumentation can develop in parallel once the contract is stable.
-- **Activation:** HCP-17 pure ownership contract now; final resolver/residency integration waits for HCP-9.
-- **Consumer:** RedactGuard can remove the false single-preset assumption now; HCP-19/20/21 gate later discovery/activation work.
+- **Configuration:** HCP-3 suggested presets now, then HCP-8 persistent store and HCP-9 resolver.
+- **Decisions:** HCP-11 rules now; HCP-12 notification projection and HCP-13 persistence split after the rule contract is green.
+- **Observability:** HCP-14 contract now; HCP-15 Room persistence is stacked from that candidate and HCP-16 runtime instrumentation follows the same stable identity.
+- **Activation:** HCP-17 ownership contract is integrated; HCP-18 final resolver/residency integration waits for HCP-9.
+- **Consumer:** RedactGuard accepts multiple host-published presets; HCP-19/20/21 gate assigned-use-case discovery and activation lifecycle.
 
 ## Integration order
 
