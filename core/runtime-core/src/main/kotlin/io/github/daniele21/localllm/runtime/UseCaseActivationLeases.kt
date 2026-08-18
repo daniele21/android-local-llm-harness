@@ -130,6 +130,9 @@ class UseCaseActivationLeaseRegistry(
     }
 
     @Synchronized
+    fun activeLeases(): List<UseCaseActivationLease> = leases.values.toList()
+
+    @Synchronized
     fun activeForOwner(ownerId: ActivationOwnerId): List<UseCaseActivationLease> = leases.values.filter { it.ownerId == ownerId }
 
     @Synchronized
