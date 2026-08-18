@@ -100,10 +100,7 @@ fun interface HarnessDecisionIdFactory {
     fun newId(): HarnessDecisionId
 }
 
-class HarnessDecisionRuleEngine(
-    private val repository: HarnessDecisionRepository,
-    private val idFactory: HarnessDecisionIdFactory,
-) {
+class HarnessDecisionRuleEngine(private val repository: HarnessDecisionRepository, private val idFactory: HarnessDecisionIdFactory) {
     @Synchronized
     fun reconcile(conditions: Collection<HarnessDecisionCondition>, nowEpochMs: Long) {
         require(nowEpochMs >= 0) { "Decision reconciliation timestamp must not be negative" }
@@ -143,122 +140,119 @@ private data class DecisionSpec(
     val action: HarnessDecisionAction,
     val evidence: Map<String, String> = emptyMap(),
 ) {
-    fun toEvent(decisionId: HarnessDecisionId, createdAtEpochMs: Long): HarnessDecisionEvent =
-        HarnessDecisionEvent(
-            decisionId = decisionId,
-            category = category,
-            code = code,
-            title = title,
-            summary = summary,
-            context = context,
-            createdAtEpochMs = createdAtEpochMs,
-            dedupeKey = dedupeKey,
-            action = action,
-            evidence = evidence,
-        )
+    fun toEvent(decisionId: HarnessDecisionId, createdAtEpochMs: Long): HarnessDecisionEvent = HarnessDecisionEvent(
+        decisionId = decisionId,
+        category = category,
+        code = code,
+        title = title,
+        summary = summary,
+        context = context,
+        createdAtEpochMs = createdAtEpochMs,
+        dedupeKey = dedupeKey,
+        action = action,
+        evidence = evidence,
+    )
 }
 
-private fun HarnessDecisionEvent.refreshedFrom(spec: DecisionSpec): HarnessDecisionEvent =
-    copy(
-        category = spec.category,
-        code = spec.code,
-        title = spec.title,
-        summary = spec.summary,
-        context = spec.context,
-        action = spec.action,
-        evidence = spec.evidence,
-    )
+private fun HarnessDecisionEvent.refreshedFrom(spec: DecisionSpec): HarnessDecisionEvent = copy(
+    category = spec.category,
+    code = spec.code,
+    title = spec.title,
+    summary = spec.summary,
+    context = spec.context,
+    action = spec.action,
+    evidence = spec.evidence,
+)
 
-private fun specFor(condition: HarnessDecisionCondition): DecisionSpec =
-    when (condition) {
-        is HarnessDecisionCondition.PendingConsumer -> {
-            spec(
-                category = HarnessDecisionCategory.ACTION_REQUIRED,
-                code = CODE_NEW_CONSUMER_PENDING,
-                title = "Application authorization required",
-                summary = "A consumer application is waiting for Harness authorization and configuration.",
-                context = HarnessDecisionContext(applicationId = condition.applicationId),
-                action = HarnessDecisionAction.CONFIGURE_APPLICATION,
-            )
-        }
-
-        is HarnessDecisionCondition.MissingApplicationConfiguration -> {
-            spec(
-                category = HarnessDecisionCategory.ACTION_REQUIRED,
-                code = CODE_APPLICATION_CONFIGURATION_REQUIRED,
-                title = "Application configuration required",
-                summary = "The consumer application has no complete Harness configuration.",
-                context = HarnessDecisionContext(applicationId = condition.applicationId),
-                action = HarnessDecisionAction.CONFIGURE_APPLICATION,
-            )
-        }
-
-        is HarnessDecisionCondition.ConfigurationUnavailable -> configurationUnavailableSpec(condition)
-        is HarnessDecisionCondition.BoundModelUnavailable -> boundModelUnavailableSpec(condition)
-        is HarnessDecisionCondition.BrokenPreset -> {
-            spec(
-                category = HarnessDecisionCategory.ACTION_REQUIRED,
-                code = CODE_PRESET_BROKEN,
-                title = "Preset requires repair",
-                summary = "A published preset can no longer resolve to a valid execution configuration.",
-                context = HarnessDecisionContext(
-                    applicationId = condition.applicationId,
-                    useCaseId = condition.useCaseId,
-                    presetId = condition.presetId,
-                    presetRevision = condition.presetRevision,
-                    bindingRevision = condition.bindingRevision,
-                ),
-                action = HarnessDecisionAction.REPAIR_PRESET,
-            )
-        }
-
-        is HarnessDecisionCondition.ProtectedResidentModelConflict -> {
-            spec(
-                category = HarnessDecisionCategory.ACTION_REQUIRED,
-                code = CODE_PROTECTED_MODEL_CONFLICT,
-                title = "Resident model conflict",
-                summary = "The requested model conflicts with a model protected by an active use-case lease.",
-                context = HarnessDecisionContext(
-                    applicationId = condition.applicationId,
-                    useCaseId = condition.useCaseId,
-                ),
-                action = HarnessDecisionAction.INSPECT_MODEL_CONFLICT,
-                evidence = mapOf(
-                    "requestedModelDigest" to condition.requestedModelDigest.sha256,
-                    "residentModelDigest" to condition.residentModelDigest.sha256,
-                ),
-            )
-        }
-
-        is HarnessDecisionCondition.CriticalMemoryPressure -> {
-            spec(
-                category = HarnessDecisionCategory.WARNING,
-                code = CODE_CRITICAL_MEMORY_PRESSURE,
-                title = "Critical memory-pressure intervention",
-                summary = "Harness evicted protected runtime state or revoked an activation to protect device stability.",
-                context = HarnessDecisionContext(
-                    applicationId = condition.applicationId,
-                    useCaseId = condition.useCaseId,
-                ),
-                action = HarnessDecisionAction.REVIEW_MEMORY_PRESSURE,
-                evidence = buildMap {
-                    put("outcome", condition.outcome.name)
-                    condition.modelDigest?.let { put("modelDigest", it.sha256) }
-                },
-            )
-        }
-
-        is HarnessDecisionCondition.SignerReauthorizationRequired -> {
-            spec(
-                category = HarnessDecisionCategory.ACTION_REQUIRED,
-                code = CODE_SIGNER_REAUTHORIZATION_REQUIRED,
-                title = "Application identity changed",
-                summary = "The registered application signer changed and requires security re-authorization.",
-                context = HarnessDecisionContext(applicationId = condition.applicationId),
-                action = HarnessDecisionAction.REVIEW_SECURITY,
-            )
-        }
+private fun specFor(condition: HarnessDecisionCondition): DecisionSpec = when (condition) {
+    is HarnessDecisionCondition.PendingConsumer -> {
+        spec(
+            category = HarnessDecisionCategory.ACTION_REQUIRED,
+            code = CODE_NEW_CONSUMER_PENDING,
+            title = "Application authorization required",
+            summary = "A consumer application is waiting for Harness authorization and configuration.",
+            context = HarnessDecisionContext(applicationId = condition.applicationId),
+            action = HarnessDecisionAction.CONFIGURE_APPLICATION,
+        )
     }
+
+    is HarnessDecisionCondition.MissingApplicationConfiguration -> {
+        spec(
+            category = HarnessDecisionCategory.ACTION_REQUIRED,
+            code = CODE_APPLICATION_CONFIGURATION_REQUIRED,
+            title = "Application configuration required",
+            summary = "The consumer application has no complete Harness configuration.",
+            context = HarnessDecisionContext(applicationId = condition.applicationId),
+            action = HarnessDecisionAction.CONFIGURE_APPLICATION,
+        )
+    }
+
+    is HarnessDecisionCondition.ConfigurationUnavailable -> configurationUnavailableSpec(condition)
+    is HarnessDecisionCondition.BoundModelUnavailable -> boundModelUnavailableSpec(condition)
+    is HarnessDecisionCondition.BrokenPreset -> {
+        spec(
+            category = HarnessDecisionCategory.ACTION_REQUIRED,
+            code = CODE_PRESET_BROKEN,
+            title = "Preset requires repair",
+            summary = "A published preset can no longer resolve to a valid execution configuration.",
+            context = HarnessDecisionContext(
+                applicationId = condition.applicationId,
+                useCaseId = condition.useCaseId,
+                presetId = condition.presetId,
+                presetRevision = condition.presetRevision,
+                bindingRevision = condition.bindingRevision,
+            ),
+            action = HarnessDecisionAction.REPAIR_PRESET,
+        )
+    }
+
+    is HarnessDecisionCondition.ProtectedResidentModelConflict -> {
+        spec(
+            category = HarnessDecisionCategory.ACTION_REQUIRED,
+            code = CODE_PROTECTED_MODEL_CONFLICT,
+            title = "Resident model conflict",
+            summary = "The requested model conflicts with a model protected by an active use-case lease.",
+            context = HarnessDecisionContext(
+                applicationId = condition.applicationId,
+                useCaseId = condition.useCaseId,
+            ),
+            action = HarnessDecisionAction.INSPECT_MODEL_CONFLICT,
+            evidence = mapOf(
+                "requestedModelDigest" to condition.requestedModelDigest.sha256,
+                "residentModelDigest" to condition.residentModelDigest.sha256,
+            ),
+        )
+    }
+
+    is HarnessDecisionCondition.CriticalMemoryPressure -> {
+        spec(
+            category = HarnessDecisionCategory.WARNING,
+            code = CODE_CRITICAL_MEMORY_PRESSURE,
+            title = "Critical memory-pressure intervention",
+            summary = "Harness evicted protected runtime state or revoked an activation to protect device stability.",
+            context = HarnessDecisionContext(
+                applicationId = condition.applicationId,
+                useCaseId = condition.useCaseId,
+            ),
+            action = HarnessDecisionAction.REVIEW_MEMORY_PRESSURE,
+            evidence = buildMap {
+                put("outcome", condition.outcome.name)
+                condition.modelDigest?.let { put("modelDigest", it.sha256) }
+            },
+        )
+    }
+
+    is HarnessDecisionCondition.SignerReauthorizationRequired -> {
+        spec(
+            category = HarnessDecisionCategory.ACTION_REQUIRED,
+            code = CODE_SIGNER_REAUTHORIZATION_REQUIRED,
+            title = "Application identity changed",
+            summary = "The registered application signer changed and requires security re-authorization.",
+            context = HarnessDecisionContext(applicationId = condition.applicationId),
+            action = HarnessDecisionAction.REVIEW_SECURITY,
+        )
+    }
+}
 
 private fun configurationUnavailableSpec(condition: HarnessDecisionCondition.ConfigurationUnavailable): DecisionSpec {
     val code = when (condition.resource) {
@@ -288,28 +282,27 @@ private fun configurationUnavailableSpec(condition: HarnessDecisionCondition.Con
     )
 }
 
-private fun boundModelUnavailableSpec(condition: HarnessDecisionCondition.BoundModelUnavailable): DecisionSpec =
-    spec(
-        category = HarnessDecisionCategory.ACTION_REQUIRED,
-        code = when (condition.problem) {
-            HarnessBoundModelProblem.MISSING -> CODE_BOUND_MODEL_MISSING
-            HarnessBoundModelProblem.INCOMPATIBLE -> CODE_BOUND_MODEL_INCOMPATIBLE
-        },
-        title = "Bound model unavailable",
-        summary = "The model assigned to this use case is missing or incompatible with its execution requirements.",
-        context = HarnessDecisionContext(
-            applicationId = condition.applicationId,
-            useCaseId = condition.useCaseId,
-            presetId = condition.presetId,
-            presetRevision = condition.presetRevision,
-            bindingRevision = condition.bindingRevision,
-        ),
-        action = HarnessDecisionAction.REPAIR_PRESET,
-        evidence = buildMap {
-            put("problem", condition.problem.name)
-            condition.modelDigest?.let { put("modelDigest", it.sha256) }
-        },
-    )
+private fun boundModelUnavailableSpec(condition: HarnessDecisionCondition.BoundModelUnavailable): DecisionSpec = spec(
+    category = HarnessDecisionCategory.ACTION_REQUIRED,
+    code = when (condition.problem) {
+        HarnessBoundModelProblem.MISSING -> CODE_BOUND_MODEL_MISSING
+        HarnessBoundModelProblem.INCOMPATIBLE -> CODE_BOUND_MODEL_INCOMPATIBLE
+    },
+    title = "Bound model unavailable",
+    summary = "The model assigned to this use case is missing or incompatible with its execution requirements.",
+    context = HarnessDecisionContext(
+        applicationId = condition.applicationId,
+        useCaseId = condition.useCaseId,
+        presetId = condition.presetId,
+        presetRevision = condition.presetRevision,
+        bindingRevision = condition.bindingRevision,
+    ),
+    action = HarnessDecisionAction.REPAIR_PRESET,
+    evidence = buildMap {
+        put("problem", condition.problem.name)
+        condition.modelDigest?.let { put("modelDigest", it.sha256) }
+    },
+)
 
 private fun spec(
     category: HarnessDecisionCategory,
@@ -319,27 +312,25 @@ private fun spec(
     context: HarnessDecisionContext,
     action: HarnessDecisionAction,
     evidence: Map<String, String> = emptyMap(),
-): DecisionSpec =
-    DecisionSpec(
-        category = category,
-        code = code,
-        title = title,
-        summary = summary,
-        context = context,
-        dedupeKey = dedupeKey(code, context),
-        action = action,
-        evidence = evidence,
-    )
+): DecisionSpec = DecisionSpec(
+    category = category,
+    code = code,
+    title = title,
+    summary = summary,
+    context = context,
+    dedupeKey = dedupeKey(code, context),
+    action = action,
+    evidence = evidence,
+)
 
-private fun dedupeKey(code: String, context: HarnessDecisionContext): String =
-    listOf(
-        code,
-        context.applicationId?.value ?: "-",
-        context.useCaseId?.value ?: "-",
-        context.presetId?.value ?: "-",
-        context.presetRevision?.toString() ?: "-",
-        context.bindingRevision?.toString() ?: "-",
-    ).joinToString("|")
+private fun dedupeKey(code: String, context: HarnessDecisionContext): String = listOf(
+    code,
+    context.applicationId?.value ?: "-",
+    context.useCaseId?.value ?: "-",
+    context.presetId?.value ?: "-",
+    context.presetRevision?.toString() ?: "-",
+    context.bindingRevision?.toString() ?: "-",
+).joinToString("|")
 
 private const val MAX_RECONCILED_DECISIONS = 1_000
 private const val CODE_NEW_CONSUMER_PENDING = "NEW_CONSUMER_PENDING"
