@@ -49,23 +49,20 @@ class SessionTelemetryTest {
         assertTrue(session.bindingRevision == 7)
     }
 
-    private fun record(
-        status: SessionRunStatus,
-        closedAtEpochMs: Long?,
-        closeReason: SessionCloseReason?,
-    ): InferenceSessionRecord = InferenceSessionRecord(
-        sessionId = SessionId("session-1"),
-        applicationId = ApplicationId("redactguard"),
-        useCaseId = UseCaseId("document-pii-detection"),
-        modelDigest = ModelDigest("a".repeat(64)),
-        sessionKind = SessionKind.STATELESS,
-        createdAtEpochMs = 10,
-        closedAtEpochMs = closedAtEpochMs,
-        status = status,
-        closeReason = closeReason,
-        presetId = InferencePresetId("quality"),
-        presetVersion = 3,
-        useCaseRevision = 4,
-        bindingRevision = 7,
-    )
+    private fun record(status: SessionRunStatus, closedAtEpochMs: Long?, closeReason: SessionCloseReason?): InferenceSessionRecord =
+        InferenceSessionRecord(
+            sessionId = SessionId("session-1"),
+            applicationId = ApplicationId("redactguard"),
+            useCaseId = UseCaseId("document-pii-detection"),
+            modelDigest = ModelDigest("a".repeat(64)),
+            sessionKind = SessionKind.STATELESS,
+            createdAtEpochMs = 10,
+            closedAtEpochMs = closedAtEpochMs,
+            status = status,
+            closeReason = closeReason,
+            presetId = InferencePresetId("quality"),
+            presetVersion = 3,
+            useCaseRevision = 4,
+            bindingRevision = 7,
+        )
 }
