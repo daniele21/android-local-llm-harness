@@ -5,7 +5,7 @@ Document type: adr-index
 Owner: repository
 Canonical scope: architecture.decisions
 Read when: a change may alter a durable architectural constraint or supersede an accepted decision
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-18
 
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
@@ -25,6 +25,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0012-shared-runtime-same-signer-binder-boundary.md`](0012-shared-runtime-same-signer-binder-boundary.md) — same-signer, bound-service trust, lifecycle, protocol, model-authority and diagnostics boundary for shared runtime v1
 - [`0013-public-consumer-capability-boundary.md`](0013-public-consumer-capability-boundary.md) — host-owned model authority, capability discovery, policy-scoped selection and deterministic prepared execution for public consumers
 - [`0014-backend-spi-boundary.md`](0014-backend-spi-boundary.md) — backend-neutral SPI ownership, runtime dependency inversion and store-neutral model-loading boundary
+- [`0015-harness-managed-control-plane.md`](0015-harness-managed-control-plane.md) — Harness-owned persistent applications/use cases/presets/bindings, activation-residency leases, unified cross-app telemetry and decision/notification ownership
 
 ## Status values
 
