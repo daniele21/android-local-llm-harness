@@ -30,7 +30,7 @@ class ActivationResidencyInferenceBackend(
         if (activationResidency.protects(model.digest)) {
             throw BackendException(
                 code = MODEL_PROTECTED_CODE,
-                message = "Model ${model.digest.value} is protected by an active use-case activation",
+                message = "Model ${model.digest.sha256} is protected by an active use-case activation",
             )
         }
         delegate.unloadModel(model)
