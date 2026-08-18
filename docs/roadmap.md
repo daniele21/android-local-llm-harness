@@ -21,14 +21,15 @@ The repository remains not production-ready until representative physical-device
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
 | Dataset-based model evaluation | In progress | Dataset packs, deterministic evaluators, execution, persistence/comparison UI and physical-device evidence |
 | Curated model distribution and installation | Implemented / device evidence pending | Real remote download/install validation on representative phones |
-| Qwen3.5-only product transition | Planned | Non-destructive support migration, compatibility, tuning, validation and certification |
+| Qwen3.5-only product transition | In progress / certification pending | Q35-6 physical tuning, Q35-7 validation and Q35-8 exact-artifact certification |
 | Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
-| Model RAM residency and warm-idle eviction | Planned | Product controls, TTL implementation and tests |
-| Reference-grade architecture hardening | Planned | Enforced backend/lifecycle/failure/scheduling boundaries, conformance tests and cumulative device evidence |
+| Model RAM residency and memory governance | Implemented / device calibration pending | MEM-7 measured profiles, MEM-8 certification and remaining product-facing controls |
+| Reference-grade architecture hardening | In progress | RA-2/4/5/6/7/8/9/10/11 completion and cumulative certification |
+| Public Consumer API and OMBRA reference consumer | In progress | OMB-6B identity plus OMB-8 quality, physical-device and release evidence |
 | Native Android SDK integration | Planned | Stable consumer adapter over the embedded contracts |
 | Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
 | Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
-| Shared Binder/AIDL runtime | Future | Central model/runtime coordination after embedded evidence |
+| Shared Binder/AIDL runtime | Implemented / physical evidence pending | SR-6 signer, process-death/reconnect and Binder-vs-in-process release evidence |
 
 ## Priority order across active plans
 
@@ -75,10 +76,10 @@ Implemented:
 
 Remaining:
 
-- enforce the Qwen3.5-only product envelope while preserving model-family-neutral lifecycle contracts;
+- complete Q35-6/7/8 tuning, validation and certification while preserving model-family-neutral lifecycle contracts;
 - explicit product-facing RAM load/unload controls;
-- monotonic warm-idle TTL with cancellation, rearming, pinning and unload reasons;
 - representative physical-device validation of cancellation, memory stability, latency, throughput and thermal behavior;
+- promote measured memory/runtime profiles only from exact compatible evidence;
 - performance policy selection based on device evidence rather than desktop assumptions;
 - execute the bounded llama.cpp efficiency/hardware workstream without reopening validated Qwen3.5 behavior from generic API availability alone.
 
@@ -111,11 +112,12 @@ Implemented:
 - durable path-free installed metadata;
 - connected download, install, import, selection, verification and protected removal;
 - unified catalog/import/selection/runtime inventory;
-- model details and deterministic ownership recovery.
+- model details and deterministic ownership recovery;
+- closed product catalog restricted to reviewed Qwen3.5 dense 0.8B/2B artifacts without deleting legacy installed bytes.
 
 Remaining:
 
-- migrate current multi-family eligibility and bindings to Qwen3.5 dense 0.8B/2B without deleting legacy installed artifacts;
+- complete Qwen3.5 candidate tuning, validation and exact-artifact certification;
 - representative physical-device remote download and installation evidence;
 - `lastUsedAt` and final restart/reconciliation UI coverage;
 - product RAM-residency actions separate from selection and storage;
@@ -185,31 +187,31 @@ Planned sequence:
 
 These integrations must not duplicate runtime policy or create a second model store.
 
-## 7. Shared runtime and control plane
+## 7. Shared runtime, Consumer API and control plane
 
-Future work after the embedded path is release-ready:
+Integrated repository-side capabilities include the Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, packaged Consumer API boundaries and the OMBRA reference consumer flow. These capabilities remain evidence-gated rather than production-ready.
 
-- signature-protected diagnostics bridge;
-- stable serializable transport contracts;
-- Binder/AIDL runtime service;
-- centralized model-file deduplication and memory coordination;
-- explicit application authorization and lifecycle ownership;
-- migration path from in-process transport without changing model-binding semantics.
+Remaining:
 
-The shared service is not part of Harness 0.5.0.
+- SR-6 physical same-signer/invalid-signer, process-death/reconnect and Binder-vs-in-process overhead evidence;
+- OMB-6B approved identity/launcher closure;
+- OMB-8 exact-model quality execution, physical two-APK document workflow and release evidence;
+- signature-protected cross-application diagnostics only when its separate read/control contract is justified;
+- release/version/signing documentation against the exact distributed build.
 
-The progressive-disclosure target, architecture, milestone order and focused workstreams are defined in [`shared-runtime/README.md`](shared-runtime/README.md). That plan does not remove the embedded physical-evidence gate or make the service application-consumable today.
+Canonical sequencing remains in [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md). The shared runtime and Consumer API must not duplicate model, scheduler, retry or memory policy from runtime core.
 
 ## 8. Reference-grade architecture hardening
 
-Planned cross-cutting work makes existing architecture intent executable and independently testable without replacing capability-specific owners.
+Cross-cutting work makes existing architecture intent executable and independently testable without replacing capability-specific owners.
 
 Remaining outcomes:
 
-- enforce dependency direction and normal native translation-unit linkage, then isolate a minimal backend SPI with deterministic fake coverage;
-- converge runtime state ownership, lifecycle transitions, failure/recovery and bounded scheduler/backpressure semantics;
+- continue state-preserving runtime decomposition only where closed lifecycle owners remain intact;
+- complete typed failure/recovery and deterministic fault/race injection;
+- finish fairness, cancellation-latency and slow/dead-consumer backpressure semantics;
 - standardize correlation, reproducible execution identity and evidence-driven device policy while reusing existing observability, ModelStore and memory owners;
-- harden shared-runtime ownership/death semantics, backend conformance and security/build provenance;
+- finish backend conformance, shared-runtime physical ownership evidence and supply-chain/provenance hardening;
 - certify the cumulative architecture with automated and representative physical-device evidence.
 
 Detailed milestone IDs, dependencies, parallel lanes and exit gates are owned by [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md); concise state belongs in [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md). Existing RAM-residency work remains separate and integrates through the lifecycle/scheduler/resource seams defined there.
