@@ -37,16 +37,11 @@ sealed interface ActivationResidencyResult<out T> {
  * rejected while another digest is protected, normal unload can query protection explicitly, and
  * the final release returns the resolved warm-retention duration that must start after demand ends.
  */
-class ActivationResidencyCoordinator(
-    private val leases: UseCaseActivationLeaseRegistry,
-) {
+class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseRegistry) {
     private val warmRetentionByActivation = LinkedHashMap<UseCaseActivationId, Long>()
 
     @Synchronized
-    fun acquire(
-        request: UseCaseActivationRequest,
-        retainModelWarmMs: Long,
-    ): ActivationResidencyResult<UseCaseActivationLease> {
+    fun acquire(request: UseCaseActivationRequest, retainModelWarmMs: Long): ActivationResidencyResult<UseCaseActivationLease> {
         require(retainModelWarmMs >= 0) { "Model warm-retention duration must not be negative" }
         val active = leases.activeLeases()
         val protectedDigest = active.firstOrNull()?.modelDigest
@@ -75,32 +70,30 @@ class ActivationResidencyCoordinator(
     }
 
     @Synchronized
-    fun release(
-        activationId: UseCaseActivationId,
-        ownerId: ActivationOwnerId,
-    ): ActivationResidencyResult<ActivationResidencyRelease> = when (val released = leases.release(activationId, ownerId)) {
-        is ActivationLeaseResult.Failure -> ActivationResidencyResult.Failure(
-            reason = ActivationResidencyFailure.LEASE_REJECTED,
-            leaseFailure = released.reason,
-        )
-
-        is ActivationLeaseResult.Success -> {
-            val lease = released.value
-            val retention = warmRetentionByActivation.remove(lease.activationId) ?: 0L
-            val warmRetention = if (leases.activeForModel(lease.modelDigest).isEmpty()) {
-                mapOf(lease.modelDigest to retention)
-            } else {
-                emptyMap()
-            }
-            ActivationResidencyResult.Success(
-                ActivationResidencyRelease(
-                    releasedLeases = listOf(lease),
-                    remainingLeaseCount = leases.activeCount,
-                    warmRetentionByModelMs = warmRetention,
-                ),
+    fun release(activationId: UseCaseActivationId, ownerId: ActivationOwnerId): ActivationResidencyResult<ActivationResidencyRelease> =
+        when (val released = leases.release(activationId, ownerId)) {
+            is ActivationLeaseResult.Failure -> ActivationResidencyResult.Failure(
+                reason = ActivationResidencyFailure.LEASE_REJECTED,
+                leaseFailure = released.reason,
             )
+
+            is ActivationLeaseResult.Success -> {
+                val lease = released.value
+                val retention = warmRetentionByActivation.remove(lease.activationId) ?: 0L
+                val warmRetention = if (leases.activeForModel(lease.modelDigest).isEmpty()) {
+                    mapOf(lease.modelDigest to retention)
+                } else {
+                    emptyMap()
+                }
+                ActivationResidencyResult.Success(
+                    ActivationResidencyRelease(
+                        releasedLeases = listOf(lease),
+                        remainingLeaseCount = leases.activeCount,
+                        warmRetentionByModelMs = warmRetention,
+                    ),
+                )
+            }
         }
-    }
 
     @Synchronized
     fun releaseAll(ownerId: ActivationOwnerId): ActivationResidencyRelease {
@@ -108,16 +101,16 @@ class ActivationResidencyCoordinator(
         val releasedPolicies = released.associateWith { lease ->
             warmRetentionByActivation.remove(lease.activationId) ?: 0L
         }
-        val warmRetention = released
-            .groupBy(UseCaseActivationLease::modelDigest)
-            .mapNotNull { (digest, modelLeases) ->
-                if (leases.activeForModel(digest).isNotEmpty()) {
-                    null
-                } else {
-                    digest to modelLeases.maxOf { releasedPolicies.getValue(it) }
-                }
-            }
-            .toMap()
+        val warmRetention =
+            released
+                .groupBy(UseCaseActivationLease::modelDigest)
+                .mapNotNull { (digest, modelLeases) ->
+                    if (leases.activeForModel(digest).isNotEmpty()) {
+                        null
+                    } else {
+                        digest to modelLeases.maxOf { releasedPolicies.getValue(it) }
+                    }
+                }.toMap()
         return ActivationResidencyRelease(
             releasedLeases = released,
             remainingLeaseCount = leases.activeCount,
