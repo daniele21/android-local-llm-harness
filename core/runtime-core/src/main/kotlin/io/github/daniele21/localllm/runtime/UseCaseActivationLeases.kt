@@ -112,10 +112,7 @@ class UseCaseActivationLeaseRegistry(
     fun find(activationId: UseCaseActivationId): UseCaseActivationLease? = leases[activationId]
 
     @Synchronized
-    fun release(
-        activationId: UseCaseActivationId,
-        ownerId: ActivationOwnerId,
-    ): ActivationLeaseResult<UseCaseActivationLease> {
+    fun release(activationId: UseCaseActivationId, ownerId: ActivationOwnerId): ActivationLeaseResult<UseCaseActivationLease> {
         val lease = leases[activationId]
             ?: return ActivationLeaseResult.Failure(ActivationLeaseFailure.NOT_FOUND)
         if (lease.ownerId != ownerId) {
@@ -133,16 +130,14 @@ class UseCaseActivationLeaseRegistry(
     }
 
     @Synchronized
-    fun activeForOwner(ownerId: ActivationOwnerId): List<UseCaseActivationLease> =
-        leases.values.filter { it.ownerId == ownerId }
+    fun activeForOwner(ownerId: ActivationOwnerId): List<UseCaseActivationLease> = leases.values.filter { it.ownerId == ownerId }
 
     @Synchronized
     fun activeForApplication(applicationId: ApplicationId): List<UseCaseActivationLease> =
         leases.values.filter { it.applicationId == applicationId }
 
     @Synchronized
-    fun activeForModel(modelDigest: ModelDigest): List<UseCaseActivationLease> =
-        leases.values.filter { it.modelDigest == modelDigest }
+    fun activeForModel(modelDigest: ModelDigest): List<UseCaseActivationLease> = leases.values.filter { it.modelDigest == modelDigest }
 
     companion object {
         const val DEFAULT_MAX_ACTIVE_LEASES = 32
