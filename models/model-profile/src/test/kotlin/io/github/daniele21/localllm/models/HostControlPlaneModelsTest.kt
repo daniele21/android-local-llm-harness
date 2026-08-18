@@ -134,33 +134,29 @@ class HostControlPlaneModelsTest {
         revision = 2,
     )
 
-    private fun preset(
-        id: String,
-        revision: Int,
-        source: PresetCreationSource,
-        state: PresetLifecycleState,
-    ): UseCasePresetDefinition = UseCasePresetDefinition(
-        useCaseId = USE_CASE_ID,
-        metadata = PresetConsumerMetadata(
-            presetId = id,
-            revision = revision,
-            displayName = id.replaceFirstChar { it.uppercase() },
-            description = "Preset $id",
-        ),
-        creationSource = source,
-        state = state,
-        execution = PresetExecutionPolicy(
-            modelProfileId = "qwen35-2b-q4",
-            inferencePreset = InferencePresetRef(InferencePresetId("$id-generation"), revision),
-            contextTokens = 4096,
-            cachePolicy = UseCaseCachePolicy(
-                retainModelWarmMs = 60_000,
-                reuseStatelessContext = false,
-                enablePrefixSnapshot = false,
-                enableDeterministicResultCache = false,
+    private fun preset(id: String, revision: Int, source: PresetCreationSource, state: PresetLifecycleState): UseCasePresetDefinition =
+        UseCasePresetDefinition(
+            useCaseId = USE_CASE_ID,
+            metadata = PresetConsumerMetadata(
+                presetId = id,
+                revision = revision,
+                displayName = id.replaceFirstChar { it.uppercase() },
+                description = "Preset $id",
             ),
-        ),
-    )
+            creationSource = source,
+            state = state,
+            execution = PresetExecutionPolicy(
+                modelProfileId = "qwen35-2b-q4",
+                inferencePreset = InferencePresetRef(InferencePresetId("$id-generation"), revision),
+                contextTokens = 4096,
+                cachePolicy = UseCaseCachePolicy(
+                    retainModelWarmMs = 60_000,
+                    reuseStatelessContext = false,
+                    enablePrefixSnapshot = false,
+                    enableDeterministicResultCache = false,
+                ),
+            ),
+        )
 
     private companion object {
         val APP_ID = ApplicationId("example-consumer")
