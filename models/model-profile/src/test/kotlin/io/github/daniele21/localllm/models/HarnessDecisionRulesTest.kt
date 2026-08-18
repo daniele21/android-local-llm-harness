@@ -189,8 +189,7 @@ private class RecordingDecisionRepository : HarnessDecisionRepository {
         events[event.decisionId] = event
     }
 
-    override fun unresolved(limit: Int): List<HarnessDecisionEvent> =
-        events.values.filterNot(HarnessDecisionEvent::isResolved).take(limit)
+    override fun unresolved(limit: Int): List<HarnessDecisionEvent> = events.values.filterNot(HarnessDecisionEvent::isResolved).take(limit)
 
     override fun recent(limit: Int): List<HarnessDecisionEvent> =
         events.values.sortedByDescending(HarnessDecisionEvent::createdAtEpochMs).take(limit)
