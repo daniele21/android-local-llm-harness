@@ -63,6 +63,12 @@ enum class SessionCloseReason {
     CANCELLED,
 }
 
+data class SessionTelemetryRetentionPolicy(val maxSessions: Int = 500) {
+    init {
+        require(maxSessions > 0) { "maxSessions must be positive" }
+    }
+}
+
 interface SessionTelemetryRepository {
     fun recordSession(session: InferenceSessionRecord)
 
