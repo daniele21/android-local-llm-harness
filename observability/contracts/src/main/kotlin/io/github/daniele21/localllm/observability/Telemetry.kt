@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -52,7 +53,15 @@ data class GenerationRunRecord(
     val stopReason: StopReason? = null,
     val promptPlanningMs: Long? = null,
     val contextCreationMs: Long? = null,
-)
+    val sessionId: SessionId? = null,
+    val useCaseRevision: Int? = null,
+    val bindingRevision: Int? = null,
+) {
+    init {
+        require(useCaseRevision == null || useCaseRevision > 0) { "Use-case revision must be positive" }
+        require(bindingRevision == null || bindingRevision > 0) { "Binding revision must be positive" }
+    }
+}
 
 enum class RunStatus {
     QUEUED,
