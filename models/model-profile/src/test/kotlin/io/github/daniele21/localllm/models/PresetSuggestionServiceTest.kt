@@ -90,7 +90,7 @@ class PresetSuggestionServiceTest {
             installedProfiles = listOf(profile("large", sizeBytes = 900, contextSize = 16_384)),
             runtimeCapabilities = PresetSuggestionRuntimeCapabilities(
                 supportedOutputModes = setOf(OutputMode.TEXT),
-                supportedSessionKinds = setOf(SessionKind.STATEFUL),
+                supportedSessionKinds = setOf(SessionKind.CONVERSATIONAL),
                 reasoningSupported = false,
                 maximumContextTokens = 4_096,
             ),
@@ -135,7 +135,7 @@ class PresetSuggestionServiceTest {
     private fun profile(id: String, sizeBytes: Long, contextSize: Int): GgufModelProfile = GgufModelProfile(
         id = id,
         artifact = GgufArtifact(
-            digest = ModelDigest(id.padEnd(64, 'a').take(64)),
+            digest = ModelDigest("a".repeat(64)),
             fileName = "$id.gguf",
             sizeBytes = sizeBytes,
             architecture = "qwen2",
