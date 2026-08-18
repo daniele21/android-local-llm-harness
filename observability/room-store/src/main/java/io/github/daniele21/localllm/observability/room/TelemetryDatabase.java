@@ -17,4 +17,6 @@ import androidx.room.RoomDatabase;
         exportSchema = true)
 public abstract class TelemetryDatabase extends RoomDatabase {
     public abstract TelemetryDao telemetryDao();
+
+    public abstract SessionTelemetryDao sessionTelemetryDao();
 }
