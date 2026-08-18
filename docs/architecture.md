@@ -5,7 +5,7 @@ Document type: architecture
 Owner: repository
 Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-18
 
 ![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, runtime and model boundaries, observability, and future shared host](assets/architecture.png)
 
@@ -40,6 +40,8 @@ Native app / Capacitor plugin
 The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change. The future deployment and workstream routing are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
 
 Runtime orchestration depends on `core:backend-spi` for backend-neutral execution operations and on `observability/contracts` for telemetry. It does not depend on a concrete inference backend. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+
+The Harness Host Control Plane follows the same isolation rule: platform-neutral application/use-case/preset/binding contracts live in `models/model-profile`, while durable Android persistence lives in `models/control-plane-room-store`. Runtime/model-loading code consumes resolved control-plane identity through contracts and does not depend directly on Room.
 
 The backend SPI is store-neutral. Runtime/model-store code resolves and verifies an installed artifact, then adapts it to `BackendModelSource` immediately before loading. Backend implementations do not own installation, integrity policy or model selection. This dependency boundary is recorded in [ADR 0014](adr/0014-backend-spi-boundary.md).
 
@@ -99,6 +101,8 @@ The `local-llm-console` application is the initial developer control plane. It w
 - sanity and health suites;
 - benchmark history;
 - privacy-safe diagnostic export.
+
+Harness-managed application/use-case configuration has one durable persistence boundary. `models/model-profile` owns the neutral domain and `HostControlPlaneStore` contract; `models/control-plane-room-store` owns the Android Room adapter for registered applications, revisioned use cases, revisioned presets, revisioned bindings and exact preset exposure. Configuration replacement is transactional, and persisted preset execution policy includes the configured cache/residency settings without moving runtime resource ownership into the store.
 
 During the embedded phase, apps will expose a signature-protected diagnostics bridge. In the shared phase, the console will query the central host directly.
 
@@ -200,6 +204,16 @@ apps / integrations / composition roots
  llama.cpp Kotlin bridge / JNI / C++
 ```
 
+Control-plane persistence is a one-way Android adapter dependency:
+
+```text
+models/control-plane-room-store
+        |
+models/model-profile
+        |
+core/contracts
+```
+
 Runtime core depends inward on the backend SPI. Concrete backends depend on the SPI and are selected only by composition roots; runtime core does not depend outward on them. Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
 
 The main ownership boundaries are:
@@ -218,7 +232,12 @@ core/runtime-core
     recovery policy and telemetry emission
 
 models/model-profile
-    model, use-case and application binding configuration
+    model, use-case and application binding configuration plus the
+    platform-neutral Host Control Plane store contract
+
+models/control-plane-room-store
+    Android Room persistence for Harness applications, revisioned use cases,
+    revisioned presets, revisioned bindings and exact preset exposure
 
 models/model-store
     artifact storage, identity and integrity
