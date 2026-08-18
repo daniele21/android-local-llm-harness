@@ -96,7 +96,12 @@ class PublishedPresetDiscoveryTest {
             modelProfileId = modelId,
             inferencePreset = InferencePresetRef(InferencePresetId("$id-generation"), revision),
             contextTokens = 4_096,
-            cachePolicy = UseCaseCachePolicy(),
+            cachePolicy = UseCaseCachePolicy(
+                retainModelWarmMs = 0,
+                reuseStatelessContext = false,
+                enablePrefixSnapshot = false,
+                enableDeterministicResultCache = false,
+            ),
         ),
     )
 
