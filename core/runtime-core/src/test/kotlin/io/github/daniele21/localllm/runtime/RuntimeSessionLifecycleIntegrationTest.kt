@@ -243,12 +243,22 @@ private class RuntimeSessionLifecycleFixture(backend: InferenceBackend) {
             },
         )
         check(terminal.await(2, TimeUnit.SECONDS)) { "Generation did not reach a terminal event" }
+        check(waitUntilRuntimeDrained()) { "Generation terminal event was emitted before runtime lifecycle drained" }
         return checkNotNull(terminalEvent)
     }
 
     fun close() {
         runtime.close()
         modelFile.delete()
+    }
+
+    private fun waitUntilRuntimeDrained(timeoutMs: Long = 2_000): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
+        while (System.nanoTime() < deadline) {
+            if (runtime.runtimeSnapshot().state != io.github.daniele21.localllm.contracts.RuntimeState.GENERATING) return true
+            Thread.sleep(10)
+        }
+        return runtime.runtimeSnapshot().state != io.github.daniele21.localllm.contracts.RuntimeState.GENERATING
     }
 
     private fun resolvedUseCase(): ResolvedUseCase {
