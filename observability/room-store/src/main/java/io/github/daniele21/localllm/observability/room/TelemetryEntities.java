@@ -14,7 +14,8 @@ public final class TelemetryEntities {
             tableName = "generation_runs",
             indices = {
                 @Index(value = {"started_at_epoch_ms"}),
-                @Index(value = {"application_id", "use_case_id"})
+                @Index(value = {"application_id", "use_case_id"}),
+                @Index(value = {"session_id"})
             })
     public static final class GenerationRunEntity {
         @PrimaryKey
@@ -109,7 +110,69 @@ public final class TelemetryEntities {
         @Nullable @ColumnInfo(name = "stop_reason") public String stopReason;
         @Nullable @ColumnInfo(name = "prompt_planning_ms") public Long promptPlanningMs;
         @Nullable @ColumnInfo(name = "context_creation_ms") public Long contextCreationMs;
+        @Nullable @ColumnInfo(name = "session_id") public String sessionId;
+        @Nullable @ColumnInfo(name = "use_case_revision") public Integer useCaseRevision;
+        @Nullable @ColumnInfo(name = "binding_revision") public Integer bindingRevision;
+    }
 
+    @Entity(
+            tableName = "inference_sessions",
+            indices = {
+                @Index(value = {"created_at_epoch_ms"}),
+                @Index(value = {"application_id", "use_case_id"}),
+                @Index(value = {"model_digest"})
+            })
+    public static final class InferenceSessionEntity {
+        @PrimaryKey
+        @NonNull
+        @ColumnInfo(name = "session_id")
+        public String sessionId = "";
+
+        @NonNull
+        @ColumnInfo(name = "application_id")
+        public String applicationId = "";
+
+        @NonNull
+        @ColumnInfo(name = "use_case_id")
+        public String useCaseId = "";
+
+        @NonNull
+        @ColumnInfo(name = "model_digest")
+        public String modelDigest = "";
+
+        @NonNull
+        @ColumnInfo(name = "session_kind")
+        public String sessionKind = "";
+
+        @ColumnInfo(name = "created_at_epoch_ms")
+        public long createdAtEpochMs;
+
+        @Nullable
+        @ColumnInfo(name = "closed_at_epoch_ms")
+        public Long closedAtEpochMs;
+
+        @NonNull
+        public String status = "";
+
+        @Nullable
+        @ColumnInfo(name = "close_reason")
+        public String closeReason;
+
+        @Nullable
+        @ColumnInfo(name = "preset_id")
+        public String presetId;
+
+        @Nullable
+        @ColumnInfo(name = "preset_version")
+        public Integer presetVersion;
+
+        @Nullable
+        @ColumnInfo(name = "use_case_revision")
+        public Integer useCaseRevision;
+
+        @Nullable
+        @ColumnInfo(name = "binding_revision")
+        public Integer bindingRevision;
     }
 
     @Entity(
