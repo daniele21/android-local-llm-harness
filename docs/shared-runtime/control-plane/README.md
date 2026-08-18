@@ -65,12 +65,18 @@ Harness runtime + observability
 | Android notifications and deep links | `apps/local-llm-phone-test` adapter/UI |
 | Consumer preset selector | consumer application, using only host-published metadata |
 
-## Documents
+## Read only the active lane
 
-- [`roadmap.md`](roadmap.md) — implementation order, dependencies, parallel lanes and exit gates.
-- [`../../adr/0015-harness-managed-control-plane.md`](../../adr/0015-harness-managed-control-plane.md) — durable ownership and lifecycle decision.
-- [`../consumer-api/README.md`](../consumer-api/README.md) — existing public consumer boundary that this workstream extends without exposing exact model identity.
-- [`../roadmap.md`](../roadmap.md) — shared-runtime release/evidence gates.
+| Need | Read |
+| --- | --- |
+| Implementation order, states and cross-lane dependencies | [`roadmap.md`](roadmap.md) |
+| Applications, use cases, suggested/custom presets, bindings, persistence, resolver and admin UI | [`workstreams/configuration.md`](workstreams/configuration.md) |
+| Decisions, dedupe, system notifications and Decision Center | [`workstreams/decisions.md`](workstreams/decisions.md) |
+| Session/run telemetry, Room history, runtime instrumentation and Sessions UI | [`workstreams/observability.md`](workstreams/observability.md) |
+| Activation/residency, consumer discovery/Binder evolution and final cutover | [`workstreams/activation-consumer.md`](workstreams/activation-consumer.md) |
+| Durable ownership decision | [`../../adr/0015-harness-managed-control-plane.md`](../../adr/0015-harness-managed-control-plane.md) |
+| Existing public consumer boundary | [`../consumer-api/README.md`](../consumer-api/README.md) |
+| Shared-runtime release/evidence gates | [`../roadmap.md`](../roadmap.md) |
 
 ## Cross-repository consumer work
 
