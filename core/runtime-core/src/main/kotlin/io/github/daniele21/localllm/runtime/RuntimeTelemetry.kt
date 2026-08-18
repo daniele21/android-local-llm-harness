@@ -40,6 +40,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             decodeTokensPerSecond = null,
             errorCode = null,
             modelLoadKind = ModelLoadKind.UNKNOWN,
+            sessionId = request.sessionId,
         )
         activeRuns[request.requestId] = run
         persist(run)
@@ -50,6 +51,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             fields = mapOf(
                 "applicationId" to request.applicationId.value,
                 "useCaseId" to request.useCaseId.value,
+                "sessionId" to request.sessionId.value,
                 "modelDigest" to modelDigest.sha256,
             ),
         )
