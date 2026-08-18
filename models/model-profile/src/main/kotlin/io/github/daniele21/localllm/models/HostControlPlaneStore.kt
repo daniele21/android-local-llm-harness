@@ -80,12 +80,14 @@ data class HostControlPlaneState(
         require(exposures.all { exposure -> bindingKeys.containsKey(exposure.bindingId to exposure.bindingRevision) }) {
             "Every exposure must reference an existing binding revision"
         }
-        require(exposures.all { exposure ->
-            val binding = bindingKeys.getValue(exposure.bindingId to exposure.bindingRevision)
-            presetKeys[
-                Triple(binding.useCaseId, exposure.presetId, exposure.presetRevision)
-            ]?.isConsumerVisible == true
-        }) {
+        require(
+            exposures.all { exposure ->
+                val binding = bindingKeys.getValue(exposure.bindingId to exposure.bindingRevision)
+                presetKeys[
+                    Triple(binding.useCaseId, exposure.presetId, exposure.presetRevision),
+                ]?.isConsumerVisible == true
+            },
+        ) {
             "Every exposure must reference a published preset revision for the binding use case"
         }
         require(
@@ -121,17 +123,15 @@ data class HostControlPlaneState(
     fun latestUseCase(useCaseId: UseCaseId): UseCaseDefinition? =
         useCases.filter { it.useCaseId == useCaseId }.maxByOrNull(UseCaseDefinition::revision)
 
-    fun latestBinding(applicationId: ApplicationId, useCaseId: UseCaseId): ApplicationUseCaseBinding? =
-        bindings
-            .filter { it.applicationId == applicationId && it.useCaseId == useCaseId }
-            .maxByOrNull(ApplicationUseCaseBinding::revision)
+    fun latestBinding(applicationId: ApplicationId, useCaseId: UseCaseId): ApplicationUseCaseBinding? = bindings
+        .filter { it.applicationId == applicationId && it.useCaseId == useCaseId }
+        .maxByOrNull(ApplicationUseCaseBinding::revision)
 
-    fun preset(useCaseId: UseCaseId, presetId: String, revision: Int): UseCasePresetDefinition? =
-        presets.firstOrNull {
-            it.useCaseId == useCaseId &&
-                it.metadata.presetId == presetId &&
-                it.metadata.revision == revision
-        }
+    fun preset(useCaseId: UseCaseId, presetId: String, revision: Int): UseCasePresetDefinition? = presets.firstOrNull {
+        it.useCaseId == useCaseId &&
+            it.metadata.presetId == presetId &&
+            it.metadata.revision == revision
+    }
 
     companion object {
         const val MAX_APPLICATIONS = 128
