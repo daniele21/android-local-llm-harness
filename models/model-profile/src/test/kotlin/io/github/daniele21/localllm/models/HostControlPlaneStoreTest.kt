@@ -150,32 +150,30 @@ class HostControlPlaneStoreTest {
         revision = revision,
     )
 
-    private fun binding(id: String, revision: Int, applicationId: String): ApplicationUseCaseBinding =
-        ApplicationUseCaseBinding(
-            bindingId = id,
-            applicationId = ApplicationId(applicationId),
-            useCaseId = USE_CASE_ID,
-            revision = revision,
-        )
+    private fun binding(id: String, revision: Int, applicationId: String): ApplicationUseCaseBinding = ApplicationUseCaseBinding(
+        bindingId = id,
+        applicationId = ApplicationId(applicationId),
+        useCaseId = USE_CASE_ID,
+        revision = revision,
+    )
 
-    private fun preset(id: String, revision: Int, state: PresetLifecycleState): UseCasePresetDefinition =
-        UseCasePresetDefinition(
-            useCaseId = USE_CASE_ID,
-            metadata = PresetConsumerMetadata(id, revision, id, "Preset $id"),
-            creationSource = PresetCreationSource.CUSTOM,
-            state = state,
-            execution = PresetExecutionPolicy(
-                modelProfileId = "qwen35-2b-q4",
-                inferencePreset = InferencePresetRef(InferencePresetId("$id-generation"), revision),
-                contextTokens = 4_096,
-                cachePolicy = UseCaseCachePolicy(
-                    retainModelWarmMs = 60_000,
-                    reuseStatelessContext = false,
-                    enablePrefixSnapshot = false,
-                    enableDeterministicResultCache = false,
-                ),
+    private fun preset(id: String, revision: Int, state: PresetLifecycleState): UseCasePresetDefinition = UseCasePresetDefinition(
+        useCaseId = USE_CASE_ID,
+        metadata = PresetConsumerMetadata(id, revision, id, "Preset $id"),
+        creationSource = PresetCreationSource.CUSTOM,
+        state = state,
+        execution = PresetExecutionPolicy(
+            modelProfileId = "qwen35-2b-q4",
+            inferencePreset = InferencePresetRef(InferencePresetId("$id-generation"), revision),
+            contextTokens = 4_096,
+            cachePolicy = UseCaseCachePolicy(
+                retainModelWarmMs = 60_000,
+                reuseStatelessContext = false,
+                enablePrefixSnapshot = false,
+                enableDeterministicResultCache = false,
             ),
-        )
+        ),
+    )
 
     private companion object {
         val USE_CASE_ID = UseCaseId("document-pii-detection")
