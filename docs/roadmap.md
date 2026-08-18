@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-19
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
@@ -17,6 +17,7 @@ The repository remains not production-ready until representative physical-device
 | --- | --- | --- |
 | Repository foundation and protected integration | Implemented | Confirm the repository-level `dev` ruleset before release |
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
+| llama.cpp runtime efficiency and hardware execution | Planned / baseline-first | Qualify upstream evolution, improve CPU efficiency, then evaluate measured accelerator lanes |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
 | Dataset-based model evaluation | In progress | Dataset packs, deterministic evaluators, execution, persistence/comparison UI and physical-device evidence |
 | Curated model distribution and installation | Implemented / device evidence pending | Real remote download/install validation on representative phones |
@@ -28,6 +29,15 @@ The repository remains not production-ready until representative physical-device
 | Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
 | Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
 | Shared Binder/AIDL runtime | Future | Central model/runtime coordination after embedded evidence |
+
+## Priority order across active plans
+
+- **P0 — current release/evidence lane:** OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and the Harness 0.5 release gates remain ahead of non-critical runtime optimization. A new llama.cpp pin or optimization may preempt this lane only for a correctness or security blocker.
+- **P1 — safe parallel hardening:** upstream qualification, backend capability/effective-plan telemetry, prompt-token reuse and bounded CPU-side measurements may proceed when ownership is disjoint. Reference-architecture RA-4/5/7/9/10 and model-evaluation work remain parallel owners rather than being duplicated here.
+- **P2 — post-CPU-evidence execution expansion:** Adreno OpenCL, OpenCL kernel caching, K/V cache type experiments, evaluation-only multi-sequence execution and deterministic device-plan evolution begin only after the CPU baseline is evidence-stable or on an explicitly non-release experimental lane.
+- **P3 — research:** Hexagon/HTP and broader heterogeneous execution remain deferred until CPU/OpenCL ownership, packaging and evidence are understood.
+
+Detailed IDs, dependencies and acceptance rules for this new lane are owned by [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md).
 
 ## 1. Repository and release discipline
 
@@ -69,7 +79,24 @@ Remaining:
 - explicit product-facing RAM load/unload controls;
 - monotonic warm-idle TTL with cancellation, rearming, pinning and unload reasons;
 - representative physical-device validation of cancellation, memory stability, latency, throughput and thermal behavior;
-- performance policy selection based on device evidence rather than desktop assumptions.
+- performance policy selection based on device evidence rather than desktop assumptions;
+- execute the bounded llama.cpp efficiency/hardware workstream without reopening validated Qwen3.5 behavior from generic API availability alone.
+
+### llama.cpp efficiency and hardware execution
+
+The current pinned llama.cpp revision remains the Harness 0.5 CPU baseline unless a correctness/security blocker requires a controlled update. Newer upstream revisions may be qualified in parallel, but promotion is explicit because Qwen tuning, memory calibration, OMBRA quality evidence and release evidence are runtime-identity bound.
+
+The staged sequence is:
+
+1. qualify a candidate upstream revision and decide `PROMOTE` versus `DEFER` without floating dependencies;
+2. expose truthful backend/device/effective-plan facts and remove avoidable CPU overhead such as duplicate prompt tokenization;
+3. qualify recurrent/prefix/session reuse for Qwen3.5 as a correctness experiment while keeping production reuse disabled unless exact-backend evidence passes;
+4. extend CPU tuning only with bounded evidence-driven deltas rather than an unbounded Cartesian parameter matrix;
+5. after the CPU path is evidence-stable, evaluate Adreno OpenCL, its bounded compiled-kernel cache, K/V cache types and evaluation-only batching;
+6. evolve RA-8 toward deterministic measured execution plans; do not add uncontrolled online self-tuning;
+7. keep Hexagon/HTP research-only until the prior lanes are stable.
+
+Canonical target and task ledger: [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md).
 
 ## 3. Model management and distribution
 
@@ -117,7 +144,8 @@ Remaining:
 - richer resource and benchmark-history visualization where source data supports it;
 - complete unavailable/loading/error state tests;
 - physical-device evidence for real values and lifecycle behavior;
-- later signature-protected diagnostics bridge for cross-application inspection.
+- later signature-protected diagnostics bridge for cross-application inspection;
+- extend execution identity only with material backend/device/load/cache/reuse facts required by measured llama.cpp plans.
 
 Dataset-based semantic model evaluation is a separate active control-plane capability. EVAL-1 now provides deterministic contracts/identity while dataset, evaluator, runner, persistence and Performance UI lanes proceed independently under [`model-evaluation/README.md`](model-evaluation/README.md). The existing benchmark engine remains the owner of telemetry-derived runtime baselines and regression health.
 
@@ -186,11 +214,13 @@ Remaining outcomes:
 
 Detailed milestone IDs, dependencies, parallel lanes and exit gates are owned by [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md); concise state belongs in [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md). Existing RAM-residency work remains separate and integrates through the lifecycle/scheduler/resource seams defined there.
 
+The llama.cpp optimization workstream consumes RA-7/8/9/10 rather than creating parallel observability, device-policy, identity or conformance owners.
+
 ## 9. Deferred capabilities
 
 Deferred until the CPU embedded path and release evidence are stable:
 
-- production-default Vulkan/GPU offload;
+- production-default Vulkan/GPU offload; experimental Adreno OpenCL is separately staged under the llama.cpp optimization workstream and does not change this production-default gate;
 - simultaneous decodes;
 - speculative decoding;
 - multimodal models;
