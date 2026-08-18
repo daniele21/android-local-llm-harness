@@ -38,9 +38,9 @@ Repository operational priority remains owned by [`current-state.md`](current-st
 
 ### Release-baseline rule
 
-The current pinned llama.cpp revision remains the Harness 0.5 baseline unless a correctness/security blocker justifies a controlled pin change. LLRT-0 may qualify a newer upstream candidate in parallel, but promotion must be an explicit decision because Q35 tuning, memory calibration, OMBRA quality evidence and release evidence are backend/runtime-identity bound.
+The pinned revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3` remains the Harness 0.5 baseline. LLRT-0 qualified candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` and selected `DEFER`: adopting it would require an explicit model-load API migration and fresh affected evidence, so it is not promoted into the active release line.
 
-If the pin is promoted before a release claim, affected physical/performance/quality evidence is rerun on the promoted revision. If promotion is deferred, the current revision is frozen through the release and the candidate becomes post-release work.
+A future pin candidate is qualified by exact SHA. Promotion remains an explicit decision because Q35 tuning, memory calibration, OMBRA quality evidence and release evidence are backend/runtime-identity bound. If a later candidate is promoted before a release claim, affected physical/performance/quality evidence is rerun on the promoted revision.
 
 ## Target execution architecture
 
@@ -72,40 +72,46 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 
 | ID | Priority | State | Outcome | Depends on |
 | --- | --- | --- | --- | --- |
-| LLRT-0 | P1 | READY | Qualify a newer llama.cpp candidate against the pinned baseline and make an explicit promote-vs-defer decision | Current green `dev` |
-| LLRT-1 | P1 | PLANNED | Expose backend/device capabilities and requested/effective execution facts without leaking native handles | LLRT-0 decision; RA-7/RA-9 ownership |
-| LLRT-2 | P1 | PLANNED | Reuse the already-tokenized native prompt plan so generation does not tokenize the same rendered prompt twice | Existing prompt-planning boundary |
+| LLRT-0 | P1 | DONE | Exact-SHA qualification harness integrated; candidate `60addddf...` classified `DEFER` and Harness 0.5 pin remains `aedb2a5e...` | Current green `dev` |
+| LLRT-1 | P1 | PLANNED | Expose backend/device capabilities and requested/effective execution facts without leaking native handles | LLRT-0; RA-7/RA-9 ownership |
+| LLRT-2 | P1 | DONE | Consume the most recently prepared exact prompt tokens once so generation avoids duplicate tokenization while retaining the existing fallback | Existing prompt-planning boundary |
 | LLRT-3 | P1 | PLANNED | Add bounded CPU-side performance deltas for threads, batch threads, batch/ubatch and sustained thermal behavior without exploding the Q35 matrix | Frozen release pin; Q35-6 measurement owner |
 | LLRT-4 | P1/P2 | PLANNED | Prove or reject safe Qwen3.5 recurrent/prefix/session state reuse on an exact backend revision; keep production reuse disabled until proven | LLRT-0; backend conformance; Qwen3.5 state semantics |
-| LLRT-5 | P2 | PLANNED | Adopt newer load-mode semantics and tri-state Flash Attention only after the promoted pin exposes them and evidence shows a benefit | LLRT-0 promotion; LLRT-1 |
-| LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | LLRT-0 promotion; MEM evidence; Q35 validation |
+| LLRT-5 | P2 | PLANNED | Migrate newer load-mode semantics and tri-state Flash Attention on a post-0.5 candidate, preserving old load semantics before evaluating `AUTO` | Newer promoted pin; LLRT-1 |
+| LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | Newer promoted pin; MEM evidence; Q35 validation |
 | LLRT-7 | P2 | PLANNED | Package and discover Adreno OpenCL as an experimental backend without changing the CPU release default | CPU release evidence stable; LLRT-1 |
 | LLRT-8 | P2 | PLANNED | Integrate bounded OpenCL compiled-kernel cache ownership/cleanup for warm startup | LLRT-7 |
-| LLRT-9 | P2 | PLANNED | Add multi-sequence/batched execution only for evaluation throughput; production single-decode policy stays unchanged | EVAL runner maturity; LLRT-0 promotion; backend correctness proof |
+| LLRT-9 | P2 | PLANNED | Add multi-sequence/batched execution only for evaluation throughput; production single-decode policy stays unchanged | EVAL runner maturity; newer promoted pin; backend correctness proof |
 | LLRT-10 | P2 | PLANNED | Evolve RA-8 into a deterministic evidence-driven execution planner using reviewed measured profiles, not online self-tuning | RA-7/RA-8/RA-9; Q35/MEM measured evidence |
 | LLRT-11 | P2 | PLANNED | Extend benchmark/evidence identity with backend/device/load/cache/reuse facts required to compare execution plans safely | LLRT-1; RA-9 |
 | LLRT-12 | P3 | DEFERRED | Evaluate Hexagon/HTP as an experimental backend with explicit hardware/toolchain support boundaries | CPU/OpenCL evidence stable; LLRT-1 |
 
 ## LLRT-0 — upstream qualification gate
 
-A pin update is a compatibility change, not routine dependency refresh. Qualification must compare the current revision and one explicit candidate revision for:
+A pin update is a compatibility change, not routine dependency refresh. Qualification compares the current revision and one explicit candidate revision for host-native/Android build compatibility, JNI/API deltas, packaged libraries, Qwen3.5 execution behavior, memory/evidence identity and relevant Android/ARM backend changes.
 
-- host-native and Android build compatibility;
-- JNI/API deltas and deprecated/changed parameters;
-- packaged shared-library set and loader behavior;
-- Qwen3.5 0.8B/2B load, prompt planning, structured output, reasoning, cancellation and cleanup;
-- memory behavior and benchmark identity;
-- relevant upstream Android/ARM/OpenCL fixes even when those backends remain disabled in release builds.
+The reusable qualification runner requires an exact 40-character SHA, never `latest`. Host-native and Android lanes execute independently in parallel. Each lane restores the repository gitlink and verifies the production pin even after failure or cancellation; a superseded CI run was used to verify this cleanup path.
 
-The output is one explicit decision: `PROMOTE` or `DEFER`. No `latest`/floating pin is introduced.
+### 2026-08-19 candidate decision
+
+Candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` is **DEFERRED for Harness 0.5**.
+
+Evidence from qualification:
+
+- the upstream penalties sampler changed from four arguments to a five-argument form requiring `n_vocab`; the adapter now supports both signatures at compile time while preserving repeat/frequency/presence semantics and failing closed on an unknown signature;
+- host-native qualification passes after making the synthetic sampler fixture provide an explicit vocabulary size instead of relying on a null vocabulary;
+- Android qualification reaches the JNI build and fails because the candidate removed `llama_model_params.use_mmap/use_mlock` in favor of `load_mode`;
+- the candidate submodule is restored to the pinned gitlink after both normal execution and cancellation.
+
+The load API change is intentionally not hidden inside LLRT-0. Mapping the legacy booleans, then separately evaluating `AUTO`, is LLRT-5 work because load policy affects execution identity and release evidence. The Harness 0.5 production pin therefore remains unchanged.
 
 ## CPU efficiency before hardware acceleration
 
 ### Native prompt-plan reuse
 
-Prompt planning already renders and tokenizes the prompt to establish exact token count. Generation should be able to consume that prepared token sequence or an opaque native plan handle rather than round-tripping through another tokenization pass.
+LLRT-2 is integrated. Prompt planning still renders and tokenizes the exact prompt for context sizing, but the llama.cpp model record retains at most one ephemeral prepared prompt/token sequence. Generation consumes it once only on an exact prompt match; a miss or mismatch discards stale state and falls back to the original tokenizer path.
 
-The plan/handle must be identity-bound to model, chat-template and backend revision, bounded in lifetime, explicitly released and invalidated by incompatible changes.
+This optimization stays inside `backends/llama-cpp`, exposes no native handles/tokens through backend-neutral contracts, persists no prompt content and does not change context/recurrent state. Model unload destroys the cache.
 
 ### Recurrent and prefix-state reuse
 
