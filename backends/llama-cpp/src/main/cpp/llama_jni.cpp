@@ -4,6 +4,7 @@
 #include "gguf_metadata.h"
 #include "llama.h"
 #include "native_handle_registry.h"
+#include "prepared_prompt_cache.h"
 #include "json-schema-to-grammar.h"
 #include "chat.h"
 #include <nlohmann/json.hpp>
@@ -221,6 +222,7 @@ struct ModelRecord final {
 
     llama_model* model;
     std::string path;
+    local_llm::PreparedPromptCache prepared_prompt_cache;
     std::mutex lifecycle_mutex;
     std::size_t active_contexts = 0;
     bool available = true;
@@ -378,6 +380,7 @@ std::vector<std::string> plan_prompt(
         if (tokens.empty()) {
             return error_response("TOKENIZATION_FAILED", "Raw completion tokenization returned no tokens");
         }
+        record.prepared_prompt_cache.store(raw_completion, tokens);
         return {
             "ok",
             base64_encode(raw_completion),
@@ -452,6 +455,7 @@ std::vector<std::string> plan_prompt(
     if (tokens.empty()) {
         return error_response("TOKENIZATION_FAILED", "Rendered prompt tokenization returned no tokens");
     }
+    record.prepared_prompt_cache.store(prompt, tokens);
     return {
         "ok",
         base64_encode(prompt),
@@ -1008,7 +1012,10 @@ std::vector<std::string> stream_text(
     if (!sampler) {
         return error_response("SAMPLER_FAILED", "Unable to create the llama.cpp sampler chain");
     }
-    const std::vector<llama_token> prompt_tokens = tokenize_prompt(vocab, prompt);
+    auto prepared_prompt = record.model->prepared_prompt_cache.take(prompt);
+    std::vector<llama_token> prompt_tokens = prepared_prompt.has_value()
+        ? std::move(prepared_prompt.value())
+        : tokenize_prompt(vocab, prompt);
     if (prompt_tokens.empty()) {
         return error_response("TOKENIZATION_FAILED", "Prompt tokenization returned no tokens");
     }
