@@ -195,7 +195,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
             requestedModelProfileId = preset.execution.modelProfileId,
         )
 
-        val modelResolution = resolveModel(useCase, preset, environment, presetEvidence)
+        val modelResolution = resolveModel(useCase, preset, environment)
         if (modelResolution is ModelResolutionFailure) {
             return failure(
                 request,
@@ -265,11 +265,11 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
             )
     }
 
+    @Suppress("ReturnCount")
     private fun resolveModel(
         useCase: UseCaseDefinition,
         preset: UseCasePresetDefinition,
         environment: HostExecutionEnvironment,
-        evidence: HostExecutionResolutionEvidence,
     ): ModelResolution {
         val profiles = environment.modelProfiles.sortedWith(PROFILE_ORDER)
         val requestedProfileId = preset.execution.modelProfileId
