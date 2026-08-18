@@ -113,7 +113,7 @@ class HarnessDecisionRulesTest {
         engine.reconcile(emptyList(), nowEpochMs = 200)
 
         assertTrue(repository.unresolved().isEmpty())
-        assertEquals(200, repository.recent().single().resolvedAtEpochMs)
+        assertEquals(200L, repository.recent().single().resolvedAtEpochMs)
     }
 
     @Test
@@ -129,7 +129,7 @@ class HarnessDecisionRulesTest {
         val reopened = repository.unresolved().single()
 
         assertNotEquals(firstId, reopened.decisionId)
-        assertEquals(300, reopened.createdAtEpochMs)
+        assertEquals(300L, reopened.createdAtEpochMs)
         assertEquals(2, repository.recent().size)
         assertEquals(1, repository.recent().count { it.isResolved })
     }
