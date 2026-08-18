@@ -86,12 +86,7 @@ enum class PresetLifecycleState {
     DISABLED,
 }
 
-data class PresetConsumerMetadata(
-    val presetId: String,
-    val revision: Int,
-    val displayName: String,
-    val description: String,
-) {
+data class PresetConsumerMetadata(val presetId: String, val revision: Int, val displayName: String, val description: String) {
     init {
         require(presetId.isNotBlank()) { "Preset ID must not be blank" }
         require(revision > 0) { "Preset revision must be positive" }
@@ -136,12 +131,7 @@ data class ApplicationUseCaseBinding(
     }
 }
 
-data class PresetExposure(
-    val bindingId: String,
-    val presetId: String,
-    val presetRevision: Int,
-    val isDefault: Boolean = false,
-) {
+data class PresetExposure(val bindingId: String, val presetId: String, val presetRevision: Int, val isDefault: Boolean = false) {
     init {
         require(bindingId.isNotBlank()) { "Binding ID must not be blank" }
         require(presetId.isNotBlank()) { "Preset ID must not be blank" }
