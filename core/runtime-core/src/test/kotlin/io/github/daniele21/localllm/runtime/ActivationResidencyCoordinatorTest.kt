@@ -46,12 +46,12 @@ class ActivationResidencyCoordinatorTest {
     @Test
     fun `releasing one shared lease keeps model protected without starting warm retention`() {
         val coordinator = coordinator()
-        val first = coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 30_000)
-            as ActivationResidencyResult.Success
+        val first =
+            coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 30_000) as ActivationResidencyResult.Success
         coordinator.acquire(request("owner-b", firstDigest), retainModelWarmMs = 60_000)
 
-        val result = coordinator.release(first.value.activationId, first.value.ownerId)
-            as ActivationResidencyResult.Success
+        val result =
+            coordinator.release(first.value.activationId, first.value.ownerId) as ActivationResidencyResult.Success
 
         assertTrue(coordinator.protects(firstDigest))
         assertEquals(1, result.value.remainingLeaseCount)
@@ -61,11 +61,11 @@ class ActivationResidencyCoordinatorTest {
     @Test
     fun `final release removes protection and starts resolved warm retention`() {
         val coordinator = coordinator()
-        val acquired = coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 45_000)
-            as ActivationResidencyResult.Success
+        val acquired =
+            coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 45_000) as ActivationResidencyResult.Success
 
-        val result = coordinator.release(acquired.value.activationId, acquired.value.ownerId)
-            as ActivationResidencyResult.Success
+        val result =
+            coordinator.release(acquired.value.activationId, acquired.value.ownerId) as ActivationResidencyResult.Success
 
         assertFalse(coordinator.protects(firstDigest))
         assertEquals(0, result.value.remainingLeaseCount)
