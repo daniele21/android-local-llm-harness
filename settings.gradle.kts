@@ -29,6 +29,7 @@ include(
     ":evaluation:persistence",
     ":evaluation:room-store",
     ":models:model-profile",
+    ":models:control-plane-room-store",
     ":models:model-store",
     ":models:model-catalog",
     ":models:model-download",
