@@ -1,7 +1,7 @@
 # ADR 0015 — Harness-managed application/use-case control plane
 
-Status: Accepted
-Date: 2026-08-18
+- Status: Accepted
+- Date: 2026-08-18
 
 ## Context
 
