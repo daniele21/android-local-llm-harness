@@ -19,14 +19,25 @@ internal data class ModelResidencySnapshot(
     val loadingDigest: ModelDigest? = null,
 )
 
+internal fun interface ModelResidencyProtection {
+    fun protects(modelDigest: ModelDigest): Boolean
+
+    companion object {
+        val NONE = ModelResidencyProtection { false }
+    }
+}
+
 /**
  * Owns the in-memory lifecycle and handle identity of the single runtime model.
  *
  * Artifact installation remains owned by ModelStore. Backend initialization/shutdown is a separate
  * runtime concern. Warm-idle and memory-pressure components decide when residency should change but
- * do not own these transitions or the resident handle.
+ * do not own these transitions or the resident handle. Normal unload cannot reserve a resident
+ * handle while an activation-residency owner protects its digest.
  */
-internal class ModelResidencyLifecycle {
+internal class ModelResidencyLifecycle(
+    private val protection: ModelResidencyProtection = ModelResidencyProtection.NONE,
+) {
     private val residency = AtomicReference<ModelResidencyRecord>(ModelResidencyRecord.NotResident)
 
     fun snapshot(): ModelResidencySnapshot = when (val current = residency.get()) {
@@ -90,7 +101,7 @@ internal class ModelResidencyLifecycle {
         }
     }
 
-    /** Reserves the resident handle for one physical unload. */
+    /** Reserves the resident handle for one physical normal unload when no activation protects it. */
     fun beginUnload(): ResidentModel? {
         while (true) {
             when (val current = residency.get()) {
@@ -101,6 +112,7 @@ internal class ModelResidencyLifecycle {
                 is ModelResidencyRecord.Loading -> error("Cannot unload while model load is in progress")
 
                 is ModelResidencyRecord.Resident -> {
+                    if (protection.protects(current.model.handle.digest)) return null
                     if (residency.compareAndSet(current, ModelResidencyRecord.Unloading(current.model))) {
                         return current.model
                     }
