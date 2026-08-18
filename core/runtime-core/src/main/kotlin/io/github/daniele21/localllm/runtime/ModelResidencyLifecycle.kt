@@ -35,9 +35,7 @@ internal fun interface ModelResidencyProtection {
  * do not own these transitions or the resident handle. Normal unload cannot reserve a resident
  * handle while an activation-residency owner protects its digest.
  */
-internal class ModelResidencyLifecycle(
-    private val protection: ModelResidencyProtection = ModelResidencyProtection.NONE,
-) {
+internal class ModelResidencyLifecycle(private val protection: ModelResidencyProtection = ModelResidencyProtection.NONE) {
     private val residency = AtomicReference<ModelResidencyRecord>(ModelResidencyRecord.NotResident)
 
     fun snapshot(): ModelResidencySnapshot = when (val current = residency.get()) {
