@@ -24,8 +24,7 @@ class ActivationResidencyInferenceBackend(
 
     override fun shutdown() = delegate.shutdown()
 
-    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
-        delegate.loadModel(source, profile)
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle = delegate.loadModel(source, profile)
 
     override fun unloadModel(model: BackendModelHandle) {
         if (activationResidency.protects(model.digest)) {
@@ -37,8 +36,7 @@ class ActivationResidencyInferenceBackend(
         delegate.unloadModel(model)
     }
 
-    override fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities =
-        delegate.modelCapabilities(model)
+    override fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities = delegate.modelCapabilities(model)
 
     override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan =
         delegate.planPrompt(model, request)
