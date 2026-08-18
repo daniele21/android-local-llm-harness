@@ -60,10 +60,7 @@ data class SuggestedPresetTemplate(
     }
 }
 
-data class RejectedPresetSuggestionProfile(
-    val modelProfileId: String,
-    val reasons: Set<PresetSuggestionProfileRejection>,
-) {
+data class RejectedPresetSuggestionProfile(val modelProfileId: String, val reasons: Set<PresetSuggestionProfileRejection>) {
     init {
         require(modelProfileId.isNotBlank()) { "Rejected model profile ID must not be blank" }
         require(reasons.isNotEmpty()) { "Rejected profile must contain at least one reason" }
@@ -151,10 +148,7 @@ class PresetSuggestionService {
         }
     }
 
-    private fun buildSuggestions(
-        useCase: UseCaseDefinition,
-        compatibleProfiles: List<GgufModelProfile>,
-    ): List<SuggestedPresetTemplate> {
+    private fun buildSuggestions(useCase: UseCaseDefinition, compatibleProfiles: List<GgufModelProfile>): List<SuggestedPresetTemplate> {
         if (compatibleProfiles.isEmpty()) return emptyList()
         if (compatibleProfiles.size == 1) {
             return listOf(template(useCase, compatibleProfiles.single(), PresetSuggestionOptimization.BALANCED))
