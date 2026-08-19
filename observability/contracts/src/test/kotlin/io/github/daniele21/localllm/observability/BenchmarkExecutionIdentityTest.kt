@@ -5,8 +5,8 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.UseCaseId
-import kotlin.test.Test
-import kotlin.test.assertNotEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Test
 
 class BenchmarkExecutionIdentityTest {
     @Test
