@@ -187,6 +187,7 @@ private fun ConsumerControlPlaneErrorCode.safeMessage(): String = when (this) {
     ConsumerControlPlaneErrorCode.STALE_REVISION -> "Consumer configuration changed; refresh assignments"
     ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE -> "Required local model is unavailable"
     ConsumerControlPlaneErrorCode.MODEL_CONFLICT -> "Another active use case protects a different local model"
+    ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE -> "Use case is already active for this connection"
     ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED -> "Harness configuration is required"
     ConsumerControlPlaneErrorCode.INVALID_REQUEST -> "Consumer control-plane request is invalid"
     ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE -> "Shared runtime transport is unavailable"
