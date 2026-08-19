@@ -20,11 +20,7 @@ internal class HarnessWarmRetentionAwareControlPlaneHost(
     override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
         delegate.publishedPresets(applicationId, useCaseId)
 
-    override fun activate(
-        ownerId: String,
-        applicationId: ApplicationId,
-        request: ConsumerActivationRequest,
-    ): ConsumerActivationResult {
+    override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
         warmRetention.cancel()
         return delegate.activate(ownerId, applicationId, request)
     }
