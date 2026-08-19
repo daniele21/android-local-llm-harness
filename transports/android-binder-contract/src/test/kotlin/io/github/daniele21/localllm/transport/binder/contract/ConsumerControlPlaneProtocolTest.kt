@@ -31,10 +31,10 @@ class ConsumerControlPlaneProtocolTest {
                 client(
                     protocolMinor = 2,
                     requiredFeatures =
-                        listOf(
-                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                        ),
+                    listOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                    ),
                 ),
             )
 
@@ -99,27 +99,24 @@ class ConsumerControlPlaneProtocolTest {
         assertEquals(8, roundTrip.activation.bindingRevision)
     }
 
-    private fun host() =
-        ProtocolInfoParcel(
-            protocolMajor = 1,
-            protocolMinor = 2,
-            minSupportedMinor = 0,
-            supportedFeatures =
-                listOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                ),
-            hostBuildId = "host-1.2",
-        )
-
-    private fun client(
-        protocolMinor: Int,
-        requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
-    ) = ClientHelloParcel(
+    private fun host() = ProtocolInfoParcel(
         protocolMajor = 1,
-        protocolMinor = protocolMinor,
+        protocolMinor = 2,
         minSupportedMinor = 0,
-        requiredFeatures = requiredFeatures,
-        clientBuildId = "client-$protocolMinor",
+        supportedFeatures =
+        listOf(
+            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+        ),
+        hostBuildId = "host-1.2",
     )
+
+    private fun client(protocolMinor: Int, requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1)) =
+        ClientHelloParcel(
+            protocolMajor = 1,
+            protocolMinor = protocolMinor,
+            minSupportedMinor = 0,
+            requiredFeatures = requiredFeatures,
+            clientBuildId = "client-$protocolMinor",
+        )
 }

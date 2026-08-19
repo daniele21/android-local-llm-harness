@@ -89,23 +89,23 @@ class ConsumerControlPlaneAuthorizationTest {
                 caller,
                 negotiatedMinor = 2,
                 enabledFeatures =
-                    setOf(
-                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                    ),
+                setOf(
+                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                ),
             ) as LedgerResult.Success
         return Fixture(
             token = token.value,
             operations =
-                ConsumerControlPlaneHostOperations(
-                    ledger = ledger,
-                    host = host,
-                    controlExecutor =
-                        HostControlExecutor { task ->
-                            task()
-                            true
-                        },
-                ),
+            ConsumerControlPlaneHostOperations(
+                ledger = ledger,
+                host = host,
+                controlExecutor =
+                HostControlExecutor { task ->
+                    task()
+                    true
+                },
+            ),
         )
     }
 

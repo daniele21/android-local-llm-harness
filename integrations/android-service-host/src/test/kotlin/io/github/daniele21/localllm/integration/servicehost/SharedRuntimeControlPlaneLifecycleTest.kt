@@ -43,17 +43,17 @@ class SharedRuntimeControlPlaneLifecycleTest {
                 protocolInfo = protocolInfo(),
                 consumerControlPlaneHost = controlPlane,
                 controlExecutor =
-                    HostControlExecutor { task ->
+                HostControlExecutor { task ->
+                    task()
+                    true
+                },
+                callbackDispatcherFactory =
+                HostCallbackDispatcherFactory {
+                    HostCallbackDispatcher { task ->
                         task()
                         true
-                    },
-                callbackDispatcherFactory =
-                    HostCallbackDispatcherFactory {
-                        HostCallbackDispatcher { task ->
-                            task()
-                            true
-                        }
-                    },
+                    }
+                },
             )
         var registration: RegistrationResultParcel? = null
         delegate.registerClient(caller, hello(), lifecycle, HostResultCallback { registration = it })
@@ -65,27 +65,25 @@ class SharedRuntimeControlPlaneLifecycleTest {
         assertEquals(listOf(token.value to caller.applicationId), controlPlane.releaseAllCalls)
     }
 
-    private fun hello() =
-        ClientHelloParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = BinderProtocolV1.MINOR,
-            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            requiredFeatures =
-                listOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                ),
-            clientBuildId = "control-plane-lifecycle-test",
-        )
+    private fun hello() = ClientHelloParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = BinderProtocolV1.MINOR,
+        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        requiredFeatures =
+        listOf(
+            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+        ),
+        clientBuildId = "control-plane-lifecycle-test",
+    )
 
-    private fun protocolInfo() =
-        ProtocolInfoParcel(
-            protocolMajor = BinderProtocolV1.MAJOR,
-            protocolMinor = BinderProtocolV1.MINOR,
-            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-            supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-            hostBuildId = "host-test",
-        )
+    private fun protocolInfo() = ProtocolInfoParcel(
+        protocolMajor = BinderProtocolV1.MAJOR,
+        protocolMinor = BinderProtocolV1.MINOR,
+        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+        supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
+        hostBuildId = "host-test",
+    )
 
     private class FakeLifecycle : ClientLifecycleLinker {
         private var onDeath: (() -> Unit)? = null
