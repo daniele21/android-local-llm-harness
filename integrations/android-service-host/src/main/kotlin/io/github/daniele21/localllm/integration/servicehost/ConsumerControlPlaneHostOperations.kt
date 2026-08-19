@@ -45,7 +45,7 @@ internal class ConsumerControlPlaneHostOperations(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
-    ) = submit(request, callback) { token ->
+    ) = submit(caller, request, callback) {
         requireHost(request).assignedUseCases(caller.applicationId).toConsumerControlPlaneWire(request.operationId)
     }
 
@@ -53,9 +53,7 @@ internal class ConsumerControlPlaneHostOperations(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
-    ) = submit(request, callback) { token ->
-        @Suppress("UNUSED_VARIABLE")
-        val owner = token
+    ) = submit(caller, request, callback) {
         val useCaseId = request.useCaseId?.takeIf(String::isNotBlank)?.let(::UseCaseId)
             ?: return@submit invalidRequest(request)
         requireHost(request).publishedPresets(caller.applicationId, useCaseId).toConsumerControlPlaneWire(request.operationId)
@@ -65,7 +63,7 @@ internal class ConsumerControlPlaneHostOperations(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
-    ) = submit(request, callback) { token ->
+    ) = submit(caller, request, callback) { token ->
         val activationRequest = request.toCoreActivationRequestOrNull() ?: return@submit invalidRequest(request)
         requireHost(request).activate(token, caller.applicationId, activationRequest).toConsumerControlPlaneWire(request.operationId)
     }
@@ -74,7 +72,7 @@ internal class ConsumerControlPlaneHostOperations(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
-    ) = submit(request, callback) { token ->
+    ) = submit(caller, request, callback) { token ->
         val activationId = request.activationId?.takeIf(String::isNotBlank)?.let(::ConsumerActivationId)
             ?: return@submit invalidRequest(request)
         requireHost(request).deactivate(token, caller.applicationId, activationId).toConsumerControlPlaneWire(
@@ -84,6 +82,7 @@ internal class ConsumerControlPlaneHostOperations(
     }
 
     private fun submit(
+        caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
         block: (HostClientToken) -> ConsumerControlPlaneResultParcel,
@@ -96,7 +95,7 @@ internal class ConsumerControlPlaneHostOperations(
         controlExecutor.submitOrReject(
             onRejected = { callback.onResult(failure(request, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
-            when (val support = ledger.supportsFeature(token, currentCaller.get(), BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1)) {
+            when (val support = ledger.supportsFeature(token, caller, BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1)) {
                 is LedgerResult.Failure -> callback.onResult(failure(request, WireErrorCodes.CLIENT_TOKEN_INVALID))
                 is LedgerResult.Success -> {
                     if (!support.value || host == null) {
@@ -111,8 +110,6 @@ internal class ConsumerControlPlaneHostOperations(
 
     private fun requireHost(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneHost =
         host ?: error("Consumer control plane is unavailable for ${request.operationId}")
-
-    private val currentCaller = ThreadLocal<AuthorizedCaller>()
 
     private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): ConsumerActivationRequest? {
         val useCase = useCaseId?.takeIf(String::isNotBlank) ?: return null
