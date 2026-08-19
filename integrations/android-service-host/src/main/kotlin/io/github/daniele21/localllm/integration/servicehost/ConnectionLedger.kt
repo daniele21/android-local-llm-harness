@@ -69,14 +69,11 @@ data class HostConnectionRef(val token: HostClientToken, val caller: AuthorizedC
 data class HostNegotiatedProtocol(val minor: Int, val enabledFeatures: Set<String>) {
     init {
         require(minor >= 0) { "Negotiated protocol minor must be non-negative" }
-        require(enabledFeatures.none(String::isBlank)) { "Negotiated protocol features must not be blank" }
+        require(enabledFeatures.none { it.isBlank() }) { "Negotiated protocol features must not be blank" }
     }
 }
 
-private class ClientConnectionState(
-    val caller: AuthorizedCaller,
-    val protocol: HostNegotiatedProtocol,
-) {
+private class ClientConnectionState(val caller: AuthorizedCaller, val protocol: HostNegotiatedProtocol) {
     private val sessions = LinkedHashMap<String, SessionId>()
     private val requests = LinkedHashMap<String, RequestId>()
     private var closing = false
