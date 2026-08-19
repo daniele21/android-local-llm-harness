@@ -157,8 +157,8 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
                 repeat(deviceCount) { ordinal ->
                     val offset = BACKEND_DEVICE_HEADER_FIELD_COUNT + ordinal * BACKEND_DEVICE_FIELD_COUNT
                     val index = response[offset].toInt()
-                    if (index != ordinal) {
-                        throw IllegalArgumentException("Backend device index $index is out of canonical order at position $ordinal")
+                    require(index == ordinal) {
+                        "Backend device index $index is out of canonical order at position $ordinal"
                     }
                     add(
                         NativeBackendDevice(
