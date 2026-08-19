@@ -38,16 +38,29 @@ class SharedRuntimeHostComposition(
     }
 }
 
-internal fun hostProtocolInfo(hostBuildId: String, consumerApiEnabled: Boolean = false): ProtocolInfoParcel {
+internal fun hostProtocolInfo(
+    hostBuildId: String,
+    consumerApiEnabled: Boolean = false,
+    consumerControlPlaneEnabled: Boolean = false,
+): ProtocolInfoParcel {
     require(hostBuildId.isNotBlank()) { "Host build ID must not be blank" }
     require(hostBuildId.length <= BinderProtocolV1.MAX_CLIENT_BUILD_ID_CHARACTERS) {
         "Host build ID exceeds protocol limit"
     }
-    val features = if (consumerApiEnabled) {
-        BinderProtocolV1.KNOWN_FEATURES
-    } else {
-        BinderProtocolV1.KNOWN_FEATURES - BinderProtocolV1.FEATURE_CONSUMER_API_V1
+    require(!consumerControlPlaneEnabled || consumerApiEnabled) {
+        "Consumer control plane requires Consumer API v1"
     }
+    val features = BinderProtocolV1.KNOWN_FEATURES
+        .let { known ->
+            if (consumerApiEnabled) known else known - BinderProtocolV1.FEATURE_CONSUMER_API_V1
+        }
+        .let { consumerFeatures ->
+            if (consumerControlPlaneEnabled) {
+                consumerFeatures
+            } else {
+                consumerFeatures - BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1
+            }
+        }
     return ProtocolInfoParcel(
         protocolMajor = BinderProtocolV1.MAJOR,
         protocolMinor = BinderProtocolV1.MINOR,
