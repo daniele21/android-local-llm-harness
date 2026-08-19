@@ -166,7 +166,24 @@ JSONL="$OUTPUT_DIR/llama-cpp-cpu-deltas-evidence.jsonl"
 CSV="$OUTPUT_DIR/llama-cpp-cpu-deltas-summary.csv"
 : > "$JSONL"
 
-declare -A SEEN_CASES=()
+# Keep this runner compatible with the system Bash 3.2 shipped on macOS.
+# Do not use associative arrays or Bash 4+ case-modifying parameter expansion.
+SEEN_SIGNATURES=()
+SEEN_LABELS=()
+THINKING_MODE_SLUG="$(printf '%s' "$THINKING_MODE" | tr '[:upper:]' '[:lower:]')"
+
+seen_case_index() {
+    wanted_signature="$1"
+    index=0
+    while ((index < ${#SEEN_SIGNATURES[@]})); do
+        if [[ "${SEEN_SIGNATURES[$index]}" == "$wanted_signature" ]]; then
+            printf '%s\n' "$index"
+            return 0
+        fi
+        index=$((index + 1))
+    done
+    return 1
+}
 
 run_case() {
     label="$1"
@@ -175,13 +192,15 @@ run_case() {
     batch="$4"
     ubatch="$5"
     signature="$threads:$batch_threads:$batch:$ubatch"
-    if [[ -n "${SEEN_CASES[$signature]:-}" ]]; then
-        echo "Skipping duplicate $label; identical to ${SEEN_CASES[$signature]}"
+    duplicate_index=""
+    if duplicate_index="$(seen_case_index "$signature")"; then
+        echo "Skipping duplicate $label; identical to ${SEEN_LABELS[$duplicate_index]}"
         return
     fi
-    SEEN_CASES[$signature]="$label"
+    SEEN_SIGNATURES+=("$signature")
+    SEEN_LABELS+=("$label")
 
-    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-${THINKING_MODE,,}"
+    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-${THINKING_MODE_SLUG}"
     echo "Running $case_id: 1 cold + $REPETITIONS warm"
     set +e
     output="$(
