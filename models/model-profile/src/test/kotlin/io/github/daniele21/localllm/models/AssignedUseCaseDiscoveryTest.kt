@@ -115,21 +115,19 @@ class AssignedUseCaseDiscoveryTest {
         useCaseId: UseCaseId,
         revision: Int = 1,
         state: UseCaseDefinitionState = UseCaseDefinitionState.ACTIVE,
-    ): UseCaseDefinition {
-        return UseCaseDefinition(
-            useCaseId = useCaseId,
-            displayName = useCaseId.value,
-            description = "Description for ${useCaseId.value}",
-            requirements = UseCaseRequirements(
-                outputMode = OutputMode.TEXT,
-                sessionKind = SessionKind.STATELESS,
-                reasoningSupported = false,
-                minimumContextTokens = 1_024,
-            ),
-            state = state,
-            revision = revision,
-        )
-    }
+    ): UseCaseDefinition = UseCaseDefinition(
+        useCaseId = useCaseId,
+        displayName = useCaseId.value,
+        description = "Description for ${useCaseId.value}",
+        requirements = UseCaseRequirements(
+            outputMode = OutputMode.TEXT,
+            sessionKind = SessionKind.STATELESS,
+            reasoningSupported = false,
+            minimumContextTokens = 1_024,
+        ),
+        state = state,
+        revision = revision,
+    )
 
     private fun binding(
         applicationId: ApplicationId,
@@ -138,16 +136,14 @@ class AssignedUseCaseDiscoveryTest {
         revision: Int = 1,
         enabled: Boolean = true,
         isDefault: Boolean = false,
-    ): ApplicationUseCaseBinding {
-        return ApplicationUseCaseBinding(
-            bindingId = bindingId,
-            applicationId = applicationId,
-            useCaseId = useCaseId,
-            revision = revision,
-            enabled = enabled,
-            isDefault = isDefault,
-        )
-    }
+    ): ApplicationUseCaseBinding = ApplicationUseCaseBinding(
+        bindingId = bindingId,
+        applicationId = applicationId,
+        useCaseId = useCaseId,
+        revision = revision,
+        enabled = enabled,
+        isDefault = isDefault,
+    )
 
     private companion object {
         val APP_A = ApplicationId("consumer-a")
