@@ -43,10 +43,9 @@ class ActivationResidencyInferenceBackendTest {
         assertTrue(delegate.unloaded)
     }
 
-    private fun coordinator(): ActivationResidencyCoordinator =
-        ActivationResidencyCoordinator(
-            UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId("activation-1") }),
-        )
+    private fun coordinator(): ActivationResidencyCoordinator = ActivationResidencyCoordinator(
+        UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId("activation-1") }),
+    )
 
     private fun request(): UseCaseActivationRequest = UseCaseActivationRequest(
         ownerId = ActivationOwnerId("owner-a"),
