@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.contract
 
+import io.github.daniele21.localllm.contracts.ConsumerActivation
 import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
 import io.github.daniele21.localllm.contracts.ConsumerActivationResult
@@ -77,7 +78,7 @@ class ConsumerControlPlaneProtocolTest {
     @Test
     fun `activation response preserves opaque activation identity`() {
         val result = ConsumerActivationResult.Activated(
-            io.github.daniele21.localllm.contracts.ConsumerActivation(
+            ConsumerActivation(
                 activationId = ConsumerActivationId("activation-opaque"),
                 useCaseId = UseCaseId("document-pii-detection"),
                 useCaseRevision = 4,
