@@ -312,11 +312,7 @@ value class NativeModelHandle(val value: Long) {
     }
 }
 
-data class NativeModelExecutionRequest(
-    val gpuLayers: Int,
-    val useMmap: Boolean,
-    val useMlock: Boolean,
-)
+data class NativeModelExecutionRequest(val gpuLayers: Int, val useMmap: Boolean, val useMlock: Boolean)
 
 data class LoadedNativeModel(
     val handle: NativeModelHandle,
