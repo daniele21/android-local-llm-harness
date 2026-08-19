@@ -88,11 +88,8 @@ sealed interface ConsumerAssignedUseCasesResult {
 }
 
 sealed interface ConsumerPublishedPresetsResult {
-    data class Available(
-        val useCaseId: UseCaseId,
-        val bindingRevision: Int,
-        val presets: List<ConsumerPublishedPreset>,
-    ) : ConsumerPublishedPresetsResult {
+    data class Available(val useCaseId: UseCaseId, val bindingRevision: Int, val presets: List<ConsumerPublishedPreset>) :
+        ConsumerPublishedPresetsResult {
         init {
             require(bindingRevision > 0) { "Binding revision must be positive" }
         }
