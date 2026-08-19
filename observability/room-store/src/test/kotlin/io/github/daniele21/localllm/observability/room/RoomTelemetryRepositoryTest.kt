@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
+import io.github.daniele21.localllm.observability.ExecutionPlacementStatus
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -78,6 +79,21 @@ class RoomTelemetryRepositoryTest {
                 repository.benchmarkBaselineHistory(),
             )
         }
+    }
+
+    @Test
+    fun `backend execution evidence round trips without changing benchmark identity`() {
+        val run = run("execution-evidence", 42L).copy(
+            backendId = "llama.cpp",
+            backendRevision = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3",
+            backendExecutionFingerprint = "c".repeat(64),
+            effectivePlacement = ExecutionPlacementStatus.UNAVAILABLE,
+        )
+
+        val restored = TelemetryEntityMapper.runRecord(TelemetryEntityMapper.runEntity(run))
+
+        assertEquals(run, restored)
+        assertEquals(BenchmarkExecutionIdentity.fromRun(run), BenchmarkExecutionIdentity.fromRun(restored))
     }
 
     @Test
