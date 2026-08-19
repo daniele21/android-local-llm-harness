@@ -27,11 +27,10 @@ fun ConsumerAssignedUseCasesResult.toConsumerControlPlaneWire(operationId: Strin
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCoreAssignedUseCasesResult(): ConsumerAssignedUseCasesResult {
-    return error?.let {
+fun ConsumerControlPlaneResultParcel.toCoreAssignedUseCasesResult(): ConsumerAssignedUseCasesResult =
+    error?.let {
         ConsumerAssignedUseCasesResult.Rejected(it.toConsumerControlPlaneFailure())
     } ?: ConsumerAssignedUseCasesResult.Available(assignments.map(ConsumerAssignedUseCaseParcel::toCore))
-}
 
 fun ConsumerPublishedPresetsResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerPublishedPresetsResult.Available -> ConsumerControlPlaneResultParcel(
@@ -47,15 +46,14 @@ fun ConsumerPublishedPresetsResult.toConsumerControlPlaneWire(operationId: Strin
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPublishedPresetsResult {
-    return error?.let {
+fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPublishedPresetsResult =
+    error?.let {
         ConsumerPublishedPresetsResult.Rejected(it.toConsumerControlPlaneFailure())
     } ?: ConsumerPublishedPresetsResult.Available(
         useCaseId = UseCaseId(requireNotNull(useCaseId)),
         bindingRevision = requireNotNull(bindingRevision),
         presets = presets.map(ConsumerPublishedPresetMetadataParcel::toCore),
     )
-}
 
 fun ConsumerActivationResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerActivationResult.Activated -> ConsumerControlPlaneResultParcel(
@@ -69,11 +67,10 @@ fun ConsumerActivationResult.toConsumerControlPlaneWire(operationId: String): Co
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCoreActivationResult(): ConsumerActivationResult {
-    return error?.let {
+fun ConsumerControlPlaneResultParcel.toCoreActivationResult(): ConsumerActivationResult =
+    error?.let {
         ConsumerActivationResult.Rejected(it.toConsumerControlPlaneFailure())
     } ?: ConsumerActivationResult.Activated(requireNotNull(activation).toCore())
-}
 
 fun ConsumerDeactivationResult.toConsumerControlPlaneWire(
     operationId: String,
@@ -92,8 +89,8 @@ fun ConsumerDeactivationResult.toConsumerControlPlaneWire(
 
 fun ConsumerControlPlaneResultParcel.toCoreDeactivationResult(
     expectedActivationId: ConsumerActivationId,
-): ConsumerDeactivationResult {
-    return error?.let {
+): ConsumerDeactivationResult =
+    error?.let {
         ConsumerDeactivationResult.Rejected(it.toConsumerControlPlaneFailure())
     } ?: if (releasedActivationId == expectedActivationId.value) {
         ConsumerDeactivationResult.Released
@@ -105,7 +102,6 @@ fun ConsumerControlPlaneResultParcel.toCoreDeactivationResult(
             ),
         )
     }
-}
 
 fun ConsumerActivationRequest.toConsumerControlPlaneWire(
     clientToken: ClientTokenParcel,
