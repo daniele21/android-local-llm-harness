@@ -2,7 +2,9 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
@@ -63,6 +65,17 @@ internal fun remoteConsumerResultCallback(
     token: ClientTokenParcel,
     remote: IConsumerResultCallback,
 ): HostResultCallback<ConsumerResultParcel> = HostResultCallback { result ->
+    if (!deliverRemote { remote.onResult(result) }) {
+        delegate.unregisterClient(caller, token.value)
+    }
+}
+
+internal fun remoteConsumerControlPlaneResultCallback(
+    delegate: SharedRuntimeHostDelegate,
+    caller: AuthorizedCaller,
+    token: ClientTokenParcel,
+    remote: IConsumerControlPlaneResultCallback,
+): HostResultCallback<ConsumerControlPlaneResultParcel> = HostResultCallback { result ->
     if (!deliverRemote { remote.onResult(result) }) {
         delegate.unregisterClient(caller, token.value)
     }

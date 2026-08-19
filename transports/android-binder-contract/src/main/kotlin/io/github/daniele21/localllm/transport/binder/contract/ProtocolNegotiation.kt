@@ -6,11 +6,14 @@ fun negotiateProtocol(host: ProtocolInfoParcel, client: ClientHelloParcel): Nego
     validateProtocolMajor(host, client)
 
     val negotiatedMinor = negotiateMinor(host, client)
-    validateRequiredFeatures(host, client)
+    validateRequiredFeatures(host, client, negotiatedMinor)
 
     return NegotiatedProtocol(
         minor = negotiatedMinor,
-        enabledFeatures = host.supportedFeatures.toSet().intersect(BinderProtocolV1.KNOWN_FEATURES),
+        enabledFeatures = host.supportedFeatures
+            .toSet()
+            .intersect(BinderProtocolV1.KNOWN_FEATURES)
+            .filterTo(linkedSetOf()) { BinderProtocolV1.minimumMinorForFeature(it) <= negotiatedMinor },
     )
 }
 
@@ -31,6 +34,13 @@ fun validateClientHello(value: ClientHelloParcel) {
     requireWire(value.protocolMinor >= 0, "Protocol minor must be non-negative")
     requireWire(value.minSupportedMinor in 0..value.protocolMinor, "Invalid client minor range")
     validateFeatureList(value.requiredFeatures)
+    value.requiredFeatures.forEach { feature ->
+        requireWire(
+            BinderProtocolV1.minimumMinorForFeature(feature) <= value.protocolMinor,
+            "Required protocol feature needs a newer client minor",
+            WireErrorCodes.FEATURE_UNAVAILABLE,
+        )
+    }
     validateIdentifier(
         value.clientBuildId,
         BinderProtocolV1.MAX_CLIENT_BUILD_ID_CHARACTERS,
@@ -63,9 +73,11 @@ private fun negotiateMinor(host: ProtocolInfoParcel, client: ClientHelloParcel):
     return upperBound
 }
 
-private fun validateRequiredFeatures(host: ProtocolInfoParcel, client: ClientHelloParcel) {
+private fun validateRequiredFeatures(host: ProtocolInfoParcel, client: ClientHelloParcel, negotiatedMinor: Int) {
     val supported = host.supportedFeatures.toSet()
-    val unavailable = client.requiredFeatures.filterNot(supported::contains)
+    val unavailable = client.requiredFeatures.filter { feature ->
+        feature !in supported || BinderProtocolV1.minimumMinorForFeature(feature) > negotiatedMinor
+    }
     requireWire(
         unavailable.isEmpty(),
         "Required protocol feature is unavailable",
