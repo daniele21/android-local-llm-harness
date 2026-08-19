@@ -54,7 +54,9 @@ class RoomHostControlPlaneStoreTest {
         }
 
         openDatabase().use { second ->
-            assertEquals(expected.canonical(), RoomHostControlPlaneStore(second).snapshot())
+            val actual = RoomHostControlPlaneStore(second).snapshot()
+            assertEquals(expected.canonical(), actual)
+            assertTrue(actual.bindings.single().isDefault)
         }
     }
 
@@ -86,7 +88,7 @@ class RoomHostControlPlaneStoreTest {
         context,
         HostControlPlaneDatabase::class.java,
         DATABASE_NAME,
-    ).allowMainThreadQueries().build()
+    ).addMigrations(HostControlPlaneDatabase.MIGRATION_1_2).allowMainThreadQueries().build()
 
     private fun state(): HostControlPlaneState = HostControlPlaneState(
         applications = listOf(
@@ -140,6 +142,7 @@ class RoomHostControlPlaneStoreTest {
                 applicationId = APP_ID,
                 useCaseId = USE_CASE_ID,
                 revision = 7,
+                isDefault = true,
             ),
         ),
         exposures = listOf(
