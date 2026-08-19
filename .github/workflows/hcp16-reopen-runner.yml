@@ -32,11 +32,11 @@ jobs:
           start = next(i for i, line in enumerate(lines) if line.strip() == 'run: |') + 1
           body = [line[10:] if line.startswith('          ') else line for line in lines[start:]]
           script = '\n'.join(body)
-          replacement = '''          close_start = text.find('    override fun closeSession(sessionId: SessionId) {')
+          replacement = """close_start = text.find('    override fun closeSession(sessionId: SessionId) {')
           close_end = text.find('\\n    fun memoryResourceSnapshot()', close_start)
           if close_start < 0 or close_end < 0:
               raise SystemExit('closeSession boundaries not found')
-          text = text[:close_start] + new_close + text[close_end:]'''
+          text = text[:close_start] + new_close + text[close_end:]"""
           pattern = re.compile(
               r"\s*if old_close not in text:\n\s*raise SystemExit\('closeSession block not found'\)\n\s*text = text\.replace\(old_close, new_close, 1\)"
           )
