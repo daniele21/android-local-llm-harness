@@ -12,10 +12,16 @@ BASE_THREADS=4
 BASE_BATCH_THREADS=4
 BASE_BATCH=128
 BASE_UBATCH=64
-REPETITIONS=8
-MAX_OUTPUT_TOKENS=128
+REPETITIONS=5
+MAX_OUTPUT_TOKENS=64
 THINKING_MODE="DISABLED"
-OUTPUT_DIR="$ROOT_DIR/build/llama-cpp-cpu-deltas"
+TIMEOUT_SECONDS=600
+CASE_SCOPE="all"
+THERMAL_START_MAX="1"
+COOLDOWN_TIMEOUT_SECONDS=1800
+COOLDOWN_POLL_SECONDS=30
+OUTPUT_DIR="$ROOT_DIR/build/llrt3"
+RESET_OUTPUT=false
 
 usage() {
     cat <<'EOF'
@@ -23,29 +29,41 @@ Usage: bash scripts/run-llama-cpp-cpu-deltas.sh --model /path/model.gguf --tier 
 
 Runs a bounded one-factor CPU delta set against one explicit baseline. It does not
 replace the full Q35-6 tuning matrix and never promotes a runtime profile automatically.
+The runner is resumable and thermal-gated so long physical runs remain comparable.
 
 Options:
-  --device SERIAL              ADB serial. Optional when exactly one device is online.
-  --context N                  Approved Qwen3.5 context tier (default: 2048).
-  --threads N                  Baseline generation threads (default: 4).
-  --batch-threads N            Baseline batch/prefill threads (default: 4).
-  --batch N                    Baseline batch size (default: 128).
-  --ubatch N                   Baseline micro-batch size (default: 64).
-  --repetitions N              Warm samples per case, >= 5 (default: 8).
-  --max-output-tokens N        Output budget used for sustained samples (default: 128).
-  --thinking-mode MODE         DISABLED or ENABLED (default: DISABLED).
-  --output-dir PATH            Privacy-safe local evidence directory.
-  --help                       Show this help.
+  --device SERIAL                 ADB serial. Optional when exactly one device is online.
+  --context N                     Approved Qwen3.5 context tier (default: 2048).
+  --threads N                     Baseline generation threads (default: 4).
+  --batch-threads N               Baseline batch/prefill threads (default: 4).
+  --batch N                       Baseline batch size (default: 128).
+  --ubatch N                      Baseline micro-batch size (default: 64).
+  --repetitions N                 Warm samples per case, >= 5 (default: 5).
+  --max-output-tokens N           Sustained output budget (default: 64).
+  --thinking-mode MODE            DISABLED or ENABLED (default: DISABLED).
+  --timeout-seconds N             Per-generation timeout (default: 600).
+  --case NAME                     all, baseline, generation-threads-2,
+                                  batch-threads-2, or batch64-ubatch32 (default: all).
+  --thermal-start-max N|off       Require Android thermal status <= N before each case;
+                                  0=none, 1=light, 2=moderate (default: 1).
+  --cooldown-timeout-seconds N    Maximum thermal-gate wait (default: 1800).
+  --cooldown-poll-seconds N       Thermal-gate polling interval (default: 30).
+  --output-dir PATH               Evidence root, or a matching 0.8b/2b leaf directory.
+                                  Default: build/llrt3.
+  --reset-output                  Explicitly discard evidence for this exact run identity.
+  --help                          Show this help.
 
 Default bounded cases:
-  baseline                     exact supplied baseline
-  generation-threads-2         only generation threads changed to 2
-  batch-threads-2              only batch/prefill threads changed to 2
-  batch64-ubatch32             only batch/ubatch changed to 64/32
+  baseline                        exact supplied baseline
+  generation-threads-2            only generation threads changed to 2
+  batch-threads-2                 only batch/prefill threads changed to 2
+  batch64-ubatch32                only batch/ubatch changed to 64/32
 
-Cases identical to the supplied baseline are de-duplicated. Each case emits one cold
-sample plus N warm samples. The summary reports first-to-last warm drift but applies no
-new pass/fail threshold; policy remains owned by Q35-6/Q35-7 evidence review.
+Each case emits one cold sample plus N warm samples. Completed cases are skipped on
+resume. Raw evidence is appended only after a case completes, so interruption does not
+leave a half-case in the active evidence file. Output budget and warm count are part of
+the run/case identity. The summary reports sustained warm drift but applies no new
+pass/fail threshold; policy remains owned by Q35-6/Q35-7 evidence review.
 EOF
 }
 
@@ -62,7 +80,13 @@ while [[ $# -gt 0 ]]; do
         --repetitions) REPETITIONS="${2:-}"; shift 2 ;;
         --max-output-tokens) MAX_OUTPUT_TOKENS="${2:-}"; shift 2 ;;
         --thinking-mode) THINKING_MODE="${2:-}"; shift 2 ;;
+        --timeout-seconds) TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
+        --case) CASE_SCOPE="${2:-}"; shift 2 ;;
+        --thermal-start-max) THERMAL_START_MAX="${2:-}"; shift 2 ;;
+        --cooldown-timeout-seconds) COOLDOWN_TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
+        --cooldown-poll-seconds) COOLDOWN_POLL_SECONDS="${2:-}"; shift 2 ;;
         --output-dir) OUTPUT_DIR="${2:-}"; shift 2 ;;
+        --reset-output) RESET_OUTPUT=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -84,7 +108,11 @@ if [[ "$CONTEXT" != "1024" && "$CONTEXT" != "2048" && "$CONTEXT" != "4096" && "$
     echo "--context must be one of 1024, 2048, 4096, 8192" >&2
     exit 2
 fi
-for value_name in BASE_THREADS BASE_BATCH_THREADS BASE_BATCH BASE_UBATCH MAX_OUTPUT_TOKENS; do
+case "$CASE_SCOPE" in
+    all|baseline|generation-threads-2|batch-threads-2|batch64-ubatch32) ;;
+    *) echo "--case must be all, baseline, generation-threads-2, batch-threads-2, or batch64-ubatch32" >&2; exit 2 ;;
+esac
+for value_name in BASE_THREADS BASE_BATCH_THREADS BASE_BATCH BASE_UBATCH MAX_OUTPUT_TOKENS TIMEOUT_SECONDS COOLDOWN_TIMEOUT_SECONDS COOLDOWN_POLL_SECONDS; do
     value="${!value_name}"
     if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1)); then
         echo "$value_name must be a positive integer" >&2
@@ -99,9 +127,30 @@ if ((BASE_UBATCH > BASE_BATCH)); then
     echo "--ubatch must be <= --batch" >&2
     exit 2
 fi
+if [[ "$THERMAL_START_MAX" != "off" ]]; then
+    if [[ ! "$THERMAL_START_MAX" =~ ^[0-6]$ ]]; then
+        echo "--thermal-start-max must be 0..6 or off" >&2
+        exit 2
+    fi
+fi
 if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
     echo "adb is required" >&2
     exit 2
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is required" >&2
+    exit 2
+fi
+
+OUTPUT_BASENAME="$(basename "$OUTPUT_DIR")"
+if [[ "$OUTPUT_BASENAME" == "0.8b" || "$OUTPUT_BASENAME" == "2b" ]]; then
+    if [[ "$OUTPUT_BASENAME" != "$TIER" ]]; then
+        echo "--output-dir ends in $OUTPUT_BASENAME but --tier is $TIER; refusing to mix tier evidence" >&2
+        exit 2
+    fi
+    TIER_OUTPUT_DIR="$OUTPUT_DIR"
+else
+    TIER_OUTPUT_DIR="$OUTPUT_DIR/$TIER"
 fi
 
 sha256_file() {
@@ -118,9 +167,16 @@ sha256_file() {
 }
 
 case "$TIER" in
-    0.8b) EXPECTED_SHA="bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517" ;;
-    2b) EXPECTED_SHA="aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223" ;;
+    0.8b)
+        EXPECTED_SHA="bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
+        EXPECTED_MODEL_TIER="B0_8"
+        ;;
+    2b)
+        EXPECTED_SHA="aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+        EXPECTED_MODEL_TIER="B2"
+        ;;
 esac
+BACKEND_REVISION="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 ACTUAL_SHA="$(sha256_file "$MODEL" | tr '[:upper:]' '[:lower:]')"
 if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
     echo "$TIER model does not match the curated Q4_K_M reference" >&2
@@ -137,9 +193,67 @@ if [[ "$DEVICE_ABI" != arm64-v8a* ]]; then
     echo "CPU delta evidence requires arm64-v8a; device reports $DEVICE_ABI" >&2
     exit 2
 fi
+DEVICE_MODEL="$("${ADB_CMD[@]}" shell getprop ro.product.model | tr -d '\r')"
+DEVICE_RELEASE="$("${ADB_CMD[@]}" shell getprop ro.build.version.release | tr -d '\r')"
+DEVICE_SDK="$("${ADB_CMD[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
 
 cd "$ROOT_DIR"
 HARNESS_COMMIT="$(git rev-parse HEAD)"
+THINKING_MODE_SLUG="$(printf '%s' "$THINKING_MODE" | tr '[:upper:]' '[:lower:]')"
+RUN_KEY="ctx${CONTEXT}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}"
+mkdir -p "$TIER_OUTPUT_DIR"
+JSONL="$TIER_OUTPUT_DIR/llama-cpp-cpu-deltas-${RUN_KEY}-evidence.jsonl"
+CSV="$TIER_OUTPUT_DIR/llama-cpp-cpu-deltas-${RUN_KEY}-summary.csv"
+
+if [[ "$RESET_OUTPUT" == true ]]; then
+    echo "Resetting evidence for exact run identity: $RUN_KEY"
+    : > "$JSONL"
+    rm -f "$CSV"
+elif [[ ! -f "$JSONL" ]]; then
+    : > "$JSONL"
+fi
+
+validate_existing_evidence() {
+    [[ -s "$JSONL" ]] || return 0
+    python3 - "$JSONL" "$EXPECTED_SHA" "$EXPECTED_MODEL_TIER" "$BACKEND_REVISION" "$HARNESS_COMMIT" \
+        "$CONTEXT" "$MAX_OUTPUT_TOKENS" "$REPETITIONS" "$THINKING_MODE" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+expected = {
+    "schemaVersion": 3,
+    "modelDigest": sys.argv[2],
+    "modelTier": sys.argv[3],
+    "architecture": "qwen35",
+    "quantization": "Q4_K_M",
+    "backendRevision": sys.argv[4],
+    "harnessCommit": sys.argv[5],
+    "contextTokens": int(sys.argv[6]),
+    "maxOutputTokens": int(sys.argv[7]),
+    "warmRepetitionsRequested": int(sys.argv[8]),
+    "thinkingMode": sys.argv[9],
+    "deviceModel": sys.argv[10],
+    "androidRelease": sys.argv[11],
+    "sdkInt": int(sys.argv[12]),
+    "abi": sys.argv[13],
+}
+for line_number, line in enumerate(path.read_text().splitlines(), start=1):
+    if not line.strip():
+        continue
+    record = json.loads(line)
+    for field, value in expected.items():
+        if record.get(field) != value:
+            raise SystemExit(
+                f"existing evidence {path} is incompatible at line {line_number}: "
+                f"{field}={record.get(field)!r}, expected {value!r}. "
+                "Use --reset-output or a different output directory."
+            )
+PY
+}
+validate_existing_evidence
+
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
 
 APP_APK="$(find apps/device-test-runner/build/outputs/apk/debug -type f -name '*.apk' | sort | tail -n 1)"
@@ -161,16 +275,119 @@ RUNNER="$(
 )"
 [[ -n "$RUNNER" ]] || { echo "Unable to discover AndroidJUnitRunner" >&2; exit 1; }
 
-mkdir -p "$OUTPUT_DIR"
-JSONL="$OUTPUT_DIR/llama-cpp-cpu-deltas-evidence.jsonl"
-CSV="$OUTPUT_DIR/llama-cpp-cpu-deltas-summary.csv"
-: > "$JSONL"
+read_thermal_status() {
+    set +e
+    thermal_output="$(
+        "${ADB_CMD[@]}" shell am instrument -w -r \
+            -e class io.github.daniele21.localllm.devicetest.Qwen35TuningInstrumentedTest#reportsThermalStatus \
+            "$RUNNER" 2>&1
+    )"
+    thermal_command_status=$?
+    set -e
+    thermal_output="$(printf '%s' "$thermal_output" | tr -d '\r')"
+    if ((thermal_command_status != 0)) || printf '%s\n' "$thermal_output" | grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg='; then
+        printf '%s\n' "$thermal_output" >&2
+        return 1
+    fi
+    thermal_status="$(printf '%s\n' "$thermal_output" | sed -n 's/^.*LOCAL_LLM_THERMAL_STATUS //p' | tail -n 1)"
+    if [[ ! "$thermal_status" =~ ^-?[0-9]+$ ]]; then
+        echo "Unable to parse Android thermal status" >&2
+        return 1
+    fi
+    printf '%s\n' "$thermal_status"
+}
+
+wait_for_thermal_gate() {
+    if [[ "$THERMAL_START_MAX" == "off" ]]; then
+        echo "Thermal start gate disabled by explicit request"
+        return 0
+    fi
+    thermal_deadline=$(( $(date +%s) + COOLDOWN_TIMEOUT_SECONDS ))
+    while true; do
+        current_thermal="$(read_thermal_status)" || exit 1
+        if ((current_thermal < 0)); then
+            echo "Android thermal status is unavailable; use --thermal-start-max off only if this is intentional" >&2
+            exit 1
+        fi
+        if ((current_thermal <= THERMAL_START_MAX)); then
+            echo "Thermal gate satisfied: status=$current_thermal <= $THERMAL_START_MAX"
+            return 0
+        fi
+        now_epoch="$(date +%s)"
+        if ((now_epoch >= thermal_deadline)); then
+            echo "Thermal gate timed out: status=$current_thermal > $THERMAL_START_MAX after ${COOLDOWN_TIMEOUT_SECONDS}s" >&2
+            exit 1
+        fi
+        remaining=$((thermal_deadline - now_epoch))
+        echo "Thermal status=$current_thermal > $THERMAL_START_MAX; cooling for ${COOLDOWN_POLL_SECONDS}s (${remaining}s remaining)"
+        sleep "$COOLDOWN_POLL_SECONDS"
+    done
+}
+
+case_state() {
+    case_id="$1"
+    python3 - "$JSONL" "$case_id" "$REPETITIONS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+case_id = sys.argv[2]
+repetitions = int(sys.argv[3])
+records = []
+if path.exists():
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("tuningCaseId") == case_id:
+            records.append(record)
+if not records:
+    print("missing")
+    raise SystemExit(0)
+indexes = sorted(int(record.get("sampleIndex", -1)) for record in records)
+loads = [record.get("modelLoadKind") for record in records]
+expected_indexes = list(range(repetitions + 1))
+if len(records) == repetitions + 1 and indexes == expected_indexes and loads.count("COLD") == 1 and loads.count("WARM") == repetitions:
+    print("complete")
+else:
+    print("partial")
+PY
+}
+
+remove_case_records() {
+    case_id="$1"
+    python3 - "$JSONL" "$case_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+case_id = sys.argv[2]
+kept = []
+removed = 0
+for line in path.read_text().splitlines():
+    if not line.strip():
+        continue
+    record = json.loads(line)
+    if record.get("tuningCaseId") == case_id:
+        removed += 1
+    else:
+        kept.append(line)
+path.write_text("\n".join(kept) + ("\n" if kept else ""))
+print(removed)
+PY
+}
+
+case_selected() {
+    label="$1"
+    [[ "$CASE_SCOPE" == "all" || "$CASE_SCOPE" == "$label" ]]
+}
 
 # Keep this runner compatible with the system Bash 3.2 shipped on macOS.
 # Do not use associative arrays or Bash 4+ case-modifying parameter expansion.
 SEEN_SIGNATURES=()
 SEEN_LABELS=()
-THINKING_MODE_SLUG="$(printf '%s' "$THINKING_MODE" | tr '[:upper:]' '[:lower:]')"
 
 seen_case_index() {
     wanted_signature="$1"
@@ -191,6 +408,11 @@ run_case() {
     batch_threads="$3"
     batch="$4"
     ubatch="$5"
+
+    if ! case_selected "$label"; then
+        return
+    fi
+
     signature="$threads:$batch_threads:$batch:$ubatch"
     duplicate_index=""
     if duplicate_index="$(seen_case_index "$signature")"; then
@@ -200,7 +422,18 @@ run_case() {
     SEEN_SIGNATURES+=("$signature")
     SEEN_LABELS+=("$label")
 
-    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-${THINKING_MODE_SLUG}"
+    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}"
+    existing_state="$(case_state "$case_id")"
+    if [[ "$existing_state" == "complete" ]]; then
+        echo "Resume: $case_id already has complete evidence; skipping"
+        return
+    fi
+    if [[ "$existing_state" == "partial" ]]; then
+        removed_count="$(remove_case_records "$case_id")"
+        echo "Removed $removed_count partial records for $case_id before rerun"
+    fi
+
+    wait_for_thermal_gate
     echo "Running $case_id: 1 cold + $REPETITIONS warm"
     set +e
     output="$(
@@ -219,6 +452,7 @@ run_case() {
             -e thinkingMode "$THINKING_MODE" \
             -e tuningCaseId "$case_id" \
             -e harnessCommit "$HARNESS_COMMIT" \
+            -e timeoutSeconds "$TIMEOUT_SECONDS" \
             "$RUNNER" 2>&1
     )"
     status=$?
@@ -236,7 +470,18 @@ run_case() {
         echo "Expected $expected_count evidence records for $case_id, got $evidence_count" >&2
         exit 1
     fi
-    printf '%s\n' "$evidence_lines" >> "$JSONL"
+
+    case_jsonl="${JSONL}.case.$$"
+    case_csv="${CSV}.case.$$"
+    printf '%s\n' "$evidence_lines" > "$case_jsonl"
+    if ! python3 scripts/summarize-qwen35-tuning.py "$case_jsonl" "$case_csv" >/dev/null; then
+        rm -f "$case_jsonl" "$case_csv"
+        echo "Evidence validation failed for $case_id" >&2
+        exit 1
+    fi
+    cat "$case_jsonl" >> "$JSONL"
+    rm -f "$case_jsonl" "$case_csv"
+    echo "Recorded complete evidence for $case_id"
 }
 
 run_case baseline "$BASE_THREADS" "$BASE_BATCH_THREADS" "$BASE_BATCH" "$BASE_UBATCH"
@@ -244,8 +489,12 @@ run_case generation-threads-2 2 "$BASE_BATCH_THREADS" "$BASE_BATCH" "$BASE_UBATC
 run_case batch-threads-2 "$BASE_THREADS" 2 "$BASE_BATCH" "$BASE_UBATCH"
 run_case batch64-ubatch32 "$BASE_THREADS" "$BASE_BATCH_THREADS" 64 32
 
+if [[ ! -s "$JSONL" ]]; then
+    echo "No completed evidence cases are available for this run identity" >&2
+    exit 1
+fi
 python3 scripts/summarize-qwen35-tuning.py "$JSONL" "$CSV"
 echo "Bounded llama.cpp CPU delta evidence written to:"
 echo "  $JSONL"
 echo "  $CSV"
-echo "Review first-to-last warm drift together with median/p95, PSS, memory and thermal status; no threshold was auto-promoted."
+echo "Review sustained warm drift together with median/p95, PSS, memory and thermal status; no threshold was auto-promoted."
