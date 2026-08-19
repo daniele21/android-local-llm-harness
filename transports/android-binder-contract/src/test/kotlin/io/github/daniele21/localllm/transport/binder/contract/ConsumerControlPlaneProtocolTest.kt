@@ -25,16 +25,18 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `version 1_2 client can require consumer control plane`() {
-        val negotiated = negotiateProtocol(
-            host(),
-            client(
-                protocolMinor = 2,
-                requiredFeatures = listOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+        val negotiated =
+            negotiateProtocol(
+                host(),
+                client(
+                    protocolMinor = 2,
+                    requiredFeatures =
+                        listOf(
+                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                        ),
                 ),
-            ),
-        )
+            )
 
         assertEquals(2, negotiated.minor)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in negotiated.enabledFeatures)
@@ -57,12 +59,13 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `activation request wire identity contains revisions but no model identity`() {
-        val request = ConsumerActivationRequest(
-            useCaseId = UseCaseId("document-pii-detection"),
-            useCaseRevision = 4,
-            bindingRevision = 8,
-            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-        )
+        val request =
+            ConsumerActivationRequest(
+                useCaseId = UseCaseId("document-pii-detection"),
+                useCaseRevision = 4,
+                bindingRevision = 8,
+                preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+            )
 
         val wire = request.toConsumerControlPlaneWire(ClientTokenParcel("opaque-token"), "operation-1")
 
@@ -77,33 +80,37 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `activation response preserves opaque activation identity`() {
-        val result = ConsumerActivationResult.Activated(
-            ConsumerActivation(
-                activationId = ConsumerActivationId("activation-opaque"),
-                useCaseId = UseCaseId("document-pii-detection"),
-                useCaseRevision = 4,
-                bindingRevision = 8,
-                preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-            ),
-        )
+        val result =
+            ConsumerActivationResult.Activated(
+                ConsumerActivation(
+                    activationId = ConsumerActivationId("activation-opaque"),
+                    useCaseId = UseCaseId("document-pii-detection"),
+                    useCaseRevision = 4,
+                    bindingRevision = 8,
+                    preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+                ),
+            )
 
-        val roundTrip = result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult()
-            as ConsumerActivationResult.Activated
+        val roundTrip =
+            result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult()
+                as ConsumerActivationResult.Activated
 
         assertEquals(ConsumerActivationId("activation-opaque"), roundTrip.activation.activationId)
         assertEquals(8, roundTrip.activation.bindingRevision)
     }
 
-    private fun host() = ProtocolInfoParcel(
-        protocolMajor = 1,
-        protocolMinor = 2,
-        minSupportedMinor = 0,
-        supportedFeatures = listOf(
-            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-        ),
-        hostBuildId = "host-1.2",
-    )
+    private fun host() =
+        ProtocolInfoParcel(
+            protocolMajor = 1,
+            protocolMinor = 2,
+            minSupportedMinor = 0,
+            supportedFeatures =
+                listOf(
+                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                ),
+            hostBuildId = "host-1.2",
+        )
 
     private fun client(
         protocolMinor: Int,
