@@ -13,6 +13,8 @@ import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPreset
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.InferencePresetId
+import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -26,6 +28,7 @@ import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.HostExecutionEnvironment
 import io.github.daniele21.localllm.models.HostExecutionFailureCode
+import io.github.daniele21.localllm.models.HostExecutionRequest
 import io.github.daniele21.localllm.models.HostExecutionResolution
 import io.github.daniele21.localllm.models.HostExecutionResolver
 import io.github.daniele21.localllm.models.OutputMode
@@ -36,6 +39,7 @@ import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.PublishedPresetDiscovery
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryFailure
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryResult
+import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
@@ -96,10 +100,7 @@ internal class HarnessConsumerControlPlaneHost(
                 bindingRevision = result.bindingRevision,
                 presets = result.presets.map { preset ->
                     ConsumerPublishedPreset(
-                        preset = io.github.daniele21.localllm.contracts.InferencePresetRef(
-                            io.github.daniele21.localllm.contracts.InferencePresetId(preset.presetId),
-                            preset.revision,
-                        ),
+                        preset = InferencePresetRef(InferencePresetId(preset.presetId), preset.revision),
                         displayName = preset.displayName,
                         description = preset.description,
                         isDefault = preset.isDefault,
@@ -120,10 +121,13 @@ internal class HarnessConsumerControlPlaneHost(
     ): ConsumerActivationResult {
         ensureSeeded()
         val resolution = resolver.resolve(
-            applicationId = applicationId,
-            useCaseId = request.useCaseId,
-            preset = request.preset,
-            environment = executionEnvironment(applicationId),
+            HostExecutionRequest(
+                applicationId = applicationId,
+                useCaseId = request.useCaseId,
+                presetId = request.preset.id.value,
+                presetRevision = request.preset.version,
+            ),
+            executionEnvironment(applicationId),
         )
         val execution = when (resolution) {
             is HostExecutionResolution.Failure -> return ConsumerActivationResult.Rejected(
@@ -138,7 +142,8 @@ internal class HarnessConsumerControlPlaneHost(
             )
         }
 
-        val installed = modelStore.get(execution.modelDigest)
+        val installed = modelStore.find(execution.modelDigest)
+            ?.takeIf { it.verified }
             ?: return ConsumerActivationResult.Rejected(
                 failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
             )
@@ -153,7 +158,7 @@ internal class HarnessConsumerControlPlaneHost(
             )
         }
 
-        val acquired = runtimeGraph.activationResidency.acquire(
+        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
             request = UseCaseActivationRequest(
                 ownerId = ActivationOwnerId(ownerId),
                 applicationId = applicationId,
@@ -168,33 +173,7 @@ internal class HarnessConsumerControlPlaneHost(
         )
         return when (acquired) {
             is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
-            is ActivationResidencyResult.Success -> {
-                val lease = acquired.value
-                val installedBinding = runCatching {
-                    runtimeGraph.installActivationBinding(
-                        activationId = lease.activationId,
-                        applicationId = applicationId,
-                        useCaseId = request.useCaseId,
-                        resolved = runtimeResolved,
-                    )
-                }
-                if (installedBinding.isFailure) {
-                    runtimeGraph.activationResidency.release(lease.activationId, lease.ownerId)
-                    ConsumerActivationResult.Rejected(
-                        failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Unable to bind activated execution"),
-                    )
-                } else {
-                    ConsumerActivationResult.Activated(
-                        ConsumerActivation(
-                            activationId = ConsumerActivationId(lease.activationId.value),
-                            useCaseId = lease.useCaseId,
-                            useCaseRevision = lease.useCaseRevision,
-                            bindingRevision = lease.bindingRevision,
-                            preset = lease.preset,
-                        ),
-                    )
-                }
-            }
+            is ActivationResidencyResult.Success -> activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
         }
     }
 
@@ -219,6 +198,12 @@ internal class HarnessConsumerControlPlaneHost(
             }
 
             is ActivationResidencyResult.Success -> {
+                val releasedLease = released.value.releasedLeases.single()
+                if (releasedLease.applicationId != applicationId) {
+                    return ConsumerDeactivationResult.Rejected(
+                        failure(ConsumerControlPlaneErrorCode.INVALID_REQUEST, "Activation belongs to another application"),
+                    )
+                }
                 runtimeGraph.removeActivationBinding(runtimeActivationId)
                 released.value.warmRetentionByModelMs.forEach(onWarmRetention)
                 ConsumerDeactivationResult.Released
@@ -232,6 +217,37 @@ internal class HarnessConsumerControlPlaneHost(
             .filter { it.applicationId == applicationId }
             .forEach { runtimeGraph.removeActivationBinding(it.activationId) }
         released.warmRetentionByModelMs.forEach(onWarmRetention)
+    }
+
+    private fun activateRuntimeBinding(
+        lease: io.github.daniele21.localllm.runtime.UseCaseActivationLease,
+        applicationId: ApplicationId,
+        request: ConsumerActivationRequest,
+        runtimeResolved: io.github.daniele21.localllm.models.ResolvedUseCase,
+    ): ConsumerActivationResult {
+        val installedBinding = runCatching {
+            runtimeGraph.installActivationBinding(
+                activationId = lease.activationId,
+                applicationId = applicationId,
+                useCaseId = request.useCaseId,
+                resolved = runtimeResolved,
+            )
+        }
+        if (installedBinding.isFailure) {
+            runtimeGraph.activationResidency.release(lease.activationId, lease.ownerId)
+            return ConsumerActivationResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Unable to bind activated execution"),
+            )
+        }
+        return ConsumerActivationResult.Activated(
+            ConsumerActivation(
+                activationId = ConsumerActivationId(lease.activationId.value),
+                useCaseId = lease.useCaseId,
+                useCaseRevision = lease.useCaseRevision,
+                bindingRevision = lease.bindingRevision,
+                preset = lease.preset,
+            ),
+        )
     }
 
     @Synchronized
@@ -270,30 +286,30 @@ internal class HarnessConsumerControlPlaneHost(
     }
 
     private fun executionEnvironment(applicationId: ApplicationId): HostExecutionEnvironment {
-        val installed = modelStore.listModels()
+        val installed = modelStore.snapshot().entries.filter { it.verified }
         val profiles = installed.mapNotNull { stored ->
             importedModel(stored.digest, stored.sizeBytes)?.let { model ->
                 runCatching { HarnessSharedRuntimeBindings.resolveOmbra(model, applicationId).model }.getOrNull()
             }
         }
         return HostExecutionEnvironment(
-            installedModels = installed.associateBy { it.digest },
             modelProfiles = profiles,
+            installedModelDigests = installed.map { it.digest }.toSet(),
             backendId = LLAMA_CPP_BACKEND_ID,
-            supportsStatelessContextReuse = false,
-            supportsPrefixSnapshot = false,
-            supportsDeterministicResultCache = false,
+            backendRevision = Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION,
         )
     }
 
     private fun importedModel(digest: ModelDigest, sizeBytes: Long): ImportedPhoneModel? {
-        val release = runCatching { CuratedModelCatalog.requireByDigestAndSize(digest, sizeBytes) }.getOrNull() ?: return null
+        val release = CuratedModelCatalog.releases.singleOrNull { candidate ->
+            candidate.artifact.digest == digest && candidate.artifact.sizeBytes == sizeBytes
+        } ?: return null
         return ImportedPhoneModel(
             digest = digest,
             fileName = release.artifact.fileName,
             sizeBytes = sizeBytes,
-            architecture = release.architecture,
-            quantization = release.quantization,
+            architecture = release.artifact.architecture,
+            quantization = release.artifact.quantization,
         )
     }
 
@@ -377,7 +393,7 @@ private fun HostExecutionFailureCode.toConsumerFailure(): ConsumerControlPlaneFa
     HostExecutionFailureCode.PRESET_UNAVAILABLE,
     HostExecutionFailureCode.STALE_PRESET_REVISION,
     -> failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments")
-    HostExecutionFailureCode.MODEL_PROFILE_NOT_FOUND,
+    HostExecutionFailureCode.MODEL_PROFILE_MISSING,
     HostExecutionFailureCode.MODEL_NOT_INSTALLED,
     HostExecutionFailureCode.MODEL_INCOMPATIBLE,
     HostExecutionFailureCode.NO_COMPATIBLE_MODEL,
@@ -387,6 +403,8 @@ private fun HostExecutionFailureCode.toConsumerFailure(): ConsumerControlPlaneFa
 private fun ActivationResidencyResult.Failure.toConsumerFailure(): ConsumerControlPlaneFailure = when (reason) {
     ActivationResidencyFailure.MODEL_CONFLICT ->
         failure(ConsumerControlPlaneErrorCode.MODEL_CONFLICT, "Another active use case protects a different local model")
+    ActivationResidencyFailure.USE_CASE_ALREADY_ACTIVE ->
+        failure(ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE, "Use case is already active for this connection")
     ActivationResidencyFailure.LEASE_REJECTED ->
         failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Unable to acquire local-AI activation")
 }
