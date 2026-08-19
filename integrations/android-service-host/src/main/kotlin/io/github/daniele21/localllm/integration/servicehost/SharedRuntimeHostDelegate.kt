@@ -167,7 +167,7 @@ class SharedRuntimeHostDelegate(
                 runCatching { client.closeSession(sessionId) }
             }
         }
-        runCatching { consumerControlPlaneHost?.releaseAll(token, caller.applicationId) }
+        runCatching { consumerControlPlaneHost?.releaseAll(token.value, caller.applicationId) }
         consumerResources.removeClient(token)
         resources.removeDeathLink(token)?.unlinkSafely()
         resources.removeCallbackDispatcher(token)?.closeSafely()
