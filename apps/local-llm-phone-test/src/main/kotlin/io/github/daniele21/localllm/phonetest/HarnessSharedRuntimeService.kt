@@ -5,10 +5,10 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
-import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
 import io.github.daniele21.localllm.runtime.ActivityManagerLowMemoryProbe
 import io.github.daniele21.localllm.runtime.AndroidMemoryPressureCallbacks
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
@@ -111,7 +111,7 @@ class HarnessSharedRuntimeService : Service() {
                 RegisteredApplication(
                     applicationId = policy.applicationId,
                     packageName = policy.packageName,
-                    signerSha256 = policy.signingCertificateSha256.minOf { it.hex },
+                    signerSha256 = policy.acceptedSigningCertificates.minOf { it.hex },
                     displayName = when (policy.applicationId) {
                         HarnessSharedRuntimeBindings.consoleApplicationId -> "Local LLM Console"
                         HarnessSharedRuntimeBindings.redactGuardApplicationId -> "RedactGuard"
