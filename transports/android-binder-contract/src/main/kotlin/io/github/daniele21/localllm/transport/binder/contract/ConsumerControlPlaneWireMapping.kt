@@ -27,10 +27,9 @@ fun ConsumerAssignedUseCasesResult.toConsumerControlPlaneWire(operationId: Strin
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCoreAssignedUseCasesResult(): ConsumerAssignedUseCasesResult =
-    error?.let {
-        ConsumerAssignedUseCasesResult.Rejected(it.toConsumerControlPlaneFailure())
-    } ?: ConsumerAssignedUseCasesResult.Available(assignments.map(ConsumerAssignedUseCaseParcel::toCore))
+fun ConsumerControlPlaneResultParcel.toCoreAssignedUseCasesResult(): ConsumerAssignedUseCasesResult = error?.let {
+    ConsumerAssignedUseCasesResult.Rejected(it.toConsumerControlPlaneFailure())
+} ?: ConsumerAssignedUseCasesResult.Available(assignments.map(ConsumerAssignedUseCaseParcel::toCore))
 
 fun ConsumerPublishedPresetsResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerPublishedPresetsResult.Available -> ConsumerControlPlaneResultParcel(
@@ -46,14 +45,13 @@ fun ConsumerPublishedPresetsResult.toConsumerControlPlaneWire(operationId: Strin
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPublishedPresetsResult =
-    error?.let {
-        ConsumerPublishedPresetsResult.Rejected(it.toConsumerControlPlaneFailure())
-    } ?: ConsumerPublishedPresetsResult.Available(
-        useCaseId = UseCaseId(requireNotNull(useCaseId)),
-        bindingRevision = requireNotNull(bindingRevision),
-        presets = presets.map(ConsumerPublishedPresetMetadataParcel::toCore),
-    )
+fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPublishedPresetsResult = error?.let {
+    ConsumerPublishedPresetsResult.Rejected(it.toConsumerControlPlaneFailure())
+} ?: ConsumerPublishedPresetsResult.Available(
+    useCaseId = UseCaseId(requireNotNull(useCaseId)),
+    bindingRevision = requireNotNull(bindingRevision),
+    presets = presets.map(ConsumerPublishedPresetMetadataParcel::toCore),
+)
 
 fun ConsumerActivationResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerActivationResult.Activated -> ConsumerControlPlaneResultParcel(
@@ -67,10 +65,9 @@ fun ConsumerActivationResult.toConsumerControlPlaneWire(operationId: String): Co
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCoreActivationResult(): ConsumerActivationResult =
-    error?.let {
-        ConsumerActivationResult.Rejected(it.toConsumerControlPlaneFailure())
-    } ?: ConsumerActivationResult.Activated(requireNotNull(activation).toCore())
+fun ConsumerControlPlaneResultParcel.toCoreActivationResult(): ConsumerActivationResult = error?.let {
+    ConsumerActivationResult.Rejected(it.toConsumerControlPlaneFailure())
+} ?: ConsumerActivationResult.Activated(requireNotNull(activation).toCore())
 
 fun ConsumerDeactivationResult.toConsumerControlPlaneWire(
     operationId: String,
@@ -87,9 +84,7 @@ fun ConsumerDeactivationResult.toConsumerControlPlaneWire(
     )
 }
 
-fun ConsumerControlPlaneResultParcel.toCoreDeactivationResult(
-    expectedActivationId: ConsumerActivationId,
-): ConsumerDeactivationResult =
+fun ConsumerControlPlaneResultParcel.toCoreDeactivationResult(expectedActivationId: ConsumerActivationId): ConsumerDeactivationResult =
     error?.let {
         ConsumerDeactivationResult.Rejected(it.toConsumerControlPlaneFailure())
     } ?: if (releasedActivationId == expectedActivationId.value) {
@@ -172,7 +167,9 @@ private fun ConsumerControlPlaneFailure.toWireError(): WireErrorParcel = WireErr
 fun WireErrorParcel.toConsumerControlPlaneFailure(): ConsumerControlPlaneFailure {
     val mapped = enumTagOrNull<ConsumerControlPlaneErrorCode>(code) ?: when (code) {
         WireErrorCodes.FEATURE_UNAVAILABLE -> ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE
+
         WireErrorCodes.MODEL_UNAVAILABLE -> ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE
+
         else -> ConsumerControlPlaneErrorCode.RUNTIME_FAILURE
     }
     return ConsumerControlPlaneFailure(mapped, mapped.safeMessage())
@@ -180,16 +177,28 @@ fun WireErrorParcel.toConsumerControlPlaneFailure(): ConsumerControlPlaneFailure
 
 private fun ConsumerControlPlaneErrorCode.safeMessage(): String = when (this) {
     ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE -> "Consumer control plane is unavailable"
+
     ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION -> "Consumer application is unknown"
+
     ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED -> "Consumer application is not authorized"
+
     ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED -> "Use case is not assigned"
+
     ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED -> "Preset is not available to this consumer"
+
     ConsumerControlPlaneErrorCode.STALE_REVISION -> "Consumer configuration changed; refresh assignments"
+
     ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE -> "Required local model is unavailable"
+
     ConsumerControlPlaneErrorCode.MODEL_CONFLICT -> "Another active use case protects a different local model"
+
     ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE -> "Use case is already active for this connection"
+
     ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED -> "Harness configuration is required"
+
     ConsumerControlPlaneErrorCode.INVALID_REQUEST -> "Consumer control-plane request is invalid"
+
     ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE -> "Shared runtime transport is unavailable"
+
     ConsumerControlPlaneErrorCode.RUNTIME_FAILURE -> "Consumer control-plane request failed"
 }
