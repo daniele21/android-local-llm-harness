@@ -217,17 +217,22 @@ public final class HostControlPlaneEntities {
         @ColumnInfo(name = "enabled")
         public final boolean enabled;
 
+        @ColumnInfo(name = "is_default")
+        public final boolean isDefault;
+
         public BindingEntity(
                 @NonNull String bindingId,
                 int revision,
                 String applicationId,
                 String useCaseId,
-                boolean enabled) {
+                boolean enabled,
+                boolean isDefault) {
             this.bindingId = bindingId;
             this.revision = revision;
             this.applicationId = applicationId;
             this.useCaseId = useCaseId;
             this.enabled = enabled;
+            this.isDefault = isDefault;
         }
     }
 
