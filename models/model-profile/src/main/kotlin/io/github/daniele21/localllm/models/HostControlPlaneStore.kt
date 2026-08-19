@@ -74,7 +74,12 @@ data class HostControlPlaneState(
         require(bindings.all { it.useCaseId in useCaseIds }) {
             "Every binding must reference a known use case"
         }
-        require(currentBindings().filter(ApplicationUseCaseBinding::isDefault).groupBy(ApplicationUseCaseBinding::applicationId).values.all { it.size <= 1 }) {
+        require(
+            currentBindings().filter(ApplicationUseCaseBinding::isDefault).groupBy(ApplicationUseCaseBinding::applicationId).values.all {
+                it.size <=
+                    1
+            },
+        ) {
             "At most one current enabled use-case binding may be default for each application"
         }
         require(presets.all { it.useCaseId in useCaseIds }) {
