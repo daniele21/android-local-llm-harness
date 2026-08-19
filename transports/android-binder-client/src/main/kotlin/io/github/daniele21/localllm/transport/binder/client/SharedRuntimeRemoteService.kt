@@ -83,8 +83,6 @@ internal data class RegisteredSharedRuntimeEndpoint(
     val service: SharedRuntimeRemoteService,
     val clientToken: ClientTokenParcel,
     val connectionEpoch: Long = 0L,
-    val negotiatedMinor: Int? = null,
-    val enabledFeatures: Set<String> = emptySet(),
 )
 
 internal fun interface SharedRuntimeEndpointInvalidationListener {
