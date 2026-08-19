@@ -1,0 +1,69 @@
+name: HCP ledger refactor once
+
+on:
+  pull_request:
+    branches:
+      - dev
+    types:
+      - reopened
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/hcp-n-consumer-control-plane-protocol
+          fetch-depth: 0
+      - name: Split connection validation from ledger facade
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/hcp-n-consumer-control-plane-protocol
+          git reset --hard origin/agent/hcp-n-consumer-control-plane-protocol
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ledger = Path('integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/ConnectionLedger.kt')
+          s = ledger.read_text()
+          member = '''    @Synchronized
+          fun validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
+              if (connections.activeConnection(token, caller) != null) LedgerResult.Success(Unit) else invalidConnection()
+
+          '''
+          if member not in s:
+              raise SystemExit('ledger validation member not found')
+          s = s.replace(member, '')
+          extension = '''
+          internal fun ClientConnectionLedger.validateRegisteredConnection(
+              token: HostClientToken,
+              caller: AuthorizedCaller,
+          ): LedgerResult<Unit> = when (val support = supportsFeature(token, caller, CONNECTION_VALIDATION_PROBE)) {
+              is LedgerResult.Failure -> support
+              is LedgerResult.Success -> LedgerResult.Success(Unit)
+          }
+
+          private const val CONNECTION_VALIDATION_PROBE = "__connection_validation__"
+          '''
+          anchor = '\nprivate fun Map<HostClientToken, ClientConnectionState>.activeConnection('
+          s = s.replace(anchor, extension + anchor)
+          ledger.write_text(s)
+
+          for path in [
+              'integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/ConsumerHostOperations.kt',
+              'integrations/android-service-host/src/main/kotlin/io/github/daniele21/localllm/integration/servicehost/HostRuntimeOperations.kt',
+          ]:
+              p = Path(path)
+              text = p.read_text()
+              if 'validateConnection(' not in text:
+                  raise SystemExit(f'expected validateConnection use in {path}')
+              p.write_text(text.replace('validateConnection(', 'validateRegisteredConnection('))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor(hcp): narrow connection ledger surface'
+          git push origin HEAD:agent/hcp-n-consumer-control-plane-protocol
