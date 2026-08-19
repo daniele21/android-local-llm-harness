@@ -24,7 +24,7 @@ class HarnessSharedRuntimeService : Service() {
     override fun onCreate() {
         super.onCreate()
         runtimeGraph = HarnessRuntimeGraph.from(this)
-        val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(this, runtimeGraph)
+        val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(runtimeGraph)
         val policies = HarnessSharedRuntimePolicy.authorizedClients(this)
         controlPlaneStoreOwner = RoomHostControlPlaneStoreOwner.open(this, CONTROL_PLANE_DATABASE_NAME)
         val controlPlaneHost = HarnessWarmRetentionAwareControlPlaneHost(
