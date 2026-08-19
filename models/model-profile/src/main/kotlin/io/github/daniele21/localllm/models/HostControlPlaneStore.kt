@@ -74,6 +74,9 @@ data class HostControlPlaneState(
         require(bindings.all { it.useCaseId in useCaseIds }) {
             "Every binding must reference a known use case"
         }
+        require(currentBindings().filter(ApplicationUseCaseBinding::isDefault).groupBy(ApplicationUseCaseBinding::applicationId).values.all { it.size <= 1 }) {
+            "At most one current enabled use-case binding may be default for each application"
+        }
         require(presets.all { it.useCaseId in useCaseIds }) {
             "Every preset must reference a known use case"
         }
@@ -126,6 +129,15 @@ data class HostControlPlaneState(
     fun latestBinding(applicationId: ApplicationId, useCaseId: UseCaseId): ApplicationUseCaseBinding? = bindings
         .filter { it.applicationId == applicationId && it.useCaseId == useCaseId }
         .maxByOrNull(ApplicationUseCaseBinding::revision)
+
+    fun currentBindings(applicationId: ApplicationId? = null): List<ApplicationUseCaseBinding> = bindings
+        .asSequence()
+        .filter { applicationId == null || it.applicationId == applicationId }
+        .groupBy { it.applicationId to it.useCaseId }
+        .values
+        .mapNotNull { revisions -> revisions.maxByOrNull(ApplicationUseCaseBinding::revision) }
+        .filter(ApplicationUseCaseBinding::enabled)
+        .sortedWith(compareBy({ it.applicationId.value }, { !it.isDefault }, { it.useCaseId.value }))
 
     fun preset(useCaseId: UseCaseId, presetId: String, revision: Int): UseCasePresetDefinition? = presets.firstOrNull {
         it.useCaseId == useCaseId &&
