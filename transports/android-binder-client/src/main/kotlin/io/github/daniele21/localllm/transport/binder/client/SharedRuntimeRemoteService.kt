@@ -5,6 +5,8 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
@@ -35,6 +37,18 @@ internal interface ConsumerSharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun closeSession(request: CloseSessionRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit)
 }
 
 internal interface SharedRuntimeRemoteService {
@@ -69,6 +83,8 @@ internal data class RegisteredSharedRuntimeEndpoint(
     val service: SharedRuntimeRemoteService,
     val clientToken: ClientTokenParcel,
     val connectionEpoch: Long = 0L,
+    val negotiatedMinor: Int? = null,
+    val enabledFeatures: Set<String> = emptySet(),
 )
 
 internal fun interface SharedRuntimeEndpointInvalidationListener {
