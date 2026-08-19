@@ -5,6 +5,8 @@ import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
 import io.github.daniele21.localllm.contracts.ConsumerActivationResult
 import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
@@ -38,7 +40,16 @@ internal class ConsumerControlPlaneHostOperations(
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
     ) = submit(caller, request, callback) {
-        requireHost(request).assignedUseCases(caller.applicationId).toConsumerControlPlaneWire(request.operationId)
+        val result = requireHost(request).assignedUseCases(caller.applicationId)
+        val authorized = when (result) {
+            is ConsumerAssignedUseCasesResult.Available ->
+                ConsumerAssignedUseCasesResult.Available(
+                    result.assignments.filter { caller.allows(it.useCaseId) },
+                )
+
+            is ConsumerAssignedUseCasesResult.Rejected -> result
+        }
+        authorized.toConsumerControlPlaneWire(request.operationId)
     }
 
     fun discoverPresets(
@@ -48,6 +59,9 @@ internal class ConsumerControlPlaneHostOperations(
     ) = submit(caller, request, callback) {
         val useCaseId = request.useCaseId?.takeIf(String::isNotBlank)?.let(::UseCaseId)
             ?: return@submit invalidRequest(request)
+        if (!caller.allows(useCaseId)) {
+            return@submit unauthorizedPresetDiscovery(request)
+        }
         requireHost(request).publishedPresets(caller.applicationId, useCaseId).toConsumerControlPlaneWire(request.operationId)
     }
 
@@ -57,6 +71,9 @@ internal class ConsumerControlPlaneHostOperations(
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
     ) = submit(caller, request, callback) { token ->
         val activationRequest = request.toCoreActivationRequestOrNull() ?: return@submit invalidRequest(request)
+        if (!caller.allows(activationRequest.useCaseId)) {
+            return@submit unauthorizedActivation(request)
+        }
         requireHost(request)
             .activate(token.value, caller.applicationId, activationRequest)
             .toConsumerControlPlaneWire(request.operationId)
@@ -126,6 +143,19 @@ internal class ConsumerControlPlaneHostOperations(
             preset = InferencePresetRef(InferencePresetId(presetValue.id), presetValue.version),
         )
     }
+
+    private fun unauthorizedPresetDiscovery(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
+        ConsumerPublishedPresetsResult.Rejected(unauthorizedUseCaseFailure())
+            .toConsumerControlPlaneWire(request.operationId)
+
+    private fun unauthorizedActivation(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
+        ConsumerActivationResult.Rejected(unauthorizedUseCaseFailure())
+            .toConsumerControlPlaneWire(request.operationId)
+
+    private fun unauthorizedUseCaseFailure() = ConsumerControlPlaneFailure(
+        ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
+        "Use case is not assigned",
+    )
 
     private fun invalidRequest(request: ConsumerControlPlaneRequestParcel) = failure(request, WireErrorCodes.INVALID_WIRE_REQUEST)
 
