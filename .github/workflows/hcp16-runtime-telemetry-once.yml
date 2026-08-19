@@ -1,0 +1,344 @@
+name: HCP16 runtime telemetry once
+
+on:
+  push:
+    branches:
+      - agent/hcp-i-runtime-session-instrumentation-current
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.event.head_commit.message != 'feat(hcp): instrument runtime session lifecycle'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/hcp-i-runtime-session-instrumentation-current
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Implement runtime-first session telemetry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/hcp-i-runtime-session-instrumentation-current
+          git reset --hard origin/agent/hcp-i-runtime-session-instrumentation-current
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old = Path('/tmp/none')
+          runtime_session = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeSessionTelemetry.kt')
+          runtime_session.write_text('''package io.github.daniele21.localllm.runtime
+
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionKind
+import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.InferenceSessionRecord
+import io.github.daniele21.localllm.observability.SessionCloseReason
+import io.github.daniele21.localllm.observability.SessionRunStatus
+import io.github.daniele21.localllm.observability.SessionTelemetryRepository
+import java.util.concurrent.ConcurrentHashMap
+
+internal class RuntimeSessionTelemetry(
+    private val repository: SessionTelemetryRepository,
+    private val clock: EpochClock,
+) {
+    private val activeSessions = ConcurrentHashMap<SessionId, InferenceSessionRecord>()
+
+    fun opened(
+        sessionId: SessionId,
+        applicationId: ApplicationId,
+        useCaseId: UseCaseId,
+        modelDigest: ModelDigest,
+        sessionKind: SessionKind,
+    ) {
+        val record = InferenceSessionRecord(
+            sessionId = sessionId,
+            applicationId = applicationId,
+            useCaseId = useCaseId,
+            modelDigest = modelDigest,
+            sessionKind = sessionKind,
+            createdAtEpochMs = clock.nowEpochMs(),
+            closedAtEpochMs = null,
+            status = SessionRunStatus.ACTIVE,
+            closeReason = null,
+        )
+        activeSessions[sessionId] = record
+        safely { repository.recordSession(record) }
+    }
+
+    fun closed(sessionId: SessionId, reason: SessionCloseReason) {
+        val current = activeSessions.remove(sessionId) ?: return
+        val status = when (reason) {
+            SessionCloseReason.CANCELLED -> SessionRunStatus.CANCELLED
+            SessionCloseReason.RUNTIME_FAILURE -> SessionRunStatus.FAILED
+            SessionCloseReason.HOST_RESTART -> SessionRunStatus.ABANDONED_HOST_RESTART
+            else -> SessionRunStatus.CLOSED
+        }
+        safely {
+            repository.recordSession(
+                current.copy(
+                    closedAtEpochMs = clock.nowEpochMs(),
+                    status = status,
+                    closeReason = reason,
+                ),
+            )
+        }
+    }
+
+    private inline fun safely(operation: () -> Unit) {
+        runCatching(operation)
+    }
+}
+''')
+
+          telemetry = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeTelemetry.kt')
+          text = telemetry.read_text()
+          marker = '            modelLoadKind = ModelLoadKind.UNKNOWN,\n'
+          if 'sessionId = request.sessionId' not in text:
+              if marker not in text:
+                  raise SystemExit('runtime telemetry generation marker not found')
+              text = text.replace(marker, marker + '            sessionId = request.sessionId,\n', 1)
+          fields = '                "useCaseId" to request.useCaseId.value,\n'
+          if '"sessionId" to request.sessionId.value' not in text:
+              text = text.replace(fields, fields + '                "sessionId" to request.sessionId.value,\n', 1)
+          telemetry.write_text(text)
+
+          orchestrator = Path('core/runtime-core/src/main/kotlin/io/github/daniele21/localllm/runtime/RuntimeOrchestrator.kt')
+          text = orchestrator.read_text()
+          imports = 'import io.github.daniele21.localllm.observability.NoOpTelemetryRepository\n'
+          extra = '''import io.github.daniele21.localllm.observability.NoOpSessionTelemetryRepository
+import io.github.daniele21.localllm.observability.SessionCloseReason
+import io.github.daniele21.localllm.observability.SessionTelemetryRepository
+'''
+          if 'NoOpSessionTelemetryRepository' not in text:
+              text = text.replace(imports, imports + extra, 1)
+          ctor = '    telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,\n'
+          if 'sessionTelemetryRepository:' not in text:
+              text = text.replace(
+                  ctor,
+                  ctor + '    sessionTelemetryRepository: SessionTelemetryRepository = NoOpSessionTelemetryRepository,\n',
+                  1,
+              )
+          field = '    private val runtimeTelemetry = RuntimeTelemetry(telemetryRepository, epochClock)\n'
+          if 'private val sessionTelemetry = RuntimeSessionTelemetry' not in text:
+              text = text.replace(
+                  field,
+                  field + '    private val sessionTelemetry = RuntimeSessionTelemetry(sessionTelemetryRepository, epochClock)\n',
+                  1,
+              )
+
+          start = text.find('    override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId {')
+          end = text.find('\n    @Suppress("ReturnCount")\n    override fun generate', start)
+          if start < 0 or end < 0:
+              raise SystemExit('createSession boundaries not found')
+          method = '''    override fun createSession(
+        applicationId: ApplicationId,
+        useCaseId: UseCaseId,
+        options: SessionOptions,
+    ): SessionId {
+        check(!closed.get()) { "Runtime is closed" }
+        val resolved = registry.resolve(applicationId, useCaseId)
+        val session = synchronized(resourceLock) {
+            val requestedDigest = resolved.model.artifact.digest
+            val warm = modelResidency.reusableModelOrNull()?.let { current ->
+                current.handle.digest == requestedDigest && current.profileId == resolved.model.id
+            } == true
+            val model = ensureModelLoaded(resolved)
+            val sessionId = SessionId(UUID.randomUUID().toString())
+            val descriptor = SessionDescriptor(
+                id = sessionId,
+                applicationId = applicationId,
+                useCaseId = useCaseId,
+                resolved = resolved,
+                model = model.handle,
+                options = options,
+                modelLoadDurationMs = if (warm) null else model.handle.loadDurationMs,
+                modelLoadKind = if (warm) ModelLoadKind.WARM else ModelLoadKind.COLD,
+            )
+            sessions[sessionId] = descriptor
+            state.set(RuntimeState.READY)
+            descriptor
+        }
+        sessionTelemetry.opened(
+            sessionId = session.id,
+            applicationId = applicationId,
+            useCaseId = useCaseId,
+            modelDigest = session.model.digest,
+            sessionKind = options.kind,
+        )
+        return session.id
+    }
+'''
+          text = text[:start] + method + text[end:]
+
+          old_close = '''    override fun closeSession(sessionId: SessionId) {
+        val session = sessions[sessionId] ?: return
+        session.lifecycle.beginClose()
+        if (session.lifecycle.isReleaseReady()) {
+            releaseSession(session)
+        }
+    }
+'''
+          new_close = '''    override fun closeSession(sessionId: SessionId) {
+        val session = sessions[sessionId] ?: return
+        markSessionClosing(session, SessionCloseReason.CLIENT_REQUEST)
+        if (session.lifecycle.isReleaseReady()) {
+            releaseSession(session)
+        }
+    }
+'''
+          if old_close not in text:
+              raise SystemExit('closeSession block not found')
+          text = text.replace(old_close, new_close, 1)
+
+          text = text.replace(
+              '            session.lifecycle.beginClose()\n            if (session.lifecycle.isReleaseReady()) {\n                releaseSession(session)\n            }',
+              '            markSessionClosing(session, SessionCloseReason.HOST_SHUTDOWN)\n            if (session.lifecycle.isReleaseReady()) {\n                releaseSession(session)\n            }',
+              1,
+          )
+          text = text.replace(
+              '        sessions.values.forEach { session -> session.lifecycle.beginClose() }\n',
+              '        sessions.values.forEach { session -> markSessionClosing(session, SessionCloseReason.MEMORY_PRESSURE) }\n',
+              1,
+          )
+
+          release_anchor = '''    private fun releaseSessionRequest(session: SessionDescriptor) {
+        if (session.lifecycle.releaseRequest()) {
+            releaseSession(session)
+        }
+    }
+
+'''
+          helper = '''    private fun markSessionClosing(session: SessionDescriptor, reason: SessionCloseReason) {
+        session.closeReason.compareAndSet(null, reason)
+        session.lifecycle.beginClose()
+    }
+
+'''
+          if helper not in text:
+              if release_anchor not in text:
+                  raise SystemExit('releaseSessionRequest anchor not found')
+              text = text.replace(release_anchor, release_anchor + helper, 1)
+
+          release_success = '''        session.lifecycle.releaseSucceeded()
+        attemptDeferredModelUnload(ignoreActiveGeneration = false)
+'''
+          if 'sessionTelemetry.closed(' not in text:
+              text = text.replace(
+                  release_success,
+                  '''        session.lifecycle.releaseSucceeded()
+        sessionTelemetry.closed(
+            session.id,
+            session.closeReason.get() ?: SessionCloseReason.NORMAL,
+        )
+        attemptDeferredModelUnload(ignoreActiveGeneration = false)
+''',
+                  1,
+              )
+
+          descriptor = '''        val modelLoadKind: ModelLoadKind,
+        @Volatile var context: BackendContextHandle? = null,
+        val lifecycle: SessionLifecycle = SessionLifecycle(),
+'''
+          if 'val closeReason: AtomicReference<SessionCloseReason?>' not in text:
+              if descriptor not in text:
+                  raise SystemExit('SessionDescriptor fields anchor not found')
+              text = text.replace(
+                  descriptor,
+                  '''        val modelLoadKind: ModelLoadKind,
+        @Volatile var context: BackendContextHandle? = null,
+        val lifecycle: SessionLifecycle = SessionLifecycle(),
+        val closeReason: AtomicReference<SessionCloseReason?> = AtomicReference(null),
+''',
+                  1,
+              )
+          orchestrator.write_text(text)
+
+          test = Path('core/runtime-core/src/test/kotlin/io/github/daniele21/localllm/runtime/RuntimeSessionTelemetryTest.kt')
+          test.write_text('''package io.github.daniele21.localllm.runtime
+
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.SessionKind
+import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.observability.InferenceSessionRecord
+import io.github.daniele21.localllm.observability.SessionCloseReason
+import io.github.daniele21.localllm.observability.SessionRunStatus
+import io.github.daniele21.localllm.observability.SessionTelemetryRepository
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class RuntimeSessionTelemetryTest {
+    @Test
+    fun `records active then explicit client close without content`() {
+        val repository = RecordingSessionRepository()
+        var now = 10L
+        val telemetry = RuntimeSessionTelemetry(repository, EpochClock { now })
+        val sessionId = SessionId("session-1")
+
+        telemetry.opened(
+            sessionId = sessionId,
+            applicationId = ApplicationId("app"),
+            useCaseId = UseCaseId("use-case"),
+            modelDigest = ModelDigest("a".repeat(64)),
+            sessionKind = SessionKind.STATELESS,
+        )
+        now = 20L
+        telemetry.closed(sessionId, SessionCloseReason.CLIENT_REQUEST)
+
+        assertEquals(2, repository.records.size)
+        assertEquals(SessionRunStatus.ACTIVE, repository.records.first().status)
+        assertEquals(SessionRunStatus.CLOSED, repository.records.last().status)
+        assertEquals(SessionCloseReason.CLIENT_REQUEST, repository.records.last().closeReason)
+        assertEquals(20L, repository.records.last().closedAtEpochMs)
+    }
+
+    @Test
+    fun `telemetry repository failures never escape runtime instrumentation`() {
+        val telemetry = RuntimeSessionTelemetry(
+            repository = object : SessionTelemetryRepository {
+                override fun recordSession(session: InferenceSessionRecord) = error("store unavailable")
+                override fun recentSessions(limit: Int) = emptyList<InferenceSessionRecord>()
+                override fun findSession(sessionId: SessionId): InferenceSessionRecord? = null
+            },
+            clock = EpochClock { 1L },
+        )
+
+        telemetry.opened(
+            sessionId = SessionId("session-2"),
+            applicationId = ApplicationId("app"),
+            useCaseId = UseCaseId("use-case"),
+            modelDigest = ModelDigest("b".repeat(64)),
+            sessionKind = SessionKind.STATELESS,
+        )
+        telemetry.closed(SessionId("session-2"), SessionCloseReason.RUNTIME_FAILURE)
+    }
+
+    private class RecordingSessionRepository : SessionTelemetryRepository {
+        val records = mutableListOf<InferenceSessionRecord>()
+        override fun recordSession(session: InferenceSessionRecord) { records += session }
+        override fun recentSessions(limit: Int): List<InferenceSessionRecord> = records.takeLast(limit).reversed()
+        override fun findSession(sessionId: SessionId): InferenceSessionRecord? = records.lastOrNull { it.sessionId == sessionId }
+    }
+}
+''')
+          PY
+
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+          ./gradlew --no-configuration-cache detekt
+          ./gradlew --no-configuration-cache :core:runtime-core:test
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(hcp): instrument runtime session lifecycle'
+          git push origin HEAD:agent/hcp-i-runtime-session-instrumentation-current
