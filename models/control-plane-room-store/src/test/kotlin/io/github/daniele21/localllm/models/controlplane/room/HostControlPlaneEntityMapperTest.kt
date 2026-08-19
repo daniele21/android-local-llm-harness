@@ -21,11 +21,12 @@ import io.github.daniele21.localllm.models.UseCaseDefinitionState
 import io.github.daniele21.localllm.models.UseCasePresetDefinition
 import io.github.daniele21.localllm.models.UseCaseRequirements
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HostControlPlaneEntityMapperTest {
     @Test
-    fun `round trip preserves exact revision and residency configuration`() {
+    fun `round trip preserves exact revision residency and binding configuration`() {
         val expected = state()
 
         val actual = HostControlPlaneEntityMapper.fromEntities(
@@ -35,6 +36,7 @@ class HostControlPlaneEntityMapperTest {
         assertEquals(expected.canonical(), actual)
         assertEquals(90_000L, actual.presets.single().execution.cachePolicy.retainModelWarmMs)
         assertEquals(7, actual.exposures.single().bindingRevision)
+        assertTrue(actual.bindings.single().isDefault)
     }
 
     private fun state(): HostControlPlaneState = HostControlPlaneState(
@@ -91,6 +93,7 @@ class HostControlPlaneEntityMapperTest {
                 applicationId = APP_ID,
                 useCaseId = USE_CASE_ID,
                 revision = 7,
+                isDefault = true,
             ),
         ),
         exposures = listOf(
