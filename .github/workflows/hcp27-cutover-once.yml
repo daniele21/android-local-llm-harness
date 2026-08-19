@@ -1,0 +1,87 @@
+name: HCP27 cutover once
+
+on:
+  pull_request:
+    types: [reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  cutover:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/hcp-p-control-plane-cutover
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Remove external selected-model fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/hcp-p-control-plane-cutover
+          git reset --hard origin/agent/hcp-p-control-plane-cutover
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessRuntimeGraph.kt')
+          text = path.read_text()
+          start = text.find('    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {')
+          end = text.find('\n    private fun resolveConsoleConsumer(', start)
+          internal = text.find('\n    private fun resolveInternal(', end)
+          if start < 0 or end < 0 or internal < 0:
+              raise SystemExit('binding registry cutover boundaries not found')
+          replacement = '''    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
+        val activationResolved = synchronized(lock) {
+            activationBindings.values.lastOrNull {
+                it.applicationId == applicationId && it.useCaseId == useCaseId
+            }?.resolved
+        }
+        if (activationResolved != null) return activationResolved
+
+        check(applicationId == HarnessRuntimeGraph.APPLICATION_ID) {
+            "External consumer requires an active Harness control-plane activation"
+        }
+        val selected = synchronized(lock) { requireNotNull(model) { "No model selected" } }
+        return resolveInternal(selected, useCaseId)
+    }
+'''
+          text = text[:start] + replacement + text[internal:]
+          path.write_text(text)
+
+          test = Path('apps/local-llm-phone-test/src/test/kotlin/io/github/daniele21/localllm/phonetest/HarnessControlPlaneCutoverTest.kt')
+          test.write_text('''package io.github.daniele21.localllm.phonetest
+
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.UseCaseId
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class HarnessControlPlaneCutoverTest {
+    @Test
+    fun `external consumer cannot fall back to phone selected model`() {
+        val registry = HarnessPhoneBindingRegistry()
+        val failure = runCatching {
+            registry.resolve(ApplicationId("external-consumer"), UseCaseId("document-pii-detection"))
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertTrue(failure?.message?.contains("control-plane activation") == true)
+    }
+}
+''')
+          Path('.github/workflows/hcp27-cutover-once.yml').unlink()
+          PY
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+          ./gradlew --no-configuration-cache detekt
+          ./gradlew --no-configuration-cache :apps:local-llm-phone-test:testDebugUnitTest
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor(hcp): require control-plane activation for consumers'
+          git push origin HEAD:agent/hcp-p-control-plane-cutover
