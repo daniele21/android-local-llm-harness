@@ -22,7 +22,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Finalize scoped complexity exceptions and remove scaffolding
+      - name: Finalize protocol compatibility and validation cleanup
         shell: bash
         run: |
           set -euo pipefail
@@ -30,6 +30,46 @@ jobs:
           git reset --hard origin/agent/hcp-n-consumer-control-plane-protocol
           python3 - <<'PY'
           from pathlib import Path
+
+          connection = Path('transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/SharedRuntimeConnection.kt')
+          text = connection.read_text()
+          old = '''    return try {
+        // Registration and feature negotiation are not sufficient proof that the caller may use
+        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
+        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
+        service.consumer
+        RegisteredConsumerValidation.Ready(requireNotNull(result.clientToken))
+    } catch (error: SecurityException) {
+        RegisteredConsumerValidation.Rejected(
+            SharedRuntimeConnectionState.PERMISSION_DENIED,
+            error.message ?: "Host denied Consumer API access",
+        )
+    } catch (error: RemoteException) {
+        RegisteredConsumerValidation.Lost(error.message ?: "Consumer API handshake failed")
+    }
+'''
+          new = '''    val token = requireNotNull(result.clientToken)
+    if (BinderProtocolV1.FEATURE_CONSUMER_API_V1 !in negotiated.enabledFeatures) {
+        return RegisteredConsumerValidation.Ready(token)
+    }
+    return try {
+        // For clients that negotiated Consumer API v1, registration and feature negotiation are
+        // not sufficient proof that the caller may use that endpoint. Probe the authorization
+        // boundary before publishing CONNECTED. Legacy protocol-0 clients intentionally skip it.
+        service.consumer
+        RegisteredConsumerValidation.Ready(token)
+    } catch (error: SecurityException) {
+        RegisteredConsumerValidation.Rejected(
+            SharedRuntimeConnectionState.PERMISSION_DENIED,
+            error.message ?: "Host denied Consumer API access",
+        )
+    } catch (error: RemoteException) {
+        RegisteredConsumerValidation.Lost(error.message ?: "Consumer API handshake failed")
+    }
+'''
+          if old not in text:
+              raise SystemExit('legacy compatibility probe block not found')
+          connection.write_text(text.replace(old, new, 1))
 
           scoped = {
               'transports/android-binder-contract/src/main/kotlin/io/github/daniele21/localllm/transport/binder/contract/ConsumerControlPlaneWireMapping.kt': ('TooManyFunctions',),
@@ -75,5 +115,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'chore(hcp): finalize protocol validation cleanup'
+          git commit -m 'fix(hcp): preserve legacy protocol negotiation'
           git push origin HEAD:agent/hcp-n-consumer-control-plane-protocol
