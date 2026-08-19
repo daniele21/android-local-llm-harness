@@ -18,10 +18,7 @@ enum class AssignedUseCaseDiscoveryFailure {
 }
 
 sealed interface AssignedUseCaseDiscoveryResult {
-    data class Success(
-        val applicationId: ApplicationId,
-        val assignments: List<AssignedUseCaseMetadata>,
-    ) : AssignedUseCaseDiscoveryResult
+    data class Success(val applicationId: ApplicationId, val assignments: List<AssignedUseCaseMetadata>) : AssignedUseCaseDiscoveryResult
 
     data class Failure(val reason: AssignedUseCaseDiscoveryFailure) : AssignedUseCaseDiscoveryResult
 }
