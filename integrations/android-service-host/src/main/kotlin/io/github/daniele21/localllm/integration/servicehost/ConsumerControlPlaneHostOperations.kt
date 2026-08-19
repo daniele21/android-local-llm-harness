@@ -96,6 +96,7 @@ internal class ConsumerControlPlaneHostOperations(
                 )
             ) {
                 is LedgerResult.Failure -> callback.onResult(failure(request, WireErrorCodes.CLIENT_TOKEN_INVALID))
+
                 is LedgerResult.Success -> {
                     if (!support.value || host == null) {
                         callback.onResult(failure(request, WireErrorCodes.FEATURE_UNAVAILABLE))
@@ -126,8 +127,7 @@ internal class ConsumerControlPlaneHostOperations(
         )
     }
 
-    private fun invalidRequest(request: ConsumerControlPlaneRequestParcel) =
-        failure(request, WireErrorCodes.INVALID_WIRE_REQUEST)
+    private fun invalidRequest(request: ConsumerControlPlaneRequestParcel) = failure(request, WireErrorCodes.INVALID_WIRE_REQUEST)
 
     private fun failure(request: ConsumerControlPlaneRequestParcel, code: String) = ConsumerControlPlaneResultParcel(
         operationId = request.operationId,
