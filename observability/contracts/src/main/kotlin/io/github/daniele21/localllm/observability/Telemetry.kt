@@ -50,6 +50,10 @@ data class GenerationRunRecord(
     val chatTemplateId: String? = null,
     val chatTemplateSource: ChatTemplateSource? = null,
     val systemPromptVersion: String? = null,
+    val backendId: String? = null,
+    val backendRevision: String? = null,
+    val backendExecutionFingerprint: String? = null,
+    val effectivePlacement: ExecutionPlacementStatus? = null,
     val stopReason: StopReason? = null,
     val promptPlanningMs: Long? = null,
     val contextCreationMs: Long? = null,
@@ -60,6 +64,21 @@ data class GenerationRunRecord(
     init {
         require(useCaseRevision == null || useCaseRevision > 0) { "Use-case revision must be positive" }
         require(bindingRevision == null || bindingRevision > 0) { "Binding revision must be positive" }
+        require(backendId == null || backendId.isNotBlank()) { "Backend ID must not be blank" }
+        require(backendRevision == null || backendRevision.isNotBlank()) { "Backend revision must not be blank" }
+        require(backendExecutionFingerprint == null || EXECUTION_FINGERPRINT_PATTERN.matches(backendExecutionFingerprint)) {
+            "Backend execution fingerprint must be SHA-256"
+        }
+        require(backendExecutionFingerprint == null || backendId != null) {
+            "Backend ID is required when execution fingerprint is present"
+        }
+        require(effectivePlacement == null || backendExecutionFingerprint != null) {
+            "Effective placement status requires backend execution evidence"
+        }
+    }
+
+    private companion object {
+        val EXECUTION_FINGERPRINT_PATTERN = Regex("[0-9a-f]{64}")
     }
 }
 
@@ -69,6 +88,11 @@ enum class RunStatus {
     COMPLETED,
     FAILED,
     CANCELLED,
+}
+
+enum class ExecutionPlacementStatus {
+    KNOWN,
+    UNAVAILABLE,
 }
 
 data class StructuredLog(
@@ -158,6 +182,10 @@ data class BenchmarkExecutionIdentity(val fingerprint: String) {
                 value(run.chatTemplateId),
                 value(run.chatTemplateSource?.name),
                 value(run.systemPromptVersion),
+                value(run.backendId),
+                value(run.backendRevision),
+                value(run.backendExecutionFingerprint),
+                value(run.effectivePlacement?.name),
             ).joinToString("|")
             val digest = java.security.MessageDigest.getInstance("SHA-256")
                 .digest(canonical.toByteArray(Charsets.UTF_8))

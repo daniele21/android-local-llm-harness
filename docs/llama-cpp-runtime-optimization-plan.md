@@ -73,18 +73,26 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | ID | Priority | State | Outcome | Depends on |
 | --- | --- | --- | --- | --- |
 | LLRT-0 | P1 | DONE | Exact-SHA qualification harness integrated; candidate `60addddf...` classified `DEFER` and Harness 0.5 pin remains `aedb2a5e...` | Current green `dev` |
-| LLRT-1 | P1 | PLANNED | Expose backend/device capabilities and requested/effective execution facts without leaking native handles | LLRT-0; RA-7/RA-9 ownership |
+| LLRT-1 | P1 | IN PROGRESS | Backend/device capability inventory and requested load facts are integrated; authoritative effective placement remains explicitly unavailable on the current pin rather than inferred | LLRT-0; RA-7/RA-9 ownership |
 | LLRT-2 | P1 | DONE | Consume the most recently prepared exact prompt tokens once so generation avoids duplicate tokenization while retaining the existing fallback | Existing prompt-planning boundary |
-| LLRT-3 | P1 | PLANNED | Add bounded CPU-side performance deltas for threads, batch threads, batch/ubatch and sustained thermal behavior without exploding the Q35 matrix | Frozen release pin; Q35-6 measurement owner |
-| LLRT-4 | P1/P2 | PLANNED | Prove or reject safe Qwen3.5 recurrent/prefix/session state reuse on an exact backend revision; keep production reuse disabled until proven | LLRT-0; backend conformance; Qwen3.5 state semantics |
+| LLRT-3 | P1 | IN PROGRESS | Bounded CPU delta runner and sustained warm/thermal evidence tooling are integrated; representative physical Android measurements remain the acceptance gate | Frozen release pin; Q35-6 measurement owner |
+| LLRT-4 | P1/P2 | IN PROGRESS | Recurrent/session state correctness probe is integrated; exact Qwen3.5 0.8B/2B physical evidence is still required before any production reuse capability can change | LLRT-0; backend conformance; Qwen3.5 state semantics |
 | LLRT-5 | P2 | PLANNED | Migrate newer load-mode semantics and tri-state Flash Attention on a post-0.5 candidate, preserving old load semantics before evaluating `AUTO` | Newer promoted pin; LLRT-1 |
 | LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | Newer promoted pin; MEM evidence; Q35 validation |
 | LLRT-7 | P2 | PLANNED | Package and discover Adreno OpenCL as an experimental backend without changing the CPU release default | CPU release evidence stable; LLRT-1 |
 | LLRT-8 | P2 | PLANNED | Integrate bounded OpenCL compiled-kernel cache ownership/cleanup for warm startup | LLRT-7 |
 | LLRT-9 | P2 | PLANNED | Add multi-sequence/batched execution only for evaluation throughput; production single-decode policy stays unchanged | EVAL runner maturity; newer promoted pin; backend correctness proof |
 | LLRT-10 | P2 | PLANNED | Evolve RA-8 into a deterministic evidence-driven execution planner using reviewed measured profiles, not online self-tuning | RA-7/RA-8/RA-9; Q35/MEM measured evidence |
-| LLRT-11 | P2 | PLANNED | Extend benchmark/evidence identity with backend/device/load/cache/reuse facts required to compare execution plans safely | LLRT-1; RA-9 |
+| LLRT-11 | P2 | DONE | Backend execution evidence is fingerprinted from the materialized context, propagated into run telemetry and persisted so material backend/load/cache/reuse changes invalidate benchmark comparability | LLRT-1; RA-9 |
 | LLRT-12 | P3 | DEFERRED | Evaluate Hexagon/HTP as an experimental backend with explicit hardware/toolchain support boundaries | CPU/OpenCL evidence stable; LLRT-1 |
+
+### Integrated P1 evidence boundary — 2026-08-19
+
+LLRT-1A, LLRT-3A and LLRT-4A are integrated foundations rather than completed physical claims. LLRT-1A records the registered ggml device inventory and requested load facts while keeping effective placement unavailable when the pinned API cannot prove it. LLRT-3A provides the bounded one-factor CPU experiment lane. LLRT-4A provides the recurrent-state correctness probe while production recurrent/prefix reuse remains disabled.
+
+LLRT-11 closes the comparability gap before physical tuning: after a runtime context is materialized, the backend emits a privacy-safe SHA-256 fingerprint over material execution inputs. The runtime records the backend ID/revision, fingerprint and explicit placement availability with the generation run; Room schema v9 preserves those fields across process restarts. The fingerprint covers the pinned backend revision, profile/context and CPU/batch knobs, requested GPU layers and mmap/mlock state, Flash Attention/KV-cache settings, stable registered-device inventory, prepared-prompt reuse mode and recurrent-state reuse mode. Effective placement remains `UNAVAILABLE` on the current pin rather than being guessed.
+
+The next LLRT-3 acceptance step is therefore physical Android evidence against the exact curated Qwen3.5 artifacts. No runtime profile is promoted from CI, desktop or emulator measurements.
 
 ## LLRT-0 — upstream qualification gate
 

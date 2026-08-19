@@ -78,6 +78,38 @@ class TelemetryMigrationTest {
         }
     }
 
+    @Test
+    fun migrationFrom8To9PreservesHistoricalRunsAndAddsNullableBackendExecutionEvidence() {
+        helper.createDatabase(DATABASE_NAME, 8).use { database ->
+            database.execSQL(
+                "INSERT INTO generation_runs (" +
+                    "request_id, application_id, use_case_id, model_digest, started_at_epoch_ms, status, model_load_kind" +
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+                arrayOf<Any>("request-v8", "app", "use-case", DIGEST, 300L, "COMPLETED", "WARM"),
+            )
+        }
+
+        helper.runMigrationsAndValidate(
+            DATABASE_NAME,
+            9,
+            true,
+            RoomTelemetryRepository.MIGRATION_8_9,
+        ).use { database ->
+            database.query(
+                "SELECT request_id, backend_id, backend_revision, backend_execution_fingerprint, effective_placement " +
+                    "FROM generation_runs WHERE request_id = ?",
+                arrayOf("request-v8"),
+            ).use { cursor ->
+                check(cursor.moveToFirst())
+                assertEquals("request-v8", cursor.getString(0))
+                assertNull(cursor.getString(1))
+                assertNull(cursor.getString(2))
+                assertNull(cursor.getString(3))
+                assertNull(cursor.getString(4))
+            }
+        }
+    }
+
     private fun assertTrueNull(cursor: android.database.Cursor, column: Int) {
         check(cursor.isNull(column))
     }

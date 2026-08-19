@@ -314,6 +314,7 @@ class RuntimeOrchestrator(
                 releaseCancelledMaterialization(session, contextResult)
                 throw GenerationCancelledException()
             }
+            val executionEvidence = backend.executionEvidence(contextResult.context)
             val effective = EffectiveGenerationMetadata(
                 preset = resolved.preset?.ref,
                 temperature = resolved.temperature,
@@ -338,6 +339,7 @@ class RuntimeOrchestrator(
                 configuration = effective,
                 promptPlanningMs = promptPlanningMs,
                 contextCreationMs = contextResult.creationMs,
+                executionEvidence = executionEvidence,
             )
             lifecycle.emit(GenerationEvent.Prepared(request.requestId, session.model.digest, effective))
 

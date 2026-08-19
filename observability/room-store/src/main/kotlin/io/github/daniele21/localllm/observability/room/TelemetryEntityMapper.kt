@@ -13,6 +13,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.BenchmarkBaseline
 import io.github.daniele21.localllm.observability.BenchmarkExecutionIdentity
 import io.github.daniele21.localllm.observability.BenchmarkKey
+import io.github.daniele21.localllm.observability.ExecutionPlacementStatus
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.HealthCheckResult
 import io.github.daniele21.localllm.observability.HealthStatus
@@ -66,6 +67,10 @@ internal object TelemetryEntityMapper {
         chatTemplateId = run.chatTemplateId
         chatTemplateSource = run.chatTemplateSource?.name
         systemPromptVersion = run.systemPromptVersion
+        backendId = run.backendId
+        backendRevision = run.backendRevision
+        backendExecutionFingerprint = run.backendExecutionFingerprint
+        effectivePlacement = run.effectivePlacement?.name
         stopReason = run.stopReason?.name
         promptPlanningMs = run.promptPlanningMs
         contextCreationMs = run.contextCreationMs
@@ -108,6 +113,10 @@ internal object TelemetryEntityMapper {
         chatTemplateId = entity.chatTemplateId,
         chatTemplateSource = entity.chatTemplateSource?.let(ChatTemplateSource::valueOf),
         systemPromptVersion = entity.systemPromptVersion,
+        backendId = entity.backendId,
+        backendRevision = entity.backendRevision,
+        backendExecutionFingerprint = entity.backendExecutionFingerprint,
+        effectivePlacement = entity.effectivePlacement?.let(ExecutionPlacementStatus::valueOf),
         stopReason = entity.stopReason?.let(StopReason::valueOf),
         promptPlanningMs = entity.promptPlanningMs,
         contextCreationMs = entity.contextCreationMs,
