@@ -27,6 +27,32 @@ interface BackendContextHandle {
     val contextSize: Int
 }
 
+enum class BackendExecutionFactAvailability {
+    KNOWN,
+    UNAVAILABLE,
+}
+
+data class BackendExecutionEvidence(
+    val backendId: String,
+    val backendRevision: String?,
+    val materialFingerprint: String,
+    val effectivePlacement: BackendExecutionFactAvailability,
+) {
+    init {
+        require(backendId.isNotBlank()) { "Backend execution evidence ID must not be blank" }
+        require(backendRevision == null || backendRevision.isNotBlank()) {
+            "Backend execution evidence revision must not be blank"
+        }
+        require(SHA256_PATTERN.matches(materialFingerprint)) {
+            "Backend execution material fingerprint must be SHA-256"
+        }
+    }
+
+    companion object {
+        private val SHA256_PATTERN = Regex("[0-9a-f]{64}")
+    }
+}
+
 data class BackendModelCapabilities(
     val maximumContextTokens: Int,
     val supportsGrammar: Boolean,
@@ -116,6 +142,8 @@ interface InferenceBackend {
         profile: GgufModelProfile,
         configuration: BackendContextConfiguration,
     ): BackendContextHandle
+
+    fun executionEvidence(context: BackendContextHandle): BackendExecutionEvidence? = null
 
     fun releaseContext(context: BackendContextHandle)
 
