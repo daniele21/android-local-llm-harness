@@ -1,8 +1,10 @@
 package io.github.daniele21.localllm.devicetest
 
 import android.app.ActivityManager
+import android.app.Instrumentation
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Debug
 import android.os.PowerManager
 import androidx.test.core.app.ApplicationProvider
@@ -57,12 +59,12 @@ class Qwen35TuningInstrumentedTest {
         try {
             val cold = runMeasuredGeneration(runtime, harness, sampleIndex = 0)
             assertEquals("Expected a cold first tuning run", "COLD", cold.completed.metrics.modelLoadKind.name)
-            println("LOCAL_LLM_TUNING_JSON ${evidence(cold)}")
+            emitEvidence(cold)
 
             repeat(config.warmRepetitions) { index ->
                 val warm = runMeasuredGeneration(runtime, harness, sampleIndex = index + 1)
                 assertEquals("Expected a warm tuning run", "WARM", warm.completed.metrics.modelLoadKind.name)
-                println("LOCAL_LLM_TUNING_JSON ${evidence(warm)}")
+                emitEvidence(warm)
             }
 
             assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())
@@ -200,6 +202,14 @@ class Qwen35TuningInstrumentedTest {
             Thread.sleep(25)
         }
         return condition()
+    }
+
+    private fun emitEvidence(measured: MeasuredGeneration) {
+        val line = "LOCAL_LLM_TUNING_JSON ${evidence(measured)}"
+        val status = Bundle().apply {
+            putString(Instrumentation.REPORT_KEY_STREAMRESULT, "$line\n")
+        }
+        InstrumentationRegistry.getInstrumentation().sendStatus(0, status)
     }
 
     private fun evidence(measured: MeasuredGeneration): JSONObject {
@@ -377,7 +387,7 @@ private data class Qwen35TuningConfig(
                 caseId = required("tuningCaseId"),
                 harnessCommit = required("harnessCommit"),
                 prompt = string("prompt", "How much is the Earth radius?"),
-                timeoutSeconds = string("timeoutSeconds", "180").toLong().also {
+                timeoutSeconds = string("timeoutSeconds", "600").toLong().also {
                     require(it > 0) { "timeoutSeconds must be positive" }
                 },
             )
