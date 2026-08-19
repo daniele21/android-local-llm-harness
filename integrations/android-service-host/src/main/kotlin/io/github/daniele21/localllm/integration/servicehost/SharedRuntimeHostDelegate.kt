@@ -97,7 +97,7 @@ class SharedRuntimeHostDelegate(
             callback.onResult(registrationFailure(wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
             return@synchronized
         }
-        when (val registration = ledger.register(caller)) {
+        when (val registration = ledger.register(caller, negotiatedMinor, enabledFeatures.toSet())) {
             is LedgerResult.Failure ->
                 callback.onResult(registrationFailure(registration.reason.toHostWireError()))
 
