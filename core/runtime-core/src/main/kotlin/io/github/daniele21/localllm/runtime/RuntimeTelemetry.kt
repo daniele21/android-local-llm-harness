@@ -82,7 +82,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         configuration: EffectiveGenerationMetadata,
         promptPlanningMs: Long,
         contextCreationMs: Long?,
-        executionEvidence: BackendExecutionEvidence?,
+        executionEvidence: BackendExecutionEvidence? = null,
     ) {
         val current = activeRuns[requestId] ?: return
         val updated = current.copy(
