@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class Qwen35TuningInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val config = Qwen35TuningConfig.fromInstrumentation()
+    private val config by lazy { Qwen35TuningConfig.fromInstrumentation() }
 
     @Test
     fun recordsColdAndWarmEvidence() {
@@ -74,7 +74,16 @@ class Qwen35TuningInstrumentedTest {
         }
     }
 
-    private fun runMeasuredGeneration(runtime: RuntimeOrchestrator, harness: Qwen35TuningHarness, sampleIndex: Int): MeasuredGeneration {
+    @Test
+    fun reportsThermalStatus() {
+        emitStatus("LOCAL_LLM_THERMAL_STATUS ${currentThermalStatus()}")
+    }
+
+    private fun runMeasuredGeneration(
+        runtime: RuntimeOrchestrator,
+        harness: Qwen35TuningHarness,
+        sampleIndex: Int,
+    ): MeasuredGeneration {
         val before = deviceSnapshot()
         val session = runtime.createSession(harness.applicationId, harness.useCaseId)
         val completed = generateAndAwait(runtime, harness, session)
@@ -205,7 +214,10 @@ class Qwen35TuningInstrumentedTest {
     }
 
     private fun emitEvidence(measured: MeasuredGeneration) {
-        val line = "LOCAL_LLM_TUNING_JSON ${evidence(measured)}"
+        emitStatus("LOCAL_LLM_TUNING_JSON ${evidence(measured)}")
+    }
+
+    private fun emitStatus(line: String) {
         val status = Bundle().apply {
             putString(Instrumentation.REPORT_KEY_STREAMRESULT, "$line\n")
         }
@@ -226,6 +238,7 @@ class Qwen35TuningInstrumentedTest {
             .put("tuningCaseId", config.caseId)
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
+            .put("maxOutputTokens", config.maxOutputTokens)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -267,20 +280,25 @@ class Qwen35TuningInstrumentedTest {
             .put("thermalStatus", maxOf(measured.before.thermalStatus, measured.after.thermalStatus))
     }
 
+    private fun currentThermalStatus(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return -1
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.currentThermalStatus
+    }
+
     private fun deviceSnapshot(): DeviceSnapshot {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val debugMemory = Debug.MemoryInfo().also(Debug::getMemoryInfo)
         return DeviceSnapshot(
             processPssKb = debugMemory.totalPss,
             availableMemoryBytes = memoryInfo.availMem,
-            thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,
+            thermalStatus = currentThermalStatus(),
         )
     }
 
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 2
+        const val EVIDENCE_SCHEMA_VERSION = 3
     }
 }
 
