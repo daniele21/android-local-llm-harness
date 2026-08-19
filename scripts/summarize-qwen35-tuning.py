@@ -43,6 +43,11 @@ NUMERIC_METRICS = [
     "prefillTokensPerSecond",
     "decodeTokensPerSecond",
 ]
+SUSTAINED_METRICS = [
+    "ttftMs",
+    "totalMs",
+    "decodeTokensPerSecond",
+]
 REQUIRED_FIELDS = set(
     ["schemaVersion", "sampleIndex", "modelLoadKind", "stopReason", "processPssKb", "availableMemoryBytes", "thermalStatus"]
     + IDENTITY_FIELDS
@@ -75,6 +80,17 @@ def max_numeric(records: list[dict[str, object]], field: str) -> float | None:
 def min_numeric(records: list[dict[str, object]], field: str) -> float | None:
     values = numeric_values(records, field)
     return min(values) if values else None
+
+
+def first_last_drift(records: list[dict[str, object]], field: str) -> tuple[float | None, float | None, float | None]:
+    ordered = sorted(records, key=lambda record: int(record["sampleIndex"]))
+    values = [(float(record[field]), int(record["sampleIndex"])) for record in ordered if record.get(field) is not None]
+    if not values:
+        return None, None, None
+    first = values[0][0]
+    last = values[-1][0]
+    drift_percent = None if first == 0 else (last - first) * 100.0 / first
+    return first, last, drift_percent
 
 
 def read_records(path: Path) -> list[dict[str, object]]:
@@ -135,6 +151,19 @@ def summarize_case(records: list[dict[str, object]]) -> dict[str, object]:
         row[f"cold_{field}"] = median(cold, field)
         row[f"warm_median_{field}"] = median(warm, field)
         row[f"warm_p95_{field}"] = p95(warm, field)
+    for field in SUSTAINED_METRICS:
+        first_value, last_value, drift_percent = first_last_drift(warm, field)
+        row[f"warm_first_{field}"] = first_value
+        row[f"warm_last_{field}"] = last_value
+        row[f"warm_driftPercent_{field}"] = drift_percent
+    ordered_warm = sorted(warm, key=lambda record: int(record["sampleIndex"]))
+    row["warm_first_thermalStatus"] = float(ordered_warm[0]["thermalStatus"]) if ordered_warm else None
+    row["warm_last_thermalStatus"] = float(ordered_warm[-1]["thermalStatus"]) if ordered_warm else None
+    row["warm_thermalStatusDelta"] = (
+        row["warm_last_thermalStatus"] - row["warm_first_thermalStatus"]
+        if row["warm_first_thermalStatus"] is not None and row["warm_last_thermalStatus"] is not None
+        else None
+    )
     row["peak_processPssKb"] = max_numeric(records, "processPssKb")
     row["min_availableMemoryBytes"] = min_numeric(records, "availableMemoryBytes")
     row["max_thermalStatus"] = max_numeric(records, "thermalStatus")
@@ -159,10 +188,17 @@ def main() -> int:
     metric_columns: list[str] = []
     for field in NUMERIC_METRICS:
         metric_columns.extend([f"cold_{field}", f"warm_median_{field}", f"warm_p95_{field}"])
+    sustained_columns: list[str] = []
+    for field in SUSTAINED_METRICS:
+        sustained_columns.extend([f"warm_first_{field}", f"warm_last_{field}", f"warm_driftPercent_{field}"])
     fieldnames = IDENTITY_FIELDS + [
         "coldSamples",
         "warmSamples",
         *metric_columns,
+        *sustained_columns,
+        "warm_first_thermalStatus",
+        "warm_last_thermalStatus",
+        "warm_thermalStatusDelta",
         "peak_processPssKb",
         "min_availableMemoryBytes",
         "max_thermalStatus",
