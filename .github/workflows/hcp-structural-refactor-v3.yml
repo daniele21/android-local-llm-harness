@@ -1,16 +1,17 @@
 name: HCP structural refactor v3
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/hcp-n-consumer-control-plane-protocol
+      - dev
+    types:
+      - reopened
 
 permissions:
   contents: write
 
 jobs:
   refactor:
-    if: github.event.head_commit.message != 'refactor(hcp): split control-plane responsibilities'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
