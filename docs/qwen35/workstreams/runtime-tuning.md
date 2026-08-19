@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.runtime-tuning
 Read when: changing Qwen3.5 context policy, cache/session reuse, Android CPU parameters or performance benchmark keys
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-19
 
 ## Goal
 
@@ -71,9 +71,12 @@ generation profile id/version
 threads / batch threads
 batch / ubatch
 context tier
+max output tokens
 thinking mode
 cold/warm classification
 ```
+
+Physical evidence schema v3 makes the output-token budget a required identity field. Evidence produced with different output budgets is therefore not silently comparable or resumable as the same case.
 
 ## Candidate runtime profiles
 
@@ -101,7 +104,42 @@ batch/ubatch: 64/32 / 128/64
 thinking: DISABLED / ENABLED
 ```
 
-## Physical-device evidence runner
+## Physical-device evidence runners
+
+### Bounded LLRT-3 CPU delta runner
+
+Use the bounded runner first when the goal is to identify promising CPU-side deltas without paying for the full Cartesian tuning matrix:
+
+```bash
+bash scripts/run-llama-cpp-cpu-deltas.sh \
+  --model /path/Qwen3.5-2B-Q4_K_M.gguf \
+  --tier 2b \
+  --output-dir build/llrt3
+```
+
+The default bounded identity is intentionally shorter than the original exploratory lane:
+
+```text
+context: 2048
+warm repetitions: 5
+max output tokens: 64
+thinking: DISABLED
+thermal start gate: <= 1 (LIGHT)
+per-generation timeout: 600 seconds
+```
+
+The four deterministic cases remain baseline, generation threads = 2, batch/prefill threads = 2, and batch/ubatch = 64/32. The runner supports `--case NAME` to execute only one case and resumes complete cases for the exact same evidence identity. Raw evidence is appended only after a case completes, so interruption does not leave a partial active case.
+
+Before every new case, the runner queries `PowerManager.currentThermalStatus` through instrumentation and waits until the device is at or below the configured start threshold. This keeps deterministic case order while reducing order bias from running a later configuration on an already-heated phone. If thermal status is unavailable, the default behavior fails closed; bypass requires the explicit `--thermal-start-max off` option.
+
+The runner protects evidence ownership in two ways:
+
+- a custom output directory ending in `0.8b` or `2b` must match `--tier`;
+- files are keyed by context, output budget, warm repetition count and thinking mode, and existing evidence must match schema, artifact, backend, Harness commit, device and common run identity before it can be resumed.
+
+`--reset-output` is the only path that discards evidence for the exact current run identity. There is no silent truncation of an existing raw evidence file.
+
+### Full Q35-6 tuning matrix
 
 Run:
 
@@ -115,16 +153,23 @@ bash scripts/run-qwen35-tuning-matrix.sh \
 
 `--device` is optional when exactly one device is online. The runner verifies both curated SHA-256 values before installation/testing and requires `arm64-v8a`.
 
-For each tuning case the instrumentation test records one true cold run and at least three warm runs while keeping the same model/runtime loaded. Evidence schema v2 records TTFT, prefill/decode time and throughput, process PSS snapshots, available memory, thermal status, stop reason and exact benchmark identity dimensions.
+For each tuning case the instrumentation test records one true cold run and at least three warm runs while keeping the same model/runtime loaded. Evidence schema v3 records TTFT, prefill/decode time and throughput, process PSS snapshots, available memory, thermal status, stop reason, output budget and exact benchmark identity dimensions. Evidence is returned to the host through Android instrumentation status output rather than relying on plain test stdout.
 
-The runner writes:
+The full matrix runner writes:
 
 ```text
 build/qwen35-tuning/qwen35-tuning-evidence.jsonl
 build/qwen35-tuning/qwen35-tuning-summary.csv
 ```
 
-The summarizer validates sample completeness and identity consistency, calculates cold metrics plus warm median/p95, peak PSS, minimum available memory and maximum thermal status, and marks a case only as `eligibleForProfileSelection`. It never changes a runtime profile to `MEASURED` automatically.
+The bounded runner writes tier-separated, run-identity-specific files under its output root, for example:
+
+```text
+build/llrt3/2b/llama-cpp-cpu-deltas-ctx2048-out64-w5-disabled-evidence.jsonl
+build/llrt3/2b/llama-cpp-cpu-deltas-ctx2048-out64-w5-disabled-summary.csv
+```
+
+The summarizer validates sample completeness and identity consistency, calculates cold metrics plus warm median/p95, sustained first-to-last drift, peak PSS, minimum available memory and maximum thermal status, and marks a case only as `eligibleForProfileSelection`. It never changes a runtime profile to `MEASURED` automatically.
 
 ## Task ledger
 
