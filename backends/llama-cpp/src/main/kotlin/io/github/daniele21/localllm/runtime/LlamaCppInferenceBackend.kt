@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.llamacpp.LlamaCppStreamingBridge
 import io.github.daniele21.localllm.llamacpp.LoadedNativeContext
 import io.github.daniele21.localllm.llamacpp.LoadedNativeModel
 import io.github.daniele21.localllm.llamacpp.ModelLoadResult
+import io.github.daniele21.localllm.llamacpp.NativeBackendDevice
 import io.github.daniele21.localllm.llamacpp.NativeGenerationConfig
 import io.github.daniele21.localllm.llamacpp.NativeModelCapabilitiesResult
 import io.github.daniele21.localllm.llamacpp.NativeOperationResult
@@ -21,6 +22,7 @@ import io.github.daniele21.localllm.llamacpp.RuntimeInitializationResult
 import io.github.daniele21.localllm.llamacpp.StreamingCancelResult
 import io.github.daniele21.localllm.models.GgufModelProfile
 import java.io.File
+import java.security.MessageDigest
 
 @Suppress("TooManyFunctions")
 class LlamaCppInferenceBackend(
@@ -33,16 +35,30 @@ class LlamaCppInferenceBackend(
     override val id: String = "llama.cpp"
     override val revision: String = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 
+    @Volatile
+    private var deviceInventoryFingerprint: String? = null
+
+    @Volatile
+    private var deviceInventoryAvailable: Boolean = false
+
     override fun initialize() {
         when (val result = lifecycleBridge.initializeRuntime(nativeLibraryDir)) {
-            is RuntimeInitializationResult.Success -> Unit
+            is RuntimeInitializationResult.Success -> {
+                deviceInventoryAvailable = result.devices != null
+                deviceInventoryFingerprint = result.devices?.let(::fingerprintDevices)
+            }
+
             is RuntimeInitializationResult.Failure -> throw result.error.asBackendException()
         }
     }
 
     override fun shutdown() {
         when (val result = lifecycleBridge.shutdownRuntime()) {
-            NativeOperationResult.Success -> Unit
+            NativeOperationResult.Success -> {
+                deviceInventoryFingerprint = null
+                deviceInventoryAvailable = false
+            }
+
             is NativeOperationResult.Failure -> throw result.error.asBackendException()
         }
     }
@@ -112,9 +128,47 @@ class LlamaCppInferenceBackend(
     ): BackendContextHandle {
         val nativeModel = model.requireLlamaModel()
         return when (val result = generationBridge.createContext(nativeModel.delegate, profile, configuration.contextSize)) {
-            is ContextCreationResult.Success -> LlamaBackendContext(nativeModel, result.context, configuration.contextSize)
+            is ContextCreationResult.Success -> LlamaBackendContext(
+                model = nativeModel,
+                delegate = result.context,
+                contextSize = configuration.contextSize,
+                profile = profile,
+            )
+
             is ContextCreationResult.Failure -> throw result.error.asBackendException()
         }
+    }
+
+    override fun executionEvidence(context: BackendContextHandle): BackendExecutionEvidence {
+        val nativeContext = context.requireLlamaContext()
+        val requested = nativeContext.model.delegate.requestedExecution
+        val profile = nativeContext.profile
+        val canonical = listOf(
+            "backend=$id",
+            "revision=$revision",
+            "profile=${profile.id}",
+            "contextSize=${nativeContext.contextSize}",
+            "batchSize=${profile.batchSize}",
+            "microBatchSize=${profile.microBatchSize}",
+            "cpuThreads=${profile.cpuThreads}",
+            "batchThreads=${profile.batchThreads}",
+            "requestedGpuLayers=${requested.gpuLayers}",
+            "requestedUseMmap=${requested.useMmap}",
+            "requestedUseMlock=${requested.useMlock}",
+            "flashAttention=${profile.flashAttention}",
+            "kvCacheTypeK=${profile.kvCacheTypeK ?: UNAVAILABLE_VALUE}",
+            "kvCacheTypeV=${profile.kvCacheTypeV ?: UNAVAILABLE_VALUE}",
+            "deviceInventory=${if (deviceInventoryAvailable) deviceInventoryFingerprint else UNAVAILABLE_VALUE}",
+            "effectivePlacement=${BackendExecutionFactAvailability.UNAVAILABLE.name}",
+            "preparedPromptTokenReuse=EXACT_ONE_SHOT",
+            "recurrentStateReuse=DISABLED",
+        ).joinToString("\n")
+        return BackendExecutionEvidence(
+            backendId = id,
+            backendRevision = revision,
+            materialFingerprint = sha256(canonical),
+            effectivePlacement = BackendExecutionFactAvailability.UNAVAILABLE,
+        )
     }
 
     override fun releaseContext(context: BackendContextHandle) {
@@ -171,6 +225,26 @@ class LlamaCppInferenceBackend(
         is StreamingCancelResult.Failure -> throw result.error.asBackendException()
     }
 
+    private fun fingerprintDevices(devices: List<NativeBackendDevice>): String = sha256(
+        devices.sortedBy(NativeBackendDevice::index).joinToString("\n") { device ->
+            listOf(
+                device.index,
+                device.type.name,
+                device.name,
+                device.description,
+                device.memoryTotalBytes,
+                device.capabilities.asynchronous,
+                device.capabilities.hostBuffer,
+                device.capabilities.bufferFromHostPointer,
+                device.capabilities.events,
+            ).joinToString("|")
+        },
+    )
+
+    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
+
     private data class LlamaBackendModel(val delegate: LoadedNativeModel) : BackendModelHandle {
         override val digest = delegate.digest
         override val profileId = delegate.profileId
@@ -181,6 +255,7 @@ class LlamaCppInferenceBackend(
         override val model: LlamaBackendModel,
         val delegate: LoadedNativeContext,
         override val contextSize: Int,
+        val profile: GgufModelProfile,
     ) : BackendContextHandle
 
     private fun BackendModelHandle.requireLlamaModel(): LlamaBackendModel = this as? LlamaBackendModel
@@ -188,6 +263,10 @@ class LlamaCppInferenceBackend(
 
     private fun BackendContextHandle.requireLlamaContext(): LlamaBackendContext = this as? LlamaBackendContext
         ?: throw BackendException("BACKEND_MISMATCH", "Context handle was not created by the llama.cpp backend")
+
+    private companion object {
+        const val UNAVAILABLE_VALUE = "~"
+    }
 }
 
 private fun io.github.daniele21.localllm.llamacpp.NativeStreamingMetrics.toBackendMetrics(): BackendGenerationMetrics =
