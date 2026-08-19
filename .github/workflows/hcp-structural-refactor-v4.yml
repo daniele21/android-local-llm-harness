@@ -22,178 +22,64 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Apply and validate final structural refactor
+      - name: Apply final structural split and validate
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin agent/hcp-n-consumer-control-plane-protocol
           git reset --hard origin/agent/hcp-n-consumer-control-plane-protocol
 
+          git show 3231318b74efc7900b7afe666ddaf780dbc2c668:.github/workflows/hcp-structural-refactor-v4.yml > /tmp/hcp-v4-source.yml
           python3 - <<'PY'
           from pathlib import Path
-
-          workflow = Path('.github/workflows/hcp-structural-refactor-v2.yml').read_text().splitlines()
-          start = next(i for i, line in enumerate(workflow) if line.strip() == 'run: |') + 1
-          body = [line[10:] if line.startswith('          ') else line for line in workflow[start:]]
+          lines = Path('/tmp/hcp-v4-source.yml').read_text().splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == 'run: |') + 1
+          body = [line[10:] if line.startswith('          ') else line for line in lines[start:]]
           script = '\n'.join(body)
           cut = script.find('chmod +x gradlew')
           if cut < 0:
-              raise SystemExit('v2 transformation boundary not found')
-          Path('/tmp/hcp-transform.sh').write_text(script[:cut] + '\n')
+              raise SystemExit('historical v4 transformation boundary not found')
+          Path('/tmp/hcp-v4-transform.sh').write_text(script[:cut] + '\n')
           PY
-          bash /tmp/hcp-transform.sh
+          bash /tmp/hcp-v4-transform.sh
 
           python3 - <<'PY'
           from pathlib import Path
-          import re
-
-          # Cross-file mapper helpers are module-internal, not file-private.
-          mapper = Path('transports/android-binder-contract/src/main/kotlin/io/github/daniele21/localllm/transport/binder/contract/ConsumerControlPlaneDomainWireMapping.kt')
-          text = mapper.read_text()
-          text = text.replace('private fun ', 'internal fun ')
-          mapper.write_text(text)
-
-          # This class is intentionally the public facade for two stable consumer contracts.
-          client = Path('transports/android-binder-client/src/main/kotlin/io/github/daniele21/localllm/transport/binder/client/BinderConsumerLocalLlmClient.kt')
-          text = client.read_text()
-          marker = '/** Public consumer API backed by an authenticated shared-runtime Binder connection. */\nclass BinderConsumerLocalLlmClient'
-          replacement = '''/** Public consumer API backed by an authenticated shared-runtime Binder connection. */
-          @Suppress("TooManyFunctions")
-          class BinderConsumerLocalLlmClient'''
-          if marker not in text:
-              raise SystemExit('Binder consumer facade marker not found')
-          client.write_text(text.replace(marker, replacement, 1))
 
           host = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessConsumerControlPlaneHost.kt')
           text = host.read_text()
-          if 'import io.github.daniele21.localllm.models.ResolvedHostExecution\n' not in text:
-              text = text.replace(
-                  'import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles\n',
-                  'import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles\nimport io.github.daniele21.localllm.models.ResolvedHostExecution\n',
-              )
-
-          start = text.find('    override fun activate(')
-          end = text.find('\n    override fun deactivate(', start)
+          start = text.find('private data class ActivationResolutionCheck(')
+          end = text.find('\nprivate fun AssignedUseCaseDiscoveryFailure', start)
           if start < 0 or end < 0:
-              raise SystemExit('activate method boundaries not found after v2 transform')
-          activate = '''    override fun activate(
-              ownerId: String,
-              applicationId: ApplicationId,
-              request: ConsumerActivationRequest,
-          ): ConsumerActivationResult {
-              ensureSeeded()
-              val resolution = resolver.resolve(
-                  HostExecutionRequest(
-                      applicationId = applicationId,
-                      useCaseId = request.useCaseId,
-                      presetId = request.preset.id.value,
-                      presetRevision = request.preset.version,
-                  ),
-                  controlPlaneExecutionEnvironment(modelStore, applicationId),
-              )
-              val resolutionCheck = resolution.validateForActivation(request)
-              resolutionCheck.failure?.let { return it }
-              val execution = requireNotNull(resolutionCheck.execution)
-
-              val runtimeTarget = resolveActivationRuntimeTarget(modelStore, execution, applicationId)
-              runtimeTarget.failure?.let { return it }
-
-              val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
-                  request = UseCaseActivationRequest(
-                      ownerId = ActivationOwnerId(ownerId),
-                      applicationId = applicationId,
-                      useCaseId = request.useCaseId,
-                      preset = request.preset,
-                      modelDigest = execution.modelDigest,
-                      acquiredAtEpochMs = epochClock(),
-                      useCaseRevision = execution.useCaseRevision,
-                      bindingRevision = execution.bindingRevision,
-                  ),
-                  retainModelWarmMs = execution.cachePolicy.retainModelWarmMs,
-              )
-              return when (acquired) {
-                  is ActivationResidencyResult.Failure ->
-                      ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
-                  is ActivationResidencyResult.Success ->
-                      activateRuntimeBinding(
-                          acquired.value,
-                          applicationId,
-                          request,
-                          requireNotNull(runtimeTarget.resolved),
-                      )
-              }
-          }
-          '''
-          text = text[:start] + activate + text[end:]
-
-          insert = text.find('\nprivate fun AssignedUseCaseDiscoveryFailure')
-          if insert < 0:
-              raise SystemExit('host helper insertion point not found')
-          helpers = '''
-          private data class ActivationResolutionCheck(
-              val execution: ResolvedHostExecution? = null,
-              val failure: ConsumerActivationResult.Rejected? = null,
+              raise SystemExit('activation support region not found after historical v4 transform')
+          support_body = text[start:end].strip() + '\n'
+          text = text[:start] + text[end:]
+          text = text.replace('private fun importedPhoneModel(', 'internal fun importedPhoneModel(', 1)
+          text = text.replace(
+              'private fun HostExecutionFailureCode.toConsumerFailure()',
+              'internal fun HostExecutionFailureCode.toConsumerFailure()',
+              1,
           )
-
-          private fun HostExecutionResolution.validateForActivation(
-              request: ConsumerActivationRequest,
-          ): ActivationResolutionCheck = when (this) {
-              is HostExecutionResolution.Failure ->
-                  ActivationResolutionCheck(failure = ConsumerActivationResult.Rejected(code.toConsumerFailure()))
-              is HostExecutionResolution.Success -> {
-                  val stale = execution.useCaseRevision != request.useCaseRevision ||
-                      execution.bindingRevision != request.bindingRevision
-                  if (stale) {
-                      ActivationResolutionCheck(
-                          failure = ConsumerActivationResult.Rejected(
-                              failure(
-                                  ConsumerControlPlaneErrorCode.STALE_REVISION,
-                                  "Consumer configuration changed; refresh assignments",
-                              ),
-                          ),
-                      )
-                  } else {
-                      ActivationResolutionCheck(execution = execution)
-                  }
-              }
-          }
-
-          private data class ActivationRuntimeTarget(
-              val resolved: ResolvedUseCase? = null,
-              val failure: ConsumerActivationResult.Rejected? = null,
+          text = text.replace(
+              'private fun failure(code: ConsumerControlPlaneErrorCode, message: String)',
+              'internal fun failure(code: ConsumerControlPlaneErrorCode, message: String)',
+              1,
           )
-
-          private fun resolveActivationRuntimeTarget(
-              modelStore: ModelStore,
-              execution: ResolvedHostExecution,
-              applicationId: ApplicationId,
-          ): ActivationRuntimeTarget {
-              val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
-                  ?: return ActivationRuntimeTarget(
-                      failure = ConsumerActivationResult.Rejected(
-                          failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
-                      ),
-                  )
-              val imported = importedPhoneModel(installed.digest, installed.sizeBytes)
-                  ?: return ActivationRuntimeTarget(
-                      failure = ConsumerActivationResult.Rejected(
-                          failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unsupported"),
-                      ),
-                  )
-              val resolved = HarnessSharedRuntimeBindings.resolveOmbra(imported, applicationId)
-              return if (resolved.model.artifact.digest == execution.modelDigest) {
-                  ActivationRuntimeTarget(resolved = resolved)
-              } else {
-                  ActivationRuntimeTarget(
-                      failure = ConsumerActivationResult.Rejected(
-                          failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved model identity mismatch"),
-                      ),
-                  )
-              }
-          }
-          '''
-          text = text[:insert] + helpers + text[insert:]
           host.write_text(text)
+
+          support = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessConsumerActivationSupport.kt')
+          support.write_text('''package io.github.daniele21.localllm.phonetest
+
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
+import io.github.daniele21.localllm.contracts.ConsumerActivationResult
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
+import io.github.daniele21.localllm.models.HostExecutionResolution
+import io.github.daniele21.localllm.models.ResolvedHostExecution
+import io.github.daniele21.localllm.models.ResolvedUseCase
+import io.github.daniele21.localllm.store.ModelStore
+
+''' + support_body)
           PY
 
           chmod +x gradlew
@@ -204,5 +90,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'refactor(hcp): split control-plane responsibilities'
+          git commit -m 'refactor(hcp): split consumer activation support'
           git push origin HEAD:agent/hcp-n-consumer-control-plane-protocol
