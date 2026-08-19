@@ -77,16 +77,40 @@ internal class ConsumerRuntimeBinderStub(
     }
 
     override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
-        controlPlaneUnavailable(request, callback)
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverUseCases(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
-        controlPlaneUnavailable(request, callback)
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverPresets(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     override fun activate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
-        controlPlaneUnavailable(request, callback)
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.activate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
-        controlPlaneUnavailable(request, callback)
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.deactivate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     private inline fun withResultCaller(
         request: ConsumerRequestParcel,
@@ -108,22 +132,23 @@ internal class ConsumerRuntimeBinderStub(
         }
     }
 
-    private fun controlPlaneUnavailable(
+    private inline fun withControlPlaneCaller(
         request: ConsumerControlPlaneRequestParcel,
         callback: IConsumerControlPlaneResultCallback,
+        block: (AuthorizedCaller) -> Unit,
     ) {
-        val code = if (authorizedCallerOrNull() == null) {
-            WireErrorCodes.CLIENT_NOT_REGISTERED
+        val caller = authorizedCallerOrNull()
+        if (caller == null) {
+            deliverRemote {
+                callback.onResult(
+                    ConsumerControlPlaneResultParcel(
+                        operationId = request.operationId,
+                        error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                    ),
+                )
+            }
         } else {
-            WireErrorCodes.FEATURE_UNAVAILABLE
-        }
-        deliverRemote {
-            callback.onResult(
-                ConsumerControlPlaneResultParcel(
-                    operationId = request.operationId,
-                    error = wireError(code),
-                ),
-            )
+            block(caller)
         }
     }
 
