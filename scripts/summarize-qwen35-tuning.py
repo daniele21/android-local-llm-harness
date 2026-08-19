@@ -9,11 +9,12 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MIN_WARM_SAMPLES = 3
 IDENTITY_FIELDS = [
     "tuningCaseId",
     "warmRepetitionsRequested",
+    "maxOutputTokens",
     "modelDigest",
     "modelTier",
     "architecture",
