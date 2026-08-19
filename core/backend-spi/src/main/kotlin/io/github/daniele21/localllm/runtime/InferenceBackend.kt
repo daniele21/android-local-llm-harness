@@ -125,6 +125,7 @@ sealed interface BackendGenerationOutcome {
 
 class BackendException(val code: String, message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 
+@Suppress("TooManyFunctions")
 interface InferenceBackend {
     val id: String
     val revision: String?
