@@ -42,12 +42,16 @@ internal class BinderConsumerControlPlaneAdapter(
         if (!controlPlaneEnabled()) return assignedFeatureUnavailable()
         val operationId = correlationIds.nextId()
         val request = ConsumerControlPlaneRequestParcel(endpoint.clientToken, operationId)
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.discoverUseCases(request, callback) }) {
+        val outcome = await(endpoint) { callback ->
+            endpoint.service.consumer.discoverUseCases(request, callback)
+        }
+        return when (outcome) {
             is ControlPlaneRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     assignedTransportFailure()
                 } else {
-                    runCatching { outcome.result.toCoreAssignedUseCasesResult() }.getOrElse { assignedTransportFailure() }
+                    runCatching { outcome.result.toCoreAssignedUseCasesResult() }
+                        .getOrElse { assignedTransportFailure() }
                 }
             }
 
@@ -65,12 +69,16 @@ internal class BinderConsumerControlPlaneAdapter(
             operationId = operationId,
             useCaseId = useCaseId.value,
         )
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.discoverPresets(request, callback) }) {
+        val outcome = await(endpoint) { callback ->
+            endpoint.service.consumer.discoverPresets(request, callback)
+        }
+        return when (outcome) {
             is ControlPlaneRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     presetsTransportFailure()
                 } else {
-                    runCatching { outcome.result.toCorePublishedPresetsResult() }.getOrElse { presetsTransportFailure() }
+                    runCatching { outcome.result.toCorePublishedPresetsResult() }
+                        .getOrElse { presetsTransportFailure() }
                 }
             }
 
@@ -84,12 +92,16 @@ internal class BinderConsumerControlPlaneAdapter(
         if (!controlPlaneEnabled()) return activationFeatureUnavailable()
         val operationId = correlationIds.nextId()
         val wire = request.toConsumerControlPlaneWire(endpoint.clientToken, operationId)
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.activate(wire, callback) }) {
+        val outcome = await(endpoint) { callback ->
+            endpoint.service.consumer.activate(wire, callback)
+        }
+        return when (outcome) {
             is ControlPlaneRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     activationTransportFailure()
                 } else {
-                    runCatching { outcome.result.toCoreActivationResult() }.getOrElse { activationTransportFailure() }
+                    runCatching { outcome.result.toCoreActivationResult() }
+                        .getOrElse { activationTransportFailure() }
                 }
             }
 
@@ -107,12 +119,16 @@ internal class BinderConsumerControlPlaneAdapter(
             operationId = operationId,
             activationId = activationId.value,
         )
-        return when (val outcome = await(endpoint) { callback -> endpoint.service.consumer.deactivate(request, callback) }) {
+        val outcome = await(endpoint) { callback ->
+            endpoint.service.consumer.deactivate(request, callback)
+        }
+        return when (outcome) {
             is ControlPlaneRemoteOutcome.Received -> {
                 if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
                     deactivationTransportFailure()
                 } else {
-                    runCatching { outcome.result.toCoreDeactivationResult(activationId) }.getOrElse { deactivationTransportFailure() }
+                    runCatching { outcome.result.toCoreDeactivationResult(activationId) }
+                        .getOrElse { deactivationTransportFailure() }
                 }
             }
 
@@ -182,7 +198,8 @@ private class ControlPlaneCallbackWaiter {
     }
 }
 
-private fun controlPlaneFailure(code: ConsumerControlPlaneErrorCode, message: String) = ConsumerControlPlaneFailure(code, message)
+private fun controlPlaneFailure(code: ConsumerControlPlaneErrorCode, message: String) =
+    ConsumerControlPlaneFailure(code, message)
 
 private fun assignedFeatureUnavailable() = ConsumerAssignedUseCasesResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
