@@ -41,6 +41,7 @@ import io.github.daniele21.localllm.models.PublishedPresetDiscoveryFailure
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryResult
 import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
 import io.github.daniele21.localllm.models.RegisteredApplication
+import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseDefinition
@@ -52,6 +53,7 @@ import io.github.daniele21.localllm.runtime.ActivationOwnerId
 import io.github.daniele21.localllm.runtime.ActivationResidencyFailure
 import io.github.daniele21.localllm.runtime.ActivationResidencyResult
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
+import io.github.daniele21.localllm.runtime.UseCaseActivationLease
 import io.github.daniele21.localllm.runtime.UseCaseActivationRequest
 import io.github.daniele21.localllm.store.ModelStore
 
@@ -89,10 +91,7 @@ internal class HarnessConsumerControlPlaneHost(
         }
     }
 
-    override fun publishedPresets(
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-    ): ConsumerPublishedPresetsResult {
+    override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
         ensureSeeded()
         return when (val result = presetDiscovery.discover(applicationId, useCaseId)) {
             is PublishedPresetDiscoveryResult.Success -> ConsumerPublishedPresetsResult.Available(
@@ -114,11 +113,7 @@ internal class HarnessConsumerControlPlaneHost(
         }
     }
 
-    override fun activate(
-        ownerId: String,
-        applicationId: ApplicationId,
-        request: ConsumerActivationRequest,
-    ): ConsumerActivationResult {
+    override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
         ensureSeeded()
         val resolution = resolver.resolve(
             HostExecutionRequest(
@@ -173,27 +168,22 @@ internal class HarnessConsumerControlPlaneHost(
         )
         return when (acquired) {
             is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
+
             is ActivationResidencyResult.Success -> activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
         }
     }
 
-    override fun deactivate(
-        ownerId: String,
-        applicationId: ApplicationId,
-        activationId: ConsumerActivationId,
-    ): ConsumerDeactivationResult {
+    override fun deactivate(ownerId: String, applicationId: ApplicationId, activationId: ConsumerActivationId): ConsumerDeactivationResult {
         val runtimeActivationId = UseCaseActivationId(activationId.value)
-        return when (
-            val released = runtimeGraph.activationResidency.release(
-                runtimeActivationId,
-                ActivationOwnerId(ownerId),
-            )
-        ) {
+        val released = runtimeGraph.activationResidency.release(runtimeActivationId, ActivationOwnerId(ownerId))
+        return when (released) {
             is ActivationResidencyResult.Failure -> when (released.leaseFailure) {
                 ActivationLeaseFailure.NOT_FOUND -> ConsumerDeactivationResult.Released
+
                 ActivationLeaseFailure.NOT_OWNED -> ConsumerDeactivationResult.Rejected(
                     failure(ConsumerControlPlaneErrorCode.INVALID_REQUEST, "Activation is owned by another connection"),
                 )
+
                 else -> ConsumerDeactivationResult.Rejected(released.toConsumerFailure())
             }
 
@@ -220,10 +210,10 @@ internal class HarnessConsumerControlPlaneHost(
     }
 
     private fun activateRuntimeBinding(
-        lease: io.github.daniele21.localllm.runtime.UseCaseActivationLease,
+        lease: UseCaseActivationLease,
         applicationId: ApplicationId,
         request: ConsumerActivationRequest,
-        runtimeResolved: io.github.daniele21.localllm.models.ResolvedUseCase,
+        runtimeResolved: ResolvedUseCase,
     ): ConsumerActivationResult {
         val installedBinding = runCatching {
             runtimeGraph.installActivationBinding(
@@ -365,6 +355,7 @@ internal class HarnessConsumerControlPlaneHost(
 private fun AssignedUseCaseDiscoveryFailure.toConsumerFailure(): ConsumerControlPlaneFailure = when (this) {
     AssignedUseCaseDiscoveryFailure.UNKNOWN_APPLICATION ->
         failure(ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION, "Consumer application is unknown")
+
     AssignedUseCaseDiscoveryFailure.APPLICATION_NOT_AUTHORIZED ->
         failure(ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED, "Consumer application is not authorized")
 }
@@ -372,8 +363,10 @@ private fun AssignedUseCaseDiscoveryFailure.toConsumerFailure(): ConsumerControl
 private fun PublishedPresetDiscoveryFailure.toConsumerFailure(): ConsumerControlPlaneFailure = when (this) {
     PublishedPresetDiscoveryFailure.UNKNOWN_APPLICATION ->
         failure(ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION, "Consumer application is unknown")
+
     PublishedPresetDiscoveryFailure.APPLICATION_NOT_AUTHORIZED ->
         failure(ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED, "Consumer application is not authorized")
+
     PublishedPresetDiscoveryFailure.USE_CASE_NOT_ASSIGNED ->
         failure(ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED, "Use case is not assigned")
 }
@@ -381,18 +374,24 @@ private fun PublishedPresetDiscoveryFailure.toConsumerFailure(): ConsumerControl
 private fun HostExecutionFailureCode.toConsumerFailure(): ConsumerControlPlaneFailure = when (this) {
     HostExecutionFailureCode.UNKNOWN_APPLICATION ->
         failure(ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION, "Consumer application is unknown")
+
     HostExecutionFailureCode.APPLICATION_NOT_AUTHORIZED ->
         failure(ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED, "Consumer application is not authorized")
+
     HostExecutionFailureCode.USE_CASE_NOT_BOUND,
     HostExecutionFailureCode.USE_CASE_DISABLED,
     -> failure(ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED, "Use case is not assigned")
+
     HostExecutionFailureCode.DEFAULT_PRESET_NOT_CONFIGURED ->
         failure(ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED, "Harness configuration is required")
+
     HostExecutionFailureCode.PRESET_NOT_EXPOSED ->
         failure(ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED, "Preset is not available to this consumer")
+
     HostExecutionFailureCode.PRESET_UNAVAILABLE,
     HostExecutionFailureCode.STALE_PRESET_REVISION,
     -> failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments")
+
     HostExecutionFailureCode.MODEL_PROFILE_MISSING,
     HostExecutionFailureCode.MODEL_NOT_INSTALLED,
     HostExecutionFailureCode.MODEL_INCOMPATIBLE,
@@ -403,8 +402,10 @@ private fun HostExecutionFailureCode.toConsumerFailure(): ConsumerControlPlaneFa
 private fun ActivationResidencyResult.Failure.toConsumerFailure(): ConsumerControlPlaneFailure = when (reason) {
     ActivationResidencyFailure.MODEL_CONFLICT ->
         failure(ConsumerControlPlaneErrorCode.MODEL_CONFLICT, "Another active use case protects a different local model")
+
     ActivationResidencyFailure.USE_CASE_ALREADY_ACTIVE ->
         failure(ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE, "Use case is already active for this connection")
+
     ActivationResidencyFailure.LEASE_REJECTED ->
         failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Unable to acquire local-AI activation")
 }
