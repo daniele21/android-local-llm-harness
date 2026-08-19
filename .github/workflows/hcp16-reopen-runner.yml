@@ -29,6 +29,17 @@ jobs:
           lines = Path('.github/workflows/hcp16-runtime-telemetry-once.yml').read_text().splitlines()
           start = next(i for i, line in enumerate(lines) if line.strip() == 'run: |') + 1
           body = [line[10:] if line.startswith('          ') else line for line in lines[start:]]
-          Path('/tmp/hcp16.sh').write_text('\n'.join(body) + '\n')
+          script = '\n'.join(body)
+          old = '''          if old_close not in text:
+              raise SystemExit('closeSession block not found')
+          text = text.replace(old_close, new_close, 1)'''
+          new = '''          close_start = text.find('    override fun closeSession(sessionId: SessionId) {')
+          close_end = text.find('\\n    fun memoryResourceSnapshot()', close_start)
+          if close_start < 0 or close_end < 0:
+              raise SystemExit('closeSession boundaries not found')
+          text = text[:close_start] + new_close + text[close_end:]'''
+          if old not in script:
+              raise SystemExit('runner close-session patch target not found')
+          Path('/tmp/hcp16.sh').write_text(script.replace(old, new, 1) + '\n')
           PY
           bash /tmp/hcp16.sh
