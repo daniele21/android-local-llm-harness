@@ -1,8 +1,10 @@
 package io.github.daniele21.localllm.phonetest
 
+import android.os.Handler
+import android.os.Looper
 import io.github.daniele21.localllm.contracts.ModelDigest
 
-internal class HarnessResolvedWarmRetentionCoordinator(
+internal class HarnessResolvedWarmRetentionCoordinator private constructor(
     private val clock: WarmIdleEpochClock,
     private val scheduler: WarmIdleDeadlineScheduler,
     private val loadedModel: () -> ModelDigest?,
@@ -34,7 +36,7 @@ internal class HarnessResolvedWarmRetentionCoordinator(
             if (retainModelWarmMs == 0L) {
                 releaseIfIdleLocked(modelDigest, expectedGeneration)
             } else {
-                scheduler.scheduleAt(clock.nowEpochMs() + retainModelWarmMs) {
+                scheduler.schedule(clock.nowEpochMs() + retainModelWarmMs) {
                     onDeadline(modelDigest, expectedGeneration)
                 }
             }
@@ -43,7 +45,6 @@ internal class HarnessResolvedWarmRetentionCoordinator(
 
     override fun close() {
         cancel()
-        scheduler.close()
     }
 
     private fun onDeadline(modelDigest: ModelDigest, expectedGeneration: Long) {
@@ -62,12 +63,29 @@ internal class HarnessResolvedWarmRetentionCoordinator(
             scheduledDigest = null
             return
         }
-        scheduler.scheduleAt(clock.nowEpochMs() + RETRY_DELAY_MS) {
+        scheduler.schedule(clock.nowEpochMs() + RETRY_DELAY_MS) {
             onDeadline(modelDigest, expectedGeneration)
         }
     }
 
-    private companion object {
-        const val RETRY_DELAY_MS = 1_000L
+    companion object {
+        private const val RETRY_DELAY_MS = 1_000L
+
+        @Volatile
+        private var instance: HarnessResolvedWarmRetentionCoordinator? = null
+
+        fun from(runtimeGraph: HarnessRuntimeGraph): HarnessResolvedWarmRetentionCoordinator = instance ?: synchronized(this) {
+            instance ?: create(runtimeGraph).also { instance = it }
+        }
+
+        private fun create(runtimeGraph: HarnessRuntimeGraph): HarnessResolvedWarmRetentionCoordinator {
+            val clock = WarmIdleEpochClock { System.currentTimeMillis() }
+            return HarnessResolvedWarmRetentionCoordinator(
+                clock = clock,
+                scheduler = AndroidWarmIdleDeadlineScheduler(Handler(Looper.getMainLooper()), clock),
+                loadedModel = { runtimeGraph.runtimeSnapshot()?.loadedModel },
+                unloadIdleResources = runtimeGraph::unloadIdleModel,
+            )
+        }
     }
 }
