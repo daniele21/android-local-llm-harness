@@ -145,6 +145,7 @@ private fun toEntity(value: ApplicationUseCaseBinding) = HostControlPlaneEntitie
     value.applicationId.value,
     value.useCaseId.value,
     value.enabled,
+    value.isDefault,
 )
 
 private fun fromEntity(value: HostControlPlaneEntities.BindingEntity) = ApplicationUseCaseBinding(
@@ -153,6 +154,7 @@ private fun fromEntity(value: HostControlPlaneEntities.BindingEntity) = Applicat
     useCaseId = UseCaseId(value.useCaseId),
     revision = value.revision,
     enabled = value.enabled,
+    isDefault = value.isDefault,
 )
 
 private fun toEntity(value: StoredPresetExposure) = HostControlPlaneEntities.ExposureEntity(

@@ -124,10 +124,12 @@ data class ApplicationUseCaseBinding(
     val useCaseId: UseCaseId,
     val revision: Int,
     val enabled: Boolean = true,
+    val isDefault: Boolean = false,
 ) {
     init {
         require(bindingId.isNotBlank()) { "Binding ID must not be blank" }
         require(revision > 0) { "Binding revision must be positive" }
+        require(!isDefault || enabled) { "A default binding must be enabled" }
     }
 }
 
