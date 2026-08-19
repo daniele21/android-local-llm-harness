@@ -117,6 +117,14 @@ target_include_directories(
     "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
 )
 
+add_executable(recurrent_state_reuse_probe recurrent_state_reuse_probe.cpp)
+target_include_directories(
+    recurrent_state_reuse_probe
+    PRIVATE
+    "${LLAMA_CPP_DIR}/include"
+)
+target_link_libraries(recurrent_state_reuse_probe PRIVATE llama)
+
 enable_testing()
 add_test(NAME gguf_metadata_test COMMAND gguf_metadata_test)
 add_test(NAME native_cancellation_registry_test COMMAND native_cancellation_registry_test)
@@ -124,3 +132,5 @@ add_test(NAME generation_output_buffer_test COMMAND generation_output_buffer_tes
 add_test(NAME generation_sampler_test COMMAND generation_sampler_test)
 add_test(NAME prepared_prompt_cache_test COMMAND prepared_prompt_cache_test)
 add_test(NAME reasoning_transition_test COMMAND reasoning_transition_test)
+add_test(NAME recurrent_state_reuse_probe COMMAND recurrent_state_reuse_probe)
+set_tests_properties(recurrent_state_reuse_probe PROPERTIES SKIP_RETURN_CODE 77)
