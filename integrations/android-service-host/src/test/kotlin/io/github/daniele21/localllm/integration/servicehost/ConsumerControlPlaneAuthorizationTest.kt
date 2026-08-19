@@ -12,6 +12,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerPresetParcel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -20,18 +21,19 @@ import org.junit.Test
 class ConsumerControlPlaneAuthorizationTest {
     private val allowedUseCase = UseCaseId("allowed")
     private val deniedUseCase = UseCaseId("denied")
-    private val caller = AuthorizedCaller(
-        uid = 10001,
-        packageName = "io.example.client",
-        applicationId = ApplicationId("consumer-app"),
-        allowedUseCases = setOf(allowedUseCase),
-    )
+    private val caller =
+        AuthorizedCaller(
+            uid = 10001,
+            packageName = "io.example.client",
+            applicationId = ApplicationId("consumer-app"),
+            allowedUseCases = setOf(allowedUseCase),
+        )
 
     @Test
     fun `discovery exposes only use cases allowed to the authenticated package`() {
         val host = RecordingHost()
         val fixture = fixture(host)
-        var result: io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel? = null
+        var result: ConsumerControlPlaneResultParcel? = null
 
         fixture.operations.discoverUseCases(
             caller,
@@ -47,7 +49,7 @@ class ConsumerControlPlaneAuthorizationTest {
     fun `preset discovery for unauthorized use case fails before host access`() {
         val host = RecordingHost()
         val fixture = fixture(host)
-        var result: io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel? = null
+        var result: ConsumerControlPlaneResultParcel? = null
 
         fixture.operations.discoverPresets(
             caller,
@@ -63,15 +65,16 @@ class ConsumerControlPlaneAuthorizationTest {
     fun `activation for unauthorized use case fails before host access`() {
         val host = RecordingHost()
         val fixture = fixture(host)
-        var result: io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel? = null
-        val request = ConsumerControlPlaneRequestParcel(
-            clientToken = ClientTokenParcel(fixture.token.value),
-            operationId = "activate",
-            useCaseId = deniedUseCase.value,
-            useCaseRevision = 1,
-            bindingRevision = 1,
-            preset = ConsumerPresetParcel("balanced", 1),
-        )
+        var result: ConsumerControlPlaneResultParcel? = null
+        val request =
+            ConsumerControlPlaneRequestParcel(
+                clientToken = ClientTokenParcel(fixture.token.value),
+                operationId = "activate",
+                useCaseId = deniedUseCase.value,
+                useCaseRevision = 1,
+                bindingRevision = 1,
+                preset = ConsumerPresetParcel("balanced", 1),
+            )
 
         fixture.operations.activate(caller, request, HostResultCallback { result = it })
 
@@ -81,24 +84,28 @@ class ConsumerControlPlaneAuthorizationTest {
 
     private fun fixture(host: RecordingHost): Fixture {
         val ledger = ClientConnectionLedger()
-        val token = ledger.register(
-            caller,
-            negotiatedMinor = 2,
-            enabledFeatures = setOf(
-                BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-            ),
-        ) as LedgerResult.Success
+        val token =
+            ledger.register(
+                caller,
+                negotiatedMinor = 2,
+                enabledFeatures =
+                    setOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                    ),
+            ) as LedgerResult.Success
         return Fixture(
             token = token.value,
-            operations = ConsumerControlPlaneHostOperations(
-                ledger = ledger,
-                host = host,
-                controlExecutor = HostControlExecutor { task ->
-                    task()
-                    true
-                },
-            ),
+            operations =
+                ConsumerControlPlaneHostOperations(
+                    ledger = ledger,
+                    host = host,
+                    controlExecutor =
+                        HostControlExecutor { task ->
+                            task()
+                            true
+                        },
+                ),
         )
     }
 
@@ -126,19 +133,12 @@ class ConsumerControlPlaneAuthorizationTest {
                 ),
             )
 
-        override fun publishedPresets(
-            applicationId: ApplicationId,
-            useCaseId: UseCaseId,
-        ): ConsumerPublishedPresetsResult {
+        override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
             presetCalls += 1
             error("Unauthorized preset discovery must not reach host")
         }
 
-        override fun activate(
-            ownerId: String,
-            applicationId: ApplicationId,
-            request: ConsumerActivationRequest,
-        ): ConsumerActivationResult {
+        override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
             activationCalls += 1
             error("Unauthorized activation must not reach host")
         }
@@ -151,13 +151,14 @@ class ConsumerControlPlaneAuthorizationTest {
 
         override fun releaseAll(ownerId: String, applicationId: ApplicationId) = Unit
 
-        private fun assignment(useCaseId: UseCaseId) = ConsumerAssignedUseCase(
-            useCaseId = useCaseId,
-            useCaseRevision = 1,
-            bindingRevision = 1,
-            displayName = useCaseId.value,
-            description = "Test assignment ${useCaseId.value}",
-            isDefault = false,
-        )
+        private fun assignment(useCaseId: UseCaseId) =
+            ConsumerAssignedUseCase(
+                useCaseId = useCaseId,
+                useCaseRevision = 1,
+                bindingRevision = 1,
+                displayName = useCaseId.value,
+                description = "Test assignment ${useCaseId.value}",
+                isDefault = false,
+            )
     }
 }
