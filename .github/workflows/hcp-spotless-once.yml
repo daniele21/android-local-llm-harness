@@ -1,16 +1,17 @@
 name: HCP spotless once
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/hcp-n-consumer-control-plane-protocol
+      - dev
+    types:
+      - reopened
 
 permissions:
   contents: write
 
 jobs:
   format:
-    if: github.event.head_commit.message != 'style(hcp): apply spotless formatting'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
