@@ -25,32 +25,36 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SharedRuntimeControlPlaneLifecycleTest {
-    private val caller = AuthorizedCaller(
-        uid = 10001,
-        packageName = "io.example.consumer",
-        applicationId = ApplicationId("consumer-app"),
-        allowedUseCases = setOf(UseCaseId("document-pii-detection")),
-    )
+    private val caller =
+        AuthorizedCaller(
+            uid = 10001,
+            packageName = "io.example.consumer",
+            applicationId = ApplicationId("consumer-app"),
+            allowedUseCases = setOf(UseCaseId("document-pii-detection")),
+        )
 
     @Test
     fun `Binder owner death releases every activation for the exact connection token`() {
         val controlPlane = RecordingControlPlaneHost()
         val lifecycle = FakeLifecycle()
-        val delegate = SharedRuntimeHostDelegate(
-            client = NoOpLocalLlmClient,
-            protocolInfo = protocolInfo(),
-            consumerControlPlaneHost = controlPlane,
-            controlExecutor = HostControlExecutor { task ->
-                task()
-                true
-            },
-            callbackDispatcherFactory = HostCallbackDispatcherFactory {
-                HostCallbackDispatcher { task ->
-                    task()
-                    true
-                }
-            },
-        )
+        val delegate =
+            SharedRuntimeHostDelegate(
+                client = NoOpLocalLlmClient,
+                protocolInfo = protocolInfo(),
+                consumerControlPlaneHost = controlPlane,
+                controlExecutor =
+                    HostControlExecutor { task ->
+                        task()
+                        true
+                    },
+                callbackDispatcherFactory =
+                    HostCallbackDispatcherFactory {
+                        HostCallbackDispatcher { task ->
+                            task()
+                            true
+                        }
+                    },
+            )
         var registration: RegistrationResultParcel? = null
         delegate.registerClient(caller, hello(), lifecycle, HostResultCallback { registration = it })
         val token = requireNotNull(registration?.clientToken)
@@ -61,24 +65,27 @@ class SharedRuntimeControlPlaneLifecycleTest {
         assertEquals(listOf(token.value to caller.applicationId), controlPlane.releaseAllCalls)
     }
 
-    private fun hello() = ClientHelloParcel(
-        protocolMajor = BinderProtocolV1.MAJOR,
-        protocolMinor = BinderProtocolV1.MINOR,
-        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-        requiredFeatures = listOf(
-            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-        ),
-        clientBuildId = "control-plane-lifecycle-test",
-    )
+    private fun hello() =
+        ClientHelloParcel(
+            protocolMajor = BinderProtocolV1.MAJOR,
+            protocolMinor = BinderProtocolV1.MINOR,
+            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+            requiredFeatures =
+                listOf(
+                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                ),
+            clientBuildId = "control-plane-lifecycle-test",
+        )
 
-    private fun protocolInfo() = ProtocolInfoParcel(
-        protocolMajor = BinderProtocolV1.MAJOR,
-        protocolMinor = BinderProtocolV1.MINOR,
-        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-        supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
-        hostBuildId = "host-test",
-    )
+    private fun protocolInfo() =
+        ProtocolInfoParcel(
+            protocolMajor = BinderProtocolV1.MAJOR,
+            protocolMinor = BinderProtocolV1.MINOR,
+            minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+            supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
+            hostBuildId = "host-test",
+        )
 
     private class FakeLifecycle : ClientLifecycleLinker {
         private var onDeath: (() -> Unit)? = null
@@ -99,16 +106,11 @@ class SharedRuntimeControlPlaneLifecycleTest {
         override fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult =
             error("Discovery is not expected in lifecycle cleanup test")
 
-        override fun publishedPresets(
-            applicationId: ApplicationId,
-            useCaseId: UseCaseId,
-        ): ConsumerPublishedPresetsResult = error("Preset discovery is not expected in lifecycle cleanup test")
+        override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
+            error("Preset discovery is not expected in lifecycle cleanup test")
 
-        override fun activate(
-            ownerId: String,
-            applicationId: ApplicationId,
-            request: ConsumerActivationRequest,
-        ): ConsumerActivationResult = error("Activation is not expected in lifecycle cleanup test")
+        override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult =
+            error("Activation is not expected in lifecycle cleanup test")
 
         override fun deactivate(
             ownerId: String,
