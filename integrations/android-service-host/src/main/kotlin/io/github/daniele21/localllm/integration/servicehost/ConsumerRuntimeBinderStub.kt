@@ -2,10 +2,13 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
@@ -73,6 +76,18 @@ internal class ConsumerRuntimeBinderStub(
         authorizedCallerOrNull()?.let { delegate.consumerOperations.closeSession(it, request) }
     }
 
+    override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        controlPlaneUnavailable(request, callback)
+
+    override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        controlPlaneUnavailable(request, callback)
+
+    override fun activate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        controlPlaneUnavailable(request, callback)
+
+    override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        controlPlaneUnavailable(request, callback)
+
     private inline fun withResultCaller(
         request: ConsumerRequestParcel,
         callback: IConsumerResultCallback,
@@ -90,6 +105,25 @@ internal class ConsumerRuntimeBinderStub(
             }
         } else {
             block(caller)
+        }
+    }
+
+    private fun controlPlaneUnavailable(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: IConsumerControlPlaneResultCallback,
+    ) {
+        val code = if (authorizedCallerOrNull() == null) {
+            WireErrorCodes.CLIENT_NOT_REGISTERED
+        } else {
+            WireErrorCodes.FEATURE_UNAVAILABLE
+        }
+        deliverRemote {
+            callback.onResult(
+                ConsumerControlPlaneResultParcel(
+                    operationId = request.operationId,
+                    error = wireError(code),
+                ),
+            )
         }
     }
 
