@@ -15,11 +15,17 @@ class SharedRuntimeHostComposition(
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
     consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
+    consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
 ) : AutoCloseable {
     private val delegate = SharedRuntimeHostDelegate(
         client = client,
-        protocolInfo = hostProtocolInfo(hostBuildId, consumerClientFactory != null),
+        protocolInfo = hostProtocolInfo(
+            hostBuildId = hostBuildId,
+            consumerApiEnabled = consumerClientFactory != null,
+            consumerControlPlaneEnabled = consumerControlPlaneHost != null,
+        ),
         consumerClientFactory = consumerClientFactory,
+        consumerControlPlaneHost = consumerControlPlaneHost,
     )
     private val binderStub = SharedRuntimeBinderStub(
         authorizer = CallerAuthorizer(
