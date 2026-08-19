@@ -1,0 +1,30 @@
+name: HCP15 dev sync once
+
+on:
+  pull_request:
+    branches:
+      - dev
+    types:
+      - reopened
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/hcp-h-session-history-current-dev
+          fetch-depth: 0
+      - name: Merge latest dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin dev agent/hcp-h-session-history-current-dev
+          git reset --hard origin/agent/hcp-h-session-history-current-dev
+          git merge --no-edit origin/dev
+          git push origin HEAD:agent/hcp-h-session-history-current-dev
