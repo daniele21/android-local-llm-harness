@@ -141,6 +141,7 @@ dependencies {
     implementation(project(":evaluation:contracts"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
+    implementation(project(":models:control-plane-room-store"))
     implementation(project(":models:model-catalog"))
     implementation(project(":models:model-download"))
     implementation(project(":models:model-install"))
