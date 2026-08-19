@@ -16,24 +16,24 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPla
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.toConsumerControlPlaneWire
 
-internal interface ConsumerControlPlaneHost {
+interface ConsumerControlPlaneHost {
     fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult
 
     fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult
 
     fun activate(
-        owner: HostClientToken,
+        ownerId: String,
         applicationId: ApplicationId,
         request: ConsumerActivationRequest,
     ): ConsumerActivationResult
 
     fun deactivate(
-        owner: HostClientToken,
+        ownerId: String,
         applicationId: ApplicationId,
         activationId: ConsumerActivationId,
     ): ConsumerDeactivationResult
 
-    fun releaseAll(owner: HostClientToken, applicationId: ApplicationId)
+    fun releaseAll(ownerId: String, applicationId: ApplicationId)
 }
 
 internal class ConsumerControlPlaneHostOperations(
@@ -65,7 +65,7 @@ internal class ConsumerControlPlaneHostOperations(
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
     ) = submit(caller, request, callback) { token ->
         val activationRequest = request.toCoreActivationRequestOrNull() ?: return@submit invalidRequest(request)
-        requireHost(request).activate(token, caller.applicationId, activationRequest).toConsumerControlPlaneWire(request.operationId)
+        requireHost(request).activate(token.value, caller.applicationId, activationRequest).toConsumerControlPlaneWire(request.operationId)
     }
 
     fun deactivate(
@@ -75,7 +75,7 @@ internal class ConsumerControlPlaneHostOperations(
     ) = submit(caller, request, callback) { token ->
         val activationId = request.activationId?.takeIf(String::isNotBlank)?.let(::ConsumerActivationId)
             ?: return@submit invalidRequest(request)
-        requireHost(request).deactivate(token, caller.applicationId, activationId).toConsumerControlPlaneWire(
+        requireHost(request).deactivate(token.value, caller.applicationId, activationId).toConsumerControlPlaneWire(
             request.operationId,
             activationId,
         )
