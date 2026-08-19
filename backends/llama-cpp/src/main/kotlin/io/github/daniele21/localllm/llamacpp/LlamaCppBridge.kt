@@ -9,6 +9,7 @@ interface NativeLlamaApi {
     fun isLlamaCppLinked(): Boolean
     fun supportsMmap(): Boolean
     fun initialize(nativeLibraryDir: String): Array<String>
+    fun backendDevices(): Array<String> = arrayOf("error", "NATIVE_PROTOCOL", "Backend device inventory is unavailable")
     fun shutdown(): Array<String>
     fun loadModel(path: String, nGpuLayers: Int, useMmap: Boolean, useMlock: Boolean): Array<String>
     fun unloadModel(modelHandle: Long): Array<String>
@@ -24,6 +25,7 @@ class JniLlamaApi : NativeLlamaApi {
     external override fun isLlamaCppLinked(): Boolean
     external override fun supportsMmap(): Boolean
     external override fun initialize(nativeLibraryDir: String): Array<String>
+    external override fun backendDevices(): Array<String>
     external override fun shutdown(): Array<String>
     external override fun loadModel(path: String, nGpuLayers: Int, useMmap: Boolean, useMlock: Boolean): Array<String>
     external override fun unloadModel(modelHandle: Long): Array<String>
@@ -41,7 +43,7 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
             modelProfileId = profile.id,
             supportsMmap = supportsMmap,
             detail = if (linked) {
-                "Pinned llama.cpp CPU backend linked"
+                "Pinned llama.cpp runtime linked"
             } else {
                 "Native library loaded, but llama.cpp symbols are unavailable"
             },
@@ -57,7 +59,22 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
                 ),
             )
         }
-        return decodeInitialization(nativeApi.initialize(nativeLibraryDir.absolutePath))
+
+        val initialization = decodeInitialization(nativeApi.initialize(nativeLibraryDir.absolutePath))
+        if (initialization !is RuntimeInitializationResult.Success) {
+            return initialization
+        }
+
+        return when (val inventory = decodeBackendDeviceInventory(nativeApi.backendDevices())) {
+            is BackendDeviceInventoryResult.Success -> initialization.copy(
+                registeredDeviceCount = inventory.devices.size,
+                devices = inventory.devices,
+            )
+
+            is BackendDeviceInventoryResult.Unavailable -> initialization.copy(
+                deviceInventoryError = inventory.error,
+            )
+        }
     }
 
     fun shutdownRuntime(): NativeOperationResult = decodeOperation(nativeApi.shutdown())
@@ -112,12 +129,63 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
     private fun decodeInitialization(response: Array<String>): RuntimeInitializationResult {
         if (response.size == INITIALIZATION_FIELD_COUNT && response[0] == OK) {
             return try {
-                RuntimeInitializationResult.Success(deviceCount = response[1].toInt())
+                RuntimeInitializationResult.Success(deviceCapacity = response[1].toInt())
             } catch (error: NumberFormatException) {
-                RuntimeInitializationResult.Failure(protocolError("Native device count is invalid: ${error.message}"))
+                RuntimeInitializationResult.Failure(protocolError("Native device capacity is invalid: ${error.message}"))
             }
         }
         return RuntimeInitializationResult.Failure(decodeStandardError(response))
+    }
+
+    private fun decodeBackendDeviceInventory(response: Array<String>): BackendDeviceInventoryResult {
+        if (response.size == ERROR_FIELD_COUNT && response[0] == ERROR) {
+            return BackendDeviceInventoryResult.Unavailable(decodeStandardError(response))
+        }
+        if (response.size < BACKEND_DEVICE_HEADER_FIELD_COUNT || response[0] != OK) {
+            return BackendDeviceInventoryResult.Unavailable(protocolError("Malformed native backend device inventory"))
+        }
+
+        return try {
+            val deviceCount = response[1].toInt()
+            if (deviceCount < 0 || response.size != BACKEND_DEVICE_HEADER_FIELD_COUNT + deviceCount * BACKEND_DEVICE_FIELD_COUNT) {
+                return BackendDeviceInventoryResult.Unavailable(
+                    protocolError("Native backend device inventory field count does not match declared device count"),
+                )
+            }
+
+            val devices = buildList(deviceCount) {
+                repeat(deviceCount) { ordinal ->
+                    val offset = BACKEND_DEVICE_HEADER_FIELD_COUNT + ordinal * BACKEND_DEVICE_FIELD_COUNT
+                    val index = response[offset].toInt()
+                    if (index != ordinal) {
+                        throw IllegalArgumentException("Backend device index $index is out of canonical order at position $ordinal")
+                    }
+                    add(
+                        NativeBackendDevice(
+                            index = index,
+                            name = response[offset + 1],
+                            description = response[offset + 2],
+                            type = NativeBackendDeviceType.entries.firstOrNull { it.name == response[offset + 3] }
+                                ?: NativeBackendDeviceType.UNKNOWN,
+                            deviceId = response[offset + 4].ifBlank { null },
+                            memoryFreeBytes = response[offset + 5].toULong(),
+                            memoryTotalBytes = response[offset + 6].toULong(),
+                            capabilities = NativeBackendDeviceCapabilities(
+                                asynchronous = response[offset + 7].toBooleanStrict(),
+                                hostBuffer = response[offset + 8].toBooleanStrict(),
+                                bufferFromHostPointer = response[offset + 9].toBooleanStrict(),
+                                events = response[offset + 10].toBooleanStrict(),
+                            ),
+                        ),
+                    )
+                }
+            }
+            BackendDeviceInventoryResult.Success(devices)
+        } catch (error: IllegalArgumentException) {
+            BackendDeviceInventoryResult.Unavailable(
+                protocolError("Native backend device inventory is invalid: ${error.message}"),
+            )
+        }
     }
 
     private fun decodeModelLoad(response: Array<String>, file: File, profile: GgufModelProfile): ModelLoadResult {
@@ -130,6 +198,11 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
                         digest = profile.artifact.digest,
                         file = file,
                         loadDurationMs = response[2].toLong(),
+                        requestedExecution = NativeModelExecutionRequest(
+                            gpuLayers = profile.gpuLayers,
+                            useMmap = profile.useMmap,
+                            useMlock = profile.useMlock,
+                        ),
                     ),
                 )
             } catch (error: NumberFormatException) {
@@ -227,6 +300,8 @@ class LlamaCppBridge(private val nativeApi: NativeLlamaApi = JniLlamaApi()) {
         const val OPERATION_FIELD_COUNT = 1
         const val ERROR_FIELD_COUNT = 3
         const val INSPECTION_SUCCESS_FIELD_COUNT = 12
+        const val BACKEND_DEVICE_HEADER_FIELD_COUNT = 2
+        const val BACKEND_DEVICE_FIELD_COUNT = 11
     }
 }
 
@@ -237,16 +312,65 @@ value class NativeModelHandle(val value: Long) {
     }
 }
 
+data class NativeModelExecutionRequest(
+    val gpuLayers: Int,
+    val useMmap: Boolean,
+    val useMlock: Boolean,
+)
+
 data class LoadedNativeModel(
     val handle: NativeModelHandle,
     val profileId: String,
     val digest: ModelDigest,
     val file: File,
     val loadDurationMs: Long,
+    val requestedExecution: NativeModelExecutionRequest = NativeModelExecutionRequest(
+        gpuLayers = 0,
+        useMmap = true,
+        useMlock = false,
+    ),
 )
 
+data class NativeBackendDeviceCapabilities(
+    val asynchronous: Boolean,
+    val hostBuffer: Boolean,
+    val bufferFromHostPointer: Boolean,
+    val events: Boolean,
+)
+
+enum class NativeBackendDeviceType {
+    CPU,
+    GPU,
+    IGPU,
+    ACCELERATOR,
+    META,
+    UNKNOWN,
+}
+
+data class NativeBackendDevice(
+    val index: Int,
+    val name: String,
+    val description: String,
+    val type: NativeBackendDeviceType,
+    val deviceId: String?,
+    val memoryFreeBytes: ULong,
+    val memoryTotalBytes: ULong,
+    val capabilities: NativeBackendDeviceCapabilities,
+)
+
+private sealed interface BackendDeviceInventoryResult {
+    data class Success(val devices: List<NativeBackendDevice>) : BackendDeviceInventoryResult
+    data class Unavailable(val error: NativeRuntimeError) : BackendDeviceInventoryResult
+}
+
 sealed interface RuntimeInitializationResult {
-    data class Success(val deviceCount: Int) : RuntimeInitializationResult
+    data class Success(
+        val deviceCapacity: Int,
+        val registeredDeviceCount: Int? = null,
+        val devices: List<NativeBackendDevice>? = null,
+        val deviceInventoryError: NativeRuntimeError? = null,
+    ) : RuntimeInitializationResult
+
     data class Failure(val error: NativeRuntimeError) : RuntimeInitializationResult
 }
 

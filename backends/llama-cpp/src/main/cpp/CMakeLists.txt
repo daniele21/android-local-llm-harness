@@ -39,6 +39,7 @@ add_subdirectory("${LLAMA_CPP_DIR}" "${CMAKE_BINARY_DIR}/llama.cpp")
 add_library(
     local_llm_jni
     SHARED
+    backend_device_inventory_jni.cpp
     gguf_metadata.cpp
     common_string_utils.cpp
     generation_output_buffer.cpp
