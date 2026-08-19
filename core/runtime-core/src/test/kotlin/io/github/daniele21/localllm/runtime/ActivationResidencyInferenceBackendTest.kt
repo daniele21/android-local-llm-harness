@@ -19,7 +19,7 @@ class ActivationResidencyInferenceBackendTest {
         val coordinator = coordinator()
         val delegate = RecordingBackend()
         val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
-        val handle = TestModelHandle(digest)
+        val handle = ResidencyBackendTestModelHandle(digest)
         coordinator.acquire(request(), retainModelWarmMs = 30_000)
 
         val failure = runCatching { backend.unloadModel(handle) }.exceptionOrNull()
@@ -34,7 +34,7 @@ class ActivationResidencyInferenceBackendTest {
         val coordinator = coordinator()
         val delegate = RecordingBackend()
         val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
-        val handle = TestModelHandle(digest)
+        val handle = ResidencyBackendTestModelHandle(digest)
         val acquired = coordinator.acquire(request(), retainModelWarmMs = 30_000) as ActivationResidencyResult.Success
         coordinator.release(acquired.value.activationId, acquired.value.ownerId)
 
@@ -59,7 +59,7 @@ class ActivationResidencyInferenceBackendTest {
     )
 }
 
-private data class TestModelHandle(
+private data class ResidencyBackendTestModelHandle(
     override val digest: ModelDigest,
     override val profileId: String = "profile-a",
     override val loadDurationMs: Long = 1,
