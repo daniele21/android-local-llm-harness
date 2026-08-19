@@ -82,6 +82,7 @@ jobs:
               '.github/workflows/hcp-structural-refactor-v3.yml',
               '.github/workflows/hcp-structural-refactor-v4.yml',
               '.github/workflows/hcp-structural-refactor-v5.yml',
+              '.github/workflows/hcp-n-finalizer.yml',
               '.hcp-refactor-trigger', '.hcp-v5-trigger', '.hcp-v4-final-trigger', '.hcp-finalizer-trigger',
           ]:
               Path(raw_path).unlink(missing_ok=True)
