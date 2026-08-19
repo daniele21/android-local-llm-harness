@@ -89,37 +89,33 @@ class ConsumerControlPlaneAuthorizationTest {
                 caller,
                 negotiatedMinor = 2,
                 enabledFeatures =
-                setOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                ),
+                    setOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                    ),
             ) as LedgerResult.Success
         return Fixture(
             token = token.value,
             operations =
-            ConsumerControlPlaneHostOperations(
-                ledger = ledger,
-                host = host,
-                controlExecutor =
-                    HostControlExecutor { task ->
-                        task()
-                        true
-                    },
-            ),
+                ConsumerControlPlaneHostOperations(
+                    ledger = ledger,
+                    host = host,
+                    controlExecutor =
+                        HostControlExecutor { task ->
+                            task()
+                            true
+                        },
+                ),
         )
     }
 
-    private fun request(token: HostClientToken, operationId: String, useCaseId: String? = null) =
-        ConsumerControlPlaneRequestParcel(
-            clientToken = ClientTokenParcel(token.value),
-            operationId = operationId,
-            useCaseId = useCaseId,
-        )
-
-    private data class Fixture(
-        val token: HostClientToken,
-        val operations: ConsumerControlPlaneHostOperations,
+    private fun request(token: HostClientToken, operationId: String, useCaseId: String? = null) = ConsumerControlPlaneRequestParcel(
+        clientToken = ClientTokenParcel(token.value),
+        operationId = operationId,
+        useCaseId = useCaseId,
     )
+
+    private data class Fixture(val token: HostClientToken, val operations: ConsumerControlPlaneHostOperations)
 
     private inner class RecordingHost : ConsumerControlPlaneHost {
         var presetCalls = 0
@@ -151,14 +147,13 @@ class ConsumerControlPlaneAuthorizationTest {
 
         override fun releaseAll(ownerId: String, applicationId: ApplicationId) = Unit
 
-        private fun assignment(useCaseId: UseCaseId) =
-            ConsumerAssignedUseCase(
-                useCaseId = useCaseId,
-                useCaseRevision = 1,
-                bindingRevision = 1,
-                displayName = useCaseId.value,
-                description = "Test assignment ${useCaseId.value}",
-                isDefault = false,
-            )
+        private fun assignment(useCaseId: UseCaseId) = ConsumerAssignedUseCase(
+            useCaseId = useCaseId,
+            useCaseRevision = 1,
+            bindingRevision = 1,
+            displayName = useCaseId.value,
+            description = "Test assignment ${useCaseId.value}",
+            isDefault = false,
+        )
     }
 }
