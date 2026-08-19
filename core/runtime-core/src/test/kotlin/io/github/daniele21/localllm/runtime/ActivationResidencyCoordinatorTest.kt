@@ -5,11 +5,11 @@ import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
-import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 class ActivationResidencyCoordinatorTest {
     private val firstDigest = ModelDigest("a".repeat(64))
