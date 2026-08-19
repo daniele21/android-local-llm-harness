@@ -1,0 +1,48 @@
+name: HCP16 reopen runner
+
+on:
+  pull_request:
+    types:
+      - reopened
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/hcp-i-runtime-session-instrumentation-current
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Run implementation script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          lines = Path('.github/workflows/hcp16-runtime-telemetry-once.yml').read_text().splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == 'run: |') + 1
+          body = [line[10:] if line.startswith('          ') else line for line in lines[start:]]
+          script = '\n'.join(body)
+          replacement = """close_start = text.find('    override fun closeSession(sessionId: SessionId) {')
+          close_end = text.find('\\n    fun memoryResourceSnapshot()', close_start)
+          if close_start < 0 or close_end < 0:
+              raise SystemExit('closeSession boundaries not found')
+          text = text[:close_start] + new_close + text[close_end:]"""
+          pattern = re.compile(
+              r"\s*if old_close not in text:\n\s*raise SystemExit\('closeSession block not found'\)\n\s*text = text\.replace\(old_close, new_close, 1\)"
+          )
+          script, count = pattern.subn('\n' + replacement, script, count=1)
+          if count != 1:
+              raise SystemExit(f'close-session patch site count={count}')
+          Path('/tmp/hcp16.sh').write_text(script + '\n')
+          PY
+          bash /tmp/hcp16.sh
