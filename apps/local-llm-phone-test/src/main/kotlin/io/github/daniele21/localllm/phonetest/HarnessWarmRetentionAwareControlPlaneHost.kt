@@ -14,8 +14,7 @@ internal class HarnessWarmRetentionAwareControlPlaneHost(
     private val delegate: ConsumerControlPlaneHost,
     private val warmRetention: HarnessResolvedWarmRetentionCoordinator,
 ) : ConsumerControlPlaneHost {
-    override fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult =
-        delegate.assignedUseCases(applicationId)
+    override fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult = delegate.assignedUseCases(applicationId)
 
     override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
         delegate.publishedPresets(applicationId, useCaseId)
