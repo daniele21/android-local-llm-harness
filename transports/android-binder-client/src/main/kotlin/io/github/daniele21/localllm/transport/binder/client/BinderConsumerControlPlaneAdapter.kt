@@ -136,8 +136,7 @@ internal class BinderConsumerControlPlaneAdapter(
         }
     }
 
-    private fun controlPlaneEnabled(): Boolean =
-        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in enabledFeaturesProvider()
+    private fun controlPlaneEnabled(): Boolean = BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in enabledFeaturesProvider()
 
     private fun await(
         endpoint: RegisteredSharedRuntimeEndpoint,
@@ -198,8 +197,7 @@ private class ControlPlaneCallbackWaiter {
     }
 }
 
-private fun controlPlaneFailure(code: ConsumerControlPlaneErrorCode, message: String) =
-    ConsumerControlPlaneFailure(code, message)
+private fun controlPlaneFailure(code: ConsumerControlPlaneErrorCode, message: String) = ConsumerControlPlaneFailure(code, message)
 
 private fun assignedFeatureUnavailable() = ConsumerAssignedUseCasesResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
