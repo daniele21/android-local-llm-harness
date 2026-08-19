@@ -121,31 +121,19 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
 
     override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
 
-    override fun discoverUseCases(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerControlPlaneResultParcel) -> Unit,
-    ) {
+    override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         delegate.discoverUseCases(request, controlPlaneResultCallback(callback))
     }
 
-    override fun discoverPresets(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerControlPlaneResultParcel) -> Unit,
-    ) {
+    override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         delegate.discoverPresets(request, controlPlaneResultCallback(callback))
     }
 
-    override fun activate(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerControlPlaneResultParcel) -> Unit,
-    ) {
+    override fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         delegate.activate(request, controlPlaneResultCallback(callback))
     }
 
-    override fun deactivate(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerControlPlaneResultParcel) -> Unit,
-    ) {
+    override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         delegate.deactivate(request, controlPlaneResultCallback(callback))
     }
 
@@ -154,9 +142,8 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
             override fun onResult(result: ConsumerResultParcel) = callback(result)
         }
 
-    private fun controlPlaneResultCallback(
-        callback: (ConsumerControlPlaneResultParcel) -> Unit,
-    ): IConsumerControlPlaneResultCallback = object : IConsumerControlPlaneResultCallback.Stub() {
-        override fun onResult(result: ConsumerControlPlaneResultParcel) = callback(result)
-    }
+    private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParcel) -> Unit): IConsumerControlPlaneResultCallback =
+        object : IConsumerControlPlaneResultCallback.Stub() {
+            override fun onResult(result: ConsumerControlPlaneResultParcel) = callback(result)
+        }
 }
