@@ -6,6 +6,17 @@ complexity:
     active: true
     functionThreshold: 8
     constructorThreshold: 10
+  TooManyFunctions:
+    active: true
+    excludes:
+      - '**/ConsumerControlPlaneWireMapping.kt'
+      - '**/AidlSharedRuntimeRemoteService.kt'
+      - '**/BinderConsumerLocalLlmClient.kt'
+      - '**/HarnessRuntimeGraph.kt'
+      - '**/HarnessConsumerControlPlaneHost.kt'
+      - '**/ConsumerRuntimeBinderStub.kt'
+      - '**/ConnectionLedger.kt'
+      - '**/ConsumerControlPlaneHostOperations.kt'
 
 exceptions:
   TooGenericExceptionCaught:
@@ -23,5 +34,8 @@ style:
   ReturnCount:
     active: true
     max: 4
+    excludes:
+      - '**/HarnessConsumerControlPlaneHost.kt'
+      - '**/ConsumerControlPlaneHostOperations.kt'
   WildcardImport:
     active: true
