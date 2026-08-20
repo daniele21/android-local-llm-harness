@@ -118,11 +118,21 @@ else
 fi
 
 if [[ "$run_native" == "1" ]]; then
+  if command -v nproc >/dev/null 2>&1; then
+    build_jobs="$(nproc)"
+  elif command -v sysctl >/dev/null 2>&1; then
+    build_jobs="$(sysctl -n hw.ncpu 2>/dev/null || printf '2')"
+  else
+    build_jobs=2
+  fi
+  if [[ ! "$build_jobs" =~ ^[0-9]+$ ]] || ((build_jobs < 1)); then
+    build_jobs=2
+  fi
   cmake \
     -S backends/llama-cpp/src/test-native \
     -B "$native_build_dir" \
     -DCMAKE_BUILD_TYPE=Release
-  cmake --build "$native_build_dir" --parallel "$(nproc)"
+  cmake --build "$native_build_dir" --parallel "$build_jobs"
   ctest --test-dir "$native_build_dir" --output-on-failure
 fi
 
