@@ -9,9 +9,9 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SUPPORTED_SCHEMA_VERSIONS = {3, 4}
 MIN_WARM_SAMPLES = 3
-IDENTITY_FIELDS = [
+BASE_IDENTITY_FIELDS = [
     "tuningCaseId",
     "warmRepetitionsRequested",
     "maxOutputTokens",
@@ -36,6 +36,8 @@ IDENTITY_FIELDS = [
     "sdkInt",
     "abi",
 ]
+V4_IDENTITY_FIELDS = ["promptDigest"]
+OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS
 NUMERIC_METRICS = [
     "ttftMs",
     "prefillMs",
@@ -49,11 +51,16 @@ SUSTAINED_METRICS = [
     "totalMs",
     "decodeTokensPerSecond",
 ]
-REQUIRED_FIELDS = set(
+BASE_REQUIRED_FIELDS = set(
     ["schemaVersion", "sampleIndex", "modelLoadKind", "stopReason", "processPssKb", "availableMemoryBytes", "thermalStatus"]
-    + IDENTITY_FIELDS
+    + BASE_IDENTITY_FIELDS
     + NUMERIC_METRICS
 )
+
+
+def identity_fields_for(record: dict[str, object]) -> list[str]:
+    schema_version = int(record["schemaVersion"])
+    return BASE_IDENTITY_FIELDS + (V4_IDENTITY_FIELDS if schema_version >= 4 else [])
 
 
 def numeric_values(records: list[dict[str, object]], field: str) -> list[float]:
@@ -100,11 +107,19 @@ def read_records(path: Path) -> list[dict[str, object]]:
         if not line.strip():
             continue
         record = json.loads(line)
-        missing = sorted(REQUIRED_FIELDS.difference(record))
+        missing = sorted(BASE_REQUIRED_FIELDS.difference(record))
         if missing:
             raise SystemExit(f"line {line_number}: missing evidence fields: {', '.join(missing)}")
-        if record["schemaVersion"] != SCHEMA_VERSION:
-            raise SystemExit(f"line {line_number}: expected schemaVersion {SCHEMA_VERSION}")
+        schema_version = int(record["schemaVersion"])
+        if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise SystemExit(
+                f"line {line_number}: unsupported schemaVersion {schema_version}; "
+                f"expected one of {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
+            )
+        if schema_version >= 4:
+            prompt_digest = record.get("promptDigest")
+            if not isinstance(prompt_digest, str) or len(prompt_digest) != 64:
+                raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char promptDigest")
         if record["modelLoadKind"] not in {"COLD", "WARM"}:
             raise SystemExit(f"line {line_number}: modelLoadKind must be COLD or WARM")
         records.append(record)
@@ -115,7 +130,9 @@ def read_records(path: Path) -> list[dict[str, object]]:
 
 def verify_identity(records: list[dict[str, object]]) -> None:
     first = records[0]
-    for field in IDENTITY_FIELDS:
+    if any(record.get("schemaVersion") != first.get("schemaVersion") for record in records):
+        raise SystemExit(f"identity drift for {first['tuningCaseId']}: schemaVersion")
+    for field in identity_fields_for(first):
         if any(record.get(field) != first.get(field) for record in records):
             raise SystemExit(f"identity drift for {first['tuningCaseId']}: {field}")
 
@@ -145,7 +162,8 @@ def summarize_case(records: list[dict[str, object]]) -> dict[str, object]:
     cold = [record for record in records if record["modelLoadKind"] == "COLD"]
     warm = [record for record in records if record["modelLoadKind"] == "WARM"]
     eligible, reason = eligibility(cold, warm)
-    row: dict[str, object] = {field: first.get(field) for field in IDENTITY_FIELDS}
+    row: dict[str, object] = {field: first.get(field) for field in OUTPUT_IDENTITY_FIELDS}
+    row["schemaVersion"] = first.get("schemaVersion")
     row["coldSamples"] = len(cold)
     row["warmSamples"] = len(warm)
     for field in NUMERIC_METRICS:
@@ -192,7 +210,7 @@ def main() -> int:
     sustained_columns: list[str] = []
     for field in SUSTAINED_METRICS:
         sustained_columns.extend([f"warm_first_{field}", f"warm_last_{field}", f"warm_driftPercent_{field}"])
-    fieldnames = IDENTITY_FIELDS + [
+    fieldnames = ["schemaVersion", *OUTPUT_IDENTITY_FIELDS] + [
         "coldSamples",
         "warmSamples",
         *metric_columns,

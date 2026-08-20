@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Debug
 import android.os.PowerManager
+import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -42,6 +43,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -235,6 +237,7 @@ class Qwen35TuningInstrumentedTest {
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
             .put("maxOutputTokens", config.maxOutputTokens)
+            .put("promptDigest", config.promptDigest)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -294,7 +297,7 @@ class Qwen35TuningInstrumentedTest {
     }
 
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 3
+        const val EVIDENCE_SCHEMA_VERSION = 4
     }
 }
 
@@ -338,6 +341,7 @@ private data class Qwen35TuningConfig(
     val caseId: String,
     val harnessCommit: String,
     val prompt: String,
+    val promptDigest: String,
     val timeoutSeconds: Long,
 ) {
     val runtimeProfileId: String
@@ -363,48 +367,81 @@ private data class Qwen35TuningConfig(
 
     companion object {
         fun fromInstrumentation(): Qwen35TuningConfig {
-            val arguments = InstrumentationRegistry.getArguments()
+            val arguments = InstrumentationArguments(InstrumentationRegistry.getArguments())
             val processors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
-            fun string(name: String, default: String): String = arguments.getString(name)?.takeIf(String::isNotBlank) ?: default
-            fun required(name: String): String = arguments.getString(name)?.takeIf(String::isNotBlank)
-                ?: error("Missing required instrumentation argument: $name")
-            fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
-                require(it > 0) { "$name must be positive" }
-            }
-            val tier = when (required("modelTier").lowercase()) {
-                "0.8b" -> Qwen35ModelTier.B0_8
-                "2b" -> Qwen35ModelTier.B2
-                else -> error("modelTier must be 0.8b or 2b")
-            }
-            val contextSize = positiveInt("contextSize", 2_048)
+            val tier = arguments.modelTier()
+            val contextSize = arguments.positiveInt("contextSize", 2_048)
             require(contextSize in Qwen35RuntimeTuningProfiles.APPROVED_CONTEXT_TIERS) {
                 "contextSize must be an approved Qwen3.5 tier"
             }
-            val warmRepetitions = positiveInt("warmRepetitions", 3)
+            val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val prompt = arguments.prompt()
+            val promptDigest = sha256(prompt)
+            arguments.requirePromptDigest(promptDigest)
             return Qwen35TuningConfig(
-                relativePath = string("modelRelativePath", "files/e2e/model.gguf"),
-                digest = ModelDigest(required("modelSha256").lowercase()),
+                relativePath = arguments.string("modelRelativePath", "files/e2e/model.gguf"),
+                digest = ModelDigest(arguments.required("modelSha256").lowercase()),
                 tier = tier,
                 contextSize = contextSize,
-                batchSize = positiveInt("batchSize", 128),
-                microBatchSize = positiveInt("microBatchSize", 64),
-                cpuThreads = positiveInt("cpuThreads", processors.coerceAtMost(4)),
-                batchThreads = positiveInt("batchThreads", processors.coerceAtMost(4)),
-                maxOutputTokens = positiveInt("maxOutputTokens", 64),
+                batchSize = arguments.positiveInt("batchSize", 128),
+                microBatchSize = arguments.positiveInt("microBatchSize", 64),
+                cpuThreads = arguments.positiveInt("cpuThreads", processors.coerceAtMost(4)),
+                batchThreads = arguments.positiveInt("batchThreads", processors.coerceAtMost(4)),
+                maxOutputTokens = arguments.positiveInt("maxOutputTokens", 64),
                 warmRepetitions = warmRepetitions,
-                thinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
-                    "ENABLED" -> ThinkingMode.ENABLED
-                    "DISABLED" -> ThinkingMode.DISABLED
-                    else -> error("thinkingMode must be ENABLED or DISABLED")
-                },
-                caseId = required("tuningCaseId"),
-                harnessCommit = required("harnessCommit"),
-                prompt = string("prompt", "How much is the Earth radius?"),
-                timeoutSeconds = string("timeoutSeconds", "600").toLong().also {
-                    require(it > 0) { "timeoutSeconds must be positive" }
-                },
+                thinkingMode = arguments.thinkingMode(),
+                caseId = arguments.required("tuningCaseId"),
+                harnessCommit = arguments.required("harnessCommit"),
+                prompt = prompt,
+                promptDigest = promptDigest,
+                timeoutSeconds = arguments.positiveLong("timeoutSeconds", 600),
             )
+        }
+
+        private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+    }
+}
+
+private class InstrumentationArguments(private val arguments: Bundle) {
+    fun string(name: String, default: String): String = arguments.getString(name)?.takeIf(String::isNotBlank) ?: default
+
+    fun required(name: String): String = arguments.getString(name)?.takeIf(String::isNotBlank)
+        ?: error("Missing required instrumentation argument: $name")
+
+    fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it > 0) { "$name must be positive" }
+    }
+
+    fun positiveLong(name: String, default: Long): Long = string(name, default.toString()).toLong().also {
+        require(it > 0) { "$name must be positive" }
+    }
+
+    fun modelTier(): Qwen35ModelTier = when (required("modelTier").lowercase()) {
+        "0.8b" -> Qwen35ModelTier.B0_8
+        "2b" -> Qwen35ModelTier.B2
+        else -> error("modelTier must be 0.8b or 2b")
+    }
+
+    fun thinkingMode(): ThinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
+        "ENABLED" -> ThinkingMode.ENABLED
+        "DISABLED" -> ThinkingMode.DISABLED
+        else -> error("thinkingMode must be ENABLED or DISABLED")
+    }
+
+    fun prompt(): String {
+        val prompt = arguments.getString("promptBase64")?.takeIf(String::isNotBlank)?.let { encoded ->
+            String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8)
+        } ?: string("prompt", "How much is the Earth radius?")
+        require(prompt.isNotBlank()) { "prompt must not be blank" }
+        return prompt
+    }
+
+    fun requirePromptDigest(actualDigest: String) {
+        arguments.getString("promptSha256")?.takeIf(String::isNotBlank)?.let { supplied ->
+            require(supplied.lowercase() == actualDigest) { "promptSha256 does not match decoded prompt" }
         }
     }
 }
