@@ -1,7 +1,11 @@
 # LLRT-5 candidate load-mode compatibility
 
 Status: active
+Document type: feature-specification
 Owner: llama-cpp-runtime
+Canonical scope: qwen35.llrt5-load-mode-compat
+Read when: qualifying a newer llama.cpp model-load API without moving the Harness 0.5 production pin
+Last reviewed: 2026-08-20
 
 ## Purpose
 
