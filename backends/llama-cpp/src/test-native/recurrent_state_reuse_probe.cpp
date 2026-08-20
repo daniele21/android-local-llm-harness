@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "model_load_params_compat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -215,8 +216,7 @@ int main() {
     llama_backend_init();
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0;
-    model_params.use_mmap = true;
-    model_params.use_mlock = false;
+    local_llm::apply_legacy_model_load_policy(model_params, true, false);
     ModelPtr model(llama_model_load_from_file(model_path, model_params), llama_model_free);
     if (!model) {
         std::cerr << "LLRT-4 probe failed: unable to load model\n";
