@@ -128,6 +128,7 @@ add_executable(recurrent_state_reuse_probe recurrent_state_reuse_probe.cpp)
 target_include_directories(
     recurrent_state_reuse_probe
     PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
     "${LLAMA_CPP_DIR}/include"
 )
 target_link_libraries(recurrent_state_reuse_probe PRIVATE llama)
