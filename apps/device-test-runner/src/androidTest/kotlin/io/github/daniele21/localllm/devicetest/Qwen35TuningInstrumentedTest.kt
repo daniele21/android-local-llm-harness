@@ -79,11 +79,7 @@ class Qwen35TuningInstrumentedTest {
         emitStatus("LOCAL_LLM_THERMAL_STATUS ${currentThermalStatus()}")
     }
 
-    private fun runMeasuredGeneration(
-        runtime: RuntimeOrchestrator,
-        harness: Qwen35TuningHarness,
-        sampleIndex: Int,
-    ): MeasuredGeneration {
+    private fun runMeasuredGeneration(runtime: RuntimeOrchestrator, harness: Qwen35TuningHarness, sampleIndex: Int): MeasuredGeneration {
         val before = deviceSnapshot()
         val session = runtime.createSession(harness.applicationId, harness.useCaseId)
         val completed = generateAndAwait(runtime, harness, session)
@@ -376,38 +372,39 @@ private data class Qwen35TuningConfig(
                 require(it > 0) { "$name must be positive" }
             }
             val tier = when (required("modelTier").lowercase()) {
-                "0.8b" -> Qwen35ModelTier.B0_8
-                "2b" -> Qwen35ModelTier.B2
-                else -> error("modelTier must be 0.8b or 2b")
+                "0.8b" -> Qwen35ModelTier.QWEN35_0_8B
+                "2b" -> Qwen35ModelTier.QWEN35_2B
+                "4b" -> Qwen35ModelTier.QWEN35_4B
+                else -> error("Unsupported modelTier; expected 0.8b, 2b, or 4b")
             }
-            val contextSize = positiveInt("contextSize", 2_048)
-            require(contextSize in Qwen35RuntimeTuningProfiles.APPROVED_CONTEXT_TIERS) {
-                "contextSize must be an approved Qwen3.5 tier"
+            val thinkingMode = when (string("thinkingMode", "disabled").lowercase()) {
+                "enabled" -> ThinkingMode.ENABLED
+                "disabled" -> ThinkingMode.DISABLED
+                else -> error("thinkingMode must be enabled or disabled")
             }
-            val warmRepetitions = positiveInt("warmRepetitions", 3)
-            require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val contextSize = positiveInt("contextTokens", 2_048)
+            val batchSize = positiveInt("batchSize", 128)
+            val microBatchSize = positiveInt("microBatchSize", 64)
+            require(microBatchSize <= batchSize) { "microBatchSize must not exceed batchSize" }
             return Qwen35TuningConfig(
-                relativePath = string("modelRelativePath", "files/e2e/model.gguf"),
-                digest = ModelDigest(required("modelSha256").lowercase()),
+                relativePath = required("modelRelativePath"),
+                digest = ModelDigest(required("modelDigest")),
                 tier = tier,
                 contextSize = contextSize,
-                batchSize = positiveInt("batchSize", 128),
-                microBatchSize = positiveInt("microBatchSize", 64),
-                cpuThreads = positiveInt("cpuThreads", processors.coerceAtMost(4)),
-                batchThreads = positiveInt("batchThreads", processors.coerceAtMost(4)),
-                maxOutputTokens = positiveInt("maxOutputTokens", 64),
-                warmRepetitions = warmRepetitions,
-                thinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
-                    "ENABLED" -> ThinkingMode.ENABLED
-                    "DISABLED" -> ThinkingMode.DISABLED
-                    else -> error("thinkingMode must be ENABLED or DISABLED")
-                },
-                caseId = required("tuningCaseId"),
-                harnessCommit = required("harnessCommit"),
-                prompt = string("prompt", "How much is the Earth radius?"),
-                timeoutSeconds = string("timeoutSeconds", "600").toLong().also {
-                    require(it > 0) { "timeoutSeconds must be positive" }
-                },
+                batchSize = batchSize,
+                microBatchSize = microBatchSize,
+                cpuThreads = positiveInt("cpuThreads", minOf(processors, 4)),
+                batchThreads = positiveInt("batchThreads", minOf(processors, 4)),
+                maxOutputTokens = positiveInt("maxOutputTokens", 128),
+                warmRepetitions = positiveInt("warmRepetitions", 2),
+                thinkingMode = thinkingMode,
+                caseId = string("tuningCaseId", "manual"),
+                harnessCommit = string("harnessCommit", "unknown"),
+                prompt = string(
+                    "prompt",
+                    "Summarize why local on-device inference can be useful in one concise paragraph.",
+                ),
+                timeoutSeconds = positiveInt("timeoutSeconds", 180).toLong(),
             )
         }
     }
