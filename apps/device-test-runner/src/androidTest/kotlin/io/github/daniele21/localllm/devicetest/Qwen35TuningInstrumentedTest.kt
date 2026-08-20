@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Debug
 import android.os.PowerManager
+import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -42,6 +43,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -235,6 +237,7 @@ class Qwen35TuningInstrumentedTest {
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
             .put("maxOutputTokens", config.maxOutputTokens)
+            .put("promptDigest", config.promptDigest)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -294,7 +297,7 @@ class Qwen35TuningInstrumentedTest {
     }
 
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 3
+        const val EVIDENCE_SCHEMA_VERSION = 4
     }
 }
 
@@ -338,6 +341,7 @@ private data class Qwen35TuningConfig(
     val caseId: String,
     val harnessCommit: String,
     val prompt: String,
+    val promptDigest: String,
     val timeoutSeconds: Long,
 ) {
     val runtimeProfileId: String
@@ -382,6 +386,14 @@ private data class Qwen35TuningConfig(
             }
             val warmRepetitions = positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val prompt = arguments.getString("promptBase64")?.takeIf(String::isNotBlank)?.let { encoded ->
+                String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8)
+            } ?: string("prompt", "How much is the Earth radius?")
+            require(prompt.isNotBlank()) { "prompt must not be blank" }
+            val promptDigest = sha256(prompt)
+            arguments.getString("promptSha256")?.takeIf(String::isNotBlank)?.let { supplied ->
+                require(supplied.lowercase() == promptDigest) { "promptSha256 does not match decoded prompt" }
+            }
             return Qwen35TuningConfig(
                 relativePath = string("modelRelativePath", "files/e2e/model.gguf"),
                 digest = ModelDigest(required("modelSha256").lowercase()),
@@ -400,11 +412,16 @@ private data class Qwen35TuningConfig(
                 },
                 caseId = required("tuningCaseId"),
                 harnessCommit = required("harnessCommit"),
-                prompt = string("prompt", "How much is the Earth radius?"),
+                prompt = prompt,
+                promptDigest = promptDigest,
                 timeoutSeconds = string("timeoutSeconds", "600").toLong().also {
                     require(it > 0) { "timeoutSeconds must be positive" }
                 },
             )
         }
+
+        private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
     }
 }
