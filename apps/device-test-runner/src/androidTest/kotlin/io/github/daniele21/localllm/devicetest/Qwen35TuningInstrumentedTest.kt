@@ -1,8 +1,10 @@
 package io.github.daniele21.localllm.devicetest
 
 import android.app.ActivityManager
+import android.app.Instrumentation
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Debug
 import android.os.PowerManager
 import androidx.test.core.app.ApplicationProvider
@@ -48,7 +50,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class Qwen35TuningInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val config = Qwen35TuningConfig.fromInstrumentation()
+    private val config by lazy { Qwen35TuningConfig.fromInstrumentation() }
 
     @Test
     fun recordsColdAndWarmEvidence() {
@@ -57,12 +59,12 @@ class Qwen35TuningInstrumentedTest {
         try {
             val cold = runMeasuredGeneration(runtime, harness, sampleIndex = 0)
             assertEquals("Expected a cold first tuning run", "COLD", cold.completed.metrics.modelLoadKind.name)
-            println("LOCAL_LLM_TUNING_JSON ${evidence(cold)}")
+            emitEvidence(cold)
 
             repeat(config.warmRepetitions) { index ->
                 val warm = runMeasuredGeneration(runtime, harness, sampleIndex = index + 1)
                 assertEquals("Expected a warm tuning run", "WARM", warm.completed.metrics.modelLoadKind.name)
-                println("LOCAL_LLM_TUNING_JSON ${evidence(warm)}")
+                emitEvidence(warm)
             }
 
             assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())
@@ -70,6 +72,11 @@ class Qwen35TuningInstrumentedTest {
         } finally {
             runtime.close()
         }
+    }
+
+    @Test
+    fun reportsThermalStatus() {
+        emitStatus("LOCAL_LLM_THERMAL_STATUS ${currentThermalStatus()}")
     }
 
     private fun runMeasuredGeneration(runtime: RuntimeOrchestrator, harness: Qwen35TuningHarness, sampleIndex: Int): MeasuredGeneration {
@@ -202,6 +209,17 @@ class Qwen35TuningInstrumentedTest {
         return condition()
     }
 
+    private fun emitEvidence(measured: MeasuredGeneration) {
+        emitStatus("LOCAL_LLM_TUNING_JSON ${evidence(measured)}")
+    }
+
+    private fun emitStatus(line: String) {
+        val status = Bundle().apply {
+            putString(Instrumentation.REPORT_KEY_STREAMRESULT, "$line\n")
+        }
+        InstrumentationRegistry.getInstrumentation().sendStatus(0, status)
+    }
+
     private fun evidence(measured: MeasuredGeneration): JSONObject {
         val completed = measured.completed
         val inputTokens = completed.metrics.inputTokens
@@ -216,6 +234,7 @@ class Qwen35TuningInstrumentedTest {
             .put("tuningCaseId", config.caseId)
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
+            .put("maxOutputTokens", config.maxOutputTokens)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -257,20 +276,25 @@ class Qwen35TuningInstrumentedTest {
             .put("thermalStatus", maxOf(measured.before.thermalStatus, measured.after.thermalStatus))
     }
 
+    private fun currentThermalStatus(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return -1
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.currentThermalStatus
+    }
+
     private fun deviceSnapshot(): DeviceSnapshot {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val debugMemory = Debug.MemoryInfo().also(Debug::getMemoryInfo)
         return DeviceSnapshot(
             processPssKb = debugMemory.totalPss,
             availableMemoryBytes = memoryInfo.availMem,
-            thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,
+            thermalStatus = currentThermalStatus(),
         )
     }
 
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 2
+        const val EVIDENCE_SCHEMA_VERSION = 3
     }
 }
 
@@ -377,7 +401,7 @@ private data class Qwen35TuningConfig(
                 caseId = required("tuningCaseId"),
                 harnessCommit = required("harnessCommit"),
                 prompt = string("prompt", "How much is the Earth radius?"),
-                timeoutSeconds = string("timeoutSeconds", "180").toLong().also {
+                timeoutSeconds = string("timeoutSeconds", "600").toLong().also {
                     require(it > 0) { "timeoutSeconds must be positive" }
                 },
             )
