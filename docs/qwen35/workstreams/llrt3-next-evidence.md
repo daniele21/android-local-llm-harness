@@ -1,6 +1,6 @@
 # LLRT-3 next physical CPU evidence wave
 
-Status: ready-for-device-evidence
+Status: active
 Owner: qwen35 / llama-cpp-runtime
 
 ## Baseline already closed
