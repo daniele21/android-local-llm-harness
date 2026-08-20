@@ -4,12 +4,15 @@ on:
   push:
     branches:
       - agent/llrt5-candidate-qualification-run
+  pull_request:
+    branches:
+      - dev
 
 permissions:
   contents: read
 
 concurrency:
-  group: llrt5-candidate-qualification-one-shot
+  group: llrt5-candidate-qualification-one-shot-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
