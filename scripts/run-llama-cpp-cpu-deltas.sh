@@ -22,6 +22,8 @@ COOLDOWN_TIMEOUT_SECONDS=1800
 COOLDOWN_POLL_SECONDS=30
 OUTPUT_DIR="$ROOT_DIR/build/llrt3"
 RESET_OUTPUT=false
+PROMPT_FILE=""
+DEFAULT_PROMPT="How much is the Earth radius?"
 
 usage() {
     cat <<'EOF'
@@ -42,8 +44,11 @@ Options:
   --max-output-tokens N           Sustained output budget (default: 64).
   --thinking-mode MODE            DISABLED or ENABLED (default: DISABLED).
   --timeout-seconds N             Per-generation timeout (default: 600).
-  --case NAME                     all, baseline, generation-threads-2,
-                                  batch-threads-2, or batch64-ubatch32 (default: all).
+  --prompt-file PATH              UTF-8 prompt file. Prompt content is not persisted;
+                                  only its SHA-256 digest enters evidence identity.
+  --case NAME[,NAME...]           all, baseline, generation-threads-2,
+                                  batch-threads-2, batch64-ubatch32, or a comma-separated
+                                  subset (default: all).
   --thermal-start-max N|off       Require Android thermal status <= N before each case;
                                   0=none, 1=light, 2=moderate (default: 1).
   --cooldown-timeout-seconds N    Maximum thermal-gate wait (default: 1800).
@@ -61,9 +66,9 @@ Default bounded cases:
 
 Each case emits one cold sample plus N warm samples. Completed cases are skipped on
 resume. Raw evidence is appended only after a case completes, so interruption does not
-leave a half-case in the active evidence file. Output budget and warm count are part of
-the run/case identity. The summary reports sustained warm drift but applies no new
-pass/fail threshold; policy remains owned by Q35-6/Q35-7 evidence review.
+leave a half-case in the active evidence file. Output budget, warm count and prompt
+digest are part of the run/case identity. The summary reports sustained warm drift but
+applies no new pass/fail threshold; policy remains owned by Q35-6/Q35-7 evidence review.
 EOF
 }
 
@@ -81,6 +86,7 @@ while [[ $# -gt 0 ]]; do
         --max-output-tokens) MAX_OUTPUT_TOKENS="${2:-}"; shift 2 ;;
         --thinking-mode) THINKING_MODE="${2:-}"; shift 2 ;;
         --timeout-seconds) TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
+        --prompt-file) PROMPT_FILE="${2:-}"; shift 2 ;;
         --case) CASE_SCOPE="${2:-}"; shift 2 ;;
         --thermal-start-max) THERMAL_START_MAX="${2:-}"; shift 2 ;;
         --cooldown-timeout-seconds) COOLDOWN_TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
@@ -108,10 +114,33 @@ if [[ "$CONTEXT" != "1024" && "$CONTEXT" != "2048" && "$CONTEXT" != "4096" && "$
     echo "--context must be one of 1024, 2048, 4096, 8192" >&2
     exit 2
 fi
-case "$CASE_SCOPE" in
-    all|baseline|generation-threads-2|batch-threads-2|batch64-ubatch32) ;;
-    *) echo "--case must be all, baseline, generation-threads-2, batch-threads-2, or batch64-ubatch32" >&2; exit 2 ;;
-esac
+if [[ -n "$PROMPT_FILE" && (! -f "$PROMPT_FILE" || ! -r "$PROMPT_FILE") ]]; then
+    echo "--prompt-file must point to a readable UTF-8 file" >&2
+    exit 2
+fi
+validate_case_scope() {
+    if [[ "$CASE_SCOPE" == "all" ]]; then
+        return 0
+    fi
+    old_ifs="$IFS"
+    IFS=','
+    set -- $CASE_SCOPE
+    IFS="$old_ifs"
+    if [[ $# -eq 0 ]]; then
+        echo "--case must not be empty" >&2
+        exit 2
+    fi
+    for selected_case in "$@"; do
+        case "$selected_case" in
+            baseline|generation-threads-2|batch-threads-2|batch64-ubatch32) ;;
+            *)
+                echo "--case contains unsupported value: $selected_case" >&2
+                exit 2
+                ;;
+        esac
+    done
+}
+validate_case_scope
 for value_name in BASE_THREADS BASE_BATCH_THREADS BASE_BATCH BASE_UBATCH MAX_OUTPUT_TOKENS TIMEOUT_SECONDS COOLDOWN_TIMEOUT_SECONDS COOLDOWN_POLL_SECONDS; do
     value="${!value_name}"
     if [[ ! "$value" =~ ^[0-9]+$ ]] || ((value < 1)); then
@@ -139,6 +168,33 @@ if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
 fi
 if ! command -v python3 >/dev/null 2>&1; then
     echo "python3 is required" >&2
+    exit 2
+fi
+
+PROMPT_PAYLOAD="$(python3 - "$PROMPT_FILE" "$DEFAULT_PROMPT" <<'PY'
+import base64
+import hashlib
+import sys
+from pathlib import Path
+
+prompt_file = sys.argv[1]
+default_prompt = sys.argv[2]
+if prompt_file:
+    prompt = Path(prompt_file).read_text(encoding="utf-8")
+else:
+    prompt = default_prompt
+if not prompt.strip():
+    raise SystemExit("prompt must not be blank")
+prompt_bytes = prompt.encode("utf-8")
+print(hashlib.sha256(prompt_bytes).hexdigest())
+print(base64.b64encode(prompt_bytes).decode("ascii"))
+PY
+)"
+PROMPT_DIGEST="$(printf '%s\n' "$PROMPT_PAYLOAD" | sed -n '1p')"
+PROMPT_BASE64="$(printf '%s\n' "$PROMPT_PAYLOAD" | sed -n '2p')"
+PROMPT_KEY="$(printf '%s' "$PROMPT_DIGEST" | cut -c1-12)"
+if [[ ! "$PROMPT_DIGEST" =~ ^[0-9a-f]{64}$ || -z "$PROMPT_BASE64" ]]; then
+    echo "Unable to build prompt evidence identity" >&2
     exit 2
 fi
 
@@ -200,7 +256,7 @@ DEVICE_SDK="$("${ADB_CMD[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
 cd "$ROOT_DIR"
 HARNESS_COMMIT="$(git rev-parse HEAD)"
 THINKING_MODE_SLUG="$(printf '%s' "$THINKING_MODE" | tr '[:upper:]' '[:lower:]')"
-RUN_KEY="ctx${CONTEXT}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}"
+RUN_KEY="ctx${CONTEXT}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}-p${PROMPT_KEY}"
 mkdir -p "$TIER_OUTPUT_DIR"
 JSONL="$TIER_OUTPUT_DIR/llama-cpp-cpu-deltas-${RUN_KEY}-evidence.jsonl"
 CSV="$TIER_OUTPUT_DIR/llama-cpp-cpu-deltas-${RUN_KEY}-summary.csv"
@@ -216,14 +272,14 @@ fi
 validate_existing_evidence() {
     [[ -s "$JSONL" ]] || return 0
     python3 - "$JSONL" "$EXPECTED_SHA" "$EXPECTED_MODEL_TIER" "$BACKEND_REVISION" "$HARNESS_COMMIT" \
-        "$CONTEXT" "$MAX_OUTPUT_TOKENS" "$REPETITIONS" "$THINKING_MODE" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" <<'PY'
+        "$CONTEXT" "$MAX_OUTPUT_TOKENS" "$REPETITIONS" "$THINKING_MODE" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" "$PROMPT_DIGEST" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
 expected = {
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "modelDigest": sys.argv[2],
     "modelTier": sys.argv[3],
     "architecture": "qwen35",
@@ -238,6 +294,7 @@ expected = {
     "androidRelease": sys.argv[11],
     "sdkInt": int(sys.argv[12]),
     "abi": sys.argv[13],
+    "promptDigest": sys.argv[14],
 }
 for line_number, line in enumerate(path.read_text().splitlines(), start=1):
     if not line.strip():
@@ -381,7 +438,10 @@ PY
 
 case_selected() {
     label="$1"
-    [[ "$CASE_SCOPE" == "all" || "$CASE_SCOPE" == "$label" ]]
+    if [[ "$CASE_SCOPE" == "all" ]]; then
+        return 0
+    fi
+    printf '%s\n' "$CASE_SCOPE" | tr ',' '\n' | grep -Fqx "$label"
 }
 
 # Keep this runner compatible with the system Bash 3.2 shipped on macOS.
@@ -422,7 +482,7 @@ run_case() {
     SEEN_SIGNATURES+=("$signature")
     SEEN_LABELS+=("$label")
 
-    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}"
+    case_id="llrt3-${TIER}-ctx${CONTEXT}-${label}-t${threads}-bt${batch_threads}-b${batch}-ub${ubatch}-out${MAX_OUTPUT_TOKENS}-w${REPETITIONS}-${THINKING_MODE_SLUG}-p${PROMPT_KEY}"
     existing_state="$(case_state "$case_id")"
     if [[ "$existing_state" == "complete" ]]; then
         echo "Resume: $case_id already has complete evidence; skipping"
@@ -434,7 +494,7 @@ run_case() {
     fi
 
     wait_for_thermal_gate
-    echo "Running $case_id: 1 cold + $REPETITIONS warm"
+    echo "Running $case_id: 1 cold + $REPETITIONS warm; promptDigest=$PROMPT_DIGEST"
     set +e
     output="$(
         "${ADB_CMD[@]}" shell am instrument -w -r \
@@ -452,6 +512,8 @@ run_case() {
             -e thinkingMode "$THINKING_MODE" \
             -e tuningCaseId "$case_id" \
             -e harnessCommit "$HARNESS_COMMIT" \
+            -e promptBase64 "$PROMPT_BASE64" \
+            -e promptSha256 "$PROMPT_DIGEST" \
             -e timeoutSeconds "$TIMEOUT_SECONDS" \
             "$RUNNER" 2>&1
     )"
@@ -497,4 +559,5 @@ python3 scripts/summarize-qwen35-tuning.py "$JSONL" "$CSV"
 echo "Bounded llama.cpp CPU delta evidence written to:"
 echo "  $JSONL"
 echo "  $CSV"
+echo "Prompt SHA-256: $PROMPT_DIGEST"
 echo "Review sustained warm drift together with median/p95, PSS, memory and thermal status; no threshold was auto-promoted."
