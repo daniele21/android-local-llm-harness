@@ -1,6 +1,6 @@
 # LLRT-5 candidate load-mode compatibility
 
-Status: experimental
+Status: active
 Owner: llama-cpp-runtime
 
 ## Purpose
