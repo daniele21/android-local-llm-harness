@@ -1,7 +1,11 @@
 # LLRT-3 next physical CPU evidence wave
 
 Status: active
+Document type: feature-specification
 Owner: qwen35 / llama-cpp-runtime
+Canonical scope: qwen35.llrt3-next-evidence
+Read when: running or changing bounded Qwen3.5 CPU tuning evidence after the completed 2B screen
+Last reviewed: 2026-08-20
 
 ## Baseline already closed
 
