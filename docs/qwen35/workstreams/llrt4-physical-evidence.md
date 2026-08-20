@@ -1,6 +1,6 @@
 # LLRT-4 physical recurrent-state evidence
 
-Status: ready-for-device-evidence
+Status: active
 Owner: llama-cpp-runtime / qwen35
 
 ## Purpose
