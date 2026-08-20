@@ -1,7 +1,11 @@
 # LLRT-4 physical recurrent-state evidence
 
 Status: active
+Document type: feature-specification
 Owner: llama-cpp-runtime / qwen35
+Canonical scope: qwen35.llrt4-physical-evidence
+Read when: running or changing Qwen3.5 recurrent/session-state correctness evidence on physical Android
+Last reviewed: 2026-08-20
 
 ## Purpose
 
