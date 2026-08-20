@@ -106,6 +106,13 @@ target_include_directories(
 
 target_link_libraries(prepared_prompt_cache_test PRIVATE Threads::Threads)
 
+add_executable(model_load_params_compat_test model_load_params_compat_test.cpp)
+target_include_directories(
+    model_load_params_compat_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+)
+
 add_executable(
     reasoning_transition_test
     reasoning_transition_test.cpp
@@ -131,6 +138,7 @@ add_test(NAME native_cancellation_registry_test COMMAND native_cancellation_regi
 add_test(NAME generation_output_buffer_test COMMAND generation_output_buffer_test)
 add_test(NAME generation_sampler_test COMMAND generation_sampler_test)
 add_test(NAME prepared_prompt_cache_test COMMAND prepared_prompt_cache_test)
+add_test(NAME model_load_params_compat_test COMMAND model_load_params_compat_test)
 add_test(NAME reasoning_transition_test COMMAND reasoning_transition_test)
 add_test(NAME recurrent_state_reuse_probe COMMAND recurrent_state_reuse_probe)
 set_tests_properties(recurrent_state_reuse_probe PROPERTIES SKIP_RETURN_CODE 77)
