@@ -13,9 +13,15 @@ namespace {
 
 constexpr int kSkipReturnCode = 77;
 constexpr float kLogitTolerance = 1.0e-4F;
+constexpr int kRepeatCycles = 3;
 
 using ModelPtr = std::unique_ptr<llama_model, decltype(&llama_model_free)>;
 using ContextPtr = std::unique_ptr<llama_context, decltype(&llama_free)>;
+
+struct EquivalenceResult final {
+    bool equivalent = false;
+    float maximum_delta = 0.0F;
+};
 
 std::vector<llama_token> tokenize(const llama_vocab* vocab, const std::string& text, bool add_special) {
     const std::int32_t required = llama_tokenize(
@@ -59,11 +65,12 @@ ContextPtr new_context(llama_model* model) {
     return ContextPtr(llama_init_from_model(model, params), llama_free);
 }
 
-bool decode(ContextPtr& context, std::vector<llama_token>& tokens) {
+bool decode(ContextPtr& context, const std::vector<llama_token>& tokens) {
     if (!context || tokens.empty()) {
         return false;
     }
-    llama_batch batch = llama_batch_get_one(tokens.data(), static_cast<std::int32_t>(tokens.size()));
+    std::vector<llama_token> copy = tokens;
+    llama_batch batch = llama_batch_get_one(copy.data(), static_cast<std::int32_t>(copy.size()));
     return llama_decode(context.get(), batch) == 0;
 }
 
@@ -94,22 +101,22 @@ bool restore_sequence_state(llama_context* context, const std::vector<std::uint8
     return !state.empty() && llama_state_seq_set_data(context, state.data(), state.size(), 0) > 0;
 }
 
-bool logits_equivalent(const std::vector<float>& expected, const std::vector<float>& actual) {
+EquivalenceResult compare_logits(const std::vector<float>& expected, const std::vector<float>& actual) {
+    EquivalenceResult result;
     if (expected.size() != actual.size() || expected.empty()) {
-        return false;
+        return result;
     }
-    float maximum_delta = 0.0F;
     for (std::size_t index = 0; index < expected.size(); ++index) {
         if (!std::isfinite(expected[index]) || !std::isfinite(actual[index])) {
             if (expected[index] != actual[index]) {
-                return false;
+                return result;
             }
             continue;
         }
-        maximum_delta = std::max(maximum_delta, std::abs(expected[index] - actual[index]));
+        result.maximum_delta = std::max(result.maximum_delta, std::abs(expected[index] - actual[index]));
     }
-    std::cout << "maximum logit delta=" << maximum_delta << '\n';
-    return maximum_delta <= kLogitTolerance;
+    result.equivalent = result.maximum_delta <= kLogitTolerance;
+    return result;
 }
 
 std::vector<float> clean_logits(
@@ -119,12 +126,7 @@ std::vector<float> clean_logits(
     const std::vector<llama_token>& suffix
 ) {
     ContextPtr context = new_context(model);
-    if (!context) {
-        return {};
-    }
-    std::vector<llama_token> prefix_copy = prefix;
-    std::vector<llama_token> suffix_copy = suffix;
-    if (!decode(context, prefix_copy) || !decode(context, suffix_copy)) {
+    if (!context || !decode(context, prefix) || !decode(context, suffix)) {
         return {};
     }
     return copy_last_logits(context.get(), vocab);
@@ -134,17 +136,71 @@ std::vector<float> restored_logits(
     llama_model* model,
     const llama_vocab* vocab,
     const std::vector<std::uint8_t>& prefix_state,
-    const std::vector<llama_token>& suffix
+    const std::vector<llama_token>& suffix,
+    bool clear_before_restore
 ) {
     ContextPtr context = new_context(model);
-    if (!context || !restore_sequence_state(context.get(), prefix_state)) {
+    if (!context) {
         return {};
     }
-    std::vector<llama_token> suffix_copy = suffix;
-    if (!decode(context, suffix_copy)) {
+    if (clear_before_restore) {
+        llama_memory_clear(llama_get_memory(context.get()), true);
+    }
+    if (!restore_sequence_state(context.get(), prefix_state) || !decode(context, suffix)) {
         return {};
     }
     return copy_last_logits(context.get(), vocab);
+}
+
+std::vector<float> full_remove_then_restore_logits(
+    llama_model* model,
+    const llama_vocab* vocab,
+    const std::vector<llama_token>& prefix,
+    const std::vector<llama_token>& first_suffix,
+    const std::vector<std::uint8_t>& prefix_state,
+    const std::vector<llama_token>& replacement_suffix,
+    bool& removal_supported
+) {
+    ContextPtr context = new_context(model);
+    if (!context || !decode(context, prefix) || !decode(context, first_suffix)) {
+        return {};
+    }
+    llama_memory_t memory = llama_get_memory(context.get());
+    removal_supported = llama_memory_seq_rm(memory, 0, 0, -1);
+    if (!removal_supported || !restore_sequence_state(context.get(), prefix_state) || !decode(context, replacement_suffix)) {
+        return {};
+    }
+    return copy_last_logits(context.get(), vocab);
+}
+
+std::vector<float> partial_rollback_logits(
+    llama_model* model,
+    const llama_vocab* vocab,
+    const std::vector<llama_token>& prefix,
+    const std::vector<llama_token>& first_suffix,
+    const std::vector<llama_token>& replacement_suffix,
+    bool& rollback_supported
+) {
+    ContextPtr context = new_context(model);
+    if (!context || !decode(context, prefix) || !decode(context, first_suffix)) {
+        return {};
+    }
+    llama_memory_t memory = llama_get_memory(context.get());
+    rollback_supported = llama_memory_seq_rm(
+        memory,
+        0,
+        static_cast<llama_pos>(prefix.size()),
+        -1
+    );
+    if (!rollback_supported || !decode(context, replacement_suffix)) {
+        return {};
+    }
+    return copy_last_logits(context.get(), vocab);
+}
+
+void print_equivalence(const char* label, const EquivalenceResult& result) {
+    std::cout << "LLRT4 " << label << ' ' << (result.equivalent ? "PASS" : "FAIL")
+              << " maxDelta=" << result.maximum_delta << '\n';
 }
 
 }  // namespace
@@ -180,8 +236,7 @@ int main() {
     }
 
     ContextPtr source = new_context(model.get());
-    std::vector<llama_token> prefix_copy = prefix;
-    if (!source || !decode(source, prefix_copy)) {
+    if (!source || !decode(source, prefix)) {
         std::cerr << "LLRT-4 probe failed: prefix decode failed\n";
         model.reset();
         llama_backend_free();
@@ -197,16 +252,104 @@ int main() {
     }
 
     const std::vector<float> clean_a = clean_logits(model.get(), vocab, prefix, suffix_a);
-    const std::vector<float> restored_a = restored_logits(model.get(), vocab, prefix_state, suffix_a);
     const std::vector<float> clean_b = clean_logits(model.get(), vocab, prefix, suffix_b);
-    const std::vector<float> restored_b = restored_logits(model.get(), vocab, prefix_state, suffix_b);
+    if (clean_a.empty() || clean_b.empty()) {
+        std::cerr << "LLRT-4 probe failed: clean-context reference decode failed\n";
+        model.reset();
+        llama_backend_free();
+        return 1;
+    }
 
-    const bool append_equivalent = logits_equivalent(clean_a, restored_a);
-    const bool divergent_equivalent = logits_equivalent(clean_b, restored_b);
-    std::cout << "append-only equivalence=" << (append_equivalent ? "PASS" : "FAIL") << '\n';
-    std::cout << "divergent-branch equivalence=" << (divergent_equivalent ? "PASS" : "FAIL") << '\n';
+    const EquivalenceResult append_result = compare_logits(
+        clean_a,
+        restored_logits(model.get(), vocab, prefix_state, suffix_a, false)
+    );
+    const EquivalenceResult divergent_result = compare_logits(
+        clean_b,
+        restored_logits(model.get(), vocab, prefix_state, suffix_b, false)
+    );
+    const EquivalenceResult clear_restore_result = compare_logits(
+        clean_a,
+        restored_logits(model.get(), vocab, prefix_state, suffix_a, true)
+    );
+
+    bool repeated_equivalent = true;
+    float repeated_maximum_delta = 0.0F;
+    for (int cycle = 0; cycle < kRepeatCycles; ++cycle) {
+        const EquivalenceResult cycle_a = compare_logits(
+            clean_a,
+            restored_logits(model.get(), vocab, prefix_state, suffix_a, false)
+        );
+        const EquivalenceResult cycle_b = compare_logits(
+            clean_b,
+            restored_logits(model.get(), vocab, prefix_state, suffix_b, false)
+        );
+        repeated_equivalent = repeated_equivalent && cycle_a.equivalent && cycle_b.equivalent;
+        repeated_maximum_delta = std::max({
+            repeated_maximum_delta,
+            cycle_a.maximum_delta,
+            cycle_b.maximum_delta,
+        });
+    }
+    const EquivalenceResult repeated_result{repeated_equivalent, repeated_maximum_delta};
+
+    bool full_remove_supported = false;
+    const EquivalenceResult full_remove_result = compare_logits(
+        clean_b,
+        full_remove_then_restore_logits(
+            model.get(),
+            vocab,
+            prefix,
+            suffix_a,
+            prefix_state,
+            suffix_b,
+            full_remove_supported
+        )
+    );
+
+    bool partial_rollback_supported = false;
+    EquivalenceResult partial_rollback_result;
+    const std::vector<float> partial_logits = partial_rollback_logits(
+        model.get(),
+        vocab,
+        prefix,
+        suffix_a,
+        suffix_b,
+        partial_rollback_supported
+    );
+    if (partial_rollback_supported) {
+        partial_rollback_result = compare_logits(clean_b, partial_logits);
+    }
+
+    print_equivalence("append-only-equivalence", append_result);
+    print_equivalence("divergent-restore-equivalence", divergent_result);
+    print_equivalence("clear-restore-equivalence", clear_restore_result);
+    print_equivalence("repeated-restore-equivalence", repeated_result);
+    std::cout << "LLRT4 full-sequence-remove " << (full_remove_supported ? "SUPPORTED" : "UNSUPPORTED") << '\n';
+    if (full_remove_supported) {
+        print_equivalence("full-remove-restore-equivalence", full_remove_result);
+    }
+    std::cout << "LLRT4 partial-rollback " << (partial_rollback_supported ? "SUPPORTED" : "UNSUPPORTED") << '\n';
+    if (partial_rollback_supported) {
+        print_equivalence("partial-rollback-equivalence", partial_rollback_result);
+    }
+
+    const bool native_state_compatible =
+        append_result.equivalent &&
+        divergent_result.equivalent &&
+        clear_restore_result.equivalent &&
+        repeated_result.equivalent &&
+        full_remove_supported &&
+        full_remove_result.equivalent &&
+        partial_rollback_supported &&
+        partial_rollback_result.equivalent;
+
+    std::cout << "LLRT4_NATIVE_VERDICT "
+              << (native_state_compatible ? "NATIVE_STATE_COMPATIBLE" : "KEEP_DISABLED")
+              << '\n';
+    std::cout << "LLRT4_NOTE production reuse remains disabled until runtime-level cancellation, pressure, switch and structured-mode evidence is complete\n";
 
     model.reset();
     llama_backend_free();
-    return append_equivalent && divergent_equivalent ? 0 : 1;
+    return 0;
 }
