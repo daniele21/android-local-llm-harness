@@ -120,6 +120,16 @@ target_include_directories(
     "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
 )
 
+add_executable(kv_cache_type_params_test kv_cache_type_params_test.cpp)
+target_include_directories(
+    kv_cache_type_params_test
+    PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
+    "${LLAMA_CPP_DIR}/include"
+    "${LLAMA_CPP_DIR}/ggml/include"
+)
+target_link_libraries(kv_cache_type_params_test PRIVATE llama)
+
 add_executable(
     reasoning_transition_test
     reasoning_transition_test.cpp
@@ -148,6 +158,7 @@ add_test(NAME generation_sampler_test COMMAND generation_sampler_test)
 add_test(NAME prepared_prompt_cache_test COMMAND prepared_prompt_cache_test)
 add_test(NAME model_load_params_compat_test COMMAND model_load_params_compat_test)
 add_test(NAME flash_attention_params_test COMMAND flash_attention_params_test)
+add_test(NAME kv_cache_type_params_test COMMAND kv_cache_type_params_test)
 add_test(NAME reasoning_transition_test COMMAND reasoning_transition_test)
 add_test(NAME recurrent_state_reuse_probe COMMAND recurrent_state_reuse_probe)
 set_tests_properties(recurrent_state_reuse_probe PROPERTIES SKIP_RETURN_CODE 77)
