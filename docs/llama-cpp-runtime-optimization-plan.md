@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: llama-cpp-runtime
 Canonical scope: target.llama-cpp-runtime-optimization
 Read when: changing the llama.cpp upstream pin, prompt/context reuse, backend device execution, native performance knobs or hardware acceleration policy
-Last reviewed: 2026-08-20
+Last reviewed: 2026-08-21
 
 ## Purpose
 
@@ -38,9 +38,9 @@ Repository operational priority remains owned by [`current-state.md`](current-st
 
 ### Release-baseline rule
 
-The pinned revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3` remains the Harness 0.5 baseline. LLRT-0 qualified candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` and selected `DEFER`: adopting it would require an explicit model-load API migration and fresh affected evidence, so it is not promoted into the active release line.
+The pinned revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3` remains the Harness 0.5 baseline. Candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` remains **DEFERRED for Harness 0.5**. LLRT-5 has since made the legacy load policy candidate-compatible and exact candidate host-native plus Android qualification succeeds without moving the production pin, but promotion is still a separate decision because affected physical/performance/quality evidence is backend-identity bound.
 
-A future pin candidate is qualified by exact SHA. Promotion remains an explicit decision because Q35 tuning, memory calibration, OMBRA quality evidence and release evidence are backend/runtime-identity bound. If a later candidate is promoted before a release claim, affected physical/performance/quality evidence is rerun on the promoted revision.
+A future pin candidate is qualified by exact SHA. If a later candidate is promoted before a release claim, affected Q35 tuning, memory calibration, OMBRA quality evidence and release evidence are rerun on the promoted revision.
 
 ## Target execution architecture
 
@@ -72,108 +72,132 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 
 | ID | Priority | State | Outcome | Depends on |
 | --- | --- | --- | --- | --- |
-| LLRT-0 | P1 | DONE | Exact-SHA qualification harness integrated; candidate `60addddf...` classified `DEFER` and Harness 0.5 pin remains `aedb2a5e...` | Current green `dev` |
+| LLRT-0 | P1 | DONE | Exact-SHA qualification harness integrated; candidate `60addddf...` remains deferred for Harness 0.5 and production pin remains `aedb2a5e...` | Current green `dev` |
 | LLRT-1 | P1 | IN PROGRESS | LLRT-1A capability inventory/requested load facts are integrated; LLRT-1B authoritative effective placement remains blocked on a newer API/pin rather than inferred | LLRT-0; RA-7/RA-9 ownership; future pin |
 | LLRT-2 | P1 | DONE | Consume the most recently prepared exact prompt tokens once so generation avoids duplicate tokenization while retaining the existing fallback | Existing prompt-planning boundary |
-| LLRT-3 | P1 | IN PROGRESS | LLRT-3A runner hardening and LLRT-3B bounded 2B physical screening are complete; bounded 0.8B evidence and broader Q35 validation remain before any measured profile promotion | Frozen release pin; Q35-6 measurement owner |
-| LLRT-4 | P1/P2 | IN PROGRESS | LLRT-4A recurrent/session-state correctness probe is integrated; exact Qwen3.5 0.8B/2B physical correctness evidence and an explicit reuse verdict remain | LLRT-0; backend conformance; Qwen3.5 state semantics |
-| LLRT-5 | P2 | READY | Non-release experimental lane: migrate newer load-mode semantics and tri-state Flash Attention on a qualified candidate while preserving the frozen release baseline | LLRT-0 candidate finding; LLRT-1A |
-| LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | Pin decision; MEM evidence; Q35 validation |
-| LLRT-7 | P2 | PLANNED | Package and discover Adreno OpenCL as an experimental backend without changing the CPU release default | CPU evidence checkpoint; LLRT-1 |
+| LLRT-3 | P1 | IN PROGRESS | Bounded 2B and 0.8B CPU screening plus focused realistic 2B prefill validation are complete; broader/representative Q35 validation still gates `MEASURED` profile promotion | Frozen release pin; Q35-6 measurement owner |
+| LLRT-4 | P1/P2 | DONE | Exact-artifact 0.8B and 2B recurrent-state native correctness probes completed with explicit `KEEP_DISABLED`: supported restore paths are exact, but partial rollback is unsupported | LLRT-0; backend conformance; Qwen3.5 state semantics |
+| LLRT-5 | P2 | IN PROGRESS | Candidate load-mode compatibility/qualification, materialized load-mode execution identity and Flash Attention tri-state mechanism are integrated; `AUTO` performance evaluation and any future pin-promotion decision remain evidence-gated | LLRT-0; LLRT-1A |
+| LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | Evidence checkpoint; MEM evidence; Q35 validation |
+| LLRT-7 | P2 | PLANNED | Package and discover Adreno OpenCL as an experimental backend without changing the CPU release default | Evidence checkpoint; LLRT-1 |
 | LLRT-8 | P2 | PLANNED | Integrate bounded OpenCL compiled-kernel cache ownership/cleanup for warm startup | LLRT-7 |
 | LLRT-9 | P2 | PLANNED | Add multi-sequence/batched execution only for evaluation throughput; production single-decode policy stays unchanged | EVAL runner maturity; backend correctness proof |
 | LLRT-10 | P2 | PLANNED | Evolve RA-8 into a deterministic evidence-driven execution planner using reviewed measured profiles, not online self-tuning | RA-7/RA-8/RA-9; Q35/MEM measured evidence |
 | LLRT-11 | P2 | DONE | Backend execution evidence is fingerprinted from the materialized context, propagated into run telemetry and persisted so material backend/load/cache/reuse changes invalidate benchmark comparability | LLRT-1; RA-9 |
 | LLRT-12 | P3 | DEFERRED | Evaluate Hexagon/HTP as an experimental backend with explicit hardware/toolchain support boundaries | CPU/OpenCL evidence stable; LLRT-1 |
 
-## Current execution wave — 2026-08-20
+## Current execution wave — 2026-08-21
 
-The top-level states above intentionally remain conservative. The implementation/evidence boundary is tracked more precisely here so completed software work is not confused with missing physical acceptance evidence.
+The top-level states remain conservative where broader product certification is still open. The implementation/evidence boundary is tracked more precisely here.
 
 | Slice | State | Current boundary / next gate |
 | --- | --- | --- |
 | LLRT-1A | DONE | Registered ggml device inventory plus requested load facts integrated; unavailable effective placement remains explicit. |
 | LLRT-1B | BLOCKED | Authoritative effective placement needs a future llama.cpp API/pin that can prove it; do not infer it on the Harness 0.5 pin. |
-| LLRT-3A | DONE | Bounded CPU runner, macOS Bash 3.2 compatibility, instrumentation evidence stream, thermal-start gate, resumability and schema-v3 identity are implemented on PR #351. |
-| LLRT-3B-2B | DONE | Bounded Qwen3.5 2B Q4_K_M physical screening completed on Samsung SM-A566B with 4 cases × (1 cold + 5 warm) = 24 successful generations. |
-| LLRT-3B-0.8B | READY | Run the same bounded methodology on the exact curated Qwen3.5 0.8B Q4_K_M artifact. |
-| LLRT-3C | BLOCKED | Promote no `MEASURED` profile until 0.8B evidence and the broader Q35 validation gates are reviewed. |
+| LLRT-3A | DONE | Bounded CPU runner, macOS Bash 3.2 compatibility, instrumentation evidence stream, thermal-start gate, resumability and schema-v4 identity are integrated. |
+| LLRT-3B-2B | DONE | Bounded Qwen3.5 2B screening complete; focused 283/553/1094-token prefill validation rejects the bounded `t4/bt2/b128/ub64` candidate for production. |
+| LLRT-3B-0.8B | DONE | Bounded Qwen3.5 0.8B screening complete; `t2/bt4/b128/ub64` is the bounded priority candidate, not a `MEASURED` default. |
+| LLRT-3C | BLOCKED | Promote no `MEASURED` profile until broader/representative Q35 validation and lifecycle/memory gates are reviewed. |
 | LLRT-4A | DONE | Recurrent/session-state correctness probe integrated; production reuse remains disabled. |
-| LLRT-4B | READY | Execute exact-artifact physical correctness evidence for 0.8B and 2B. |
-| LLRT-4C | BLOCKED | Decide `ENABLE` vs `KEEP DISABLED` only after LLRT-4B; either verdict can close the workstream when evidence-backed. |
-| LLRT-5 | READY | Develop candidate-pin `load_mode` compatibility and tri-state Flash Attention on an isolated non-release lane. |
+| LLRT-4B | DONE | Exact curated 0.8B and 2B physical native correctness evidence completed on Samsung SM-A566B. |
+| LLRT-4C | DONE | Verdict `KEEP_DISABLED` for both tiers because partial rollback is unsupported even though all supported restore-equivalence checks pass with `maxDelta=0`. |
+| LLRT-5A | DONE | Legacy mmap/mlock combinations map to candidate `load_mode` and exact candidate host-native + Android qualification succeeds without a release-pin move. |
+| LLRT-5B | DONE | Materialized load mode `NONE/MMAP/MLOCK/MMAP_MLOCK` is part of backend execution identity while legacy mmap/mlock facts remain for comparability. |
+| LLRT-5C | DONE | Flash Attention mechanism carries explicit `AUTO=-1`, `DISABLED=0`, `ENABLED=1`; product profile `false/true` still maps to disabled/enabled and AUTO is not selected automatically. |
+| LLRT-5D | BLOCKED | Evaluate `AUTO`/enabled performance and decide any future candidate-pin promotion only with physical evidence under a new execution identity. |
 
-### LLRT-3 bounded 2B evidence snapshot
+### LLRT-3 physical CPU evidence snapshot
 
-The 2026-08-20 bounded evidence is tied to Qwen3.5 2B Q4_K_M SHA-256 `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`, llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, Harness commit `ac0f5adf9aefded4e516abe5e47f62ced3f11ba8`, Samsung `SM-A566B`, Android 16, arm64-v8a, context 2048, 64 output tokens and thinking disabled.
+All 2026-08-21 follow-up evidence uses production llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, Harness commit `b35d303f9f019e6304a5e628d20fefc5b944765f`, Samsung `SM-A566B`, Android 16 / SDK 36 / arm64-v8a, context 2048, 64 output tokens and thinking disabled.
 
-All 24 generations completed successfully without crash, timeout or OOM and all four cases were eligible for profile selection. The strongest balanced candidate is currently `generationThreads=4 / batchThreads=2 / batch=128 / ubatch=64`: it kept median total latency near baseline while reducing observed peak process PSS and sustained drift. `batch=64 / ubatch=32` produced the best latency/decode result in the bounded set but reached Android thermal status `3`, so it remains experimental rather than a production candidate.
+For Qwen3.5 0.8B Q4_K_M SHA-256 `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517`, all four bounded cases completed with 1 cold + 5 warm generations and were evidence-eligible. `t2/bt4/b128/ub64` is the bounded priority candidate: warm total latency improved from roughly 70.0 s baseline to 65.9 s while thermal status remained 0. This is search-space evidence only, not a measured default.
 
-This evidence closes the bounded 2B screening purpose only. It does not make the 2B profile `MEASURED`: the benchmark used one device, a 19-token input, context 2048 and five warm samples. Longer-prompt prefill behavior, 0.8B evidence, broader context/product workloads and lifecycle/memory validation remain separate gates.
+For Qwen3.5 2B Q4_K_M SHA-256 `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`, the earlier short 19-token bounded run had identified `t4/bt2/b128/ub64` as a memory-oriented candidate. Focused deterministic prefill validation then compared it with baseline `t4/bt4/b128/ub64` at 283, 553 and 1094 actual input tokens. Warm median baseline versus candidate total latency was approximately 313.7 vs 330.0 s, 465.3 vs 505.4 s and 754.3 vs 862.6 s respectively. At 1094 tokens the candidate also increased median prefill from about 619.6 s to 721.3 s. The candidate is therefore **REJECTED** for production; `t4/bt4/b128/ub64` remains the current 2B CPU candidate pending broader certification.
+
+The ~10-minute 1094-token baseline prefill is a device/configuration-specific observation, not a universal Qwen3.5 2B claim. It is nevertheless a strong reason to preserve CPU measurements as the baseline for later hardware-acceleration evaluation.
+
+### LLRT-4 recurrent-state physical verdict
+
+The exact 0.8B and 2B native probes both report:
+
+```text
+append-only-equivalence        PASS maxDelta=0
+divergent-restore-equivalence  PASS maxDelta=0
+clear-restore-equivalence      PASS maxDelta=0
+repeated-restore-equivalence   PASS maxDelta=0
+full-sequence-remove           SUPPORTED
+full-remove-restore-equivalence PASS maxDelta=0
+partial-rollback               UNSUPPORTED
+LLRT4_NATIVE_VERDICT           KEEP_DISABLED
+```
+
+This is a successful negative qualification result. Supported state-save/restore operations are bit-equivalent under the probe, but the missing partial rollback is sufficient to keep Qwen3.5 recurrent/prefix reuse disabled for production. No additional optimization work is required to justify that release decision; lifecycle hardening remains useful for the runtime generally.
 
 ## Parallelization model
 
-The next wave uses three concurrent software/evidence lanes plus one evidence checkpoint. Parallelism is allowed only when ownership and physical-device conditions remain disjoint.
+The 2026-08-21 evidence checkpoint is now satisfied. Future wider P2 work remains an explicit implementation decision rather than an automatic consequence of passing the checkpoint.
 
 ### Lane A — CPU evidence and candidate narrowing
 
-1. run LLRT-3B-0.8B with the same bounded identity discipline used for 2B;
-2. preserve the completed 2B v3 evidence unchanged as the CPU baseline;
-3. validate the 2B `t4 / bt2 / b128 / ub64` candidate with realistic longer-prompt prefill workloads because its main bounded regression is prefill/TTFT;
-4. add 4096/8192 context evidence only where a product requirement justifies the cost;
-5. feed accepted results into Q35-RT-08 rather than auto-promoting from the runner.
+1. preserve the completed bounded 0.8B and 2B evidence as immutable search-space evidence;
+2. keep `t2/bt4/b128/ub64` as the bounded 0.8B priority candidate only;
+3. reject 2B `t4/bt2/b128/ub64` and retain `t4/bt4/b128/ub64` as the current CPU candidate;
+4. add broader context/product/representative-device evidence only where the Q35 acceptance owner requires it;
+5. feed accepted results into Q35-RT-08 rather than auto-promoting from a runner.
 
 ### Lane B — recurrent-state correctness
 
-Prepare and execute LLRT-4B against exact 0.8B and 2B artifacts. Required coverage remains clean-vs-restored equivalence, append-only turns, divergent prefix, cancellation, model/context close and switch, memory pressure/warm-idle unload, structured/reasoning modes and repeated cycles. A negative result is valid evidence: if any state operation is unsupported or ambiguous, production reuse remains disabled and LLRT-4 may close with an evidence-backed `KEEP DISABLED` verdict.
+LLRT-4 is closed with `KEEP_DISABLED` on both curated tiers. Recurrent/prefix reuse remains disabled. Runtime cancellation, model/context close and switch, memory pressure/warm-idle unload and structured/reasoning lifecycle tests remain general hardening work, not prerequisites for turning this optimization on.
 
 ### Lane C — post-0.5 candidate-pin compatibility
 
-LLRT-5 may proceed in parallel as a non-release experiment because LLRT-0 already isolated the concrete incompatibility: the candidate replaced `use_mmap/use_mlock` with `load_mode`. This lane preserves legacy load semantics first, adds explicit execution identity for the material load mode and only then evaluates `AUTO`/tri-state Flash Attention. It must not move the Harness 0.5 production pin or invalidate current CPU evidence.
+LLRT-5 preserves the frozen release pin while making the newer load-mode API mechanically compatible. The four legacy mmap/mlock combinations have explicit materialized load-mode identity. Flash Attention is represented as a fail-closed tri-state across Kotlin/JNI/native code, but current product defaults remain unchanged and `AUTO` remains experimental until measured.
 
 ### Physical-device serialization rule
 
-Software preparation for lanes A/B/C may run concurrently. Performance/thermal measurements on the same physical phone must not run concurrently and must not be interleaved without a comparable thermal-start gate. If two independent representative devices are available, 0.8B and 2B evidence can run in parallel by device; otherwise physical execution is serialized while software development remains parallel.
+Software preparation may run concurrently across disjoint ownership. Performance/thermal measurements on the same physical phone must not run concurrently and must not be interleaved without a comparable thermal-start gate. If two independent representative devices are available, evidence can run in parallel by device; otherwise physical execution is serialized while software development remains parallel.
 
 ### Evidence checkpoint before wider P2 work
 
-Do not start a broad LLRT-6/7/8/10 implementation wave merely because the tooling exists. Reconcile these facts first:
+Checkpoint facts as of 2026-08-21:
 
 - bounded 0.8B evidence is complete;
-- the 2B balanced candidate has realistic prefill evidence and an explicit keep/reject decision;
-- LLRT-4 has an explicit evidence-backed reuse verdict;
-- LLRT-5 has a compatibility/qualification result for the candidate pin without changing the release baseline.
+- the 2B bounded candidate has realistic prefill evidence and an explicit **REJECT** decision;
+- LLRT-4 has an explicit evidence-backed `KEEP_DISABLED` verdict for both curated tiers;
+- LLRT-5 has exact candidate compatibility/qualification without changing the release baseline, plus materialized load-mode identity and tri-state Flash Attention mechanism.
 
-After that checkpoint, LLRT-6 K/V policy and LLRT-7 OpenCL discovery may proceed in parallel if their native ownership is kept disjoint. LLRT-8 follows LLRT-7. LLRT-10 waits for reviewed measured CPU/memory/hardware profiles. LLRT-9 remains an evaluation-owned side lane and should advance with EVAL runner maturity rather than block the interactive runtime path.
+**Checkpoint status: SATISFIED.** LLRT-6 K/V policy and LLRT-7 OpenCL discovery are now eligible to start in parallel if their native ownership is kept disjoint. LLRT-8 follows LLRT-7. LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles. LLRT-9 remains an evaluation-owned side lane. Eligibility does not itself authorize or promote any P2 feature.
 
 ## Integrated P1 evidence boundary
 
-LLRT-1A, LLRT-3A and LLRT-4A are integrated foundations. LLRT-1A records the registered ggml device inventory and requested load facts while keeping effective placement unavailable when the pinned API cannot prove it. LLRT-3A provides the bounded one-factor CPU experiment lane, and LLRT-3B now contains completed 2B physical evidence while 0.8B remains open. LLRT-4A provides the recurrent-state correctness probe while production recurrent/prefix reuse remains disabled.
+LLRT-1A, LLRT-2, LLRT-3A, the bounded/focused LLRT-3 physical slices and LLRT-4 are integrated foundations. LLRT-1A records the registered ggml device inventory and requested load facts while keeping effective placement unavailable when the pinned API cannot prove it. LLRT-3 provides the bounded one-factor CPU experiment lane and focused prefill validation. LLRT-4 closes recurrent-state reuse with `KEEP_DISABLED` rather than fabricating support.
 
-LLRT-11 closes the comparability gap before physical tuning: after a runtime context is materialized, the backend emits a privacy-safe SHA-256 fingerprint over material execution inputs. The runtime records the backend ID/revision, fingerprint and explicit placement availability with the generation run; Room schema v9 preserves those fields across process restarts. The fingerprint covers the pinned backend revision, profile/context and CPU/batch knobs, requested GPU layers and mmap/mlock state, Flash Attention/KV-cache settings, stable registered-device inventory, prepared-prompt reuse mode and recurrent-state reuse mode. Effective placement remains `UNAVAILABLE` on the current pin rather than being guessed.
+LLRT-11 closes the comparability gap before physical tuning: after a runtime context is materialized, the backend emits a privacy-safe SHA-256 fingerprint over material execution inputs. The runtime records the backend ID/revision, fingerprint and explicit placement availability with the generation run; Room schema v9 preserves those fields across process restarts. The fingerprint covers the pinned backend revision, profile/context and CPU/batch knobs, requested GPU layers, requested mmap/mlock state, **materialized load mode**, Flash Attention/KV-cache settings, stable registered-device inventory, prepared-prompt reuse mode and recurrent-state reuse mode. Effective placement remains `UNAVAILABLE` on the current pin rather than being guessed.
 
-The physical lane uses Bash 3.2-compatible scripting, instrumentation status output, a 600-second default generation timeout, thermal-start gating and evidence schema v3 with explicit output-token budget identity. Exact-case execution/resume and output identity protect evidence from interrupted or cross-tier runs.
+The physical lane uses Bash 3.2-compatible scripting, instrumentation status output, bounded generation timeouts, thermal-start gating and evidence schema **v4** with explicit output-token budget and prompt-digest identity. Exact-case execution/resume and output identity protect evidence from interrupted or cross-tier runs.
 
-No runtime profile is promoted from CI, desktop or emulator measurements, and the completed bounded 2B screening is not by itself a measured-profile promotion gate.
+No runtime profile is promoted from CI, desktop/emulator or bounded single-device measurements.
 
-## LLRT-0 — upstream qualification gate
+## LLRT-0 and LLRT-5 — upstream qualification and compatibility
 
 A pin update is a compatibility change, not routine dependency refresh. Qualification compares the current revision and one explicit candidate revision for host-native/Android build compatibility, JNI/API deltas, packaged libraries, Qwen3.5 execution behavior, memory/evidence identity and relevant Android/ARM backend changes.
 
-The reusable qualification runner requires an exact 40-character SHA, never `latest`. Host-native and Android lanes execute independently in parallel. Each lane restores the repository gitlink and verifies the production pin even after failure or cancellation; a superseded CI run was used to verify this cleanup path.
+The reusable qualification runner requires an exact 40-character SHA, never `latest`. Host-native and Android lanes execute independently in parallel. Each lane restores the repository gitlink and verifies the production pin even after failure or cancellation.
 
-### 2026-08-19 candidate decision
+### Candidate history and current decision
 
-Candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` is **DEFERRED for Harness 0.5**.
+Candidate `60addddf3c567c43ec3caf70fc953fba3572d96f` remains **DEFERRED for Harness 0.5**.
 
-Evidence from qualification:
+Initial qualification found two concrete API migrations:
 
-- the upstream penalties sampler changed from four arguments to a five-argument form requiring `n_vocab`; the adapter now supports both signatures at compile time while preserving repeat/frequency/presence semantics and failing closed on an unknown signature;
-- host-native qualification passes after making the synthetic sampler fixture provide an explicit vocabulary size instead of relying on a null vocabulary;
-- Android qualification reaches the JNI build and fails because the candidate removed `llama_model_params.use_mmap/use_mlock` in favor of `load_mode`;
-- the candidate submodule is restored to the pinned gitlink after both normal execution and cancellation.
+- the penalties sampler changed from four arguments to a five-argument form requiring `n_vocab`; the adapter supports both signatures at compile time while preserving semantics and failing closed on an unknown signature;
+- model load replaced `llama_model_params.use_mmap/use_mlock` with `load_mode`.
 
-The load API change is intentionally not hidden inside LLRT-0. Mapping the legacy booleans, then separately evaluating `AUTO`, is LLRT-5 work because load policy affects execution identity and release evidence. The Harness 0.5 production pin therefore remains unchanged.
+LLRT-5 subsequently added a compatibility adapter that preserves exactly the four legacy combinations `NONE`, `MMAP`, `MLOCK` and `MMAP_MLOCK`, without silently selecting candidate-only `AUTO` or `DIRECT_IO`. The recurrent-state probe was also made candidate-compatible. Exact candidate qualification then passed both host-native and Android lanes with the production pin restored afterward.
+
+Execution evidence now includes the materialized load mode in addition to the legacy requested mmap/mlock dimensions. Flash Attention mechanism carries explicit `AUTO=-1`, `DISABLED=0` and `ENABLED=1`; current profile booleans still map to explicit disabled/enabled, so no product behavior changes and AUTO remains evidence-gated.
+
+This removes the known mechanical migration blocker but does **not** promote the candidate pin or invalidate existing production-pin evidence.
 
 ## CPU efficiency before hardware acceleration
 
@@ -185,26 +209,15 @@ This optimization stays inside `backends/llama-cpp`, exposes no native handles/t
 
 ### Recurrent and prefix-state reuse
 
-The current Qwen3.5 plan intentionally disables prefix/session reuse because Qwen3.5 uses hybrid/recurrent state. LLRT-4 therefore begins as a correctness experiment, not an optimization implementation.
+Qwen3.5 uses hybrid/recurrent state, so generic context-state APIs are not sufficient proof of safe prefix/session reuse. LLRT-4 was intentionally a correctness experiment rather than an optimization implementation.
 
-Qualification must cover at least:
-
-- exact token-equivalent output against clean-context execution;
-- append-only conversational turns;
-- divergent-prefix rollback/removal;
-- cancellation during prefill/decode;
-- model/context close and switch;
-- memory pressure and warm-idle unload;
-- structured output and reasoning modes;
-- repeated cycles with no residual state contamination.
-
-If any required state operation is unsupported or ambiguous, the capability stays false. Enabling it requires a new Qwen3.5 capability revision and fresh device/quality evidence rather than silently reopening Q35-5.
+Exact physical probes on both curated tiers show exact supported restore equivalence but no partial rollback. The capability therefore stays false and production recurrent/prefix reuse remains disabled. Enabling it in a future workstream would require a new Qwen3.5 capability revision plus fresh lifecycle/device/quality evidence; the current release decision is closed.
 
 ### CPU tuning discipline
 
-Do not create a full Cartesian product of every llama.cpp knob. Keep the existing Q35-6 matrix as the baseline owner, then test only short-listed one-factor or paired deltas where profiling shows a plausible benefit.
+Do not create a full Cartesian product of every llama.cpp knob. Keep Q35-6 as the baseline owner, then test only short-listed one-factor or paired deltas where profiling shows a plausible benefit.
 
-Important dimensions include generation threads, batch/prefill threads, `n_batch`, `n_ubatch`, context tier and sustained thermal behavior. Peak token/s alone is not sufficient to select a mobile default. Bounded cases must begin from comparable thermal state when a previous case can materially heat the device; deterministic ordering is preferred over randomization when the thermal gate controls start state.
+Important dimensions include generation threads, batch/prefill threads, `n_batch`, `n_ubatch`, context tier and sustained thermal behavior. Peak token/s alone is not sufficient to select a mobile default. The 2B realistic-prefill rejection is the concrete example: a short-prompt memory-oriented candidate regressed increasingly as prompt length grew.
 
 ## Hardware execution
 
@@ -250,7 +263,7 @@ Identical inputs and policy version must yield the same plan. New measurements b
 Reuse existing metric/identity owners. Add only missing material dimensions, such as:
 
 - requested and effective backend/device;
-- effective load mode and offloaded layers;
+- effective/materialized load mode and offloaded layers;
 - effective Flash Attention and K/V cache type;
 - context, batch, ubatch, generation threads and batch threads;
 - output-token budget when it affects the measured sustained workload;
