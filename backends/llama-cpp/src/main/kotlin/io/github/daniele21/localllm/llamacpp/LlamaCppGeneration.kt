@@ -51,18 +51,23 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
         profile: GgufModelProfile,
         contextSize: Int = profile.contextSize,
         flashAttentionMode: NativeFlashAttentionMode = NativeFlashAttentionMode.fromProfile(profile.flashAttention),
-    ): ContextCreationResult = decodeContextCreation(
-        response = nativeApi.createContext(
-            modelHandle = model.handle.value,
-            contextSize = contextSize,
-            batchSize = profile.batchSize,
-            microBatchSize = profile.microBatchSize,
-            threads = profile.cpuThreads,
-            batchThreads = profile.batchThreads,
-            flashAttentionMode = flashAttentionMode.nativeValue,
-        ),
-        model = model,
-    )
+    ): ContextCreationResult {
+        profile.explicitKvCacheSelectionError()?.let { error ->
+            return ContextCreationResult.Failure(error)
+        }
+        return decodeContextCreation(
+            response = nativeApi.createContext(
+                modelHandle = model.handle.value,
+                contextSize = contextSize,
+                batchSize = profile.batchSize,
+                microBatchSize = profile.microBatchSize,
+                threads = profile.cpuThreads,
+                batchThreads = profile.batchThreads,
+                flashAttentionMode = flashAttentionMode.nativeValue,
+            ),
+            model = model,
+        )
+    }
 
     fun releaseContext(context: LoadedNativeContext): GenerationNativeOperationResult = decodeOperation(
         nativeApi.releaseContext(context.handle.value),
@@ -223,6 +228,7 @@ enum class GenerationNativeErrorCode {
     INVALID_ARGUMENT,
     UNKNOWN_HANDLE,
     CONTEXT_CREATE_FAILED,
+    UNSUPPORTED_CONFIGURATION,
     UNSUPPORTED_MODEL,
     TOKENIZATION_FAILED,
     CONTEXT_OVERFLOW,
