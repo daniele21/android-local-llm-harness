@@ -15,7 +15,8 @@ VERIFIED_ANDROID_ADRENO = ("750", "830")
 OPENCL_LIBRARY_CANDIDATES = (
     "/vendor/lib64/libOpenCL.so",
     "/system/vendor/lib64/libOpenCL.so",
-    "/vendor/lib64/egl/libGLES_mesa.so",
+    "/system/lib64/libOpenCL.so",
+    "/odm/lib64/libOpenCL.so",
 )
 
 
