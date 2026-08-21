@@ -10,16 +10,16 @@ import io.github.daniele21.localllm.models.GgufModelProfile
  * values to llama_context_params.type_k/type_v. Null values intentionally keep
  * the pinned upstream defaults unchanged.
  */
-internal enum class NativeKvCacheType(val wireName: String) {
-    F32("f32"),
-    F16("f16"),
-    BF16("bf16"),
-    Q8_0("q8_0"),
-    Q4_0("q4_0"),
-    Q4_1("q4_1"),
-    IQ4_NL("iq4_nl"),
-    Q5_0("q5_0"),
-    Q5_1("q5_1"),
+internal enum class NativeKvCacheType(val wireName: String, val quantized: Boolean) {
+    F32("f32", false),
+    F16("f16", false),
+    BF16("bf16", false),
+    Q8_0("q8_0", true),
+    Q4_0("q4_0", true),
+    Q4_1("q4_1", true),
+    IQ4_NL("iq4_nl", true),
+    Q5_0("q5_0", true),
+    Q5_1("q5_1", true),
     ;
 
     companion object {
@@ -39,4 +39,17 @@ internal fun GgufModelProfile.explicitKvCacheSelectionError(): GenerationNativeE
         code = GenerationNativeErrorCode.INVALID_ARGUMENT,
         message = "Unsupported ${unsupportedName.first} cache type: ${unsupportedName.second}",
     )
+}
+
+internal fun GgufModelProfile.kvCacheCompatibilityError(
+    flashAttentionMode: NativeFlashAttentionMode,
+): GenerationNativeError? {
+    val valueType = kvCacheTypeV?.let(NativeKvCacheType::fromWireName) ?: return null
+    if (valueType.quantized && flashAttentionMode == NativeFlashAttentionMode.DISABLED) {
+        return GenerationNativeError(
+            code = GenerationNativeErrorCode.UNSUPPORTED_CONFIGURATION,
+            message = "Quantized V cache requires Flash Attention on the pinned llama.cpp revision",
+        )
+    }
+    return null
 }
