@@ -395,7 +395,9 @@ private data class Qwen35TuningConfig(
             }
             val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
-            val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", 4)
+            val generationSeed = arguments.optionalNonNegativeLong("generationSeed")
+            val defaultSchemaVersion = if (generationSeed == null) 4 else 5
+            val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", defaultSchemaVersion)
             require(evidenceSchemaVersion in 4..5) { "evidenceSchemaVersion must be 4 or 5" }
             val prompt = arguments.prompt()
             val promptDigest = sha256(prompt)
@@ -415,7 +417,7 @@ private data class Qwen35TuningConfig(
                 flashAttention = arguments.boolean("flashAttention", false),
                 kvCacheTypeK = arguments.optionalString("kvCacheTypeK"),
                 kvCacheTypeV = arguments.optionalString("kvCacheTypeV"),
-                generationSeed = arguments.optionalNonNegativeLong("generationSeed"),
+                generationSeed = generationSeed,
                 thinkingMode = arguments.thinkingMode(),
                 caseId = arguments.required("tuningCaseId"),
                 harnessCommit = arguments.required("harnessCommit"),
