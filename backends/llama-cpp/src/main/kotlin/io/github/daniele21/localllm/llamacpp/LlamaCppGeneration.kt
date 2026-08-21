@@ -14,6 +14,8 @@ enum class NativeFlashAttentionMode(val nativeValue: Int) {
 }
 
 interface NativeLlamaGenerationApi {
+    // Keep this flat: it mirrors the stable JNI createContext ABI implemented in llama_jni.cpp.
+    @Suppress("LongParameterList")
     fun createContext(
         modelHandle: Long,
         contextSize: Int,
@@ -22,6 +24,8 @@ interface NativeLlamaGenerationApi {
         threads: Int,
         batchThreads: Int,
         flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     fun releaseContext(contextHandle: Long): Array<String>
@@ -40,6 +44,8 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
         threads: Int,
         batchThreads: Int,
         flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     external override fun releaseContext(contextHandle: Long): Array<String>
@@ -55,6 +61,9 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
         profile.explicitKvCacheSelectionError()?.let { error ->
             return ContextCreationResult.Failure(error)
         }
+        profile.kvCacheCompatibilityError(flashAttentionMode)?.let { error ->
+            return ContextCreationResult.Failure(error)
+        }
         return decodeContextCreation(
             response = nativeApi.createContext(
                 modelHandle = model.handle.value,
@@ -64,6 +73,8 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
                 threads = profile.cpuThreads,
                 batchThreads = profile.batchThreads,
                 flashAttentionMode = flashAttentionMode.nativeValue,
+                kvCacheTypeK = profile.kvCacheTypeK,
+                kvCacheTypeV = profile.kvCacheTypeV,
             ),
             model = model,
         )
