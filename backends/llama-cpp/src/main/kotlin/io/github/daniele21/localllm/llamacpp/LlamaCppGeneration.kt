@@ -14,6 +14,8 @@ enum class NativeFlashAttentionMode(val nativeValue: Int) {
 }
 
 interface NativeLlamaGenerationApi {
+    // Keep this flat: it mirrors the stable JNI createContext ABI implemented in llama_jni.cpp.
+    @Suppress("LongParameterList")
     fun createContext(
         modelHandle: Long,
         contextSize: Int,
