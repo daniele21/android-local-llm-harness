@@ -3,6 +3,7 @@
 #include "flash_attention_params.h"
 #include "ggml-backend.h"
 #include "gguf_metadata.h"
+#include "kv_cache_type_params.h"
 #include "llama.h"
 #include "native_handle_registry.h"
 #include "prepared_prompt_cache.h"
@@ -590,7 +591,9 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_createContext(
     jint micro_batch_size,
     jint threads,
     jint batch_threads,
-    jint flash_attention_mode
+    jint flash_attention_mode,
+    jstring kv_cache_type_k_value,
+    jstring kv_cache_type_v_value
 ) {
     const auto model = models.get(static_cast<std::int64_t>(model_handle));
     if (!model) {
@@ -598,6 +601,27 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_createContext(
     }
     if (context_size <= 0 || batch_size <= 0 || micro_batch_size <= 0 || threads <= 0 || batch_threads <= 0) {
         return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Context and thread parameters must be positive"));
+    }
+
+    std::string kv_cache_type_k;
+    std::string kv_cache_type_v;
+    const char* kv_cache_type_k_ptr = nullptr;
+    const char* kv_cache_type_v_ptr = nullptr;
+    if (kv_cache_type_k_value != nullptr) {
+        const UtfChars value(env, kv_cache_type_k_value);
+        if (value.get() == nullptr) {
+            return nullptr;
+        }
+        kv_cache_type_k.assign(value.get());
+        kv_cache_type_k_ptr = kv_cache_type_k.c_str();
+    }
+    if (kv_cache_type_v_value != nullptr) {
+        const UtfChars value(env, kv_cache_type_v_value);
+        if (value.get() == nullptr) {
+            return nullptr;
+        }
+        kv_cache_type_v.assign(value.get());
+        kv_cache_type_v_ptr = kv_cache_type_v.c_str();
     }
 
     std::lock_guard<std::mutex> lifecycle_lock(model->lifecycle_mutex);
@@ -612,6 +636,9 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_createContext(
     params.n_threads_batch = batch_threads;
     if (!local_llm::apply_flash_attention_mode(params, flash_attention_mode)) {
         return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Unsupported flash-attention mode"));
+    }
+    if (!local_llm::apply_kv_cache_type_overrides(params, kv_cache_type_k_ptr, kv_cache_type_v_ptr)) {
+        return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Unsupported K/V cache type"));
     }
 
     llama_context* raw_context = llama_init_from_model(model->model, params);
