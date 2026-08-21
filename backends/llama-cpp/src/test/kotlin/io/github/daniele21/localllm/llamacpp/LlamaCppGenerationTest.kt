@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.models.ArtifactSource
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -51,6 +52,40 @@ class LlamaCppGenerationTest {
         )
 
         assertEquals(NativeFlashAttentionMode.AUTO.nativeValue, nativeApi.lastContextCreation?.last())
+    }
+
+    @Test
+    fun `supported explicit KV cache type fails closed until JNI materializes it`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            testModel(),
+            testProfile().copy(kvCacheTypeK = "q8_0", kvCacheTypeV = "q8_0"),
+        )
+
+        assertTrue(result is ContextCreationResult.Failure)
+        assertEquals(
+            GenerationNativeErrorCode.UNSUPPORTED_CONFIGURATION,
+            (result as ContextCreationResult.Failure).error.code,
+        )
+        assertNull(nativeApi.lastContextCreation)
+    }
+
+    @Test
+    fun `unknown explicit KV cache type fails before JNI`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            testModel(),
+            testProfile().copy(kvCacheTypeK = "q3_not_real"),
+        )
+
+        assertTrue(result is ContextCreationResult.Failure)
+        assertEquals(
+            GenerationNativeErrorCode.INVALID_ARGUMENT,
+            (result as ContextCreationResult.Failure).error.code,
+        )
+        assertNull(nativeApi.lastContextCreation)
     }
 
     @Test
