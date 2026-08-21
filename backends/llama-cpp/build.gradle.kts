@@ -2,6 +2,11 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
+val experimentalOpenCl = providers.gradleProperty("localLlm.experimentalOpenCl")
+    .orNull
+    ?.toBooleanStrictOrNull()
+    ?: false
+
 android {
     namespace = "io.github.daniele21.localllm.llamacpp"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -14,6 +19,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DLOCAL_LLM_EXPERIMENTAL_OPENCL=${if (experimentalOpenCl) "ON" else "OFF"}"
                 cppFlags += listOf("-std=c++17", "-Wall", "-Wextra")
             }
         }
