@@ -22,6 +22,8 @@ interface NativeLlamaGenerationApi {
         threads: Int,
         batchThreads: Int,
         flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     fun releaseContext(contextHandle: Long): Array<String>
@@ -40,6 +42,8 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
         threads: Int,
         batchThreads: Int,
         flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     external override fun releaseContext(contextHandle: Long): Array<String>
@@ -64,6 +68,8 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
                 threads = profile.cpuThreads,
                 batchThreads = profile.batchThreads,
                 flashAttentionMode = flashAttentionMode.nativeValue,
+                kvCacheTypeK = profile.kvCacheTypeK,
+                kvCacheTypeV = profile.kvCacheTypeV,
             ),
             model = model,
         )
