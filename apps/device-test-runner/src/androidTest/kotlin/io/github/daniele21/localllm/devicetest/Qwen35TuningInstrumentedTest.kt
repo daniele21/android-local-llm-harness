@@ -239,14 +239,13 @@ class Qwen35TuningInstrumentedTest {
         } else {
             null
         }
-        return JSONObject()
-            .put("schemaVersion", EVIDENCE_SCHEMA_VERSION)
+        val evidence = JSONObject()
+            .put("schemaVersion", config.evidenceSchemaVersion)
             .put("tuningCaseId", config.caseId)
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
             .put("maxOutputTokens", config.maxOutputTokens)
             .put("promptDigest", config.promptDigest)
-            .put("outputDigest", sha256(completed.output))
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -263,11 +262,16 @@ class Qwen35TuningInstrumentedTest {
             .put("batchSize", config.batchSize)
             .put("microBatchSize", config.microBatchSize)
             .put("thinkingMode", config.thinkingMode.name)
-            .put("flashAttention", config.flashAttention)
-            .put("kvCacheTypeK", config.kvCacheTypeK ?: "DEFAULT")
-            .put("kvCacheTypeV", config.kvCacheTypeV ?: "DEFAULT")
-            .put("seedPolicy", if (config.generationSeed == null) "PROFILE_DEFAULT" else "FIXED")
-            .put("generationSeed", config.generationSeed ?: JSONObject.NULL)
+        if (config.evidenceSchemaVersion >= 5) {
+            evidence
+                .put("outputDigest", sha256(completed.output))
+                .put("flashAttention", config.flashAttention)
+                .put("kvCacheTypeK", config.kvCacheTypeK ?: "DEFAULT")
+                .put("kvCacheTypeV", config.kvCacheTypeV ?: "DEFAULT")
+                .put("seedPolicy", if (config.generationSeed == null) "PROFILE_DEFAULT" else "FIXED")
+                .put("generationSeed", config.generationSeed ?: JSONObject.NULL)
+        }
+        return evidence
             .put("modelLoadKind", completed.metrics.modelLoadKind.name)
             .put("deviceModel", Build.MODEL)
             .put("androidRelease", Build.VERSION.RELEASE)
@@ -309,10 +313,6 @@ class Qwen35TuningInstrumentedTest {
             thermalStatus = currentThermalStatus(),
         )
     }
-
-    private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 5
-    }
 }
 
 private data class MeasuredGeneration(
@@ -351,6 +351,7 @@ private data class Qwen35TuningConfig(
     val batchThreads: Int,
     val maxOutputTokens: Int,
     val warmRepetitions: Int,
+    val evidenceSchemaVersion: Int,
     val flashAttention: Boolean,
     val kvCacheTypeK: String?,
     val kvCacheTypeV: String?,
@@ -394,6 +395,8 @@ private data class Qwen35TuningConfig(
             }
             val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", 4)
+            require(evidenceSchemaVersion in 4..5) { "evidenceSchemaVersion must be 4 or 5" }
             val prompt = arguments.prompt()
             val promptDigest = sha256(prompt)
             arguments.requirePromptDigest(promptDigest)
@@ -408,6 +411,7 @@ private data class Qwen35TuningConfig(
                 batchThreads = arguments.positiveInt("batchThreads", processors.coerceAtMost(4)),
                 maxOutputTokens = arguments.positiveInt("maxOutputTokens", 64),
                 warmRepetitions = warmRepetitions,
+                evidenceSchemaVersion = evidenceSchemaVersion,
                 flashAttention = arguments.boolean("flashAttention", false),
                 kvCacheTypeK = arguments.optionalString("kvCacheTypeK"),
                 kvCacheTypeV = arguments.optionalString("kvCacheTypeV"),
