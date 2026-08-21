@@ -1,5 +1,6 @@
 #include <jni.h>
 
+#include "flash_attention_params.h"
 #include "ggml-backend.h"
 #include "gguf_metadata.h"
 #include "llama.h"
@@ -589,7 +590,7 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_createContext(
     jint micro_batch_size,
     jint threads,
     jint batch_threads,
-    jboolean flash_attention
+    jint flash_attention_mode
 ) {
     const auto model = models.get(static_cast<std::int64_t>(model_handle));
     if (!model) {
@@ -609,9 +610,9 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaGenerationApi_createContext(
     params.n_ubatch = static_cast<std::uint32_t>(micro_batch_size);
     params.n_threads = threads;
     params.n_threads_batch = batch_threads;
-    params.flash_attn_type = flash_attention == JNI_TRUE
-        ? LLAMA_FLASH_ATTN_TYPE_ENABLED
-        : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    if (!local_llm::apply_flash_attention_mode(params, flash_attention_mode)) {
+        return to_java_string_array(env, error_response("INVALID_ARGUMENT", "Unsupported flash-attention mode"));
+    }
 
     llama_context* raw_context = llama_init_from_model(model->model, params);
     if (raw_context == nullptr) {

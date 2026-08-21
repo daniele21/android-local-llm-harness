@@ -25,9 +25,32 @@ class LlamaCppGenerationTest {
             result,
         )
         assertEquals(
-            listOf(7L, 1024, 256, 128, 3, 4, true),
+            listOf(7L, 1024, 256, 128, 3, 4, NativeFlashAttentionMode.ENABLED.nativeValue),
             nativeApi.lastContextCreation,
         )
+    }
+
+    @Test
+    fun `profile false maps to explicitly disabled flash attention`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+        val profile = testProfile().copy(flashAttention = false)
+
+        LlamaCppGenerationBridge(nativeApi).createContext(testModel(), profile)
+
+        assertEquals(NativeFlashAttentionMode.DISABLED.nativeValue, nativeApi.lastContextCreation?.last())
+    }
+
+    @Test
+    fun `auto flash attention is only forwarded when explicitly requested`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        LlamaCppGenerationBridge(nativeApi).createContext(
+            model = testModel(),
+            profile = testProfile().copy(flashAttention = false),
+            flashAttentionMode = NativeFlashAttentionMode.AUTO,
+        )
+
+        assertEquals(NativeFlashAttentionMode.AUTO.nativeValue, nativeApi.lastContextCreation?.last())
     }
 
     @Test
@@ -99,7 +122,7 @@ private class FakeNativeGenerationApi(
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
     ): Array<String> {
         lastContextCreation = listOf(
             modelHandle,
@@ -108,7 +131,7 @@ private class FakeNativeGenerationApi(
             microBatchSize,
             threads,
             batchThreads,
-            flashAttention,
+            flashAttentionMode,
         )
         return contextCreation
     }

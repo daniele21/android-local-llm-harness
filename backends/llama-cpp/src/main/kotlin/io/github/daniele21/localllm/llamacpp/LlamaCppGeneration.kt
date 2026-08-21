@@ -2,6 +2,17 @@ package io.github.daniele21.localllm.llamacpp
 
 import io.github.daniele21.localllm.models.GgufModelProfile
 
+enum class NativeFlashAttentionMode(val nativeValue: Int) {
+    AUTO(-1),
+    DISABLED(0),
+    ENABLED(1),
+    ;
+
+    companion object {
+        fun fromProfile(enabled: Boolean): NativeFlashAttentionMode = if (enabled) ENABLED else DISABLED
+    }
+}
+
 interface NativeLlamaGenerationApi {
     fun createContext(
         modelHandle: Long,
@@ -10,7 +21,7 @@ interface NativeLlamaGenerationApi {
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
     ): Array<String>
 
     fun releaseContext(contextHandle: Long): Array<String>
@@ -28,26 +39,30 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
     ): Array<String>
 
     external override fun releaseContext(contextHandle: Long): Array<String>
 }
 
 class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi = JniLlamaGenerationApi()) {
-    fun createContext(model: LoadedNativeModel, profile: GgufModelProfile, contextSize: Int = profile.contextSize): ContextCreationResult =
-        decodeContextCreation(
-            response = nativeApi.createContext(
-                modelHandle = model.handle.value,
-                contextSize = contextSize,
-                batchSize = profile.batchSize,
-                microBatchSize = profile.microBatchSize,
-                threads = profile.cpuThreads,
-                batchThreads = profile.batchThreads,
-                flashAttention = profile.flashAttention,
-            ),
-            model = model,
-        )
+    fun createContext(
+        model: LoadedNativeModel,
+        profile: GgufModelProfile,
+        contextSize: Int = profile.contextSize,
+        flashAttentionMode: NativeFlashAttentionMode = NativeFlashAttentionMode.fromProfile(profile.flashAttention),
+    ): ContextCreationResult = decodeContextCreation(
+        response = nativeApi.createContext(
+            modelHandle = model.handle.value,
+            contextSize = contextSize,
+            batchSize = profile.batchSize,
+            microBatchSize = profile.microBatchSize,
+            threads = profile.cpuThreads,
+            batchThreads = profile.batchThreads,
+            flashAttentionMode = flashAttentionMode.nativeValue,
+        ),
+        model = model,
+    )
 
     fun releaseContext(context: LoadedNativeContext): GenerationNativeOperationResult = decodeOperation(
         nativeApi.releaseContext(context.handle.value),
