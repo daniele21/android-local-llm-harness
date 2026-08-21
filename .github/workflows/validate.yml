@@ -81,6 +81,7 @@ jobs:
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
+          python3 scripts/test_summarize_qwen35_tuning.py
           python3 scripts/test_check_pr_base.py
           python3 scripts/test_detect_ci_scope.py
           python3 scripts/test_gradle_module_inventory.py
