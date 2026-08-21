@@ -5,10 +5,10 @@ import io.github.daniele21.localllm.models.GgufModelProfile
 /**
  * Exact K/V cache data-type names accepted by the pinned llama.cpp revision.
  *
- * Explicit cache selection is intentionally fail-closed until the JNI context
- * boundary materializes the requested type. This prevents a profile field from
- * changing execution identity while the native context silently keeps its
- * upstream default.
+ * The Kotlin boundary validates the exact wire vocabulary before JNI. Native
+ * materialization performs the same validation again and applies explicit
+ * values to llama_context_params.type_k/type_v. Null values intentionally keep
+ * the pinned upstream defaults unchanged.
  */
 internal enum class NativeKvCacheType(val wireName: String) {
     F32("f32"),
@@ -32,18 +32,11 @@ internal fun GgufModelProfile.explicitKvCacheSelectionError(): GenerationNativeE
         kvCacheTypeK?.let { "K" to it },
         kvCacheTypeV?.let { "V" to it },
     )
-    if (requested.isEmpty()) return null
-
     val unsupportedName = requested.firstOrNull { (_, value) -> NativeKvCacheType.fromWireName(value) == null }
-    if (unsupportedName != null) {
-        return GenerationNativeError(
-            code = GenerationNativeErrorCode.INVALID_ARGUMENT,
-            message = "Unsupported ${unsupportedName.first} cache type: ${unsupportedName.second}",
-        )
-    }
+        ?: return null
 
     return GenerationNativeError(
-        code = GenerationNativeErrorCode.UNSUPPORTED_CONFIGURATION,
-        message = "Explicit K/V cache types are not materialized by the pinned JNI context boundary yet",
+        code = GenerationNativeErrorCode.INVALID_ARGUMENT,
+        message = "Unsupported ${unsupportedName.first} cache type: ${unsupportedName.second}",
     )
 }
