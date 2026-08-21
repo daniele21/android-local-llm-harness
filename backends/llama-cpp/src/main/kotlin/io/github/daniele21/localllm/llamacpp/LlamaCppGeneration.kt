@@ -59,6 +59,9 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
         profile.explicitKvCacheSelectionError()?.let { error ->
             return ContextCreationResult.Failure(error)
         }
+        profile.kvCacheCompatibilityError(flashAttentionMode)?.let { error ->
+            return ContextCreationResult.Failure(error)
+        }
         return decodeContextCreation(
             response = nativeApi.createContext(
                 modelHandle = model.handle.value,
