@@ -78,8 +78,8 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-3 | P1 | IN PROGRESS | Bounded 2B and 0.8B CPU screening plus focused realistic 2B prefill validation are complete; broader/representative Q35 validation still gates `MEASURED` profile promotion | Frozen release pin; Q35-6 measurement owner |
 | LLRT-4 | P1/P2 | DONE | Exact-artifact 0.8B and 2B recurrent-state native correctness probes completed with explicit `KEEP_DISABLED`: supported restore paths are exact, but partial rollback is unsupported | LLRT-0; backend conformance; Qwen3.5 state semantics |
 | LLRT-5 | P2 | IN PROGRESS | Candidate load-mode compatibility/qualification, materialized load-mode execution identity and Flash Attention tri-state mechanism are integrated; `AUTO` performance evaluation and any future pin-promotion decision remain evidence-gated | LLRT-0; LLRT-1A |
-| LLRT-6 | P2 | PLANNED | Evaluate K/V cache data-type policy for memory/context benefit with correctness and quality checks | Evidence checkpoint; MEM evidence; Q35 validation |
-| LLRT-7 | P2 | PLANNED | Package and discover Adreno OpenCL as an experimental backend without changing the CPU release default | Evidence checkpoint; LLRT-1 |
+| LLRT-6 | P2 | IN PROGRESS | Exact K/V cache vocabulary, fail-closed validation and native `type_k/type_v` materialization are integrated; bounded fixed-seed physical evidence tooling is under validation before any cache-type policy decision | Evidence checkpoint; MEM evidence; Q35 validation |
+| LLRT-7 | P2 | IN PROGRESS | Default-off OpenCL packaging plus representative Adreno 750/830 loader preflight are integrated; representative exact-artifact physical evidence is still required before any support/performance claim | Evidence checkpoint; LLRT-1 |
 | LLRT-8 | P2 | PLANNED | Integrate bounded OpenCL compiled-kernel cache ownership/cleanup for warm startup | LLRT-7 |
 | LLRT-9 | P2 | PLANNED | Add multi-sequence/batched execution only for evaluation throughput; production single-decode policy stays unchanged | EVAL runner maturity; backend correctness proof |
 | LLRT-10 | P2 | PLANNED | Evolve RA-8 into a deterministic evidence-driven execution planner using reviewed measured profiles, not online self-tuning | RA-7/RA-8/RA-9; Q35/MEM measured evidence |
@@ -105,6 +105,12 @@ The top-level states remain conservative where broader product certification is 
 | LLRT-5B | DONE | Materialized load mode `NONE/MMAP/MLOCK/MMAP_MLOCK` is part of backend execution identity while legacy mmap/mlock facts remain for comparability. |
 | LLRT-5C | DONE | Flash Attention mechanism carries explicit `AUTO=-1`, `DISABLED=0`, `ENABLED=1`; product profile `false/true` still maps to disabled/enabled and AUTO is not selected automatically. |
 | LLRT-5D | BLOCKED | Evaluate `AUTO`/enabled performance and decide any future candidate-pin promotion only with physical evidence under a new execution identity. |
+| LLRT-6A | DONE | Exact cache-type names fail closed at Kotlin/native boundaries and explicit K/V selections now materialize atomically into `llama_context_params.type_k/type_v`; null/default behavior remains unchanged. |
+| LLRT-6B | IN PROGRESS | Bounded physical runner uses schema-v5 fixed-seed identity, output digest, memory/latency/thermal evidence and separate K-only versus K+V/Flash-Attention comparison lanes; CI/tooling validation is the current gate. |
+| LLRT-6C | READY | Run exact curated 0.8B/2B device evidence, review correctness/output drift, memory and sustained performance with Q35/MEM owners, then either select an evidence-backed policy or explicitly keep defaults. |
+| LLRT-7A | DONE | OpenCL remains default-off behind an explicit experimental build lane; CPU release packaging is unchanged. |
+| LLRT-7B | DONE | ADB preflight only admits documented representative Adreno 750/830 classes with an actual device OpenCL loader; preflight is not a support claim. |
+| LLRT-7C | READY | Build and run representative exact-artifact OpenCL correctness/performance evidence before enabling any product selection; current Q4_K_M artifacts do not inherit an optimized OpenCL claim from device eligibility. |
 
 ### LLRT-3 physical CPU evidence snapshot
 
@@ -166,7 +172,7 @@ Checkpoint facts as of 2026-08-21:
 - LLRT-4 has an explicit evidence-backed `KEEP_DISABLED` verdict for both curated tiers;
 - LLRT-5 has exact candidate compatibility/qualification without changing the release baseline, plus materialized load-mode identity and tri-state Flash Attention mechanism.
 
-**Checkpoint status: SATISFIED.** LLRT-6 K/V policy and LLRT-7 OpenCL discovery are now eligible to start in parallel if their native ownership is kept disjoint. LLRT-8 follows LLRT-7. LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles. LLRT-9 remains an evaluation-owned side lane. Eligibility does not itself authorize or promote any P2 feature.
+**Checkpoint status: SATISFIED.** LLRT-6 K/V policy and LLRT-7 OpenCL discovery are now active P2 lanes with release defaults unchanged. LLRT-8 follows LLRT-7 after representative OpenCL evidence. LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles. LLRT-9 remains an evaluation-owned side lane. Active implementation does not itself authorize or promote any P2 feature.
 
 ## Integrated P1 evidence boundary
 
@@ -174,7 +180,7 @@ LLRT-1A, LLRT-2, LLRT-3A, the bounded/focused LLRT-3 physical slices and LLRT-4 
 
 LLRT-11 closes the comparability gap before physical tuning: after a runtime context is materialized, the backend emits a privacy-safe SHA-256 fingerprint over material execution inputs. The runtime records the backend ID/revision, fingerprint and explicit placement availability with the generation run; Room schema v9 preserves those fields across process restarts. The fingerprint covers the pinned backend revision, profile/context and CPU/batch knobs, requested GPU layers, requested mmap/mlock state, **materialized load mode**, Flash Attention/KV-cache settings, stable registered-device inventory, prepared-prompt reuse mode and recurrent-state reuse mode. Effective placement remains `UNAVAILABLE` on the current pin rather than being guessed.
 
-The physical lane uses Bash 3.2-compatible scripting, instrumentation status output, bounded generation timeouts, thermal-start gating and evidence schema **v4** with explicit output-token budget and prompt-digest identity. Exact-case execution/resume and output identity protect evidence from interrupted or cross-tier runs.
+The physical lane uses Bash 3.2-compatible scripting, instrumentation status output, bounded generation timeouts, thermal-start gating and evidence schema **v4** with explicit output-token budget and prompt-digest identity. LLRT-6 extends only its fixed-seed cache experiment to schema **v5**, adding K/V cache type, Flash Attention, generation-seed identity and a privacy-safe output digest while keeping existing LLRT-3 v4 evidence/resume behavior unchanged. Exact-case execution/resume and output identity protect evidence from interrupted or cross-tier runs.
 
 No runtime profile is promoted from CI, desktop/emulator or bounded single-device measurements.
 
@@ -223,15 +229,17 @@ Important dimensions include generation threads, batch/prefill threads, `n_batch
 
 ### Adreno OpenCL
 
-OpenCL is the first hardware-acceleration lane because upstream llama.cpp has an Android/Adreno backend and the repository already enables dynamic ggml backend loading. The first milestone is experimental packaging/discovery, not product-default offload.
+OpenCL is the first hardware-acceleration lane because upstream llama.cpp has an Android/Adreno backend and the repository already enables dynamic ggml backend loading. Experimental packaging is now integrated behind a default-off build flag, and the physical preflight admits only documented representative Adreno 750/830 classes that expose an actual device OpenCL loader. Neither mechanism changes the CPU release default or constitutes a model/backend support claim.
 
-The backend must expose device identity, supported features and effective offload; runtime policy stays conservative and backend-neutral. Unsupported devices fail closed to the already-supported CPU path only when policy explicitly selects CPU fallback; there is no silent change in execution identity.
+The next gate is representative exact-artifact correctness/performance evidence. In particular, the curated Qwen3.5 Q4_K_M artifacts must not inherit an optimized OpenCL claim merely because a device passes the preflight. The backend must expose device identity, supported features and effective offload; runtime policy stays conservative and backend-neutral. Unsupported devices fail closed to the already-supported CPU path only when policy explicitly selects CPU fallback; there is no silent change in execution identity.
 
 OpenCL compiled-kernel cache must have an app-owned directory, bounded cleanup/retention and identity that includes relevant backend/device/driver inputs. Cache failure may reduce startup performance but must not corrupt inference.
 
 ### KV-cache data types
 
-K/V cache quantization is treated as a memory/performance policy with possible quality/correctness consequences. `AUTO`, F16 and evidence-backed quantized types may be considered, but no type becomes a product default from a theoretical memory estimate alone.
+K/V cache quantization is treated as a memory/performance policy with possible quality/correctness consequences. Exact supported cache names now fail closed and explicit K/V selections materialize into the pinned llama.cpp context while null preserves upstream defaults. Quantized V cache on the pinned revision requires Flash Attention, so physical evidence separates K-only/FA-off comparisons from K+V/FA-on comparisons rather than hiding a second policy change.
+
+The bounded LLRT-6 runner records fixed-seed output digest, memory, latency and thermal evidence for the exact curated Qwen3.5 artifacts. Output-digest differences are evidence for quality/correctness review, not automatic failure or acceptance. No cache type becomes a product default from a theoretical memory estimate or from CI alone.
 
 ### Hexagon/HTP
 
