@@ -40,6 +40,21 @@ int main() {
 
     {
         llama_context_params params = llama_context_default_params();
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+        const ggml_type default_key = params.type_k;
+        const ggml_type default_value = params.type_v;
+
+        assert(!local_llm::apply_kv_cache_type_overrides(params, "q8_0", "q8_0"));
+        assert(params.type_k == default_key);
+        assert(params.type_v == default_value);
+
+        assert(local_llm::apply_kv_cache_type_overrides(params, "q8_0", nullptr));
+        assert(params.type_k == GGML_TYPE_Q8_0);
+        assert(params.type_v == default_value);
+    }
+
+    {
+        llama_context_params params = llama_context_default_params();
         const ggml_type default_key = params.type_k;
         const ggml_type default_value = params.type_v;
 
