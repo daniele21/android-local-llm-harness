@@ -41,9 +41,7 @@ internal fun GgufModelProfile.explicitKvCacheSelectionError(): GenerationNativeE
     )
 }
 
-internal fun GgufModelProfile.kvCacheCompatibilityError(
-    flashAttentionMode: NativeFlashAttentionMode,
-): GenerationNativeError? {
+internal fun GgufModelProfile.kvCacheCompatibilityError(flashAttentionMode: NativeFlashAttentionMode): GenerationNativeError? {
     val valueType = kvCacheTypeV?.let(NativeKvCacheType::fromWireName) ?: return null
     if (valueType.quantized && flashAttentionMode == NativeFlashAttentionMode.DISABLED) {
         return GenerationNativeError(
