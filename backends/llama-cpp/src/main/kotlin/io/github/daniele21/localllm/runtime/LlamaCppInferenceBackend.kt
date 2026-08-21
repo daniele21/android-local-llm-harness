@@ -20,6 +20,7 @@ import io.github.daniele21.localllm.llamacpp.NativeStreamingListener
 import io.github.daniele21.localllm.llamacpp.NativeStreamingResult
 import io.github.daniele21.localllm.llamacpp.RuntimeInitializationResult
 import io.github.daniele21.localllm.llamacpp.StreamingCancelResult
+import io.github.daniele21.localllm.llamacpp.materializedLoadMode
 import io.github.daniele21.localllm.models.GgufModelProfile
 import java.io.File
 import java.security.MessageDigest
@@ -155,6 +156,7 @@ class LlamaCppInferenceBackend(
             "requestedGpuLayers=${requested.gpuLayers}",
             "requestedUseMmap=${requested.useMmap}",
             "requestedUseMlock=${requested.useMlock}",
+            "materializedLoadMode=${requested.materializedLoadMode.name}",
             "flashAttention=${profile.flashAttention}",
             "kvCacheTypeK=${profile.kvCacheTypeK ?: UNAVAILABLE_VALUE}",
             "kvCacheTypeV=${profile.kvCacheTypeV ?: UNAVAILABLE_VALUE}",
