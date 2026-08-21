@@ -60,6 +60,11 @@ inline bool apply_kv_cache_type_overrides(
     if (value_type != nullptr && !kv_cache_type_from_wire_name(value_type, parsed_value)) {
         return false;
     }
+    if (value_type != nullptr &&
+        ggml_is_quantized(parsed_value) &&
+        params.flash_attn_type == LLAMA_FLASH_ATTN_TYPE_DISABLED) {
+        return false;
+    }
 
     params.type_k = parsed_key;
     params.type_v = parsed_value;
