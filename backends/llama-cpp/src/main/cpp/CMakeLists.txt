@@ -34,6 +34,20 @@ set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_BACKEND_DL ON CACHE BOOL "" FORCE)
 set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
 
+# LLRT-7 is an opt-in experimental build lane. Release/default builds remain
+# CPU-only. Enabling this requires OpenCL headers and a linkable OpenCL loader
+# to be provided to CMake; upstream then emits ggml-opencl as a dynamic backend
+# that the existing runtime loader can discover from the native library path.
+option(LOCAL_LLM_EXPERIMENTAL_OPENCL "Build the experimental ggml OpenCL backend" OFF)
+if(LOCAL_LLM_EXPERIMENTAL_OPENCL)
+    set(GGML_OPENCL ON CACHE BOOL "" FORCE)
+    set(GGML_OPENCL_PROFILING OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL_EMBED_KERNELS ON CACHE BOOL "" FORCE)
+    set(GGML_OPENCL_USE_ADRENO_KERNELS ON CACHE BOOL "" FORCE)
+else()
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+endif()
+
 add_subdirectory("${LLAMA_CPP_DIR}" "${CMAKE_BINARY_DIR}/llama.cpp")
 
 add_library(
