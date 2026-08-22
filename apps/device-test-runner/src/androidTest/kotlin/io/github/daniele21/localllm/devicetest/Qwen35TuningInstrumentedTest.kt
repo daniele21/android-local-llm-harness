@@ -57,6 +57,9 @@ class Qwen35TuningInstrumentedTest {
 
     @Test
     fun recordsColdAndWarmEvidence() {
+        if (config.experimentalOpenClBuild) {
+            assertTrue("Experimental OpenCL build is missing libggml-opencl.so", openClBackendLibraryPresent())
+        }
         val harness = buildHarness()
         val runtime = harness.runtime
         try {
@@ -130,7 +133,7 @@ class Qwen35TuningInstrumentedTest {
             microBatchSize = config.microBatchSize,
             cpuThreads = config.cpuThreads,
             batchThreads = config.batchThreads,
-            gpuLayers = 0,
+            gpuLayers = config.gpuLayers,
             useMmap = true,
             useMlock = false,
             flashAttention = config.flashAttention,
@@ -271,6 +274,18 @@ class Qwen35TuningInstrumentedTest {
                 .put("seedPolicy", if (config.generationSeed == null) "PROFILE_DEFAULT" else "FIXED")
                 .put("generationSeed", config.generationSeed ?: JSONObject.NULL)
         }
+        if (config.evidenceSchemaVersion >= 6) {
+            evidence
+                .put("experimentalOpenClBuild", config.experimentalOpenClBuild)
+                .put(
+                    "executionLane",
+                    if (config.gpuLayers == 0) "OPENCL_BUILD_CPU_CONTROL" else "OPENCL_REQUESTED_OFFLOAD",
+                )
+                .put("requestedGpuLayers", config.gpuLayers)
+                .put("openClBackendTarget", "ggml-opencl")
+                .put("openClBackendLibraryPresent", openClBackendLibraryPresent())
+                .put("effectivePlacement", "UNAVAILABLE")
+        }
         return evidence
             .put("modelLoadKind", completed.metrics.modelLoadKind.name)
             .put("deviceModel", Build.MODEL)
@@ -313,6 +328,13 @@ class Qwen35TuningInstrumentedTest {
             thermalStatus = currentThermalStatus(),
         )
     }
+
+    private fun openClBackendLibraryPresent(): Boolean =
+        File(context.applicationInfo.nativeLibraryDir, OPENCL_BACKEND_LIBRARY).isFile
+
+    private companion object {
+        const val OPENCL_BACKEND_LIBRARY = "libggml-opencl.so"
+    }
 }
 
 private data class MeasuredGeneration(
@@ -349,9 +371,11 @@ private data class Qwen35TuningConfig(
     val microBatchSize: Int,
     val cpuThreads: Int,
     val batchThreads: Int,
+    val gpuLayers: Int,
     val maxOutputTokens: Int,
     val warmRepetitions: Int,
     val evidenceSchemaVersion: Int,
+    val experimentalOpenClBuild: Boolean,
     val flashAttention: Boolean,
     val kvCacheTypeK: String?,
     val kvCacheTypeV: String?,
@@ -396,9 +420,27 @@ private data class Qwen35TuningConfig(
             val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
             val generationSeed = arguments.optionalNonNegativeLong("generationSeed")
-            val defaultSchemaVersion = if (generationSeed == null) 4 else 5
+            val gpuLayers = arguments.nonNegativeInt("gpuLayers", 0)
+            val experimentalOpenClBuild = arguments.boolean("experimentalOpenClBuild", false)
+            require(gpuLayers == 0 || experimentalOpenClBuild) {
+                "gpuLayers > 0 is reserved for the explicit experimental OpenCL evidence lane"
+            }
+            val defaultSchemaVersion = when {
+                experimentalOpenClBuild || gpuLayers > 0 -> 6
+                generationSeed == null -> 4
+                else -> 5
+            }
             val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", defaultSchemaVersion)
-            require(evidenceSchemaVersion in 4..5) { "evidenceSchemaVersion must be 4 or 5" }
+            require(evidenceSchemaVersion in 4..6) { "evidenceSchemaVersion must be 4, 5 or 6" }
+            require(evidenceSchemaVersion < 6 || experimentalOpenClBuild) {
+                "evidenceSchemaVersion 6 is reserved for the experimental OpenCL build"
+            }
+            require(evidenceSchemaVersion >= 6 || (gpuLayers == 0 && !experimentalOpenClBuild)) {
+                "OpenCL build or gpuLayers evidence requires schemaVersion 6"
+            }
+            require(evidenceSchemaVersion < 6 || generationSeed != null) {
+                "schemaVersion 6 requires a fixed generationSeed"
+            }
             val prompt = arguments.prompt()
             val promptDigest = sha256(prompt)
             arguments.requirePromptDigest(promptDigest)
@@ -411,9 +453,11 @@ private data class Qwen35TuningConfig(
                 microBatchSize = arguments.positiveInt("microBatchSize", 64),
                 cpuThreads = arguments.positiveInt("cpuThreads", processors.coerceAtMost(4)),
                 batchThreads = arguments.positiveInt("batchThreads", processors.coerceAtMost(4)),
+                gpuLayers = gpuLayers,
                 maxOutputTokens = arguments.positiveInt("maxOutputTokens", 64),
                 warmRepetitions = warmRepetitions,
                 evidenceSchemaVersion = evidenceSchemaVersion,
+                experimentalOpenClBuild = experimentalOpenClBuild,
                 flashAttention = arguments.boolean("flashAttention", false),
                 kvCacheTypeK = arguments.optionalString("kvCacheTypeK"),
                 kvCacheTypeV = arguments.optionalString("kvCacheTypeV"),
@@ -439,6 +483,10 @@ private class InstrumentationArguments(private val arguments: Bundle) {
 
     fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
         require(it > 0) { "$name must be positive" }
+    }
+
+    fun nonNegativeInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it >= 0) { "$name must not be negative" }
     }
 
     fun positiveLong(name: String, default: Long): Long = string(name, default.toString()).toLong().also {
