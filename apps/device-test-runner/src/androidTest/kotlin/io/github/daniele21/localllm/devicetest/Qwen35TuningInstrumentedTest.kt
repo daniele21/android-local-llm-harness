@@ -17,6 +17,7 @@ import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -108,6 +109,11 @@ class Qwen35TuningInstrumentedTest {
         }
         val generationProfile = Qwen35GenerationProfiles.forTier(config.tier)
             .single { it.id == generationProfileId }
+        val generationDefaults = generationProfile.defaults.copy(maxOutputTokens = config.maxOutputTokens).let { defaults ->
+            config.generationSeed?.let { seed ->
+                defaults.copy(seed = seed, seedPolicy = SeedPolicy.Fixed(seed))
+            } ?: defaults
+        }
         val artifact = GgufArtifact(
             digest = config.digest,
             fileName = sourceModel.name,
@@ -127,14 +133,16 @@ class Qwen35TuningInstrumentedTest {
             gpuLayers = 0,
             useMmap = true,
             useMlock = false,
-            flashAttention = false,
+            flashAttention = config.flashAttention,
+            kvCacheTypeK = config.kvCacheTypeK,
+            kvCacheTypeV = config.kvCacheTypeV,
             runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
         )
         val useCase = UseCaseProfile(
             id = useCaseProfileId,
             modelProfileId = modelProfileId,
             systemPromptVersion = "qwen35-tuning-v1",
-            generationDefaults = generationProfile.defaults.copy(maxOutputTokens = config.maxOutputTokens),
+            generationDefaults = generationDefaults,
             outputMode = OutputMode.TEXT,
             cachePolicy = UseCaseCachePolicy(0, false, false, false),
             healthSuiteId = "qwen35-tuning-health",
@@ -231,8 +239,8 @@ class Qwen35TuningInstrumentedTest {
         } else {
             null
         }
-        return JSONObject()
-            .put("schemaVersion", EVIDENCE_SCHEMA_VERSION)
+        val evidence = JSONObject()
+            .put("schemaVersion", config.evidenceSchemaVersion)
             .put("tuningCaseId", config.caseId)
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
@@ -254,6 +262,16 @@ class Qwen35TuningInstrumentedTest {
             .put("batchSize", config.batchSize)
             .put("microBatchSize", config.microBatchSize)
             .put("thinkingMode", config.thinkingMode.name)
+        if (config.evidenceSchemaVersion >= 5) {
+            evidence
+                .put("outputDigest", sha256(completed.output))
+                .put("flashAttention", config.flashAttention)
+                .put("kvCacheTypeK", config.kvCacheTypeK ?: "DEFAULT")
+                .put("kvCacheTypeV", config.kvCacheTypeV ?: "DEFAULT")
+                .put("seedPolicy", if (config.generationSeed == null) "PROFILE_DEFAULT" else "FIXED")
+                .put("generationSeed", config.generationSeed ?: JSONObject.NULL)
+        }
+        return evidence
             .put("modelLoadKind", completed.metrics.modelLoadKind.name)
             .put("deviceModel", Build.MODEL)
             .put("androidRelease", Build.VERSION.RELEASE)
@@ -295,10 +313,6 @@ class Qwen35TuningInstrumentedTest {
             thermalStatus = currentThermalStatus(),
         )
     }
-
-    private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 4
-    }
 }
 
 private data class MeasuredGeneration(
@@ -337,6 +351,11 @@ private data class Qwen35TuningConfig(
     val batchThreads: Int,
     val maxOutputTokens: Int,
     val warmRepetitions: Int,
+    val evidenceSchemaVersion: Int,
+    val flashAttention: Boolean,
+    val kvCacheTypeK: String?,
+    val kvCacheTypeV: String?,
+    val generationSeed: Long?,
     val thinkingMode: ThinkingMode,
     val caseId: String,
     val harnessCommit: String,
@@ -376,6 +395,10 @@ private data class Qwen35TuningConfig(
             }
             val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val generationSeed = arguments.optionalNonNegativeLong("generationSeed")
+            val defaultSchemaVersion = if (generationSeed == null) 4 else 5
+            val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", defaultSchemaVersion)
+            require(evidenceSchemaVersion in 4..5) { "evidenceSchemaVersion must be 4 or 5" }
             val prompt = arguments.prompt()
             val promptDigest = sha256(prompt)
             arguments.requirePromptDigest(promptDigest)
@@ -390,6 +413,11 @@ private data class Qwen35TuningConfig(
                 batchThreads = arguments.positiveInt("batchThreads", processors.coerceAtMost(4)),
                 maxOutputTokens = arguments.positiveInt("maxOutputTokens", 64),
                 warmRepetitions = warmRepetitions,
+                evidenceSchemaVersion = evidenceSchemaVersion,
+                flashAttention = arguments.boolean("flashAttention", false),
+                kvCacheTypeK = arguments.optionalString("kvCacheTypeK"),
+                kvCacheTypeV = arguments.optionalString("kvCacheTypeV"),
+                generationSeed = generationSeed,
                 thinkingMode = arguments.thinkingMode(),
                 caseId = arguments.required("tuningCaseId"),
                 harnessCommit = arguments.required("harnessCommit"),
@@ -398,15 +426,13 @@ private data class Qwen35TuningConfig(
                 timeoutSeconds = arguments.positiveLong("timeoutSeconds", 600),
             )
         }
-
-        private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { byte -> "%02x".format(byte) }
     }
 }
 
 private class InstrumentationArguments(private val arguments: Bundle) {
     fun string(name: String, default: String): String = arguments.getString(name)?.takeIf(String::isNotBlank) ?: default
+
+    fun optionalString(name: String): String? = arguments.getString(name)?.takeIf(String::isNotBlank)
 
     fun required(name: String): String = arguments.getString(name)?.takeIf(String::isNotBlank)
         ?: error("Missing required instrumentation argument: $name")
@@ -417,6 +443,16 @@ private class InstrumentationArguments(private val arguments: Bundle) {
 
     fun positiveLong(name: String, default: Long): Long = string(name, default.toString()).toLong().also {
         require(it > 0) { "$name must be positive" }
+    }
+
+    fun optionalNonNegativeLong(name: String): Long? = optionalString(name)?.toLong()?.also {
+        require(it >= 0) { "$name must not be negative" }
+    }
+
+    fun boolean(name: String, default: Boolean): Boolean = when (string(name, default.toString()).lowercase()) {
+        "true" -> true
+        "false" -> false
+        else -> error("$name must be true or false")
     }
 
     fun modelTier(): Qwen35ModelTier = when (required("modelTier").lowercase()) {
@@ -445,3 +481,7 @@ private class InstrumentationArguments(private val arguments: Bundle) {
         }
     }
 }
+
+private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+    .digest(value.toByteArray(Charsets.UTF_8))
+    .joinToString("") { byte -> "%02x".format(byte) }

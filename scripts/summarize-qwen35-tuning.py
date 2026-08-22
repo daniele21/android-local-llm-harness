@@ -9,7 +9,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-SUPPORTED_SCHEMA_VERSIONS = {3, 4}
+SUPPORTED_SCHEMA_VERSIONS = {3, 4, 5}
 MIN_WARM_SAMPLES = 3
 BASE_IDENTITY_FIELDS = [
     "tuningCaseId",
@@ -37,7 +37,14 @@ BASE_IDENTITY_FIELDS = [
     "abi",
 ]
 V4_IDENTITY_FIELDS = ["promptDigest"]
-OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS
+V5_IDENTITY_FIELDS = [
+    "flashAttention",
+    "kvCacheTypeK",
+    "kvCacheTypeV",
+    "seedPolicy",
+    "generationSeed",
+]
+OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS + V5_IDENTITY_FIELDS
 NUMERIC_METRICS = [
     "ttftMs",
     "prefillMs",
@@ -60,7 +67,12 @@ BASE_REQUIRED_FIELDS = set(
 
 def identity_fields_for(record: dict[str, object]) -> list[str]:
     schema_version = int(record["schemaVersion"])
-    return BASE_IDENTITY_FIELDS + (V4_IDENTITY_FIELDS if schema_version >= 4 else [])
+    fields = list(BASE_IDENTITY_FIELDS)
+    if schema_version >= 4:
+        fields += V4_IDENTITY_FIELDS
+    if schema_version >= 5:
+        fields += V5_IDENTITY_FIELDS
+    return fields
 
 
 def numeric_values(records: list[dict[str, object]], field: str) -> list[float]:
@@ -120,6 +132,15 @@ def read_records(path: Path) -> list[dict[str, object]]:
             prompt_digest = record.get("promptDigest")
             if not isinstance(prompt_digest, str) or len(prompt_digest) != 64:
                 raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char promptDigest")
+        if schema_version >= 5:
+            missing_v5 = [field for field in V5_IDENTITY_FIELDS if field not in record]
+            if missing_v5:
+                raise SystemExit(
+                    f"line {line_number}: schemaVersion {schema_version} missing identity fields: {', '.join(missing_v5)}"
+                )
+            output_digest = record.get("outputDigest")
+            if not isinstance(output_digest, str) or len(output_digest) != 64:
+                raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char outputDigest")
         if record["modelLoadKind"] not in {"COLD", "WARM"}:
             raise SystemExit(f"line {line_number}: modelLoadKind must be COLD or WARM")
         records.append(record)
@@ -187,6 +208,10 @@ def summarize_case(records: list[dict[str, object]]) -> dict[str, object]:
     row["min_availableMemoryBytes"] = min_numeric(records, "availableMemoryBytes")
     row["max_thermalStatus"] = max_numeric(records, "thermalStatus")
     row["stopReasons"] = ",".join(sorted({str(record["stopReason"]) for record in records}))
+    output_digests = sorted({str(record["outputDigest"]) for record in records if record.get("outputDigest")})
+    row["outputDigestCount"] = len(output_digests)
+    row["outputDigestStable"] = len(output_digests) == 1
+    row["stableOutputDigest"] = output_digests[0] if len(output_digests) == 1 else ""
     row["eligibleForProfileSelection"] = eligible
     row["eligibilityReason"] = reason
     return row
@@ -222,6 +247,9 @@ def main() -> int:
         "min_availableMemoryBytes",
         "max_thermalStatus",
         "stopReasons",
+        "outputDigestCount",
+        "outputDigestStable",
+        "stableOutputDigest",
         "eligibleForProfileSelection",
         "eligibilityReason",
     ]
