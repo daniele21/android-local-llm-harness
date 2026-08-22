@@ -225,7 +225,11 @@ class RuntimeEvaluationBatchExecutionAdapter(
                 continuation.cancel(error)
             } catch (_: Exception) {
                 if (terminal.compareAndSet(false, true) && continuation.isActive) {
-                    continuation.resume(RuntimeEvaluationBatchOutcome.Failed(io.github.daniele21.localllm.contracts.LocalLlmError.NativeRuntime("evaluation batch start failed")))
+                    continuation.resume(
+                        RuntimeEvaluationBatchOutcome.Failed(
+                            io.github.daniele21.localllm.contracts.LocalLlmError.NativeRuntime("evaluation batch start failed"),
+                        ),
+                    )
                 }
             }
         }
@@ -236,6 +240,7 @@ class RuntimeEvaluationBatchExecutionAdapter(
         outcome: RuntimeEvaluationBatchOutcome,
     ): EvaluationStepResult<List<EvaluationCaseResult>> = when (outcome) {
         is RuntimeEvaluationBatchOutcome.Failed -> runtimeFailure(prepared.first().caseId)
+
         is RuntimeEvaluationBatchOutcome.Completed -> {
             val expectedIds = requests.map(GenerationRequest::requestId)
             if (outcome.cases.map(RuntimeEvaluationBatchCaseResult::requestId) != expectedIds) {
@@ -262,26 +267,24 @@ class RuntimeEvaluationBatchExecutionAdapter(
         }
     }
 
-    private fun timeoutResults(
-        prepared: List<PreparedCase>,
-        requests: List<GenerationRequest>,
-    ): List<EvaluationCaseResult> = prepared.zip(requests).map { (preparedCase, request) ->
-        EvaluationCaseResult(
-            caseId = preparedCase.caseId,
-            categoryId = preparedCase.case.categoryId,
-            evaluator = preparedCase.case.evaluator,
-            status = EvaluationCaseStatus.TIMEOUT,
-            outcome = null,
-            requestId = request.requestId,
-            metrics = correlatedMetrics(request.requestId),
-            failure = EvaluationFailure(
-                stage = EvaluationFailureStage.GENERATION,
-                code = EvaluationFailureCode.CASE_TIMEOUT,
+    private fun timeoutResults(prepared: List<PreparedCase>, requests: List<GenerationRequest>): List<EvaluationCaseResult> =
+        prepared.zip(requests).map { (preparedCase, request) ->
+            EvaluationCaseResult(
                 caseId = preparedCase.caseId,
-                retryable = true,
-            ),
-        )
-    }
+                categoryId = preparedCase.case.categoryId,
+                evaluator = preparedCase.case.evaluator,
+                status = EvaluationCaseStatus.TIMEOUT,
+                outcome = null,
+                requestId = request.requestId,
+                metrics = correlatedMetrics(request.requestId),
+                failure = EvaluationFailure(
+                    stage = EvaluationFailureStage.GENERATION,
+                    code = EvaluationFailureCode.CASE_TIMEOUT,
+                    caseId = preparedCase.caseId,
+                    retryable = true,
+                ),
+            )
+        }
 
     private fun cancelledResult(prepared: PreparedCase, requestId: RequestId): EvaluationCaseResult = EvaluationCaseResult(
         caseId = prepared.caseId,
@@ -327,10 +330,7 @@ class RuntimeEvaluationBatchExecutionAdapter(
         return subList(start, start + candidate.size) == candidate
     }
 
-    private data class PreparedCase(
-        val caseId: EvaluationCaseId,
-        val case: EvaluationDatasetCaseV1,
-    )
+    private data class PreparedCase(val caseId: EvaluationCaseId, val case: EvaluationDatasetCaseV1)
 
     private companion object {
         const val MIN_BATCH_WIDTH = 2

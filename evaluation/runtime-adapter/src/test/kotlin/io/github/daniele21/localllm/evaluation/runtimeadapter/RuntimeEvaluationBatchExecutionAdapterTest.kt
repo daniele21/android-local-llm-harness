@@ -185,21 +185,18 @@ class RuntimeEvaluationBatchExecutionAdapterTest {
         assertEquals(EvaluationCaseStatus.SCORED, result.value[1].status)
     }
 
-    private fun adapter(
-        client: FakeClient,
-        runtime: FakeBatchClient,
-        fallback: EvaluationBatchExecutionPort = emptyFallback(),
-    ) = RuntimeEvaluationBatchExecutionAdapter(
-        client = client,
-        batchClient = runtime,
-        bindingSource = bindingSource(),
-        caseSource = caseSource(),
-        requestFactory = EvaluationCaseGenerationRequestFactory { _, case, binding, sessionId -> request(case.id, binding, sessionId) },
-        singletonFallback = fallback,
-        telemetry = EvaluationTelemetryCorrelationPort { requestId ->
-            EvaluationCaseMetrics(totalMs = if (requestId == REQUEST_A) 10 else 11, outputTokens = 1)
-        },
-    )
+    private fun adapter(client: FakeClient, runtime: FakeBatchClient, fallback: EvaluationBatchExecutionPort = emptyFallback()) =
+        RuntimeEvaluationBatchExecutionAdapter(
+            client = client,
+            batchClient = runtime,
+            bindingSource = bindingSource(),
+            caseSource = caseSource(),
+            requestFactory = EvaluationCaseGenerationRequestFactory { _, case, binding, sessionId -> request(case.id, binding, sessionId) },
+            singletonFallback = fallback,
+            telemetry = EvaluationTelemetryCorrelationPort { requestId ->
+                EvaluationCaseMetrics(totalMs = if (requestId == REQUEST_A) 10 else 11, outputTokens = 1)
+            },
+        )
 
     private fun bindingSource() = EvaluationRuntimeBindingSource { model, profile ->
         BINDING.takeIf { BINDING.model == model && BINDING.executionProfile == profile }
@@ -273,7 +270,8 @@ class RuntimeEvaluationBatchExecutionAdapterTest {
             return id
         }
 
-        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle = error("serial generation not expected")
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
+            error("serial generation not expected")
 
         override fun closeSession(sessionId: SessionId) {
             closedSessions += sessionId
