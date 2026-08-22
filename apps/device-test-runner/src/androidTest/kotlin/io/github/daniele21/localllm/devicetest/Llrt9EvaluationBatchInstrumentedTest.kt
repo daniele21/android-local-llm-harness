@@ -84,6 +84,11 @@ class Llrt9EvaluationBatchInstrumentedTest {
 
             assertEquals("Native batch attribution drifted", serial.prompts, batch.prompts)
             assertEquals("Native batch output count drifted", serial.outputs.size, batch.outputs.size)
+            assertEquals(
+                "Native batch output-token attribution drifted",
+                serial.outputTokens,
+                batch.outputTokens,
+            )
             val serialDigests = serial.outputs.map(::sha256)
             val batchDigests = batch.outputs.map(::sha256)
             assertEquals(
@@ -317,6 +322,8 @@ class Llrt9EvaluationBatchInstrumentedTest {
             .put("promptDigests", JSONArray(config.prompts.map(::sha256)))
             .put("serialOutputDigests", JSONArray(serialDigests))
             .put("batchOutputDigests", JSONArray(batch.outputs.map(::sha256)))
+            .put("serialOutputTokensPerCase", JSONArray(serial.outputTokens))
+            .put("batchOutputTokensPerCase", JSONArray(batch.outputTokens))
             .put("outputsMatch", serialDigests == batch.outputs.map(::sha256))
             .put("serialElapsedMs", serial.elapsedMs)
             .put("batchElapsedMs", batch.elapsedMs)
