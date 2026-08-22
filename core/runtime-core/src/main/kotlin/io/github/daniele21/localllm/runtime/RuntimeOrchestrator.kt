@@ -244,7 +244,6 @@ class RuntimeOrchestrator(
                 task = {
                     if (!lifecycle.markRunning()) return@submit
                     executeEvaluationBatch(
-                        batchRequest = request,
                         bindings = bindings,
                         lifecycle = lifecycle,
                         listener = listener,
@@ -586,7 +585,6 @@ class RuntimeOrchestrator(
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun executeEvaluationBatch(
-        batchRequest: RuntimeEvaluationBatchRequest,
         bindings: List<BatchSessionBinding>,
         lifecycle: RuntimeEvaluationBatchLifecycle,
         listener: RuntimeEvaluationBatchListener,
@@ -602,7 +600,7 @@ class RuntimeOrchestrator(
         try {
             val executionStartedAt = clock.nowNanos()
             val prepared = bindings.map { binding -> prepareEvaluationBatchCase(binding) }
-            if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
+            ensureEvaluationBatchNotCancelled(lifecycle)
             val perSequenceContextSize = resolveEvaluationBatchContextSize(bindings, prepared)
             val contextStartedAt = clock.nowNanos()
             context = synchronized(resourceLock) {
@@ -616,7 +614,7 @@ class RuntimeOrchestrator(
                 )
             }
             val contextCreationMs = nanosToMillis(clock.nowNanos() - contextStartedAt)
-            if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
+            ensureEvaluationBatchNotCancelled(lifecycle)
             val executionEvidence = backend.executionEvidence(context)
             prepared.forEach { preparedCase ->
                 val effective = EffectiveGenerationMetadata(
@@ -652,14 +650,8 @@ class RuntimeOrchestrator(
                 context = context,
                 requests = prepared.map(PreparedEvaluationBatchCase::backendRequest),
             )
-            if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
-            val expectedRequestIds = prepared.map { it.binding.request.requestId.value }
-            if (backendResult.cases.map(BackendEvaluationBatchCaseResult::requestId) != expectedRequestIds) {
-                throw BackendException(
-                    "EVALUATION_BATCH_ATTRIBUTION",
-                    "Evaluation batch backend result order does not match the submitted request order",
-                )
-            }
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            validateEvaluationBatchResultOrder(prepared, backendResult)
             val totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt)
             val queueMs = nanosToMillis(executionStartedAt - enqueuedAt)
             val results = backendResult.cases.zip(prepared).map { (backendCase, preparedCase) ->
@@ -742,6 +734,23 @@ class RuntimeOrchestrator(
             if (!closed.get() && !unloaded) {
                 state.set(if (deferredModelUnload.get()) RuntimeState.DEGRADED else RuntimeState.READY)
             }
+        }
+    }
+
+    private fun ensureEvaluationBatchNotCancelled(lifecycle: RuntimeEvaluationBatchLifecycle) {
+        if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
+    }
+
+    private fun validateEvaluationBatchResultOrder(
+        prepared: List<PreparedEvaluationBatchCase>,
+        backendResult: BackendEvaluationBatchResult,
+    ) {
+        val expectedRequestIds = prepared.map { it.binding.request.requestId.value }
+        if (backendResult.cases.map(BackendEvaluationBatchCaseResult::requestId) != expectedRequestIds) {
+            throw BackendException(
+                "EVALUATION_BATCH_ATTRIBUTION",
+                "Evaluation batch backend result order does not match the submitted request order",
+            )
         }
     }
 
