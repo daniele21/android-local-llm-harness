@@ -235,10 +235,7 @@ private data class BatchFakeModelHandle(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class BatchFakeContextHandle(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class BatchFakeContextHandle(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private data class BatchFakeEvaluationContextHandle(
     override val model: BackendModelHandle,
@@ -247,7 +244,9 @@ private data class BatchFakeEvaluationContextHandle(
     override val maxSequences: Int,
 ) : BackendEvaluationBatchContextHandle
 
-private class BatchFakeInferenceBackend : InferenceBackend, EvaluationBatchInferenceBackend {
+private class BatchFakeInferenceBackend :
+    InferenceBackend,
+    EvaluationBatchInferenceBackend {
     override val id: String = "batch-fake"
     override val revision: String = "test-v1"
     var ordinaryContextCreateCalls = 0
