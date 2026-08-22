@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
+import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
@@ -22,6 +23,7 @@ import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.StopReason
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
@@ -56,10 +58,12 @@ class RuntimeOrchestrator(
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
     private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
     private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
+    private val memoryAwareEvaluationBatchContextPlanner: MemoryAwareEvaluationBatchContextPlanner? = null,
     seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
     telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
     epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
 ) : LocalLlmClient,
+    RuntimeEvaluationBatchClient,
     AutoCloseable {
     private val resourceLock = Any()
     private val state = AtomicReference(RuntimeState.IDLE)
@@ -200,6 +204,96 @@ class RuntimeOrchestrator(
             requestId = request.requestId,
             schedulerHandle = submission.handle,
             lifecycle = lifecycle,
+        )
+    }
+
+    @Suppress("ReturnCount")
+    override fun generateEvaluationBatch(
+        request: RuntimeEvaluationBatchRequest,
+        listener: RuntimeEvaluationBatchListener,
+    ): RuntimeEvaluationBatchHandle {
+        if (closed.get()) {
+            return failEvaluationBatchImmediately(request.batchId, listener, LocalLlmError.Configuration("Runtime is closed"))
+        }
+        val batchBackend = backend as? EvaluationBatchInferenceBackend
+            ?: return failEvaluationBatchImmediately(
+                request.batchId,
+                listener,
+                LocalLlmError.Configuration("Backend ${backend.id} does not support evaluation batching"),
+            )
+        val bindings = try {
+            acquireEvaluationBatchBindings(request)
+        } catch (error: Throwable) {
+            return failEvaluationBatchImmediately(
+                request.batchId,
+                listener,
+                LocalLlmError.Configuration(error.message ?: "Invalid evaluation batch binding"),
+            )
+        }
+        val lifecycle = RuntimeEvaluationBatchLifecycle(
+            requestIds = request.requests.map(GenerationRequest::requestId).toSet(),
+            onTerminal = { bindings.forEach { releaseSessionRequest(it.session) } },
+        )
+        val enqueuedAt = clock.nowNanos()
+        bindings.forEach { binding -> runtimeTelemetry.queued(binding.request, binding.session.model.digest) }
+
+        val submission = try {
+            scheduler.submit(
+                requestId = request.batchId,
+                priority = DecodePriority.BACKGROUND,
+                task = {
+                    if (!lifecycle.markRunning()) return@submit
+                    executeEvaluationBatch(
+                        bindings = bindings,
+                        lifecycle = lifecycle,
+                        listener = listener,
+                        batchBackend = batchBackend,
+                        enqueuedAt = enqueuedAt,
+                    )
+                },
+                onQueuedCancellation = {
+                    lifecycle.requestCancellation()
+                    failEvaluationBatch(
+                        bindings,
+                        lifecycle,
+                        listener,
+                        LocalLlmError.Cancelled("Evaluation batch cancelled before execution"),
+                    )
+                },
+                onRunningCancellation = {
+                    lifecycle.requestCancellation()
+                    if (lifecycle.isRunning()) {
+                        bindings.forEach { binding ->
+                            runCatching { batchBackend.cancelEvaluationCase(binding.request.requestId.value) }
+                        }
+                    } else {
+                        failEvaluationBatch(
+                            bindings,
+                            lifecycle,
+                            listener,
+                            LocalLlmError.Cancelled("Evaluation batch cancelled before execution"),
+                        )
+                    }
+                },
+                onQueued = { position ->
+                    bindings.forEach { binding -> runtimeTelemetry.queuedPosition(binding.request.requestId, position) }
+                },
+            )
+        } catch (error: Throwable) {
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.Configuration(error.message ?: "Unable to schedule evaluation batch"),
+            )
+            return NoOpRuntimeEvaluationBatchHandle(request.batchId)
+        }
+
+        return ScheduledRuntimeEvaluationBatchHandle(
+            batchId = request.batchId,
+            schedulerHandle = submission.handle,
+            lifecycle = lifecycle,
+            cancelRunningCase = { requestId -> batchBackend.cancelEvaluationCase(requestId.value) },
         )
     }
 
@@ -487,6 +581,410 @@ class RuntimeOrchestrator(
                 state.set(if (deferredModelUnload.get()) RuntimeState.DEGRADED else RuntimeState.READY)
             }
         }
+    }
+
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    private fun executeEvaluationBatch(
+        bindings: List<BatchSessionBinding>,
+        lifecycle: RuntimeEvaluationBatchLifecycle,
+        listener: RuntimeEvaluationBatchListener,
+        batchBackend: EvaluationBatchInferenceBackend,
+        enqueuedAt: Long,
+    ) {
+        if (lifecycle.isCancellationRequested()) {
+            failEvaluationBatch(bindings, lifecycle, listener, LocalLlmError.Cancelled())
+            return
+        }
+
+        var context: BackendEvaluationBatchContextHandle? = null
+        try {
+            val executionStartedAt = clock.nowNanos()
+            val prepared = bindings.map { binding -> prepareEvaluationBatchCase(binding) }
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            val perSequenceContextSize = resolveEvaluationBatchContextSize(bindings, prepared)
+            val contextStartedAt = clock.nowNanos()
+            context = synchronized(resourceLock) {
+                batchBackend.createEvaluationBatchContext(
+                    model = bindings.first().session.model,
+                    profile = bindings.first().session.resolved.model,
+                    configuration = BackendEvaluationBatchContextConfiguration(
+                        perSequenceContextSize = perSequenceContextSize,
+                        maxSequences = bindings.size,
+                    ),
+                )
+            }
+            val contextCreationMs = nanosToMillis(clock.nowNanos() - contextStartedAt)
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            val executionEvidence = backend.executionEvidence(context)
+            prepared.forEach { preparedCase ->
+                val effective = EffectiveGenerationMetadata(
+                    preset = preparedCase.resolved.preset?.ref,
+                    temperature = preparedCase.resolved.temperature,
+                    topP = preparedCase.resolved.topP,
+                    topK = preparedCase.resolved.topK,
+                    minP = preparedCase.resolved.minP,
+                    presencePenalty = preparedCase.resolved.presencePenalty,
+                    repeatPenalty = preparedCase.resolved.repeatPenalty,
+                    repeatLastN = preparedCase.resolved.repeatLastN,
+                    requestedSeedPolicy = preparedCase.resolved.seedPolicy.toType(),
+                    effectiveSeed = preparedCase.resolved.effectiveSeed,
+                    maxOutputTokens = preparedCase.resolved.maxOutputTokens,
+                    contextSize = perSequenceContextSize,
+                    promptTokenCount = preparedCase.promptPlan.tokenCount,
+                    chatTemplateId = preparedCase.promptPlan.chatTemplateId,
+                    chatTemplateSource = preparedCase.promptPlan.chatTemplateSource,
+                    systemPromptVersion = preparedCase.resolved.systemPromptVersion,
+                    thinkingMode = preparedCase.resolved.thinkingMode,
+                )
+                runtimeTelemetry.prepared(
+                    requestId = preparedCase.binding.request.requestId,
+                    configuration = effective,
+                    promptPlanningMs = preparedCase.promptPlanningMs,
+                    contextCreationMs = contextCreationMs,
+                    executionEvidence = executionEvidence,
+                )
+            }
+            state.set(RuntimeState.GENERATING)
+            prepared.forEach { runtimeTelemetry.started(it.binding.request.requestId) }
+            val backendResult = batchBackend.generateEvaluationBatch(
+                context = context,
+                requests = prepared.map(PreparedEvaluationBatchCase::backendRequest),
+            )
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            validateEvaluationBatchResultOrder(prepared, backendResult)
+            val totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt)
+            val queueMs = nanosToMillis(executionStartedAt - enqueuedAt)
+            val results = backendResult.cases.zip(prepared).map { (backendCase, preparedCase) ->
+                val metrics = backendCase.outcome.metrics().toPublicMetrics(
+                    queueMs = queueMs,
+                    modelLoadMs = preparedCase.binding.session.modelLoadDurationMs,
+                    modelLoadKind = preparedCase.binding.session.modelLoadKind,
+                    timeToFirstTokenMs = null,
+                    timeToFirstAnswerMs = null,
+                    totalMs = totalMs,
+                    promptPlanningMs = preparedCase.promptPlanningMs,
+                    contextCreationMs = contextCreationMs,
+                )
+                when (backendCase.outcome) {
+                    is BackendGenerationOutcome.Completed -> RuntimeEvaluationBatchCaseResult.Completed(
+                        requestId = preparedCase.binding.request.requestId,
+                        output = backendCase.output,
+                        metrics = metrics,
+                    )
+
+                    is BackendGenerationOutcome.Cancelled -> RuntimeEvaluationBatchCaseResult.Cancelled(
+                        requestId = preparedCase.binding.request.requestId,
+                        metrics = metrics,
+                    )
+                }
+            }
+            val releasing = context
+            context = null
+            releaseEvaluationBatchContext(batchBackend, releasing)
+            results.forEach { result ->
+                when (result) {
+                    is RuntimeEvaluationBatchCaseResult.Completed -> runtimeTelemetry.completed(result.requestId, result.metrics)
+
+                    is RuntimeEvaluationBatchCaseResult.Cancelled -> {
+                        runtimeTelemetry.failed(result.requestId, LocalLlmError.Cancelled())
+                    }
+                }
+            }
+            lifecycle.finish(listener, RuntimeEvaluationBatchOutcome.Completed(results))
+        } catch (_: GenerationCancelledException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(bindings, lifecycle, listener, LocalLlmError.Cancelled())
+        } catch (error: GenerationPlanningException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.Configuration(error.message.orEmpty(), error.reason),
+            )
+        } catch (error: BackendException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(bindings, lifecycle, listener, error.toPublicError())
+        } catch (error: Throwable) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.NativeRuntime(error.message ?: "Unexpected evaluation batch failure"),
+            )
+        } finally {
+            val unloaded = attemptDeferredModelUnload(ignoreActiveGeneration = true)
+            if (!closed.get() && !unloaded) {
+                state.set(if (deferredModelUnload.get()) RuntimeState.DEGRADED else RuntimeState.READY)
+            }
+        }
+    }
+
+    private fun ensureEvaluationBatchNotCancelled(lifecycle: RuntimeEvaluationBatchLifecycle) {
+        if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
+    }
+
+    private fun validateEvaluationBatchResultOrder(
+        prepared: List<PreparedEvaluationBatchCase>,
+        backendResult: BackendEvaluationBatchResult,
+    ) {
+        val expectedRequestIds = prepared.map { it.binding.request.requestId.value }
+        if (backendResult.cases.map(BackendEvaluationBatchCaseResult::requestId) != expectedRequestIds) {
+            throw BackendException(
+                "EVALUATION_BATCH_ATTRIBUTION",
+                "Evaluation batch backend result order does not match the submitted request order",
+            )
+        }
+    }
+
+    private fun acquireEvaluationBatchBindings(request: RuntimeEvaluationBatchRequest): List<BatchSessionBinding> {
+        val acquired = ArrayList<BatchSessionBinding>(request.requests.size)
+        try {
+            request.requests.forEach { generationRequest ->
+                val session = sessions[generationRequest.sessionId]
+                    ?: error("Unknown session ${generationRequest.sessionId.value}")
+                check(
+                    session.applicationId == generationRequest.applicationId &&
+                        session.useCaseId == generationRequest.useCaseId,
+                ) { "Evaluation batch request does not match its session binding" }
+                check(session.options.kind == SessionKind.STATELESS) {
+                    "Evaluation batching requires stateless isolated sessions"
+                }
+                check(session.context == null) {
+                    "Evaluation batching requires sessions without an ordinary materialized context"
+                }
+                check(session.lifecycle.tryAcquireRequest()) {
+                    "Session ${generationRequest.sessionId.value} is closing"
+                }
+                acquired += BatchSessionBinding(generationRequest, session)
+            }
+            validateEvaluationBatchBindings(acquired)
+            return acquired
+        } catch (error: Throwable) {
+            acquired.forEach { binding -> releaseSessionRequest(binding.session) }
+            throw error
+        }
+    }
+
+    private fun validateEvaluationBatchBindings(bindings: List<BatchSessionBinding>) {
+        val first = bindings.first()
+        bindings.forEach { binding ->
+            check(binding.session.applicationId == first.session.applicationId) {
+                "Evaluation batch cases must share one application binding"
+            }
+            check(binding.session.useCaseId == first.session.useCaseId) {
+                "Evaluation batch cases must share one use-case binding"
+            }
+            check(binding.session.model.digest == first.session.model.digest) {
+                "Evaluation batch cases must use one resident model artifact"
+            }
+            check(binding.session.resolved.model.id == first.session.resolved.model.id) {
+                "Evaluation batch cases must use one model profile"
+            }
+            check(binding.session.options == first.session.options) {
+                "Evaluation batch cases must use identical session options"
+            }
+        }
+        val resident = modelResidency.reusableModelOrNull()
+        check(resident != null && resident.handle.digest == first.session.model.digest) {
+            "Evaluation batch requires the selected model to remain resident"
+        }
+    }
+
+    private fun prepareEvaluationBatchCase(binding: BatchSessionBinding): PreparedEvaluationBatchCase {
+        val resolved = generationPlanning.resolveConfiguration(binding.request, binding.session.resolved)
+        if (resolved.thinkingMode != ThinkingMode.DISABLED) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Evaluation batching currently requires thinking mode to be disabled",
+            )
+        }
+        val planningStartedAt = clock.nowNanos()
+        val promptPlan = backend.planPrompt(
+            binding.session.model,
+            BackendPromptPlanningRequest(
+                input = binding.request.input,
+                systemPrompt = resolved.systemPrompt,
+                chatTemplatePolicy = binding.session.resolved.model.chatTemplatePolicy,
+                thinkingMode = resolved.thinkingMode,
+            ),
+        )
+        val promptPlanningMs = nanosToMillis(clock.nowNanos() - planningStartedAt)
+        val capabilities = backend.modelCapabilities(binding.session.model)
+        generationPlanning.validateOutputConstraint(
+            outputConstraint = binding.request.outputConstraint,
+            resolved = resolved,
+            resolvedUseCase = binding.session.resolved,
+            capabilities = capabilities,
+        )
+        val contextPlan = generationPlanning.planContextSize(
+            resolvedUseCase = binding.session.resolved,
+            options = binding.session.options,
+            promptTokenCount = promptPlan.tokenCount,
+            maxOutputTokens = resolved.maxOutputTokens,
+            capabilities = capabilities,
+            preference = resolved.contextPreference,
+        )
+        return PreparedEvaluationBatchCase(
+            binding = binding,
+            resolved = resolved,
+            promptPlan = promptPlan,
+            contextPlan = contextPlan,
+            promptPlanningMs = promptPlanningMs,
+            backendRequest = BackendGenerationRequest(
+                requestId = binding.request.requestId.value,
+                prompt = promptPlan.prompt,
+                maxOutputTokens = resolved.maxOutputTokens,
+                temperature = resolved.temperature,
+                topP = resolved.topP,
+                topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
+                repeatPenalty = resolved.repeatPenalty,
+                repeatLastN = resolved.repeatLastN,
+                seed = resolved.effectiveSeed,
+                outputConstraint = binding.request.outputConstraint,
+                stopTokenIds = promptPlan.stopTokenIds,
+                stopSequences = promptPlan.stopSequences,
+                reasoningControl = null,
+            ),
+        )
+    }
+
+    private fun resolveEvaluationBatchContextSize(bindings: List<BatchSessionBinding>, prepared: List<PreparedEvaluationBatchCase>): Int {
+        val requestedPerSequence = prepared.maxOf { it.contextPlan.requestedContextTokens }
+        val minimumPerSequence = prepared.maxOf { it.contextPlan.minimumRequiredTokens }
+        val sequenceCount = bindings.size
+        val requestedAggregate = aggregateContextTokens(requestedPerSequence, sequenceCount)
+        val planner = memoryAwareEvaluationBatchContextPlanner
+        if (planner == null) {
+            if (memoryAwareContextPlanner != null) {
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    "Evaluation batch aggregate memory planner is required when memory-aware context admission is enabled",
+                )
+            }
+            return requestedPerSequence
+        }
+        val firstSession = bindings.first().session
+        val approvedTiers = when (val policy = firstSession.options.contextPolicy) {
+            is ContextPolicy.Manual -> listOf(policy.tokens)
+
+            ContextPolicy.Auto -> firstSession.resolved.model.runtimeCapabilities.approvedContextTiers.ifEmpty {
+                ContextSizeSelector.supportedSizes
+            }
+        }
+        val schedulerSnapshot = scheduler.snapshot()
+        val decision = planner.plan(
+            MemoryAwareEvaluationBatchContextRequest(
+                modelProfileId = firstSession.resolved.model.id,
+                requestedPerSequenceContextTokens = requestedPerSequence,
+                minimumPerSequenceContextTokens = minimumPerSequence,
+                approvedPerSequenceContextTiers = approvedTiers,
+                sequenceCount = sequenceCount,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = modelResidency.hasResidentModel(),
+                    residentContexts = sessions.values.count { it.context != null },
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
+        )
+        return when (decision) {
+            is MemoryAwareEvaluationBatchContextDecision.Allow -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = if (decision.downshifted) MemoryAdmissionOutcome.DOWNSHIFT else MemoryAdmissionOutcome.ALLOW,
+                    estimate = decision.estimate,
+                    requestedContextTokens = requestedAggregate,
+                    effectiveContextTokens = decision.aggregateContextTokens,
+                )
+                decision.perSequenceContextTokens
+            }
+
+            is MemoryAwareEvaluationBatchContextDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                    requestedContextTokens = requestedAggregate,
+                )
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    evaluationBatchMemoryFailureMessage(requestedAggregate, decision),
+                )
+            }
+        }
+    }
+
+    private fun aggregateContextTokens(perSequenceTokens: Int, sequenceCount: Int): Int = try {
+        Math.multiplyExact(perSequenceTokens, sequenceCount)
+    } catch (_: ArithmeticException) {
+        throw GenerationPlanningException(
+            ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+            "Evaluation batch aggregate context size overflow",
+        )
+    }
+
+    private fun evaluationBatchMemoryFailureMessage(
+        requestedAggregate: Int,
+        decision: MemoryAwareEvaluationBatchContextDecision.Reject,
+    ): String = buildString {
+        append("Memory admission rejected evaluation batch aggregate context ")
+        append(requestedAggregate)
+        append(" tokens: ")
+        append(decision.reason.name)
+        decision.admissionReason?.let { reason ->
+            append(" (")
+            append(reason.name)
+            append(')')
+        }
+    }
+
+    private fun releaseEvaluationBatchContext(
+        batchBackend: EvaluationBatchInferenceBackend,
+        context: BackendEvaluationBatchContextHandle,
+    ) {
+        synchronized(resourceLock) {
+            batchBackend.releaseEvaluationBatchContext(context)
+        }
+    }
+
+    private fun failEvaluationBatch(
+        bindings: List<BatchSessionBinding>,
+        lifecycle: RuntimeEvaluationBatchLifecycle,
+        listener: RuntimeEvaluationBatchListener,
+        error: LocalLlmError,
+    ) {
+        bindings.forEach { binding -> runtimeTelemetry.failed(binding.request.requestId, error) }
+        lifecycle.finish(listener, RuntimeEvaluationBatchOutcome.Failed(error))
+    }
+
+    private fun failEvaluationBatchImmediately(
+        batchId: RequestId,
+        listener: RuntimeEvaluationBatchListener,
+        error: LocalLlmError,
+    ): RuntimeEvaluationBatchHandle {
+        runCatching { listener.onTerminal(RuntimeEvaluationBatchOutcome.Failed(error)) }
+        return NoOpRuntimeEvaluationBatchHandle(batchId)
     }
 
     private fun materializeContext(session: SessionDescriptor, contextPlan: ContextPlanningResult): ContextMaterialization =
@@ -871,6 +1369,17 @@ class RuntimeOrchestrator(
     )
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
+
+    private data class BatchSessionBinding(val request: GenerationRequest, val session: SessionDescriptor)
+
+    private data class PreparedEvaluationBatchCase(
+        val binding: BatchSessionBinding,
+        val resolved: ResolvedRequestConfiguration,
+        val promptPlan: BackendPromptPlan,
+        val contextPlan: ContextPlanningResult,
+        val promptPlanningMs: Long,
+        val backendRequest: BackendGenerationRequest,
+    )
 
     private data class SessionDescriptor(
         val id: SessionId,
