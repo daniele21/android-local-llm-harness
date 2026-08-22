@@ -54,6 +54,7 @@ add_library(
     local_llm_jni
     SHARED
     backend_device_inventory_jni.cpp
+    evaluation_multiseq_context_params.cpp
     gguf_metadata.cpp
     common_string_utils.cpp
     generation_output_buffer.cpp
