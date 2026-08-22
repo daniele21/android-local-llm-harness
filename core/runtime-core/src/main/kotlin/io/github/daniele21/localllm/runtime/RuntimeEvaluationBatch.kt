@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.RequestId
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Runtime-only control-plane request for bounded evaluation batching.
@@ -93,26 +94,37 @@ internal class RuntimeEvaluationBatchLifecycle(
     val requestIds: Set<RequestId>,
     private val onTerminal: () -> Unit,
 ) {
-    private val terminal = AtomicBoolean(false)
+    private val state = AtomicReference(RuntimeEvaluationBatchState.QUEUED)
     private val cancellationRequested = AtomicBoolean(false)
-    private val running = AtomicBoolean(false)
 
-    fun markRunning(): Boolean = running.compareAndSet(false, true)
+    fun markRunning(): Boolean = state.compareAndSet(RuntimeEvaluationBatchState.QUEUED, RuntimeEvaluationBatchState.RUNNING)
 
-    fun isRunning(): Boolean = running.get()
+    fun isRunning(): Boolean = state.get() == RuntimeEvaluationBatchState.RUNNING
 
     fun requestCancellation(): Boolean = cancellationRequested.compareAndSet(false, true)
 
     fun isCancellationRequested(): Boolean = cancellationRequested.get()
 
     fun finish(listener: RuntimeEvaluationBatchListener, outcome: RuntimeEvaluationBatchOutcome) {
-        if (!terminal.compareAndSet(false, true)) return
-        try {
-            runCatching { listener.onTerminal(outcome) }
-        } finally {
-            onTerminal()
+        while (true) {
+            val current = state.get()
+            if (current == RuntimeEvaluationBatchState.TERMINAL) return
+            if (state.compareAndSet(current, RuntimeEvaluationBatchState.TERMINAL)) {
+                try {
+                    runCatching { listener.onTerminal(outcome) }
+                } finally {
+                    onTerminal()
+                }
+                return
+            }
         }
     }
+}
+
+private enum class RuntimeEvaluationBatchState {
+    QUEUED,
+    RUNNING,
+    TERMINAL,
 }
 
 internal class ScheduledRuntimeEvaluationBatchHandle(
