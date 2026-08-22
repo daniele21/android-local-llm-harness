@@ -16,7 +16,10 @@ data class MemoryAwareEvaluationBatchContextRequest(
             "Minimum per-sequence context must not exceed the requested context"
         }
         require(approvedPerSequenceContextTiers.all { it > 0 }) { "Approved per-sequence context tiers must be positive" }
-        require(sequenceCount in RuntimeEvaluationBatchRequest.MIN_RUNTIME_EVALUATION_BATCH_WIDTH..RuntimeEvaluationBatchRequest.MAX_RUNTIME_EVALUATION_BATCH_WIDTH) {
+        require(
+            sequenceCount in RuntimeEvaluationBatchRequest.MIN_RUNTIME_EVALUATION_BATCH_WIDTH..
+                RuntimeEvaluationBatchRequest.MAX_RUNTIME_EVALUATION_BATCH_WIDTH,
+        ) {
             "Evaluation batch sequence count is outside the supported runtime width"
         }
     }
