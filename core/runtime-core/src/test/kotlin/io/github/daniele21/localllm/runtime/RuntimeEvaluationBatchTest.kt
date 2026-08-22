@@ -1,0 +1,371 @@
+package io.github.daniele21.localllm.runtime
+
+import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.GenerationRequest
+import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SessionId
+import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.models.AppModelBinding
+import io.github.daniele21.localllm.models.ArtifactSource
+import io.github.daniele21.localllm.models.GenerationDefaults
+import io.github.daniele21.localllm.models.GgufArtifact
+import io.github.daniele21.localllm.models.GgufModelProfile
+import io.github.daniele21.localllm.models.ModelProfileRegistry
+import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.models.ResolvedUseCase
+import io.github.daniele21.localllm.models.UseCaseCachePolicy
+import io.github.daniele21.localllm.models.UseCaseProfile
+import io.github.daniele21.localllm.store.ModelStore
+import io.github.daniele21.localllm.store.ModelStoreSnapshot
+import io.github.daniele21.localllm.store.StoredModel
+import io.github.daniele21.localllm.store.VerificationResult
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+class RuntimeEvaluationBatchTest {
+    @Test
+    fun `batch uses dedicated context and preserves exact request order`() {
+        val fixture = BatchRuntimeFixture()
+        val sessions = fixture.sessions(2)
+        val terminal = CountDownLatch(1)
+        var outcome: RuntimeEvaluationBatchOutcome? = null
+
+        fixture.runtime.generateEvaluationBatch(
+            fixture.batchRequest("batch", sessions),
+            RuntimeEvaluationBatchListener {
+                outcome = it
+                terminal.countDown()
+            },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        val completed = outcome as RuntimeEvaluationBatchOutcome.Completed
+        assertEquals(listOf("case-0", "case-1"), completed.cases.map { it.requestId.value })
+        assertEquals(1, fixture.backend.batchContextCreateCalls)
+        assertEquals(1, fixture.backend.batchGenerationCalls)
+        assertEquals(1, fixture.backend.batchContextReleaseCalls)
+        assertEquals(0, fixture.backend.ordinaryContextCreateCalls)
+        assertEquals(0, fixture.backend.ordinaryGenerationCalls)
+        assertEquals(2, fixture.backend.lastBatchConfiguration?.maxSequences)
+        assertTrue(fixture.backend.lastBatchConfiguration!!.perSequenceContextSize > 0)
+        fixture.close()
+    }
+
+    @Test
+    fun `batch is one scheduler operation behind an active ordinary generation`() {
+        val fixture = BatchRuntimeFixture()
+        fixture.backend.blockOrdinaryGeneration = CountDownLatch(1)
+        val ordinarySession = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val ordinaryTerminal = CountDownLatch(1)
+        fixture.runtime.generate(
+            fixture.request("ordinary", ordinarySession),
+        ) { event ->
+            if (event is io.github.daniele21.localllm.contracts.GenerationEvent.Completed ||
+                event is io.github.daniele21.localllm.contracts.GenerationEvent.Failed
+            ) {
+                ordinaryTerminal.countDown()
+            }
+        }
+        assertTrue(fixture.backend.ordinaryGenerationStarted.await(2, TimeUnit.SECONDS))
+
+        val batchTerminal = CountDownLatch(1)
+        fixture.runtime.generateEvaluationBatch(
+            fixture.batchRequest("queued-batch", fixture.sessions(2)),
+            RuntimeEvaluationBatchListener { batchTerminal.countDown() },
+        )
+
+        assertFalse(fixture.backend.batchGenerationStarted.await(150, TimeUnit.MILLISECONDS))
+        fixture.backend.blockOrdinaryGeneration!!.countDown()
+        assertTrue(ordinaryTerminal.await(2, TimeUnit.SECONDS))
+        assertTrue(fixture.backend.batchGenerationStarted.await(2, TimeUnit.SECONDS))
+        assertTrue(batchTerminal.await(2, TimeUnit.SECONDS))
+        fixture.close()
+    }
+
+    @Test
+    fun `running case cancellation is delegated without cancelling sibling case`() {
+        val fixture = BatchRuntimeFixture()
+        fixture.backend.blockBatchGeneration = CountDownLatch(1)
+        val sessions = fixture.sessions(2)
+        val terminal = CountDownLatch(1)
+        var outcome: RuntimeEvaluationBatchOutcome? = null
+
+        val handle = fixture.runtime.generateEvaluationBatch(
+            fixture.batchRequest("batch-cancel-case", sessions),
+            RuntimeEvaluationBatchListener {
+                outcome = it
+                terminal.countDown()
+            },
+        )
+        assertTrue(fixture.backend.batchGenerationStarted.await(2, TimeUnit.SECONDS))
+        assertTrue(handle.cancelCase(RequestId("case-0")))
+        fixture.backend.blockBatchGeneration!!.countDown()
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        val completed = outcome as RuntimeEvaluationBatchOutcome.Completed
+        assertTrue(completed.cases[0] is RuntimeEvaluationBatchCaseResult.Cancelled)
+        assertTrue(completed.cases[1] is RuntimeEvaluationBatchCaseResult.Completed)
+        assertEquals(listOf("case-0"), fixture.backend.cancelledCaseIds.toList())
+        fixture.close()
+    }
+
+    @Test
+    fun `queued per-case cancellation fails closed instead of changing batch membership`() {
+        val fixture = BatchRuntimeFixture()
+        fixture.backend.blockOrdinaryGeneration = CountDownLatch(1)
+        val ordinarySession = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        fixture.runtime.generate(fixture.request("ordinary-blocker", ordinarySession)) { }
+        assertTrue(fixture.backend.ordinaryGenerationStarted.await(2, TimeUnit.SECONDS))
+
+        val handle = fixture.runtime.generateEvaluationBatch(
+            fixture.batchRequest("queued-case-cancel", fixture.sessions(2)),
+            RuntimeEvaluationBatchListener { },
+        )
+
+        assertFalse(handle.cancelCase(RequestId("case-0")))
+        fixture.backend.blockOrdinaryGeneration!!.countDown()
+        fixture.close()
+    }
+}
+
+private class BatchRuntimeFixture {
+    val applicationId = ApplicationId("evaluation-app")
+    val useCaseId = UseCaseId("evaluation-use-case")
+    private val digest = ModelDigest("c".repeat(64))
+    private val modelFile = File.createTempFile("batch-runtime-model", ".gguf").apply {
+        writeText("model")
+        deleteOnExit()
+    }
+    val backend = BatchFakeInferenceBackend()
+    private val resolved = resolvedUseCase()
+    private val registry = object : ModelProfileRegistry {
+        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = resolved
+    }
+    private val store = object : ModelStore {
+        override fun find(digest: ModelDigest): StoredModel? = if (digest == this@BatchRuntimeFixture.digest) {
+            StoredModel(digest, modelFile, modelFile.length(), verified = true)
+        } else {
+            null
+        }
+
+        override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Not used")
+
+        override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(true, digest, "valid")
+
+        override fun remove(digest: ModelDigest): Boolean = false
+
+        override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(0, 0, emptyList())
+    }
+    val runtime = RuntimeOrchestrator(registry, store, backend)
+
+    fun sessions(count: Int): List<SessionId> = List(count) { runtime.createSession(applicationId, useCaseId) }
+
+    fun batchRequest(id: String, sessions: List<SessionId>): RuntimeEvaluationBatchRequest = RuntimeEvaluationBatchRequest(
+        batchId = RequestId(id),
+        requests = sessions.mapIndexed { index, sessionId -> request("case-$index", sessionId) },
+    )
+
+    fun request(id: String, sessionId: SessionId): GenerationRequest = GenerationRequest(
+        requestId = RequestId(id),
+        sessionId = sessionId,
+        applicationId = applicationId,
+        useCaseId = useCaseId,
+        input = "prompt $id",
+    )
+
+    fun close() {
+        backend.blockOrdinaryGeneration?.countDown()
+        backend.blockBatchGeneration?.countDown()
+        runtime.close()
+        modelFile.delete()
+    }
+
+    private fun resolvedUseCase(): ResolvedUseCase {
+        val profile = GgufModelProfile(
+            id = "batch-profile",
+            artifact = GgufArtifact(
+                digest = digest,
+                fileName = "batch.gguf",
+                sizeBytes = modelFile.length(),
+                architecture = "qwen2",
+                quantization = "Q4_K_M",
+                source = ArtifactSource.Imported("batch-test"),
+            ),
+            contextSize = 2_048,
+            batchSize = 128,
+            microBatchSize = 64,
+            cpuThreads = 2,
+            batchThreads = 2,
+            gpuLayers = 0,
+        )
+        val useCase = UseCaseProfile(
+            id = "batch-use-case-profile",
+            modelProfileId = profile.id,
+            systemPromptVersion = "v1",
+            generationDefaults = GenerationDefaults(
+                maxOutputTokens = 16,
+                temperature = 0f,
+                topP = 1f,
+                topK = 0,
+                seed = 42,
+            ),
+            outputMode = OutputMode.TEXT,
+            cachePolicy = UseCaseCachePolicy(0, false, false, false),
+            healthSuiteId = "health",
+        )
+        return ResolvedUseCase(
+            binding = AppModelBinding(applicationId, useCaseId, useCase.id),
+            useCase = useCase,
+            model = profile,
+        )
+    }
+}
+
+private data class BatchFakeModelHandle(
+    override val digest: ModelDigest,
+    override val profileId: String,
+    override val loadDurationMs: Long = 1,
+) : BackendModelHandle
+
+private data class BatchFakeContextHandle(
+    override val model: BackendModelHandle,
+    override val contextSize: Int,
+) : BackendContextHandle
+
+private data class BatchFakeEvaluationContextHandle(
+    override val model: BackendModelHandle,
+    override val contextSize: Int,
+    override val perSequenceContextSize: Int,
+    override val maxSequences: Int,
+) : BackendEvaluationBatchContextHandle
+
+private class BatchFakeInferenceBackend : InferenceBackend, EvaluationBatchInferenceBackend {
+    override val id: String = "batch-fake"
+    override val revision: String = "test-v1"
+    var ordinaryContextCreateCalls = 0
+    var ordinaryGenerationCalls = 0
+    var batchContextCreateCalls = 0
+    var batchGenerationCalls = 0
+    var batchContextReleaseCalls = 0
+    var lastBatchConfiguration: BackendEvaluationBatchContextConfiguration? = null
+    var blockOrdinaryGeneration: CountDownLatch? = null
+    var blockBatchGeneration: CountDownLatch? = null
+    val ordinaryGenerationStarted = CountDownLatch(1)
+    val batchGenerationStarted = CountDownLatch(1)
+    val cancelledCaseIds = Collections.synchronizedSet(LinkedHashSet<String>())
+    private val loadedModels = ConcurrentHashMap<String, BatchFakeModelHandle>()
+
+    override fun initialize() = Unit
+
+    override fun shutdown() = Unit
+
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
+        BatchFakeModelHandle(source.digest, profile.id).also { loadedModels[profile.id] = it }
+
+    override fun unloadModel(model: BackendModelHandle) {
+        loadedModels.remove(model.profileId)
+    }
+
+    override fun modelCapabilities(model: BackendModelHandle): BackendModelCapabilities = BackendModelCapabilities(
+        maximumContextTokens = 4_096,
+        supportsGrammar = true,
+        supportsReasoningTransition = true,
+    )
+
+    override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan = fakePromptPlan(request)
+
+    override fun createContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendContextConfiguration,
+    ): BackendContextHandle {
+        ordinaryContextCreateCalls += 1
+        return BatchFakeContextHandle(model, configuration.contextSize)
+    }
+
+    override fun releaseContext(context: BackendContextHandle) = Unit
+
+    override fun generate(
+        context: BackendContextHandle,
+        request: BackendGenerationRequest,
+        onChunk: (text: String, generatedTokens: Int) -> Boolean,
+    ): BackendGenerationOutcome {
+        ordinaryGenerationCalls += 1
+        ordinaryGenerationStarted.countDown()
+        blockOrdinaryGeneration?.await()
+        onChunk("ordinary", 1)
+        return completedMetrics()
+    }
+
+    override fun cancel(requestId: String): Boolean {
+        blockOrdinaryGeneration?.countDown()
+        return true
+    }
+
+    override fun createEvaluationBatchContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendEvaluationBatchContextConfiguration,
+    ): BackendEvaluationBatchContextHandle {
+        batchContextCreateCalls += 1
+        lastBatchConfiguration = configuration
+        return BatchFakeEvaluationContextHandle(
+            model = model,
+            contextSize = configuration.perSequenceContextSize * configuration.maxSequences,
+            perSequenceContextSize = configuration.perSequenceContextSize,
+            maxSequences = configuration.maxSequences,
+        )
+    }
+
+    override fun releaseEvaluationBatchContext(context: BackendEvaluationBatchContextHandle) {
+        batchContextReleaseCalls += 1
+    }
+
+    override fun generateEvaluationBatch(
+        context: BackendEvaluationBatchContextHandle,
+        requests: List<BackendGenerationRequest>,
+    ): BackendEvaluationBatchResult {
+        batchGenerationCalls += 1
+        batchGenerationStarted.countDown()
+        blockBatchGeneration?.await()
+        return BackendEvaluationBatchResult(
+            requests.map { request ->
+                if (request.requestId in cancelledCaseIds) {
+                    BackendEvaluationBatchCaseResult(
+                        requestId = request.requestId,
+                        output = "",
+                        outcome = BackendGenerationOutcome.Cancelled(metrics()),
+                    )
+                } else {
+                    BackendEvaluationBatchCaseResult(
+                        requestId = request.requestId,
+                        output = "batch-${request.requestId}",
+                        outcome = completedMetrics(),
+                    )
+                }
+            },
+        )
+    }
+
+    override fun cancelEvaluationCase(requestId: String): Boolean {
+        cancelledCaseIds += requestId
+        return true
+    }
+
+    private fun completedMetrics(): BackendGenerationOutcome.Completed = BackendGenerationOutcome.Completed(metrics())
+
+    private fun metrics(): BackendGenerationMetrics = BackendGenerationMetrics(
+        inputTokens = 4,
+        outputTokens = 1,
+        promptDurationMs = 2,
+        generationDurationMs = 3,
+    )
+}
