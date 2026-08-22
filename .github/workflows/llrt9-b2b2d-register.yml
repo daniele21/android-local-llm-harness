@@ -1,0 +1,88 @@
+name: LLRT-9 B2B2d register adapter
+
+on:
+  push:
+    branches:
+      - agent/llrt9-evaluation-batch-engine-adapter-v1
+
+permissions:
+  contents: write
+
+jobs:
+  register:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/llrt9-evaluation-batch-engine-adapter-v1
+          fetch-depth: 0
+      - name: Register module, navigation and canonical LLRT status
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          settings = Path('settings.gradle.kts')
+          text = settings.read_text()
+          needle = '    ":evaluation:engine",\n    ":evaluation:in-memory-store",'
+          replacement = '    ":evaluation:engine",\n    ":evaluation:runtime-adapter",\n    ":evaluation:in-memory-store",'
+          if needle not in text:
+              raise SystemExit('settings evaluation module anchor not found')
+          settings.write_text(text.replace(needle, replacement, 1))
+
+          agents = Path('evaluation/AGENTS.md')
+          text = agents.read_text()
+          ownership = '- `evaluation/engine` owns fake-friendly evaluation lifecycle orchestration and controlled resolution of one explicitly selected supported installed model. It does not own production dataset installation, persistence, telemetry storage or UI state.\n'
+          ownership_add = ownership + '- `evaluation/runtime-adapter` owns production composition from the backend-neutral `EvaluationBatchExecutionPort` to the runtime-only bounded evaluation-batch client, including isolated session lifecycle, exact result attribution, timeout/cancellation and one-case serial fallback. It must not depend on a concrete backend such as `llama.cpp`.\n'
+          if ownership not in text:
+              raise SystemExit('evaluation ownership anchor not found')
+          text = text.replace(ownership, ownership_add, 1)
+          validation = 'For engine work run the equivalent scoped checks for `:evaluation:engine`, including unit tests and lint. Runner tests must use fake preflight/model-preparation/case-execution ports until the owning runner tasks explicitly integrate production dataset/runtime boundaries.\n'
+          validation_add = validation + '\nFor runtime-adapter work run `:evaluation:runtime-adapter:compileDebugKotlin`, `:evaluation:runtime-adapter:testDebugUnitTest` and `:evaluation:runtime-adapter:lintDebug` together with repository-wide formatting/static-analysis/model-artifact and navigation guards. The adapter may depend on runtime-core but never on a concrete backend.\n'
+          if validation not in text:
+              raise SystemExit('evaluation validation anchor not found')
+          agents.write_text(text.replace(validation, validation_add, 1))
+
+          plan = Path('docs/llama-cpp-runtime-optimization-plan.md')
+          text = plan.read_text()
+          replacements = {
+              '| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, capacity planning, the backend-local native decode kernel, sampled-token acceptance normalization, the backend-neutral evaluation-batch SPI and the runtime ownership/admission seam are integrated; backend/JNI and evaluation-adapter slices plus refreshed physical evidence remain. |':
+              '| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, capacity planning, native multi-sequence decode, sampled-token acceptance normalization, backend-neutral batch SPI, runtime ownership/admission, llama.cpp/JNI bridging and the evaluation runtime adapter are integrated; refreshed deterministic and physical evidence remain. |',
+              '| LLRT-9B2B2c | READY | Implement the llama.cpp backend plus dedicated evaluation JNI bridge over the integrated native kernel; production flat `createContext` stays unchanged and batch execution identity must include width plus aggregate/per-sequence context. |':
+              '| LLRT-9B2B2c | DONE | The llama.cpp backend/JNI bridge reuses the already-resident model, owns a dedicated bounded multi-sequence context, shares cancellation identity with normal generation and fingerprints width plus aggregate/per-sequence context without widening production `generate()`. |',
+              '| LLRT-9B2B2d | PLANNED | Adapt the runtime batch operation to `EvaluationBatchExecutionPort` without making `evaluation:engine` depend on `backends:llama-cpp`. |':
+              '| LLRT-9B2B2d | DONE | `evaluation:runtime-adapter` composes `EvaluationBatchExecutionPort` onto the runtime-only batch client with isolated stateless sessions, exact ordered attribution, timeout/cancellation and serial one-case fallback; `evaluation:engine` remains backend-neutral. |',
+              '| LLRT-9C | BLOCKED | Physical serial-vs-native-batch correctness/throughput/memory/thermal evidence waits for LLRT-9B2B2c/d and refreshed deterministic output/correctness evidence under the normalized sampler semantics. |':
+              '| LLRT-9C | BLOCKED | Software batching gates are complete; physical serial-vs-native-batch correctness/throughput/memory/thermal evidence now waits only for refreshed deterministic output/correctness evidence under the normalized sampler semantics. |',
+              'LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. LLRT-9A, LLRT-9B1, LLRT-9B2A, LLRT-9B2B1, sampled-token acceptance normalization, LLRT-9B2B2a and the LLRT-9B2B2b runtime seam are integrated without changing production concurrency policy; LLRT-9B2B2c is the next ready software gate. Before LLRT-9C, affected deterministic output/correctness evidence must be replayed under the normalized sampler semantics. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.':
+              'LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. The LLRT-9 software path through the native llama.cpp/JNI bridge and backend-neutral evaluation runtime adapter is integrated without changing production concurrency policy. Before LLRT-9C, affected deterministic output/correctness evidence must be replayed under the normalized sampler semantics; then the physical serial-vs-native-batch comparison becomes the next gate. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.'
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('canonical LLRT plan anchor not found: ' + old[:80])
+              text = text.replace(old, new, 1)
+          plan.write_text(text)
+
+          source = Path('evaluation/runtime-adapter/src/main/kotlin/io/github/daniele21/localllm/evaluation/runtimeadapter/RuntimeEvaluationBatchExecutionAdapter.kt')
+          text = source.read_text()
+          text = text.replace('prepared += PreparedCase(caseId, case, binding)', 'prepared += PreparedCase(caseId, case)')
+          text = text.replace(
+              '    private data class PreparedCase(\n        val caseId: EvaluationCaseId,\n        val case: EvaluationDatasetCaseV1,\n        val binding: EvaluationRuntimeBinding,\n    )',
+              '    private data class PreparedCase(\n        val caseId: EvaluationCaseId,\n        val case: EvaluationDatasetCaseV1,\n    )',
+          )
+          source.write_text(text)
+
+          test = Path('evaluation/runtime-adapter/src/test/kotlin/io/github/daniele21/localllm/evaluation/runtimeadapter/RuntimeEvaluationBatchExecutionAdapterTest.kt')
+          text = test.read_text().replace('import org.junit.Assert.assertFalse\n', '')
+          test.write_text(text)
+
+          Path('.github/workflows/llrt9-b2b2d-register.yml').unlink()
+          PY
+      - name: Commit registered adapter and remove one-shot workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "docs(llrt9): register evaluation runtime adapter"
+          git push origin HEAD:agent/llrt9-evaluation-batch-engine-adapter-v1
