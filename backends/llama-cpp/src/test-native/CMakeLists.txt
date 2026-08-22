@@ -141,6 +141,14 @@ target_include_directories(
     "${CMAKE_CURRENT_LIST_DIR}/../main/cpp"
 )
 
+add_executable(multi_sequence_api_compat_test multi_sequence_api_compat_test.cpp)
+target_include_directories(
+    multi_sequence_api_compat_test
+    PRIVATE
+    "${LLAMA_CPP_DIR}/include"
+)
+target_link_libraries(multi_sequence_api_compat_test PRIVATE llama)
+
 add_executable(recurrent_state_reuse_probe recurrent_state_reuse_probe.cpp)
 target_include_directories(
     recurrent_state_reuse_probe
@@ -160,5 +168,6 @@ add_test(NAME model_load_params_compat_test COMMAND model_load_params_compat_tes
 add_test(NAME flash_attention_params_test COMMAND flash_attention_params_test)
 add_test(NAME kv_cache_type_params_test COMMAND kv_cache_type_params_test)
 add_test(NAME reasoning_transition_test COMMAND reasoning_transition_test)
+add_test(NAME multi_sequence_api_compat_test COMMAND multi_sequence_api_compat_test)
 add_test(NAME recurrent_state_reuse_probe COMMAND recurrent_state_reuse_probe)
 set_tests_properties(recurrent_state_reuse_probe PROPERTIES SKIP_RETURN_CODE 77)

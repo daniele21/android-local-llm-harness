@@ -77,7 +77,7 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-6 | P2 | IN PROGRESS | K/V materialization and fixed-seed physical-evidence tooling are integrated; curated device evidence is the next policy gate. |
 | LLRT-7 | P2 | IN PROGRESS | Reproducible default-off OpenCL build/preflight/evidence tooling is integrated; representative exact-artifact device evidence remains required. |
 | LLRT-8 | P2 | PLANNED | Bounded OpenCL compiled-kernel cache ownership and cleanup. |
-| LLRT-9 | P2 | IN PROGRESS | Evaluation-only bounded batch orchestration is integrated; native multi-sequence execution and throughput evidence remain separate gates. |
+| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration plus exact-pin multi-sequence API qualification are integrated; dedicated native execution and throughput evidence remain separate gates. |
 | LLRT-10 | P2 | PLANNED | Deterministic evidence-driven execution planner using reviewed measured profiles. |
 | LLRT-11 | P2 | DONE | Material backend execution identity is fingerprinted, propagated and persisted. |
 | LLRT-12 | P3 | DEFERRED | Hexagon/HTP evaluation after CPU/OpenCL evidence is stable. |
@@ -101,7 +101,8 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-7A/B | DONE | OpenCL remains default-off; representative Adreno 750/830 loader preflight is not a support claim. |
 | LLRT-7C | IN PROGRESS | Reproducible OpenCL build, packaging checks and schema-v6 runner are ready; representative exact-artifact physical evidence is still required. |
 | LLRT-9A | DONE | Evaluation-only bounded batch planning/execution with exact ordered attribution and a serial compatibility path is integrated; production concurrency is unchanged. |
-| LLRT-9B | PLANNED | Add a true backend multi-sequence execution path only after lifecycle/cancellation semantics and pinned llama.cpp feasibility are explicit. |
+| LLRT-9B1 | DONE | Exact pin qualifies default `n_seq_max=1`, explicit multi-sequence batch allocation, per-output logits and per-sequence cleanup APIs; this is API compatibility, not a runtime batching claim. |
+| LLRT-9B2 | PLANNED | Add a dedicated evaluation-only multi-sequence context/decode path with explicit capacity, sampler ownership and per-sequence cancellation/cleanup; production scheduling remains unchanged. |
 | LLRT-9C | PLANNED | Compare serial evaluation with the native batch candidate for correctness, throughput, memory and thermal behavior before any selection. |
 
 ## Physical evidence snapshot
@@ -120,7 +121,7 @@ Physical performance/thermal runs on the same phone are serialized and thermal-g
 
 The P2 checkpoint is **SATISFIED**: bounded 0.8B evidence is complete, the 2B CPU candidate has an explicit reject decision, LLRT-4 has an evidence-backed `KEEP_DISABLED` verdict and LLRT-5 mechanical compatibility is integrated without moving the release pin.
 
-LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. LLRT-9A orchestration is integrated without changing production decode policy; LLRT-9B/9C remain the native execution and evidence gates. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
+LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. LLRT-9A orchestration and LLRT-9B1 pin qualification are integrated without changing production decode policy; LLRT-9B2/9C remain the native execution and evidence gates. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
 
 ## Integrated execution identity
 
@@ -168,7 +169,9 @@ Hexagon remains research-only until CPU/OpenCL ownership, packaging, conformance
 
 LLRT-9A is an evaluation-only orchestration seam: it groups the immutable ordered sample set into bounded batches, requires exact per-case attribution and supplies a sequential compatibility executor over the existing single-case port. It does **not** imply concurrent decode, native batching or a throughput improvement and is not wired into production scheduling.
 
-LLRT-9B owns any true llama.cpp multi-sequence implementation. Before engine integration it must define per-sequence cancellation/timeout cleanup and progress attribution without weakening the current evaluation lifecycle; production continues to use `SingleDecodeScheduler`. LLRT-9C then requires representative correctness, throughput, memory and thermal evidence before any evaluation execution policy selects the native path.
+LLRT-9B1 proves only that the exact production pin exposes and links the primitives required by a multi-sequence path: the default context remains `n_seq_max=1`, explicit sequence IDs can be carried by `llama_batch`, logits are addressable per output and a complete sequence can be removed independently. With the pin's default `kv_unified=false`, increasing `n_seq_max` divides the configured context across sequences, so LLRT-9B2 must own aggregate context capacity and memory explicitly rather than mutating the production context.
+
+LLRT-9B2 owns the true evaluation-only llama.cpp multi-sequence implementation. It must define per-sequence sampler state, cancellation/timeout cleanup, progress attribution and bounded context width without weakening the current evaluation lifecycle; production continues to use `SingleDecodeScheduler`. LLRT-9C then requires representative correctness, throughput, memory and thermal evidence before any evaluation execution policy selects the native path.
 
 ## Deterministic device policy
 
