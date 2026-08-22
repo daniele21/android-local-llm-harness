@@ -55,6 +55,7 @@ add_library(
     SHARED
     backend_device_inventory_jni.cpp
     evaluation_multiseq_context_params.cpp
+    evaluation_multiseq_generation.cpp
     gguf_metadata.cpp
     common_string_utils.cpp
     generation_output_buffer.cpp
