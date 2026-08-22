@@ -55,10 +55,20 @@ class EvaluationBatchExecutionTest {
             code = EvaluationFailureCode.RUNTIME_FAILURE,
             caseId = EvaluationCaseId("case-b"),
         )
-        val port = SequentialEvaluationBatchExecution { _, caseId ->
-            executed += caseId
-            if (caseId.value == "case-b") EvaluationStepResult.Failure(failure) else EvaluationStepResult.Success(scored(caseId))
+        val caseExecution = object : EvaluationCaseExecutionPort {
+            override suspend fun execute(
+                config: EvaluationRunConfig,
+                caseId: EvaluationCaseId,
+            ): EvaluationStepResult<EvaluationCaseResult> {
+                executed += caseId
+                return if (caseId.value == "case-b") {
+                    EvaluationStepResult.Failure(failure)
+                } else {
+                    EvaluationStepResult.Success(scored(caseId))
+                }
+            }
         }
+        val port = SequentialEvaluationBatchExecution(caseExecution)
 
         val outcome = port.execute(config, EvaluationCaseBatch(0, config.sampling.orderedCaseIds))
 
