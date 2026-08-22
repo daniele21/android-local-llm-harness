@@ -34,10 +34,7 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
-internal data class PreparedEvaluationCase(
-    val caseId: EvaluationCaseId,
-    val case: EvaluationDatasetCaseV1,
-)
+internal data class PreparedEvaluationCase(val caseId: EvaluationCaseId, val case: EvaluationDatasetCaseV1)
 
 internal data class PreparedRuntimeEvaluationBatch(
     val firstCaseId: EvaluationCaseId,
@@ -210,37 +207,36 @@ internal class RuntimeEvaluationBatchPreparer(
 }
 
 internal class RuntimeEvaluationBatchAwaiter(private val batchClient: RuntimeEvaluationBatchClient) {
-    suspend fun await(request: RuntimeEvaluationBatchRequest): RuntimeEvaluationBatchOutcome =
-        suspendCancellableCoroutine { continuation ->
-            val terminal = AtomicBoolean(false)
-            var handle: RuntimeEvaluationBatchHandle? = null
-            continuation.invokeOnCancellation {
-                if (terminal.compareAndSet(false, true)) {
-                    runCatching { handle?.cancel() }
-                }
-            }
-            try {
-                val started = batchClient.generateEvaluationBatch(request) { outcome ->
-                    if (terminal.compareAndSet(false, true) && continuation.isActive) {
-                        continuation.resume(outcome)
-                    }
-                }
-                handle = started
-                if (continuation.isCancelled) {
-                    runCatching { started.cancel() }
-                }
-            } catch (error: CancellationException) {
-                continuation.cancel(error)
-            } catch (_: Exception) {
-                if (terminal.compareAndSet(false, true) && continuation.isActive) {
-                    continuation.resume(
-                        RuntimeEvaluationBatchOutcome.Failed(
-                            LocalLlmError.NativeRuntime("evaluation batch start failed"),
-                        ),
-                    )
-                }
+    suspend fun await(request: RuntimeEvaluationBatchRequest): RuntimeEvaluationBatchOutcome = suspendCancellableCoroutine { continuation ->
+        val terminal = AtomicBoolean(false)
+        var handle: RuntimeEvaluationBatchHandle? = null
+        continuation.invokeOnCancellation {
+            if (terminal.compareAndSet(false, true)) {
+                runCatching { handle?.cancel() }
             }
         }
+        try {
+            val started = batchClient.generateEvaluationBatch(request) { outcome ->
+                if (terminal.compareAndSet(false, true) && continuation.isActive) {
+                    continuation.resume(outcome)
+                }
+            }
+            handle = started
+            if (continuation.isCancelled) {
+                runCatching { started.cancel() }
+            }
+        } catch (error: CancellationException) {
+            continuation.cancel(error)
+        } catch (_: Exception) {
+            if (terminal.compareAndSet(false, true) && continuation.isActive) {
+                continuation.resume(
+                    RuntimeEvaluationBatchOutcome.Failed(
+                        LocalLlmError.NativeRuntime("evaluation batch start failed"),
+                    ),
+                )
+            }
+        }
+    }
 }
 
 internal class RuntimeEvaluationBatchResultMapper(
@@ -301,22 +297,21 @@ internal class RuntimeEvaluationBatchResultMapper(
         )
     }
 
-    private fun cancelledResult(prepared: PreparedEvaluationCase, requestId: RequestId): EvaluationCaseResult =
-        EvaluationCaseResult(
+    private fun cancelledResult(prepared: PreparedEvaluationCase, requestId: RequestId): EvaluationCaseResult = EvaluationCaseResult(
+        caseId = prepared.caseId,
+        categoryId = prepared.case.categoryId,
+        evaluator = prepared.case.evaluator,
+        status = EvaluationCaseStatus.CANCELLED,
+        outcome = null,
+        requestId = requestId,
+        metrics = correlatedMetrics(requestId),
+        failure = EvaluationFailure(
+            stage = EvaluationFailureStage.CANCELLATION,
+            code = EvaluationFailureCode.CANCELLED,
             caseId = prepared.caseId,
-            categoryId = prepared.case.categoryId,
-            evaluator = prepared.case.evaluator,
-            status = EvaluationCaseStatus.CANCELLED,
-            outcome = null,
-            requestId = requestId,
-            metrics = correlatedMetrics(requestId),
-            failure = EvaluationFailure(
-                stage = EvaluationFailureStage.CANCELLATION,
-                code = EvaluationFailureCode.CANCELLED,
-                caseId = prepared.caseId,
-                retryable = true,
-            ),
-        )
+            retryable = true,
+        ),
+    )
 
     private fun correlatedMetrics(requestId: RequestId): EvaluationCaseMetrics = try {
         telemetry.metrics(requestId)
