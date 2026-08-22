@@ -62,7 +62,7 @@ class LlamaCppEvaluationBatchTest {
                 "2",
                 "case-a",
                 "COMPLETED",
-                "alpha",
+                "YWxwaGE=",
                 "10",
                 "2",
                 "4",
@@ -107,7 +107,7 @@ class LlamaCppEvaluationBatchTest {
                 "2",
                 "case-b",
                 "COMPLETED",
-                "b",
+                "Yg==",
                 "1",
                 "1",
                 "1",
@@ -115,7 +115,7 @@ class LlamaCppEvaluationBatchTest {
                 "MAX_OUTPUT_TOKENS",
                 "case-a",
                 "COMPLETED",
-                "a",
+                "YQ==",
                 "1",
                 "1",
                 "1",
@@ -165,6 +165,43 @@ class LlamaCppEvaluationBatchTest {
         assertEquals(41L, nativeApi.releasedContextHandle)
         assertEquals(EvaluationBatchCancelResult.Accepted(true), bridge.cancel("case-a"))
         assertEquals("case-a", nativeApi.cancelledRequestId)
+    }
+
+    @Test
+    fun `malformed encoded output fails closed`() {
+        val nativeApi = FakeNativeEvaluationBatchApi(
+            generation = arrayOf(
+                "ok",
+                "2",
+                "case-a",
+                "COMPLETED",
+                "not-valid-base64!",
+                "1",
+                "1",
+                "1",
+                "1",
+                "MAX_OUTPUT_TOKENS",
+                "case-b",
+                "COMPLETED",
+                "Yg==",
+                "1",
+                "1",
+                "1",
+                "1",
+                "MAX_OUTPUT_TOKENS",
+            ),
+        )
+
+        val result = LlamaCppEvaluationBatchBridge(nativeApi).generate(
+            testContext(),
+            listOf(testCase("case-a", "a"), testCase("case-b", "b")),
+        )
+
+        assertTrue(result is NativeEvaluationBatchResult.Failure)
+        assertEquals(
+            GenerationNativeErrorCode.NATIVE_PROTOCOL,
+            (result as NativeEvaluationBatchResult.Failure).error.code,
+        )
     }
 
     private fun testCase(
