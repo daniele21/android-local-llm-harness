@@ -34,11 +34,21 @@ data class RuntimeEvaluationBatchRequest(val batchId: RequestId, val requests: L
     }
 }
 
-data class RuntimeEvaluationBatchCaseResult(
-    val requestId: RequestId,
-    val output: String,
-    val metrics: GenerationMetrics,
-)
+sealed interface RuntimeEvaluationBatchCaseResult {
+    val requestId: RequestId
+    val metrics: GenerationMetrics
+
+    data class Completed(
+        override val requestId: RequestId,
+        val output: String,
+        override val metrics: GenerationMetrics,
+    ) : RuntimeEvaluationBatchCaseResult
+
+    data class Cancelled(
+        override val requestId: RequestId,
+        override val metrics: GenerationMetrics,
+    ) : RuntimeEvaluationBatchCaseResult
+}
 
 sealed interface RuntimeEvaluationBatchOutcome {
     data class Completed(val cases: List<RuntimeEvaluationBatchCaseResult>) : RuntimeEvaluationBatchOutcome {
