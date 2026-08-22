@@ -8,6 +8,8 @@
 
 using GenerationSampler = std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)>;
 
+GenerationSampler normalize_sampled_token_acceptance(GenerationSampler sampler);
+
 GenerationSampler create_generation_sampler(
     const llama_vocab* vocab,
     float temperature,
