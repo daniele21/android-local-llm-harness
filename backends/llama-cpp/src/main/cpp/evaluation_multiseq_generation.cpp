@@ -19,12 +19,24 @@ struct SequenceState final {
     llama_seq_id sequence_id = 0;
     llama_token pending_token = LLAMA_TOKEN_NULL;
     llama_pos pending_position = 0;
+    Clock::time_point generation_started{};
+    bool generation_started_set = false;
     bool pending = false;
     bool cleaned = false;
 };
 
+struct SampledOutput final {
+    std::size_t state_index = 0;
+    llama_token token = LLAMA_TOKEN_NULL;
+    bool cancelled = false;
+};
+
 std::int64_t elapsed_ms(Clock::time_point started) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count();
+}
+
+std::int64_t generation_elapsed_ms(const SequenceState& state) {
+    return state.generation_started_set ? elapsed_ms(state.generation_started) : 0;
 }
 
 bool contains_token(const std::vector<llama_token>& values, llama_token token) {
@@ -123,11 +135,11 @@ EvaluationMultiSequenceGenerationError validate_inputs(
     return EvaluationMultiSequenceGenerationError::NONE;
 }
 
-bool finish_cancelled(llama_memory_t memory, SequenceState& state, std::int64_t generation_ms) {
+bool finish_cancelled(llama_memory_t memory, SequenceState& state) {
     state.result.status = EvaluationMultiSequenceCaseStatus::CANCELLED;
     state.result.output.clear();
     state.result.stop_reason = "UNKNOWN";
-    state.result.generation_duration_ms = generation_ms;
+    state.result.generation_duration_ms = generation_elapsed_ms(state);
     return cleanup_sequence(memory, state);
 }
 
@@ -135,8 +147,7 @@ EvaluationMultiSequenceGenerationError process_sample(
     llama_memory_t memory,
     const llama_vocab* vocab,
     SequenceState& state,
-    llama_token token,
-    std::int64_t generation_ms) {
+    llama_token token) {
     auto& input = *state.input;
     auto& result = state.result;
 
@@ -145,14 +156,14 @@ EvaluationMultiSequenceGenerationError process_sample(
     }
     if (llama_vocab_is_eog(vocab, token)) {
         result.stop_reason = input.grammar_constrained ? "GRAMMAR_COMPLETE" : "END_OF_GENERATION";
-        result.generation_duration_ms = generation_ms;
+        result.generation_duration_ms = generation_elapsed_ms(state);
         return cleanup_sequence(memory, state)
             ? EvaluationMultiSequenceGenerationError::NONE
             : EvaluationMultiSequenceGenerationError::CLEANUP_FAILED;
     }
     if (contains_token(input.stop_token_ids, token)) {
         result.stop_reason = "STOP_SEQUENCE";
-        result.generation_duration_ms = generation_ms;
+        result.generation_duration_ms = generation_elapsed_ms(state);
         return cleanup_sequence(memory, state)
             ? EvaluationMultiSequenceGenerationError::NONE
             : EvaluationMultiSequenceGenerationError::CLEANUP_FAILED;
@@ -164,13 +175,18 @@ EvaluationMultiSequenceGenerationError process_sample(
     }
     result.output.append(piece);
     ++result.output_tokens;
+
+    // The pinned llama_sampler_sample() already accepts the token. The current
+    // production stream path performs one additional accept for emitted tokens;
+    // preserve that behavior here until sampler normalization is reviewed as a
+    // separate correctness change, so LLRT-9C compares equivalent semantics.
     llama_sampler_accept(input.sampler, token);
 
     const auto stop_position = earliest_stop_position(result.output, input.stop_sequences);
     if (stop_position.has_value()) {
         result.output.resize(stop_position.value());
         result.stop_reason = "STOP_SEQUENCE";
-        result.generation_duration_ms = generation_ms;
+        result.generation_duration_ms = generation_elapsed_ms(state);
         return cleanup_sequence(memory, state)
             ? EvaluationMultiSequenceGenerationError::NONE
             : EvaluationMultiSequenceGenerationError::CLEANUP_FAILED;
@@ -178,7 +194,7 @@ EvaluationMultiSequenceGenerationError process_sample(
 
     if (result.output_tokens >= input.max_output_tokens) {
         result.stop_reason = "MAX_OUTPUT_TOKENS";
-        result.generation_duration_ms = generation_ms;
+        result.generation_duration_ms = generation_elapsed_ms(state);
         return cleanup_sequence(memory, state)
             ? EvaluationMultiSequenceGenerationError::NONE
             : EvaluationMultiSequenceGenerationError::CLEANUP_FAILED;
@@ -263,6 +279,9 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
 
     llama_memory_clear(memory, true);
 
+    // Prefill each prompt into its own sequence. This intentionally does not
+    // claim parallel prefill; LLRT-9B first establishes safe multi-sequence
+    // decode while preserving independent prompts and exact attribution.
     for (auto& state : states) {
         auto& input = *state.input;
         const auto prompt_started = Clock::now();
@@ -270,7 +289,7 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
         while (offset < input.prompt_tokens.size()) {
             if (input.cancellation->load(std::memory_order_acquire)) {
                 state.result.prompt_duration_ms = elapsed_ms(prompt_started);
-                if (!finish_cancelled(memory, state, 0)) {
+                if (!finish_cancelled(memory, state)) {
                     llama_batch_free(batch);
                     return fatal_result(
                         EvaluationMultiSequenceGenerationError::CLEANUP_FAILED,
@@ -285,15 +304,17 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
             const std::size_t remaining = input.prompt_tokens.size() - offset;
             const std::int32_t chunk_size = static_cast<std::int32_t>(
                 std::min<std::size_t>(remaining, static_cast<std::size_t>(batch_size)));
+            const bool final_chunk = offset + static_cast<std::size_t>(chunk_size) == input.prompt_tokens.size();
             for (std::int32_t index = 0; index < chunk_size; ++index) {
                 const std::size_t prompt_index = offset + static_cast<std::size_t>(index);
+                const bool request_logits = final_chunk && index == chunk_size - 1;
                 if (!append_evaluation_multi_sequence_batch_token(
                         batch,
                         batch_size,
                         input.prompt_tokens[prompt_index],
                         static_cast<llama_pos>(prompt_index),
                         state.sequence_id,
-                        index == chunk_size - 1)) {
+                        request_logits)) {
                     llama_batch_free(batch);
                     return fatal_result(
                         EvaluationMultiSequenceGenerationError::INVALID_ARGUMENT,
@@ -318,7 +339,7 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
         }
         state.result.prompt_duration_ms = elapsed_ms(prompt_started);
         if (input.cancellation->load(std::memory_order_acquire)) {
-            if (!finish_cancelled(memory, state, 0)) {
+            if (!finish_cancelled(memory, state)) {
                 llama_batch_free(batch);
                 return fatal_result(
                     EvaluationMultiSequenceGenerationError::CLEANUP_FAILED,
@@ -329,15 +350,18 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
             continue;
         }
 
+        // Sampling must happen before prefilling the next sequence because the
+        // next llama_decode() replaces the output rows from this decode.
+        state.generation_started = Clock::now();
+        state.generation_started_set = true;
         const llama_token first_token = llama_sampler_sample(input.sampler, context, -1);
-        const auto sample_error = process_sample(memory, vocab, state, first_token, 0);
+        const auto sample_error = process_sample(memory, vocab, state, first_token);
         if (sample_error != EvaluationMultiSequenceGenerationError::NONE) {
             llama_batch_free(batch);
             return fatal_result(sample_error, "Unable to sample the first evaluation token", memory, states);
         }
     }
 
-    const auto generation_started = Clock::now();
     while (true) {
         std::vector<std::size_t> scheduled;
         scheduled.reserve(states.size());
@@ -349,7 +373,7 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
                 continue;
             }
             if (state.input->cancellation->load(std::memory_order_acquire)) {
-                if (!finish_cancelled(memory, state, elapsed_ms(generation_started))) {
+                if (!finish_cancelled(memory, state)) {
                     llama_batch_free(batch);
                     return fatal_result(
                         EvaluationMultiSequenceGenerationError::CLEANUP_FAILED,
@@ -388,11 +412,30 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
                 states);
         }
 
+        // Sample every requested output row before removing any sequence from
+        // the context. This keeps logits attribution stable for the complete
+        // shared decode even if an earlier sequence terminates or is cancelled.
+        std::vector<SampledOutput> sampled;
+        sampled.reserve(scheduled.size());
         for (std::size_t output_index = 0; output_index < scheduled.size(); ++output_index) {
-            auto& state = states[scheduled[output_index]];
+            const std::size_t state_index = scheduled[output_index];
+            auto& state = states[state_index];
+            const bool cancelled = state.input->cancellation->load(std::memory_order_acquire);
+            llama_token token = LLAMA_TOKEN_NULL;
+            if (!cancelled) {
+                token = llama_sampler_sample(
+                    state.input->sampler,
+                    context,
+                    static_cast<std::int32_t>(output_index));
+            }
+            sampled.push_back({state_index, token, cancelled});
+        }
+
+        for (const auto& output : sampled) {
+            auto& state = states[output.state_index];
             state.pending = false;
-            if (state.input->cancellation->load(std::memory_order_acquire)) {
-                if (!finish_cancelled(memory, state, elapsed_ms(generation_started))) {
+            if (output.cancelled || state.input->cancellation->load(std::memory_order_acquire)) {
+                if (!finish_cancelled(memory, state)) {
                     llama_batch_free(batch);
                     return fatal_result(
                         EvaluationMultiSequenceGenerationError::CLEANUP_FAILED,
@@ -403,19 +446,10 @@ EvaluationMultiSequenceGenerationResult generate_evaluation_multi_sequence(
                 continue;
             }
 
-            const llama_token token = llama_sampler_sample(
-                state.input->sampler,
-                context,
-                static_cast<std::int32_t>(output_index));
-            const auto sample_error = process_sample(
-                memory,
-                vocab,
-                state,
-                token,
-                elapsed_ms(generation_started));
+            const auto sample_error = process_sample(memory, vocab, state, output.token);
             if (sample_error != EvaluationMultiSequenceGenerationError::NONE) {
                 llama_batch_free(batch);
-                return fatal_result(sample_error, "Unable to sample an evaluation batch token", memory, states);
+                return fatal_result(sample_error, "Unable to process an evaluation batch token", memory, states);
             }
         }
     }
