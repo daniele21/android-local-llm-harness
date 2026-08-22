@@ -329,8 +329,7 @@ class Qwen35TuningInstrumentedTest {
         )
     }
 
-    private fun openClBackendLibraryPresent(): Boolean =
-        File(context.applicationInfo.nativeLibraryDir, OPENCL_BACKEND_LIBRARY).isFile
+    private fun openClBackendLibraryPresent(): Boolean = File(context.applicationInfo.nativeLibraryDir, OPENCL_BACKEND_LIBRARY).isFile
 
     private companion object {
         const val OPENCL_BACKEND_LIBRARY = "libggml-opencl.so"
