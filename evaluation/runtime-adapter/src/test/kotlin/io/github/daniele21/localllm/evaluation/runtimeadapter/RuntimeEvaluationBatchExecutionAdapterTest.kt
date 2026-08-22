@@ -60,7 +60,6 @@ import io.github.daniele21.localllm.runtime.RuntimeEvaluationBatchOutcome
 import io.github.daniele21.localllm.runtime.RuntimeEvaluationBatchRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test

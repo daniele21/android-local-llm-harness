@@ -25,6 +25,7 @@ include(
     ":evaluation:datasets",
     ":evaluation:evaluators",
     ":evaluation:engine",
+    ":evaluation:runtime-adapter",
     ":evaluation:in-memory-store",
     ":evaluation:persistence",
     ":evaluation:room-store",

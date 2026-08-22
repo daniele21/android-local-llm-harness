@@ -77,7 +77,7 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-6 | P2 | IN PROGRESS | K/V materialization and fixed-seed physical-evidence tooling are integrated; curated device evidence is the next policy gate. |
 | LLRT-7 | P2 | IN PROGRESS | Reproducible default-off OpenCL build/preflight/evidence tooling is integrated; representative exact-artifact device evidence remains required. |
 | LLRT-8 | P2 | PLANNED | Bounded OpenCL compiled-kernel cache ownership and cleanup. |
-| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, capacity planning, the backend-local native decode kernel, sampled-token acceptance normalization, the backend-neutral evaluation-batch SPI and the runtime ownership/admission seam are integrated; backend/JNI and evaluation-adapter slices plus refreshed physical evidence remain. |
+| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, capacity planning, native multi-sequence decode, sampled-token acceptance normalization, backend-neutral batch SPI, runtime ownership/admission, llama.cpp/JNI bridging and the evaluation runtime adapter are integrated; refreshed deterministic and physical evidence remain. |
 | LLRT-10 | P2 | PLANNED | Deterministic evidence-driven execution planner using reviewed measured profiles. |
 | LLRT-11 | P2 | DONE | Material backend execution identity is fingerprinted, propagated and persisted. |
 | LLRT-12 | P3 | DEFERRED | Hexagon/HTP evaluation after CPU/OpenCL evidence is stable. |
@@ -106,9 +106,9 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-9B2B1 | DONE | Backend-local native kernel owns independent `seq_id`, sampler/cancellation state, sequential per-sequence prefill, shared decode batches, exact ordered attribution and fail-closed cleanup; it is not exposed outside the backend yet. |
 | LLRT-9B2B2a | DONE | Backend-neutral optional evaluation-batch SPI defines bounded 2..4 sequence contexts, ordered request attribution and cooperative per-case cancellation without broadening production `InferenceBackend`. |
 | LLRT-9B2B2b | DONE | Runtime seam schedules one bounded evaluation batch as one background decode unit, reuses only the resident model, owns a dedicated evaluation context, admits aggregate context memory fail-closed, preserves ordered attribution/per-case cancellation and leaves ordinary `session.context` plus production `generate()` semantics unchanged. |
-| LLRT-9B2B2c | READY | Implement the llama.cpp backend plus dedicated evaluation JNI bridge over the integrated native kernel; production flat `createContext` stays unchanged and batch execution identity must include width plus aggregate/per-sequence context. |
-| LLRT-9B2B2d | PLANNED | Adapt the runtime batch operation to `EvaluationBatchExecutionPort` without making `evaluation:engine` depend on `backends:llama-cpp`. |
-| LLRT-9C | BLOCKED | Physical serial-vs-native-batch correctness/throughput/memory/thermal evidence waits for LLRT-9B2B2c/d and refreshed deterministic output/correctness evidence under the normalized sampler semantics. |
+| LLRT-9B2B2c | DONE | The llama.cpp backend/JNI bridge reuses the already-resident model, owns a dedicated bounded multi-sequence context, shares cancellation identity with normal generation and fingerprints width plus aggregate/per-sequence context without widening production `generate()`. |
+| LLRT-9B2B2d | DONE | `evaluation:runtime-adapter` composes `EvaluationBatchExecutionPort` onto the runtime-only batch client with isolated stateless sessions, exact ordered attribution, timeout/cancellation and serial one-case fallback; `evaluation:engine` remains backend-neutral. |
+| LLRT-9C | BLOCKED | Software batching gates are complete; physical serial-vs-native-batch correctness/throughput/memory/thermal evidence now waits only for refreshed deterministic output/correctness evidence under the normalized sampler semantics. |
 
 ## Physical evidence snapshot
 
@@ -128,7 +128,7 @@ Sampler acceptance normalization changes generation state semantics for penaltie
 
 The P2 checkpoint is **SATISFIED**: bounded 0.8B evidence is complete, the 2B CPU candidate has an explicit reject decision, LLRT-4 has an evidence-backed `KEEP_DISABLED` verdict and LLRT-5 mechanical compatibility is integrated without moving the release pin.
 
-LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. LLRT-9A, LLRT-9B1, LLRT-9B2A, LLRT-9B2B1, sampled-token acceptance normalization, LLRT-9B2B2a and the LLRT-9B2B2b runtime seam are integrated without changing production concurrency policy; LLRT-9B2B2c is the next ready software gate. Before LLRT-9C, affected deterministic output/correctness evidence must be replayed under the normalized sampler semantics. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
+LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. The LLRT-9 software path through the native llama.cpp/JNI bridge and backend-neutral evaluation runtime adapter is integrated without changing production concurrency policy. Before LLRT-9C, affected deterministic output/correctness evidence must be replayed under the normalized sampler semantics; then the physical serial-vs-native-batch comparison becomes the next gate. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
 
 ## Integrated execution identity
 

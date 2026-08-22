@@ -140,7 +140,7 @@ class RuntimeEvaluationBatchExecutionAdapter(
                 null
             } ?: return null
             if (case.id != caseId) return null
-            prepared += PreparedCase(caseId, case, binding)
+            prepared += PreparedCase(caseId, case)
         }
         return prepared
     }
@@ -330,7 +330,6 @@ class RuntimeEvaluationBatchExecutionAdapter(
     private data class PreparedCase(
         val caseId: EvaluationCaseId,
         val case: EvaluationDatasetCaseV1,
-        val binding: EvaluationRuntimeBinding,
     )
 
     private companion object {
