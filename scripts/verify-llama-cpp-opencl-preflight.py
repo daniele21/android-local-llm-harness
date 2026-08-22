@@ -20,7 +20,13 @@ required_cmake = (
 )
 required_gradle = (
     'gradleProperty("localLlm.experimentalOpenCl")',
+    'gradleProperty("localLlm.openClIncludeDir")',
+    'gradleProperty("localLlm.openClLibrary")',
     '-DLOCAL_LLM_EXPERIMENTAL_OPENCL=',
+    '-DOpenCL_INCLUDE_DIR=',
+    '-DOpenCL_LIBRARY=',
+    'OpenCL include directory must contain CL/cl.h',
+    'OpenCL provisioning properties require -PlocalLlm.experimentalOpenCl=true',
 )
 
 missing = [entry for entry in required_cmake if entry not in cmake]
@@ -31,4 +37,4 @@ if missing:
         print(f"missing OpenCL preflight contract: {entry}", file=sys.stderr)
     raise SystemExit(1)
 
-print("LLRT-7 OpenCL build contract is explicit and default-off")
+print("LLRT-7 OpenCL build contract is explicit, provisioned and default-off")
