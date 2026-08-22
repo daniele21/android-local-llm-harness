@@ -288,9 +288,9 @@ class Llrt9EvaluationBatchInstrumentedTest {
         serial: MeasuredMode,
         batch: MeasuredMode,
         serialDigests: List<String>,
-        before: DeviceSnapshot,
-        afterSerial: DeviceSnapshot,
-        afterBatch: DeviceSnapshot,
+        before: Llrt9DeviceSnapshot,
+        afterSerial: Llrt9DeviceSnapshot,
+        afterBatch: Llrt9DeviceSnapshot,
         measurementOrder: String,
     ) {
         val evidence = JSONObject()
@@ -342,13 +342,13 @@ class Llrt9EvaluationBatchInstrumentedTest {
         emitStatus("LOCAL_LLM_LLRT9_JSON $evidence")
     }
 
-    private fun deviceSnapshot(): DeviceSnapshot {
+    private fun deviceSnapshot(): Llrt9DeviceSnapshot {
         val processMemory = Debug.MemoryInfo().also { Debug.getMemoryInfo(it) }
         val memoryInfo = ActivityManager.MemoryInfo().also {
             context.getSystemService(ActivityManager::class.java).getMemoryInfo(it)
         }
         val powerManager = context.getSystemService(PowerManager::class.java)
-        return DeviceSnapshot(processMemory.totalPss, memoryInfo.availMem, powerManager.currentThermalStatus)
+        return Llrt9DeviceSnapshot(processMemory.totalPss, memoryInfo.availMem, powerManager.currentThermalStatus)
     }
 
     private fun eventually(condition: () -> Boolean): Boolean {
@@ -376,11 +376,12 @@ private data class Llrt9Harness(val runtime: RuntimeOrchestrator, val applicatio
 
 private data class MeasuredMode(val prompts: List<String>, val outputs: List<String>, val outputTokens: List<Int>, val elapsedMs: Long)
 
-private data class DeviceSnapshot(val processPssKb: Int, val availableMemoryBytes: Long, val thermalStatus: Int)
+private data class Llrt9DeviceSnapshot(val processPssKb: Int, val availableMemoryBytes: Long, val thermalStatus: Int)
 
 private class Llrt9SingleBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
-    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase? =
+    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         resolved.takeIf { it.binding.applicationId == applicationId && it.binding.useCaseId == useCaseId }
+            ?: error("No LLRT-9 model binding for application=${applicationId.value}, useCase=${useCaseId.value}")
 }
 
 private data class Llrt9EvidenceConfig(
