@@ -15,13 +15,14 @@ UBATCH=64
 MAX_OUTPUT_TOKENS=64
 GENERATION_SEED=42
 TIMEOUT_SECONDS=900
-REPETITIONS=3
+REPETITIONS=4
 WIDTH_SCOPE="all"
 THERMAL_START_MAX=1
 COOLDOWN_TIMEOUT_SECONDS=1800
 COOLDOWN_POLL_SECONDS=30
 OUTPUT_DIR="$ROOT_DIR/build/llrt9"
 RESET_OUTPUT=false
+BACKEND_REVISION="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 
 usage() {
   cat <<'EOF'
@@ -41,7 +42,7 @@ Options:
   --max-output-tokens N           Output budget per case (default: 64).
   --seed N                        Fixed non-negative generation seed (default: 42).
   --timeout-seconds N             Per serial-vs-batch pair timeout (default: 900).
-  --repetitions N                 Repetitions per width, >= 3 (default: 3).
+  --repetitions N                 Even repetitions per width, >= 4 (default: 4).
   --width 2|3|4|all               Batch widths to evaluate (default: all).
   --thermal-start-max N|off       Require Android thermal status <= N before each pair (default: 1).
   --cooldown-timeout-seconds N    Maximum thermal-gate wait (default: 1800).
@@ -49,6 +50,10 @@ Options:
   --output-dir PATH               Evidence root (default: build/llrt9).
   --reset-output                  Discard evidence for this exact run identity.
   --help                          Show this help.
+
+Each width alternates SERIAL_FIRST and BATCH_FIRST samples. The even repetition requirement keeps
+the order balanced. Exact serial/native output digests and per-case output-token counts are hard
+correctness gates. The runner rejects tracked worktree changes and an unexpected llama.cpp pin.
 EOF
 }
 
@@ -93,17 +98,21 @@ for value_name in CONTEXT THREADS BATCH_THREADS BATCH UBATCH MAX_OUTPUT_TOKENS T
   value="${!value_name}"
   [[ "$value" =~ ^[0-9]+$ ]] && (( value > 0 )) || { echo "$value_name must be a positive integer" >&2; exit 2; }
 done
-[[ "$REPETITIONS" =~ ^[0-9]+$ ]] && (( REPETITIONS >= 3 )) || { echo "--repetitions must be >= 3" >&2; exit 2; }
+[[ "$REPETITIONS" =~ ^[0-9]+$ ]] && (( REPETITIONS >= 4 && REPETITIONS % 2 == 0 )) || {
+  echo "--repetitions must be an even integer >= 4" >&2; exit 2;
+}
 [[ "$GENERATION_SEED" =~ ^[0-9]+$ ]] || { echo "--seed must be non-negative" >&2; exit 2; }
 (( UBATCH <= BATCH )) || { echo "--ubatch must be <= --batch" >&2; exit 2; }
 (( CONTEXT % 256 == 0 )) || { echo "--context must be a multiple of 256" >&2; exit 2; }
 command -v "$ADB_BIN" >/dev/null 2>&1 || { echo "adb is required" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 2; }
+command -v git >/dev/null 2>&1 || { echo "git is required" >&2; exit 2; }
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
-  else openssl dgst -sha256 "$1" | awk '{print $NF}'
+  elif command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 "$1" | awk '{print $NF}'
+  else echo "A SHA-256 implementation is required" >&2; exit 2
   fi
 }
 
@@ -117,9 +126,29 @@ case "$TIER" in
     EXPECTED_MODEL_TIER="B2"
     ;;
 esac
-BACKEND_REVISION="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 ACTUAL_SHA="$(sha256_file "$MODEL" | tr '[:upper:]' '[:lower:]')"
 [[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || { echo "$TIER model does not match the curated Q4_K_M reference" >&2; exit 2; }
+
+cd "$ROOT_DIR"
+if ! git diff --quiet --ignore-submodules=dirty -- || ! git diff --cached --quiet --ignore-submodules=dirty --; then
+  echo "LLRT-9C evidence requires a clean tracked Harness worktree" >&2
+  exit 2
+fi
+if [[ ! -e third_party/llama.cpp/.git ]]; then
+  echo "third_party/llama.cpp is not initialized; initialize the pinned submodule before evidence capture" >&2
+  exit 2
+fi
+if ! git -C third_party/llama.cpp diff --quiet -- || ! git -C third_party/llama.cpp diff --cached --quiet --; then
+  echo "LLRT-9C evidence requires a clean llama.cpp submodule worktree" >&2
+  exit 2
+fi
+ACTUAL_BACKEND_REVISION="$(git -C third_party/llama.cpp rev-parse HEAD)"
+[[ "$ACTUAL_BACKEND_REVISION" == "$BACKEND_REVISION" ]] || {
+  echo "Unexpected llama.cpp pin: expected $BACKEND_REVISION, got $ACTUAL_BACKEND_REVISION" >&2
+  exit 2
+}
+HARNESS_COMMIT="$(git rev-parse HEAD)"
+[[ "$HARNESS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "Unable to resolve exact Harness commit" >&2; exit 2; }
 
 ADB_CMD=("$ADB_BIN")
 [[ -n "$DEVICE" ]] && ADB_CMD+=("-s" "$DEVICE")
@@ -130,8 +159,6 @@ DEVICE_MODEL="$("${ADB_CMD[@]}" shell getprop ro.product.model | tr -d '\r')"
 DEVICE_RELEASE="$("${ADB_CMD[@]}" shell getprop ro.build.version.release | tr -d '\r')"
 DEVICE_SDK="$("${ADB_CMD[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
 
-cd "$ROOT_DIR"
-HARNESS_COMMIT="$(git rev-parse HEAD)"
 RUN_KEY="ctx${CONTEXT}-out${MAX_OUTPUT_TOKENS}-r${REPETITIONS}-seed${GENERATION_SEED}-t${THREADS}-bt${BATCH_THREADS}-b${BATCH}-ub${UBATCH}"
 TIER_OUTPUT_DIR="$OUTPUT_DIR/$TIER"
 mkdir -p "$TIER_OUTPUT_DIR"
@@ -139,17 +166,56 @@ JSONL="$TIER_OUTPUT_DIR/llrt9-${RUN_KEY}-evidence.jsonl"
 CSV="$TIER_OUTPUT_DIR/llrt9-${RUN_KEY}-summary.csv"
 if [[ "$RESET_OUTPUT" == true ]]; then : > "$JSONL"; rm -f "$CSV"; elif [[ ! -f "$JSONL" ]]; then : > "$JSONL"; fi
 
-python3 - "$JSONL" "$EXPECTED_SHA" "$EXPECTED_MODEL_TIER" "$BACKEND_REVISION" "$HARNESS_COMMIT" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" <<'PY'
+python3 - "$JSONL" "$EXPECTED_SHA" "$EXPECTED_MODEL_TIER" "$BACKEND_REVISION" "$HARNESS_COMMIT" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" "$CONTEXT" "$BATCH" "$UBATCH" "$THREADS" "$BATCH_THREADS" "$MAX_OUTPUT_TOKENS" "$GENERATION_SEED" <<'PY'
 import json, sys
 from pathlib import Path
 path=Path(sys.argv[1])
-expected={"schemaVersion":7,"evidenceType":"LLRT9_SERIAL_VS_NATIVE_BATCH","modelDigest":sys.argv[2],"modelTier":sys.argv[3],"backendRevision":sys.argv[4],"harnessCommit":sys.argv[5],"deviceModel":sys.argv[6],"androidRelease":sys.argv[7],"sdkInt":int(sys.argv[8]),"abi":sys.argv[9]}
+expected={
+    "schemaVersion":7,
+    "evidenceType":"LLRT9_SERIAL_VS_NATIVE_BATCH",
+    "modelDigest":sys.argv[2],
+    "modelTier":sys.argv[3],
+    "backendRevision":sys.argv[4],
+    "harnessCommit":sys.argv[5],
+    "deviceModel":sys.argv[6],
+    "androidRelease":sys.argv[7],
+    "sdkInt":int(sys.argv[8]),
+    "abi":sys.argv[9],
+    "contextTokensPerSequence":int(sys.argv[10]),
+    "batchSize":int(sys.argv[11]),
+    "microBatchSize":int(sys.argv[12]),
+    "cpuThreads":int(sys.argv[13]),
+    "batchThreads":int(sys.argv[14]),
+    "maxOutputTokens":int(sys.argv[15]),
+    "generationSeed":int(sys.argv[16]),
+    "seedPolicy":"FIXED",
+    "thinkingMode":"DISABLED",
+}
 for n,line in enumerate(path.read_text().splitlines(),1):
     if not line.strip(): continue
     record=json.loads(line)
     for key,value in expected.items():
         if record.get(key)!=value:
             raise SystemExit(f"existing LLRT-9 evidence incompatible at line {n}: {key}")
+    width=record.get("batchWidth")
+    sample=record.get("sampleIndex")
+    if width not in (2,3,4) or not isinstance(sample,int) or sample < 0:
+        raise SystemExit(f"existing LLRT-9 evidence has invalid width/sample at line {n}")
+    expected_order="SERIAL_FIRST" if sample % 2 == 0 else "BATCH_FIRST"
+    if record.get("measurementOrder") != expected_order:
+        raise SystemExit(f"existing LLRT-9 evidence has invalid measurementOrder at line {n}")
+    if record.get("aggregateContextTokens") != record["contextTokensPerSequence"] * width:
+        raise SystemExit(f"existing LLRT-9 evidence has invalid aggregate context at line {n}")
+    serial_digests=record.get("serialOutputDigests")
+    batch_digests=record.get("batchOutputDigests")
+    serial_tokens=record.get("serialOutputTokensPerCase")
+    batch_tokens=record.get("batchOutputTokensPerCase")
+    if record.get("outputsMatch") is not True or serial_digests != batch_digests:
+        raise SystemExit(f"existing LLRT-9 evidence has correctness drift at line {n}")
+    if serial_tokens != batch_tokens:
+        raise SystemExit(f"existing LLRT-9 evidence has per-case token drift at line {n}")
+    if not all(isinstance(v,list) and len(v)==width for v in (serial_digests,batch_digests,serial_tokens,batch_tokens)):
+        raise SystemExit(f"existing LLRT-9 evidence has invalid per-case arrays at line {n}")
 PY
 
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
@@ -226,13 +292,17 @@ run_pair() {
   [[ -n "$line" ]] || { echo "No LLRT-9C evidence emitted" >&2; exit 1; }
   python3 - "$line" "$width" "$sample" <<'PY'
 import json,sys
-r=json.loads(sys.argv[1])
+r=json.loads(sys.argv[1]); width=int(sys.argv[2]); sample=int(sys.argv[3])
 assert r["schemaVersion"]==7
 assert r["evidenceType"]=="LLRT9_SERIAL_VS_NATIVE_BATCH"
-assert r["batchWidth"]==int(sys.argv[2]) and r["sampleIndex"]==int(sys.argv[3])
+assert r["batchWidth"]==width and r["sampleIndex"]==sample
+assert r["measurementOrder"] == ("SERIAL_FIRST" if sample % 2 == 0 else "BATCH_FIRST")
 assert r["outputsMatch"] is True
 assert r["serialOutputDigests"]==r["batchOutputDigests"]
-assert len(r["serialOutputDigests"])==int(sys.argv[2])
+assert r["serialOutputTokensPerCase"]==r["batchOutputTokensPerCase"]
+assert len(r["serialOutputDigests"])==width
+assert len(r["serialOutputTokensPerCase"])==width
+assert r["aggregateContextTokens"]==r["contextTokensPerSequence"]*width
 assert r["serialElapsedMs"]>0 and r["batchElapsedMs"]>0
 PY
   printf '%s\n' "$line" >> "$JSONL"
@@ -252,17 +322,28 @@ records=[json.loads(x) for x in Path(sys.argv[1]).read_text().splitlines() if x.
 reps=int(sys.argv[3]); groups=defaultdict(list)
 for r in records:
     if not r.get("outputsMatch"): raise SystemExit("LLRT-9C correctness mismatch present in evidence")
+    if r.get("serialOutputDigests") != r.get("batchOutputDigests"):
+        raise SystemExit("LLRT-9C output-digest mismatch present in evidence")
+    if r.get("serialOutputTokensPerCase") != r.get("batchOutputTokensPerCase"):
+        raise SystemExit("LLRT-9C per-case token mismatch present in evidence")
     groups[r["batchWidth"]].append(r)
 with Path(sys.argv[2]).open("w",newline="") as f:
-    w=csv.writer(f); w.writerow(["batchWidth","samples","serialMedianMs","batchMedianMs","medianSpeedup","maxObservedPssKb","maxThermalStatus"])
+    w=csv.writer(f)
+    w.writerow(["batchWidth","samples","serialFirstSamples","batchFirstSamples","serialMedianMs","batchMedianMs","medianSpeedup","maxObservedPssKb","maxThermalStatus"])
     for width in sorted(groups):
         rs=groups[width]
-        if len(rs)<reps: continue
-        serial=statistics.median(r["serialElapsedMs"] for r in rs)
-        batch=statistics.median(r["batchElapsedMs"] for r in rs)
-        pss=max(max(r["processPssKbBefore"],r["processPssKbAfterSerial"],r["processPssKbAfterBatch"]) for r in rs)
-        thermal=max(max(r["thermalStatusBefore"],r["thermalStatusAfterSerial"],r["thermalStatusAfterBatch"]) for r in rs)
-        w.writerow([width,len(rs),round(serial,2),round(batch,2),round(serial/max(batch,1),4),pss,thermal])
+        selected=[r for r in rs if 0 <= r["sampleIndex"] < reps]
+        if len(selected)!=reps or {r["sampleIndex"] for r in selected} != set(range(reps)):
+            raise SystemExit(f"LLRT-9C width {width} does not contain exactly the requested balanced sample set")
+        serial_first=sum(r["measurementOrder"]=="SERIAL_FIRST" for r in selected)
+        batch_first=sum(r["measurementOrder"]=="BATCH_FIRST" for r in selected)
+        if serial_first != reps//2 or batch_first != reps//2:
+            raise SystemExit(f"LLRT-9C width {width} measurement order is not balanced")
+        serial=statistics.median(r["serialElapsedMs"] for r in selected)
+        batch=statistics.median(r["batchElapsedMs"] for r in selected)
+        pss=max(max(r["processPssKbBefore"],r["processPssKbAfterSerial"],r["processPssKbAfterBatch"]) for r in selected)
+        thermal=max(max(r["thermalStatusBefore"],r["thermalStatusAfterSerial"],r["thermalStatusAfterBatch"]) for r in selected)
+        w.writerow([width,len(selected),serial_first,batch_first,round(serial,2),round(batch,2),round(serial/max(batch,1),4),pss,thermal])
 PY
 
 echo "LLRT-9C evidence: $JSONL"
