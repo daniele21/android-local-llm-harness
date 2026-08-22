@@ -39,16 +39,10 @@ sealed interface RuntimeEvaluationBatchCaseResult {
     val requestId: RequestId
     val metrics: GenerationMetrics
 
-    data class Completed(
-        override val requestId: RequestId,
-        val output: String,
-        override val metrics: GenerationMetrics,
-    ) : RuntimeEvaluationBatchCaseResult
+    data class Completed(override val requestId: RequestId, val output: String, override val metrics: GenerationMetrics) :
+        RuntimeEvaluationBatchCaseResult
 
-    data class Cancelled(
-        override val requestId: RequestId,
-        override val metrics: GenerationMetrics,
-    ) : RuntimeEvaluationBatchCaseResult
+    data class Cancelled(override val requestId: RequestId, override val metrics: GenerationMetrics) : RuntimeEvaluationBatchCaseResult
 }
 
 sealed interface RuntimeEvaluationBatchOutcome {
@@ -90,10 +84,7 @@ interface RuntimeEvaluationBatchClient {
     ): RuntimeEvaluationBatchHandle
 }
 
-internal class RuntimeEvaluationBatchLifecycle(
-    val requestIds: Set<RequestId>,
-    private val onTerminal: () -> Unit,
-) {
+internal class RuntimeEvaluationBatchLifecycle(val requestIds: Set<RequestId>, private val onTerminal: () -> Unit) {
     private val state = AtomicReference(RuntimeEvaluationBatchState.QUEUED)
     private val cancellationRequested = AtomicBoolean(false)
 
