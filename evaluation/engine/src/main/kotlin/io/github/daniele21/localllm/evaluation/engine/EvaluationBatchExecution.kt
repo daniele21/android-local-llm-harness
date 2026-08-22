@@ -98,19 +98,7 @@ class EvaluationBatchOrchestrator(private val execution: EvaluationBatchExecutio
 
         val results = ArrayList<EvaluationCaseResult>(plan.orderedCaseIds.size)
         for (batch in plan.batches) {
-            val outcome = try {
-                execution.execute(config, batch)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                return EvaluationStepResult.Failure(
-                    EvaluationFailure(
-                        stage = EvaluationFailureStage.GENERATION,
-                        code = EvaluationFailureCode.RUNTIME_FAILURE,
-                    ),
-                )
-            }
-            when (outcome) {
+            when (val outcome = executeBatch(config, batch)) {
                 is EvaluationStepResult.Failure -> return outcome
 
                 is EvaluationStepResult.Success -> {
@@ -122,6 +110,22 @@ class EvaluationBatchOrchestrator(private val execution: EvaluationBatchExecutio
             }
         }
         return EvaluationStepResult.Success(results)
+    }
+
+    private suspend fun executeBatch(
+        config: EvaluationRunConfig,
+        batch: EvaluationCaseBatch,
+    ): EvaluationStepResult<List<EvaluationCaseResult>> = try {
+        execution.execute(config, batch)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+        EvaluationStepResult.Failure(
+            EvaluationFailure(
+                stage = EvaluationFailureStage.GENERATION,
+                code = EvaluationFailureCode.RUNTIME_FAILURE,
+            ),
+        )
     }
 }
 
