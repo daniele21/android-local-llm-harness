@@ -3,15 +3,22 @@ package io.github.daniele21.localllm.runtime
 import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.llamacpp.ContextCreationResult
+import io.github.daniele21.localllm.llamacpp.EvaluationBatchCancelResult
+import io.github.daniele21.localllm.llamacpp.EvaluationContextCreationResult
 import io.github.daniele21.localllm.llamacpp.GenerationNativeOperationResult
 import io.github.daniele21.localllm.llamacpp.LlamaCppBridge
+import io.github.daniele21.localllm.llamacpp.LlamaCppEvaluationBatchBridge
 import io.github.daniele21.localllm.llamacpp.LlamaCppGenerationBridge
 import io.github.daniele21.localllm.llamacpp.LlamaCppPromptPlanningBridge
 import io.github.daniele21.localllm.llamacpp.LlamaCppStreamingBridge
 import io.github.daniele21.localllm.llamacpp.LoadedNativeContext
+import io.github.daniele21.localllm.llamacpp.LoadedNativeEvaluationContext
 import io.github.daniele21.localllm.llamacpp.LoadedNativeModel
 import io.github.daniele21.localllm.llamacpp.ModelLoadResult
 import io.github.daniele21.localllm.llamacpp.NativeBackendDevice
+import io.github.daniele21.localllm.llamacpp.NativeEvaluationBatchCase
+import io.github.daniele21.localllm.llamacpp.NativeEvaluationBatchCaseStatus
+import io.github.daniele21.localllm.llamacpp.NativeEvaluationBatchResult
 import io.github.daniele21.localllm.llamacpp.NativeGenerationConfig
 import io.github.daniele21.localllm.llamacpp.NativeModelCapabilitiesResult
 import io.github.daniele21.localllm.llamacpp.NativeOperationResult
@@ -30,9 +37,11 @@ class LlamaCppInferenceBackend(
     private val nativeLibraryDir: File,
     private val lifecycleBridge: LlamaCppBridge = LlamaCppBridge(),
     private val generationBridge: LlamaCppGenerationBridge = LlamaCppGenerationBridge(),
+    private val evaluationBatchBridge: LlamaCppEvaluationBatchBridge = LlamaCppEvaluationBatchBridge(),
     private val promptPlanningBridge: LlamaCppPromptPlanningBridge = LlamaCppPromptPlanningBridge(),
     private val streamingBridge: LlamaCppStreamingBridge = LlamaCppStreamingBridge(),
-) : InferenceBackend {
+) : InferenceBackend,
+    EvaluationBatchInferenceBackend {
     override val id: String = "llama.cpp"
     override val revision: String = "aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
 
@@ -140,15 +149,70 @@ class LlamaCppInferenceBackend(
         }
     }
 
+    override fun createEvaluationBatchContext(
+        model: BackendModelHandle,
+        profile: GgufModelProfile,
+        configuration: BackendEvaluationBatchContextConfiguration,
+    ): BackendEvaluationBatchContextHandle {
+        val nativeModel = model.requireLlamaModel()
+        val aggregateContextSize = try {
+            Math.multiplyExact(configuration.perSequenceContextSize, configuration.maxSequences)
+        } catch (error: ArithmeticException) {
+            throw BackendException("CONTEXT_OVERFLOW", "Evaluation aggregate context size overflow", error)
+        }
+        return when (
+            val result = evaluationBatchBridge.createContext(
+                model = nativeModel.delegate,
+                profile = profile,
+                perSequenceContextSize = configuration.perSequenceContextSize,
+                maxSequences = configuration.maxSequences,
+            )
+        ) {
+            is EvaluationContextCreationResult.Success -> LlamaBackendEvaluationContext(
+                model = nativeModel,
+                delegate = result.context,
+                contextSize = aggregateContextSize,
+                perSequenceContextSize = configuration.perSequenceContextSize,
+                maxSequences = configuration.maxSequences,
+                profile = profile,
+            )
+
+            is EvaluationContextCreationResult.Failure -> throw result.error.asBackendException()
+        }
+    }
+
     override fun executionEvidence(context: BackendContextHandle): BackendExecutionEvidence {
-        val nativeContext = context.requireLlamaContext()
-        val requested = nativeContext.model.delegate.requestedExecution
-        val profile = nativeContext.profile
+        val executionContext = when (context) {
+            is LlamaBackendContext -> ExecutionContextIdentity(
+                model = context.model,
+                profile = context.profile,
+                aggregateContextSize = context.contextSize,
+                perSequenceContextSize = context.contextSize,
+                sequenceWidth = 1,
+                executionMode = EXECUTION_MODE_PRODUCTION,
+            )
+
+            is LlamaBackendEvaluationContext -> ExecutionContextIdentity(
+                model = context.model,
+                profile = context.profile,
+                aggregateContextSize = context.contextSize,
+                perSequenceContextSize = context.perSequenceContextSize,
+                sequenceWidth = context.maxSequences,
+                executionMode = EXECUTION_MODE_EVALUATION_MULTI_SEQUENCE,
+            )
+
+            else -> throw BackendException("BACKEND_MISMATCH", "Context handle was not created by the llama.cpp backend")
+        }
+        val requested = executionContext.model.delegate.requestedExecution
+        val profile = executionContext.profile
         val canonical = listOf(
             "backend=$id",
             "revision=$revision",
             "profile=${profile.id}",
-            "contextSize=${nativeContext.contextSize}",
+            "executionMode=${executionContext.executionMode}",
+            "contextSize=${executionContext.aggregateContextSize}",
+            "perSequenceContextSize=${executionContext.perSequenceContextSize}",
+            "sequenceWidth=${executionContext.sequenceWidth}",
             "batchSize=${profile.batchSize}",
             "microBatchSize=${profile.microBatchSize}",
             "cpuThreads=${profile.cpuThreads}",
@@ -181,30 +245,21 @@ class LlamaCppInferenceBackend(
         }
     }
 
+    override fun releaseEvaluationBatchContext(context: BackendEvaluationBatchContextHandle) {
+        val nativeContext = context.requireLlamaEvaluationContext()
+        when (val result = evaluationBatchBridge.releaseContext(nativeContext.delegate)) {
+            GenerationNativeOperationResult.Success -> Unit
+            is GenerationNativeOperationResult.Failure -> throw result.error.asBackendException()
+        }
+    }
+
     override fun generate(
         context: BackendContextHandle,
         request: BackendGenerationRequest,
         onChunk: (text: String, generatedTokens: Int) -> Boolean,
     ): BackendGenerationOutcome {
         val nativeContext = context.requireLlamaContext()
-        val config = NativeGenerationConfig(
-            maxOutputTokens = request.maxOutputTokens,
-            temperature = request.temperature,
-            topP = request.topP,
-            topK = request.topK,
-            minP = request.minP,
-            presencePenalty = request.presencePenalty,
-            repeatPenalty = request.repeatPenalty,
-            repeatLastN = request.repeatLastN,
-            seed = request.seed,
-            outputConstraintType = request.outputConstraint.nativeType,
-            outputSchema = (request.outputConstraint as? OutputConstraint.JsonSchema)?.schema,
-            stopTokenIds = request.stopTokenIds.toIntArray(),
-            stopSequences = request.stopSequences,
-            reasoningMaxTokens = request.reasoningControl?.maxReasoningTokens,
-            reasoningCloseMarker = request.reasoningControl?.closeMarker,
-            reasoningForcedCloseText = request.reasoningControl?.forcedCloseText,
-        )
+        val config = request.toNativeGenerationConfig()
         return when (
             val result = streamingBridge.generate(
                 context = nativeContext.delegate,
@@ -222,10 +277,71 @@ class LlamaCppInferenceBackend(
         }
     }
 
+    override fun generateEvaluationBatch(
+        context: BackendEvaluationBatchContextHandle,
+        requests: List<BackendGenerationRequest>,
+    ): BackendEvaluationBatchResult {
+        val nativeContext = context.requireLlamaEvaluationContext()
+        val cases = requests.map { request ->
+            NativeEvaluationBatchCase(
+                requestId = request.requestId,
+                prompt = request.prompt,
+                config = request.toNativeGenerationConfig(),
+            )
+        }
+        return when (val result = evaluationBatchBridge.generate(nativeContext.delegate, cases)) {
+            is NativeEvaluationBatchResult.Completed -> BackendEvaluationBatchResult(
+                result.cases.map { nativeCase ->
+                    val metrics = BackendGenerationMetrics(
+                        inputTokens = nativeCase.metrics.inputTokens,
+                        outputTokens = nativeCase.metrics.outputTokens,
+                        promptDurationMs = nativeCase.metrics.promptDurationMs,
+                        generationDurationMs = nativeCase.metrics.generationDurationMs,
+                        stopReason = StopReason.entries.firstOrNull { it.name == nativeCase.metrics.stopReason } ?: StopReason.UNKNOWN,
+                    )
+                    BackendEvaluationBatchCaseResult(
+                        requestId = nativeCase.requestId,
+                        output = nativeCase.output,
+                        outcome = when (nativeCase.status) {
+                            NativeEvaluationBatchCaseStatus.COMPLETED -> BackendGenerationOutcome.Completed(metrics)
+                            NativeEvaluationBatchCaseStatus.CANCELLED -> BackendGenerationOutcome.Cancelled(metrics)
+                        },
+                    )
+                },
+            )
+
+            is NativeEvaluationBatchResult.Failure -> throw result.error.asBackendException()
+        }
+    }
+
     override fun cancel(requestId: String): Boolean = when (val result = streamingBridge.cancel(requestId)) {
         is StreamingCancelResult.Accepted -> result.wasRunning
         is StreamingCancelResult.Failure -> throw result.error.asBackendException()
     }
+
+    override fun cancelEvaluationCase(requestId: String): Boolean = when (val result = evaluationBatchBridge.cancel(requestId)) {
+        is EvaluationBatchCancelResult.Accepted -> result.wasRunning
+        is EvaluationBatchCancelResult.Failure -> throw result.error.asBackendException()
+    }
+
+    private fun BackendGenerationRequest.toNativeGenerationConfig(): NativeGenerationConfig = NativeGenerationConfig(
+        maxOutputTokens = maxOutputTokens,
+        temperature = temperature,
+        topP = topP,
+        topK = topK,
+        minP = minP,
+        presencePenalty = presencePenalty,
+        repeatPenalty = repeatPenalty,
+        repeatLastN = repeatLastN,
+        seed = seed,
+        outputConstraintType = outputConstraint.nativeType,
+        outputSchema = (outputConstraint as? OutputConstraint.JsonSchema)?.schema,
+        stopTokenIds = stopTokenIds.toIntArray(),
+        stopSequences = stopSequences,
+        reasoningMaxTokens = reasoningControl?.maxReasoningTokens,
+        reasoningCloseMarker = reasoningControl?.closeMarker,
+        reasoningForcedCloseText = reasoningControl?.forcedCloseText,
+    )
 
     private fun fingerprintDevices(devices: List<NativeBackendDevice>): String = sha256(
         devices.sortedBy(NativeBackendDevice::index).joinToString("\n") { device ->
@@ -260,14 +376,38 @@ class LlamaCppInferenceBackend(
         val profile: GgufModelProfile,
     ) : BackendContextHandle
 
+    private data class LlamaBackendEvaluationContext(
+        override val model: LlamaBackendModel,
+        val delegate: LoadedNativeEvaluationContext,
+        override val contextSize: Int,
+        override val perSequenceContextSize: Int,
+        override val maxSequences: Int,
+        val profile: GgufModelProfile,
+    ) : BackendEvaluationBatchContextHandle
+
+    private data class ExecutionContextIdentity(
+        val model: LlamaBackendModel,
+        val profile: GgufModelProfile,
+        val aggregateContextSize: Int,
+        val perSequenceContextSize: Int,
+        val sequenceWidth: Int,
+        val executionMode: String,
+    )
+
     private fun BackendModelHandle.requireLlamaModel(): LlamaBackendModel = this as? LlamaBackendModel
         ?: throw BackendException("BACKEND_MISMATCH", "Model handle was not created by the llama.cpp backend")
 
     private fun BackendContextHandle.requireLlamaContext(): LlamaBackendContext = this as? LlamaBackendContext
-        ?: throw BackendException("BACKEND_MISMATCH", "Context handle was not created by the llama.cpp backend")
+        ?: throw BackendException("BACKEND_MISMATCH", "Context handle was not created by the llama.cpp production path")
+
+    private fun BackendEvaluationBatchContextHandle.requireLlamaEvaluationContext(): LlamaBackendEvaluationContext =
+        this as? LlamaBackendEvaluationContext
+            ?: throw BackendException("BACKEND_MISMATCH", "Evaluation context handle was not created by the llama.cpp backend")
 
     private companion object {
         const val UNAVAILABLE_VALUE = "~"
+        const val EXECUTION_MODE_PRODUCTION = "PRODUCTION_SINGLE_SEQUENCE"
+        const val EXECUTION_MODE_EVALUATION_MULTI_SEQUENCE = "EVALUATION_MULTI_SEQUENCE"
     }
 }
 
