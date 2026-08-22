@@ -31,10 +31,8 @@ sealed interface MemoryAwareEvaluationBatchContextDecision {
         val estimate: MemoryCostEstimate,
     ) : MemoryAwareEvaluationBatchContextDecision
 
-    data class Reject(
-        val reason: MemoryAwareContextRejectReason,
-        val admissionReason: MemoryAdmissionRejectReason? = null,
-    ) : MemoryAwareEvaluationBatchContextDecision
+    data class Reject(val reason: MemoryAwareContextRejectReason, val admissionReason: MemoryAdmissionRejectReason? = null) :
+        MemoryAwareEvaluationBatchContextDecision
 }
 
 /**
