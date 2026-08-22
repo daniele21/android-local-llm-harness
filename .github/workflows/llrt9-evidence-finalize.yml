@@ -1,0 +1,65 @@
+name: LLRT-9 evidence finalize
+
+on:
+  push:
+    branches:
+      - agent/llrt9-native-batch-evidence-v1
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/llrt9-native-batch-evidence-v1
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Reconcile LLRT-9C ledger
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('docs/llama-cpp-runtime-optimization-plan.md')
+          text = path.read_text()
+          replacements = {
+            '| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, capacity planning, native multi-sequence decode, sampled-token acceptance normalization, backend-neutral batch SPI, runtime ownership/admission, llama.cpp/JNI bridging and the evaluation runtime adapter are integrated; refreshed deterministic and physical evidence remain. |':
+            '| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, native multi-sequence execution, runtime/evaluation composition and schema-v7 physical comparison tooling are integrated; curated serial-vs-native-batch device evidence remains. |',
+            '| LLRT-9C | BLOCKED | Software batching gates are complete; physical serial-vs-native-batch correctness/throughput/memory/thermal evidence now waits only for refreshed deterministic output/correctness evidence under the normalized sampler semantics. |':
+            '| LLRT-9C | READY | Schema-v7 tooling compares the normal serial runtime path with evaluation-only native batching at widths 2..4 using fixed-seed digest equality, elapsed time, observed PSS/memory and thermal snapshots; curated 0.8B/2B physical evidence remains required. |',
+            'LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. The LLRT-9 software path through the native llama.cpp/JNI bridge and backend-neutral evaluation runtime adapter is integrated without changing production concurrency policy. Before LLRT-9C, affected deterministic output/correctness evidence must be replayed under the normalized sampler semantics; then the physical serial-vs-native-batch comparison becomes the next gate. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.':
+            'LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. The LLRT-9 software path through the native llama.cpp/JNI bridge and backend-neutral evaluation runtime adapter is integrated without changing production concurrency policy. LLRT-9C schema-v7 tooling now replays deterministic correctness directly by comparing fixed-seed serial and native-batch output digests on the same resident model before recording throughput, observed memory and thermal evidence; curated 0.8B/2B physical runs remain the gate. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.',
+            'Existing LLRT-3 evidence remains schema **v4**. LLRT-6 fixed-seed cache experiments use schema **v5** to add K/V cache type, Flash Attention, generation-seed identity and a privacy-safe output digest. LLRT-7 OpenCL experiments use schema **v6** to add the experimental-build flag, CPU-control versus requested-offload lane, requested GPU layers, backend target/library presence and explicit `effectivePlacement=UNAVAILABLE` while the pinned API cannot prove placement. Prompt and generated text are not persisted.':
+            'Existing LLRT-3 evidence remains schema **v4**. LLRT-6 fixed-seed cache experiments use schema **v5** to add K/V cache type, Flash Attention, generation-seed identity and a privacy-safe output digest. LLRT-7 OpenCL experiments use schema **v6** to add the experimental-build flag, CPU-control versus requested-offload lane, requested GPU layers, backend target/library presence and explicit `effectivePlacement=UNAVAILABLE` while the pinned API cannot prove placement. LLRT-9C uses schema **v7** for fixed-seed serial-versus-native-batch comparison: width, per-sequence/aggregate context, exact ordered prompt/output digests, elapsed time, output-token counts, observed process PSS/available-memory snapshots and thermal status. Exact serial/native output-digest equality is a correctness gate. Prompt and generated text are not persisted.'
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('LLRT-9C canonical anchor not found: ' + old[:100])
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+      - name: Format and validate new tooling
+        run: |
+          chmod +x gradlew scripts/run-llama-cpp-evaluation-batch-evidence.sh
+          bash -n scripts/run-llama-cpp-evaluation-batch-evidence.sh
+          ./gradlew --no-configuration-cache spotlessApply
+      - name: Commit finalized tooling and remove workflow
+        run: |
+          rm .github/workflows/llrt9-evidence-finalize.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/device-test-runner/src/androidTest/kotlin/io/github/daniele21/localllm/devicetest/Llrt9EvaluationBatchInstrumentedTest.kt
+          git add scripts/run-llama-cpp-evaluation-batch-evidence.sh
+          git add docs/llama-cpp-runtime-optimization-plan.md
+          git add .github/workflows/llrt9-evidence-finalize.yml
+          git diff --cached --check
+          git commit -m "tooling(llrt9): finalize schema-v7 physical evidence lane"
+          git push origin HEAD:agent/llrt9-native-batch-evidence-v1
