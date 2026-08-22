@@ -15,10 +15,7 @@ import java.util.concurrent.CancellationException
  * runtime remains governed by SingleDecodeScheduler until a separate measured backend capability is
  * introduced.
  */
-data class EvaluationCaseBatch(
-    val ordinal: Int,
-    val orderedCaseIds: List<EvaluationCaseId>,
-) {
+data class EvaluationCaseBatch(val ordinal: Int, val orderedCaseIds: List<EvaluationCaseId>) {
     init {
         require(ordinal >= 0) { "Evaluation batch ordinal must not be negative" }
         require(orderedCaseIds.isNotEmpty()) { "Evaluation batch must contain at least one case" }
@@ -60,10 +57,7 @@ data class EvaluationBatchPlan(val batches: List<EvaluationCaseBatch>) {
 }
 
 fun interface EvaluationBatchExecutionPort {
-    suspend fun execute(
-        config: EvaluationRunConfig,
-        batch: EvaluationCaseBatch,
-    ): EvaluationStepResult<List<EvaluationCaseResult>>
+    suspend fun execute(config: EvaluationRunConfig, batch: EvaluationCaseBatch): EvaluationStepResult<List<EvaluationCaseResult>>
 }
 
 /**
@@ -81,6 +75,7 @@ class SequentialEvaluationBatchExecution(private val caseExecution: EvaluationCa
         for (caseId in batch.orderedCaseIds) {
             when (val result = caseExecution.execute(config, caseId)) {
                 is EvaluationStepResult.Failure -> return result
+
                 is EvaluationStepResult.Success -> {
                     if (result.value.caseId != caseId) return attributionFailure(caseId)
                     results += result.value
@@ -96,10 +91,7 @@ class SequentialEvaluationBatchExecution(private val caseExecution: EvaluationCa
  * It deliberately owns no production scheduler or backend-specific concurrency policy.
  */
 class EvaluationBatchOrchestrator(private val execution: EvaluationBatchExecutionPort) {
-    suspend fun execute(
-        config: EvaluationRunConfig,
-        plan: EvaluationBatchPlan,
-    ): EvaluationStepResult<List<EvaluationCaseResult>> {
+    suspend fun execute(config: EvaluationRunConfig, plan: EvaluationBatchPlan): EvaluationStepResult<List<EvaluationCaseResult>> {
         if (plan.orderedCaseIds != config.sampling.orderedCaseIds) {
             return invalidPlanFailure()
         }
@@ -120,6 +112,7 @@ class EvaluationBatchOrchestrator(private val execution: EvaluationBatchExecutio
             }
             when (outcome) {
                 is EvaluationStepResult.Failure -> return outcome
+
                 is EvaluationStepResult.Success -> {
                     if (outcome.value.map(EvaluationCaseResult::caseId) != batch.orderedCaseIds) {
                         return attributionFailure(batch.orderedCaseIds.first())
