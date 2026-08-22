@@ -24,23 +24,61 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Reconcile balanced LLRT-9C documentation
+      - name: Harden balanced LLRT-9C evidence
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('docs/llama-cpp-runtime-optimization-plan.md')
-          text = path.read_text()
+
+          test = Path('apps/device-test-runner/src/androidTest/kotlin/io/github/daniele21/localllm/devicetest/Llrt9EvaluationBatchInstrumentedTest.kt')
+          text = test.read_text()
+          old = '''            assertEquals("Native batch output count drifted", serial.outputs.size, batch.outputs.size)
+            val serialDigests = serial.outputs.map(::sha256)'''
+          new = '''            assertEquals("Native batch output count drifted", serial.outputs.size, batch.outputs.size)
+            assertEquals(
+                "Native batch output-token attribution drifted",
+                serial.outputTokens,
+                batch.outputTokens,
+            )
+            val serialDigests = serial.outputs.map(::sha256)'''
+          if old not in text:
+              raise SystemExit('LLRT-9 output-token gate anchor not found')
+          text = text.replace(old, new, 1)
+          old = '''            .put("serialOutputDigests", JSONArray(serialDigests))
+            .put("batchOutputDigests", JSONArray(batch.outputs.map(::sha256)))'''
+          new = '''            .put("serialOutputDigests", JSONArray(serialDigests))
+            .put("batchOutputDigests", JSONArray(batch.outputs.map(::sha256)))
+            .put("serialOutputTokensPerCase", JSONArray(serial.outputTokens))
+            .put("batchOutputTokensPerCase", JSONArray(batch.outputTokens))'''
+          if old not in text:
+              raise SystemExit('LLRT-9 per-case token evidence anchor not found')
+          test.write_text(text)
+
+          script = Path('scripts/run-llama-cpp-evaluation-batch-evidence.sh')
+          text = script.read_text()
+          replacements = {
+              'REPETITIONS=3': 'REPETITIONS=4',
+              '--repetitions N                 Repetitions per width, >= 3 (default: 3).': '--repetitions N                 Even repetitions per width, >= 4 (default: 4).',
+              '[[ "$REPETITIONS" =~ ^[0-9]+$ ]] && (( REPETITIONS >= 3 )) || { echo "--repetitions must be >= 3" >&2; exit 2; }': '[[ "$REPETITIONS" =~ ^[0-9]+$ ]] && (( REPETITIONS >= 4 && REPETITIONS % 2 == 0 )) || { echo "--repetitions must be an even integer >= 4" >&2; exit 2; }',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit('LLRT-9 runner balance anchor not found: ' + old)
+              text = text.replace(old, new, 1)
+          script.write_text(text)
+
+          plan = Path('docs/llama-cpp-runtime-optimization-plan.md')
+          text = plan.read_text()
           replacements = {
             '| LLRT-9C | READY | Schema-v7 tooling compares the normal serial runtime path with evaluation-only native batching at widths 2..4 using fixed-seed digest equality, elapsed time, observed PSS/memory and thermal snapshots; curated 0.8B/2B physical evidence remains required. |':
-            '| LLRT-9C | READY | Schema-v7 tooling compares the normal serial runtime path with evaluation-only native batching at widths 2..4 using fixed-seed digest equality, alternating execution order, elapsed time, observed PSS/memory and thermal snapshots; curated 0.8B/2B physical evidence remains required. |',
+            '| LLRT-9C | READY | Schema-v7 tooling compares the normal serial runtime path with evaluation-only native batching at widths 2..4 using fixed-seed digest and per-case token-count equality, balanced alternating execution order, elapsed time, observed PSS/memory and thermal snapshots; curated 0.8B/2B physical evidence remains required. |',
             'LLRT-9C uses schema **v7** for fixed-seed serial-versus-native-batch comparison: width, per-sequence/aggregate context, exact ordered prompt/output digests, elapsed time, output-token counts, observed process PSS/available-memory snapshots and thermal status.':
-            'LLRT-9C uses schema **v7** for fixed-seed serial-versus-native-batch comparison: width, alternating measurement order, per-sequence/aggregate context, exact ordered prompt/output digests, elapsed time, output-token counts, observed process PSS/available-memory snapshots and thermal status.'
+            'LLRT-9C uses schema **v7** for fixed-seed serial-versus-native-batch comparison: width, balanced alternating measurement order with an even repetition count, per-sequence/aggregate context, exact ordered prompt/output digests, per-case output-token counts, elapsed time, observed process PSS/available-memory snapshots and thermal status.'
           }
           for old, new in replacements.items():
               if old not in text:
                   raise SystemExit('balanced LLRT-9C documentation anchor not found')
               text = text.replace(old, new, 1)
-          path.write_text(text)
+          plan.write_text(text)
           PY
       - name: Apply canonical formatting and shell syntax check
         run: |
