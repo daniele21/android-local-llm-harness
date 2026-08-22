@@ -254,10 +254,7 @@ private object EvaluationBatchValidator {
         else -> profile.explicitKvCacheSelectionError() ?: profile.kvCacheCompatibilityError(flashAttentionMode)
     }
 
-    fun batchError(
-        context: LoadedNativeEvaluationContext,
-        cases: List<NativeEvaluationBatchCase>,
-    ): GenerationNativeError? {
+    fun batchError(context: LoadedNativeEvaluationContext, cases: List<NativeEvaluationBatchCase>): GenerationNativeError? {
         val structuralError = when {
             cases.size !in LoadedNativeEvaluationContext.MIN_BATCH_WIDTH..context.maxSequences ->
                 invalidEvaluationBatchError(
@@ -272,15 +269,14 @@ private object EvaluationBatchValidator {
         return structuralError ?: cases.asSequence().mapNotNull(::caseError).firstOrNull()
     }
 
-    private fun caseError(case: NativeEvaluationBatchCase): GenerationNativeError? =
-        case.config.validationError(case.prompt) ?: when {
-            case.config.reasoningMaxTokens != null ||
-                case.config.reasoningCloseMarker != null ||
-                case.config.reasoningForcedCloseText != null ->
-                invalidEvaluationBatchError("Evaluation batching does not support reasoning transitions")
+    private fun caseError(case: NativeEvaluationBatchCase): GenerationNativeError? = case.config.validationError(case.prompt) ?: when {
+        case.config.reasoningMaxTokens != null ||
+            case.config.reasoningCloseMarker != null ||
+            case.config.reasoningForcedCloseText != null ->
+            invalidEvaluationBatchError("Evaluation batching does not support reasoning transitions")
 
-            else -> null
-        }
+        else -> null
+    }
 }
 
 private object EvaluationBatchResponseDecoder {
@@ -320,7 +316,9 @@ private object EvaluationBatchResponseDecoder {
         if (response.size == CANCEL_FIELD_COUNT && response[0] == OK) {
             return when (response[1]) {
                 TRUE -> EvaluationBatchCancelResult.Accepted(true)
+
                 FALSE -> EvaluationBatchCancelResult.Accepted(false)
+
                 else -> EvaluationBatchCancelResult.Failure(
                     evaluationBatchProtocolError("Malformed evaluation cancellation response"),
                 )
