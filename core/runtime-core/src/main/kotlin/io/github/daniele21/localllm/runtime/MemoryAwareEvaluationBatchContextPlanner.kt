@@ -71,26 +71,28 @@ class MemoryAwareEvaluationBatchContextPlanner(
                 arithmeticOverflow = true
                 break
             }
-            val estimate = costEstimator.estimate(request.modelProfileId, aggregateTokens) ?: continue
-            sawEstimate = true
-            when (
-                val admission = admissionController.decide(
-                    observation = observation,
-                    request = MemoryAdmissionRequest(
-                        resource = MemoryAdmissionResource.CONTEXT,
+            val estimate = costEstimator.estimate(request.modelProfileId, aggregateTokens)
+            if (estimate != null) {
+                sawEstimate = true
+                when (
+                    val admission = admissionController.decide(
+                        observation = observation,
+                        request = MemoryAdmissionRequest(
+                            resource = MemoryAdmissionResource.CONTEXT,
+                            estimate = estimate,
+                            residency = request.residency,
+                        ),
+                    )
+                ) {
+                    MemoryAdmissionDecision.Allow -> return MemoryAwareEvaluationBatchContextDecision.Allow(
+                        perSequenceContextTokens = perSequenceTokens,
+                        aggregateContextTokens = aggregateTokens,
+                        downshifted = perSequenceTokens != request.requestedPerSequenceContextTokens,
                         estimate = estimate,
-                        residency = request.residency,
-                    ),
-                )
-            ) {
-                MemoryAdmissionDecision.Allow -> return MemoryAwareEvaluationBatchContextDecision.Allow(
-                    perSequenceContextTokens = perSequenceTokens,
-                    aggregateContextTokens = aggregateTokens,
-                    downshifted = perSequenceTokens != request.requestedPerSequenceContextTokens,
-                    estimate = estimate,
-                )
+                    )
 
-                is MemoryAdmissionDecision.Reject -> lastAdmissionReject = admission.reason
+                    is MemoryAdmissionDecision.Reject -> lastAdmissionReject = admission.reason
+                }
             }
         }
 
