@@ -9,17 +9,23 @@ val experimentalOpenCl = providers.gradleProperty("localLlm.experimentalOpenCl")
 val openClIncludeDirProperty = providers.gradleProperty("localLlm.openClIncludeDir").orNull
 val openClLibraryProperty = providers.gradleProperty("localLlm.openClLibrary").orNull
 
-val openClIncludeDir = openClIncludeDirProperty?.let(rootProject::file)
-val openClLibrary = openClLibraryProperty?.let(rootProject::file)
+val openClIncludeDir = openClIncludeDirProperty?.let { rootProject.file(it) }
+val openClLibrary = openClLibraryProperty?.let { rootProject.file(it) }
 
 if (experimentalOpenCl) {
-    require(openClIncludeDir?.isDirectory == true) {
+    val includeDir = requireNotNull(openClIncludeDir) {
+        "-PlocalLlm.openClIncludeDir is required when experimental OpenCL is enabled"
+    }
+    val library = requireNotNull(openClLibrary) {
+        "-PlocalLlm.openClLibrary is required when experimental OpenCL is enabled"
+    }
+    require(includeDir.isDirectory && includeDir.canRead()) {
         "-PlocalLlm.openClIncludeDir must point to readable OpenCL headers when experimental OpenCL is enabled"
     }
-    require(File(openClIncludeDir, "CL/cl.h").isFile) {
+    require(file("${includeDir.absolutePath}/CL/cl.h").isFile) {
         "OpenCL include directory must contain CL/cl.h"
     }
-    require(openClLibrary?.isFile == true && openClLibrary.canRead()) {
+    require(library.isFile && library.canRead()) {
         "-PlocalLlm.openClLibrary must point to a readable arm64-v8a libOpenCL.so when experimental OpenCL is enabled"
     }
 } else {
