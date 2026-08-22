@@ -69,10 +69,18 @@ class Llrt9EvaluationBatchInstrumentedTest {
             assertEquals(config.digest, prepared.modelDigest)
 
             val before = deviceSnapshot()
-            val serial = runSerial(runtime, harness)
-            val afterSerial = deviceSnapshot()
-            val batch = runNativeBatch(runtime, harness)
-            val afterBatch = deviceSnapshot()
+            val serialFirst = config.sampleIndex % 2 == 0
+            val first =
+                if (serialFirst) runSerial(runtime, harness) else runNativeBatch(runtime, harness)
+            val afterFirst = deviceSnapshot()
+            val second =
+                if (serialFirst) runNativeBatch(runtime, harness) else runSerial(runtime, harness)
+            val afterSecond = deviceSnapshot()
+            val serial = if (serialFirst) first else second
+            val batch = if (serialFirst) second else first
+            val afterSerial = if (serialFirst) afterFirst else afterSecond
+            val afterBatch = if (serialFirst) afterSecond else afterFirst
+            val measurementOrder = if (serialFirst) "SERIAL_FIRST" else "BATCH_FIRST"
 
             assertEquals("Native batch attribution drifted", serial.prompts, batch.prompts)
             assertEquals("Native batch output count drifted", serial.outputs.size, batch.outputs.size)
@@ -85,7 +93,15 @@ class Llrt9EvaluationBatchInstrumentedTest {
             )
             assertTrue("Runtime leaked evaluation sessions", eventually { runtime.runtimeSnapshot().activeSessions == 0 })
 
-            emitEvidence(serial, batch, serialDigests, before, afterSerial, afterBatch)
+            emitEvidence(
+                serial,
+                batch,
+                serialDigests,
+                before,
+                afterSerial,
+                afterBatch,
+                measurementOrder,
+            )
             assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())
             assertFalse(runtime.memoryResourceSnapshot().modelLoaded)
         } finally {
@@ -270,6 +286,7 @@ class Llrt9EvaluationBatchInstrumentedTest {
         before: DeviceSnapshot,
         afterSerial: DeviceSnapshot,
         afterBatch: DeviceSnapshot,
+        measurementOrder: String,
     ) {
         val evidence = JSONObject()
             .put("schemaVersion", 7)
@@ -288,6 +305,7 @@ class Llrt9EvaluationBatchInstrumentedTest {
             .put("contextTokensPerSequence", config.contextSize)
             .put("aggregateContextTokens", config.contextSize * config.width)
             .put("batchWidth", config.width)
+            .put("measurementOrder", measurementOrder)
             .put("batchSize", config.batchSize)
             .put("microBatchSize", config.microBatchSize)
             .put("cpuThreads", config.cpuThreads)
