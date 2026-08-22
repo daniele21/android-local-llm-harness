@@ -85,11 +85,7 @@ class JniLlamaEvaluationBatchApi : NativeLlamaEvaluationBatchApi {
     external override fun cancelEvaluationCase(requestId: String): Array<String>
 }
 
-data class NativeEvaluationBatchCase(
-    val requestId: String,
-    val prompt: String,
-    val config: NativeGenerationConfig,
-)
+data class NativeEvaluationBatchCase(val requestId: String, val prompt: String, val config: NativeGenerationConfig)
 
 @JvmInline
 value class NativeEvaluationContextHandle(val value: Long) {
@@ -242,9 +238,12 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
             invalid("Evaluation per-sequence context size must be a positive multiple of $CONTEXT_ALIGNMENT")
 
         maxSequences !in LoadedNativeEvaluationContext.MIN_BATCH_WIDTH..LoadedNativeEvaluationContext.MAX_BATCH_WIDTH ->
-            invalid("Evaluation batch width must be in ${LoadedNativeEvaluationContext.MIN_BATCH_WIDTH}..${LoadedNativeEvaluationContext.MAX_BATCH_WIDTH}")
+            invalid(
+                "Evaluation batch width must be in ${LoadedNativeEvaluationContext.MIN_BATCH_WIDTH}..${LoadedNativeEvaluationContext.MAX_BATCH_WIDTH}",
+            )
 
         profile.batchSize < maxSequences -> invalid("Evaluation batch size must be at least the sequence width")
+
         else -> profile.explicitKvCacheSelectionError() ?: profile.kvCacheCompatibilityError(flashAttentionMode)
     }
 
@@ -260,7 +259,9 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
         }
         for (case in cases) {
             case.config.validationError(case.prompt)?.let { return it }
-            if (case.config.reasoningMaxTokens != null || case.config.reasoningCloseMarker != null || case.config.reasoningForcedCloseText != null) {
+            if (case.config.reasoningMaxTokens != null || case.config.reasoningCloseMarker != null ||
+                case.config.reasoningForcedCloseText != null
+            ) {
                 return invalid("Evaluation batching does not support reasoning transitions")
             }
         }
