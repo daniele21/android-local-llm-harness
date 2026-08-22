@@ -9,7 +9,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-SUPPORTED_SCHEMA_VERSIONS = {3, 4, 5}
+SUPPORTED_SCHEMA_VERSIONS = {3, 4, 5, 6}
 MIN_WARM_SAMPLES = 3
 BASE_IDENTITY_FIELDS = [
     "tuningCaseId",
@@ -44,7 +44,15 @@ V5_IDENTITY_FIELDS = [
     "seedPolicy",
     "generationSeed",
 ]
-OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS + V5_IDENTITY_FIELDS
+V6_IDENTITY_FIELDS = [
+    "experimentalOpenClBuild",
+    "executionLane",
+    "requestedGpuLayers",
+    "openClBackendTarget",
+    "openClBackendLibraryPresent",
+    "effectivePlacement",
+]
+OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS + V5_IDENTITY_FIELDS + V6_IDENTITY_FIELDS
 NUMERIC_METRICS = [
     "ttftMs",
     "prefillMs",
@@ -72,6 +80,8 @@ def identity_fields_for(record: dict[str, object]) -> list[str]:
         fields += V4_IDENTITY_FIELDS
     if schema_version >= 5:
         fields += V5_IDENTITY_FIELDS
+    if schema_version >= 6:
+        fields += V6_IDENTITY_FIELDS
     return fields
 
 
@@ -141,6 +151,23 @@ def read_records(path: Path) -> list[dict[str, object]]:
             output_digest = record.get("outputDigest")
             if not isinstance(output_digest, str) or len(output_digest) != 64:
                 raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char outputDigest")
+        if schema_version >= 6:
+            missing_v6 = [field for field in V6_IDENTITY_FIELDS if field not in record]
+            if missing_v6:
+                raise SystemExit(
+                    f"line {line_number}: schemaVersion {schema_version} missing OpenCL identity fields: {', '.join(missing_v6)}"
+                )
+            if record.get("experimentalOpenClBuild") is not True:
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires experimentalOpenClBuild=true")
+            if record.get("openClBackendTarget") != "ggml-opencl":
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires openClBackendTarget=ggml-opencl")
+            if record.get("openClBackendLibraryPresent") is not True:
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires packaged libggml-opencl.so")
+            if record.get("effectivePlacement") != "UNAVAILABLE":
+                raise SystemExit(f"line {line_number}: pinned runtime must report effectivePlacement=UNAVAILABLE")
+            requested_gpu_layers = record.get("requestedGpuLayers")
+            if not isinstance(requested_gpu_layers, int) or isinstance(requested_gpu_layers, bool) or requested_gpu_layers < 0:
+                raise SystemExit(f"line {line_number}: requestedGpuLayers must be a non-negative integer")
         if record["modelLoadKind"] not in {"COLD", "WARM"}:
             raise SystemExit(f"line {line_number}: modelLoadKind must be COLD or WARM")
         records.append(record)
@@ -174,6 +201,8 @@ def eligibility(cold: list[dict[str, object]], warm: list[dict[str, object]]) ->
     unsafe_markers = ("GUARD", "CANCEL", "UNKNOWN", "BUDGET")
     if any(any(marker in reason for marker in unsafe_markers) for reason in stop_reasons):
         return False, f"non-comparable stop reason: {','.join(sorted(stop_reasons))}"
+    if int((cold or warm)[0]["schemaVersion"]) >= 6:
+        return False, "complete experimental OpenCL evidence; effective placement is unavailable and cannot select a profile"
     return True, "complete comparable evidence"
 
 

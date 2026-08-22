@@ -66,6 +66,17 @@ def base_record(schema_version: int, sample_index: int) -> dict[str, object]:
                 "generationSeed": 42,
             }
         )
+    if schema_version >= 6:
+        record.update(
+            {
+                "experimentalOpenClBuild": True,
+                "executionLane": "OPENCL_BUILD_CPU_CONTROL",
+                "requestedGpuLayers": 0,
+                "openClBackendTarget": "ggml-opencl",
+                "openClBackendLibraryPresent": True,
+                "effectivePlacement": "UNAVAILABLE",
+            }
+        )
     return record
 
 
@@ -93,10 +104,14 @@ def assert_schema_supported(schema_version: int) -> None:
     assert result.returncode == 0, result.stderr
     assert len(rows) == 1
     assert rows[0]["schemaVersion"] == str(schema_version)
-    assert rows[0]["eligibleForProfileSelection"] == "True"
-    if schema_version == 5:
+    expected_eligible = "False" if schema_version == 6 else "True"
+    assert rows[0]["eligibleForProfileSelection"] == expected_eligible
+    if schema_version >= 5:
         assert rows[0]["outputDigestStable"] == "True"
         assert rows[0]["stableOutputDigest"] == "e" * 64
+    if schema_version == 6:
+        assert rows[0]["effectivePlacement"] == "UNAVAILABLE"
+        assert "cannot select a profile" in rows[0]["eligibilityReason"]
 
 
 def assert_v5_requires_output_digest() -> None:
@@ -107,11 +122,30 @@ def assert_v5_requires_output_digest() -> None:
     assert "requires 64-char outputDigest" in result.stderr
 
 
+def assert_v6_fails_closed_on_placement_claim() -> None:
+    records = [base_record(6, index) for index in range(4)]
+    records[0]["effectivePlacement"] = "AVAILABLE"
+    result, _ = run_summary(records)
+    assert result.returncode != 0
+    assert "effectivePlacement=UNAVAILABLE" in result.stderr
+
+
+def assert_v6_requires_packaged_backend() -> None:
+    records = [base_record(6, index) for index in range(4)]
+    records[0]["openClBackendLibraryPresent"] = False
+    result, _ = run_summary(records)
+    assert result.returncode != 0
+    assert "requires packaged libggml-opencl.so" in result.stderr
+
+
 def main() -> int:
     assert_schema_supported(3)
     assert_schema_supported(4)
     assert_schema_supported(5)
+    assert_schema_supported(6)
     assert_v5_requires_output_digest()
+    assert_v6_fails_closed_on_placement_claim()
+    assert_v6_requires_packaged_backend()
     print("Qwen3.5 tuning summarizer schema compatibility tests passed.")
     return 0
 

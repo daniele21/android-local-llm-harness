@@ -74,8 +74,8 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-3 | P1 | IN PROGRESS | Bounded 0.8B/2B CPU screening and focused 2B prefill evidence complete; broader Q35 evidence still gates `MEASURED` promotion. |
 | LLRT-4 | P1/P2 | DONE | Recurrent-state probe closed `KEEP_DISABLED`: supported restores are exact, partial rollback is unsupported. |
 | LLRT-5 | P2 | IN PROGRESS | Load-mode compatibility/materialized identity and Flash Attention tri-state integrated; AUTO/pin promotion remain evidence-gated. |
-| LLRT-6 | P2 | IN PROGRESS | K/V types now materialize natively; bounded fixed-seed physical evidence is the next policy gate. |
-| LLRT-7 | P2 | IN PROGRESS | OpenCL packaging/preflight are default-off and integrated; representative exact-artifact evidence remains required. |
+| LLRT-6 | P2 | IN PROGRESS | K/V materialization and fixed-seed physical-evidence tooling are integrated; curated device evidence is the next policy gate. |
+| LLRT-7 | P2 | IN PROGRESS | Reproducible default-off OpenCL build/preflight/evidence tooling is integrated; representative exact-artifact device evidence remains required. |
 | LLRT-8 | P2 | PLANNED | Bounded OpenCL compiled-kernel cache ownership and cleanup. |
 | LLRT-9 | P2 | PLANNED | Evaluation-only multi-sequence/batched execution; production stays single-decode. |
 | LLRT-10 | P2 | PLANNED | Deterministic evidence-driven execution planner using reviewed measured profiles. |
@@ -96,10 +96,10 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-5A/B/C | DONE | Candidate load-mode compatibility, materialized load-mode identity and FA tri-state are integrated. |
 | LLRT-5D | BLOCKED | AUTO/FA performance and any future pin promotion require physical evidence. |
 | LLRT-6A | DONE | Exact cache names fail closed and explicit K/V values materialize atomically into `type_k/type_v`; null preserves defaults. |
-| LLRT-6B | IN PROGRESS | Schema-v5 fixed-seed runner records K/V, FA, output digest, memory, latency and thermal evidence. |
+| LLRT-6B | DONE | Schema-v5 fixed-seed runner records K/V, FA, output digest, memory, latency and thermal evidence without changing release defaults. |
 | LLRT-6C | READY | Run curated 0.8B/2B device evidence and either select an evidence-backed policy or keep defaults. |
 | LLRT-7A/B | DONE | OpenCL remains default-off; representative Adreno 750/830 loader preflight is not a support claim. |
-| LLRT-7C | READY | Run exact-artifact OpenCL correctness/performance evidence before any product selection. |
+| LLRT-7C | IN PROGRESS | Reproducible OpenCL build, packaging checks and schema-v6 runner are ready; representative exact-artifact physical evidence is still required. |
 
 ## Physical evidence snapshot
 
@@ -117,13 +117,13 @@ Physical performance/thermal runs on the same phone are serialized and thermal-g
 
 The P2 checkpoint is **SATISFIED**: bounded 0.8B evidence is complete, the 2B CPU candidate has an explicit reject decision, LLRT-4 has an evidence-backed `KEEP_DISABLED` verdict and LLRT-5 mechanical compatibility is integrated without moving the release pin.
 
-LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
+LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
 
 ## Integrated execution identity
 
 LLRT-11 fingerprints material execution inputs after context creation and persists backend revision, execution fingerprint and placement availability with the run. The fingerprint covers profile/context and CPU/batch knobs, requested GPU layers, mmap/mlock and materialized load mode, Flash Attention/KV-cache settings, registered-device inventory, prompt-reuse mode and recurrent-state mode.
 
-Existing LLRT-3 evidence remains schema **v4**. LLRT-6 fixed-seed cache experiments use schema **v5** to add K/V cache type, Flash Attention, generation-seed identity and a privacy-safe output digest without persisting prompt or generated text.
+Existing LLRT-3 evidence remains schema **v4**. LLRT-6 fixed-seed cache experiments use schema **v5** to add K/V cache type, Flash Attention, generation-seed identity and a privacy-safe output digest. LLRT-7 OpenCL experiments use schema **v6** to add the experimental-build flag, CPU-control versus requested-offload lane, requested GPU layers, backend target/library presence and explicit `effectivePlacement=UNAVAILABLE` while the pinned API cannot prove placement. Prompt and generated text are not persisted.
 
 No runtime profile is promoted from CI, desktop/emulator or bounded single-device evidence.
 
@@ -145,7 +145,9 @@ CPU tuning stays bounded: test short-listed one-factor or paired deltas rather t
 
 ### Adreno OpenCL
 
-OpenCL is experimental and default-off. Packaging and representative Adreno 750/830 loader preflight are integrated, but device eligibility is not a model/backend support claim. Curated Qwen3.5 Q4_K_M artifacts require exact-artifact correctness/performance evidence before any product selection. Effective device/offload facts must be reported rather than inferred.
+OpenCL is experimental and default-off. The reproducible lane requires explicit headers plus an AArch64 link-time `libOpenCL.so`, verifies that `libggml-opencl.so` is packaged and that the vendor loader is not redistributed, and can source the exact device loader locally for the build. Representative Adreno 750/830 eligibility is only a preflight condition, not a model/backend support claim.
+
+The physical runner compares a `gpuLayers=0` CPU control against explicitly bounded requested-offload values on the same experimental build. The current pin cannot authoritatively prove effective layer placement, so schema v6 records `effectivePlacement=UNAVAILABLE`; requested GPU layers must not be reported as effective placement. Curated Qwen3.5 Q4_K_M artifacts still require correctness, memory, latency and thermal evidence before any product selection.
 
 Any compiled-kernel cache introduced by LLRT-8 must be app-owned, bounded, invalidated by relevant backend/device/driver identity and safe to lose.
 
