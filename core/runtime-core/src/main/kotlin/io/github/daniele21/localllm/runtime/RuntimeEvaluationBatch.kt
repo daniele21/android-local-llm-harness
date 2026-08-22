@@ -113,7 +113,7 @@ internal class ScheduledRuntimeEvaluationBatchHandle(
 ) : RuntimeEvaluationBatchHandle {
     override fun cancel(): Boolean {
         lifecycle.requestCancellation()
-        return schedulerHandle.cancel(batchId)
+        return schedulerHandle.cancel()
     }
 
     override fun cancelCase(requestId: RequestId): Boolean {
