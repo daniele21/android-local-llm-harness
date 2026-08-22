@@ -14,6 +14,7 @@ enum class EvaluationMultiSequenceGenerationError {
     NONE,
     INVALID_ARGUMENT,
     CONTEXT_OVERFLOW,
+    BATCH_ALLOCATION_FAILED,
     SAMPLER_FAILED,
     DECODE_FAILED,
     TOKEN_DECODE_FAILED,
