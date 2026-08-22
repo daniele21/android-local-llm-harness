@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.llamacpp
 
 import io.github.daniele21.localllm.models.GgufModelProfile
+import java.util.Base64
 
 interface NativeLlamaEvaluationBatchApi {
     @Suppress("LongParameterList")
@@ -320,7 +321,7 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
     private fun decodeCase(response: Array<String>, offset: Int): NativeEvaluationBatchCaseResult = NativeEvaluationBatchCaseResult(
         requestId = response[offset],
         status = NativeEvaluationBatchCaseStatus.valueOf(response[offset + 1]),
-        output = response[offset + 2],
+        output = String(Base64.getDecoder().decode(response[offset + 2]), Charsets.UTF_8),
         metrics = NativeEvaluationBatchMetrics(
             inputTokens = response[offset + 3].toInt(),
             outputTokens = response[offset + 4].toInt(),
