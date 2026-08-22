@@ -63,15 +63,13 @@ class MemoryAwareEvaluationBatchContextPlanner(
             )
 
         var sawEstimate = false
+        var arithmeticOverflow = false
         var lastAdmissionReject: MemoryAdmissionRejectReason? = null
         for (perSequenceTokens in candidates) {
-            val aggregateTokens = try {
-                Math.multiplyExact(perSequenceTokens, request.sequenceCount)
-            } catch (_: ArithmeticException) {
-                return MemoryAwareEvaluationBatchContextDecision.Reject(
-                    reason = MemoryAwareContextRejectReason.MEMORY_BUDGET_REJECTED,
-                    admissionReason = MemoryAdmissionRejectReason.BYTE_ARITHMETIC_OVERFLOW,
-                )
+            val aggregateTokens = aggregateContextTokens(perSequenceTokens, request.sequenceCount)
+            if (aggregateTokens == null) {
+                arithmeticOverflow = true
+                break
             }
             val estimate = costEstimator.estimate(request.modelProfileId, aggregateTokens) ?: continue
             sawEstimate = true
@@ -96,13 +94,26 @@ class MemoryAwareEvaluationBatchContextPlanner(
             }
         }
 
-        return if (!sawEstimate) {
-            MemoryAwareEvaluationBatchContextDecision.Reject(MemoryAwareContextRejectReason.MEMORY_COST_ESTIMATE_UNAVAILABLE)
-        } else {
-            MemoryAwareEvaluationBatchContextDecision.Reject(
+        return when {
+            arithmeticOverflow -> MemoryAwareEvaluationBatchContextDecision.Reject(
+                reason = MemoryAwareContextRejectReason.MEMORY_BUDGET_REJECTED,
+                admissionReason = MemoryAdmissionRejectReason.BYTE_ARITHMETIC_OVERFLOW,
+            )
+
+            !sawEstimate -> MemoryAwareEvaluationBatchContextDecision.Reject(
+                MemoryAwareContextRejectReason.MEMORY_COST_ESTIMATE_UNAVAILABLE,
+            )
+
+            else -> MemoryAwareEvaluationBatchContextDecision.Reject(
                 reason = MemoryAwareContextRejectReason.MEMORY_BUDGET_REJECTED,
                 admissionReason = lastAdmissionReject,
             )
         }
+    }
+
+    private fun aggregateContextTokens(perSequenceTokens: Int, sequenceCount: Int): Int? = try {
+        Math.multiplyExact(perSequenceTokens, sequenceCount)
+    } catch (_: ArithmeticException) {
+        null
     }
 }
