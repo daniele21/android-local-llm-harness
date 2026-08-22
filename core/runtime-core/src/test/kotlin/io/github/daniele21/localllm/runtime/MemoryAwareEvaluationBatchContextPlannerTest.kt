@@ -37,7 +37,7 @@ class MemoryAwareEvaluationBatchContextPlannerTest {
     fun `downshifts per-sequence tier using aggregate estimates`() {
         val planner = planner { aggregateTokens ->
             when (aggregateTokens) {
-                8_192 -> estimate(900, "8192")
+                8_192 -> estimate(901, "8192")
                 4_096 -> estimate(300, "4096")
                 else -> null
             }
