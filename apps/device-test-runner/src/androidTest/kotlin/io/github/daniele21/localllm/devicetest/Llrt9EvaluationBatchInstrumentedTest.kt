@@ -347,18 +347,9 @@ class Llrt9EvaluationBatchInstrumentedTest {
         .joinToString("") { "%02x".format(it) }
 }
 
-private data class Llrt9Harness(
-    val runtime: RuntimeOrchestrator,
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+private data class Llrt9Harness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
-private data class MeasuredMode(
-    val prompts: List<String>,
-    val outputs: List<String>,
-    val outputTokens: List<Int>,
-    val elapsedMs: Long,
-)
+private data class MeasuredMode(val prompts: List<String>, val outputs: List<String>, val outputTokens: List<Int>, val elapsedMs: Long)
 
 private data class DeviceSnapshot(val processPssKb: Int, val availableMemoryBytes: Long, val thermalStatus: Int)
 
