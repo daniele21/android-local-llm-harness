@@ -3,6 +3,18 @@ package io.github.daniele21.localllm.llamacpp
 import io.github.daniele21.localllm.models.GgufModelProfile
 import java.util.Base64
 
+private const val OK = "ok"
+private const val ERROR = "error"
+private const val TRUE = "true"
+private const val FALSE = "false"
+private const val CONTEXT_ALIGNMENT = 256
+private const val CONTEXT_CREATION_FIELD_COUNT = 2
+private const val OPERATION_FIELD_COUNT = 1
+private const val CANCEL_FIELD_COUNT = 2
+private const val ERROR_FIELD_COUNT = 3
+private const val BATCH_HEADER_FIELD_COUNT = 2
+private const val CASE_FIELD_COUNT = 8
+
 interface NativeLlamaEvaluationBatchApi {
     @Suppress("LongParameterList")
     fun createEvaluationContext(
@@ -162,10 +174,10 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
         maxSequences: Int,
         flashAttentionMode: NativeFlashAttentionMode = NativeFlashAttentionMode.fromProfile(profile.flashAttention),
     ): EvaluationContextCreationResult {
-        contextValidationError(profile, perSequenceContextSize, maxSequences, flashAttentionMode)?.let { error ->
+        EvaluationBatchValidator.contextError(profile, perSequenceContextSize, maxSequences, flashAttentionMode)?.let { error ->
             return EvaluationContextCreationResult.Failure(error)
         }
-        return decodeContextCreation(
+        return EvaluationBatchResponseDecoder.decodeContextCreation(
             response = nativeApi.createEvaluationContext(
                 modelHandle = model.handle.value,
                 perSequenceContextSize = perSequenceContextSize,
@@ -184,12 +196,11 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
         )
     }
 
-    fun releaseContext(context: LoadedNativeEvaluationContext): GenerationNativeOperationResult = decodeOperation(
-        nativeApi.releaseEvaluationContext(context.handle.value),
-    )
+    fun releaseContext(context: LoadedNativeEvaluationContext): GenerationNativeOperationResult =
+        EvaluationBatchResponseDecoder.decodeOperation(nativeApi.releaseEvaluationContext(context.handle.value))
 
     fun generate(context: LoadedNativeEvaluationContext, cases: List<NativeEvaluationBatchCase>): NativeEvaluationBatchResult {
-        batchValidationError(context, cases)?.let { error ->
+        EvaluationBatchValidator.batchError(context, cases)?.let { error ->
             return NativeEvaluationBatchResult.Failure(error)
         }
         val response = nativeApi.generateEvaluationBatch(
@@ -210,65 +221,70 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
             stopTokenIds = cases.map { it.config.stopTokenIds.copyOf() }.toTypedArray(),
             stopSequences = cases.map { it.config.stopSequences.toTypedArray() }.toTypedArray(),
         )
-        return decodeBatch(response, cases.map(NativeEvaluationBatchCase::requestId))
+        return EvaluationBatchResponseDecoder.decodeBatch(response, cases.map(NativeEvaluationBatchCase::requestId))
     }
 
     fun cancel(requestId: String): EvaluationBatchCancelResult {
         if (requestId.isBlank()) {
-            return EvaluationBatchCancelResult.Failure(invalid("Evaluation request ID must not be blank"))
+            return EvaluationBatchCancelResult.Failure(invalidEvaluationBatchError("Evaluation request ID must not be blank"))
         }
-        val response = nativeApi.cancelEvaluationCase(requestId)
-        if (response.size == CANCEL_FIELD_COUNT && response[0] == OK) {
-            return when (response[1]) {
-                TRUE -> EvaluationBatchCancelResult.Accepted(true)
-                FALSE -> EvaluationBatchCancelResult.Accepted(false)
-                else -> EvaluationBatchCancelResult.Failure(protocolError("Malformed evaluation cancellation response"))
-            }
-        }
-        return EvaluationBatchCancelResult.Failure(decodeError(response))
+        return EvaluationBatchResponseDecoder.decodeCancel(nativeApi.cancelEvaluationCase(requestId))
     }
+}
 
-    private fun contextValidationError(
+private object EvaluationBatchValidator {
+    fun contextError(
         profile: GgufModelProfile,
         perSequenceContextSize: Int,
         maxSequences: Int,
         flashAttentionMode: NativeFlashAttentionMode,
     ): GenerationNativeError? = when {
         perSequenceContextSize <= 0 || perSequenceContextSize % CONTEXT_ALIGNMENT != 0 ->
-            invalid("Evaluation per-sequence context size must be a positive multiple of $CONTEXT_ALIGNMENT")
+            invalidEvaluationBatchError(
+                "Evaluation per-sequence context size must be a positive multiple of $CONTEXT_ALIGNMENT",
+            )
 
         maxSequences !in LoadedNativeEvaluationContext.MIN_BATCH_WIDTH..LoadedNativeEvaluationContext.MAX_BATCH_WIDTH ->
-            invalid(
+            invalidEvaluationBatchError(
                 "Evaluation batch width must be in ${LoadedNativeEvaluationContext.MIN_BATCH_WIDTH}..${LoadedNativeEvaluationContext.MAX_BATCH_WIDTH}",
             )
 
-        profile.batchSize < maxSequences -> invalid("Evaluation batch size must be at least the sequence width")
+        profile.batchSize < maxSequences -> invalidEvaluationBatchError("Evaluation batch size must be at least the sequence width")
 
         else -> profile.explicitKvCacheSelectionError() ?: profile.kvCacheCompatibilityError(flashAttentionMode)
     }
 
-    private fun batchValidationError(
+    fun batchError(
         context: LoadedNativeEvaluationContext,
         cases: List<NativeEvaluationBatchCase>,
     ): GenerationNativeError? {
-        if (cases.size !in LoadedNativeEvaluationContext.MIN_BATCH_WIDTH..context.maxSequences) {
-            return invalid("Evaluation case count must be in ${LoadedNativeEvaluationContext.MIN_BATCH_WIDTH}..${context.maxSequences}")
+        val structuralError = when {
+            cases.size !in LoadedNativeEvaluationContext.MIN_BATCH_WIDTH..context.maxSequences ->
+                invalidEvaluationBatchError(
+                    "Evaluation case count must be in ${LoadedNativeEvaluationContext.MIN_BATCH_WIDTH}..${context.maxSequences}",
+                )
+
+            cases.any { it.requestId.isBlank() } || cases.map(NativeEvaluationBatchCase::requestId).distinct().size != cases.size ->
+                invalidEvaluationBatchError("Evaluation request IDs must be non-blank and unique")
+
+            else -> null
         }
-        if (cases.any { it.requestId.isBlank() } || cases.map(NativeEvaluationBatchCase::requestId).distinct().size != cases.size) {
-            return invalid("Evaluation request IDs must be non-blank and unique")
-        }
-        for (case in cases) {
-            case.config.validationError(case.prompt)?.let { return it }
-            if (case.config.reasoningMaxTokens != null || case.config.reasoningCloseMarker != null ||
-                case.config.reasoningForcedCloseText != null
-            ) {
-                return invalid("Evaluation batching does not support reasoning transitions")
-            }
-        }
-        return null
+        return structuralError ?: cases.asSequence().mapNotNull(::caseError).firstOrNull()
     }
 
-    private fun decodeContextCreation(
+    private fun caseError(case: NativeEvaluationBatchCase): GenerationNativeError? =
+        case.config.validationError(case.prompt) ?: when {
+            case.config.reasoningMaxTokens != null ||
+                case.config.reasoningCloseMarker != null ||
+                case.config.reasoningForcedCloseText != null ->
+                invalidEvaluationBatchError("Evaluation batching does not support reasoning transitions")
+
+            else -> null
+        }
+}
+
+private object EvaluationBatchResponseDecoder {
+    fun decodeContextCreation(
         response: Array<String>,
         model: LoadedNativeModel,
         perSequenceContextSize: Int,
@@ -284,38 +300,61 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
                         maxSequences = maxSequences,
                     ),
                 )
-            } catch (error: RuntimeException) {
-                EvaluationContextCreationResult.Failure(protocolError("Native evaluation context response is invalid: ${error.message}"))
+            } catch (error: IllegalArgumentException) {
+                EvaluationContextCreationResult.Failure(
+                    evaluationBatchProtocolError("Native evaluation context response is invalid: ${error.message}"),
+                )
             }
         }
         return EvaluationContextCreationResult.Failure(decodeError(response))
     }
 
-    private fun decodeOperation(response: Array<String>): GenerationNativeOperationResult {
+    fun decodeOperation(response: Array<String>): GenerationNativeOperationResult {
         if (response.size == OPERATION_FIELD_COUNT && response[0] == OK) {
             return GenerationNativeOperationResult.Success
         }
         return GenerationNativeOperationResult.Failure(decodeError(response))
     }
 
-    private fun decodeBatch(response: Array<String>, expectedRequestIds: List<String>): NativeEvaluationBatchResult {
+    fun decodeCancel(response: Array<String>): EvaluationBatchCancelResult {
+        if (response.size == CANCEL_FIELD_COUNT && response[0] == OK) {
+            return when (response[1]) {
+                TRUE -> EvaluationBatchCancelResult.Accepted(true)
+                FALSE -> EvaluationBatchCancelResult.Accepted(false)
+                else -> EvaluationBatchCancelResult.Failure(
+                    evaluationBatchProtocolError("Malformed evaluation cancellation response"),
+                )
+            }
+        }
+        return EvaluationBatchCancelResult.Failure(decodeError(response))
+    }
+
+    fun decodeBatch(response: Array<String>, expectedRequestIds: List<String>): NativeEvaluationBatchResult {
         if (response.size < BATCH_HEADER_FIELD_COUNT || response[0] != OK) {
             return NativeEvaluationBatchResult.Failure(decodeError(response))
         }
         val count = response[1].toIntOrNull()
-            ?: return NativeEvaluationBatchResult.Failure(protocolError("Native evaluation batch count is invalid"))
+            ?: return NativeEvaluationBatchResult.Failure(
+                evaluationBatchProtocolError("Native evaluation batch count is invalid"),
+            )
         if (count != expectedRequestIds.size || response.size != BATCH_HEADER_FIELD_COUNT + count * CASE_FIELD_COUNT) {
-            return NativeEvaluationBatchResult.Failure(protocolError("Native evaluation batch response size is invalid"))
+            return NativeEvaluationBatchResult.Failure(
+                evaluationBatchProtocolError("Native evaluation batch response size is invalid"),
+            )
         }
         return try {
             val decoded = List(count) { index -> decodeCase(response, BATCH_HEADER_FIELD_COUNT + index * CASE_FIELD_COUNT) }
             if (decoded.map(NativeEvaluationBatchCaseResult::requestId) != expectedRequestIds) {
-                NativeEvaluationBatchResult.Failure(protocolError("Native evaluation batch result order does not match the request order"))
+                NativeEvaluationBatchResult.Failure(
+                    evaluationBatchProtocolError("Native evaluation batch result order does not match the request order"),
+                )
             } else {
                 NativeEvaluationBatchResult.Completed(decoded)
             }
-        } catch (error: RuntimeException) {
-            NativeEvaluationBatchResult.Failure(protocolError("Native evaluation batch response is invalid: ${error.message}"))
+        } catch (error: IllegalArgumentException) {
+            NativeEvaluationBatchResult.Failure(
+                evaluationBatchProtocolError("Native evaluation batch response is invalid: ${error.message}"),
+            )
         }
     }
 
@@ -334,34 +373,22 @@ class LlamaCppEvaluationBatchBridge(private val nativeApi: NativeLlamaEvaluation
 
     private fun decodeError(response: Array<String>): GenerationNativeError {
         if (response.size != ERROR_FIELD_COUNT || response[0] != ERROR) {
-            return protocolError("Malformed native evaluation response: ${response.joinToString(separator = "|")}")
+            return evaluationBatchProtocolError(
+                "Malformed native evaluation response: ${response.joinToString(separator = "|")}",
+            )
         }
         val code = GenerationNativeErrorCode.entries.firstOrNull { it.name == response[1] }
             ?: GenerationNativeErrorCode.NATIVE_PROTOCOL
         return GenerationNativeError(code, response[2])
     }
-
-    private fun invalid(message: String): GenerationNativeError = GenerationNativeError(
-        GenerationNativeErrorCode.INVALID_ARGUMENT,
-        message,
-    )
-
-    private fun protocolError(message: String): GenerationNativeError = GenerationNativeError(
-        GenerationNativeErrorCode.NATIVE_PROTOCOL,
-        message,
-    )
-
-    private companion object {
-        const val OK = "ok"
-        const val ERROR = "error"
-        const val TRUE = "true"
-        const val FALSE = "false"
-        const val CONTEXT_ALIGNMENT = 256
-        const val CONTEXT_CREATION_FIELD_COUNT = 2
-        const val OPERATION_FIELD_COUNT = 1
-        const val CANCEL_FIELD_COUNT = 2
-        const val ERROR_FIELD_COUNT = 3
-        const val BATCH_HEADER_FIELD_COUNT = 2
-        const val CASE_FIELD_COUNT = 8
-    }
 }
+
+private fun invalidEvaluationBatchError(message: String): GenerationNativeError = GenerationNativeError(
+    GenerationNativeErrorCode.INVALID_ARGUMENT,
+    message,
+)
+
+private fun evaluationBatchProtocolError(message: String): GenerationNativeError = GenerationNativeError(
+    GenerationNativeErrorCode.NATIVE_PROTOCOL,
+    message,
+)
