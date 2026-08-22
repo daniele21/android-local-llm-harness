@@ -692,6 +692,7 @@ class RuntimeOrchestrator(
             results.forEach { result ->
                 when (result) {
                     is RuntimeEvaluationBatchCaseResult.Completed -> runtimeTelemetry.completed(result.requestId, result.metrics)
+
                     is RuntimeEvaluationBatchCaseResult.Cancelled -> {
                         runtimeTelemetry.failed(result.requestId, LocalLlmError.Cancelled())
                     }
@@ -858,10 +859,7 @@ class RuntimeOrchestrator(
         )
     }
 
-    private fun resolveEvaluationBatchContextSize(
-        bindings: List<BatchSessionBinding>,
-        prepared: List<PreparedEvaluationBatchCase>,
-    ): Int {
+    private fun resolveEvaluationBatchContextSize(bindings: List<BatchSessionBinding>, prepared: List<PreparedEvaluationBatchCase>): Int {
         val requestedPerSequence = prepared.maxOf { it.contextPlan.requestedContextTokens }
         val minimumPerSequence = prepared.maxOf { it.contextPlan.minimumRequiredTokens }
         val sequenceCount = bindings.size
@@ -879,6 +877,7 @@ class RuntimeOrchestrator(
         val firstSession = bindings.first().session
         val approvedTiers = when (val policy = firstSession.options.contextPolicy) {
             is ContextPolicy.Manual -> listOf(policy.tokens)
+
             ContextPolicy.Auto -> firstSession.resolved.model.runtimeCapabilities.approvedContextTiers.ifEmpty {
                 ContextSizeSelector.supportedSizes
             }
