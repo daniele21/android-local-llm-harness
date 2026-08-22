@@ -1,8 +1,6 @@
-// LLRT-9B2B2c keeps the existing JNI implementation and evaluation-only
-// multi-sequence entry points in one translation unit so the evaluation path
-// can reuse the same resident-model/context ownership registries. The stable
-// production JNI surface remains implemented in llama_jni.cpp and unchanged.
-#include "llama_jni.cpp"
+// LLRT-9B2B2c private implementation fragment. It is included exactly once
+// from llama_jni.cpp so evaluation batching shares the resident-model and
+// cancellation registries without exposing them through the public JNI ABI.
 
 #include "evaluation_multiseq_context_params.h"
 #include "evaluation_multiseq_generation.h"

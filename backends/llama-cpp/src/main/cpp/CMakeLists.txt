@@ -62,10 +62,7 @@ add_library(
     generation_sampler.cpp
     prepared_prompt_cache.cpp
     reasoning_transition.cpp
-    # LLRT-9 evaluation JNI must share the resident-model registries owned by
-    # llama_jni.cpp. The entrypoint includes that stable implementation and
-    # appends evaluation-only methods in the same translation unit.
-    llama_jni_entrypoint.cpp
+    llama_jni.cpp
 )
 
 target_compile_definitions(

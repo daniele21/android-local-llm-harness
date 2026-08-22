@@ -1346,3 +1346,7 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaStreamingApi_cancel(
     const bool was_running = cancellations.cancel(request_id.get());
     return to_java_string_array(env, {"ok", was_running ? "true" : "false"});
 }
+
+// Evaluation-only JNI extension intentionally shares this translation unit
+// with the stable JNI implementation so native model residency stays singular.
+#include "evaluation_batch_jni.inc"
