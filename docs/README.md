@@ -5,11 +5,11 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating the canonical owner of repository documentation or changing documentation governance
-Last reviewed: 2026-08-19
+Last reviewed: 2026-08-23
 
 Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
 
-Machine-enforced document types, reading budgets and duplication thresholds are defined in [`documentation-policy.json`](documentation-policy.json).
+Machine-enforced document types, reading budgets and duplication thresholds are defined in [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). The legacy [`documentation-policy.json`](documentation-policy.json) path is a compatibility symlink to that owner, not a second policy source.
 
 ## Canonical sources
 
@@ -18,6 +18,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | What is integrated, blocked or next? | [`current-state.md`](current-state.md) |
 | Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
 | What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
+| What bounded repository workstream is active? | [`workstreams/`](workstreams/README.md), when a temporary cross-PR ledger is actually required |
 | What is the reference-grade architecture hardening target and current workstream state? | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), then [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
 | How is llama.cpp runtime efficiency, upstream qualification and hardware execution staged? | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) |
 | How is runtime memory residency, admission, pressure handling and validation governed? | [`memory-management/README.md`](memory-management/README.md) |
@@ -27,7 +28,7 @@ Machine-enforced document types, reading budgets and duplication thresholds are 
 | What is required before merge or release? | [`definition-of-done.md`](definition-of-done.md) |
 | What remains for Harness 0.5.0? | [`releases/harness-0.5.md`](releases/harness-0.5.md) |
 | How is a procedure executed? | The applicable build, signing, device or evidence runbook |
-| What happened in a completed plan or audit? | [`archive/`](archive/) |
+| Which historical material is retained independently of Git history? | [`archive/`](archive/) only for audit, regulatory, release-evidence or other independently justified history |
 
 ## Active source index
 
@@ -40,6 +41,7 @@ Use this index to locate a source, not as a mandatory reading list.
 - [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) — concise architecture-hardening workstream state and next slice
 - [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) — staged llama.cpp upstream qualification, CPU efficiency, device/backend execution and accelerator evidence target
 - [`memory-management/README.md`](memory-management/README.md) — runtime memory ownership, residency, budgeting, admission, pressure response and validation workstream
+- [`workstreams/README.md`](workstreams/README.md) — repository-level bounded workstream lifecycle
 - [`architecture.md`](architecture.md) — current dependency and ownership boundaries
 - [`adr/README.md`](adr/README.md) — accepted durable decisions
 - [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
@@ -99,7 +101,7 @@ Use this index to locate a source, not as a mandatory reading list.
 ## Document lifecycle
 
 - `current-state`: one short repository operational ledger.
-- `workstream-state`: one bounded domain ledger that links to the repository state.
+- `workstream-state`: one bounded temporary ledger that links to the repository state or durable owner.
 - `roadmap`: capability milestones without branch or commit history.
 - `target-specification`: intended behavior and acceptance criteria.
 - `feature-index`: a small routing document for a cross-module lifecycle.
@@ -110,17 +112,20 @@ Use this index to locate a source, not as a mandatory reading list.
 - `evidence`: immutable, explicitly scoped results.
 - `release-policy`, `release-checklist` and `completion-policy`: delivery constraints and gates.
 - `design-guideline`, `asset-specification` and `asset-index`: brand intent and asset ownership.
-- `historical-plan`, `historical-audit` or archived `evidence`: read-only context, never current truth.
+
+New temporary repository-level workstreams live under [`workstreams/`](workstreams/README.md). Existing legacy plan/progress sources remain valid until intentionally consolidated; touching them should reduce fragmentation rather than create another paired status file.
+
+Completed workstreams are **deleted by default** after durable knowledge is transferred. `archive/` is exception-only for material with independent audit, regulatory, release-evidence or historical value; Git history owns normal implementation history.
 
 ## Before creating a document
 
 1. Search `Canonical scope` and this index for the owning source.
 2. Update the existing owner when the fact fits its scope.
-3. Create a document only for a durable, independently readable concern.
-4. Give it one supported type, owner, unique canonical scope and a precise `Read when` condition.
+3. Create a durable document only for an independently readable concern; create a temporary workstream only when cross-PR/agent state genuinely needs its own bounded ledger.
+4. Give every active document one supported type, owner, unique canonical scope and precise `Read when` condition.
 5. Link it from this index or the closest domain index in the same change.
 6. State which source it replaces, or why no source already owns the concern.
-7. Archive a completed plan or temporary ledger after transferring durable behavior.
+7. Finalize a completed workstream by transferring durable knowledge and deleting it; archive only under the exception rule above.
 
 Do not create a document solely to report that a branch, pull request or isolated implementation step completed.
 
@@ -141,7 +146,7 @@ ADRs retain their accepted ADR status and date format. Archived documents use `S
 
 ## Reading and writing budgets
 
-- CI enforces line and estimated-token limits by document type.
+- CI enforces line and estimated-token limits by document type from [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json).
 - New documents must fit their type budget.
 - An explicitly baselined oversized document may only shrink; growth fails validation.
 - Root and scoped `AGENTS.md` files have separate budgets.
@@ -153,7 +158,7 @@ Summaries may restate a high-level conclusion when they clearly link to the cano
 
 ## Precedence
 
-When sources disagree: executable contracts and tests, accepted ADRs, architecture, focused feature specifications, target overview, current state, roadmap, README/agent guides, then archived material.
+When sources disagree: executable contracts and tests, accepted ADRs, architecture, focused feature specifications, target overview, current state, roadmap, README/agent guides, then independently retained historical material.
 
 Do not silently reconcile a contradiction that changes behavior. Correct the owning source or surface it in review.
 
