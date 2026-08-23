@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
@@ -124,7 +125,13 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
 
 @Composable
 private fun DiagnosticEntryCard(title: String, detail: String, status: String, tone: HarnessStatusTone, onClick: () -> Unit) {
-    HarnessCard(modifier = Modifier.clickable(onClick = onClick)) {
+    HarnessCard(
+        modifier = Modifier.clickable(
+            onClickLabel = "Open $title diagnostics",
+            role = Role.Button,
+            onClick = onClick,
+        ),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
