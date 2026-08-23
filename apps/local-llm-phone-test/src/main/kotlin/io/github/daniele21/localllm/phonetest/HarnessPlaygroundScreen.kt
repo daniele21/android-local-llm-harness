@@ -370,8 +370,6 @@ internal fun playgroundSettingsValidationMessage(state: HarnessUiState): String?
     )
 }.exceptionOrNull()?.message
 
-private fun playgroundTemperature(state: HarnessUiState): Float =
-    state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
 
-private fun formatPlaygroundControlValue(value: Float): String =
-    "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
+private fun formatPlaygroundControlValue(value: Float): String = "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
