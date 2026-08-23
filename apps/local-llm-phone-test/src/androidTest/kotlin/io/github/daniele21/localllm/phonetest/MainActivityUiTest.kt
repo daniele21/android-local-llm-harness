@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -99,7 +100,7 @@ class MainActivityUiTest {
     private fun assertTagAbsent(tag: String) {
         assertTrue(
             "$tag must not be present in the UI",
-            composeRule.onAllNodesWithText(tag).fetchSemanticsNodes().isEmpty(),
+            composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty(),
         )
     }
 }
