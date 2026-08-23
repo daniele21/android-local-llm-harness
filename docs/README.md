@@ -17,6 +17,7 @@ Use progressive disclosure: root guide -> closest scoped guide -> focused owner.
 | Capability milestones | [`roadmap.md`](roadmap.md) |
 | Repository target | [`implementation-plan.md`](implementation-plan.md) |
 | Active bounded repository work | [`workstreams/`](workstreams/README.md) when needed |
+| Durable feature behavior | [`features/`](features/README.md) |
 | Architecture hardening | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
 | llama.cpp optimization | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) |
 | Memory management | [`memory-management/README.md`](memory-management/README.md) |
@@ -36,6 +37,7 @@ Use progressive disclosure: root guide -> closest scoped guide -> focused owner.
 - [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md)
 - [`memory-management/README.md`](memory-management/README.md)
 - [`workstreams/README.md`](workstreams/README.md)
+- [`features/README.md`](features/README.md)
 - [`architecture.md`](architecture.md)
 - [`adr/README.md`](adr/README.md)
 - [`api-usage.md`](api-usage.md)
@@ -72,6 +74,7 @@ Use progressive disclosure: root guide -> closest scoped guide -> focused owner.
 
 ### Applications, UX and brand
 
+- [`features/README.md`](features/README.md)
 - [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
 - [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
 - [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md)
