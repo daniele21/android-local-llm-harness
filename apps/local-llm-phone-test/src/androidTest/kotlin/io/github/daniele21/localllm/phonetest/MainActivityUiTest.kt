@@ -20,7 +20,7 @@ class MainActivityUiTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun compactShellKeepsBrandAndCuratedModelEntryPointVisible() {
+    fun compactShellKeepsBrandAndTaskFirstEntryPointVisible() {
         val topBarHeight = composeRule.onNodeWithTag("harnessTopBar").fetchSemanticsNode().boundsInRoot.height
         val topBarHeightDp = with(composeRule.density) { topBarHeight.toDp() }
         val maximumHeight = 120.dp
@@ -32,9 +32,10 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Local AI Console").assertIsDisplayed()
         composeRule.onNodeWithTag("nav-overview").assertIsDisplayed()
         composeRule.onNodeWithText("Models").assertIsDisplayed()
-        composeRule.onNodeWithText("Qwen3.5 catalog").assertIsDisplayed()
-        assertTextAbsent("Import model")
-        composeRule.onNodeWithText("Device resources").assertIsDisplayed()
+        composeRule.onNodeWithText("Choose a model").assertIsDisplayed()
+        composeRule.onNodeWithText("Device evidence").assertIsDisplayed()
+        assertTextAbsent("All systems operational · ready for inference")
+        assertTextAbsent("Run health check")
     }
 
     @Test
@@ -54,21 +55,29 @@ class MainActivityUiTest {
         assertTextAbsent("Import model")
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
-        composeRule.onNodeWithText("Overall health").assertIsDisplayed()
+        composeRule.onNodeWithText("Diagnostics").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Open settings").performClick()
         composeRule.onNodeWithText("APPEARANCE").assertIsDisplayed()
         composeRule.onNodeWithText("PRIVACY").assertIsDisplayed()
+        assertTextAbsent("Brand palette")
     }
 
     @Test
-    fun playgroundGenerationControlsExposeAccessibleExplicitPolicies() {
+    fun playgroundRevealsAdvancedAndExpertControlsProgressively() {
         composeRule.onNodeWithTag("nav-playground").performClick()
-        composeRule.onNodeWithText("Generation settings  ·  Show").performClick()
+        composeRule.onNodeWithTag("playground-advanced-toggle").assertIsDisplayed()
+        assertTextAbsent("Seed policy")
+        assertTagAbsent("playground-min-p")
 
+        composeRule.onNodeWithTag("playground-advanced-toggle").performClick()
         composeRule.onNodeWithTag("playground-thinking-on").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-temperature-slider").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-top-p-slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("playground-expert-toggle").assertIsDisplayed()
+        assertTagAbsent("playground-min-p")
+
+        composeRule.onNodeWithTag("playground-expert-toggle").performClick()
         composeRule.onNodeWithTag("playground-min-p").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-presence-penalty").assertIsDisplayed()
         composeRule.onNodeWithTag("playground-repeat-penalty").assertIsDisplayed()
@@ -84,6 +93,13 @@ class MainActivityUiTest {
         assertTrue(
             "$text must not be present in the UI",
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty(),
+        )
+    }
+
+    private fun assertTagAbsent(tag: String) {
+        assertTrue(
+            "$tag must not be present in the UI",
+            composeRule.onAllNodesWithText(tag).fetchSemanticsNodes().isEmpty(),
         )
     }
 }
