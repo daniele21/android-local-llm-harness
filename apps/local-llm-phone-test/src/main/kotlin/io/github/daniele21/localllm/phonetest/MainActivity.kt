@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.EnterTransition
@@ -97,7 +98,7 @@ class MainActivity :
     private var logFilter by mutableStateOf(DiagnosticsLogFilter())
     private var logState by mutableStateOf(DiagnosticsLogUiState())
     private var selectedRequestTimeline by mutableStateOf<DiagnosticsRequestTimelineUi?>(null)
-    private var diagnosticsSection by mutableStateOf(DiagnosticsSection.HEALTH)
+    private var diagnosticsSection by mutableStateOf(DiagnosticsSection.OVERVIEW)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -365,6 +366,9 @@ class MainActivity :
             onDispose { harnessViewModel.models.detach(modelEffects) }
         }
         val navigate: (HarnessDestination) -> Unit = { target ->
+            if (target == HarnessDestination.DIAGNOSTICS) {
+                selectDiagnosticsSection(DiagnosticsSection.OVERVIEW)
+            }
             navController.navigate(target.route) {
                 launchSingleTop = true
                 restoreState = true
@@ -547,11 +551,15 @@ class MainActivity :
                         DeveloperToolsDetailScreen(
                             onOpenHealth = {
                                 selectDiagnosticsSection(DiagnosticsSection.HEALTH)
-                                navigate(HarnessDestination.DIAGNOSTICS)
+                                navController.navigate(HarnessDestination.DIAGNOSTICS.route) {
+                                    launchSingleTop = true
+                                }
                             },
                             onOpenLogs = {
                                 selectDiagnosticsSection(DiagnosticsSection.LOGS)
-                                navigate(HarnessDestination.DIAGNOSTICS)
+                                navController.navigate(HarnessDestination.DIAGNOSTICS.route) {
+                                    launchSingleTop = true
+                                }
                             },
                             onOpenPhysicalValidation = {
                                 navController.navigate(HarnessSettingsDetail.PHYSICAL_VALIDATION.route)
@@ -666,53 +674,77 @@ class MainActivity :
 
     @Composable
     private fun DiagnosticsScreen(state: HarnessUiState, onOpenRequestTimeline: (String) -> Unit) {
+        BackHandler(enabled = diagnosticsSection != DiagnosticsSection.OVERVIEW) {
+            selectDiagnosticsSection(DiagnosticsSection.OVERVIEW)
+        }
         HarnessScreenList(
             title = "Diagnostics",
-            supportingText = "Health, performance and privacy-safe evidence",
+            supportingText = if (diagnosticsSection == DiagnosticsSection.OVERVIEW) {
+                "Source-backed health, performance and privacy-safe evidence"
+            } else {
+                diagnosticsSection.label
+            },
         ) {
-            item {
-                DiagnosticsSectionSelector(
-                    selected = diagnosticsSection,
-                    onSelected = ::selectDiagnosticsSection,
-                )
-            }
-            when (diagnosticsSection) {
-                DiagnosticsSection.HEALTH -> {
-                    healthDiagnostics(state)
-                    runtimeDiagnostics()
-                }
-
-                DiagnosticsSection.RUNS -> {
-                    runtimeDiagnostics()
-                    runDiagnostics(onOpenRequestTimeline)
-                }
-
-                DiagnosticsSection.RESOURCES -> {
-                    runtimeDiagnostics()
-                    resourceDiagnostics()
-                }
-
-                DiagnosticsSection.BENCHMARKS -> {
-                    runtimeDiagnostics()
-                    benchmarkDiagnostics(state)
-                }
-
-                DiagnosticsSection.LOGS -> {
-                    runtimeDiagnostics()
-                    logDiagnostics(
-                        state = logState,
-                        filter = logFilter,
-                        timeline = selectedRequestTimeline,
-                        onFilterChange = ::updateLogFilter,
-                        onOpenTimeline = onOpenRequestTimeline,
-                        onCloseTimeline = ::closeRequestTimeline,
-                        onCopyLog = ::copyLog,
+            if (diagnosticsSection == DiagnosticsSection.OVERVIEW) {
+                item {
+                    HarnessDiagnosticsOverview(
+                        state = harnessDiagnosticsOverviewState(
+                            diagnostics = diagnosticsState,
+                            resources = resourceSource.history(),
+                            benchmarks = benchmarkState,
+                            logs = logState,
+                            validationReport = latestReport,
+                        ),
+                        onOpen = ::selectDiagnosticsSection,
                     )
                 }
+            } else {
+                item {
+                    HarnessSecondaryButton(
+                        text = "Back to diagnostics",
+                        onClick = { selectDiagnosticsSection(DiagnosticsSection.OVERVIEW) },
+                    )
+                }
+                when (diagnosticsSection) {
+                    DiagnosticsSection.OVERVIEW -> Unit
 
-                DiagnosticsSection.VALIDATION -> {
-                    runtimeDiagnostics()
-                    validationDiagnostics(state)
+                    DiagnosticsSection.HEALTH -> {
+                        healthDiagnostics(state)
+                        runtimeDiagnostics()
+                    }
+
+                    DiagnosticsSection.RUNS -> {
+                        runtimeDiagnostics()
+                        runDiagnostics(onOpenRequestTimeline)
+                    }
+
+                    DiagnosticsSection.RESOURCES -> {
+                        runtimeDiagnostics()
+                        resourceDiagnostics()
+                    }
+
+                    DiagnosticsSection.BENCHMARKS -> {
+                        runtimeDiagnostics()
+                        benchmarkDiagnostics(state)
+                    }
+
+                    DiagnosticsSection.LOGS -> {
+                        runtimeDiagnostics()
+                        logDiagnostics(
+                            state = logState,
+                            filter = logFilter,
+                            timeline = selectedRequestTimeline,
+                            onFilterChange = ::updateLogFilter,
+                            onOpenTimeline = onOpenRequestTimeline,
+                            onCloseTimeline = ::closeRequestTimeline,
+                            onCopyLog = ::copyLog,
+                        )
+                    }
+
+                    DiagnosticsSection.VALIDATION -> {
+                        runtimeDiagnostics()
+                        validationDiagnostics(state)
+                    }
                 }
             }
         }
@@ -749,7 +781,7 @@ class MainActivity :
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     HarnessRuntimeGlyph(
-                        ready = diagnosticsState.healthStatus.equals("healthy", ignoreCase = true),
+                        ready = diagnosticsState.healthStatus.equals("Pass", ignoreCase = true),
                         modifier = Modifier.size(52.dp),
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -757,7 +789,7 @@ class MainActivity :
                         Text(
                             diagnosticsState.healthStatus,
                             style = MaterialTheme.typography.headlineMedium,
-                            color = if (diagnosticsState.healthStatus.equals("healthy", ignoreCase = true)) {
+                            color = if (diagnosticsState.healthStatus.equals("Pass", ignoreCase = true)) {
                                 HarnessColors.Secondary
                             } else {
                                 MaterialTheme.colorScheme.onSurface
@@ -767,7 +799,7 @@ class MainActivity :
                             if (diagnosticsState.health.isEmpty()) {
                                 "Run checks to validate the local runtime"
                             } else {
-                                "All available checks have completed"
+                                "Available checks have completed; review any warning or failure below."
                             },
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
