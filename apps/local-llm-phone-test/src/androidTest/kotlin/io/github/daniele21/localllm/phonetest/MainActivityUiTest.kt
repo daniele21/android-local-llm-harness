@@ -57,6 +57,7 @@ class MainActivityUiTest {
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
         composeRule.onNodeWithText("Diagnostics").assertIsDisplayed()
+        composeRule.onNodeWithText("Physical validation").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Open settings").performClick()
         composeRule.onNodeWithText("APPEARANCE").assertIsDisplayed()
@@ -88,6 +89,16 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Fixed").assertIsDisplayed()
         composeRule.onNodeWithText("Context policy").assertIsDisplayed()
         composeRule.onNodeWithText("Auto").assertIsDisplayed()
+    }
+
+    @Test
+    fun diagnosticsUsesOverviewThenDeterministicDrillDown() {
+        composeRule.onNodeWithTag("nav-diagnostics").performClick()
+        composeRule.onNodeWithText("Health").performClick()
+        composeRule.onNodeWithText("Overall health").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to diagnostics").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Physical validation").assertIsDisplayed()
+        assertTextAbsent("Back to diagnostics")
     }
 
     private fun assertTextAbsent(text: String) {
