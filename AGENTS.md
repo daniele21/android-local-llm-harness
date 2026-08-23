@@ -27,7 +27,7 @@ Canonical routing:
 - [`docs/workstreams/README.md`](docs/workstreams/README.md) — active-workstream lifecycle;
 - [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) — product-UI experience and brand contracts when UI changes.
 
-[`docs/documentation-policy.json`](docs/documentation-policy.json) is only a compatibility symlink to the `.engineering` owner.
+[`docs/documentation-policy.json`](docs/documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
 
 ## Repository purpose
 
