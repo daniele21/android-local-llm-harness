@@ -294,12 +294,15 @@ private fun validateRegisteredConsumer(
             "Host returned an invalid registration result",
         )
     }
+    val token = requireNotNull(result.clientToken)
+    if (BinderProtocolV1.FEATURE_CONSUMER_API_V1 !in negotiated.enabledFeatures) {
+        return RegisteredConsumerValidation.Ready(token)
+    }
     return try {
-        // Registration and feature negotiation are not sufficient proof that the caller may use
-        // the Consumer API. Older hosts can expose the feature while enforcing package/signature
-        // authorization at getConsumerApi(). Probe that boundary before publishing CONNECTED.
+        // Consumer API v1 requires an authorization probe before CONNECTED. Legacy clients that
+        // did not negotiate the feature intentionally skip this newer endpoint.
         service.consumer
-        RegisteredConsumerValidation.Ready(requireNotNull(result.clientToken))
+        RegisteredConsumerValidation.Ready(token)
     } catch (error: SecurityException) {
         RegisteredConsumerValidation.Rejected(
             SharedRuntimeConnectionState.PERMISSION_DENIED,
