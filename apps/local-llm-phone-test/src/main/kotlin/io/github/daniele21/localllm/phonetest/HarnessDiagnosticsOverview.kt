@@ -43,10 +43,7 @@ internal fun harnessDiagnosticsOverviewState(
 )
 
 @Composable
-internal fun HarnessDiagnosticsOverview(
-    state: HarnessDiagnosticsOverviewState,
-    onOpen: (DiagnosticsSection) -> Unit,
-) {
+internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, onOpen: (DiagnosticsSection) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         DiagnosticEntryCard(
             title = "Health",
@@ -65,7 +62,13 @@ internal fun HarnessDiagnosticsOverview(
         )
         DiagnosticEntryCard(
             title = "Runs",
-            detail = if (state.runCount == 0) "No local inference runs recorded yet." else "${state.runCount} privacy-safe run records available.",
+            detail = if (state.runCount ==
+                0
+            ) {
+                "No local inference runs recorded yet."
+            } else {
+                "${state.runCount} privacy-safe run records available."
+            },
             status = state.runCount.toString(),
             tone = HarnessStatusTone.INFO,
             onClick = { onOpen(DiagnosticsSection.RUNS) },
@@ -94,7 +97,13 @@ internal fun HarnessDiagnosticsOverview(
         )
         DiagnosticEntryCard(
             title = "Logs",
-            detail = if (state.logCount == 0) "No structured privacy-safe logs recorded yet." else "${state.logCount} bounded log entries available.",
+            detail = if (state.logCount ==
+                0
+            ) {
+                "No structured privacy-safe logs recorded yet."
+            } else {
+                "${state.logCount} bounded log entries available."
+            },
             status = state.logCount.toString(),
             tone = HarnessStatusTone.INFO,
             onClick = { onOpen(DiagnosticsSection.LOGS) },
@@ -114,13 +123,7 @@ internal fun HarnessDiagnosticsOverview(
 }
 
 @Composable
-private fun DiagnosticEntryCard(
-    title: String,
-    detail: String,
-    status: String,
-    tone: HarnessStatusTone,
-    onClick: () -> Unit,
-) {
+private fun DiagnosticEntryCard(title: String, detail: String, status: String, tone: HarnessStatusTone, onClick: () -> Unit) {
     HarnessCard(modifier = Modifier.clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
