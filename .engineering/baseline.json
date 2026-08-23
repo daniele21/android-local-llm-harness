@@ -5,7 +5,7 @@
     "version": "0.4.0"
   },
   "target_level": "L2",
-  "profiles": [],
+  "profiles": ["android", "local-ai", "product-ui"],
   "skills": {
     "plan-workstream": {"source_version": "0.1.0", "customized": false},
     "structured-change": {"source_version": "0.4.0", "customized": false},
