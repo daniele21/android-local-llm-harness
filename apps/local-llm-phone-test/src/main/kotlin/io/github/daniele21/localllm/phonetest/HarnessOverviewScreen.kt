@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -196,7 +197,14 @@ private fun OverviewInfoRow(
     showDivider: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = "Open $label",
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
