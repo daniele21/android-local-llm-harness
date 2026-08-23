@@ -23,6 +23,8 @@ jobs:
           fetch-depth: 0
       - name: Verify repo-template-sw operating contract
         run: python3 scripts/verify_operations.py
+      - name: Verify product experience contract
+        run: python3 scripts/verify_product_experience.py
       - name: Verify Harness agent navigation
         run: python3 scripts/verify-agent-navigation.py
       - name: Verify documentation lifecycle
