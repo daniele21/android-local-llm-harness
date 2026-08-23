@@ -24,7 +24,10 @@ Canonical repository routing:
 - [`docs/architecture.md`](docs/architecture.md) and [`docs/adr/README.md`](docs/adr/README.md) — architecture ownership and durable decisions;
 - [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge/release completion policy;
 - [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — Harness 0.5 release gates;
-- [`docs/documentation-policy.json`](docs/documentation-policy.json) — compatibility policy owner used by the current documentation validator during the 0.4 migration.
+- [`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) — machine-enforced documentation budgets and lifecycle policy;
+- [`docs/workstreams/README.md`](docs/workstreams/README.md) — bounded active-workstream lifecycle.
+
+[`docs/documentation-policy.json`](docs/documentation-policy.json) is a compatibility symlink to the `.engineering` owner for validators that still use the legacy path; it is not a second policy source.
 
 Do not load every plan or all documentation for a local change.
 
@@ -110,11 +113,11 @@ Missing hardware/device evidence remains pending; synthetic evidence must not be
 - `docs/features/` owns durable feature behavior when a dedicated source is justified.
 - `docs/adr/` owns accepted durable architectural decisions.
 - [`docs/current-state.md`](docs/current-state.md) is the single repository operational ledger.
-- `docs/workstreams/` is reserved for active bounded implementation workstreams.
+- [`docs/workstreams/`](docs/workstreams/README.md) is reserved for active bounded implementation workstreams.
 - Completed workstreams are deleted by default after durable knowledge moves to its owner; archive only with independent audit/release/regulatory value.
-- Git history owns implementation history.
+- Git history owns normal implementation history.
 
-[`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) is the repo-template-sw 0.4 policy surface. [`docs/documentation-policy.json`](docs/documentation-policy.json) remains a compatibility mirror until the existing Harness validator is migrated; do not let the two silently diverge.
+[`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) is the single machine-readable policy owner. The legacy [`docs/documentation-policy.json`](docs/documentation-policy.json) path is only a symlink for compatibility.
 
 ## Maintaining agent guides
 
