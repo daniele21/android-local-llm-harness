@@ -24,9 +24,10 @@ Canonical routing:
 - [`docs/architecture.md`](docs/architecture.md), [`docs/adr/README.md`](docs/adr/README.md) — architecture and decisions;
 - [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — completion/release gates;
 - [`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) — documentation policy;
-- [`docs/workstreams/README.md`](docs/workstreams/README.md) — active-workstream lifecycle.
+- [`docs/workstreams/README.md`](docs/workstreams/README.md) — active-workstream lifecycle;
+- [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) — product-UI experience and brand contracts when UI changes.
 
-[`docs/documentation-policy.json`](docs/documentation-policy.json) is only a compatibility symlink to the `.engineering` owner.
+[`docs/documentation-policy.json`](docs/documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
 
 ## Repository purpose
 
@@ -64,7 +65,7 @@ Inspect the owner, direct consumers and tests before editing.
 | Embedded transport | `transports/in-process` | contracts/runtime |
 | Shared Binder/control plane | `transports/android-binder-*`, `integrations/android-service-host` | contracts/fixtures |
 | Packaged consumer validation | `apps/shared-runtime-client-consumer-fixture` | Binder AARs, packaging |
-| Shared Compose UI | `ui/design-system` | Android apps, accessibility |
+| Shared Compose UI | `ui/design-system` | `design/*` contracts, Android apps, accessibility |
 | Connected phone behavior | `apps/local-llm-phone-test` | owning domain contracts |
 | CI/packaging/governance | `.github`, `.engineering`, `scripts` | affected validation/docs |
 

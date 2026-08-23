@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.4.0",
+  "product_name": "Harness",
+  "assets": {
+    "logo_primary": "docs/assets/brand/master/harness-lockup.svg",
+    "logo_compact": "docs/assets/brand/master/harness-symbol.svg",
+    "logo_monochrome": "docs/assets/brand/master/harness-symbol.svg (monochrome Android output is generated deterministically)",
+    "app_icon": "generated Android launcher resources from docs/assets/brand/master/harness-symbol.svg",
+    "favicon": "n/a — Android product surface"
+  },
+  "themes": {
+    "light": true,
+    "dark": true
+  },
+  "tokens": {
+    "colors": {
+      "surface": "ui/design-system HarnessColors/HarnessTheme semantic surface token",
+      "surface_elevated": "ui/design-system semantic elevated/container surface token",
+      "text_primary": "MaterialTheme colorScheme on-surface semantic token",
+      "text_secondary": "MaterialTheme colorScheme secondary/on-surface-variant semantic token",
+      "primary": "ui/design-system Harness purple primary semantic token",
+      "success": "ui/design-system HarnessStatusTone success semantic token",
+      "warning": "ui/design-system HarnessStatusTone warning semantic token",
+      "error": "MaterialTheme/HarnessStatusTone error semantic token",
+      "border": "MaterialTheme outline semantic token",
+      "focus": "platform/Material focus indication using semantic theme colors"
+    },
+    "typography": "ui/design-system HarnessTypography.kt and offline HarnessFontFamilies aliases",
+    "spacing": "ui/design-system HarnessSpacing.kt",
+    "radius": "ui/design-system HarnessShapes.kt",
+    "elevation": "Material 3 semantic surface/elevation behavior through shared Harness components"
+  },
+  "style": {
+    "iconography": "Material/platform-appropriate icons with text or semantic cues for critical status; never color-only meaning",
+    "motion": "restrained state/progress/hierarchy motion only, with reduced-motion behavior where available",
+    "imagery": "technical product evidence and bounded reference views only; no decorative imagery required for core workflows",
+    "voice_microcopy": "direct, specific, technical and privacy-conscious; name the operation/object, distinguish lifecycle states, give actionable recovery, and never overclaim evidence"
+  }
+}
