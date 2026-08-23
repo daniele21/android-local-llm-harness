@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-23
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -37,6 +37,8 @@ Remaining app hardening is primarily:
 - recreation/back-stack and state-restoration evidence;
 - accessibility, large-font, landscape/expanded and screenshot coverage;
 - final signed Internal Testing evidence.
+
+The repo-template-sw 0.5 product-experience realignment is actively coordinated in [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). It first removes the current `MainActivity.kt` screen-ownership bottleneck, then runs Overview correctness, Playground progressive disclosure, Diagnostics IA and Settings cleanup as parallel disjoint lanes before adaptive/accessibility, evaluation-decision and final state/evidence convergence.
 
 ### Shared Android runtime
 
@@ -126,11 +128,12 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 4. keep Q35-6 and SR-6 physical evidence in parallel where hardware sessions can be shared without conflating their exit gates;
 5. complete privacy/security, packaged-APK, versioning/signing and release-documentation checks only against the exact distributed build.
 
-Model-evaluation work may proceed in parallel when ownership is disjoint, without changing these OMBRA dependency and evidence gates.
+Model-evaluation and the Harness product-experience realignment may proceed in parallel when write ownership is disjoint, without changing these OMBRA dependency and evidence gates.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
+- Harness product-experience workstream: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md)
 - Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
