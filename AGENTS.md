@@ -1,6 +1,6 @@
 # Android Local LLM Harness — Coding Agent Guide
 
-Repository-wide routing, invariants and validation selection for coding agents.
+Repository-wide routing, invariants and validation selection.
 
 ## Read only what the task requires
 
@@ -9,26 +9,26 @@ Read this guide, then only:
 1. the closest scoped `AGENTS.md`;
 2. the owning architecture, feature or active-workstream source;
 3. [`.engineering/commands.json`](.engineering/commands.json) when operational behavior matters;
-4. the relevant project-local Skill under [`skills/`](skills/README.md) for recurring ordered procedures;
-5. when user-facing behavior or visual semantics change, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md);
-6. the implementation, direct consumers, fakes and nearby tests.
+4. the relevant project-local Skill under [`skills/`](skills/README.md);
+5. for user-facing/visual semantics, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md);
+6. implementation, direct consumers, fakes and nearby tests.
 
 Scoped guides: [`models/AGENTS.md`](models/AGENTS.md), [`backends/llama-cpp/AGENTS.md`](backends/llama-cpp/AGENTS.md), [`observability/AGENTS.md`](observability/AGENTS.md), [`evaluation/AGENTS.md`](evaluation/AGENTS.md), [`apps/local-llm-phone-test/AGENTS.md`](apps/local-llm-phone-test/AGENTS.md), [`integrations/android-service-host/AGENTS.md`](integrations/android-service-host/AGENTS.md), [`transports/android-binder-client/AGENTS.md`](transports/android-binder-client/AGENTS.md), [`transports/android-binder-contract/AGENTS.md`](transports/android-binder-contract/AGENTS.md).
 
 Canonical routing:
 
-- [`README.md`](README.md) — purpose and modules;
+- [`README.md`](README.md) — purpose/modules;
 - [`BRANCHING.md`](BRANCHING.md) — branch/PR policy;
 - [`docs/README.md`](docs/README.md) — documentation map;
-- [`docs/current-state.md`](docs/current-state.md) — integrated state and blockers;
+- [`docs/current-state.md`](docs/current-state.md) — integrated state/blockers;
 - [`docs/roadmap.md`](docs/roadmap.md) — capability milestones;
-- [`docs/implementation-plan.md`](docs/implementation-plan.md) — repository target routing;
-- [`docs/architecture.md`](docs/architecture.md), [`docs/adr/README.md`](docs/adr/README.md) — architecture and decisions;
+- [`docs/implementation-plan.md`](docs/implementation-plan.md) — repository target;
+- [`docs/architecture.md`](docs/architecture.md), [`docs/adr/README.md`](docs/adr/README.md) — architecture/decisions;
 - [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — completion/release gates;
 - [`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) — documentation policy;
 - [`docs/workstreams/README.md`](docs/workstreams/README.md) — active-workstream lifecycle;
-- [`skills/README.md`](skills/README.md) — project-local recurring procedures;
-- [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) — product experience and brand/design-system contracts.
+- [`skills/README.md`](skills/README.md) — recurring procedures;
+- [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) — product-experience/brand contracts.
 
 [`docs/documentation-policy.json`](docs/documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
 
@@ -95,25 +95,23 @@ user outcome
 -> validation
 ```
 
-Classify the change first:
+Classify first:
 
-- **structural UX** — use the full sequence;
-- **interaction** — start from the owning task/journey and cover affected state, feedback, accessibility, adaptive/component and motion layers;
-- **visual-only** — preserve settled flow/interaction semantics and stay with the existing design-system/brand owner.
-
-Do not expose internal architecture merely because implementation options exist. Do not create a new component when the design system already owns the semantic role. Do not use motion, graphics or polish to compensate for unresolved task flow, hierarchy or feedback.
+- **structural UX** — full sequence;
+- **interaction** — owning task/journey plus affected state, feedback, accessibility, adaptive/component and motion layers;
+- **visual-only** — preserve settled flow/interaction semantics; stay with the design-system/brand owner.
 
 ## Change workflow
 
 1. Confirm owner and smallest coherent scope.
-2. Use [`skills/plan-workstream/SKILL.md`](skills/plan-workstream/SKILL.md) only when persistent dependency/state coordination is justified.
-3. Use [`skills/structured-change/SKILL.md`](skills/structured-change/SKILL.md) before and after meaningful behavior/cross-layer changes.
-4. For meaningful user-facing changes, use `design-product-experience` before implementation at the appropriate depth.
+2. Use [`skills/plan-workstream/SKILL.md`](skills/plan-workstream/SKILL.md) only for persistent dependency/state coordination.
+3. Use [`skills/structured-change/SKILL.md`](skills/structured-change/SKILL.md) around meaningful behavior/cross-layer changes.
+4. For meaningful user-facing changes, use `design-product-experience` before implementation at appropriate depth.
 5. Inspect owner, consumers, fakes and tests before shared-contract changes.
 6. Implement one vertical slice; avoid parallel domain logic.
-7. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) to select the narrowest sufficient iteration gate and the correct final blast-radius gate.
+7. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) for iteration and final blast-radius gates.
 8. Update only the canonical durable owner.
-9. Finalize completed workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
+9. Finalize workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
 10. Inspect the complete diff before publishing.
 
 Ordinary work starts from latest green `dev` and targets `dev`; `main` is promotion/hotfix only under [`BRANCHING.md`](BRANCHING.md).
@@ -125,9 +123,9 @@ Use the scoped guide, [`skills/validate-change/SKILL.md`](skills/validate-change
 - **Documentation/navigation:** documentation and agent guards.
 - **Targeted:** owning module plus direct consumers.
 - **Repository-wide:** shared contracts, Gradle, CI, packaging or multi-domain changes.
-- **Product experience:** changed task/journey, hierarchy, states/recovery, accessibility/adaptive behavior, design-system reuse and purposeful motion/graphics semantics.
+- **Product experience:** task/journey, hierarchy, states/recovery, accessibility/adaptive behavior, design-system reuse and purposeful motion/graphics.
 - **Native:** CMake/CTest for native ownership changes.
-- **Physical device:** hardware-, memory-, thermal-, packaged cross-app or representative usability claims that CI cannot prove.
+- **Physical device:** hardware-, memory-, thermal-, packaged cross-app or representative usability claims CI cannot prove.
 
 Missing device/usability evidence remains pending; never upgrade synthetic evidence into a stronger claim.
 
@@ -135,14 +133,14 @@ Missing device/usability evidence remains pending; never upgrade synthetic evide
 
 - [`docs/architecture.md`](docs/architecture.md), `docs/features/` and `docs/adr/` own durable knowledge.
 - [`docs/current-state.md`](docs/current-state.md) is the single repository operational ledger.
-- [`docs/workstreams/`](docs/workstreams/README.md) holds active bounded implementation workstreams.
-- `design/` owns durable product-experience/brand routing; generated screenshots remain evidence, not default design truth.
+- [`docs/workstreams/`](docs/workstreams/README.md) holds active bounded workstreams.
+- `design/` owns durable product-experience/brand routing; generated screenshots are evidence, not default design truth.
 - Completed workstreams are deleted after durable transfer; archive only for independent audit/release/regulatory value.
 - Git history owns normal implementation history.
 
 ## Maintaining agent guides
 
-Keep only durable routing, hazards, invariants and validation selection. Put recurring conditional procedure in project-local Skills and deterministic rules in scripts/CI. When a canonical source moves, update routing and rerun guards.
+Keep durable routing, hazards, invariants and validation selection. Put recurring procedure in Skills and deterministic rules in scripts/CI. Update routing when owners move and rerun guards.
 
 ## Stop conditions
 
