@@ -109,13 +109,7 @@ private fun SettingsSectionLabel(text: String) {
 }
 
 @Composable
-private fun SettingsRow(
-    destination: HarnessDestination,
-    title: String,
-    detail: String,
-    trailing: String,
-    onClick: () -> Unit,
-) {
+private fun SettingsRow(destination: HarnessDestination, title: String, detail: String, trailing: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surface,
