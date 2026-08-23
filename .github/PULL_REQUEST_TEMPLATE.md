@@ -26,7 +26,7 @@ Harness invariants to call out when relevant:
 
 ## Product experience
 
-If user-facing behavior changes, describe task/IA/progressive disclosure, loading/empty/error/disabled states, recovery, accessibility/adaptive-layout and design-system implications. Otherwise `N/A`.
+If user-facing behavior changes, classify it as structural UX, interaction or visual-only and describe the affected user outcome/task, information/action hierarchy, progressive disclosure/defaults, critical states/feedback/recovery, accessibility/adaptive behavior, design-system ownership and any purposeful motion/graphics semantics. Confirm that structure/interaction was resolved before motion or polish. Otherwise `N/A`.
 
 ## Build / runtime / artifact lifecycle
 
@@ -40,11 +40,11 @@ List exact checks and evidence executed; never claim evidence not run.
 - [ ] `Repository validation` is green on the current head.
 - [ ] `Repository health` is green on the current head.
 - [ ] Relevant Android packaging/native checks are green.
-- [ ] Missing physical-device evidence is explicitly pending rather than inferred.
+- [ ] Missing physical-device or representative-usability evidence is explicitly pending rather than inferred.
 
 ## E2E / experience evidence
 
-For a complete critical workflow or stable high-risk UI surface, describe journey, environment/artifact identity, accessibility/visual/usability evidence, cleanup verification and bounded evidence retention. Otherwise `N/A`.
+For a complete critical workflow or stable high-risk UI surface, describe journey, environment/artifact identity, accessibility/visual/usability evidence, cleanup verification and bounded evidence retention. A screenshot alone does not prove interaction, recovery, accessibility, adaptive behavior or usability. Otherwise `N/A`.
 
 ## Documentation / design lifecycle
 

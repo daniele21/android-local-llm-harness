@@ -2,14 +2,15 @@
   "schema_version": 1,
   "standard": {
     "source": "daniele21/repo-template-sw",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "target_level": "L2",
   "profiles": ["android", "local-ai", "product-ui"],
   "skills": {
     "plan-workstream": {"source_version": "0.1.0", "customized": false},
-    "structured-change": {"source_version": "0.4.0", "customized": false},
-    "validate-change": {"source_version": "0.4.0", "customized": false},
+    "structured-change": {"source_version": "0.5.0", "customized": false},
+    "design-product-experience": {"source_version": "0.5.0", "customized": false},
+    "validate-change": {"source_version": "0.5.0", "customized": false},
     "finalize-workstream": {"source_version": "0.1.0", "customized": false},
     "review-reference-quality": {"source_version": "0.4.0", "customized": false}
   },
