@@ -1,3 +1,5 @@
+@file:Suppress("FunctionName")
+
 package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.foundation.layout.Arrangement
