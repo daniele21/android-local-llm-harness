@@ -90,7 +90,7 @@ internal data class HarnessUiState(
     val logFilter: DiagnosticsLogFilter = DiagnosticsLogFilter(),
     val logs: DiagnosticsLogUiState = DiagnosticsLogUiState(),
     val selectedRequestTimeline: DiagnosticsRequestTimelineUi? = null,
-    val diagnosticsSection: DiagnosticsSection = DiagnosticsSection.HEALTH,
+    val diagnosticsSection: DiagnosticsSection = DiagnosticsSection.OVERVIEW,
     val playgroundPrompt: String = DEFAULT_PROMPT,
     val playgroundMaxTokens: String = DEFAULT_MAX_OUTPUT_TOKENS,
     val playgroundTemperature: String = DEFAULT_TEMPERATURE,
@@ -288,7 +288,7 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.ReportChanged -> state.copy(
             latestReport = event.report,
-            operationStatus = "Validation completed",
+            operationStatus = if (event.report.isBlank()) state.operationStatus else "Validation completed",
         )
 
         is HarnessUiEvent.OperationStatusChanged -> state.copy(operationStatus = event.status)
