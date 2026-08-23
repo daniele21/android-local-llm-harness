@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.3.0",
+  "commands": {
+    "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
+    "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
+    "dev": {"status": "n/a", "run": "n/a"},
+    "check": {"status": "required", "run": "python3 scripts/verify-agent-navigation.py && python3 scripts/verify_architecture.py && ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts"},
+    "test": {"status": "required", "run": "./gradlew --no-configuration-cache check"},
+    "e2e": {"status": "recommended", "run": "bash scripts/capture-device-e2e-evidence.sh --model \"$MODEL_GGUF\" --architecture \"$MODEL_ARCHITECTURE\" --quantization \"$MODEL_QUANTIZATION\" --memory-repeat 5"},
+    "build": {"status": "required", "run": "./gradlew assembleDebug"},
+    "smoke": {"status": "n/a", "run": "n/a"},
+    "package": {"status": "optional", "run": "LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true ./gradlew :apps:local-llm-phone-test:bundleRelease"},
+    "stop": {"status": "n/a", "run": "n/a"},
+    "clean": {"status": "required", "run": "./gradlew clean && rm -rf build/native-tests build/llrt-suite"}
+  },
+  "end_to_end": {
+    "recommended_when_full_workflow_boundary_exists": true,
+    "critical_journeys_prioritized": true,
+    "lower_level_tests_remain_primary": true,
+    "use_stack_native_tooling": true,
+    "run_against_built_artifact_when_material": true,
+    "failure_evidence_bounded": true,
+    "zero_residue_required": true
+  },
+  "build_identity": {
+    "unique_per_build": true,
+    "source_revision_required": true,
+    "dirty_state_required": true,
+    "lineage_fields": ["project", "platform", "architecture", "channel", "variant"],
+    "artifact_name_fields": ["product", "product_version", "build_id", "source_revision"]
+  },
+  "artifact_lifecycle": {
+    "immutable_successful_artifacts": true,
+    "promote_only_after_success": true,
+    "manifest_required": true,
+    "manifest_name": "build-manifest.json",
+    "checksum_algorithm": "sha256",
+    "local_keep_successful_per_lineage": 2,
+    "ci_store": "github-actions",
+    "ci_retention_days": 7,
+    "release_store": "github-releases",
+    "release_artifacts_immutable": true
+  },
+  "build_delta": {
+    "required": true,
+    "compare_to": "previous-successful-comparable-build",
+    "output": "BUILD_CHANGELOG.md",
+    "bundle_with_artifact": true,
+    "dimensions": [
+      "source",
+      "dependencies",
+      "toolchain",
+      "configuration",
+      "compatibility_migrations",
+      "artifact_metrics",
+      "validation"
+    ]
+  },
+  "local_runtime": {
+    "applicable": false,
+    "bind_default": "loopback",
+    "port_strategy": "configurable-with-collision-check",
+    "foreground_default": true,
+    "readiness_required": true,
+    "graceful_shutdown_required": true,
+    "verify_no_project_listener_after_stop": true
+  },
+  "ephemeral_resources": {
+    "run_identity": true,
+    "isolated_workspace": true,
+    "cleanup_paths": ["success", "failure", "timeout", "cancellation", "interrupt", "partial-initialization"],
+    "stale_resource_recovery": true,
+    "ownership_required_before_cleanup": true,
+    "post_cleanup_verification": true
+  }
+}

@@ -1,0 +1,37 @@
+name: Repository health
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-health-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engineering-baseline:
+    name: Engineering baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify repo-template-sw operating contract
+        run: python3 scripts/verify_operations.py
+      - name: Verify Harness agent navigation
+        run: python3 scripts/verify-agent-navigation.py
+      - name: Verify documentation lifecycle
+        env:
+          DOCS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 scripts/test_verify_docs.py
+          python3 scripts/verify-docs.py --base "$DOCS_BASE_SHA"
+      - name: Verify repository scripts remain parseable
+        run: python3 -m py_compile scripts/*.py
+      - name: Verify clean diff semantics
+        run: git diff --check
