@@ -38,7 +38,7 @@ Remaining app hardening is primarily:
 - accessibility, large-font, landscape/expanded and screenshot coverage;
 - final signed Internal Testing evidence.
 
-The repo-template-sw 0.5 product-experience realignment is actively coordinated in [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). It first removes the current `MainActivity.kt` screen-ownership bottleneck, then runs Overview correctness, Playground progressive disclosure, Diagnostics IA and Settings cleanup as parallel disjoint lanes before adaptive/accessibility, evaluation-decision and final state/evidence convergence.
+Active phone UX/UI realignment: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). Overview, Playground, Diagnostics and Settings proceed as disjoint lanes after the screen-ownership split.
 
 ### Shared Android runtime
 
@@ -127,8 +127,6 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence on representative Android hardware and independently verify exported output;
 4. keep Q35-6 and SR-6 physical evidence in parallel where hardware sessions can be shared without conflating their exit gates;
 5. complete privacy/security, packaged-APK, versioning/signing and release-documentation checks only against the exact distributed build.
-
-Model-evaluation and the Harness product-experience realignment may proceed in parallel when write ownership is disjoint, without changing these OMBRA dependency and evidence gates.
 
 ## Source links
 
