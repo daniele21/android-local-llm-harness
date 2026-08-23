@@ -1,25 +1,32 @@
 # Android Local LLM Harness — Coding Agent Guide
 
-This is the repository-wide navigation layer for coding agents. It owns durable invariants, routing and validation selection. It is not a project-status ledger or a substitute for architecture/feature documentation.
+This file is the repository-wide navigation layer for coding agents. It owns durable invariants, routing and validation selection. It is not a project-status ledger or a substitute for architecture/feature documentation.
 
 ## Read only what the task requires
 
-Always read this guide. Then read only:
+Always read this guide, then only the sources needed for the task:
 
 1. the closest scoped `AGENTS.md` for the target subtree;
-2. the canonical architecture, feature or active workstream source required by the task;
-3. `.engineering/commands.json` when setup/check/test/E2E/build/package/cleanup behavior matters;
+2. the canonical architecture, feature or active-workstream source;
+3. [`.engineering/commands.json`](.engineering/commands.json) when setup/check/test/E2E/build/package/cleanup behavior matters;
 4. the owning implementation, direct consumers, fakes and nearby tests.
 
-Scoped guides currently exist for:
+Scoped guides include [`models/AGENTS.md`](models/AGENTS.md), [`backends/llama-cpp/AGENTS.md`](backends/llama-cpp/AGENTS.md), [`observability/AGENTS.md`](observability/AGENTS.md), [`evaluation/AGENTS.md`](evaluation/AGENTS.md), [`apps/local-llm-phone-test/AGENTS.md`](apps/local-llm-phone-test/AGENTS.md), [`integrations/android-service-host/AGENTS.md`](integrations/android-service-host/AGENTS.md), [`transports/android-binder-client/AGENTS.md`](transports/android-binder-client/AGENTS.md) and [`transports/android-binder-contract/AGENTS.md`](transports/android-binder-contract/AGENTS.md).
 
-- `models/AGENTS.md` — profiles, catalog, download, installation and model storage;
-- `backends/llama-cpp/AGENTS.md` — Kotlin/JNI/C++, CMake, GGUF inspection and upstream pin;
-- `observability/AGENTS.md` — telemetry, stores, health, resources and benchmarks;
-- `evaluation/AGENTS.md` — dataset/model evaluation contracts, scoring, execution and persistence;
-- `apps/local-llm-phone-test/AGENTS.md` — connected Compose app and device evidence.
+Canonical repository routing:
 
-Use `docs/current-state.md` only when integrated state/blockers matter, `docs/architecture.md` for ownership/dependency questions, accepted `docs/adr/` records for durable decisions, and `docs/README.md` to locate canonical documentation. Do not load every plan for a local change.
+- [`README.md`](README.md) — purpose, toolchain and module overview;
+- [`BRANCHING.md`](BRANCHING.md) — branch, PR and promotion policy;
+- [`docs/README.md`](docs/README.md) — documentation ownership map;
+- [`docs/current-state.md`](docs/current-state.md) — integrated state, blockers and next repository block;
+- [`docs/roadmap.md`](docs/roadmap.md) — capability milestones;
+- [`docs/implementation-plan.md`](docs/implementation-plan.md) — repository target and focused-spec routing;
+- [`docs/architecture.md`](docs/architecture.md) and [`docs/adr/README.md`](docs/adr/README.md) — architecture ownership and durable decisions;
+- [`docs/definition-of-done.md`](docs/definition-of-done.md) — merge/release completion policy;
+- [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — Harness 0.5 release gates;
+- [`docs/documentation-policy.json`](docs/documentation-policy.json) — compatibility policy owner used by the current documentation validator during the 0.4 migration.
+
+Do not load every plan or all documentation for a local change.
 
 ## Repository purpose
 
@@ -33,16 +40,18 @@ It provides reusable Android-local LLM execution, model lifecycle, evaluation, o
 - Backend-neutral execution contracts live in `core/backend-spi`; runtime-core does not depend on concrete `backends:*` implementations.
 - Native pointers, ggml/llama structures and backend-owned handles never leave the backend boundary.
 - Runtime orchestration stays independent from transport and persistence implementations.
-- Model resolution is explicit through application/use-case control-plane state; never silently substitute a phone-global or fallback model for an external consumer.
-- Product support is limited to the currently accepted Qwen3.5 dense 0.8B/2B boundary under ADR 0011 while shared contracts remain model-family neutral.
-- Catalog selection, verified transfer, installation, binding/activation and runtime residency are separate explicit operations.
+- External consumers resolve models through explicit application/use-case control-plane state; never silently substitute a phone-global fallback.
+- Product support follows accepted ADRs while shared contracts remain model-family neutral.
+- Catalog selection, verified transfer, installation, binding/activation and runtime residency remain separate explicit operations.
 - GGUF artifacts use immutable SHA-256 identity; never commit or bundle model binaries.
 - Prompts and generated content stay out of normal telemetry, persistence and shared validation reports.
 - Cancellation, timeout, shutdown, memory pressure, partial failure and cleanup are normal lifecycle paths.
 - Keep one resident model and one production active decode by default until representative evidence approves another policy.
 - Emulator/CI evidence must never be presented as physical-device or production evidence.
 
-## Ownership and routing
+## Find the owning boundary
+
+Start from the domain owner, then inspect direct consumers and tests before editing.
 
 | Change | Start here | Inspect next |
 | --- | --- | --- |
@@ -56,8 +65,9 @@ It provides reusable Android-local LLM execution, model lifecycle, evaluation, o
 | llama.cpp/JNI/native generation | `backends/llama-cpp` | backend SPI, runtime, device validation |
 | Telemetry/health/resources/benchmarks | matching `observability/*` owner | stores, engines, presenters |
 | Embedded transport | `transports/in-process` | contracts/runtime |
-| Shared Binder transport/control plane | `transports/android-binder-*` + `integrations/android-service-host` | shared-runtime docs/contracts/fixtures |
-| Shared Compose components | `ui/design-system` | both Android apps and accessibility coverage |
+| Shared Binder transport/control plane | `transports/android-binder-*` + `integrations/android-service-host` | shared-runtime contracts/fixtures |
+| Packaged consumer validation | `apps/shared-runtime-client-consumer-fixture` | Binder client/contract AARs and packaging |
+| Shared Compose components | `ui/design-system` | Android apps and accessibility coverage |
 | Connected phone behavior | `apps/local-llm-phone-test` | owning domain contracts |
 | CI/packaging/repository governance | `.github`, `.engineering`, `scripts` | affected docs/validation guards |
 
@@ -65,38 +75,52 @@ It provides reusable Android-local LLM execution, model lifecycle, evaluation, o
 
 ## Project operating commands
 
-Canonical intent-to-command routing lives in `.engineering/commands.json`. Use those commands instead of adding a second repository-wide command vocabulary.
+Canonical intent-to-command routing lives in [`.engineering/commands.json`](.engineering/commands.json). Use those commands instead of adding a second repository-wide command vocabulary.
 
-The main intents are `setup`, `doctor`, `check`, `test`, `e2e`, `build`, `package` and `clean`. `dev`, `smoke` and `stop` are explicitly `n/a` until the repository owns a distinct lifecycle for them.
+The main intents are `setup`, `doctor`, `check`, `test`, `e2e`, `build`, `package` and `clean`. Intents declared `n/a` stay unavailable until the repository owns a distinct lifecycle for them.
 
-Physical-device E2E requires the model identity inputs declared by the command contract. Missing hardware evidence stays pending; do not weaken the claim.
-
-## Core change workflow
+## Change workflow
 
 1. Confirm the owning boundary and smallest coherent scope.
 2. Use a bounded workstream only when dependencies/state must survive across PRs or agents.
 3. Inspect owner, direct consumers, fakes and tests before changing a shared contract.
 4. Implement one coherent vertical slice without speculative modules or parallel domain logic.
-5. Add deterministic success/invalid-input/failure/cancellation/cleanup coverage where applicable.
+5. Add deterministic success, invalid-input, failure, cancellation and cleanup coverage where applicable.
 6. Run the narrowest sufficient validation while iterating; expand according to blast radius.
-7. Update only the canonical durable document whose current behavior or decision changed.
+7. Update only the canonical durable document whose behavior or decision changed.
 8. Inspect the complete diff before publishing.
 
-Ordinary work starts from the latest green `dev` and targets `dev`. `main` is reserved for validated `dev -> main` promotion or an explicit emergency hotfix as defined in `BRANCHING.md`.
+Ordinary work starts from the latest green `dev` and targets `dev`. `main` is reserved for validated promotion or an explicit emergency hotfix under [`BRANCHING.md`](BRANCHING.md).
+
+## Validation levels
+
+Use the closest scoped guide and [`.engineering/commands.json`](.engineering/commands.json) rather than duplicating full command strings here.
+
+- **Documentation/navigation:** run documentation and agent-navigation guards.
+- **Targeted change:** format/compile/test the owning module plus direct consumers.
+- **Repository-wide:** use for shared contracts, Gradle, CI, packaging or multiple domains.
+- **Native:** run host-native CMake/CTest when `llama.cpp` or native ownership changes.
+- **Physical device:** required for claims whose truth depends on Android hardware, memory, thermal behavior or packaged cross-app execution.
+
+Missing hardware/device evidence remains pending; synthetic evidence must not be promoted into a stronger claim.
 
 ## Documentation lifecycle
 
-- `docs/architecture.md` owns current architecture and ownership.
+- [`docs/architecture.md`](docs/architecture.md) owns current architecture and ownership.
 - `docs/features/` owns durable feature behavior when a dedicated source is justified.
 - `docs/adr/` owns accepted durable architectural decisions.
-- `docs/current-state.md` is the single repository operational ledger.
+- [`docs/current-state.md`](docs/current-state.md) is the single repository operational ledger.
 - `docs/workstreams/` is reserved for active bounded implementation workstreams.
-- Completed workstreams are deleted by default after durable behavior/decisions move to their owners; archive only with independent audit/release/regulatory value.
+- Completed workstreams are deleted by default after durable knowledge moves to its owner; archive only with independent audit/release/regulatory value.
 - Git history owns implementation history.
 
-`.engineering/documentation-policy.json` is the repo-template-sw 0.4 policy surface. `docs/documentation-policy.json` remains a compatibility mirror for the existing Harness documentation validator until that validator is migrated; keep the two files semantically synchronized during the transition.
+[`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) is the repo-template-sw 0.4 policy surface. [`docs/documentation-policy.json`](docs/documentation-policy.json) remains a compatibility mirror until the existing Harness validator is migrated; do not let the two silently diverge.
 
-Agent guides contain only durable routing, hazards, invariants and validation selection. Do not put branch/PR status, completed-work histories, release checklists or duplicate feature specifications here.
+## Maintaining agent guides
+
+Agent guides contain only durable routing, hazards, invariants and validation selection. Do not put branch/PR status, completed-work histories, release checklists or duplicate feature specifications in them.
+
+Update the root guide only for repository-wide routing/invariants. Put subtree-specific ownership, hazards and commands in the closest scoped guide. When a canonical source moves, update navigation in the same change and rerun the agent/documentation guards.
 
 ## Stop conditions
 
