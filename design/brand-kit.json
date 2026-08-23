@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.4.0",
+  "contract_version": "0.5.0",
   "product_name": "Harness",
   "assets": {
     "logo_primary": "docs/assets/brand/master/harness-lockup.svg",
@@ -33,8 +33,26 @@
   },
   "style": {
     "iconography": "Material/platform-appropriate icons with text or semantic cues for critical status; never color-only meaning",
-    "motion": "restrained state/progress/hierarchy motion only, with reduced-motion behavior where available",
-    "imagery": "technical product evidence and bounded reference views only; no decorative imagery required for core workflows",
+    "motion": "restrained and purposeful; use motion only for feedback, continuity, spatial relationship, state transition, progress, attention, hierarchy or meaningful completion; never to compensate for unclear structure",
+    "imagery": "functional technical product evidence, orientation, explanation, data visualization and bounded reference views before decoration; core workflows must remain understandable without decorative imagery",
     "voice_microcopy": "direct, specific, technical and privacy-conscious; name the operation/object, distinguish lifecycle states, give actionable recovery, and never overclaim evidence"
+  },
+  "motion_tokens": {
+    "durations": {
+      "instant": "immediate state update/no animation when continuity adds no user value",
+      "fast": "Compose/Material platform-default motion for frequent feedback; no Harness numeric override",
+      "standard": "Compose/Material platform-default motion for ordinary state transitions; no Harness numeric override",
+      "large": "Compose/Material platform-default motion for infrequent large navigation/continuity transitions; no Harness numeric override"
+    },
+    "easing": {
+      "enter": "Compose/Material platform easing; no Harness override",
+      "exit": "Compose/Material platform easing; no Harness override",
+      "move": "Compose/Material platform easing; no Harness override"
+    },
+    "spring": {
+      "default": "Compose/Material platform spring only when interaction semantics benefit; no Harness override",
+      "bounce": "avoid bounce by default; allow only restrained use when it communicates meaningful completion"
+    },
+    "reduced_motion_strategy": "respect Android/Compose accessibility and animator-scale signals where available; prefer immediate or simplified transitions and never require motion to understand state or progress"
   }
 }
