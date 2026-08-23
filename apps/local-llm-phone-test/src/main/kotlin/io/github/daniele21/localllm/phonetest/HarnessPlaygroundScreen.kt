@@ -171,11 +171,7 @@ private fun PlaygroundPromptCard(
 }
 
 @Composable
-private fun PlaygroundPresetControls(
-    state: HarnessUiState,
-    presentation: PlaygroundPresentation,
-    onPresetChanged: (String) -> Unit,
-) {
+private fun PlaygroundPresetControls(state: HarnessUiState, presentation: PlaygroundPresentation, onPresetChanged: (String) -> Unit) {
     val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
     val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
     Text(
@@ -201,11 +197,7 @@ private fun PlaygroundPresetControls(
 }
 
 @Composable
-private fun PlaygroundAdvancedControls(
-    state: HarnessUiState,
-    presentation: PlaygroundPresentation,
-    actions: HarnessPlaygroundActions,
-) {
+private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
     Text("Thinking", style = MaterialTheme.typography.labelLarge)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(
@@ -253,11 +245,7 @@ private fun PlaygroundAdvancedControls(
 }
 
 @Composable
-private fun PlaygroundExpertControls(
-    state: HarnessUiState,
-    presentation: PlaygroundPresentation,
-    actions: HarnessPlaygroundActions,
-) {
+private fun PlaygroundExpertControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
     val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
 
     OutlinedTextField(
