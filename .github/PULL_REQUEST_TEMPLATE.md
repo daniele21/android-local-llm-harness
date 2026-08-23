@@ -1,45 +1,72 @@
 ## Target branch
 
 - [ ] Ordinary feature, fix, documentation, dependency, UX/UI or infrastructure work targets `dev`.
-- [ ] A pull request targeting `main` is either a promotion from `dev` or an explicit emergency hotfix.
+- [ ] A pull request targeting `main` is either a validated `dev -> main` promotion or an explicit emergency hotfix.
 
-## Summary
+## What changed
 
-Describe the coherent deliverable in this pull request.
+Describe one coherent deliverable.
 
 ## Why
 
-Explain the problem, architectural motivation or operational need.
+Explain the problem/outcome and important tradeoffs.
+
+## Invariants / risk
+
+Describe public-contract, data, resource, failure, security, migration or operating-lifecycle implications. Write `N/A` when truly not applicable.
+
+Harness invariants to call out when relevant:
+
+- backend-neutral public/domain contracts;
+- explicit model/use-case resolution and activation;
+- no native/backend handles outside their owner;
+- privacy-safe telemetry/evidence;
+- bounded model/context/decode/resource ownership;
+- no production/device claim without representative evidence.
+
+## Product experience
+
+If user-facing behavior changes, describe task/IA/progressive disclosure, loading/empty/error/disabled states, recovery, accessibility/adaptive-layout and design-system implications. Otherwise `N/A`.
+
+## Build / runtime / artifact lifecycle
+
+State affected `.engineering/commands.json` intents and any build identity, manifest/checksum/build-delta/retention or cleanup implications. Otherwise `N/A`.
 
 ## Validation
 
-List the checks executed and any evidence still pending.
+List exact checks and evidence executed; never claim evidence not run.
 
+- [ ] Relevant targeted tests cover the changed behavior.
 - [ ] `Repository validation` is green on the current head.
-- [ ] Relevant Android packaging and native checks are green.
-- [ ] Tests cover the changed behavior.
-- [ ] Documentation and repository state ledgers are updated when the functional boundary changed.
+- [ ] `Repository health` is green on the current head.
+- [ ] Relevant Android packaging/native checks are green.
+- [ ] Missing physical-device evidence is explicitly pending rather than inferred.
 
-## Documentation impact
+## E2E / experience evidence
 
-- [ ] I searched `Canonical scope` and updated the existing owner instead of creating a duplicate source.
-- [ ] New active documents declare supported metadata, fit their reading budget and are linked from the documentation map.
-- [ ] Completed plans, temporary progress ledgers and superseded evidence are archived or redirected.
-- [ ] `python3 scripts/verify-docs.py --base <target commit>` reports an intentional reading-cost delta.
-- [ ] Detailed facts, checklists and acceptance criteria have one canonical owner; summaries link instead of copying them.
+For a complete critical workflow or stable high-risk UI surface, describe journey, environment/artifact identity, accessibility/visual/usability evidence, cleanup verification and bounded evidence retention. Otherwise `N/A`.
+
+## Documentation / design lifecycle
+
+- [ ] I updated the canonical durable owner rather than creating a duplicate source.
+- [ ] New active docs have supported metadata, bounded reading cost and one navigation owner.
+- [ ] Active multi-PR coordination lives in `docs/workstreams/`, not separate plan/progress/status files.
+- [ ] Completed workstreams are deleted by default after durable knowledge is transferred; archive is exception-only.
+- [ ] Generated screenshots/reports/logs are evidence artifacts, not default durable design/document truth.
 
 ## Safety and privacy
 
-- [ ] No GGUF/GGML model binary, credential, signing material, private path, URI, prompt or generated output is committed or exposed.
+- [ ] No GGUF/GGML model binary, credential, signing material, private path/URI, prompt or generated output is committed or exposed.
 - [ ] Public contracts remain backend-neutral and implementation details do not leak across module boundaries.
 
 ## Promotion-only checklist
 
-Complete this section only for `dev -> main`.
+Complete only for `dev -> main`.
 
-- [ ] The head is the current protected `dev` branch.
-- [ ] Full, non-scoped repository validation passed.
-- [ ] Android packaging passed for the exact candidate commit.
-- [ ] Native host tests passed for the exact candidate commit.
+- [ ] The head is the current protected `dev` candidate.
+- [ ] Full non-scoped repository validation passed on the exact candidate.
+- [ ] Repository health passed on the exact candidate.
+- [ ] Android packaging and native host tests passed on the exact candidate.
+- [ ] Required physical/device/release evidence for the promoted claims is attached.
 - [ ] All conversations are resolved and the branch is up to date.
-- [ ] The merge method will preserve the validated `dev` history with a merge commit.
+- [ ] The merge method preserves validated `dev` history with a merge commit.
