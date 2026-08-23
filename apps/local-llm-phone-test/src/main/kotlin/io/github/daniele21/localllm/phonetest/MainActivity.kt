@@ -38,9 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -84,24 +82,67 @@ class MainActivity :
     private lateinit var modelDistributionController: PhoneModelDistributionController
     private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
+    private lateinit var themePreferenceStore: HarnessThemePreferenceStore
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
     private val harnessViewModel: HarnessViewModel by viewModels()
 
-    private var latestReport by mutableStateOf("")
-    private var controllerBusy by mutableStateOf(false)
-    private var healthRunning by mutableStateOf(false)
-    private var resourceCaptureRunning by mutableStateOf(false)
-    private var benchmarkCaptureRunning by mutableStateOf(false)
-    private var operationStatus by mutableStateOf("Ready")
-    private var diagnosticsState by mutableStateOf(DiagnosticsUiState(null, emptyList(), emptyList()))
-    private var benchmarkState by mutableStateOf(BenchmarkUiState())
-    private var logFilter by mutableStateOf(DiagnosticsLogFilter())
-    private var logState by mutableStateOf(DiagnosticsLogUiState())
-    private var selectedRequestTimeline by mutableStateOf<DiagnosticsRequestTimelineUi?>(null)
-    private var diagnosticsSection by mutableStateOf(DiagnosticsSection.OVERVIEW)
+    private var latestReport: String
+        get() = harnessViewModel.uiState.value.latestReport
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.ReportChanged(value))
+
+    private var controllerBusy: Boolean
+        get() = harnessViewModel.uiState.value.controllerBusy
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.ControllerBusyChanged(value))
+
+    private var healthRunning: Boolean
+        get() = HarnessDiagnosticAction.HEALTH in harnessViewModel.uiState.value.activeDiagnosticActions
+        set(value) = harnessViewModel.dispatch(
+            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.HEALTH, value),
+        )
+
+    private var resourceCaptureRunning: Boolean
+        get() = HarnessDiagnosticAction.RESOURCE_CAPTURE in harnessViewModel.uiState.value.activeDiagnosticActions
+        set(value) = harnessViewModel.dispatch(
+            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.RESOURCE_CAPTURE, value),
+        )
+
+    private var benchmarkCaptureRunning: Boolean
+        get() = HarnessDiagnosticAction.BENCHMARK_CAPTURE in harnessViewModel.uiState.value.activeDiagnosticActions
+        set(value) = harnessViewModel.dispatch(
+            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.BENCHMARK_CAPTURE, value),
+        )
+
+    private var operationStatus: String
+        get() = harnessViewModel.uiState.value.operationStatus
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.OperationStatusChanged(value))
+
+    private var diagnosticsState: DiagnosticsUiState
+        get() = harnessViewModel.uiState.value.diagnostics
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.DiagnosticsChanged(value))
+
+    private var benchmarkState: BenchmarkUiState
+        get() = harnessViewModel.uiState.value.benchmark
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.BenchmarkChanged(value))
+
+    private val logFilter: DiagnosticsLogFilter
+        get() = harnessViewModel.uiState.value.logFilter
+
+    private var logState: DiagnosticsLogUiState
+        get() = harnessViewModel.uiState.value.logs
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.LogsChanged(value))
+
+    private var selectedRequestTimeline: DiagnosticsRequestTimelineUi?
+        get() = harnessViewModel.uiState.value.selectedRequestTimeline
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.RequestTimelineChanged(value))
+
+    private var diagnosticsSection: DiagnosticsSection
+        get() = harnessViewModel.uiState.value.diagnosticsSection
+        set(value) = harnessViewModel.dispatch(HarnessUiEvent.DiagnosticsSectionChanged(value))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        themePreferenceStore = HarnessThemePreferenceStore(this)
+        harnessViewModel.updateThemePreference(themePreferenceStore.read())
         latestReport = savedInstanceState?.getString(STATE_REPORT).orEmpty()
         runtimeGraph = HarnessRuntimeGraph.from(this)
         resourceSource = HarnessResourceSource(
@@ -188,7 +229,6 @@ class MainActivity :
     override fun onBusyChanged(busy: Boolean) {
         runOnUiThread {
             controllerBusy = busy
-            harnessViewModel.dispatch(HarnessUiEvent.ControllerBusyChanged(busy))
             updateKeepScreenOn()
             refreshDiagnostics()
         }
@@ -216,7 +256,6 @@ class MainActivity :
     override fun onReport(report: String) {
         runOnUiThread {
             latestReport = report
-            harnessViewModel.dispatch(HarnessUiEvent.ReportChanged(report))
             syncLoadedModelOwnership()
             operationStatus = "Validation completed"
             refreshDiagnostics()
@@ -335,12 +374,12 @@ class MainActivity :
 
     private fun selectDiagnosticsSection(section: DiagnosticsSection) {
         diagnosticsSection = section
-        if (section != DiagnosticsSection.LOGS) selectedRequestTimeline = null
     }
 
     private fun updateLogFilter(filter: DiagnosticsLogFilter) {
-        logFilter = filter
-        logState = logSource.snapshot(filter)
+        harnessViewModel.dispatch(
+            HarnessUiEvent.LogFilterChanged(filter, logSource.snapshot(filter)),
+        )
     }
 
     private fun openRequestTimeline(requestId: String) {
@@ -352,6 +391,11 @@ class MainActivity :
         selectedRequestTimeline = null
     }
 
+    private fun updateThemePreference(preference: HarnessThemePreference) {
+        themePreferenceStore.write(preference)
+        harnessViewModel.updateThemePreference(preference)
+    }
+
     @Composable
     private fun HarnessApp() {
         val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
@@ -359,7 +403,12 @@ class MainActivity :
         val backStackEntry by navController.currentBackStackEntryAsState()
         val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
         val destination = shellState.destination
-        val expanded = LocalConfiguration.current.screenWidthDp >= 720
+        val configuration = LocalConfiguration.current
+        val adaptivePolicy = harnessAdaptivePolicy(
+            widthDp = configuration.screenWidthDp,
+            fontScale = configuration.fontScale,
+        )
+        val expanded = adaptivePolicy.useNavigationRail
         val modelEffects = remember { createModelEffects() }
         DisposableEffect(modelEffects) {
             harnessViewModel.models.attach(modelEffects)
@@ -516,7 +565,7 @@ class MainActivity :
                         HarnessSettingsScreen(
                             model = uiState.importedModel,
                             themePreference = uiState.themePreference,
-                            onThemeChange = harnessViewModel::updateThemePreference,
+                            onThemeChange = ::updateThemePreference,
                             onOpenPrivacy = {
                                 navController.navigate(HarnessSettingsDetail.PRIVACY.route)
                             },
@@ -707,7 +756,6 @@ class MainActivity :
                 }
                 when (diagnosticsSection) {
                     DiagnosticsSection.OVERVIEW -> Unit
-
                     DiagnosticsSection.HEALTH -> {
                         healthDiagnostics(state)
                         runtimeDiagnostics()
