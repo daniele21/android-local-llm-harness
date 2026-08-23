@@ -7,6 +7,8 @@ Canonical scope: workstream.phone-product-experience
 Read when: coordinating the repo-template-sw 0.5 UX/UI realignment of the Harness Android phone application
 Last reviewed: 2026-08-23
 
+Canonical repository status remains in [`docs/current-state.md`](../current-state.md); this file owns only temporary implementation sequencing and dependency state for this bounded UX/UI change.
+
 ## Goal
 
 Make the connected Harness Android experience answer the product question directly: **for this use case, device and candidate models, which local model/configuration is the best supported choice?**
@@ -92,7 +94,7 @@ Transfer durable behavior/decisions to:
 - `docs/harness-ux-ui-implementation-plan.md` for the canonical phone UX target;
 - `docs/harness-ux-ui-implementation-progress.md` while that legacy owner remains active;
 - `docs/features/phone-app-architecture.md` for durable screen/state ownership;
-- `docs/current-state.md` for integrated status/blockers;
+- [`docs/current-state.md`](../current-state.md) for integrated status/blockers;
 - `ui/design-system` and `docs/design-system.md` for genuinely reusable components/tokens.
 
 When all slices are integrated and durable knowledge has moved, remove this temporary workstream by default.
