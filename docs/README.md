@@ -4,130 +4,113 @@ Status: active
 Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
-Read when: locating the canonical owner of repository documentation or changing documentation governance
+Read when: locating documentation ownership or changing documentation governance
 Last reviewed: 2026-08-23
 
-Documentation uses progressive disclosure: an agent starts from the repository guide, adds the closest scoped guide, then reads only the focused source that owns the question. A fact has one canonical owner; summaries link to that owner instead of repeating the same claim at the same precision.
-
-Machine-enforced document types, reading budgets and duplication thresholds are defined in [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). The legacy [`documentation-policy.json`](documentation-policy.json) path is a compatibility symlink to that owner, not a second policy source.
+Use progressive disclosure: root guide -> closest scoped guide -> focused owner. One fact has one canonical owner. Machine policy: [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is only its compatibility symlink.
 
 ## Canonical sources
 
 | Question | Canonical source |
 | --- | --- |
-| What is integrated, blocked or next? | [`current-state.md`](current-state.md) |
-| Which capabilities and milestones remain? | [`roadmap.md`](roadmap.md) |
-| What is the repository-level target? | [`implementation-plan.md`](implementation-plan.md), then the focused specification |
-| What bounded repository workstream is active? | [`workstreams/`](workstreams/README.md), when a temporary cross-PR ledger is actually required |
-| What is the reference-grade architecture hardening target and current workstream state? | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), then [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
-| How is llama.cpp runtime efficiency, upstream qualification and hardware execution staged? | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) |
-| How is runtime memory residency, admission, pressure handling and validation governed? | [`memory-management/README.md`](memory-management/README.md) |
-| What is the Qwen3.5-only product status and plan? | [`qwen35/README.md`](qwen35/README.md) |
-| How are model quality and dataset-based performance evaluated? | [`model-evaluation/README.md`](model-evaluation/README.md) |
-| What architecture exists today? | [`architecture.md`](architecture.md) and accepted [`adr/`](adr/) records |
-| What is required before merge or release? | [`definition-of-done.md`](definition-of-done.md) |
-| What remains for Harness 0.5.0? | [`releases/harness-0.5.md`](releases/harness-0.5.md) |
-| How is a procedure executed? | The applicable build, signing, device or evidence runbook |
-| Which historical material is retained independently of Git history? | [`archive/`](archive/) only for audit, regulatory, release-evidence or other independently justified history |
+| Integrated state/blockers | [`current-state.md`](current-state.md) |
+| Capability milestones | [`roadmap.md`](roadmap.md) |
+| Repository target | [`implementation-plan.md`](implementation-plan.md) |
+| Active bounded repository work | [`workstreams/`](workstreams/README.md) when needed |
+| Architecture hardening | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
+| llama.cpp optimization | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) |
+| Memory management | [`memory-management/README.md`](memory-management/README.md) |
+| Qwen3.5 | [`qwen35/README.md`](qwen35/README.md) |
+| Model evaluation | [`model-evaluation/README.md`](model-evaluation/README.md) |
+| Architecture/decisions | [`architecture.md`](architecture.md), [`adr/`](adr/) |
+| Merge/release completion | [`definition-of-done.md`](definition-of-done.md), [`releases/harness-0.5.md`](releases/harness-0.5.md) |
+| Historical exception material | [`archive/`](archive/) |
 
 ## Active source index
 
-Use this index to locate a source, not as a mandatory reading list.
-
 ### Architecture, delivery and API
 
-- [`implementation-plan.md`](implementation-plan.md) — repository target overview and focused-spec routing
-- [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md) — cross-cutting reference-grade architecture target, milestones and dependency sequencing
-- [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) — concise architecture-hardening workstream state and next slice
-- [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) — staged llama.cpp upstream qualification, CPU efficiency, device/backend execution and accelerator evidence target
-- [`memory-management/README.md`](memory-management/README.md) — runtime memory ownership, residency, budgeting, admission, pressure response and validation workstream
-- [`workstreams/README.md`](workstreams/README.md) — repository-level bounded workstream lifecycle
-- [`architecture.md`](architecture.md) — current dependency and ownership boundaries
-- [`adr/README.md`](adr/README.md) — accepted durable decisions
-- [`api-usage.md`](api-usage.md) — embedded public API assembly and lifecycle
-- [`shared-runtime/README.md`](shared-runtime/README.md) — planned cross-application Binder runtime routing and workstreams
-- [`shared-runtime/consumer-api/pii-redactor/README.md`](shared-runtime/consumer-api/pii-redactor/README.md) — OMBRA PDF/PII reference-consumer product and implementation plan
-- [`definition-of-done.md`](definition-of-done.md) — merge and production completion policy
-- [`versioning.md`](versioning.md) — version and release policy
-- [`releases/harness-0.5.md`](releases/harness-0.5.md) — Harness 0.5.0 release gates
+- [`implementation-plan.md`](implementation-plan.md)
+- [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md)
+- [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md)
+- [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md)
+- [`memory-management/README.md`](memory-management/README.md)
+- [`workstreams/README.md`](workstreams/README.md)
+- [`architecture.md`](architecture.md)
+- [`adr/README.md`](adr/README.md)
+- [`api-usage.md`](api-usage.md)
+- [`shared-runtime/README.md`](shared-runtime/README.md)
+- [`shared-runtime/consumer-api/pii-redactor/README.md`](shared-runtime/consumer-api/pii-redactor/README.md)
+- [`definition-of-done.md`](definition-of-done.md)
+- [`versioning.md`](versioning.md)
+- [`releases/harness-0.5.md`](releases/harness-0.5.md)
 
 ### Model lifecycle and generation
 
-- [`qwen35/README.md`](qwen35/README.md) — Qwen3.5-only product status, routing and implementation plan
-- [`model-catalog-download-plan.md`](model-catalog-download-plan.md) — distribution lifecycle entry point
-- [`curated-model-catalog.md`](curated-model-catalog.md) — catalog releases and compatibility
-- [`secure-model-download.md`](secure-model-download.md) — verified network transfer
-- [`model-installation.md`](model-installation.md) — inspection, publication and rollback
-- [`phone-model-distribution.md`](phone-model-distribution.md) — phone catalog/download/install orchestration
-- [`model-management-phone.md`](model-management-phone.md) — phone import, selection and removal controls
-- [`harness-model-inventory-state.md`](harness-model-inventory-state.md) — unified model presentation state
-- [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md) — model-aware generation planning
+- [`qwen35/README.md`](qwen35/README.md)
+- [`model-catalog-download-plan.md`](model-catalog-download-plan.md)
+- [`curated-model-catalog.md`](curated-model-catalog.md)
+- [`secure-model-download.md`](secure-model-download.md)
+- [`model-installation.md`](model-installation.md)
+- [`phone-model-distribution.md`](phone-model-distribution.md)
+- [`model-management-phone.md`](model-management-phone.md)
+- [`harness-model-inventory-state.md`](harness-model-inventory-state.md)
+- [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md)
 
 ### Observability, diagnostics and evaluation
 
-- [`console-observability.md`](console-observability.md) — standalone console observability
-- [`health-engine.md`](health-engine.md) — health and sanity behavior
-- [`resource-observability.md`](resource-observability.md) — resource capture and load classification
-- [`benchmark-engine.md`](benchmark-engine.md) — telemetry-derived benchmark history and regression policy
-- [`model-evaluation/README.md`](model-evaluation/README.md) — dataset-based model-quality execution, performance comparison and implementation plan
-- [`harness-telemetry-composition.md`](harness-telemetry-composition.md) — connected telemetry composition
-- [`harness-logs-composition.md`](harness-logs-composition.md) — connected log composition
-- [`harness-health-composition.md`](harness-health-composition.md) — connected health composition
-- [`harness-resource-composition.md`](harness-resource-composition.md) — connected resource composition
-- [`harness-benchmark-composition.md`](harness-benchmark-composition.md) — connected benchmark composition
+- [`console-observability.md`](console-observability.md)
+- [`health-engine.md`](health-engine.md)
+- [`resource-observability.md`](resource-observability.md)
+- [`benchmark-engine.md`](benchmark-engine.md)
+- [`model-evaluation/README.md`](model-evaluation/README.md)
+- [`harness-telemetry-composition.md`](harness-telemetry-composition.md)
+- [`harness-logs-composition.md`](harness-logs-composition.md)
+- [`harness-health-composition.md`](harness-health-composition.md)
+- [`harness-resource-composition.md`](harness-resource-composition.md)
+- [`harness-benchmark-composition.md`](harness-benchmark-composition.md)
 
 ### Applications, UX and brand
 
-- [`features/phone-app-architecture.md`](features/phone-app-architecture.md) — connected app state, effect and navigation boundary
-- [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md) — connected UX/UI acceptance criteria
-- [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md) — focused phone UX workstream state
-- [`phone-inference-playground.md`](phone-inference-playground.md) — connected inference workflow
-- [`console-inference-playground.md`](console-inference-playground.md) — standalone console inference workflow
-- [`design-system.md`](design-system.md) — shared Compose tokens and components
-- [`harness-brand-guidelines.md`](harness-brand-guidelines.md) — concise brand and product-language contract
-- [`android-brand-assets.md`](android-brand-assets.md) — generated Android identity
-- [`assets/brand/README.md`](assets/brand/README.md) and [`assets/brand/master/README.md`](assets/brand/master/README.md) — asset routing and vector masters
-- [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md) — OMBRA brand-kit and consumer-flow visual references
+- [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
+- [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
+- [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md)
+- [`phone-inference-playground.md`](phone-inference-playground.md)
+- [`console-inference-playground.md`](console-inference-playground.md)
+- [`design-system.md`](design-system.md)
+- [`harness-brand-guidelines.md`](harness-brand-guidelines.md)
+- [`android-brand-assets.md`](android-brand-assets.md)
+- [`assets/brand/README.md`](assets/brand/README.md)
+- [`assets/brand/master/README.md`](assets/brand/master/README.md)
+- [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md)
 
 ### Build, distribution and evidence
 
-- [`android-build-and-run.md`](android-build-and-run.md) — Android build and launch runbook
-- [`android-upload-key.md`](android-upload-key.md) — external upload-key custody
-- [`device-e2e-testing.md`](device-e2e-testing.md) — ADB/instrumentation device execution
-- [`device-e2e-evidence.md`](device-e2e-evidence.md) — physical-device evidence bundle
-- [`play-internal-phone-test.md`](play-internal-phone-test.md) — Google Play Internal Testing
-- [`emulator-e2e-results.md`](emulator-e2e-results.md) — explicitly labelled emulator evidence
+- [`android-build-and-run.md`](android-build-and-run.md)
+- [`android-upload-key.md`](android-upload-key.md)
+- [`device-e2e-testing.md`](device-e2e-testing.md)
+- [`device-e2e-evidence.md`](device-e2e-evidence.md)
+- [`play-internal-phone-test.md`](play-internal-phone-test.md)
+- [`emulator-e2e-results.md`](emulator-e2e-results.md)
 
 ## Document lifecycle
 
-- `current-state`: one short repository operational ledger.
-- `workstream-state`: one bounded temporary ledger that links to the repository state or durable owner.
-- `roadmap`: capability milestones without branch or commit history.
-- `target-specification`: intended behavior and acceptance criteria.
-- `feature-index`: a small routing document for a cross-module lifecycle.
-- `feature-specification`: durable behavior for one owner.
-- `architecture` and `adr-index`: current boundaries and durable decisions.
-- `api-reference`: public assembly and lifecycle usage.
-- `runbook` and `evidence-runbook`: executable operational procedures.
-- `evidence`: immutable, explicitly scoped results.
-- `release-policy`, `release-checklist` and `completion-policy`: delivery constraints and gates.
-- `design-guideline`, `asset-specification` and `asset-index`: brand intent and asset ownership.
+Durable types: `roadmap`, `target-specification`, `feature-index`, `feature-specification`, `architecture`, `adr-index`, `api-reference`, runbooks/evidence, release/completion policy and design/asset owners. `current-state` is the single repository operational ledger.
 
-New temporary repository-level workstreams live under [`workstreams/`](workstreams/README.md). Existing legacy plan/progress sources remain valid until intentionally consolidated; touching them should reduce fragmentation rather than create another paired status file.
+`workstream-state` is temporary. New repository-level workstreams live under [`workstreams/`](workstreams/README.md). Existing legacy plan/progress sources remain valid until intentionally consolidated; do not create new paired status files.
 
-Completed workstreams are **deleted by default** after durable knowledge is transferred. `archive/` is exception-only for material with independent audit, regulatory, release-evidence or historical value; Git history owns normal implementation history.
+Completed workstreams are **deleted by default** after durable transfer. `archive/` is exception-only for independent audit, regulatory, release-evidence or historical value. Git history owns normal implementation history.
 
 ## Before creating a document
 
-1. Search `Canonical scope` and this index for the owning source.
-2. Update the existing owner when the fact fits its scope.
-3. Create a durable document only for an independently readable concern; create a temporary workstream only when cross-PR/agent state genuinely needs its own bounded ledger.
-4. Give every active document one supported type, owner, unique canonical scope and precise `Read when` condition.
-5. Link it from this index or the closest domain index in the same change.
-6. State which source it replaces, or why no source already owns the concern.
-7. Finalize a completed workstream by transferring durable knowledge and deleting it; archive only under the exception rule above.
+1. Search `Canonical scope` and this index.
+2. Update an existing owner when possible.
+3. Create only a durable independent owner or a genuinely necessary bounded workstream.
+4. Set supported type, owner, unique canonical scope and precise `Read when`.
+5. Link it from this or the closest domain index.
+6. Finalize temporary work by transferring durable knowledge and deleting it; archive only under the exception rule.
 
-Do not create a document solely to report that a branch, pull request or isolated implementation step completed.
+Do not create documentation merely to record a branch, PR or isolated implementation completion.
 
 ## Required metadata
 
@@ -142,25 +125,15 @@ Read when: <specific trigger>
 Last reviewed: YYYY-MM-DD
 ```
 
-ADRs retain their accepted ADR status and date format. Archived documents use `Status: historical`. A compatibility redirect outside `archive/` stays below the configured redirect budget and links to its replacement or archive record.
+ADRs keep ADR status/date format. Archived documents use `Status: historical`.
 
 ## Reading and writing budgets
 
-- CI enforces line and estimated-token limits by document type from [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json).
-- New documents must fit their type budget.
-- An explicitly baselined oversized document may only shrink; growth fails validation.
-- Root and scoped `AGENTS.md` files have separate budgets.
-- Active documents must be reachable from this map or an agent guide.
-- Duplicate canonical scopes and long exact duplicate paragraphs fail validation.
-- Near-duplicate paragraphs are reported for human review.
-
-Summaries may restate a high-level conclusion when they clearly link to the canonical owner. They must not copy detailed checklists, status tables or acceptance criteria.
+CI enforces [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json): budgets, reachability, unique canonical scopes, duplicate detection and agent-guide limits. Baselined oversized documents may only shrink.
 
 ## Precedence
 
-When sources disagree: executable contracts and tests, accepted ADRs, architecture, focused feature specifications, target overview, current state, roadmap, README/agent guides, then independently retained historical material.
-
-Do not silently reconcile a contradiction that changes behavior. Correct the owning source or surface it in review.
+Executable contracts/tests -> accepted ADRs -> architecture -> focused specifications -> target overview -> current state -> roadmap -> README/agent guides -> retained history. Correct the owning source rather than silently reconciling behavioral contradictions.
 
 ## Validation
 
@@ -170,5 +143,3 @@ python3 scripts/verify-agent-navigation.py
 python3 -m py_compile scripts/*.py
 git diff --check
 ```
-
-The cost report shows active token delta, largest changed source, canonical scopes and mandatory agent-guide bundles. The CI workflow publishes it for every documentation change.
