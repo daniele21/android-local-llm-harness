@@ -32,6 +32,8 @@ jobs:
           python3 scripts/test_verify_docs.py
           python3 scripts/verify-docs.py --base "$DOCS_BASE_SHA"
       - name: Verify repository scripts remain parseable
-        run: python3 -m py_compile scripts/*.py
+        run: |
+          python3 -m py_compile scripts/*.py
+          python3 scripts/test_package_artifact_metadata.py
       - name: Verify clean diff semantics
         run: git diff --check
