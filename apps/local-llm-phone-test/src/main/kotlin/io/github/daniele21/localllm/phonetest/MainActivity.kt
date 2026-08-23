@@ -756,6 +756,7 @@ class MainActivity :
                 }
                 when (diagnosticsSection) {
                     DiagnosticsSection.OVERVIEW -> Unit
+
                     DiagnosticsSection.HEALTH -> {
                         healthDiagnostics(state)
                         runtimeDiagnostics()
