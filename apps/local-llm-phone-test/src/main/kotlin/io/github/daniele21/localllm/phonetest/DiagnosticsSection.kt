@@ -21,18 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 internal enum class DiagnosticsSection(val label: String) {
-    OVERVIEW("Overview"),
     HEALTH("Health"),
     RUNS("Runs"),
     RESOURCES("Resources"),
     BENCHMARKS("Benchmarks"),
     LOGS("Logs"),
     VALIDATION("Validation"),
-    ;
-
-    companion object {
-        val detailSections = entries.filterNot { it == OVERVIEW }
-    }
 }
 
 @Composable
@@ -41,7 +35,7 @@ internal fun DiagnosticsSectionSelector(selected: DiagnosticsSection, onSelected
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         contentPadding = PaddingValues(end = 16.dp),
     ) {
-        items(DiagnosticsSection.detailSections, key = DiagnosticsSection::name) { section ->
+        items(DiagnosticsSection.entries, key = DiagnosticsSection::name) { section ->
             val isSelected = selected == section
             Column(
                 modifier = Modifier.clickable { onSelected(section) }.padding(horizontal = 9.dp, vertical = 6.dp),
