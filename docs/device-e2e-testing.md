@@ -5,7 +5,7 @@ Document type: runbook
 Owner: apps/device-test-runner
 Canonical scope: validation.device-e2e
 Read when: running ADB or instrumentation validation with a real GGUF model
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-23
 
 This procedure validates the Phase 1 runtime on a physical Android `arm64-v8a` device with a real GGUF model.
 
@@ -61,6 +61,51 @@ shutdown runtime
 - enough free device storage for both the staged source and content-addressed copy.
 
 The initial Phase 1 device gate is CPU-only and uses `gpuLayers = 0`.
+
+## Run the bounded LLRT quick screening suite
+
+Use the unified entrypoint when the goal is to screen the integrated LLRT-6 KV-cache, LLRT-9 native-batch and optional LLRT-7 OpenCL paths before spending device time on the full qualification matrices.
+
+With both curated Qwen3.5 tiers available:
+
+```bash
+bash scripts/run-llrt-device-suite.sh \
+  --model-0.8b /absolute/path/to/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --model-2b /absolute/path/to/Qwen3.5-2B-Q4_K_M.gguf
+```
+
+The default quick profile is intentionally bounded:
+
+- context `1024`;
+- maximum output `8` tokens;
+- LLRT-9 width `2` with `4` balanced repetitions, which preserves the minimum serial-first/batch-first correctness gate;
+- LLRT-6 with `3` warm repetitions over `release-default` and `k-q8-fa-off`;
+- LLRT-7 skipped unless OpenCL headers are supplied and representative-device preflight is eligible.
+
+To include the optional OpenCL screen on the default quick tier:
+
+```bash
+bash scripts/run-llrt-device-suite.sh \
+  --model-0.8b /absolute/path/to/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --model-2b /absolute/path/to/Qwen3.5-2B-Q4_K_M.gguf \
+  --opencl-include-dir /absolute/path/to/OpenCL-Headers
+```
+
+`--opencl-tier auto` selects 0.8B when available, otherwise the only supplied tier. Use `--opencl-tier both` only when the additional device time is intentional. The underlying LLRT runners still enforce curated model SHA-256 identity, the production llama.cpp pin, arm64 device requirements, fixed-seed evidence and thermal gates.
+
+Each run writes a timestamped, commit-bound directory under `build/llrt-suite/` containing:
+
+```text
+run.json
+lane-status.tsv
+report.md
+report.html
+evidence/
+```
+
+The Markdown and standalone HTML reports summarize lane status plus the privacy-safe evidence already produced by the canonical runners: serial/native-batch median time and speedup, observed PSS and thermal status, KV latency/memory deltas and digest stability, and OpenCL CPU-control/requested-offload metrics when available. The suite continues to the next lane after an individual lane failure so that the final report records the whole screening attempt; it returns non-zero when any executed lane fails.
+
+The quick suite is **diagnostic screening only**. It does not close LLRT-6C, LLRT-7C or LLRT-9C and must not promote runtime defaults. Candidates that survive screening still require the canonical `2048` context / `64` output physical qualification matrices owned by the llama.cpp runtime plan.
 
 ## ARM64 emulator preflight
 
