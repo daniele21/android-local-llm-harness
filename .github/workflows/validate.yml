@@ -83,6 +83,7 @@ jobs:
           python3 -m py_compile scripts/*.py
           python3 scripts/test_summarize_qwen35_tuning.py
           python3 scripts/test_llrt7_opencl_tools.py
+          python3 scripts/test_render_llrt_device_suite_report.py
           python3 scripts/test_check_pr_base.py
           python3 scripts/test_detect_ci_scope.py
           python3 scripts/test_gradle_module_inventory.py
@@ -95,6 +96,7 @@ jobs:
           bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
           bash scripts/capture-shared-runtime-release-evidence.sh --help >/dev/null
           bash scripts/run-llama-cpp-opencl-evidence.sh --help >/dev/null
+          bash scripts/run-llrt-device-suite.sh --help >/dev/null
 
   native:
     name: Native host tests
