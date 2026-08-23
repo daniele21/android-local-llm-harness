@@ -17,6 +17,9 @@ import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.runtime.ActivationIdFactory
+import io.github.daniele21.localllm.runtime.ActivationResidencyCoordinator
+import io.github.daniele21.localllm.runtime.ActivationResidencyInferenceBackend
 import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
 import io.github.daniele21.localllm.runtime.ConsumerLocalLlmFacade
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
@@ -24,16 +27,23 @@ import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistr
 import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
+import io.github.daniele21.localllm.runtime.UseCaseActivationId
+import io.github.daniele21.localllm.runtime.UseCaseActivationLeaseRegistry
 import io.github.daniele21.localllm.store.FileSystemModelStore
 import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
 import java.io.File
+import java.util.UUID
 
 /** Process-scoped owner of the embedded Harness runtime and observability sources. */
 internal class HarnessRuntimeGraph private constructor(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
     private val lock = Any()
     private val registry = HarnessPhoneBindingRegistry()
+    private val activationLeases = UseCaseActivationLeaseRegistry(
+        idFactory = ActivationIdFactory { UseCaseActivationId(UUID.randomUUID().toString()) },
+    )
 
+    val activationResidency = ActivationResidencyCoordinator(activationLeases)
     val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
 
     val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
@@ -59,12 +69,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         activeClient = { synchronized(lock) { runtimeClient } },
         prepareClient = {
             synchronized(lock) {
-                if (registry.selectedModel == null) {
-                    null
-                } else {
-                    ensureRuntime()
-                    runtimeClient
-                }
+                ensureRuntime()
+                runtimeClient
             }
         },
     )
@@ -114,6 +120,19 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
     }
 
+    fun installActivationBinding(
+        activationId: UseCaseActivationId,
+        applicationId: ApplicationId,
+        useCaseId: UseCaseId,
+        resolved: ResolvedUseCase,
+    ) {
+        registry.installActivationBinding(activationId, applicationId, useCaseId, resolved)
+    }
+
+    fun removeActivationBinding(activationId: UseCaseActivationId) {
+        registry.removeActivationBinding(activationId)
+    }
+
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
         registry.selectedModel = model
@@ -132,6 +151,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     fun releaseModel(digest: ModelDigest) {
         synchronized(lock) {
+            if (activationResidency.protects(digest)) return
             if (runtime?.runtimeSnapshot()?.loadedModel != digest) return
             closeRuntimeLocked()
         }
@@ -152,6 +172,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     override fun close() {
         synchronized(lock) {
             closeRuntimeLocked()
+            registry.clearActivationBindings()
             registry.selectedModel = null
         }
     }
@@ -161,10 +182,14 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
         val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
         require(nativeLibraryDirectory.isDirectory) { "Native library directory is unavailable" }
+        val backend = ActivationResidencyInferenceBackend(
+            delegate = LlamaCppInferenceBackend(nativeLibraryDirectory),
+            activationResidency = activationResidency,
+        )
         val orchestrator = RuntimeOrchestrator(
             registry = registry,
             modelStore = modelStore,
-            backend = LlamaCppInferenceBackend(nativeLibraryDirectory),
+            backend = backend,
             telemetryRepository = telemetryRepository,
         )
         runtime = orchestrator
@@ -201,8 +226,16 @@ internal enum class HarnessRuntimePurpose(val useCaseId: UseCaseId) {
 }
 
 internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
+    private data class ActivationBinding(
+        val activationId: UseCaseActivationId,
+        val applicationId: ApplicationId,
+        val useCaseId: UseCaseId,
+        val resolved: ResolvedUseCase,
+    )
+
     private val lock = Any()
     private var model: ImportedPhoneModel? = null
+    private val activationBindings = LinkedHashMap<UseCaseActivationId, ActivationBinding>()
 
     var selectedModel: ImportedPhoneModel?
         get() = synchronized(lock) { model }
@@ -211,30 +244,40 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
             synchronized(lock) { model = value }
         }
 
-    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        val selected = synchronized(lock) { requireNotNull(model) { "No model selected" } }
-        return when (applicationId) {
-            HarnessRuntimeGraph.APPLICATION_ID -> resolveInternal(selected, useCaseId)
-            HarnessSharedRuntimeBindings.consoleApplicationId -> resolveConsoleConsumer(selected, useCaseId)
-            HarnessSharedRuntimeBindings.redactGuardApplicationId -> resolveRedactGuardConsumer(selected, useCaseId)
-            else -> throw IllegalArgumentException("Unknown applicationId ${applicationId.value}")
+    fun installActivationBinding(
+        activationId: UseCaseActivationId,
+        applicationId: ApplicationId,
+        useCaseId: UseCaseId,
+        resolved: ResolvedUseCase,
+    ) {
+        require(resolved.binding.applicationId == applicationId) { "Activation binding application mismatch" }
+        require(resolved.binding.useCaseId == useCaseId) { "Activation binding use-case mismatch" }
+        synchronized(lock) {
+            activationBindings[activationId] = ActivationBinding(activationId, applicationId, useCaseId, resolved)
         }
     }
 
-    private fun resolveConsoleConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
-        HarnessSharedRuntimeBindings.consoleUseCaseId -> HarnessSharedRuntimeBindings.resolveConsole(model)
-
-        HarnessSharedRuntimeBindings.ombraUseCaseId ->
-            HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.consoleApplicationId)
-
-        else -> throw IllegalArgumentException("Unknown useCaseId ${useCaseId.value}")
+    fun removeActivationBinding(activationId: UseCaseActivationId) {
+        synchronized(lock) { activationBindings.remove(activationId) }
     }
 
-    private fun resolveRedactGuardConsumer(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
-        HarnessSharedRuntimeBindings.ombraUseCaseId ->
-            HarnessSharedRuntimeBindings.resolveOmbra(model, HarnessSharedRuntimeBindings.redactGuardApplicationId)
+    fun clearActivationBindings() {
+        synchronized(lock) { activationBindings.clear() }
+    }
 
-        else -> throw IllegalArgumentException("Unknown RedactGuard useCaseId ${useCaseId.value}")
+    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
+        val activationResolved = synchronized(lock) {
+            activationBindings.values.lastOrNull {
+                it.applicationId == applicationId && it.useCaseId == useCaseId
+            }?.resolved
+        }
+        if (activationResolved != null) return activationResolved
+
+        check(applicationId == HarnessRuntimeGraph.APPLICATION_ID) {
+            "External consumer requires an active Harness control-plane activation"
+        }
+        val selected = synchronized(lock) { requireNotNull(model) { "No model selected" } }
+        return resolveInternal(selected, useCaseId)
     }
 
     private fun resolveInternal(model: ImportedPhoneModel, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
