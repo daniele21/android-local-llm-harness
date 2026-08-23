@@ -2,10 +2,13 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
@@ -73,6 +76,42 @@ internal class ConsumerRuntimeBinderStub(
         authorizedCallerOrNull()?.let { delegate.consumerOperations.closeSession(it, request) }
     }
 
+    override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverUseCases(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
+    override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverPresets(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
+    override fun activate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.activate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
+    override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(request, callback) { caller ->
+            delegate.controlPlaneOperations.deactivate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
     private inline fun withResultCaller(
         request: ConsumerRequestParcel,
         callback: IConsumerResultCallback,
@@ -83,6 +122,26 @@ internal class ConsumerRuntimeBinderStub(
             deliverRemote {
                 callback.onResult(
                     ConsumerResultParcel(
+                        operationId = request.operationId,
+                        error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                    ),
+                )
+            }
+        } else {
+            block(caller)
+        }
+    }
+
+    private inline fun withControlPlaneCaller(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: IConsumerControlPlaneResultCallback,
+        block: (AuthorizedCaller) -> Unit,
+    ) {
+        val caller = authorizedCallerOrNull()
+        if (caller == null) {
+            deliverRemote {
+                callback.onResult(
+                    ConsumerControlPlaneResultParcel(
                         operationId = request.operationId,
                         error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
                     ),
