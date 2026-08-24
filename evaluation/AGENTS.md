@@ -14,6 +14,7 @@ This guide owns navigation and validation for model-evaluation implementation un
 - `evaluation/contracts` owns backend-independent dataset, evaluator, sampling, run, identity, compatibility, persistence-interface and failure contracts plus deterministic canonical hashing.
 - `evaluation/comparison` owns typed quality/runtime compatibility assessment. It does not query persistence or calculate numeric deltas.
 - `evaluation/datasets` owns bounded canonical JSONL parsing, pack-level semantic validation and ordered content-digest verification. It does not install packs, sample cases or execute inference.
+- `evaluation/dataset-adapter` owns production adaptation from registry-published immutable dataset packs to runner preflight/case-definition/category access. It must re-verify the canonical pack before exposing cases and must not execute inference or own installation.
 - `evaluation/evaluators` owns the versioned evaluator registry, deterministic scorer implementations and quality aggregation. Registry entries are declarative and fail closed; scorer-specific work stays inside this module.
 - `evaluation/engine` owns fake-friendly evaluation lifecycle orchestration and controlled resolution of one explicitly selected supported installed model. It does not own production dataset installation, persistence, telemetry storage or UI state.
 - `evaluation/runtime-adapter` owns production composition from the backend-neutral `EvaluationBatchExecutionPort` to the runtime-only bounded evaluation-batch client, including isolated session lifecycle, exact result attribution, timeout/cancellation and one-case serial fallback. It must not depend on a concrete backend such as `llama.cpp`.
@@ -37,6 +38,7 @@ Do not add Room or other durable storage behavior to the in-memory module. Durab
 - Failure contracts use bounded typed codes rather than arbitrary backend exception text.
 - Prompt, expected-answer and generated-answer content is not part of persistent run/result contracts.
 - `evaluation/engine` may resolve only curated product-supplied model profiles and verified local artifacts; it must not create or mutate ordinary application model bindings.
+- `evaluation/dataset-adapter` may read only registry-published packs and must verify manifest identity, case shape and canonical content digest before returning cases or categories.
 - R-01 cooperative cancellation between phases/cases is only a lifecycle foundation. Active decode cancellation, timeout cleanup and unattempted-case accounting remain R-08/R-09 after isolated per-case runtime ownership exists.
 - Persistence implementations must not invent alternate lifecycle, ordering, deletion or retention semantics.
 - `evaluation/persistence` may observe and persist lifecycle/progress, but it must not absorb Room ownership, runner execution logic or prompt/output content.
@@ -59,6 +61,15 @@ For dataset work run:
 ./gradlew :evaluation:datasets:testDebugUnitTest \
   :evaluation:datasets:compileDebugKotlin \
   :evaluation:datasets:lintDebug
+./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
+```
+
+For dataset-to-runner adapter work run:
+
+```bash
+./gradlew :evaluation:dataset-adapter:testDebugUnitTest \
+  :evaluation:dataset-adapter:compileDebugKotlin \
+  :evaluation:dataset-adapter:lintDebug
 ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
 ```
 

@@ -23,6 +23,7 @@ include(
     ":evaluation:contracts",
     ":evaluation:comparison",
     ":evaluation:datasets",
+    ":evaluation:dataset-adapter",
     ":evaluation:evaluators",
     ":evaluation:engine",
     ":evaluation:runtime-adapter",
