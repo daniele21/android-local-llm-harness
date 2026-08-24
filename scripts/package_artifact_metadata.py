@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -326,9 +327,19 @@ def fetch_previous(args: argparse.Namespace) -> int:
         )
         if metadata is None:
             continue
-        archive = request_bytes(
-            f"{api}/actions/artifacts/{metadata['id']}/zip", token
-        )
+        try:
+            archive = request_bytes(
+                f"{api}/actions/artifacts/{metadata['id']}/zip", token
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 410):
+                print(
+                    f"Previous package metadata artifact from run {run['id']} is unavailable "
+                    f"(HTTP {exc.code}); trying older successful runs.",
+                    file=sys.stderr,
+                )
+                continue
+            raise
         with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
             names = [
                 name for name in bundle.namelist() if name.endswith("build-manifest.json")
