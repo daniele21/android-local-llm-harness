@@ -1,22 +1,20 @@
 package io.github.daniele21.localllm.phonetest
 
-internal fun performanceSectionLabel(section: PerformanceSection): String =
-    when (section) {
-        PerformanceSection.RUN -> "Run"
-        PerformanceSection.DATASETS -> "Datasets"
-        PerformanceSection.HISTORY -> "History"
-        PerformanceSection.COMPARE -> "Compare"
-    }
+internal fun performanceSectionLabel(section: PerformanceSection): String = when (section) {
+    PerformanceSection.RUN -> "Run"
+    PerformanceSection.DATASETS -> "Datasets"
+    PerformanceSection.HISTORY -> "History"
+    PerformanceSection.COMPARE -> "Compare"
+}
 
-internal fun performanceSampleLabel(selection: PerformanceSampleSelection): String =
-    when (selection) {
-        PerformanceSampleSelection.Smoke -> "Smoke · 20"
-        PerformanceSampleSelection.Quick -> "Quick · 50"
-        PerformanceSampleSelection.Standard -> "Standard · 100"
-        PerformanceSampleSelection.Extended -> "Extended · 200"
-        PerformanceSampleSelection.All -> "All cases"
-        is PerformanceSampleSelection.Custom -> "Custom · ${selection.count}"
-    }
+internal fun performanceSampleLabel(selection: PerformanceSampleSelection): String = when (selection) {
+    PerformanceSampleSelection.Smoke -> "Smoke · 20"
+    PerformanceSampleSelection.Quick -> "Quick · 50"
+    PerformanceSampleSelection.Standard -> "Standard · 100"
+    PerformanceSampleSelection.Extended -> "Extended · 200"
+    PerformanceSampleSelection.All -> "All cases"
+    is PerformanceSampleSelection.Custom -> "Custom · ${selection.count}"
+}
 
 internal val performanceFixedSamples: List<PerformanceSampleSelection> = listOf(
     PerformanceSampleSelection.Smoke,
@@ -50,11 +48,10 @@ internal fun performanceReadinessDetail(readiness: PerformanceRunReadiness, runn
     }
 }
 
-internal fun performanceBlockReasonLabel(reason: PerformanceBlockReason): String =
-    when (reason) {
-        PerformanceBlockReason.MODEL_REQUIRED -> "model required"
-        PerformanceBlockReason.DATASET_REQUIRED -> "dataset required"
-        PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE -> "sample selection unavailable"
-        PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED -> "execution profile required"
-        PerformanceBlockReason.MODEL_UNAVAILABLE -> "model unavailable"
-    }
+internal fun performanceBlockReasonLabel(reason: PerformanceBlockReason): String = when (reason) {
+    PerformanceBlockReason.MODEL_REQUIRED -> "model required"
+    PerformanceBlockReason.DATASET_REQUIRED -> "dataset required"
+    PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE -> "sample selection unavailable"
+    PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED -> "execution profile required"
+    PerformanceBlockReason.MODEL_UNAVAILABLE -> "model unavailable"
+}
