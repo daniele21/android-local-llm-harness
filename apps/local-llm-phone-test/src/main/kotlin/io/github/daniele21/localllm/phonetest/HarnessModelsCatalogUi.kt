@@ -110,6 +110,12 @@ internal fun UnifiedModelsCatalog(
     }
 }
 
+internal fun modelActionStatusTone(tone: ModelActionFeedbackTone): HarnessStatusTone = when (tone) {
+    ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
+    ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
+    ModelActionFeedbackTone.ERROR -> HarnessStatusTone.ERROR
+}
+
 @Composable
 private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
     Row(
@@ -123,11 +129,7 @@ private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
                 ModelActionFeedbackTone.SUCCESS -> "OK"
                 ModelActionFeedbackTone.ERROR -> "ERROR"
             },
-            tone = when (feedback.tone) {
-                ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
-                ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
-                ModelActionFeedbackTone.ERROR -> HarnessStatusTone.WARNING
-            },
+            tone = modelActionStatusTone(feedback.tone),
         )
         Text(
             text = feedback.latest,
@@ -257,9 +259,10 @@ internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this)
     -> HarnessStatusTone.INFO
 
     HarnessModelLifecycle.DEGRADED,
-    HarnessModelLifecycle.FAILED,
     HarnessModelLifecycle.INCOMPATIBLE,
     -> HarnessStatusTone.WARNING
+
+    HarnessModelLifecycle.FAILED -> HarnessStatusTone.ERROR
 
     HarnessModelLifecycle.INSTALLED,
     HarnessModelLifecycle.READY_TO_DOWNLOAD,
