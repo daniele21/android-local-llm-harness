@@ -44,5 +44,6 @@ jobs:
           python3 -m py_compile scripts/*.py
           python3 scripts/test_package_artifact_metadata.py
           python3 scripts/test_verify_no_tracked_generated_artifacts.py
+          python3 scripts/test_llrt9_width4_diagnostic.py
       - name: Verify clean diff semantics
         run: git diff --check
