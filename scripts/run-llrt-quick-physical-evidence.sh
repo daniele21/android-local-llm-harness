@@ -136,11 +136,17 @@ COMMON=(
   --cooldown-timeout-seconds "$COOLDOWN_TIMEOUT_SECONDS"
   --cooldown-poll-seconds "$COOLDOWN_POLL_SECONDS"
 )
-if [[ "$RESET_OUTPUT" == true ]]; then
-  RESET=(--reset-output)
-else
-  RESET=()
-fi
+
+# Stock macOS Bash 3.2 treats expansion of an empty array under `set -u` as an
+# unbound-variable error. Keep the optional reset flag out of an empty array and
+# append it only when requested.
+run_with_optional_reset() {
+  if [[ "$RESET_OUTPUT" == true ]]; then
+    "$@" --reset-output
+  else
+    "$@"
+  fi
+}
 
 if [[ "$TIER" == "0.8b" ]]; then
   THREADS=2
@@ -153,7 +159,7 @@ fi
 run_batch() {
   echo
   echo "== LLRT-9 quick native-batch screen =="
-  bash "$ROOT_DIR/scripts/run-llama-cpp-evaluation-batch-evidence.sh" \
+  run_with_optional_reset bash "$ROOT_DIR/scripts/run-llama-cpp-evaluation-batch-evidence.sh" \
     "${COMMON[@]}" \
     --threads "$THREADS" \
     --batch-threads 4 \
@@ -162,14 +168,13 @@ run_batch() {
     --timeout-seconds "$TIMEOUT_SECONDS" \
     --repetitions 4 \
     --width 2 \
-    --output-dir "$OUTPUT_DIR/llrt9" \
-    "${RESET[@]}"
+    --output-dir "$OUTPUT_DIR/llrt9"
 }
 
 run_kv() {
   echo
   echo "== LLRT-6 quick KV-cache screen =="
-  bash "$ROOT_DIR/scripts/run-llama-cpp-kv-cache-evidence.sh" \
+  run_with_optional_reset bash "$ROOT_DIR/scripts/run-llama-cpp-kv-cache-evidence.sh" \
     "${COMMON[@]}" \
     --threads "$THREADS" \
     --batch-threads 4 \
@@ -180,8 +185,7 @@ run_kv() {
     --seed 42 \
     --thinking-mode DISABLED \
     --case "$KV_CASES" \
-    --output-dir "$OUTPUT_DIR/llrt6" \
-    "${RESET[@]}"
+    --output-dir "$OUTPUT_DIR/llrt6"
 }
 
 opencl_eligible() {
@@ -221,7 +225,7 @@ run_opencl() {
     OPENCL_ARGS+=(--opencl-library "$OPENCL_LIBRARY")
   fi
 
-  bash "$ROOT_DIR/scripts/run-llama-cpp-opencl-evidence.sh" \
+  run_with_optional_reset bash "$ROOT_DIR/scripts/run-llama-cpp-opencl-evidence.sh" \
     "${COMMON[@]}" \
     "${OPENCL_ARGS[@]}" \
     --threads "$THREADS" \
@@ -232,8 +236,7 @@ run_opencl() {
     --repetitions 3 \
     --seed 42 \
     --thinking-mode DISABLED \
-    --output-dir "$OUTPUT_DIR/llrt7" \
-    "${RESET[@]}"
+    --output-dir "$OUTPUT_DIR/llrt7"
 }
 
 case "$LANE" in
