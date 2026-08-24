@@ -40,12 +40,12 @@ internal fun PerformanceRunSection(
 @Composable
 private fun PerformanceDatasetSelector(state: PerformanceState) {
     HarnessCard {
-        Text("Dataset", style = MaterialTheme.typography.titleMedium)
+        Text("1 · Dataset", style = MaterialTheme.typography.titleMedium)
         val selection = state.runSetup.dataset
         if (selection != null) {
             Text(selection.displayName, style = MaterialTheme.typography.bodyLarge)
             Text(
-                "${selection.caseCount} cases · ${selection.id.value} · ${selection.version.value}",
+                "${selection.caseCount} cases · version ${selection.version.value}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -62,7 +62,7 @@ private fun PerformanceDatasetSelector(state: PerformanceState) {
             )
 
             is PerformanceSurfaceState.Available -> Text(
-                "${surface.count} installed datasets are known, but the production dataset selector is not connected to this surface yet.",
+                "${surface.count} datasets are installed. Dataset selection is not available on this screen yet.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -77,10 +77,10 @@ private fun PerformanceModelSelector(
     onOpenModels: () -> Unit,
 ) {
     HarnessCard {
-        Text("Model", style = MaterialTheme.typography.titleMedium)
+        Text("2 · Model", style = MaterialTheme.typography.titleMedium)
         if (options.isEmpty()) {
             Text(
-                "No installed product-supported model is available for evaluation.",
+                "No installed supported model is available for evaluation.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -110,9 +110,9 @@ private fun PerformanceModelSelector(
 @Composable
 private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (PerformanceIntent) -> Unit) {
     HarnessCard {
-        Text("Samples", style = MaterialTheme.typography.titleMedium)
+        Text("3 · Samples", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Choose a deterministic sample size. Unavailable presets stay disabled instead of being clamped.",
+            "Choose how many cases to evaluate. Presets larger than the selected dataset remain unavailable.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -147,10 +147,10 @@ private fun PerformanceProfileSelector(
     onIntent: (PerformanceIntent) -> Unit,
 ) {
     HarnessCard {
-        Text("Execution profile", style = MaterialTheme.typography.titleMedium)
+        Text("4 · Execution profile", style = MaterialTheme.typography.titleMedium)
         if (options.isEmpty()) {
             Text(
-                "No canonical execution-profile registry is connected yet. Profiles are intentionally not invented by the UI.",
+                "No compatible execution profile is available for selection yet. Evaluation stays disabled until one is available.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -182,10 +182,10 @@ private fun PerformanceReadinessCard(state: PerformanceState, runnerAvailable: B
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Readiness", style = MaterialTheme.typography.titleMedium)
+            Text("Ready to run?", style = MaterialTheme.typography.titleMedium)
             HarnessStatusBadge(
                 label = when {
-                    !runnerAvailable -> "Runner unavailable"
+                    !runnerAvailable -> "Unavailable"
                     ready -> "Ready"
                     else -> "Setup incomplete"
                 },
