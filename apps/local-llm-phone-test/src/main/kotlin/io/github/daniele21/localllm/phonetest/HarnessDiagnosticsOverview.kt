@@ -34,6 +34,13 @@ internal fun harnessDiagnosticsOverviewState(
     validationAvailable = validationReport.isNotBlank(),
 )
 
+internal fun diagnosticsHealthTone(status: String): HarnessStatusTone = when (status) {
+    "Pass" -> HarnessStatusTone.SUCCESS
+    "Warning" -> HarnessStatusTone.WARNING
+    "Fail" -> HarnessStatusTone.ERROR
+    else -> HarnessStatusTone.NEUTRAL
+}
+
 @Composable
 internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, onOpen: (DiagnosticsSection) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -45,18 +52,12 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
                 "Latest aggregate status: ${state.health}."
             },
             status = state.health,
-            tone = when (state.health) {
-                "Pass" -> HarnessStatusTone.SUCCESS
-                "Warning", "Fail" -> HarnessStatusTone.WARNING
-                else -> HarnessStatusTone.NEUTRAL
-            },
+            tone = diagnosticsHealthTone(state.health),
             onClick = { onOpen(DiagnosticsSection.HEALTH) },
         )
         DiagnosticEntryCard(
             title = "Runs",
-            detail = if (state.runCount ==
-                0
-            ) {
+            detail = if (state.runCount == 0) {
                 "No local inference runs recorded yet."
             } else {
                 "${state.runCount} privacy-safe run records available."
@@ -89,9 +90,7 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
         )
         DiagnosticEntryCard(
             title = "Logs",
-            detail = if (state.logCount ==
-                0
-            ) {
+            detail = if (state.logCount == 0) {
                 "No structured privacy-safe logs recorded yet."
             } else {
                 "${state.logCount} bounded log entries available."
