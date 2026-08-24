@@ -12,7 +12,11 @@ import org.junit.Test
 
 class ConsumerProtocolCompatibilityTest {
     private val host = SharedRuntimeHostConfig.create("io.github.example.host", ".SharedRuntimeService")
-    private val legacyFeatures = BinderProtocolV1.KNOWN_FEATURES - BinderProtocolV1.FEATURE_CONSUMER_API_V1
+    private val legacyFeatures = BinderProtocolV1.KNOWN_FEATURES -
+        setOf(
+            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+        )
 
     @Test
     fun `legacy client remains compatible with protocol minor zero host`() {
