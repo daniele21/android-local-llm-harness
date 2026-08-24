@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
+import urllib.error
 import zipfile
 
 
@@ -237,6 +238,64 @@ class PackageArtifactMetadataTest(unittest.TestCase):
             self.assertEqual(
                 json.loads(output.read_text(encoding="utf-8"))["identity"]["buildId"],
                 "right",
+            )
+
+    def test_fetch_previous_skips_unavailable_historical_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "previous.json"
+            right = {
+                "lineage": {"channel": "dev", "sourceRef": "dev"},
+                "identity": {"buildId": "older-valid"},
+            }
+
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as bundle:
+                bundle.writestr(
+                    "build/package-metadata/build-manifest.json",
+                    json.dumps(right),
+                )
+            valid_archive = buffer.getvalue()
+
+            def fake_json(url: str, token: str) -> dict:
+                if "/actions/workflows/" in url:
+                    return {"workflow_runs": [{"id": 9}, {"id": 8}]}
+                if "/actions/runs/9/artifacts" in url:
+                    return {
+                        "artifacts": [
+                            {"id": 90, "name": module.METADATA_ARTIFACT_NAME, "expired": False}
+                        ]
+                    }
+                if "/actions/runs/8/artifacts" in url:
+                    return {
+                        "artifacts": [
+                            {"id": 80, "name": module.METADATA_ARTIFACT_NAME, "expired": False}
+                        ]
+                    }
+                raise AssertionError(url)
+
+            def fake_bytes(url: str, token: str) -> bytes:
+                if "/90/" in url:
+                    raise urllib.error.HTTPError(url, 410, "Gone", None, None)
+                return valid_archive
+
+            args = argparse.Namespace(
+                repository="owner/repo",
+                workflow="package.yml",
+                current_run_id="10",
+                channel="dev",
+                source_ref="dev",
+                token_env="TEST_TOKEN",
+                output=str(output),
+            )
+            with mock.patch.dict("os.environ", {"TEST_TOKEN": "secret"}), mock.patch.object(
+                module, "request_json", side_effect=fake_json
+            ), mock.patch.object(module, "request_bytes", side_effect=fake_bytes):
+                self.assertEqual(module.fetch_previous(args), 0)
+
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["identity"]["buildId"],
+                "older-valid",
             )
 
 
