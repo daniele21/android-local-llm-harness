@@ -1,13 +1,8 @@
 package io.github.daniele21.localllm.transport.binder.client
 
 import android.content.Context
-import io.github.daniele21.localllm.contracts.ConsumerActivationId
-import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
-import io.github.daniele21.localllm.contracts.ConsumerActivationResult
-import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneClient
-import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerGenerationListener
 import io.github.daniele21.localllm.contracts.ConsumerGenerationRequest
 import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
@@ -15,7 +10,6 @@ import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
-import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -30,7 +24,7 @@ private constructor(
     private val generation: BinderConsumerGenerationAdapter,
     private val controlPlane: BinderConsumerControlPlaneAdapter,
 ) : ConsumerLocalLlmClient,
-    ConsumerControlPlaneClient,
+    ConsumerControlPlaneClient by controlPlane,
     AutoCloseable {
     private val closed = AtomicBoolean(false)
 
@@ -65,26 +59,6 @@ private constructor(
     override fun closeSession(sessionId: SessionId) {
         if (closed.get()) return
         lifecycle.closeSession(sessionId)
-    }
-
-    override fun assignedUseCases(): ConsumerAssignedUseCasesResult {
-        checkOpen()
-        return controlPlane.assignedUseCases()
-    }
-
-    override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
-        checkOpen()
-        return controlPlane.publishedPresets(useCaseId)
-    }
-
-    override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult {
-        checkOpen()
-        return controlPlane.activate(request)
-    }
-
-    override fun deactivate(activationId: ConsumerActivationId): ConsumerDeactivationResult {
-        checkOpen()
-        return controlPlane.deactivate(activationId)
     }
 
     override fun close() {

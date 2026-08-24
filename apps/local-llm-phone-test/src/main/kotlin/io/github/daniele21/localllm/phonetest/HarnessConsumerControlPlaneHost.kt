@@ -57,6 +57,13 @@ import io.github.daniele21.localllm.runtime.UseCaseActivationLease
 import io.github.daniele21.localllm.runtime.UseCaseActivationRequest
 import io.github.daniele21.localllm.store.ModelStore
 
+private const val SEED_REVISION = 1
+private const val OMBRA_MINIMUM_CONTEXT_TOKENS = 4_096
+private const val OMBRA_MAX_INPUT_CHARACTERS = 12_000
+private const val OMBRA_MAX_SCHEMA_CHARACTERS = 4_096
+private const val MIGRATION_WARM_RETENTION_MS = 60_000L
+private const val LLAMA_CPP_BACKEND_ID = "llama.cpp"
+
 internal class HarnessConsumerControlPlaneHost(
     private val store: HostControlPlaneStore,
     private val modelStore: ModelStore,
@@ -124,51 +131,12 @@ internal class HarnessConsumerControlPlaneHost(
             ),
             executionEnvironment(applicationId),
         )
-        val execution = when (resolution) {
-            is HostExecutionResolution.Failure -> return ConsumerActivationResult.Rejected(
+        return when (resolution) {
+            is HostExecutionResolution.Failure -> ConsumerActivationResult.Rejected(
                 resolution.code.toConsumerFailure(),
             )
 
-            is HostExecutionResolution.Success -> resolution.execution
-        }
-        if (execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision) {
-            return ConsumerActivationResult.Rejected(
-                failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments"),
-            )
-        }
-
-        val installed = modelStore.find(execution.modelDigest)
-            ?.takeIf { it.verified }
-            ?: return ConsumerActivationResult.Rejected(
-                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
-            )
-        val imported = importedModel(installed.digest, installed.sizeBytes)
-            ?: return ConsumerActivationResult.Rejected(
-                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unsupported"),
-            )
-        val runtimeResolved = HarnessSharedRuntimeBindings.resolveOmbra(imported, applicationId)
-        if (runtimeResolved.model.artifact.digest != execution.modelDigest) {
-            return ConsumerActivationResult.Rejected(
-                failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved model identity mismatch"),
-            )
-        }
-
-        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
-            request = UseCaseActivationRequest(
-                ownerId = ActivationOwnerId(ownerId),
-                applicationId = applicationId,
-                useCaseId = request.useCaseId,
-                preset = request.preset,
-                modelDigest = execution.modelDigest,
-                acquiredAtEpochMs = epochClock(),
-                useCaseRevision = execution.useCaseRevision,
-                bindingRevision = execution.bindingRevision,
-            ),
-            retainModelWarmMs = execution.cachePolicy.retainModelWarmMs,
-        )
-        return when (acquired) {
-            is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
-            is ActivationResidencyResult.Success -> activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
+            is HostExecutionResolution.Success -> activateResolved(ownerId, applicationId, request, resolution)
         }
     }
 
@@ -206,6 +174,61 @@ internal class HarnessConsumerControlPlaneHost(
             .filter { it.applicationId == applicationId }
             .forEach { runtimeGraph.removeActivationBinding(it.activationId) }
         released.warmRetentionByModelMs.forEach(onWarmRetention)
+    }
+
+    private fun activateResolved(
+        ownerId: String,
+        applicationId: ApplicationId,
+        request: ConsumerActivationRequest,
+        resolution: HostExecutionResolution.Success,
+    ): ConsumerActivationResult {
+        val execution = resolution.execution
+        val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
+        return when {
+            execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision ->
+                ConsumerActivationResult.Rejected(
+                    failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments"),
+                )
+
+            installed == null -> ConsumerActivationResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
+            )
+
+            else -> {
+                val imported = importedModel(installed.digest, installed.sizeBytes)
+                if (imported == null) {
+                    ConsumerActivationResult.Rejected(
+                        failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unsupported"),
+                    )
+                } else {
+                    val runtimeResolved = HarnessSharedRuntimeBindings.resolveOmbra(imported, applicationId)
+                    if (runtimeResolved.model.artifact.digest != execution.modelDigest) {
+                        ConsumerActivationResult.Rejected(
+                            failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved model identity mismatch"),
+                        )
+                    } else {
+                        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
+                            request = UseCaseActivationRequest(
+                                ownerId = ActivationOwnerId(ownerId),
+                                applicationId = applicationId,
+                                useCaseId = request.useCaseId,
+                                preset = request.preset,
+                                modelDigest = execution.modelDigest,
+                                acquiredAtEpochMs = epochClock(),
+                                useCaseRevision = execution.useCaseRevision,
+                                bindingRevision = execution.bindingRevision,
+                            ),
+                            retainModelWarmMs = execution.cachePolicy.retainModelWarmMs,
+                        )
+                        when (acquired) {
+                            is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
+                            is ActivationResidencyResult.Success ->
+                                activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun activateRuntimeBinding(
@@ -301,55 +324,46 @@ internal class HarnessConsumerControlPlaneHost(
             quantization = release.artifact.quantization,
         )
     }
-
-    private fun seedUseCase() = UseCaseDefinition(
-        useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-        displayName = "Document PII detection",
-        description = "Detect configured PII locally from document text",
-        requirements = UseCaseRequirements(
-            outputMode = OutputMode.JSON_SCHEMA,
-            sessionKind = SessionKind.STATELESS,
-            reasoningSupported = false,
-            minimumContextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
-            maxInputCharacters = OMBRA_MAX_INPUT_CHARACTERS,
-            maxJsonSchemaCharacters = OMBRA_MAX_SCHEMA_CHARACTERS,
-        ),
-        state = UseCaseDefinitionState.ACTIVE,
-        revision = SEED_REVISION,
-    )
-
-    private fun seedPreset() = UseCasePresetDefinition(
-        useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-        metadata = PresetConsumerMetadata(
-            presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
-            revision = HarnessSharedRuntimeBindings.ombraDefaultPreset.version,
-            displayName = "Balanced local PII",
-            description = "Automatic local Qwen3.5 selection for structured PII detection",
-        ),
-        creationSource = PresetCreationSource.SUGGESTED,
-        state = PresetLifecycleState.PUBLISHED,
-        execution = PresetExecutionPolicy(
-            modelProfileId = null,
-            inferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
-            contextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
-            cachePolicy = UseCaseCachePolicy(
-                retainModelWarmMs = MIGRATION_WARM_RETENTION_MS,
-                reuseStatelessContext = false,
-                enablePrefixSnapshot = false,
-                enableDeterministicResultCache = false,
-            ),
-        ),
-    )
-
-    private companion object {
-        const val SEED_REVISION = 1
-        const val OMBRA_MINIMUM_CONTEXT_TOKENS = 4_096
-        const val OMBRA_MAX_INPUT_CHARACTERS = 12_000
-        const val OMBRA_MAX_SCHEMA_CHARACTERS = 4_096
-        const val MIGRATION_WARM_RETENTION_MS = 60_000L
-        const val LLAMA_CPP_BACKEND_ID = "llama.cpp"
-    }
 }
+
+private fun seedUseCase() = UseCaseDefinition(
+    useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
+    displayName = "Document PII detection",
+    description = "Detect configured PII locally from document text",
+    requirements = UseCaseRequirements(
+        outputMode = OutputMode.JSON_SCHEMA,
+        sessionKind = SessionKind.STATELESS,
+        reasoningSupported = false,
+        minimumContextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
+        maxInputCharacters = OMBRA_MAX_INPUT_CHARACTERS,
+        maxJsonSchemaCharacters = OMBRA_MAX_SCHEMA_CHARACTERS,
+    ),
+    state = UseCaseDefinitionState.ACTIVE,
+    revision = SEED_REVISION,
+)
+
+private fun seedPreset() = UseCasePresetDefinition(
+    useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
+    metadata = PresetConsumerMetadata(
+        presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
+        revision = HarnessSharedRuntimeBindings.ombraDefaultPreset.version,
+        displayName = "Balanced local PII",
+        description = "Automatic local Qwen3.5 selection for structured PII detection",
+    ),
+    creationSource = PresetCreationSource.SUGGESTED,
+    state = PresetLifecycleState.PUBLISHED,
+    execution = PresetExecutionPolicy(
+        modelProfileId = null,
+        inferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
+        contextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
+        cachePolicy = UseCaseCachePolicy(
+            retainModelWarmMs = MIGRATION_WARM_RETENTION_MS,
+            reuseStatelessContext = false,
+            enablePrefixSnapshot = false,
+            enableDeterministicResultCache = false,
+        ),
+    ),
+)
 
 private fun AssignedUseCaseDiscoveryFailure.toConsumerFailure(): ConsumerControlPlaneFailure = when (this) {
     AssignedUseCaseDiscoveryFailure.UNKNOWN_APPLICATION ->

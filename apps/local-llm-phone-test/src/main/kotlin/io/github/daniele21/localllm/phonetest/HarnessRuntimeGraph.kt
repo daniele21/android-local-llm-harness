@@ -34,6 +34,9 @@ import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
 import java.io.File
 import java.util.UUID
 
+private const val DEFAULT_RUN_LIMIT = 50
+private const val DEFAULT_LOG_LIMIT = 200
+
 /** Process-scoped owner of the embedded Harness runtime and observability sources. */
 internal class HarnessRuntimeGraph private constructor(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
@@ -145,10 +148,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         )
     }
 
-    fun recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> = telemetryRepository.recentRuns(limit)
-
-    fun recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> = telemetryRepository.recentLogs(limit)
-
     fun releaseModel(digest: ModelDigest) {
         synchronized(lock) {
             if (activationResidency.protects(digest)) return
@@ -207,8 +206,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
-        private const val DEFAULT_RUN_LIMIT = 50
-        private const val DEFAULT_LOG_LIMIT = 200
         internal val APPLICATION_ID = ApplicationId("play-internal-phone-test")
 
         @Volatile
@@ -219,6 +216,12 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         }
     }
 }
+
+internal fun HarnessRuntimeGraph.recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> =
+    telemetryRepository.recentRuns(limit)
+
+internal fun HarnessRuntimeGraph.recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> =
+    telemetryRepository.recentLogs(limit)
 
 internal enum class HarnessRuntimePurpose(val useCaseId: UseCaseId) {
     PLAYGROUND(UseCaseId("manual-inference-playground")),

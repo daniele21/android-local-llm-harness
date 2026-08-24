@@ -172,10 +172,6 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
-        if (connections.activeConnection(token, caller) != null) LedgerResult.Success(Unit) else invalidConnection()
-
-    @Synchronized
     fun supportsFeature(token: HostClientToken, caller: AuthorizedCaller, feature: String): LedgerResult<Boolean> {
         val connection = connections.activeConnection(token, caller) ?: return invalidConnection()
         return LedgerResult.Success(connection.supportsFeature(feature))
@@ -239,6 +235,14 @@ class ClientConnectionLedger(
         const val MAX_TOKEN_GENERATION_ATTEMPTS = 8
     }
 }
+
+fun ClientConnectionLedger.validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
+    when (val result = supportsFeature(token, caller, CONNECTION_VALIDATION_FEATURE)) {
+        is LedgerResult.Failure -> result
+        is LedgerResult.Success -> LedgerResult.Success(Unit)
+    }
+
+private const val CONNECTION_VALIDATION_FEATURE = "__connection_validation__"
 
 private fun Map<HostClientToken, ClientConnectionState>.activeConnection(
     token: HostClientToken,

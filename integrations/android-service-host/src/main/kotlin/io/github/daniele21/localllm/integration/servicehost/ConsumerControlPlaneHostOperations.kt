@@ -40,7 +40,7 @@ internal class ConsumerControlPlaneHostOperations(
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
     ) = submit(caller, request, callback) {
-        val result = requireHost(request).assignedUseCases(caller.applicationId)
+        val result = requireHost(host, request).assignedUseCases(caller.applicationId)
         val authorized = when (result) {
             is ConsumerAssignedUseCasesResult.Available ->
                 ConsumerAssignedUseCasesResult.Available(
@@ -62,7 +62,7 @@ internal class ConsumerControlPlaneHostOperations(
         if (!caller.allows(useCaseId)) {
             return@submit unauthorizedPresetDiscovery(request)
         }
-        requireHost(request).publishedPresets(caller.applicationId, useCaseId).toConsumerControlPlaneWire(request.operationId)
+        requireHost(host, request).publishedPresets(caller.applicationId, useCaseId).toConsumerControlPlaneWire(request.operationId)
     }
 
     fun activate(
@@ -74,7 +74,7 @@ internal class ConsumerControlPlaneHostOperations(
         if (!caller.allows(activationRequest.useCaseId)) {
             return@submit unauthorizedActivation(request)
         }
-        requireHost(request)
+        requireHost(host, request)
             .activate(token.value, caller.applicationId, activationRequest)
             .toConsumerControlPlaneWire(request.operationId)
     }
@@ -86,7 +86,7 @@ internal class ConsumerControlPlaneHostOperations(
     ) = submit(caller, request, callback) { token ->
         val activationId = request.activationId?.takeIf(String::isNotBlank)?.let(::ConsumerActivationId)
             ?: return@submit invalidRequest(request)
-        requireHost(request)
+        requireHost(host, request)
             .deactivate(token.value, caller.applicationId, activationId)
             .toConsumerControlPlaneWire(request.operationId, activationId)
     }
@@ -126,41 +126,44 @@ internal class ConsumerControlPlaneHostOperations(
             }
         }
     }
+}
 
-    private fun requireHost(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneHost =
-        host ?: error("Consumer control plane is unavailable for ${request.operationId}")
+private fun requireHost(host: ConsumerControlPlaneHost?, request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneHost =
+    host ?: error("Consumer control plane is unavailable for ${request.operationId}")
 
-    private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): ConsumerActivationRequest? {
-        val useCase = useCaseId?.takeIf(String::isNotBlank) ?: return null
-        val useCaseRevisionValue = useCaseRevision?.takeIf { it > 0 } ?: return null
-        val bindingRevisionValue = bindingRevision?.takeIf { it > 0 } ?: return null
-        val presetValue = preset ?: return null
-        if (presetValue.id.isBlank() || presetValue.version <= 0) return null
-        return ConsumerActivationRequest(
+private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): ConsumerActivationRequest? {
+    val useCase = useCaseId?.takeIf(String::isNotBlank)
+    val useCaseRevisionValue = useCaseRevision?.takeIf { it > 0 }
+    val bindingRevisionValue = bindingRevision?.takeIf { it > 0 }
+    val presetValue = preset?.takeIf { it.id.isNotBlank() && it.version > 0 }
+    return if (useCase != null && useCaseRevisionValue != null && bindingRevisionValue != null && presetValue != null) {
+        ConsumerActivationRequest(
             useCaseId = UseCaseId(useCase),
             useCaseRevision = useCaseRevisionValue,
             bindingRevision = bindingRevisionValue,
             preset = InferencePresetRef(InferencePresetId(presetValue.id), presetValue.version),
         )
+    } else {
+        null
     }
-
-    private fun unauthorizedPresetDiscovery(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
-        ConsumerPublishedPresetsResult.Rejected(unauthorizedUseCaseFailure())
-            .toConsumerControlPlaneWire(request.operationId)
-
-    private fun unauthorizedActivation(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
-        ConsumerActivationResult.Rejected(unauthorizedUseCaseFailure())
-            .toConsumerControlPlaneWire(request.operationId)
-
-    private fun unauthorizedUseCaseFailure() = ConsumerControlPlaneFailure(
-        ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
-        "Use case is not assigned",
-    )
-
-    private fun invalidRequest(request: ConsumerControlPlaneRequestParcel) = failure(request, WireErrorCodes.INVALID_WIRE_REQUEST)
-
-    private fun failure(request: ConsumerControlPlaneRequestParcel, code: String) = ConsumerControlPlaneResultParcel(
-        operationId = request.operationId,
-        error = wireError(code),
-    )
 }
+
+private fun unauthorizedPresetDiscovery(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
+    ConsumerPublishedPresetsResult.Rejected(unauthorizedUseCaseFailure())
+        .toConsumerControlPlaneWire(request.operationId)
+
+private fun unauthorizedActivation(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
+    ConsumerActivationResult.Rejected(unauthorizedUseCaseFailure())
+        .toConsumerControlPlaneWire(request.operationId)
+
+private fun unauthorizedUseCaseFailure() = ConsumerControlPlaneFailure(
+    ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
+    "Use case is not assigned",
+)
+
+private fun invalidRequest(request: ConsumerControlPlaneRequestParcel) = failure(request, WireErrorCodes.INVALID_WIRE_REQUEST)
+
+private fun failure(request: ConsumerControlPlaneRequestParcel, code: String) = ConsumerControlPlaneResultParcel(
+    operationId = request.operationId,
+    error = wireError(code),
+)
