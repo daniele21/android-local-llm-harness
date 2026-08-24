@@ -184,7 +184,7 @@ private fun PerformanceReadinessCard(state: PerformanceState, runnerAvailable: B
         ) {
             Text("Readiness", style = MaterialTheme.typography.titleMedium)
             HarnessStatusBadge(
-                text = when {
+                label = when {
                     !runnerAvailable -> "Runner unavailable"
                     ready -> "Ready"
                     else -> "Setup incomplete"
