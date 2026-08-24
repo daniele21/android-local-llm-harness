@@ -43,11 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-internal enum class HarnessDestination(
-    val route: String,
-    val label: String,
-    val compactLabel: String = label,
-) {
+internal enum class HarnessDestination(val route: String, val label: String, val compactLabel: String = label) {
     OVERVIEW("overview", "Overview"),
     PLAYGROUND("playground", "Playground"),
     PERFORMANCE("performance", "Performance", "Perf"),
