@@ -43,13 +43,19 @@ interface EvaluationEngineObserver {
     suspend fun onProgress(runId: EvaluationRunId, progress: EvaluationProgress) = Unit
 
     suspend fun onCaseResult(runId: EvaluationRunId, result: EvaluationCaseResult) = Unit
+
+    suspend fun onAggregation(runId: EvaluationRunId, aggregation: EvaluationRunAggregation) = Unit
 }
 
 sealed interface EvaluationEngineTerminal {
     val runId: EvaluationRunId
     val results: List<EvaluationCaseResult>
 
-    data class Completed(override val runId: EvaluationRunId, override val results: List<EvaluationCaseResult>) : EvaluationEngineTerminal
+    data class Completed(
+        override val runId: EvaluationRunId,
+        override val results: List<EvaluationCaseResult>,
+        val aggregation: EvaluationRunAggregation? = null,
+    ) : EvaluationEngineTerminal
 
     data class Cancelled(override val runId: EvaluationRunId, override val results: List<EvaluationCaseResult>) : EvaluationEngineTerminal
 
@@ -64,6 +70,7 @@ class EvaluationEngine(
     private val preflight: EvaluationPreflightPort,
     private val modelPreparation: EvaluationModelPreparationPort,
     private val caseExecution: EvaluationCaseExecutionPort,
+    private val runAggregation: EvaluationRunAggregationPort? = null,
 ) {
     private val ownershipLock = Any()
     private val cancelRequested = AtomicBoolean(false)
@@ -94,6 +101,7 @@ class EvaluationEngine(
                 preflight = preflight,
                 modelPreparation = modelPreparation,
                 caseExecution = caseExecution,
+                runAggregation = runAggregation,
                 cancelRequested = cancelRequested,
                 activeCaseJob = activeCaseJob,
             ).execute()
@@ -140,6 +148,7 @@ private class EvaluationRunExecution(
     private val preflight: EvaluationPreflightPort,
     private val modelPreparation: EvaluationModelPreparationPort,
     private val caseExecution: EvaluationCaseExecutionPort,
+    private val runAggregation: EvaluationRunAggregationPort?,
     private val cancelRequested: AtomicBoolean,
     private val activeCaseJob: AtomicReference<Job?>,
 ) {
@@ -157,7 +166,7 @@ private class EvaluationRunExecution(
     private suspend fun validatePhase(results: List<EvaluationCaseResult>): EvaluationEngineTerminal? {
         observer.emitState(config.runId, EvaluationRunState.VALIDATING)
         return when (val validation = preflight.validate(config)) {
-            is EvaluationStepResult.Failure -> fail(results, validation.failure)
+            is EvaluationStepResult.Failure -> fail(config, observer, results, validation.failure)
             is EvaluationStepResult.Success -> cancellationIfRequested(results)
         }
     }
@@ -165,7 +174,7 @@ private class EvaluationRunExecution(
     private suspend fun prepareModelPhase(results: List<EvaluationCaseResult>): EvaluationEngineTerminal? {
         observer.emitState(config.runId, EvaluationRunState.PREPARING_MODEL)
         return when (val preparation = modelPreparation.prepare(config)) {
-            is EvaluationStepResult.Failure -> fail(results, preparation.failure)
+            is EvaluationStepResult.Failure -> fail(config, observer, results, preparation.failure)
             is EvaluationStepResult.Success -> cancellationIfRequested(results)
         }
     }
@@ -175,7 +184,7 @@ private class EvaluationRunExecution(
 
         observer.emitState(config.runId, EvaluationRunState.WARMING_UP)
         return when (val warmup = modelPreparation.warmup(config)) {
-            is EvaluationStepResult.Failure -> fail(results, warmup.failure)
+            is EvaluationStepResult.Failure -> fail(config, observer, results, warmup.failure)
             is EvaluationStepResult.Success -> cancellationIfRequested(results)
         }
     }
@@ -187,7 +196,7 @@ private class EvaluationRunExecution(
         observer.emitProgress(config, attempted, results.size, null)
 
         for (caseId in caseIds) {
-            if (cancelRequested.get()) return cancel(results)
+            if (cancelRequested.get()) return cancel(config, observer, results)
 
             attempted += 1
             observer.emitProgress(config, attempted, results.size, caseId)
@@ -196,17 +205,30 @@ private class EvaluationRunExecution(
             } catch (error: CancellationException) {
                 if (!cancelRequested.get()) throw error
                 observer.emitProgress(config, attempted, results.size, null)
-                return cancel(results)
+                return cancel(config, observer, results)
             }
             when (execution) {
-                is EvaluationStepResult.Failure -> return fail(results, execution.failure)
+                is EvaluationStepResult.Failure -> return fail(config, observer, results, execution.failure)
                 is EvaluationStepResult.Success -> recordCaseResult(caseId, execution.value, results, attempted)
             }
         }
 
+        return aggregateAndComplete(results)
+    }
+
+    private suspend fun aggregateAndComplete(results: List<EvaluationCaseResult>): EvaluationEngineTerminal {
         observer.emitState(config.runId, EvaluationRunState.AGGREGATING)
+        val aggregation = when (val port = runAggregation) {
+            null -> null
+
+            else -> when (val result = port.aggregate(config, results)) {
+                is EvaluationStepResult.Failure -> return fail(config, observer, results, result.failure)
+                is EvaluationStepResult.Success -> result.value
+            }
+        }
+        if (aggregation != null) observer.onAggregation(config.runId, aggregation)
         observer.emitState(config.runId, EvaluationRunState.COMPLETED)
-        return EvaluationEngineTerminal.Completed(config.runId, results.toList())
+        return EvaluationEngineTerminal.Completed(config.runId, results.toList(), aggregation)
     }
 
     private suspend fun executeActiveCase(caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> = coroutineScope {
@@ -237,18 +259,27 @@ private class EvaluationRunExecution(
     }
 
     private suspend fun cancellationIfRequested(results: List<EvaluationCaseResult>): EvaluationEngineTerminal.Cancelled? =
-        if (cancelRequested.get()) cancel(results) else null
+        if (cancelRequested.get()) cancel(config, observer, results) else null
+}
 
-    private suspend fun fail(results: List<EvaluationCaseResult>, failure: EvaluationFailure): EvaluationEngineTerminal.Failed {
-        observer.emitState(config.runId, EvaluationRunState.FAILED)
-        return EvaluationEngineTerminal.Failed(config.runId, results.toList(), failure)
-    }
+private suspend fun fail(
+    config: EvaluationRunConfig,
+    observer: EvaluationEngineObserver,
+    results: List<EvaluationCaseResult>,
+    failure: EvaluationFailure,
+): EvaluationEngineTerminal.Failed {
+    observer.emitState(config.runId, EvaluationRunState.FAILED)
+    return EvaluationEngineTerminal.Failed(config.runId, results.toList(), failure)
+}
 
-    private suspend fun cancel(results: List<EvaluationCaseResult>): EvaluationEngineTerminal.Cancelled {
-        observer.emitState(config.runId, EvaluationRunState.CANCELLING)
-        observer.emitState(config.runId, EvaluationRunState.CANCELLED)
-        return EvaluationEngineTerminal.Cancelled(config.runId, results.toList())
-    }
+private suspend fun cancel(
+    config: EvaluationRunConfig,
+    observer: EvaluationEngineObserver,
+    results: List<EvaluationCaseResult>,
+): EvaluationEngineTerminal.Cancelled {
+    observer.emitState(config.runId, EvaluationRunState.CANCELLING)
+    observer.emitState(config.runId, EvaluationRunState.CANCELLED)
+    return EvaluationEngineTerminal.Cancelled(config.runId, results.toList())
 }
 
 private suspend fun EvaluationEngineObserver.emitState(runId: EvaluationRunId, state: EvaluationRunState) {
