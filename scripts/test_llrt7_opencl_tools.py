@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic host tests for LLRT-7 OpenCL provisioning and packaging guards."""
+"""Deterministic host tests for LLRT physical tooling, OpenCL provisioning and packaging guards."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent
 SDK_PREFLIGHT = ROOT / "llrt7_opencl_sdk_preflight.py"
 PACKAGING = ROOT / "verify_llrt7_opencl_packaging.py"
 QUICK_RUNNER = ROOT / "run-llrt-quick-physical-evidence.sh"
+LLRT9_RUNNER = ROOT / "run-llama-cpp-evaluation-batch-evidence.sh"
 EM_AARCH64 = 183
 EM_X86_64 = 62
 
@@ -112,6 +113,22 @@ def test_quick_runner_avoids_empty_optional_array_under_nounset() -> None:
     assert source.count("run_with_optional_reset bash") == 3
 
 
+def test_llrt9_model_path_is_relative_to_android_files_dir() -> None:
+    source = LLRT9_RUNNER.read_text(encoding="utf-8")
+    assert 'MODEL_RELATIVE_PATH="e2e/model.gguf"' in source
+    assert 'MODEL_APP_DATA_PATH="files/$MODEL_RELATIVE_PATH"' in source
+    assert '-e modelRelativePath "$MODEL_RELATIVE_PATH"' in source
+    assert "-e modelRelativePath files/e2e/model.gguf" not in source
+
+
+def test_llrt9_worktree_guard_rechecks_after_build() -> None:
+    source = LLRT9_RUNNER.read_text(encoding="utf-8")
+    assert 'require_clean_tracked_worktree "before build"' in source
+    assert 'require_clean_tracked_worktree "after Gradle device-test build"' in source
+    assert "git status --short --untracked-files=no --ignore-submodules=dirty" in source
+    assert "Tracked changes:" in source
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -119,7 +136,9 @@ def main() -> int:
         test_packaging_guard(root)
     test_device_loader_probe_uses_direct_adb_shell()
     test_quick_runner_avoids_empty_optional_array_under_nounset()
-    print("LLRT-7 OpenCL tool tests passed.")
+    test_llrt9_model_path_is_relative_to_android_files_dir()
+    test_llrt9_worktree_guard_rechecks_after_build()
+    print("LLRT physical tooling tests passed.")
     return 0
 
 
