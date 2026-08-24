@@ -4,12 +4,15 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
@@ -115,10 +118,31 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
     }
 
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
+
     override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
 
-    private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback =
-        object : IConsumerResultCallback.Stub() {
-            override fun onResult(result: ConsumerResultParcel) = callback(result)
-        }
+    override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        delegate.discoverUseCases(request, controlPlaneResultCallback(callback))
+    }
+
+    override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        delegate.discoverPresets(request, controlPlaneResultCallback(callback))
+    }
+
+    override fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        delegate.activate(request, controlPlaneResultCallback(callback))
+    }
+
+    override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        delegate.deactivate(request, controlPlaneResultCallback(callback))
+    }
 }
+
+private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback = object : IConsumerResultCallback.Stub() {
+    override fun onResult(result: ConsumerResultParcel) = callback(result)
+}
+
+private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParcel) -> Unit): IConsumerControlPlaneResultCallback =
+    object : IConsumerControlPlaneResultCallback.Stub() {
+        override fun onResult(result: ConsumerControlPlaneResultParcel) = callback(result)
+    }

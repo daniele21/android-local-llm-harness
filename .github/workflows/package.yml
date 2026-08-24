@@ -199,6 +199,7 @@ jobs:
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
       - name: Fetch previous successful comparable package metadata
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |

@@ -5,6 +5,8 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
@@ -16,6 +18,8 @@ import io.github.daniele21.localllm.transport.binder.contract.PrepareResultParce
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
+import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 
 internal interface ConsumerSharedRuntimeRemoteService {
     @Throws(RemoteException::class)
@@ -35,6 +39,26 @@ internal interface ConsumerSharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun closeSession(request: CloseSessionRequestParcel)
+
+    @Throws(RemoteException::class)
+    fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        callback(controlPlaneUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        callback(controlPlaneUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        callback(controlPlaneUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        callback(controlPlaneUnavailable(request.operationId))
+    }
 }
 
 internal interface SharedRuntimeRemoteService {
@@ -97,3 +121,12 @@ internal class EndpointInvalidationRegistry {
         snapshot.forEach { listener -> runCatching { listener.onEndpointInvalidated(connectionEpoch, detail) } }
     }
 }
+
+private fun controlPlaneUnavailable(operationId: String) = ConsumerControlPlaneResultParcel(
+    operationId = operationId,
+    error = WireErrorParcel(
+        code = WireErrorCodes.FEATURE_UNAVAILABLE,
+        safeMessage = "Consumer control plane is unavailable",
+        retryable = false,
+    ),
+)

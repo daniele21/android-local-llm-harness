@@ -2,10 +2,13 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
@@ -17,7 +20,7 @@ internal class ConsumerRuntimeBinderStub(
     private val callingProcessSource: CallingProcessSource,
 ) : IConsumerLocalLlmService.Stub() {
     override fun capabilities(request: ConsumerRequestParcel, callback: IConsumerResultCallback) =
-        withResultCaller(request, callback) { caller ->
+        withResultCaller(authorizer, callingProcessSource, request, callback) { caller ->
             delegate.consumerOperations.capabilities(
                 caller,
                 request,
@@ -26,7 +29,7 @@ internal class ConsumerRuntimeBinderStub(
         }
 
     override fun prepare(request: ConsumerRequestParcel, callback: IConsumerResultCallback) =
-        withResultCaller(request, callback) { caller ->
+        withResultCaller(authorizer, callingProcessSource, request, callback) { caller ->
             delegate.consumerOperations.prepare(
                 caller,
                 request,
@@ -35,7 +38,7 @@ internal class ConsumerRuntimeBinderStub(
         }
 
     override fun openSession(request: ConsumerRequestParcel, callback: IConsumerResultCallback) =
-        withResultCaller(request, callback) { caller ->
+        withResultCaller(authorizer, callingProcessSource, request, callback) { caller ->
             delegate.consumerOperations.openSession(
                 caller,
                 request,
@@ -44,7 +47,7 @@ internal class ConsumerRuntimeBinderStub(
         }
 
     override fun generate(request: ConsumerRequestParcel, callback: IConsumerGenerationCallback) {
-        val caller = authorizedCallerOrNull()
+        val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
         if (caller == null) {
             deliverRemote {
                 callback.onEvent(
@@ -66,35 +69,96 @@ internal class ConsumerRuntimeBinderStub(
     }
 
     override fun cancel(request: CancelRequestParcel) {
-        authorizedCallerOrNull()?.let { delegate.consumerOperations.cancel(it, request) }
+        authorizedCallerOrNull(authorizer, callingProcessSource)?.let { delegate.consumerOperations.cancel(it, request) }
     }
 
     override fun closeSession(request: CloseSessionRequestParcel) {
-        authorizedCallerOrNull()?.let { delegate.consumerOperations.closeSession(it, request) }
+        authorizedCallerOrNull(authorizer, callingProcessSource)?.let { delegate.consumerOperations.closeSession(it, request) }
     }
 
-    private inline fun withResultCaller(
-        request: ConsumerRequestParcel,
-        callback: IConsumerResultCallback,
-        block: (AuthorizedCaller) -> Unit,
-    ) {
-        val caller = authorizedCallerOrNull()
-        if (caller == null) {
-            deliverRemote {
-                callback.onResult(
-                    ConsumerResultParcel(
-                        operationId = request.operationId,
-                        error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
-                    ),
-                )
-            }
-        } else {
-            block(caller)
+    override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverUseCases(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
         }
-    }
 
-    private fun authorizedCallerOrNull(): AuthorizedCaller? = when (val result = authorizer.authorize(callingProcessSource.current())) {
+    override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.controlPlaneOperations.discoverPresets(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
+    override fun activate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.controlPlaneOperations.activate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
+    override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.controlPlaneOperations.deactivate(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+}
+
+private inline fun withResultCaller(
+    authorizer: CallerAuthorizer,
+    callingProcessSource: CallingProcessSource,
+    request: ConsumerRequestParcel,
+    callback: IConsumerResultCallback,
+    block: (AuthorizedCaller) -> Unit,
+) {
+    val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
+    if (caller == null) {
+        deliverRemote {
+            callback.onResult(
+                ConsumerResultParcel(
+                    operationId = request.operationId,
+                    error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                ),
+            )
+        }
+    } else {
+        block(caller)
+    }
+}
+
+private inline fun withControlPlaneCaller(
+    authorizer: CallerAuthorizer,
+    callingProcessSource: CallingProcessSource,
+    request: ConsumerControlPlaneRequestParcel,
+    callback: IConsumerControlPlaneResultCallback,
+    block: (AuthorizedCaller) -> Unit,
+) {
+    val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
+    if (caller == null) {
+        deliverRemote {
+            callback.onResult(
+                ConsumerControlPlaneResultParcel(
+                    operationId = request.operationId,
+                    error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                ),
+            )
+        }
+    } else {
+        block(caller)
+    }
+}
+
+private fun authorizedCallerOrNull(authorizer: CallerAuthorizer, callingProcessSource: CallingProcessSource): AuthorizedCaller? =
+    when (val result = authorizer.authorize(callingProcessSource.current())) {
         is AuthorizationResult.Allowed -> result.caller
         is AuthorizationResult.Denied -> null
     }
-}

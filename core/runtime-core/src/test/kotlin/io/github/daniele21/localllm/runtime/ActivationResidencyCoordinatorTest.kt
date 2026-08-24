@@ -29,6 +29,21 @@ class ActivationResidencyCoordinatorTest {
     }
 
     @Test
+    fun `exclusive consumer activation rejects duplicate owner application use case`() {
+        val coordinator = coordinator()
+
+        val first = coordinator.acquireExclusiveUseCase(request("owner-a", firstDigest), retainModelWarmMs = 30_000)
+        val duplicate = coordinator.acquireExclusiveUseCase(request("owner-a", firstDigest), retainModelWarmMs = 30_000)
+        val otherOwner = coordinator.acquireExclusiveUseCase(request("owner-b", firstDigest), retainModelWarmMs = 30_000)
+
+        assertTrue(first is ActivationResidencyResult.Success)
+        duplicate as ActivationResidencyResult.Failure
+        assertEquals(ActivationResidencyFailure.USE_CASE_ALREADY_ACTIVE, duplicate.reason)
+        assertTrue(otherOwner is ActivationResidencyResult.Success)
+        assertEquals(2, coordinator.activeLeaseCount(firstDigest))
+    }
+
+    @Test
     fun `different model activation fails while resident target is protected`() {
         val coordinator = coordinator()
         coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 30_000)

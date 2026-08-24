@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -58,22 +59,33 @@ class HarnessSharedRuntimeBindingsTest {
     }
 
     @Test
-    fun `external binding requires host-selected curated model`() {
+    fun `external binding requires explicit control-plane activation even with selected model`() {
         val registry = HarnessPhoneBindingRegistry()
+        registry.selectedModel = curatedModel()
 
-        assertThrows(IllegalArgumentException::class.java) {
+        val failure = assertThrows(IllegalStateException::class.java) {
             registry.resolve(
                 HarnessSharedRuntimeBindings.consoleApplicationId,
                 HarnessSharedRuntimeBindings.consoleUseCaseId,
             )
         }
+
+        assertTrue(failure.message?.contains("control-plane activation") == true)
     }
 
     @Test
-    fun `external binding uses host model and fixed console identity`() {
+    fun `external binding uses activation-owned model and fixed console identity`() {
         val registry = HarnessPhoneBindingRegistry()
-        val model = curatedModel()
-        registry.selectedModel = model
+        val activationModel = curatedModel(index = 0)
+        val selectedModel = curatedModel(index = 1)
+        val resolvedActivation = HarnessSharedRuntimeBindings.resolveConsole(activationModel)
+        registry.selectedModel = selectedModel
+        registry.installActivationBinding(
+            activationId = UseCaseActivationId("console-activation"),
+            applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+            useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
+            resolved = resolvedActivation,
+        )
 
         val resolved = registry.resolve(
             HarnessSharedRuntimeBindings.consoleApplicationId,
@@ -82,24 +94,27 @@ class HarnessSharedRuntimeBindingsTest {
 
         assertEquals(HarnessSharedRuntimeBindings.consoleApplicationId, resolved.binding.applicationId)
         assertEquals(HarnessSharedRuntimeBindings.consoleUseCaseId, resolved.binding.useCaseId)
-        assertEquals(model.digest, resolved.model.artifact.digest)
+        assertEquals(activationModel.digest, resolved.model.artifact.digest)
+        assertFalse(selectedModel.digest == resolved.model.artifact.digest)
     }
 
     @Test
-    fun `external binding rejects unregistered use case`() {
+    fun `external binding rejects use case without matching activation`() {
         val registry = HarnessPhoneBindingRegistry()
         registry.selectedModel = curatedModel()
 
-        assertThrows(IllegalArgumentException::class.java) {
+        val failure = assertThrows(IllegalStateException::class.java) {
             registry.resolve(
                 HarnessSharedRuntimeBindings.consoleApplicationId,
                 UseCaseId("client-selected-model-profile"),
             )
         }
+
+        assertTrue(failure.message?.contains("control-plane activation") == true)
     }
 
-    private fun curatedModel(): ImportedPhoneModel {
-        val artifact = CuratedModelCatalog.releases.first().artifact
+    private fun curatedModel(index: Int = 0): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases[index].artifact
         return ImportedPhoneModel(
             digest = artifact.digest,
             fileName = artifact.fileName,

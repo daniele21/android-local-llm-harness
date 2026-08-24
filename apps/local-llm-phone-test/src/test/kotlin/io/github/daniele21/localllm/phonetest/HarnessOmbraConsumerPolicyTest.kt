@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind
 import io.github.daniele21.localllm.contracts.ConsumerReasoningCapability
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -61,10 +62,21 @@ class HarnessOmbraConsumerPolicyTest {
     }
 
     @Test
-    fun `phone binding registry restricts redactguard to document pii detection`() {
+    fun `phone binding registry resolves redactguard only through activated document pii binding`() {
         val registry = HarnessPhoneBindingRegistry()
         val model = curatedModel()
+        val activated =
+            HarnessSharedRuntimeBindings.resolveOmbra(
+                model,
+                HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            )
         registry.selectedModel = model
+        registry.installActivationBinding(
+            activationId = UseCaseActivationId("redactguard-pii-activation"),
+            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
+            resolved = activated,
+        )
 
         val redactGuard =
             registry.resolve(
@@ -75,12 +87,13 @@ class HarnessOmbraConsumerPolicyTest {
         assertEquals(model.digest, redactGuard.model.artifact.digest)
         assertEquals(HarnessSharedRuntimeBindings.redactGuardApplicationId, redactGuard.binding.applicationId)
         assertEquals(HarnessSharedRuntimeBindings.ombraUseCaseId, redactGuard.binding.useCaseId)
-        assertThrows(IllegalArgumentException::class.java) {
+        val failure = assertThrows(IllegalStateException::class.java) {
             registry.resolve(
                 HarnessSharedRuntimeBindings.redactGuardApplicationId,
                 HarnessSharedRuntimeBindings.consoleUseCaseId,
             )
         }
+        assertTrue(failure.message?.contains("control-plane activation") == true)
     }
 
     @Test

@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.transport.binder.client
 
 import android.content.Context
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneClient
 import io.github.daniele21.localllm.contracts.ConsumerGenerationListener
 import io.github.daniele21.localllm.contracts.ConsumerGenerationRequest
 import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
@@ -21,7 +22,9 @@ private constructor(
     private val connection: SharedRuntimeConnection,
     private val lifecycle: BinderConsumerLifecycleAdapter,
     private val generation: BinderConsumerGenerationAdapter,
+    private val controlPlane: BinderConsumerControlPlaneAdapter,
 ) : ConsumerLocalLlmClient,
+    ConsumerControlPlaneClient by controlPlane,
     AutoCloseable {
     private val closed = AtomicBoolean(false)
 
@@ -94,6 +97,12 @@ private constructor(
                 generation =
                 BinderConsumerGenerationAdapter(
                     endpointProvider = { connection.endpoint },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
+                controlPlane =
+                BinderConsumerControlPlaneAdapter(
+                    endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
                     endpointInvalidations = connection.endpointInvalidations,
                 ),
             )

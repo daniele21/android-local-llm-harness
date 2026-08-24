@@ -45,7 +45,7 @@ internal object HarnessSharedRuntimePolicy {
                     AuthorizedClientPolicy(
                         packageName = HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE,
                         applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
-                        allowedUseCases = setOf(HarnessSharedRuntimeBindings.consoleUseCaseId),
+                        allowedUseCases = HarnessSharedRuntimeBindings.consoleUseCases,
                         acceptedSigningCertificates = acceptedSigningCertificates,
                     ),
                 )

@@ -66,12 +66,21 @@ data class ClosingResources(val requestIds: List<RequestId>, val sessionIds: Lis
 
 data class HostConnectionRef(val token: HostClientToken, val caller: AuthorizedCaller)
 
-private class ClientConnectionState(val caller: AuthorizedCaller) {
+data class HostNegotiatedProtocol(val minor: Int, val enabledFeatures: Set<String>) {
+    init {
+        require(minor >= 0) { "Negotiated protocol minor must be non-negative" }
+        require(enabledFeatures.none { it.isBlank() }) { "Negotiated protocol features must not be blank" }
+    }
+}
+
+private class ClientConnectionState(val caller: AuthorizedCaller, val protocol: HostNegotiatedProtocol) {
     private val sessions = LinkedHashMap<String, SessionId>()
     private val requests = LinkedHashMap<String, RequestId>()
     private var closing = false
 
     fun matches(candidate: AuthorizedCaller): Boolean = caller.uid == candidate.uid && caller.packageName == candidate.packageName
+
+    fun supportsFeature(feature: String): Boolean = feature in protocol.enabledFeatures
 
     fun registerSession(externalSessionId: String, internalSessionId: SessionId, maxSessions: Int): LedgerResult<SessionId> = when {
         closing -> LedgerResult.Failure(LedgerFailure.CLIENT_CLOSING)
@@ -142,15 +151,20 @@ class ClientConnectionLedger(
         @Synchronized get() = connections.map { (token, state) -> HostConnectionRef(token, state.caller) }
 
     @Synchronized
-    fun register(caller: AuthorizedCaller): LedgerResult<HostClientToken> {
+    fun register(
+        caller: AuthorizedCaller,
+        negotiatedMinor: Int = 0,
+        enabledFeatures: Set<String> = emptySet(),
+    ): LedgerResult<HostClientToken> {
         if (connections.size >= quotas.maxConnections) {
             return LedgerResult.Failure(LedgerFailure.CONNECTION_LIMIT)
         }
+        val protocol = HostNegotiatedProtocol(negotiatedMinor, enabledFeatures.toSet())
 
         repeat(MAX_TOKEN_GENERATION_ATTEMPTS) {
             val token = identifiers.newClientToken()
             if (token !in connections) {
-                connections[token] = ClientConnectionState(caller = caller)
+                connections[token] = ClientConnectionState(caller = caller, protocol = protocol)
                 return LedgerResult.Success(token)
             }
         }
@@ -158,8 +172,10 @@ class ClientConnectionLedger(
     }
 
     @Synchronized
-    fun validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
-        if (connections.activeConnection(token, caller) != null) LedgerResult.Success(Unit) else invalidConnection()
+    fun supportsFeature(token: HostClientToken, caller: AuthorizedCaller, feature: String): LedgerResult<Boolean> {
+        val connection = connections.activeConnection(token, caller) ?: return invalidConnection()
+        return LedgerResult.Success(connection.supportsFeature(feature))
+    }
 
     @Synchronized
     fun registerSession(
@@ -219,6 +235,14 @@ class ClientConnectionLedger(
         const val MAX_TOKEN_GENERATION_ATTEMPTS = 8
     }
 }
+
+fun ClientConnectionLedger.validateConnection(token: HostClientToken, caller: AuthorizedCaller): LedgerResult<Unit> =
+    when (val result = supportsFeature(token, caller, CONNECTION_VALIDATION_FEATURE)) {
+        is LedgerResult.Failure -> result
+        is LedgerResult.Success -> LedgerResult.Success(Unit)
+    }
+
+private const val CONNECTION_VALIDATION_FEATURE = "__connection_validation__"
 
 private fun Map<HostClientToken, ClientConnectionState>.activeConnection(
     token: HostClientToken,

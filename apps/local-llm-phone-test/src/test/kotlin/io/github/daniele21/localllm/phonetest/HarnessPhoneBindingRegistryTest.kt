@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessPhoneBindingRegistryTest {
@@ -76,13 +77,22 @@ class HarnessPhoneBindingRegistryTest {
     }
 
     @Test
-    fun `rejects unknown application and use case ids`() {
+    fun `external application cannot fall back to selected model`() {
         val registry = HarnessPhoneBindingRegistry()
         registry.selectedModel = model
 
-        assertThrows(IllegalArgumentException::class.java) {
+        val failure = assertThrows(IllegalStateException::class.java) {
             registry.resolve(ApplicationId("other-app"), HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         }
+
+        assertTrue(failure.message?.contains("control-plane activation") == true)
+    }
+
+    @Test
+    fun `internal application rejects unknown use case id`() {
+        val registry = HarnessPhoneBindingRegistry()
+        registry.selectedModel = model
+
         assertThrows(IllegalStateException::class.java) {
             registry.resolve(APPLICATION_ID, UseCaseId("unknown"))
         }

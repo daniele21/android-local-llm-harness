@@ -4,7 +4,9 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +29,40 @@ class ConnectionLedgerTest {
         assertNotEquals(requestA, requestB)
         assertEquals(SessionId("internal-session-a"), successValue(ledger.sessionId(tokenA, callerA, "session-1")))
         assertEquals(SessionId("internal-session-b"), successValue(ledger.sessionId(tokenB, callerB, "session-1")))
+    }
+
+    @Test
+    fun negotiatedFeaturesAreScopedToTheExactClientToken() {
+        val ledger = ClientConnectionLedger(identifiers = FakeIdentifiers())
+        val caller = caller(uid = 10001, packageName = "io.example.client")
+        val v11Token = successValue(
+            ledger.register(
+                caller,
+                negotiatedMinor = 1,
+                enabledFeatures = setOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
+            ),
+        )
+        val v12Token = successValue(
+            ledger.register(
+                caller,
+                negotiatedMinor = 2,
+                enabledFeatures = setOf(
+                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                ),
+            ),
+        )
+
+        assertFalse(
+            successValue(
+                ledger.supportsFeature(v11Token, caller, BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1),
+            ),
+        )
+        assertTrue(
+            successValue(
+                ledger.supportsFeature(v12Token, caller, BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1),
+            ),
+        )
     }
 
     @Test
