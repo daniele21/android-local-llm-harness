@@ -1,9 +1,0 @@
-io.github.daniele21.localllm.install.model-install-pngs-0 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/generated/res/pngs/debug
-io.github.daniele21.localllm.install.model-install-updated_navigation_xml-1 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/generated/updated_navigation_xml/debug
-io.github.daniele21.localllm.install.model-install-mergeDebugResources-2 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
-io.github.daniele21.localllm.install.model-install-mergeDebugResources-3 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
-io.github.daniele21.localllm.install.model-install-debug-4 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/merged_res/debug/mergeDebugResources
-io.github.daniele21.localllm.install.model-install-debug-5 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/build/intermediates/packaged_res/debug/packageDebugResources
-io.github.daniele21.localllm.install.model-install-debug-6 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/src/debug/res
-io.github.daniele21.localllm.install.model-install-main-7 /home/runner/work/android-local-llm-harness/android-local-llm-harness/models/model-install/src/main/res
-gradleHome-0 /home/runner/.gradle
