@@ -93,7 +93,7 @@ A physical Samsung `SM-A566B` run on exact Harness commit `016467c300e84decb1669
 
 This is **short-profile physical diagnostic evidence**, not the canonical `2048`-context / `64`-output qualification matrix. It must not mark LLRT-9C `DONE`, cap or promote production concurrency by itself, or promote a runtime profile to `MEASURED`.
 
-The width-4 failure currently has two live hypotheses: sequence-slot/KV/logits attribution drift versus numerically sensitive stochastic sampling. Repository tooling now provides a separate non-qualifying diagnostic path that records privacy-safe digests/token counts for three cases without relaxing the canonical hard gate:
+The width-4 failure currently has two live hypotheses: sequence-slot/KV/logits attribution drift versus numerically sensitive stochastic sampling. Repository tooling now provides a separate non-qualifying diagnostic path that records privacy-safe digests/token counts for three cases without relaxing the canonical hard gate. Active bounded investigation: [`LLRT-9 width=4 diagnostic`](../workstreams/llrt9-width4-diagnostic.md).
 
 1. `baseline-quality`: source prompt order `0,1,2,3` with the normal Quality sampler;
 2. `swap02-quality`: source prompt order `2,1,0,3`, directly swapping the previously divergent source prompt with slot `0` to distinguish prompt-following from slot-following divergence;
