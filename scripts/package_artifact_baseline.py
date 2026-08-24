@@ -24,6 +24,9 @@ RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
 MAX_RUN_PAGES = 4
 RUNS_PER_PAGE = 50
+SENSITIVE_REDIRECT_HEADERS = frozenset(
+    {"authorization", "x-github-api-version", "accept"}
+)
 
 
 class BaselineLookupError(RuntimeError):
@@ -33,6 +36,12 @@ class BaselineLookupError(RuntimeError):
 def _origin(url: str) -> tuple[str, str, int | None]:
     parsed = urllib.parse.urlsplit(url)
     return parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port
+
+
+def _strip_sensitive_redirect_headers(request: urllib.request.Request) -> None:
+    for header, _ in tuple(request.header_items()):
+        if header.lower() in SENSITIVE_REDIRECT_HEADERS:
+            request.remove_header(header)
 
 
 class GitHubArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -55,8 +64,7 @@ class GitHubArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
             return None
 
         if _origin(req.full_url) != _origin(newurl):
-            for header in ("Authorization", "X-GitHub-Api-Version", "Accept"):
-                redirected.remove_header(header)
+            _strip_sensitive_redirect_headers(redirected)
         return redirected
 
 
