@@ -31,7 +31,7 @@ internal fun HarnessScreenList(
         LazyColumn(
             modifier = Modifier
                 .fillMaxHeight()
-                .widthIn(max = HARNESS_CONTENT_MAX_WIDTH)
+                .widthIn(max = harnessContentMaxWidth)
                 .align(Alignment.TopCenter),
             contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -62,4 +62,4 @@ internal fun harnessScreenHorizontalPadding(width: Dp): Dp = when {
     else -> 32.dp
 }
 
-private val HARNESS_CONTENT_MAX_WIDTH = 960.dp
+private val harnessContentMaxWidth = 960.dp
