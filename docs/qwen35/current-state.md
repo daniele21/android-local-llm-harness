@@ -98,20 +98,69 @@ The follow-up width-4 diagnostic ran on exact Harness commit `0ec8b1bf44c700a57f
 - `baseline-greedy` produced exact serial/native output-digest and token-count parity for all four prompts at width `4`;
 - therefore the observed failure is **prompt-following and sampling-sensitive**, which favors numerical sensitivity under stochastic Quality sampling rather than a slot/sequence/KV attribution defect.
 
-The durable decision is deliberately fail-closed: the canonical exact-output gate remains unchanged, and **width `4` under Quality sampling is not qualified by this evidence**. Within this short-profile/device envelope, width `3` is the highest width that has passed the exact-output gate. This is not a production concurrency cap and must not be generalized to the canonical `2048`-context / `64`-output qualification matrix or to other devices.
+The durable decision is deliberately fail-closed: the exact-output gate remains unchanged, and **width `4` under Quality sampling is not qualified by this short-profile evidence**.
 
-The width-4 diagnostic also showed large timing upside (`~1.30x–1.33x` speedup under Quality and `~1.47x` under greedy), but correctness qualification takes precedence over throughput; those timing results cannot justify promotion while Quality sampling fails exact equivalence.
+### LLRT-9 canonical `2048 / 64` physical findings
 
-This remains **short-profile physical diagnostic evidence**, not the canonical `2048`-context / `64`-output qualification matrix. It must not mark LLRT-9C `DONE`, cap or promote production concurrency by itself, or promote a runtime profile to `MEASURED`.
+The canonical LLRT-9C profile was then run on the same Samsung `SM-A566B`, exact Harness commit `3ac9a64ffc115de14beb890065ae4719f065787b`, pinned llama.cpp revision, seed `42`, `b128/ub64`, thinking disabled and four order-balanced samples per width. Both curated Q4_K_M tiers were exercised.
 
-Q35-6 remains `IN PROGRESS` because full physical evidence must still be collected for both tiers and reviewed before selecting versioned measured defaults.
+#### Qwen3.5 2B
+
+`threads=4`, `batchThreads=4`:
+
+| Width | Correctness | Serial median | Native-batch median | Median speedup | Decision |
+| ---: | --- | ---: | ---: | ---: | --- |
+| 2 | PASS, 4/4 exact digest + token parity | 91.50 s | 84.71 s | `1.080x` | positive candidate |
+| 3 | PASS, 4/4 exact digest + token parity | 131.71 s | 119.40 s | `1.103x` | positive candidate |
+| 4 | FAIL at sample 0 | n/a | n/a | n/a | UNQUALIFIED |
+
+Width `4` reproduced the same prompt-sensitive digest divergence already seen in the short profile: source prompt index `2` changed from digest prefix `b118...` in serial execution to `d722...` in native batch, while the other three prompt outputs matched. This confirms that the width-4 Quality mismatch is not specific to the `1024 / 8` diagnostic workload.
+
+For this exact device/profile identity, width `2` reduces median wall-clock by about `7.4%` and width `3` by about `9.4%`; thermal status remained `0`. Width `3` is the highest canonical width that passed the exact-output gate on this device. This is still an evidence-backed device/tier finding, not a global product cap for unrelated hardware.
+
+#### Qwen3.5 0.8B
+
+`threads=2`, `batchThreads=4`:
+
+| Width | Correctness | Serial median | Native-batch median | Relative result | Decision |
+| ---: | --- | ---: | ---: | ---: | --- |
+| 2 | PASS, 4/4 exact digest + token parity | 100.69 s | 115.39 s | native batch `14.6%` slower | REJECT for performance |
+| 3 | PASS, 4/4 exact digest + token parity | 119.42 s | 132.53 s | native batch `11.0%` slower | REJECT for performance |
+| 4 | FAIL at sample 0 | n/a | n/a | n/a | UNQUALIFIED |
+
+Width `4` failed before output-digest comparison because per-case output-token counts diverged: serial `[24,45,8,7]` versus native batch `[39,24,10,7]`. This is a hard correctness failure under the LLRT-9C contract. It does **not** by itself prove sequence mis-attribution, because divergent sampled outputs can also terminate at different lengths; no production conclusion should over-interpret the failure mechanism.
+
+The 0.8B result is nevertheless decisive for policy selection on this exact device/profile: native multi-sequence batching provides no throughput benefit at widths `2` or `3`, and width `4` additionally fails correctness. Therefore native batching is **REJECTED for the canonical 0.8B profile on this device**; further width-4 root-cause work is not required for product promotion unless the native batching implementation is revisited independently.
+
+### Tier-specific LLRT-9 decision from the canonical wave
+
+For this exact Samsung/device/backend/profile identity:
+
+```text
+Qwen3.5 0.8B canonical Quality:
+  width 2 -> correctness PASS, performance REJECT
+  width 3 -> correctness PASS, performance REJECT
+  width 4 -> correctness FAIL / UNQUALIFIED
+  native batching -> REJECT for product use on this device/profile
+
+Qwen3.5 2B canonical Quality:
+  width 2 -> correctness PASS, performance POSITIVE
+  width 3 -> correctness PASS, performance POSITIVE
+  width 4 -> correctness FAIL / UNQUALIFIED
+  native batching -> candidate only up to width 3 on this device/profile
+```
+
+The result is explicitly tier-specific. It is evidence against a single global batching policy for all Qwen3.5 dense tiers. The exact-output and per-case token gates remain unchanged; no failure is relaxed to obtain a favorable performance result.
+
+Q35-6 remains `IN PROGRESS` because canonical LLRT-9 evidence on this device is only one part of measured-profile selection. Broader representative-device evidence and lifecycle/memory acceptance remain before any profile becomes `MEASURED` or a production policy is generalized.
 
 ## Remaining Q35-6 evidence
 
-- run the complete 0.8B Q4_K_M matrix on representative physical Android hardware;
-- run the complete 2B Q4_K_M matrix on the same device classes, including the canonical LLRT-9 profile with the exact-output gate preserved;
-- treat width `4` Quality as unqualified unless a future canonical evidence wave demonstrates exact serial/native equivalence for the exact target identity;
+- preserve the completed canonical LLRT-9 0.8B/2B findings as tier-specific physical evidence for Samsung `SM-A566B`;
+- continue broader/representative 0.8B and 2B physical tuning evidence required by the measured-profile acceptance criteria;
 - review eligible evidence separately by tier and choose evidence-backed runtime defaults;
+- keep 0.8B native batching rejected for this exact device/profile unless a later intentionally re-opened evidence wave supersedes it;
+- keep 2B width `4` Quality unqualified and treat widths `2`/`3` only as device/profile candidates until policy promotion criteria are satisfied;
 - mark selected profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
 - validate cancellation, model switching, memory pressure and idle unload on the measured configurations.
 
