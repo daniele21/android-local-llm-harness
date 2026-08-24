@@ -351,11 +351,7 @@ class Llrt9Width4DiagnosticInstrumentedTest {
         .joinToString("") { "%02x".format(it) }
 }
 
-private data class Llrt9DiagnosticHarness(
-    val runtime: RuntimeOrchestrator,
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+private data class Llrt9DiagnosticHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
 private data class Llrt9DiagnosticMeasuredMode(
     val prompts: List<String>,
@@ -364,11 +360,7 @@ private data class Llrt9DiagnosticMeasuredMode(
     val elapsedMs: Long,
 )
 
-private data class Llrt9DiagnosticDeviceSnapshot(
-    val processPssKb: Int,
-    val availableMemoryBytes: Long,
-    val thermalStatus: Int,
-)
+private data class Llrt9DiagnosticDeviceSnapshot(val processPssKb: Int, val availableMemoryBytes: Long, val thermalStatus: Int)
 
 private class Llrt9DiagnosticSingleBindingRegistry(private val resolved: ResolvedUseCase) : ModelProfileRegistry {
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
