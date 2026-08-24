@@ -23,6 +23,8 @@ COOLDOWN_POLL_SECONDS=30
 OUTPUT_DIR="$ROOT_DIR/build/llrt9"
 RESET_OUTPUT=false
 BACKEND_REVISION="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
+MODEL_RELATIVE_PATH="e2e/model.gguf"
+MODEL_APP_DATA_PATH="files/$MODEL_RELATIVE_PATH"
 
 usage() {
   cat <<'EOF'
@@ -116,6 +118,23 @@ sha256_file() {
   fi
 }
 
+tracked_worktree_status() {
+  git status --short --untracked-files=no --ignore-submodules=dirty
+}
+
+require_clean_tracked_worktree() {
+  stage="$1"
+  if ! git diff --quiet --ignore-submodules=dirty -- || ! git diff --cached --quiet --ignore-submodules=dirty --; then
+    echo "LLRT-9C evidence requires a clean tracked Harness worktree ($stage)" >&2
+    dirty_status="$(tracked_worktree_status)"
+    if [[ -n "$dirty_status" ]]; then
+      echo "Tracked changes:" >&2
+      printf '%s\n' "$dirty_status" >&2
+    fi
+    exit 2
+  fi
+}
+
 case "$TIER" in
   0.8b)
     EXPECTED_SHA="bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
@@ -130,10 +149,7 @@ ACTUAL_SHA="$(sha256_file "$MODEL" | tr '[:upper:]' '[:lower:]')"
 [[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || { echo "$TIER model does not match the curated Q4_K_M reference" >&2; exit 2; }
 
 cd "$ROOT_DIR"
-if ! git diff --quiet --ignore-submodules=dirty -- || ! git diff --cached --quiet --ignore-submodules=dirty --; then
-  echo "LLRT-9C evidence requires a clean tracked Harness worktree" >&2
-  exit 2
-fi
+require_clean_tracked_worktree "before build"
 if [[ ! -e third_party/llama.cpp/.git ]]; then
   echo "third_party/llama.cpp is not initialized; initialize the pinned submodule before evidence capture" >&2
   exit 2
@@ -219,14 +235,15 @@ for n,line in enumerate(path.read_text().splitlines(),1):
 PY
 
 ./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
+require_clean_tracked_worktree "after Gradle device-test build"
 APP_APK="$(find apps/device-test-runner/build/outputs/apk/debug -type f -name '*.apk' | sort | tail -n 1)"
 TEST_APK="$(find apps/device-test-runner/build/outputs/apk/androidTest/debug -type f -name '*.apk' | sort | tail -n 1)"
 [[ -n "$APP_APK" && -n "$TEST_APK" ]] || { echo "Unable to locate device-test APKs" >&2; exit 1; }
 "${ADB_CMD[@]}" install -r -t "$APP_APK"
 "${ADB_CMD[@]}" install -r -t "$TEST_APK"
 "${ADB_CMD[@]}" shell run-as "$APP_ID" mkdir -p files/e2e
-"${ADB_CMD[@]}" shell -T run-as "$APP_ID" dd of=files/e2e/model.gguf bs=1048576 < "$MODEL" >/dev/null
-trap '"${ADB_CMD[@]}" shell run-as "$APP_ID" rm -f files/e2e/model.gguf >/dev/null 2>&1 || true' EXIT
+"${ADB_CMD[@]}" shell -T run-as "$APP_ID" dd of="$MODEL_APP_DATA_PATH" bs=1048576 < "$MODEL" >/dev/null
+trap '"${ADB_CMD[@]}" shell run-as "$APP_ID" rm -f "$MODEL_APP_DATA_PATH" >/dev/null 2>&1 || true' EXIT
 RUNNER="$("${ADB_CMD[@]}" shell pm list instrumentation | tr -d '\r' | grep -F "(target=$APP_ID)" | head -n 1 | sed -E 's/^instrumentation:([^ ]+).*/\1/' || true)"
 [[ -n "$RUNNER" ]] || { echo "Unable to discover AndroidJUnitRunner" >&2; exit 1; }
 
@@ -275,7 +292,7 @@ run_pair() {
   set +e
   out="$("${ADB_CMD[@]}" shell am instrument -w -r \
     -e class io.github.daniele21.localllm.devicetest.Llrt9EvaluationBatchInstrumentedTest#recordsSerialVsNativeBatchEvidence \
-    -e modelRelativePath files/e2e/model.gguf \
+    -e modelRelativePath "$MODEL_RELATIVE_PATH" \
     -e modelSha256 "$EXPECTED_SHA" -e modelTier "$TIER" -e batchWidth "$width" \
     -e contextSize "$CONTEXT" -e batchSize "$BATCH" -e microBatchSize "$UBATCH" \
     -e cpuThreads "$THREADS" -e batchThreads "$BATCH_THREADS" -e maxOutputTokens "$MAX_OUTPUT_TOKENS" \
