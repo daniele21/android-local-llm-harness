@@ -19,15 +19,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 
-internal data class HarnessDiagnosticsOverviewState(
-    val health: String,
-    val runCount: Int,
-    val resourceCount: Int,
-    val benchmarkCount: Int,
-    val logCount: Int,
-    val validationAvailable: Boolean,
-)
-
 internal fun harnessDiagnosticsOverviewState(
     diagnostics: DiagnosticsUiState,
     resources: DiagnosticsResourceHistoryUi,
@@ -44,7 +35,10 @@ internal fun harnessDiagnosticsOverviewState(
 )
 
 @Composable
-internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, onOpen: (DiagnosticsSection) -> Unit) {
+internal fun HarnessDiagnosticsOverview(
+    state: HarnessDiagnosticsOverviewState,
+    onOpen: (DiagnosticsSection) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         DiagnosticEntryCard(
             title = "Health",
@@ -63,9 +57,7 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
         )
         DiagnosticEntryCard(
             title = "Runs",
-            detail = if (state.runCount ==
-                0
-            ) {
+            detail = if (state.runCount == 0) {
                 "No local inference runs recorded yet."
             } else {
                 "${state.runCount} privacy-safe run records available."
@@ -98,9 +90,7 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
         )
         DiagnosticEntryCard(
             title = "Logs",
-            detail = if (state.logCount ==
-                0
-            ) {
+            detail = if (state.logCount == 0) {
                 "No structured privacy-safe logs recorded yet."
             } else {
                 "${state.logCount} bounded log entries available."
@@ -124,7 +114,13 @@ internal fun HarnessDiagnosticsOverview(state: HarnessDiagnosticsOverviewState, 
 }
 
 @Composable
-private fun DiagnosticEntryCard(title: String, detail: String, status: String, tone: HarnessStatusTone, onClick: () -> Unit) {
+private fun DiagnosticEntryCard(
+    title: String,
+    detail: String,
+    status: String,
+    tone: HarnessStatusTone,
+    onClick: () -> Unit,
+) {
     HarnessCard(
         modifier = Modifier.clickable(
             onClickLabel = "Open $title diagnostics",
@@ -146,7 +142,11 @@ private fun DiagnosticEntryCard(title: String, detail: String, status: String, t
                 )
             }
             HarnessStatusBadge(status, tone)
-            Text("›", modifier = Modifier.padding(start = 2.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "›",
+                modifier = Modifier.padding(start = 2.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

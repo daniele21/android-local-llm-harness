@@ -43,137 +43,179 @@ internal fun HarnessOverviewScreen(
     )
 
     HarnessScreenList(title = null) {
-        item {
-            Text(
-                "Local inference only · no cloud fallback",
-                style = MaterialTheme.typography.labelLarge,
-                color = HarnessColors.Secondary,
+        item { OverviewPolicyLabel() }
+        item { OverviewHeroCard(presentation, onOpenPlayground, onOpenModels) }
+        item { OverviewCurrentStatePanel(presentation, onOpenModels, onOpenPlayground, onOpenDiagnostics) }
+        item { OverviewDeviceEvidencePanel(presentation, onOpenDiagnostics) }
+        item { OverviewRecentActivityPanel(presentation, onOpenPlayground) }
+    }
+}
+
+@Composable
+private fun OverviewPolicyLabel() {
+    Text(
+        "Local inference only · no cloud fallback",
+        style = MaterialTheme.typography.labelLarge,
+        color = HarnessColors.Secondary,
+    )
+}
+
+@Composable
+private fun OverviewHeroCard(
+    presentation: HarnessOverviewPresentation,
+    onOpenPlayground: () -> Unit,
+    onOpenModels: () -> Unit,
+) {
+    HarnessCard(emphasized = true) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    presentation.heroLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = overviewHeroLabelColor(presentation.primaryAction),
+                )
+                Text(presentation.heroTitle, style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    presentation.heroDetail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HarnessRuntimeGlyph(
+                ready = presentation.primaryAction == HarnessOverviewPrimaryAction.RUN_PROMPT,
+                modifier = Modifier.size(58.dp),
             )
         }
-        item {
-            HarnessCard(emphasized = true) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            presentation.heroLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (presentation.primaryAction == HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE) {
-                                HarnessColors.Warning
-                            } else {
-                                HarnessColors.Secondary
-                            },
-                        )
-                        Text(presentation.heroTitle, style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            presentation.heroDetail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    HarnessRuntimeGlyph(
-                        ready = presentation.primaryAction == HarnessOverviewPrimaryAction.RUN_PROMPT,
-                        modifier = Modifier.size(58.dp),
-                    )
-                }
-                HarnessPrimaryButton(
-                    text = when (presentation.primaryAction) {
-                        HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "Choose a model"
-                        HarnessOverviewPrimaryAction.RUN_PROMPT -> "Run a prompt"
-                        HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "Resolve model state"
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = when (presentation.primaryAction) {
-                        HarnessOverviewPrimaryAction.CHOOSE_MODEL,
-                        HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE,
-                        -> onOpenModels
+        HarnessPrimaryButton(
+            text = overviewPrimaryActionLabel(presentation.primaryAction),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = overviewPrimaryActionClick(presentation.primaryAction, onOpenPlayground, onOpenModels),
+        )
+    }
+}
 
-                        HarnessOverviewPrimaryAction.RUN_PROMPT -> onOpenPlayground
-                    },
+@Composable
+private fun overviewHeroLabelColor(primaryAction: HarnessOverviewPrimaryAction) =
+    if (primaryAction == HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE) {
+        HarnessColors.Warning
+    } else {
+        HarnessColors.Secondary
+    }
+
+private fun overviewPrimaryActionLabel(primaryAction: HarnessOverviewPrimaryAction): String = when (primaryAction) {
+    HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "Choose a model"
+    HarnessOverviewPrimaryAction.RUN_PROMPT -> "Run a prompt"
+    HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "Resolve model state"
+}
+
+private fun overviewPrimaryActionClick(
+    primaryAction: HarnessOverviewPrimaryAction,
+    onOpenPlayground: () -> Unit,
+    onOpenModels: () -> Unit,
+): () -> Unit = when (primaryAction) {
+    HarnessOverviewPrimaryAction.CHOOSE_MODEL,
+    HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE,
+    -> onOpenModels
+
+    HarnessOverviewPrimaryAction.RUN_PROMPT -> onOpenPlayground
+}
+
+@Composable
+private fun OverviewCurrentStatePanel(
+    presentation: HarnessOverviewPresentation,
+    onOpenModels: () -> Unit,
+    onOpenPlayground: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
+) {
+    OverviewSectionPanel("Current state") {
+        OverviewInfoRow(
+            icon = HarnessDestination.MODELS,
+            label = "Selected model",
+            value = presentation.selectedModelValue,
+            status = presentation.selectedModelStatus,
+            statusPositive = presentation.selectedModelPositive,
+            onClick = onOpenModels,
+        )
+        OverviewInfoRow(
+            icon = HarnessDestination.PLAYGROUND,
+            label = "Runtime / residency",
+            value = "${presentation.runtimeValue} · ${presentation.residencyValue}",
+            status = presentation.residencyStatus,
+            statusPositive = presentation.residencyPositive,
+            onClick = onOpenPlayground,
+        )
+        OverviewInfoRow(
+            icon = HarnessDestination.DIAGNOSTICS,
+            label = "Runtime health",
+            value = presentation.healthValue,
+            status = presentation.healthStatus,
+            statusPositive = presentation.healthPositive,
+            onClick = onOpenDiagnostics,
+            showDivider = false,
+        )
+    }
+}
+
+@Composable
+private fun OverviewDeviceEvidencePanel(
+    presentation: HarnessOverviewPresentation,
+    onOpenDiagnostics: () -> Unit,
+) {
+    OverviewSectionPanel("Device evidence") {
+        if (presentation.processPss == "Unavailable" && presentation.thermalStatus == "Unavailable") {
+            Text(
+                "No resource snapshot has been captured yet. Memory and thermal state remain unavailable until an explicit capture runs.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HarnessSecondaryButton(
+                text = "Open diagnostics",
+                onClick = onOpenDiagnostics,
+            )
+        } else {
+            HarnessMetricRow {
+                HarnessMetric(
+                    label = "Process PSS",
+                    value = presentation.processPss,
+                    modifier = Modifier.weight(1f),
+                )
+                HarnessMetric(
+                    label = "Thermal",
+                    value = presentation.thermalStatus,
+                    modifier = Modifier.weight(1f),
                 )
             }
+            Text(
+                "Values come from the latest explicit resource snapshot.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        item {
-            OverviewSectionPanel("Current state") {
-                OverviewInfoRow(
-                    icon = HarnessDestination.MODELS,
-                    label = "Selected model",
-                    value = presentation.selectedModelValue,
-                    status = presentation.selectedModelStatus,
-                    statusPositive = presentation.selectedModelPositive,
-                    onClick = onOpenModels,
-                )
-                OverviewInfoRow(
-                    icon = HarnessDestination.PLAYGROUND,
-                    label = "Runtime / residency",
-                    value = "${presentation.runtimeValue} · ${presentation.residencyValue}",
-                    status = presentation.residencyStatus,
-                    statusPositive = presentation.residencyPositive,
-                    onClick = onOpenPlayground,
-                )
-                OverviewInfoRow(
-                    icon = HarnessDestination.DIAGNOSTICS,
-                    label = "Runtime health",
-                    value = presentation.healthValue,
-                    status = presentation.healthStatus,
-                    statusPositive = presentation.healthPositive,
-                    onClick = onOpenDiagnostics,
-                    showDivider = false,
-                )
-            }
-        }
-        item {
-            OverviewSectionPanel("Device evidence") {
-                if (presentation.processPss == "Unavailable" && presentation.thermalStatus == "Unavailable") {
-                    Text(
-                        "No resource snapshot has been captured yet. Memory and thermal state remain unavailable until an explicit capture runs.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HarnessSecondaryButton(
-                        text = "Open diagnostics",
-                        onClick = onOpenDiagnostics,
-                    )
-                } else {
-                    HarnessMetricRow {
-                        HarnessMetric(
-                            label = "Process PSS",
-                            value = presentation.processPss,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HarnessMetric(
-                            label = "Thermal",
-                            value = presentation.thermalStatus,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Text(
-                        "Values come from the latest explicit resource snapshot.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        item {
-            OverviewSectionPanel("Recent activity") {
-                OverviewInfoRow(
-                    icon = HarnessDestination.PLAYGROUND,
-                    label = "Latest inference",
-                    value = presentation.latestRunValue,
-                    status = presentation.latestRunStatus,
-                    statusPositive = presentation.latestRunPositive,
-                    onClick = onOpenPlayground,
-                    showDivider = false,
-                )
-            }
-        }
+    }
+}
+
+@Composable
+private fun OverviewRecentActivityPanel(
+    presentation: HarnessOverviewPresentation,
+    onOpenPlayground: () -> Unit,
+) {
+    OverviewSectionPanel("Recent activity") {
+        OverviewInfoRow(
+            icon = HarnessDestination.PLAYGROUND,
+            label = "Latest inference",
+            value = presentation.latestRunValue,
+            status = presentation.latestRunStatus,
+            statusPositive = presentation.latestRunPositive,
+            onClick = onOpenPlayground,
+            showDivider = false,
+        )
     }
 }
 

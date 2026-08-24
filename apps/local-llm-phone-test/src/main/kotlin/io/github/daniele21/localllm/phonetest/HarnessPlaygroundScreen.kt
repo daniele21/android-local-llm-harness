@@ -30,25 +30,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessColors
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
-internal data class HarnessPlaygroundActions(
-    val openModels: () -> Unit,
-    val updatePrompt: (String) -> Unit,
-    val updatePreset: (String) -> Unit,
-    val updateThinkingMode: (ThinkingMode) -> Unit,
-    val updateTemperature: (String) -> Unit,
-    val updateTopP: (String) -> Unit,
-    val updateMaxTokens: (String) -> Unit,
-    val updateTopK: (String) -> Unit,
-    val updateMinP: (String) -> Unit,
-    val updatePresencePenalty: (String) -> Unit,
-    val updateRepeatPenalty: (String) -> Unit,
-    val updateRepeatLastN: (String) -> Unit,
-    val updateSeed: (String) -> Unit,
-    val updateContext: (String) -> Unit,
-    val run: () -> Unit,
-    val cancel: () -> Unit,
-)
-
 @Composable
 internal fun HarnessPlaygroundScreen(state: HarnessUiState, actions: HarnessPlaygroundActions) {
     var advancedVisible by rememberSaveable { mutableStateOf(false) }
@@ -171,7 +152,11 @@ private fun PlaygroundPromptCard(
 }
 
 @Composable
-private fun PlaygroundPresetControls(state: HarnessUiState, presentation: PlaygroundPresentation, onPresetChanged: (String) -> Unit) {
+private fun PlaygroundPresetControls(
+    state: HarnessUiState,
+    presentation: PlaygroundPresentation,
+    onPresetChanged: (String) -> Unit,
+) {
     val selectedPreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundPreset }
     val basePreset = playgroundPresetOptions.firstOrNull { it.id == state.playgroundBasePreset }
     Text(
@@ -197,7 +182,11 @@ private fun PlaygroundPresetControls(state: HarnessUiState, presentation: Playgr
 }
 
 @Composable
-private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
+private fun PlaygroundAdvancedControls(
+    state: HarnessUiState,
+    presentation: PlaygroundPresentation,
+    actions: HarnessPlaygroundActions,
+) {
     Text("Thinking", style = MaterialTheme.typography.labelLarge)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(
@@ -245,7 +234,11 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
 }
 
 @Composable
-private fun PlaygroundExpertControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
+private fun PlaygroundExpertControls(
+    state: HarnessUiState,
+    presentation: PlaygroundPresentation,
+    actions: HarnessPlaygroundActions,
+) {
     val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
 
     OutlinedTextField(
@@ -370,6 +363,8 @@ internal fun playgroundSettingsValidationMessage(state: HarnessUiState): String?
     )
 }.exceptionOrNull()?.message
 
-private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+private fun playgroundTemperature(state: HarnessUiState): Float =
+    state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
 
-private fun formatPlaygroundControlValue(value: Float): String = "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
+private fun formatPlaygroundControlValue(value: Float): String =
+    "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
