@@ -18,7 +18,9 @@ on:
       - ".engineering/commands.json"
       - "third_party/llama.cpp"
       - "scripts/build-console-release.sh"
+      - "scripts/package_artifact_baseline.py"
       - "scripts/package_artifact_metadata.py"
+      - "scripts/test_package_artifact_baseline.py"
       - "scripts/test_package_artifact_metadata.py"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
@@ -39,7 +41,9 @@ on:
       - ".engineering/commands.json"
       - "third_party/llama.cpp"
       - "scripts/build-console-release.sh"
+      - "scripts/package_artifact_baseline.py"
       - "scripts/package_artifact_metadata.py"
+      - "scripts/test_package_artifact_baseline.py"
       - "scripts/test_package_artifact_metadata.py"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
@@ -133,7 +137,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Test package metadata tooling
-        run: python3 scripts/test_package_artifact_metadata.py
+        run: |
+          python3 scripts/test_package_artifact_baseline.py
+          python3 scripts/test_package_artifact_metadata.py
 
       - name: Build and validate Android packages
         env:
@@ -203,7 +209,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          python3 scripts/package_artifact_metadata.py fetch-previous \
+          python3 scripts/package_artifact_baseline.py \
             --repository "${GITHUB_REPOSITORY}" \
             --current-run-id "${GITHUB_RUN_ID}" \
             --channel "${{ steps.package-identity.outputs.channel }}" \

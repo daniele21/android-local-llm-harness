@@ -65,6 +65,10 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
         dispatch(HarnessUiEvent.PlaygroundSeedChanged(seed))
     }
 
+    fun updateThemePreference(preference: HarnessThemePreference) {
+        dispatch(HarnessUiEvent.ThemeChanged(preference))
+    }
+
     fun startPlayground(): PlaygroundStartResult {
         val state = uiState.value
         val model = state.importedModel
