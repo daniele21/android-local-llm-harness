@@ -220,6 +220,7 @@ private class EvaluationRunExecution(
         observer.emitState(config.runId, EvaluationRunState.AGGREGATING)
         val aggregation = when (val port = runAggregation) {
             null -> null
+
             else -> when (val result = port.aggregate(config, results)) {
                 is EvaluationStepResult.Failure -> return fail(results, result.failure)
                 is EvaluationStepResult.Success -> result.value
