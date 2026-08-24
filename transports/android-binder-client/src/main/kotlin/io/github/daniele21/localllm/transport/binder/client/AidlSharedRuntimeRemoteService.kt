@@ -138,10 +138,9 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
     }
 }
 
-private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback =
-    object : IConsumerResultCallback.Stub() {
-        override fun onResult(result: ConsumerResultParcel) = callback(result)
-    }
+private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback = object : IConsumerResultCallback.Stub() {
+    override fun onResult(result: ConsumerResultParcel) = callback(result)
+}
 
 private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParcel) -> Unit): IConsumerControlPlaneResultCallback =
     object : IConsumerControlPlaneResultCallback.Stub() {

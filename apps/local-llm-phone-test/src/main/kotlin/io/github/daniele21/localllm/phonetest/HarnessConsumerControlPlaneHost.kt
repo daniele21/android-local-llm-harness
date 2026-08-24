@@ -222,6 +222,7 @@ internal class HarnessConsumerControlPlaneHost(
                         )
                         when (acquired) {
                             is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
+
                             is ActivationResidencyResult.Success ->
                                 activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
                         }
