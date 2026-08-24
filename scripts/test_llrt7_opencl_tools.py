@@ -10,9 +10,12 @@ import tempfile
 from pathlib import Path
 from zipfile import ZipFile
 
+from llrt7_opencl_device_preflight import OPENCL_LIBRARY_CANDIDATES, _opencl_library
+
 ROOT = Path(__file__).resolve().parent
 SDK_PREFLIGHT = ROOT / "llrt7_opencl_sdk_preflight.py"
 PACKAGING = ROOT / "verify_llrt7_opencl_packaging.py"
+QUICK_RUNNER = ROOT / "run-llrt-quick-physical-evidence.sh"
 EM_AARCH64 = 183
 EM_X86_64 = 62
 
@@ -82,11 +85,40 @@ def test_packaging_guard(root: Path) -> None:
     assert "unexpectedly redistributes libOpenCL.so" in result.stderr
 
 
+def test_device_loader_probe_uses_direct_adb_shell() -> None:
+    calls: list[tuple[str, list[str]]] = []
+    expected = OPENCL_LIBRARY_CANDIDATES[0]
+
+    def fake_runner(serial: str, args: list[str]) -> str:
+        calls.append((serial, list(args)))
+        return expected
+
+    actual = _opencl_library("device-serial", fake_runner)
+    assert actual == expected
+    assert len(calls) == 1
+    serial, args = calls[0]
+    assert serial == "device-serial"
+    assert args[0] == "shell"
+    assert len(args) == 2, f"nested shell invocation is unsafe through adb: {args}"
+    assert args[1].startswith("for p in ")
+    for candidate in OPENCL_LIBRARY_CANDIDATES:
+        assert candidate in args[1]
+
+
+def test_quick_runner_avoids_empty_optional_array_under_nounset() -> None:
+    source = QUICK_RUNNER.read_text(encoding="utf-8")
+    assert '"${RESET[@]}"' not in source
+    assert "run_with_optional_reset()" in source
+    assert source.count("run_with_optional_reset bash") == 3
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         test_sdk_preflight(root)
         test_packaging_guard(root)
+    test_device_loader_probe_uses_direct_adb_shell()
+    test_quick_runner_avoids_empty_optional_array_under_nounset()
     print("LLRT-7 OpenCL tool tests passed.")
     return 0
 
