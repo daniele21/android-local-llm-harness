@@ -43,16 +43,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-internal enum class HarnessDestination(val route: String, val label: String) {
+internal enum class HarnessDestination(
+    val route: String,
+    val label: String,
+    val compactLabel: String = label,
+) {
     OVERVIEW("overview", "Overview"),
     PLAYGROUND("playground", "Playground"),
+    PERFORMANCE("performance", "Performance", "Perf"),
     MODELS("models", "Models"),
-    DIAGNOSTICS("diagnostics", "Diagnostics"),
+    DIAGNOSTICS("diagnostics", "Diagnostics", "Diag"),
     SETTINGS("settings", "Settings"),
     ;
 
     companion object {
-        val main = listOf(OVERVIEW, PLAYGROUND, MODELS, DIAGNOSTICS)
+        val main = listOf(OVERVIEW, PLAYGROUND, PERFORMANCE, MODELS, DIAGNOSTICS)
 
         fun fromRoute(route: String?): HarnessDestination = entries.firstOrNull { it.route == route } ?: OVERVIEW
     }
@@ -133,6 +138,7 @@ internal fun HarnessBottomBar(destination: HarnessDestination, onNavigate: (Harn
                             .weight(1f)
                             .fillMaxHeight()
                             .testTag("nav-${item.route}")
+                            .semantics { contentDescription = item.label }
                             .selectable(
                                 selected = selected,
                                 role = Role.Tab,
@@ -146,7 +152,7 @@ internal fun HarnessBottomBar(destination: HarnessDestination, onNavigate: (Harn
                         ) {
                             HarnessDestinationIcon(item, selected = selected, modifier = Modifier.size(18.dp))
                             Text(
-                                item.label,
+                                item.compactLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 color = color,
@@ -250,6 +256,18 @@ internal fun HarnessDestinationIcon(
                     close()
                 }
                 drawPath(play, color)
+            }
+
+            HarnessDestination.PERFORMANCE -> {
+                drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)
+                drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.88f, height * 0.78f), stroke.width)
+                val chart = Path().apply {
+                    moveTo(width * 0.22f, height * 0.68f)
+                    lineTo(width * 0.4f, height * 0.5f)
+                    lineTo(width * 0.57f, height * 0.58f)
+                    lineTo(width * 0.82f, height * 0.28f)
+                }
+                drawPath(chart, color, style = stroke)
             }
 
             HarnessDestination.MODELS -> {
