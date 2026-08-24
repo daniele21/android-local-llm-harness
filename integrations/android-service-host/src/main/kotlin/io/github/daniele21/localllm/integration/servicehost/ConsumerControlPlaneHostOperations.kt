@@ -136,16 +136,15 @@ private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): C
     val useCaseRevisionValue = useCaseRevision?.takeIf { it > 0 }
     val bindingRevisionValue = bindingRevision?.takeIf { it > 0 }
     val presetValue = preset?.takeIf { it.id.isNotBlank() && it.version > 0 }
-    return if (useCase != null && useCaseRevisionValue != null && bindingRevisionValue != null && presetValue != null) {
-        ConsumerActivationRequest(
-            useCaseId = UseCaseId(useCase),
-            useCaseRevision = useCaseRevisionValue,
-            bindingRevision = bindingRevisionValue,
-            preset = InferencePresetRef(InferencePresetId(presetValue.id), presetValue.version),
-        )
-    } else {
-        null
-    }
+    val hasIdentity = useCase != null && presetValue != null
+    val hasRevisions = useCaseRevisionValue != null && bindingRevisionValue != null
+    if (!hasIdentity || !hasRevisions) return null
+    return ConsumerActivationRequest(
+        useCaseId = UseCaseId(requireNotNull(useCase)),
+        useCaseRevision = requireNotNull(useCaseRevisionValue),
+        bindingRevision = requireNotNull(bindingRevisionValue),
+        preset = InferencePresetRef(InferencePresetId(requireNotNull(presetValue).id), presetValue.version),
+    )
 }
 
 private fun unauthorizedPresetDiscovery(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =

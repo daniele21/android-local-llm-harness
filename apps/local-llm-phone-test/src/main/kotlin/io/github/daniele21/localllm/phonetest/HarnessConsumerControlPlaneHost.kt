@@ -184,51 +184,36 @@ internal class HarnessConsumerControlPlaneHost(
     ): ConsumerActivationResult {
         val execution = resolution.execution
         val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
-        return when {
-            execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision ->
-                ConsumerActivationResult.Rejected(
-                    failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments"),
-                )
+        val imported = installed?.let { importedModel(it.digest, it.sizeBytes) }
+        val runtimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
+        val preparationFailure = activationPreparationFailure(
+            staleRevision = execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision,
+            modelInstalled = installed != null,
+            modelImported = imported != null,
+            expectedModelDigest = execution.modelDigest,
+            runtimeModelDigest = runtimeResolved?.model?.artifact?.digest,
+        )
+        if (preparationFailure != null) {
+            return ConsumerActivationResult.Rejected(preparationFailure)
+        }
+        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
+            request = UseCaseActivationRequest(
+                ownerId = ActivationOwnerId(ownerId),
+                applicationId = applicationId,
+                useCaseId = request.useCaseId,
+                preset = request.preset,
+                modelDigest = execution.modelDigest,
+                acquiredAtEpochMs = epochClock(),
+                useCaseRevision = execution.useCaseRevision,
+                bindingRevision = execution.bindingRevision,
+            ),
+            retainModelWarmMs = execution.cachePolicy.retainModelWarmMs,
+        )
+        return when (acquired) {
+            is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
 
-            installed == null -> ConsumerActivationResult.Rejected(
-                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
-            )
-
-            else -> {
-                val imported = importedModel(installed.digest, installed.sizeBytes)
-                if (imported == null) {
-                    ConsumerActivationResult.Rejected(
-                        failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unsupported"),
-                    )
-                } else {
-                    val runtimeResolved = HarnessSharedRuntimeBindings.resolveOmbra(imported, applicationId)
-                    if (runtimeResolved.model.artifact.digest != execution.modelDigest) {
-                        ConsumerActivationResult.Rejected(
-                            failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved model identity mismatch"),
-                        )
-                    } else {
-                        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
-                            request = UseCaseActivationRequest(
-                                ownerId = ActivationOwnerId(ownerId),
-                                applicationId = applicationId,
-                                useCaseId = request.useCaseId,
-                                preset = request.preset,
-                                modelDigest = execution.modelDigest,
-                                acquiredAtEpochMs = epochClock(),
-                                useCaseRevision = execution.useCaseRevision,
-                                bindingRevision = execution.bindingRevision,
-                            ),
-                            retainModelWarmMs = execution.cachePolicy.retainModelWarmMs,
-                        )
-                        when (acquired) {
-                            is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
-
-                            is ActivationResidencyResult.Success ->
-                                activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
-                        }
-                    }
-                }
-            }
+            is ActivationResidencyResult.Success ->
+                activateRuntimeBinding(acquired.value, applicationId, request, requireNotNull(runtimeResolved))
         }
     }
 
@@ -325,6 +310,36 @@ internal class HarnessConsumerControlPlaneHost(
             quantization = release.artifact.quantization,
         )
     }
+}
+
+private fun activationPreparationFailure(
+    staleRevision: Boolean,
+    modelInstalled: Boolean,
+    modelImported: Boolean,
+    expectedModelDigest: ModelDigest,
+    runtimeModelDigest: ModelDigest?,
+): ConsumerControlPlaneFailure? = when {
+    staleRevision -> failure(
+        ConsumerControlPlaneErrorCode.STALE_REVISION,
+        "Consumer configuration changed; refresh assignments",
+    )
+
+    !modelInstalled -> failure(
+        ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+        "Required local model is unavailable",
+    )
+
+    !modelImported -> failure(
+        ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+        "Required local model is unsupported",
+    )
+
+    runtimeModelDigest != expectedModelDigest -> failure(
+        ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+        "Resolved model identity mismatch",
+    )
+
+    else -> null
 }
 
 private fun seedUseCase() = UseCaseDefinition(

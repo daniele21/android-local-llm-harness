@@ -85,7 +85,7 @@ class DatasetFixturePackTest {
     fun `publication failure removes staged fixture bytes`() = withRoot { root ->
         val fixture = EvaluationDatasetFixtures.pack(caseCount = 20)
         val installer = installer(root)
-        val blockedDatasetDirectory = installer.installedDirectory(fixture.manifest).parentFile
+        val blockedDatasetDirectory = requireNotNull(installer.installedDirectory(fixture.manifest).parentFile)
         blockedDatasetDirectory.writeText("not-a-directory")
 
         val result = installer.install(fixture.manifest, fixture.input()) as DatasetInstallResult.Rejected
