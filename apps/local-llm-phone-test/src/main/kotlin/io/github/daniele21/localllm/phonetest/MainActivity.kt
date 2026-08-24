@@ -85,6 +85,7 @@ class MainActivity :
     private lateinit var themePreferenceStore: HarnessThemePreferenceStore
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
     private val harnessViewModel: HarnessViewModel by viewModels()
+    private val performanceViewModel: PerformanceViewModel by viewModels()
 
     private var latestReport: String
         get() = harnessViewModel.uiState.value.latestReport
@@ -399,6 +400,7 @@ class MainActivity :
     @Composable
     private fun HarnessApp() {
         val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
+        val performanceState by performanceViewModel.state.collectAsStateWithLifecycle()
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
@@ -521,6 +523,16 @@ class MainActivity :
                                 run = ::startPlayground,
                                 cancel = { harnessViewModel.cancelPlayground() },
                             ),
+                        )
+                    }
+                    composable(HarnessDestination.PERFORMANCE.route) {
+                        PerformanceScreen(
+                            state = performanceState,
+                            modelOptions = performanceModelOptions(uiState.modelDistribution),
+                            profileOptions = emptyList(),
+                            runnerAvailable = false,
+                            onIntent = performanceViewModel::dispatch,
+                            onOpenModels = { navigate(HarnessDestination.MODELS) },
                         )
                     }
                     composable(HarnessDestination.MODELS.route) {
