@@ -229,84 +229,94 @@ internal fun HarnessDestinationIcon(
             drawLine(color, Offset(width * 0.28f, height * 0.5f), Offset(width * 0.76f, height * 0.82f), stroke.width)
             return@Canvas
         }
-        when (destination) {
-            HarnessDestination.OVERVIEW -> {
-                val path = Path().apply {
-                    moveTo(width * 0.14f, height * 0.48f)
-                    lineTo(width * 0.5f, height * 0.16f)
-                    lineTo(width * 0.86f, height * 0.48f)
-                    moveTo(width * 0.24f, height * 0.42f)
-                    lineTo(width * 0.24f, height * 0.84f)
-                    lineTo(width * 0.76f, height * 0.84f)
-                    lineTo(width * 0.76f, height * 0.42f)
-                }
-                drawPath(path, color, style = stroke)
-            }
+        drawHarnessDestinationGlyph(destination = destination, color = color, stroke = stroke)
+    }
+}
 
-            HarnessDestination.PLAYGROUND -> {
-                drawCircle(color, radius = width * 0.38f, style = stroke)
-                val play = Path().apply {
-                    moveTo(width * 0.43f, height * 0.35f)
-                    lineTo(width * 0.69f, height * 0.5f)
-                    lineTo(width * 0.43f, height * 0.65f)
-                    close()
-                }
-                drawPath(play, color)
+private fun DrawScope.drawHarnessDestinationGlyph(
+    destination: HarnessDestination,
+    color: Color,
+    stroke: Stroke,
+) {
+    val width = size.width
+    val height = size.height
+    when (destination) {
+        HarnessDestination.OVERVIEW -> {
+            val path = Path().apply {
+                moveTo(width * 0.14f, height * 0.48f)
+                lineTo(width * 0.5f, height * 0.16f)
+                lineTo(width * 0.86f, height * 0.48f)
+                moveTo(width * 0.24f, height * 0.42f)
+                lineTo(width * 0.24f, height * 0.84f)
+                lineTo(width * 0.76f, height * 0.84f)
+                lineTo(width * 0.76f, height * 0.42f)
             }
+            drawPath(path, color, style = stroke)
+        }
 
-            HarnessDestination.PERFORMANCE -> {
-                drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)
-                drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.88f, height * 0.78f), stroke.width)
-                val chart = Path().apply {
-                    moveTo(width * 0.22f, height * 0.68f)
-                    lineTo(width * 0.4f, height * 0.5f)
-                    lineTo(width * 0.57f, height * 0.58f)
-                    lineTo(width * 0.82f, height * 0.28f)
-                }
-                drawPath(chart, color, style = stroke)
+        HarnessDestination.PLAYGROUND -> {
+            drawCircle(color, radius = width * 0.38f, style = stroke)
+            val play = Path().apply {
+                moveTo(width * 0.43f, height * 0.35f)
+                lineTo(width * 0.69f, height * 0.5f)
+                lineTo(width * 0.43f, height * 0.65f)
+                close()
             }
+            drawPath(play, color)
+        }
 
-            HarnessDestination.MODELS -> {
-                val hexagon = Path().apply {
-                    moveTo(width * 0.5f, height * 0.12f)
-                    lineTo(width * 0.84f, height * 0.31f)
-                    lineTo(width * 0.84f, height * 0.69f)
-                    lineTo(width * 0.5f, height * 0.88f)
-                    lineTo(width * 0.16f, height * 0.69f)
-                    lineTo(width * 0.16f, height * 0.31f)
-                    close()
-                }
-                drawPath(hexagon, color, style = stroke)
-                drawLine(color, Offset(width * 0.5f, height * 0.12f), Offset(width * 0.5f, height * 0.88f), stroke.width)
+        HarnessDestination.PERFORMANCE -> {
+            drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)
+            drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.88f, height * 0.78f), stroke.width)
+            val chart = Path().apply {
+                moveTo(width * 0.22f, height * 0.68f)
+                lineTo(width * 0.4f, height * 0.5f)
+                lineTo(width * 0.57f, height * 0.58f)
+                lineTo(width * 0.82f, height * 0.28f)
             }
+            drawPath(chart, color, style = stroke)
+        }
 
-            HarnessDestination.DIAGNOSTICS -> {
-                val pulse = Path().apply {
-                    moveTo(width * 0.08f, height * 0.56f)
-                    lineTo(width * 0.28f, height * 0.56f)
-                    lineTo(width * 0.4f, height * 0.3f)
-                    lineTo(width * 0.58f, height * 0.75f)
-                    lineTo(width * 0.7f, height * 0.48f)
-                    lineTo(width * 0.92f, height * 0.48f)
-                }
-                drawPath(pulse, color, style = stroke)
+        HarnessDestination.MODELS -> {
+            val hexagon = Path().apply {
+                moveTo(width * 0.5f, height * 0.12f)
+                lineTo(width * 0.84f, height * 0.31f)
+                lineTo(width * 0.84f, height * 0.69f)
+                lineTo(width * 0.5f, height * 0.88f)
+                lineTo(width * 0.16f, height * 0.69f)
+                lineTo(width * 0.16f, height * 0.31f)
+                close()
             }
+            drawPath(hexagon, color, style = stroke)
+            drawLine(color, Offset(width * 0.5f, height * 0.12f), Offset(width * 0.5f, height * 0.88f), stroke.width)
+        }
 
-            HarnessDestination.SETTINGS -> {
-                drawCircle(color, radius = width * 0.24f, style = stroke)
-                drawCircle(color, radius = width * 0.07f, style = stroke)
-                listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
-                    val radians = Math.toRadians(degrees.toDouble())
-                    val inner = Offset(
-                        x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
-                        y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
-                    )
-                    val outer = Offset(
-                        x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
-                        y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
-                    )
-                    drawLine(color, inner, outer, stroke.width)
-                }
+        HarnessDestination.DIAGNOSTICS -> {
+            val pulse = Path().apply {
+                moveTo(width * 0.08f, height * 0.56f)
+                lineTo(width * 0.28f, height * 0.56f)
+                lineTo(width * 0.4f, height * 0.3f)
+                lineTo(width * 0.58f, height * 0.75f)
+                lineTo(width * 0.7f, height * 0.48f)
+                lineTo(width * 0.92f, height * 0.48f)
+            }
+            drawPath(pulse, color, style = stroke)
+        }
+
+        HarnessDestination.SETTINGS -> {
+            drawCircle(color, radius = width * 0.24f, style = stroke)
+            drawCircle(color, radius = width * 0.07f, style = stroke)
+            listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
+                val radians = Math.toRadians(degrees.toDouble())
+                val inner = Offset(
+                    x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
+                    y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
+                )
+                val outer = Offset(
+                    x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
+                    y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
+                )
+                drawLine(color, inner, outer, stroke.width)
             }
         }
     }
