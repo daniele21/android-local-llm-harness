@@ -23,6 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -66,7 +70,13 @@ internal fun HarnessPlaygroundScreen(state: HarnessUiState, actions: HarnessPlay
 @Composable
 private fun PlaygroundModelState(model: ImportedPhoneModel?, onOpenModels: () -> Unit) {
     HarnessCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenModels),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = if (model == null) "Choose a model" else "Change selected model",
+                role = Role.Button,
+                onClick = onOpenModels,
+            ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -144,7 +154,9 @@ private fun PlaygroundPromptCard(
                 text = validation,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag("playground-settings-error"),
+                modifier = Modifier
+                    .testTag("playground-settings-error")
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         PlaygroundRunControls(presentation, actions)
@@ -215,6 +227,13 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
         enabled = presentation.inputsEnabled && temperature != 0f,
         modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
     )
+    if (presentation.inputsEnabled && temperature == 0f) {
+        Text(
+            "Top-p is inactive while Temperature is 0 because sampling is deterministic.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 
     OutlinedTextField(
         value = state.playgroundMaxTokens,
@@ -228,6 +247,13 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
 @Composable
 private fun PlaygroundExpertControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
     val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
+    if (presentation.inputsEnabled && !samplingEnabled) {
+        Text(
+            "Sampling-only expert controls are inactive while Temperature is 0.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 
     OutlinedTextField(
         value = state.playgroundTopK,
