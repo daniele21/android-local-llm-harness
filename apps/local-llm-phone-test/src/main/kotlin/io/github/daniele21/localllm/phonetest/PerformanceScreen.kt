@@ -2,11 +2,9 @@
 
 package io.github.daniele21.localllm.phonetest
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -71,15 +69,16 @@ internal fun PerformanceScreen(
 
 @Composable
 private fun PerformanceSectionSelector(selected: PerformanceSection, onIntent: (PerformanceIntent) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ScrollableTabRow(
+        selectedTabIndex = PerformanceSection.entries.indexOf(selected),
+        edgePadding = 0.dp,
         modifier = Modifier.testTag("performance-sections"),
     ) {
-        items(PerformanceSection.entries) { section ->
-            FilterChip(
+        PerformanceSection.entries.forEach { section ->
+            Tab(
                 selected = section == selected,
                 onClick = { onIntent(PerformanceIntent.SelectSection(section)) },
-                label = { Text(performanceSectionLabel(section)) },
+                text = { Text(performanceSectionLabel(section)) },
                 modifier = Modifier.testTag("performance-section-${section.name.lowercase()}"),
             )
         }
