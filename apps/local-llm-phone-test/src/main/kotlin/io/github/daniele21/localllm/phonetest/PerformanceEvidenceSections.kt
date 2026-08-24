@@ -8,24 +8,22 @@ import androidx.compose.runtime.Composable
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 
 @Composable
-internal fun PerformanceCollectionSection(
-    title: String,
-    state: PerformanceSurfaceState,
-    emptyMessage: String,
-    availableLabel: String,
-) {
+internal fun PerformanceCollectionSection(title: String, state: PerformanceSurfaceState, emptyMessage: String, availableLabel: String) {
     HarnessCard {
         Text(title, style = MaterialTheme.typography.titleLarge)
         when (state) {
             PerformanceSurfaceState.Loading -> Text("Loading…")
+
             is PerformanceSurfaceState.Failure -> Text(
                 state.message,
                 color = MaterialTheme.colorScheme.error,
             )
+
             PerformanceSurfaceState.Empty -> Text(
                 emptyMessage,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
             is PerformanceSurfaceState.Available -> Text(
                 "${state.count} $availableLabel available.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -41,11 +39,14 @@ internal fun PerformanceCompareSection(state: PerformanceState) {
         Text("Compare", style = MaterialTheme.typography.titleLarge)
         when (surface) {
             PerformanceSurfaceState.Loading -> Text("Loading comparison candidates…")
+
             is PerformanceSurfaceState.Failure -> Text(surface.message, color = MaterialTheme.colorScheme.error)
+
             PerformanceSurfaceState.Empty -> Text(
                 "Complete evaluation runs before comparison becomes available.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
             is PerformanceSurfaceState.Available -> Text(
                 "${surface.count} historical runs are known. Compatible deltas remain unavailable until terminal result aggregation and comparison binding are connected.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
