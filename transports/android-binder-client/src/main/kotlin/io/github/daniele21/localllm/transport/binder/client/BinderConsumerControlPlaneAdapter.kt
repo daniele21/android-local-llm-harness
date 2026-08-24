@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
 import io.github.daniele21.localllm.contracts.ConsumerActivationResult
 import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneClient
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
@@ -31,12 +32,12 @@ internal class BinderConsumerControlPlaneAdapter(
     private val blockingCallGuard: BlockingCallGuard = AndroidMainThreadBlockingCallGuard,
     private val operationTimeoutMillis: Long = DEFAULT_OPERATION_TIMEOUT_MILLIS,
     private val correlationIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
-) {
+) : ConsumerControlPlaneClient {
     init {
         require(operationTimeoutMillis > 0) { "operationTimeoutMillis must be positive" }
     }
 
-    fun assignedUseCases(): ConsumerAssignedUseCasesResult {
+    override fun assignedUseCases(): ConsumerAssignedUseCasesResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return assignedTransportFailure()
         if (!controlPlaneEnabled()) return assignedFeatureUnavailable()
@@ -59,7 +60,7 @@ internal class BinderConsumerControlPlaneAdapter(
         }
     }
 
-    fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
+    override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return presetsTransportFailure()
         if (!controlPlaneEnabled()) return presetsFeatureUnavailable()
@@ -86,7 +87,7 @@ internal class BinderConsumerControlPlaneAdapter(
         }
     }
 
-    fun activate(request: ConsumerActivationRequest): ConsumerActivationResult {
+    override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return activationTransportFailure()
         if (!controlPlaneEnabled()) return activationFeatureUnavailable()
@@ -109,7 +110,7 @@ internal class BinderConsumerControlPlaneAdapter(
         }
     }
 
-    fun deactivate(activationId: ConsumerActivationId): ConsumerDeactivationResult {
+    override fun deactivate(activationId: ConsumerActivationId): ConsumerDeactivationResult {
         blockingCallGuard.requireAllowed()
         val endpoint = endpointProvider() ?: return deactivationTransportFailure()
         if (!controlPlaneEnabled()) return deactivationFeatureUnavailable()
