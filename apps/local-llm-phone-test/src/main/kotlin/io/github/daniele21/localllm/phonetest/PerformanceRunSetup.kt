@@ -53,11 +53,14 @@ private fun PerformanceDatasetSelector(state: PerformanceState) {
         }
         when (val surface = performanceDatasetSurfaceState(state.datasets)) {
             PerformanceSurfaceState.Loading -> Text("Loading installed datasets…")
+
             is PerformanceSurfaceState.Failure -> Text(surface.message, color = MaterialTheme.colorScheme.error)
+
             PerformanceSurfaceState.Empty -> Text(
                 "No evaluation dataset is currently available.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
             is PerformanceSurfaceState.Available -> Text(
                 "${surface.count} installed datasets are known, but the production dataset selector is not connected to this surface yet.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -105,10 +108,7 @@ private fun PerformanceModelSelector(
 }
 
 @Composable
-private fun PerformanceSampleSelector(
-    state: PerformanceState,
-    onIntent: (PerformanceIntent) -> Unit,
-) {
+private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (PerformanceIntent) -> Unit) {
     HarnessCard {
         Text("Samples", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -175,11 +175,7 @@ private fun PerformanceProfileSelector(
 }
 
 @Composable
-private fun PerformanceReadinessCard(
-    state: PerformanceState,
-    runnerAvailable: Boolean,
-    onIntent: (PerformanceIntent) -> Unit,
-) {
+private fun PerformanceReadinessCard(state: PerformanceState, runnerAvailable: Boolean, onIntent: (PerformanceIntent) -> Unit) {
     val ready = state.runSetup.readiness == PerformanceRunReadiness.Ready
     HarnessCard(emphasized = true) {
         Row(
