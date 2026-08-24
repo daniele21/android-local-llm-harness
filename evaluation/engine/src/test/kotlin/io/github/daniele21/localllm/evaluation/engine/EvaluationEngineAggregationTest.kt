@@ -48,9 +48,9 @@ class EvaluationEngineAggregationTest {
             },
         )
         val engine = EvaluationEngine(
-            preflight = EvaluationPreflightPort { EvaluationStepResult.Success(Unit) },
+            preflight = successPreflight(),
             modelPreparation = successPreparation(),
-            caseExecution = EvaluationCaseExecutionPort { _, caseId -> EvaluationStepResult.Success(scored(caseId)) },
+            caseExecution = successCaseExecution(),
             runAggregation = aggregationPort,
         )
 
@@ -92,9 +92,9 @@ class EvaluationEngineAggregationTest {
             code = EvaluationFailureCode.DATASET_NOT_FOUND,
         )
         val engine = EvaluationEngine(
-            preflight = EvaluationPreflightPort { EvaluationStepResult.Success(Unit) },
+            preflight = successPreflight(),
             modelPreparation = successPreparation(),
-            caseExecution = EvaluationCaseExecutionPort { _, caseId -> EvaluationStepResult.Success(scored(caseId)) },
+            caseExecution = successCaseExecution(),
             runAggregation = EvaluationRunAggregationPort { _, _ -> EvaluationStepResult.Failure(failure) },
         )
 
@@ -113,9 +113,20 @@ class EvaluationEngineAggregationTest {
         assertEquals(EvaluationRunState.FAILED, states.last())
     }
 
+    private fun successPreflight() = object : EvaluationPreflightPort {
+        override suspend fun validate(config: EvaluationRunConfig) = EvaluationStepResult.Success(Unit)
+    }
+
     private fun successPreparation() = object : EvaluationModelPreparationPort {
         override suspend fun prepare(config: EvaluationRunConfig) = EvaluationStepResult.Success(Unit)
         override suspend fun warmup(config: EvaluationRunConfig) = EvaluationStepResult.Success(Unit)
+    }
+
+    private fun successCaseExecution() = object : EvaluationCaseExecutionPort {
+        override suspend fun execute(
+            config: EvaluationRunConfig,
+            caseId: EvaluationCaseId,
+        ): EvaluationStepResult<EvaluationCaseResult> = EvaluationStepResult.Success(scored(caseId))
     }
 
     private fun scored(caseId: EvaluationCaseId) = EvaluationCaseResult(
