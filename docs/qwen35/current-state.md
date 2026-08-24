@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: qwen35
 Canonical scope: qwen35.state
 Read when: determining Qwen3.5-only product progress, blockers or the next implementation slice
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-24
 
 This ledger reports only Qwen3.5-only product progress. Repository-wide integrated state remains owned by [`../current-state.md`](../current-state.md).
 
@@ -19,7 +19,7 @@ This ledger reports only Qwen3.5-only product progress. Repository-wide integrat
 | Q35-3 | Thinking/template/sampling | DONE | Neutral thinking intent, typed Jinja kwargs, tier-aware profiles and sampler fields resolve end-to-end. |
 | Q35-4 | Generation guard | DONE | Runaway/repetitive thinking is bounded with typed stop reasons and deterministic runtime tests. |
 | Q35-5 | Runtime/context/cache capability model | DONE | Context and reuse paths are backend-revision-bound and do not assume pure KV-cache semantics. |
-| Q35-6 | Android runtime tuning | IN PROGRESS | Software matrix/evidence tooling is complete; 0.8B/2B physical-device evidence and measured-profile selection remain. |
+| Q35-6 | Android runtime tuning | IN PROGRESS | Software matrix/evidence tooling is complete; representative 0.8B/2B physical qualification and measured-profile selection remain. |
 | Q35-7 | Validation suite | PLANNED | Golden/integration/device gates pass for the supported matrix. |
 | Q35-8 | Certification | PLANNED | Exact curated artifacts receive evidence-backed certification independently of catalog availability. |
 
@@ -82,12 +82,32 @@ The repository-side tuning harness is implemented:
 7. the summarizer validates identity/sample completeness and marks only comparable cases as `eligibleForProfileSelection`;
 8. no script automatically promotes a runtime profile from `CANDIDATE` to `MEASURED`.
 
-Q35-6 remains `IN PROGRESS` because physical evidence must still be collected for both tiers and reviewed before selecting versioned measured defaults.
+### LLRT-9 short-profile physical findings
+
+A physical Samsung `SM-A566B` run on exact Harness commit `016467c300e84decb16697850aaef40d5e592753`, pinned llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, Qwen3.5 2B Q4_K_M, context `1024`, output budget `8`, seed `42`, batch `128`, ubatch `64`, CPU/batch threads `4/4` established a useful bounded signal without closing canonical LLRT-9C:
+
+- width `2`: all four balanced samples preserved exact serial/native output digests and per-case output-token counts; native batching was consistently faster, with median speedup around `1.055x`;
+- width `3`: all four balanced samples preserved exact serial/native output digests and per-case output-token counts; median speedup increased to roughly `1.08x`;
+- width `4`: the first `SERIAL_FIRST` sample failed the hard exact-output gate because source prompt index `2` diverged while source prompt indices `0`, `1` and `3` remained identical;
+- thermal status remained `0` throughout the reported samples, so the width-4 mismatch was not accompanied by an observed thermal escalation.
+
+This is **short-profile physical diagnostic evidence**, not the canonical `2048`-context / `64`-output qualification matrix. It must not mark LLRT-9C `DONE`, cap or promote production concurrency by itself, or promote a runtime profile to `MEASURED`.
+
+The width-4 failure currently has two live hypotheses: sequence-slot/KV/logits attribution drift versus numerically sensitive stochastic sampling. Repository tooling now provides a separate non-qualifying diagnostic path that records privacy-safe digests/token counts for three cases without relaxing the canonical hard gate. Active bounded investigation: [`LLRT-9 width=4 diagnostic`](../workstreams/llrt9-width4-diagnostic.md).
+
+1. `baseline-quality`: source prompt order `0,1,2,3` with the normal Quality sampler;
+2. `swap02-quality`: source prompt order `2,1,0,3`, directly swapping the previously divergent source prompt with slot `0` to distinguish prompt-following from slot-following divergence;
+3. `baseline-greedy`: source prompt order `0,1,2,3` with temperature `0`, which uses the backend greedy sampler and removes stochastic sampling while preserving the width-4 execution path.
+
+Diagnostic records use the separate `LLRT9_WIDTH4_DIAGNOSTIC` type/tag and are not accepted as canonical LLRT-9C evidence.
+
+Q35-6 remains `IN PROGRESS` because full physical evidence must still be collected for both tiers and reviewed before selecting versioned measured defaults.
 
 ## Remaining Q35-6 evidence
 
+- execute the width-4 LLRT-9 diagnostic cases on the exact reviewed build and classify the mismatch as slot-following, prompt-following/numerical, or unresolved;
 - run the complete 0.8B Q4_K_M matrix on representative physical Android hardware;
-- run the complete 2B Q4_K_M matrix on the same device classes;
+- run the complete 2B Q4_K_M matrix on the same device classes, including the canonical LLRT-9 profile after the width-4 investigation;
 - review eligible evidence separately by tier and choose evidence-backed runtime defaults;
 - mark selected profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
 - validate cancellation, model switching, memory pressure and idle unload on the measured configurations.
