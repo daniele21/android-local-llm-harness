@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,6 +39,14 @@ class HarnessModelsCatalogUiTest {
         assertFalse(ModelsAvailabilityFilter.AVAILABLE.matches(installed))
         assertTrue(ModelsAvailabilityFilter.ALL.matches(installed))
         assertTrue(ModelsAvailabilityFilter.ALL.matches(available))
+    }
+
+    @Test
+    fun modelFailuresKeepErrorSeverity() {
+        assertEquals(HarnessStatusTone.ERROR, HarnessModelLifecycle.FAILED.statusTone())
+        assertEquals(HarnessStatusTone.ERROR, modelActionStatusTone(ModelActionFeedbackTone.ERROR))
+        assertEquals(HarnessStatusTone.WARNING, HarnessModelLifecycle.DEGRADED.statusTone())
+        assertEquals(HarnessStatusTone.WARNING, HarnessModelLifecycle.INCOMPATIBLE.statusTone())
     }
 
     private fun item(stableId: String, installed: Boolean = false): HarnessModelInventoryItem = HarnessModelInventoryItem(
