@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.evaluation.EvaluationRunSummary
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngine
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngineObserver
 import io.github.daniele21.localllm.evaluation.engine.EvaluationEngineTerminal
+import io.github.daniele21.localllm.evaluation.engine.EvaluationRunAggregation
 
 fun interface EvaluationClock {
     fun nowEpochMs(): Long
@@ -47,6 +48,16 @@ class EvaluationLifecyclePersistence(private val repository: EvaluationResultRep
                 require(runId == config.runId) { "Case-result observer run ID must match persisted run" }
                 repository.appendCaseResult(runId, result)
                 observer.onCaseResult(runId, result)
+            }
+
+            override suspend fun onAggregation(runId: EvaluationRunId, aggregation: EvaluationRunAggregation) {
+                require(runId == config.runId) { "Aggregation observer run ID must match persisted run" }
+                summary = summary.copy(
+                    quality = aggregation.quality,
+                    reliability = aggregation.reliability,
+                )
+                repository.updateRunSummary(summary)
+                observer.onAggregation(runId, aggregation)
             }
         }
 
