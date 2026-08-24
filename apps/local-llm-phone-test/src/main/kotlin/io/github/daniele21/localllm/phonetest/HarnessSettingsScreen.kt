@@ -69,9 +69,9 @@ internal fun HarnessSettingsScreen(
         item {
             SettingsRow(
                 destination = HarnessDestination.MODELS,
-                title = "Models & local data",
-                detail = "Inspect model storage and protected cleanup behavior.",
-                trailing = model?.let { "${formatSettingsBytes(it.sizeBytes)} used" } ?: "Empty",
+                title = "Selected model & local data",
+                detail = "Inspect the selected model and protected local cleanup behavior.",
+                trailing = model?.let { "${formatSettingsBytes(it.sizeBytes)} selected" } ?: "No selection",
                 onClick = onOpenStorage,
             )
         }
