@@ -233,11 +233,7 @@ internal fun HarnessDestinationIcon(
     }
 }
 
-private fun DrawScope.drawHarnessDestinationGlyph(
-    destination: HarnessDestination,
-    color: Color,
-    stroke: Stroke,
-) {
+private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestination, color: Color, stroke: Stroke) {
     val width = size.width
     val height = size.height
     when (destination) {
