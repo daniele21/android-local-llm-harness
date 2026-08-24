@@ -13,7 +13,11 @@ class PerformanceModelOptionTest {
             catalogStatus = PhoneCatalogLoadStatus.READY,
             models = listOf(
                 modelUi("installed", installed, compatible = true),
-                modelUi("incompatible", installedMetadata("b".repeat(64), "qwen35-2b", "Qwen 3.5 2B"), compatible = false),
+                modelUi(
+                    "incompatible",
+                    installedMetadata("b".repeat(64), "qwen35-2b", "Qwen 3.5 2B"),
+                    compatible = false,
+                ),
                 modelUi("not-installed", null, compatible = true),
             ),
         )
@@ -31,43 +35,37 @@ class PerformanceModelOptionTest {
         assertTrue(performanceModelOptions(PhoneModelDistributionState()).isEmpty())
     }
 
-    private fun modelUi(
-        stableId: String,
-        installed: InstalledCatalogModelMetadata?,
-        compatible: Boolean,
-    ): PhoneCatalogModelUi = PhoneCatalogModelUi(
-        stableId = stableId,
-        displayName = installed?.displayName ?: "Not installed",
-        description = "test",
-        fileName = installed?.fileName ?: "$stableId.gguf",
-        sizeBytes = installed?.sizeBytes ?: 512L,
-        architecture = "qwen3_5",
-        quantization = "Q4_K_M",
-        profileKey = installed?.profileKey ?: "qwen35-test",
-        licenseName = "Apache-2.0",
-        status = if (installed == null) PhoneCatalogModelStatus.READY_TO_DOWNLOAD else PhoneCatalogModelStatus.INSTALLED,
-        compatible = compatible,
-        compatibilityReasons = emptyList(),
-        compatibilityWarnings = emptyList(),
-        installedModel = installed,
-    )
+    private fun modelUi(stableId: String, installed: InstalledCatalogModelMetadata?, compatible: Boolean): PhoneCatalogModelUi =
+        PhoneCatalogModelUi(
+            stableId = stableId,
+            displayName = installed?.displayName ?: "Not installed",
+            description = "test",
+            fileName = installed?.fileName ?: "$stableId.gguf",
+            sizeBytes = installed?.sizeBytes ?: 512L,
+            architecture = "qwen3_5",
+            quantization = "Q4_K_M",
+            profileKey = installed?.profileKey ?: "qwen35-test",
+            licenseName = "Apache-2.0",
+            status = if (installed == null) PhoneCatalogModelStatus.READY_TO_DOWNLOAD else PhoneCatalogModelStatus.INSTALLED,
+            compatible = compatible,
+            compatibilityReasons = emptyList(),
+            compatibilityWarnings = emptyList(),
+            installedModel = installed,
+        )
 
-    private fun installedMetadata(
-        digest: String,
-        profileKey: String,
-        displayName: String,
-    ): InstalledCatalogModelMetadata = InstalledCatalogModelMetadata(
-        digest = ModelDigest(digest),
-        modelId = profileKey,
-        version = "1.0.0",
-        displayName = displayName,
-        profileKey = profileKey,
-        applicationId = "harness",
-        useCaseId = "evaluation",
-        fileName = "$profileKey.gguf",
-        sizeBytes = 512L * 1024L * 1024L,
-        architecture = "qwen3_5",
-        quantization = "Q4_K_M",
-        installedAtEpochMs = 1L,
-    )
+    private fun installedMetadata(digest: String, profileKey: String, displayName: String): InstalledCatalogModelMetadata =
+        InstalledCatalogModelMetadata(
+            digest = ModelDigest(digest),
+            modelId = profileKey,
+            version = "1.0.0",
+            displayName = displayName,
+            profileKey = profileKey,
+            applicationId = "harness",
+            useCaseId = "evaluation",
+            fileName = "$profileKey.gguf",
+            sizeBytes = 512L * 1024L * 1024L,
+            architecture = "qwen3_5",
+            quantization = "Q4_K_M",
+            installedAtEpochMs = 1L,
+        )
 }
