@@ -101,7 +101,11 @@ def _renderer(serial: str, runner: Callable[[str, Sequence[str]], str]) -> str:
 def _opencl_library(serial: str, runner: Callable[[str, Sequence[str]], str]) -> str | None:
     quoted_paths = " ".join(OPENCL_LIBRARY_CANDIDATES)
     script = f'for p in {quoted_paths}; do if [ -f "$p" ]; then echo "$p"; break; fi; done'
-    value = runner(serial, ["shell", "sh", "-c", script]).strip()
+    # `adb shell sh -c <script>` is not argument-safe across Android adb shells: adb
+    # flattens the command arguments before the device shell sees them, so `sh -c`
+    # can receive only `for` as its script. Send the complete script directly to the
+    # device shell instead; Python already bypasses the host shell here.
+    value = runner(serial, ["shell", script]).strip()
     return value or None
 
 
