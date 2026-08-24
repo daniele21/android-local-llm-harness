@@ -40,6 +40,7 @@ class InstalledEvaluationDatasetAdapter(
         if (sampling.dataset != dataset) return preflightFailure(EvaluationFailureCode.SAMPLE_SET_INVALID)
         return when (val load = loadSnapshot(dataset)) {
             is SnapshotLoad.Failed -> preflightFailure(load.code)
+
             is SnapshotLoad.Loaded -> {
                 if (sampling.orderedCaseIds.all { it in load.snapshot.byId }) {
                     null
