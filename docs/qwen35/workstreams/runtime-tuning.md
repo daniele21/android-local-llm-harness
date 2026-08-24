@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.runtime-tuning
 Read when: changing Qwen3.5 context policy, cache/session reuse, Android CPU parameters or performance benchmark keys
-Last reviewed: 2026-08-21
+Last reviewed: 2026-08-24
 
 ## Goal
 
@@ -34,7 +34,7 @@ Q35-5 is complete.
 
 - runtime capabilities are bound to pinned llama.cpp revision `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`;
 - approved Qwen3.5 mobile context tiers are `1024`, `2048`, `4096` and `8192` tokens;
-- context planning reserves 256 tokens and selects the smallest approved tier that can satisfy prompt + requested output + reserve;
+- context planning reserves 256 tokens and selects the smallest approved tier that can satisfy prompt + output + reserve;
 - candidate runtime defaults use 2048 tokens rather than the model-advertised maximum;
 - `supportsStatelessContextReuse`, `supportsPrefixSnapshot`, `supportsSessionRestore` and `supportsPrefixReuse` remain false unless exact-backend evidence proves them safe;
 - unknown or backend-mismatched capability state fails closed.
@@ -277,6 +277,30 @@ Qwen3.5 2B recurrent/prefix reuse:   KEEP_DISABLED
 
 A negative qualification is valid evidence. No product capability flag changes to true.
 
+### 2026-08-24 LLRT-9 width-4 diagnostic evidence
+
+A short-profile physical LLRT-9 run on Samsung `SM-A566B` with Qwen3.5 2B Q4_K_M, pinned llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, context `1024`, output budget `8`, seed `42`, `b128/ub64`, and `t4/bt4` passed exact serial/native parity at widths `2` and `3` but failed the exact-output gate at width `4` for source prompt index `2`.
+
+The dedicated diagnostic then ran on exact Harness commit `0ec8b1bf44c700a57f7f50fa512e8c1ea03a518e`:
+
+| Case | Prompt order | Result | Interpretation |
+| --- | --- | --- | --- |
+| `baseline-quality` | `0,1,2,3` | mismatch only at source prompt `2` / slot `2`; token counts equal | reproduces the Quality mismatch |
+| `swap02-quality` | `2,1,0,3` | mismatch moves to source prompt `2` / slot `0`; former slot `2` now matches | divergence follows the prompt, not sequence slot `2` |
+| `baseline-greedy` | `0,1,2,3` | all four output digests and token counts match exactly | divergence disappears when stochastic sampling is removed |
+
+Thermal status remained `0` throughout. Quality timing still favored native batching strongly (`~1.30x–1.33x` speedup), and greedy showed about `1.47x`, but throughput cannot override a correctness failure.
+
+The evidence therefore favors **prompt-sensitive numerical/stochastic sampling divergence** over a slot/sequence/KV attribution defect. This does not prove that every width-4 execution is unsafe, but under the Harness qualification contract the exact-output gate remains authoritative:
+
+```text
+short-profile 2B width 2 Quality: qualified signal
+short-profile 2B width 3 Quality: qualified signal
+short-profile 2B width 4 Quality: UNQUALIFIED
+```
+
+Within this exact short-profile/device envelope, width `3` is the highest concurrency width that passed exact serial/native equivalence. This is not a production cap and must not be generalized to the canonical `2048` context / `64` output profile or to other devices. A future canonical evidence wave may re-evaluate width `4`, but it must pass the same exact-output gate; the gate is not relaxed because the divergence is sampling-sensitive.
+
 ### Full Q35-6 tuning matrix
 
 Run only when broader Q35 acceptance requires it:
@@ -309,7 +333,8 @@ The priority evidence checkpoint is complete, but Q35-6 remains a broader certif
 1. **0.8B bounded screening:** DONE; `t2/bt4/b128/ub64` is the bounded priority candidate.
 2. **2B realistic prefill:** DONE; `t4/bt2/b128/ub64` is REJECTED and baseline `t4/bt4/b128/ub64` remains the current CPU candidate.
 3. **Recurrent-state correctness:** DONE; both tiers return `KEEP_DISABLED` because partial rollback is unsupported.
-4. **Profile promotion:** still blocked on broader/representative evidence plus lifecycle/memory acceptance; no bounded result is automatically `MEASURED`.
+4. **LLRT-9 short-profile width-4 diagnosis:** DONE; mismatch follows source prompt `2`, not slot `2`, and disappears under greedy. Quality width `4` remains unqualified while the exact-output gate stays unchanged.
+5. **Profile promotion:** still blocked on broader/representative evidence plus lifecycle/memory acceptance; no bounded result is automatically `MEASURED`.
 
 ## Task ledger
 
@@ -321,10 +346,11 @@ The priority evidence checkpoint is complete, but Q35-6 remains a broader certif
 | Q35-RT-04 | DONE | Extend benchmark identity and persistence with exact execution-configuration identity. |
 | Q35-RT-05 | DONE | Define controlled tuning matrix plus repeatable physical-device evidence tooling. |
 | Q35-RT-06 | IN PROGRESS | 0.8B physical tuning track: bounded screening is DONE with `t2/bt4/b128/ub64` as the bounded priority candidate; broader/representative validation remains before profile promotion. |
-| Q35-RT-07 | IN PROGRESS | 2B physical tuning track: bounded and realistic longer-prompt validation are DONE; `t4/bt2/b128/ub64` is REJECTED, baseline remains current candidate, and broader representative validation remains. |
+| Q35-RT-07 | IN PROGRESS | 2B physical tuning track: bounded and realistic longer-prompt validation are DONE; `t4/bt2/b128/ub64` is REJECTED, baseline remains current candidate, LLRT-9 short-profile width `4` Quality is unqualified, and broader representative validation remains. |
 | Q35-RT-08 | BLOCKED | Select versioned default profiles only after both model tracks provide sufficient measured memory/TTFT/throughput/thermal evidence. |
 | Q35-RT-09 | BLOCKED | Validate model switch, memory pressure, cancellation and idle unload after measured configuration candidates are selected. |
 | Q35-RT-10 | DONE | Diagnostic candidate profiles and evidence summarization cannot masquerade as measured/certified defaults. |
+| Q35-RT-11 | DONE | Classify the short-profile 2B LLRT-9 width-4 mismatch without relaxing the exact-output correctness gate. |
 
 ## Acceptance criteria
 

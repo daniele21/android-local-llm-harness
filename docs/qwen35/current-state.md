@@ -91,23 +91,26 @@ A physical Samsung `SM-A566B` run on exact Harness commit `016467c300e84decb1669
 - width `4`: the first `SERIAL_FIRST` sample failed the hard exact-output gate because source prompt index `2` diverged while source prompt indices `0`, `1` and `3` remained identical;
 - thermal status remained `0` throughout the reported samples, so the width-4 mismatch was not accompanied by an observed thermal escalation.
 
-This is **short-profile physical diagnostic evidence**, not the canonical `2048`-context / `64`-output qualification matrix. It must not mark LLRT-9C `DONE`, cap or promote production concurrency by itself, or promote a runtime profile to `MEASURED`.
+The follow-up width-4 diagnostic ran on exact Harness commit `0ec8b1bf44c700a57f7f50fa512e8c1ea03a518e` with the same device, model artifact, pinned backend and short-profile runtime envelope. It classified the mismatch:
 
-The width-4 failure currently has two live hypotheses: sequence-slot/KV/logits attribution drift versus numerically sensitive stochastic sampling. Repository tooling now provides a separate non-qualifying diagnostic path that records privacy-safe digests/token counts for three cases without relaxing the canonical hard gate. Active bounded investigation: [`LLRT-9 width=4 diagnostic`](../workstreams/llrt9-width4-diagnostic.md).
+- `baseline-quality` reproduced the mismatch only for source prompt `2` in slot `2`; token counts still matched and thermal status remained `0`;
+- `swap02-quality` moved source prompt `2` to slot `0`, and the mismatch moved with that prompt to slot `0`; source prompt `0`, now occupying slot `2`, matched exactly;
+- `baseline-greedy` produced exact serial/native output-digest and token-count parity for all four prompts at width `4`;
+- therefore the observed failure is **prompt-following and sampling-sensitive**, which favors numerical sensitivity under stochastic Quality sampling rather than a slot/sequence/KV attribution defect.
 
-1. `baseline-quality`: source prompt order `0,1,2,3` with the normal Quality sampler;
-2. `swap02-quality`: source prompt order `2,1,0,3`, directly swapping the previously divergent source prompt with slot `0` to distinguish prompt-following from slot-following divergence;
-3. `baseline-greedy`: source prompt order `0,1,2,3` with temperature `0`, which uses the backend greedy sampler and removes stochastic sampling while preserving the width-4 execution path.
+The durable decision is deliberately fail-closed: the canonical exact-output gate remains unchanged, and **width `4` under Quality sampling is not qualified by this evidence**. Within this short-profile/device envelope, width `3` is the highest width that has passed the exact-output gate. This is not a production concurrency cap and must not be generalized to the canonical `2048`-context / `64`-output qualification matrix or to other devices.
 
-Diagnostic records use the separate `LLRT9_WIDTH4_DIAGNOSTIC` type/tag and are not accepted as canonical LLRT-9C evidence.
+The width-4 diagnostic also showed large timing upside (`~1.30x–1.33x` speedup under Quality and `~1.47x` under greedy), but correctness qualification takes precedence over throughput; those timing results cannot justify promotion while Quality sampling fails exact equivalence.
+
+This remains **short-profile physical diagnostic evidence**, not the canonical `2048`-context / `64`-output qualification matrix. It must not mark LLRT-9C `DONE`, cap or promote production concurrency by itself, or promote a runtime profile to `MEASURED`.
 
 Q35-6 remains `IN PROGRESS` because full physical evidence must still be collected for both tiers and reviewed before selecting versioned measured defaults.
 
 ## Remaining Q35-6 evidence
 
-- execute the width-4 LLRT-9 diagnostic cases on the exact reviewed build and classify the mismatch as slot-following, prompt-following/numerical, or unresolved;
 - run the complete 0.8B Q4_K_M matrix on representative physical Android hardware;
-- run the complete 2B Q4_K_M matrix on the same device classes, including the canonical LLRT-9 profile after the width-4 investigation;
+- run the complete 2B Q4_K_M matrix on the same device classes, including the canonical LLRT-9 profile with the exact-output gate preserved;
+- treat width `4` Quality as unqualified unless a future canonical evidence wave demonstrates exact serial/native equivalence for the exact target identity;
 - review eligible evidence separately by tier and choose evidence-backed runtime defaults;
 - mark selected profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
 - validate cancellation, model switching, memory pressure and idle unload on the measured configurations.
