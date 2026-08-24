@@ -1,100 +1,160 @@
-# Harness product-experience realignment
+# Harness product-experience overhaul
 
 Status: active
 Document type: workstream-state
 Owner: apps/local-llm-phone-test
 Canonical scope: workstream.phone-product-experience
-Read when: coordinating the repo-template-sw 0.5 UX/UI realignment of the Harness Android phone application
-Last reviewed: 2026-08-23
+Read when: coordinating the complete repo-template-sw 0.5 UX/UI review and implementation of the Harness Android phone application
+Last reviewed: 2026-08-24
 
-Canonical repository status remains in [`docs/current-state.md`](../current-state.md); this file owns only temporary implementation sequencing and dependency state for this bounded UX/UI change.
+Canonical repository status remains in [`docs/current-state.md`](../current-state.md). This file owns only temporary sequencing, dependencies, branch/PR integration and acceptance gates for this bounded UX/UI overhaul.
+
+## Integration topology
+
+The workstream uses one dedicated integration branch created from `dev`:
+
+```text
+dev@ae0bc6934d0971e5457b0f4cbc4993f8e51542fd
+  └── ux/product-experience-overhaul
+        ├── ux/px-10-shell-navigation
+        ├── ux/px-20-generation-journey
+        ├── ux/px-25-model-lifecycle
+        ├── ux/px-30-performance-journey
+        └── ux/px-40-diagnostics-settings
+```
+
+Feature PRs target `ux/product-experience-overhaul`, not `dev`. After the parallel lanes and convergence/evidence gates are green, one final PR from `ux/product-experience-overhaul` targets the then-current `dev`.
+
+Do not merge stale historical `ux/harness-*` branches into this line. PR #397 and PR #401 already integrated their valid product-experience work into `dev`; older branches are evidence only unless an exact missing delta is identified and replayed on the current base.
 
 ## Goal
 
-Make the connected Harness Android experience answer the product question directly: **for this use case, device and candidate models, which local model/configuration is the best supported choice?**
+Make Harness answer the product question directly: **for this use case, device and candidate models, which local model/configuration is the best supported choice?**
 
-The UI must preserve expert capability while making the next user decision obvious, using only source-backed state and applying the repo-template-sw 0.5 decision order:
+The interface must preserve expert capability while making the next decision obvious, using only source-backed state and the repo-template-sw 0.5 decision order:
 
 ```text
 user outcome
 -> task model
 -> IA / critical journey
--> hierarchy / progressive disclosure / defaults
+-> hierarchy / disclosure / defaults
 -> interactions / states / feedback / recovery
 -> adaptive / platform
 -> accessibility
 -> design system
--> motion / polish
+-> motion
+-> visual polish / graphics
 -> validation
 ```
 
-## Non-goals
+## Current audit baseline
 
-- redesign the Harness brand or create a second design system;
-- change runtime/model/benchmark policy in the UI layer;
-- add cloud fallback or persist prompts/generated output;
-- claim physical-device, thermal, performance or usability evidence from host/emulator checks;
-- rewrite OMBRA; `apps/local-llm-console` remains a separate consumer product surface.
+PR #397 established a materially stronger task-first phone experience and PR #401 added the source-backed Performance destination. The remaining work is therefore not a brand redesign. It is a completeness and consistency pass across the full product experience.
 
-## Invariants
+### P0 — correctness, state and recovery
 
-- `dev` remains base/target; this work starts from the latest green `dev`.
-- Every displayed runtime/model/resource/benchmark value is source-backed or explicitly unavailable/not-run.
-- Installed, selected, resident and running model states remain distinct.
-- Navigation/refresh stays observational; execution requires an explicit action.
-- Advanced/expert inference controls remain available but do not dominate the common Playground path.
-- Shared visual semantics stay owned by `ui/design-system`; app-specific composition stays in `apps/local-llm-phone-test`.
-- Reachable loading/empty/error/disabled/cancelling/recovery states remain explicit.
-- Compact/large-font/TalkBack behavior is part of correctness.
+- Preserve source-backed truth everywhere; unavailable/not-run must never be replaced by inferred or decorative values.
+- Remove user-facing implementation language such as whether an internal registry or adapter is "connected"; expose the user-visible capability state and next action instead.
+- Correct semantic severity mismatches: a real failure/error must not render as a warning tone merely because a warning component is convenient.
+- Every critical loading/empty/error/disabled/cancelling/partial state must expose an understandable outcome and recovery/next step when one exists.
+- Storage, model lifecycle and evaluation summaries must describe exactly the source-backed quantity/state they represent; labels must not imply a broader total than the data actually contains.
+- Long-running model/evaluation/generation operations must expose truthful progress or phase state and remain cancellable where the runtime supports cancellation.
+
+### P1 — task hierarchy, IA and progressive disclosure
+
+- Make route identity obvious without forcing the user to infer the current destination from body content while the app bar shows only the Harness brand.
+- Revalidate compact navigation now that Performance is a fifth primary destination; avoid abbreviations or density that weaken scanability or touch/accessibility behavior.
+- Keep Overview as a decision surface, not a second diagnostics dashboard.
+- Keep Playground default flow `model -> prompt -> preset -> run`; Advanced and Expert controls remain progressively disclosed with clear disabled-state explanations.
+- Keep Models centered on lifecycle decisions: available/downloaded/installed/selected/resident/running are distinct and the next valid action is visually primary.
+- Make Performance read as a decision workflow rather than a stack of equally weighted technical cards; move internal IDs/revisions to contextual/detail disclosure.
+- Keep Diagnostics as summary -> drill-down; raw logs and low-level evidence remain expert detail rather than competing with health/validation outcomes.
+- Keep Settings task-oriented; developer tools remain explicitly advanced.
+
+### P1 — adaptive and accessibility correctness
+
+- Materialize the existing compact/medium/expanded policy into layouts that preserve task priority rather than only changing navigation chrome.
+- Verify 48 dp minimum interactive targets for custom clickable rows/cards and deterministic TalkBack labels/roles/state descriptions.
+- Add accessible status/error announcements where state changes materially affect the next action.
+- Preserve logical focus order, large-font readability, landscape behavior and state across size changes where technically applicable.
+- Do not communicate critical meaning by color alone; status text/semantics remain authoritative.
+
+### P2 — design-system convergence, motion and polish
+
+- Replace repeated one-off clickable/status row compositions with canonical design-system components only when they represent a real shared concept.
+- Use spacing/grouping before adding more cards, borders or badges.
+- Motion is allowed only for feedback, continuity, spatial relationship, state transition, progress, attention, hierarchy or meaningful completion.
+- Respect reduced-motion behavior and prefer simple/fast transitions over decorative animation.
+- Add scoped visual regression only for stable high-value reference states; do not freeze every incidental pixel.
 
 ## Execution DAG
 
-| ID | State | Depends on | Owns / writes | Can run with | Acceptance |
-| --- | --- | --- | --- | --- | --- |
-| UXR-00 | DONE | — | `MainActivity.kt`, screen ownership boundaries only | UXR-01 | Overview, Playground and Settings now have dedicated owners; Diagnostics is the only remaining lane allowed to edit its legacy Activity block, so all four UI lanes can proceed without overlapping screen edits. |
-| UXR-01 | DONE | — | this workstream, `docs/current-state.md`, UX target/progress docs | UXR-00 | Active dependency state is linked from the canonical current-state ledger without creating a second plan/progress pair. |
-| UXR-10 | ACTIVE | UXR-00 | Overview screen/presentation + focused tests | UXR-20, UXR-30, UXR-40 | No inferred `Loaded/Warm/Normal` or decorative resource progress; one state-dependent primary next action; explicit unavailable/not-run evidence. |
-| UXR-20 | ACTIVE | UXR-00 | Playground screen/presentation + focused tests | UXR-10, UXR-30, UXR-40 | Default path is model -> prompt -> preset -> run; Advanced is collapsed by default; Expert controls are a second disclosure layer; duplicate controls removed; validation/recovery is inline where deterministic. |
-| UXR-30 | ACTIVE | UXR-00 | Diagnostics IA/presentation + focused tests | UXR-10, UXR-20, UXR-40 | Diagnostics opens as an evidence overview and drills into Health/Runs/Resources/Benchmarks/Logs/Validation; section changes never execute work; Back/restoration deterministic. |
-| UXR-40 | ACTIVE | UXR-00 | Settings screen/presentation + focused tests | UXR-10, UXR-20, UXR-30 | Remove non-task brand-palette UI; retain Appearance/Privacy/Storage/About/Advanced; theme state has one ViewModel render owner and survives the declared lifecycle. |
-| UXR-50 | BLOCKED | UXR-10, UXR-20, UXR-30, UXR-40 | adaptive/accessibility refinements + shared components only when genuinely reusable | UXR-60 | Compact/landscape/medium/expanded and large-font layouts preserve priority; touch/focus/semantics/contrast are verified; no critical meaning is color-only. |
-| UXR-60 | BLOCKED | UXR-10, UXR-20 | result/evaluation decision layer + evaluation adapters/presentation | UXR-50 | Terminal inference/evaluation surfaces answer a user decision with source-backed latency/throughput/memory/quality evidence and link to raw evidence without inventing rankings. |
-| UXR-70 | BLOCKED | UXR-30, UXR-50 | state/effect migration for remaining Diagnostics/Settings Activity debt | UXR-60 | Renderable state immutable/ViewModel-owned; Activity remains lifecycle/result/effect root; stale callbacks cannot overwrite terminal state. |
-| UXR-80 | BLOCKED | UXR-50, UXR-60, UXR-70 | tests/evidence/docs finalization | — | Focused unit/Compose semantics + app compile/lint/package gates pass; representative-device TalkBack/large-font/physical GGUF evidence remains explicitly PENDING until run. |
+| ID | Priority | State | Depends on | Exclusive ownership | Can run with | Acceptance |
+| --- | --- | --- | --- | --- | --- | --- |
+| PX-00 | P0 | DONE | — | audit + this workstream + integration topology | — | Current `dev` and repo-template-sw 0.5 contract reviewed; integration branch exists; stale historical UX branches classified as evidence-only. |
+| PX-10 | P1 | READY | PX-00 | shell/navigation/orientation, `HarnessDestination.kt`, `HarnessNavigation.kt`, `HarnessScreenLayout.kt`, `HarnessAdaptivePolicy.kt`, focused shell tests | PX-20, PX-25, PX-30, PX-40 | Current destination is obvious; compact fifth-destination navigation remains readable/accessible; detail Back/restoration rules stay deterministic; medium/expanded shell preserves context. |
+| PX-20 | P0/P1 | READY | PX-00 | Overview + Playground presentation/composition + focused tests | PX-10, PX-25, PX-30, PX-40 | One obvious next action; no inferred evidence; default generation path stays simple; advanced/expert controls explain unavailable/disabled states; run status/error/recovery is actionable and accessible. |
+| PX-25 | P0/P1 | READY | PX-00 | Models catalog/cards/detail + lifecycle presentation + focused tests | PX-10, PX-20, PX-30, PX-40 | Lifecycle states remain distinct; one primary valid action per state; failures use error semantics; progress/cancel/retry/remove/recovery are explicit; filters and empty states remain understandable. |
+| PX-30 | P0/P1 | READY | PX-00 | Performance Run/Datasets/History/Compare presentation + focused tests | PX-10, PX-20, PX-25, PX-40 | Dataset -> model -> samples -> execution profile -> readiness reads as a bounded decision flow; implementation jargon removed; internal identity detail disclosed contextually; active/terminal evaluation states and recovery are complete. |
+| PX-40 | P0/P1 | READY | PX-00 | Diagnostics overview/detail presentation + Settings presentation + focused tests | PX-10, PX-20, PX-25, PX-30 | Fail/error tones are semantically correct; source loading/error/unavailable remains visible; diagnostics stays summary -> drill-down; Settings labels match the exact source-backed quantity/state and Advanced remains secondary. |
+| PX-50 | P1/P2 | BLOCKED | PX-10, PX-20, PX-25, PX-30, PX-40 | shared design-system convergence, accessibility/adaptive cross-cutting pass, purposeful motion + cross-surface tests | — | Shared components own repeated semantics; 48 dp/focus/announcements/large-font/landscape/medium/expanded/reduced-motion behavior is proven without reintroducing duplicated screen logic. |
+| PX-60 | P0/P1 | BLOCKED | PX-50 | E2E/Compose semantics/visual evidence + durable docs/status transfer | — | Critical model lifecycle/local generation/physical-validation journeys have the narrowest sufficient evidence; screenshot/accessibility evidence is bounded; target/progress/current-state docs match production UI. |
+| PX-70 | P0 | BLOCKED | PX-60 | integration branch final validation and PR to current `dev` | — | All feature PRs merged into integration branch, branch rebased/reconciled with current `dev`, repository/product-experience/Android gates green, no unowned temporary workstream state remains. |
 
 ## Parallel execution policy
 
-`UXR-00` was the intentional serialization point because the original monolithic `MainActivity.kt` created overlapping write ownership. Overview, Playground and Settings now have dedicated files, while Diagnostics alone owns the remaining legacy Activity diagnostics block. `UXR-10`, `UXR-20`, `UXR-30` and `UXR-40` therefore run concurrently. Later, `UXR-50` and `UXR-60` may overlap after their prerequisites; final state/effect migration and evidence converge through `UXR-70/80`.
+`PX-10`, `PX-20`, `PX-25`, `PX-30` and `PX-40` deliberately own disjoint production files and may run in parallel. They must not introduce shared design-system abstractions merely to solve a local problem; that convergence belongs to `PX-50` after real repetition is visible.
 
-Do not parallelize two slices that mutate the same screen/state owner. Prefer moving ownership once over resolving repeated merge conflicts.
+If a lane discovers that it must change another lane's owner, record the dependency here rather than editing across boundaries. Integration conflicts are resolved by replaying the smallest semantic change on the current integration head, never by force-merging stale UX branches.
 
-## Current executable slices
+`PX-50` is intentionally serialized after the surface lanes because accessibility/adaptive/design-system convergence touches shared primitives and would otherwise create unnecessary merge conflicts. `PX-60` and `PX-70` are evidence/integration gates, not opportunities for new visual scope.
 
-- `UXR-10` — validate and refine evidence-backed Overview behavior.
-- `UXR-20` — validate and refine Basic -> Advanced -> Expert Playground disclosure and recovery.
-- `UXR-30` — replace the six-tab diagnostics entry with an evidence overview + drill-down while preserving explicit execution semantics.
-- `UXR-40` — validate Settings hierarchy and move remaining preference persistence behind its durable owner.
+## Branch and PR policy
 
-## Validation by slice
+- Every PX-10..PX-40 implementation branch starts from the exact integration head containing this plan.
+- Every lane opens a draft PR against `ux/product-experience-overhaul`.
+- A lane becomes mergeable only when its focused tests and applicable repository/Android checks are green on the exact head.
+- Merge to the integration branch only after review of hierarchy/states/recovery, not just visual output.
+- Do not target `dev` directly from the parallel lanes.
+- The final integration PR to `dev` must reconcile any newer runtime/evaluation changes first; it must not overwrite source-backed capability work that landed after this integration branch was created.
 
-- UXR-00: focused phone-test compilation/unit tests; navigation tests; verify no side-effect changes.
-- UXR-10/20/30/40: focused presentation/unit tests, Compose semantics, compile + lint.
-- UXR-50: compact/landscape/expanded/large-font instrumentation plus accessibility semantics; physical TalkBack evidence remains a real-device gate.
-- UXR-60: deterministic comparison/presentation tests using source-backed evaluation/telemetry data; no synthetic quality claim is promoted to device evidence.
-- UXR-70: reducer/effect race/recreation/back-stack tests.
-- UXR-80: repository product-experience checks, targeted app validation, packaging and bounded evidence cleanup.
+## Validation matrix
 
-Canonical repository commands and physical evidence rules remain owned by `.engineering/commands.json`, `skills/validate-change/SKILL.md` and `apps/local-llm-phone-test/AGENTS.md`.
+### Automated per-lane
+
+- pure presentation/reducer tests for deterministic hierarchy/state decisions;
+- Compose semantics for primary actions, disabled/error/loading/empty states and navigation roles;
+- focused phone-test compile/unit tests and Android Lint;
+- design-system tests when shared components/tokens are touched;
+- repository product-experience/documentation/navigation guards.
+
+### Final automated
+
+- compact/medium/expanded and portrait/landscape representative layout tests;
+- large-font semantics/layout coverage;
+- critical navigation/back/restoration tests;
+- scoped screenshot regression for stable reference states;
+- package/build gates required by `.engineering/commands.json`.
+
+### Representative physical-device evidence
+
+Physical evidence remains a separate release claim and must not be fabricated from CI/emulator runs:
+
+- TalkBack traversal and status announcements;
+- large-font and orientation behavior;
+- real GGUF install/select/load/generate/stream/cancel/recovery;
+- real resource/thermal and evaluation presentation;
+- physical validation report/export behavior.
 
 ## Durable destinations on completion
 
-Transfer durable behavior/decisions to:
+Transfer durable behavior and decisions to:
 
-- `design/ux-contract.json` only if the durable product contract changes;
+- `design/ux-contract.json` only when the durable product contract changes;
 - `docs/harness-ux-ui-implementation-plan.md` for the canonical phone UX target;
 - `docs/harness-ux-ui-implementation-progress.md` while that legacy owner remains active;
 - `docs/features/phone-app-architecture.md` for durable screen/state ownership;
-- [`docs/current-state.md`](../current-state.md) for integrated status/blockers;
+- `docs/current-state.md` for integrated status/blockers;
 - `ui/design-system` and `docs/design-system.md` for genuinely reusable components/tokens.
 
-When all slices are integrated and durable knowledge has moved, remove this temporary workstream by default.
+When PX-70 is complete and durable knowledge has moved, delete this temporary workstream by default; Git history owns the implementation history.
