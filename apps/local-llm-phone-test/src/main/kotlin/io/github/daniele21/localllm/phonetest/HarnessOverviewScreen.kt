@@ -61,11 +61,7 @@ private fun OverviewPolicyLabel() {
 }
 
 @Composable
-private fun OverviewHeroCard(
-    presentation: HarnessOverviewPresentation,
-    onOpenPlayground: () -> Unit,
-    onOpenModels: () -> Unit,
-) {
+private fun OverviewHeroCard(presentation: HarnessOverviewPresentation, onOpenPlayground: () -> Unit, onOpenModels: () -> Unit) {
     HarnessCard(emphasized = true) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -164,10 +160,7 @@ private fun OverviewCurrentStatePanel(
 }
 
 @Composable
-private fun OverviewDeviceEvidencePanel(
-    presentation: HarnessOverviewPresentation,
-    onOpenDiagnostics: () -> Unit,
-) {
+private fun OverviewDeviceEvidencePanel(presentation: HarnessOverviewPresentation, onOpenDiagnostics: () -> Unit) {
     OverviewSectionPanel("Device evidence") {
         if (presentation.processPss == "Unavailable" && presentation.thermalStatus == "Unavailable") {
             Text(
@@ -202,10 +195,7 @@ private fun OverviewDeviceEvidencePanel(
 }
 
 @Composable
-private fun OverviewRecentActivityPanel(
-    presentation: HarnessOverviewPresentation,
-    onOpenPlayground: () -> Unit,
-) {
+private fun OverviewRecentActivityPanel(presentation: HarnessOverviewPresentation, onOpenPlayground: () -> Unit) {
     OverviewSectionPanel("Recent activity") {
         OverviewInfoRow(
             icon = HarnessDestination.PLAYGROUND,

@@ -30,17 +30,12 @@ internal data class HarnessOverviewPresentation(
 
 private data class OverviewModelState(
     val selectedModel: ImportedPhoneModel?,
-    val selectedDigest: String?,
     val loadedDigest: String?,
     val mismatch: Boolean,
     val selectedResident: Boolean,
 )
 
-private data class OverviewHeroCopy(
-    val label: String,
-    val title: String,
-    val detail: String,
-)
+private data class OverviewHeroCopy(val label: String, val title: String, val detail: String)
 
 internal fun harnessOverviewPresentation(
     state: HarnessUiState,
@@ -59,11 +54,11 @@ internal fun harnessOverviewPresentation(
         heroTitle = hero.title,
         heroDetail = hero.detail,
         primaryAction = primaryAction,
-        selectedModelValue = overviewSelectedModelValue(state, modelState),
+        selectedModelValue = state.modelInventory.selectedItem?.displayName ?: modelState.selectedModel?.fileName ?: "No model selected",
         selectedModelStatus = overviewSelectedModelStatus(modelState),
         selectedModelPositive = modelState.selectedModel != null && !modelState.mismatch,
-        runtimeValue = overviewRuntimeValue(diagnostics),
-        residencyValue = overviewResidencyValue(modelState.loadedDigest),
+        runtimeValue = diagnostics.runtime?.state?.name?.lowercase()?.replaceFirstChar(Char::uppercase) ?: "Unavailable",
+        residencyValue = modelState.loadedDigest?.let { "${it.take(12)}…" } ?: "No model in memory",
         residencyStatus = overviewResidencyStatus(state, modelState),
         residencyPositive = modelState.selectedResident && !modelState.mismatch,
         healthValue = healthValue,
@@ -85,7 +80,6 @@ private fun overviewModelState(state: HarnessUiState): OverviewModelState {
         (selectedDigest != null && loadedDigest != null && selectedDigest != loadedDigest)
     return OverviewModelState(
         selectedModel = selectedModel,
-        selectedDigest = selectedDigest,
         loadedDigest = loadedDigest,
         mismatch = mismatch,
         selectedResident = selectedDigest != null && selectedDigest == loadedDigest,
@@ -98,34 +92,22 @@ private fun overviewPrimaryAction(modelState: OverviewModelState): HarnessOvervi
     else -> HarnessOverviewPrimaryAction.RUN_PROMPT
 }
 
-private fun overviewHeroCopy(
-    primaryAction: HarnessOverviewPrimaryAction,
-    modelState: OverviewModelState,
-): OverviewHeroCopy = OverviewHeroCopy(
-    label = overviewHeroLabel(primaryAction),
-    title = overviewHeroTitle(primaryAction, modelState.selectedModel),
-    detail = overviewHeroDetail(primaryAction, modelState.selectedResident),
-)
+private fun overviewHeroCopy(primaryAction: HarnessOverviewPrimaryAction, modelState: OverviewModelState): OverviewHeroCopy =
+    OverviewHeroCopy(
+        label = when (primaryAction) {
+            HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "MODEL REQUIRED"
+            HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "MODEL STATE NEEDS ATTENTION"
+            HarnessOverviewPrimaryAction.RUN_PROMPT -> "READY TO EVALUATE"
+        },
+        title = when (primaryAction) {
+            HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "Choose a model to begin"
+            HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "Reconcile model state before the next run"
+            HarnessOverviewPrimaryAction.RUN_PROMPT -> modelState.selectedModel?.fileName ?: "Ready to evaluate"
+        },
+        detail = overviewHeroDetail(primaryAction, modelState.selectedResident),
+    )
 
-private fun overviewHeroLabel(primaryAction: HarnessOverviewPrimaryAction): String = when (primaryAction) {
-    HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "MODEL REQUIRED"
-    HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "MODEL STATE NEEDS ATTENTION"
-    HarnessOverviewPrimaryAction.RUN_PROMPT -> "READY TO EVALUATE"
-}
-
-private fun overviewHeroTitle(
-    primaryAction: HarnessOverviewPrimaryAction,
-    selectedModel: ImportedPhoneModel?,
-): String = when (primaryAction) {
-    HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "Choose a model to begin"
-    HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "Reconcile model state before the next run"
-    HarnessOverviewPrimaryAction.RUN_PROMPT -> selectedModel?.fileName ?: "Ready to evaluate"
-}
-
-private fun overviewHeroDetail(
-    primaryAction: HarnessOverviewPrimaryAction,
-    selectedResident: Boolean,
-): String = when {
+private fun overviewHeroDetail(primaryAction: HarnessOverviewPrimaryAction, selectedResident: Boolean): String = when {
     primaryAction == HarnessOverviewPrimaryAction.CHOOSE_MODEL ->
         "Choose a reviewed Qwen3.5 model for this device, then run a prompt with a measured configuration."
 
@@ -139,11 +121,6 @@ private fun overviewHeroDetail(
         "Selected on this device. The runtime will load it explicitly when the next inference requires it."
 }
 
-private fun overviewSelectedModelValue(
-    state: HarnessUiState,
-    modelState: OverviewModelState,
-): String = state.modelInventory.selectedItem?.displayName ?: modelState.selectedModel?.fileName ?: "No model selected"
-
 private fun overviewSelectedModelStatus(modelState: OverviewModelState): String = when {
     modelState.selectedModel == null -> "Not selected"
     modelState.mismatch -> "Needs attention"
@@ -151,16 +128,7 @@ private fun overviewSelectedModelStatus(modelState: OverviewModelState): String 
     else -> "Selected"
 }
 
-private fun overviewRuntimeValue(diagnostics: DiagnosticsUiState): String =
-    diagnostics.runtime?.state?.name?.lowercase()?.replaceFirstChar(Char::uppercase) ?: "Unavailable"
-
-private fun overviewResidencyValue(loadedDigest: String?): String =
-    loadedDigest?.let { "${it.take(12)}…" } ?: "No model in memory"
-
-private fun overviewResidencyStatus(
-    state: HarnessUiState,
-    modelState: OverviewModelState,
-): String = when {
+private fun overviewResidencyStatus(state: HarnessUiState, modelState: OverviewModelState): String = when {
     state.playground.active -> "Running"
     modelState.mismatch -> "Mismatch"
     modelState.selectedResident -> "Resident"
