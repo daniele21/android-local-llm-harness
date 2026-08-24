@@ -123,10 +123,8 @@ class EvaluationEngineAggregationTest {
     }
 
     private fun successCaseExecution() = object : EvaluationCaseExecutionPort {
-        override suspend fun execute(
-            config: EvaluationRunConfig,
-            caseId: EvaluationCaseId,
-        ): EvaluationStepResult<EvaluationCaseResult> = EvaluationStepResult.Success(scored(caseId))
+        override suspend fun execute(config: EvaluationRunConfig, caseId: EvaluationCaseId): EvaluationStepResult<EvaluationCaseResult> =
+            EvaluationStepResult.Success(scored(caseId))
     }
 
     private fun scored(caseId: EvaluationCaseId) = EvaluationCaseResult(
