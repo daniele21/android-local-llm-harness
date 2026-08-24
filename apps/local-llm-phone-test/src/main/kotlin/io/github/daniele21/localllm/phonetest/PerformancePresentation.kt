@@ -39,19 +39,19 @@ internal fun performanceSampleEnabled(selection: PerformanceSampleSelection, cas
 
 internal fun performanceReadinessDetail(readiness: PerformanceRunReadiness, runnerAvailable: Boolean): String {
     if (!runnerAvailable) {
-        return "Evaluation execution is not connected in this build. Setup remains inspectable without claiming executable readiness."
+        return "Evaluation cannot be started in this build yet. You can still review the available setup inputs."
     }
     return when (readiness) {
         PerformanceRunReadiness.Incomplete -> "Choose the required evaluation inputs."
-        PerformanceRunReadiness.Ready -> "All required source-backed inputs are available."
+        PerformanceRunReadiness.Ready -> "All required inputs are available."
         is PerformanceRunReadiness.Blocked -> readiness.reasons.joinToString(", ") { reason -> performanceBlockReasonLabel(reason) }
     }
 }
 
 internal fun performanceBlockReasonLabel(reason: PerformanceBlockReason): String = when (reason) {
-    PerformanceBlockReason.MODEL_REQUIRED -> "model required"
-    PerformanceBlockReason.DATASET_REQUIRED -> "dataset required"
-    PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE -> "sample selection unavailable"
-    PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED -> "execution profile required"
-    PerformanceBlockReason.MODEL_UNAVAILABLE -> "model unavailable"
+    PerformanceBlockReason.MODEL_REQUIRED -> "Choose a model"
+    PerformanceBlockReason.DATASET_REQUIRED -> "Choose a dataset"
+    PerformanceBlockReason.SAMPLE_SELECTION_UNAVAILABLE -> "Choose an available sample size"
+    PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED -> "Choose an execution profile"
+    PerformanceBlockReason.MODEL_UNAVAILABLE -> "The selected model is unavailable"
 }
