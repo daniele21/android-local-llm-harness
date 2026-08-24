@@ -48,18 +48,21 @@ internal fun PerformanceScreen(
                     onIntent = onIntent,
                     onOpenModels = onOpenModels,
                 )
+
                 PerformanceSection.DATASETS -> PerformanceCollectionSection(
                     title = "Datasets",
                     state = performanceDatasetSurfaceState(state.datasets),
                     emptyMessage = "No evaluation datasets are installed yet.",
                     availableLabel = "installed datasets",
                 )
+
                 PerformanceSection.HISTORY -> PerformanceCollectionSection(
                     title = "History",
                     state = performanceHistorySurfaceState(state.history),
                     emptyMessage = "No completed evaluation runs are available yet.",
                     availableLabel = "evaluation runs",
                 )
+
                 PerformanceSection.COMPARE -> PerformanceCompareSection(state)
             }
         }
@@ -67,10 +70,7 @@ internal fun PerformanceScreen(
 }
 
 @Composable
-private fun PerformanceSectionSelector(
-    selected: PerformanceSection,
-    onIntent: (PerformanceIntent) -> Unit,
-) {
+private fun PerformanceSectionSelector(selected: PerformanceSection, onIntent: (PerformanceIntent) -> Unit) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.testTag("performance-sections"),
