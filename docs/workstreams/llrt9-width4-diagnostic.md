@@ -1,7 +1,7 @@
 # LLRT-9 width=4 diagnostic
 
 Status: active
-Document type: workstream
+Document type: workstream-state
 Owner: qwen35/runtime-tuning
 Canonical scope: qwen35.llrt9.width4-diagnostic
 Read when: investigating the short-profile Qwen3.5 2B native-batch width=4 output divergence observed on physical Android hardware
