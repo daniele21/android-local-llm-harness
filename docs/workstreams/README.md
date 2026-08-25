@@ -5,11 +5,15 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.workstreams
 Read when: creating, locating, updating or finalizing a bounded implementation workstream
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 
 This directory is the canonical home for repository-level **temporary implementation workstreams** that must preserve dependency, sequencing or handoff state across pull requests or coding agents.
 
 A workstream belongs here only while it is active. It is not a second project-status ledger and it must not duplicate durable feature, architecture, ADR, runbook or release information.
+
+## Active bounded work
+
+- [`q35-runtime-qualification-wave.md`](q35-runtime-qualification-wave.md) — coordinates the temporary Qwen3.5 CPU runtime qualification wave, including measured-profile acceptance, lifecycle/memory evidence, representative-device gates and final review dependencies.
 
 ## Lifecycle
 
