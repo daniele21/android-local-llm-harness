@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.transport.binder.contract.CloseSessionReques
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
@@ -33,6 +34,11 @@ internal interface ConsumerSharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+        throw RemoteException("Consumer generation v2 is unavailable")
+    }
 
     @Throws(RemoteException::class)
     fun cancel(request: CancelRequestParcel)
