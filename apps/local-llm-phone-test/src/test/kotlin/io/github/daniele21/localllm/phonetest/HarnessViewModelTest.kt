@@ -75,6 +75,42 @@ class HarnessViewModelTest {
     }
 
     @Test
+    fun staleDiagnosticGenerationCannotFinishNewerAction() {
+        val viewModel = HarnessViewModel()
+        val first = viewModel.beginDiagnosticAction(HarnessDiagnosticAction.HEALTH)
+        val second = viewModel.beginDiagnosticAction(HarnessDiagnosticAction.HEALTH)
+
+        assertFalse(viewModel.finishDiagnosticAction(first))
+        assertTrue(viewModel.uiState.value.diagnosticActionRunning)
+        assertTrue(viewModel.finishDiagnosticAction(second))
+        assertFalse(viewModel.uiState.value.diagnosticActionRunning)
+    }
+
+    @Test
+    fun invalidatingDiagnosticActionsRejectsOutstandingCallbacks() {
+        val viewModel = HarnessViewModel()
+        val token = viewModel.beginDiagnosticAction(HarnessDiagnosticAction.RESOURCE_CAPTURE)
+
+        viewModel.invalidateDiagnosticActions()
+
+        assertFalse(viewModel.finishDiagnosticAction(token))
+        assertFalse(viewModel.uiState.value.diagnosticActionRunning)
+    }
+
+    @Test
+    fun diagnosticResourceHistoryIsViewModelOwned() {
+        val viewModel = HarnessViewModel()
+        val history = DiagnosticsResourceHistoryUi(
+            sampleCount = 3,
+            currentProcessPss = "128.0 MiB",
+        )
+
+        viewModel.dispatch(HarnessUiEvent.ResourceHistoryChanged(history))
+
+        assertEquals(history, viewModel.uiState.value.resourceHistory)
+    }
+
+    @Test
     fun activePlaygroundKeepsTheScreenOn() {
         val viewModel = HarnessViewModel()
 
