@@ -22,7 +22,7 @@ Route by responsibility:
 
 | Concern | Start here | Owning dependency to inspect |
 | --- | --- | --- |
-| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, transport, observability and design-system contracts |
+| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control-plane store, transport, observability and design-system contracts |
 | Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, manifest/build variants | `integrations/android-service-host`, Binder contract and ADR 0012 |
 | Destinations and responsive shell | `HarnessDestination.kt`, Compose entry points | Shared navigation/components under `ui/design-system` |
 | Playground state and inference | `HarnessViewModel.kt`, `PhonePlaygroundController.kt` and related UI | `LocalLlmClient`, runtime lifecycle and generation contracts |
@@ -50,6 +50,7 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 - Navigation, opening a screen and observational refresh do not implicitly load a model, start inference/evaluation, download, install, run health, capture resources, mutate a baseline or repair a cache.
 - Performance may present only source-backed evaluation state. It must not rank models/configurations while compatible aggregated latency, throughput, memory and quality evidence is unavailable.
 - The shared-runtime proof `Service` reuses `HarnessRuntimeGraph.from(...)`; binding/handshake must not create a second runtime, select a model or load a GGUF.
+- `HarnessRuntimeGraph` owns the single process-scoped control-plane Room store used by both the proof `Service` and Harness UI; neither surface opens or closes a parallel database owner.
 - Shared-runtime release and debug variants use deterministic, distinct signature-permission names. Caller package matching is exact; never strip application ID suffixes to authorize a caller.
 - Download, install, selection, verification, removal, health, benchmark, evaluation and validation are distinct explicit user actions.
 - Prompt and generated output stay bounded in process memory and out of saved state, Room, normal telemetry and shared reports.
@@ -67,7 +68,7 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 - Move runtime, model, telemetry, evaluation, health or benchmark policy to the owning module and expose the smallest neutral contract the app needs.
 - Keep shared-runtime Binder/AIDL, caller authorization and caller-owned ledgers in their transport/integration modules; the phone app owns only the concrete proof service and explicit host configuration.
 - Keep UI models immutable and separate observation from mutating capabilities.
-- Preserve a single process-scoped runtime graph across destinations and the proof service; do not create a runtime per screen, Activity recreation or Binder connection.
+- Preserve a single process-scoped runtime graph, including its control-plane store owner, across destinations and the proof service; do not create a runtime or control-plane database per screen, Activity recreation or Binder connection.
 - For model flows, test progress plus success, cancellation, invalid state, source failure, cleanup and restart reconciliation.
 - For destructive actions, require explicit confirmation, active-resource protection and a privacy-safe terminal result.
 - For asynchronous Diagnostics actions, test success/failure plus stale-generation and lifecycle invalidation behavior.
