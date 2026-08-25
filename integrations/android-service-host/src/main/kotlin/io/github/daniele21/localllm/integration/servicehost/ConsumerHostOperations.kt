@@ -7,10 +7,12 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
+import io.github.daniele21.localllm.contracts.TaskDefinition
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
@@ -118,11 +120,16 @@ internal class ConsumerHostOperations(
     }
 
     fun generate(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
-        controlExecutor.submitOrReject(
-            onRejected = { callback.onEvent(failureEvent(request.externalRequestId, WireErrorCodes.TRANSPORT_FAILURE)) },
-        ) {
-            runGeneration(caller, request, callback)
+        submitGeneration(caller, request, emptyList(), callback)
+    }
+
+    fun generateV2(caller: AuthorizedCaller, request: ConsumerGenerationRequestV2Parcel, callback: ConsumerHostEventCallback) {
+        val definitions = runCatching { request.taskDefinitions.map { it.toCoreTaskDefinition() } }.getOrNull()
+        if (definitions == null) {
+            callback.onEvent(failureEvent(request.request.externalRequestId, WireErrorCodes.INVALID_WIRE_REQUEST))
+            return
         }
+        submitGeneration(caller, request.request, definitions, callback)
     }
 
     fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) {
@@ -153,7 +160,25 @@ internal class ConsumerHostOperations(
         }
     }
 
-    private fun runGeneration(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
+    private fun submitGeneration(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        taskDefinitions: List<TaskDefinition>,
+        callback: ConsumerHostEventCallback,
+    ) {
+        controlExecutor.submitOrReject(
+            onRejected = { callback.onEvent(failureEvent(request.externalRequestId, WireErrorCodes.TRANSPORT_FAILURE)) },
+        ) {
+            runGeneration(caller, request, taskDefinitions, callback)
+        }
+    }
+
+    private fun runGeneration(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        taskDefinitions: List<TaskDefinition>,
+        callback: ConsumerHostEventCallback,
+    ) {
         val context = resolveContext(caller, request)
         val externalRequestId = request.externalRequestId?.takeIf(String::isNotBlank)
         val externalSessionId = request.externalSessionId?.takeIf(String::isNotBlank)
@@ -179,7 +204,7 @@ internal class ConsumerHostOperations(
                     sessionId = sessionId,
                     input = requireNotNull(request.input).toCoreConsumerInput(),
                     outputConstraint = requireNotNull(request.outputConstraint).toCoreConsumerOutput(),
-                    taskDefinitions = request.taskDefinitions.map { it.toCoreTaskDefinition() },
+                    taskDefinitions = taskDefinitions,
                 )
             }.getOrNull()
         if (coreRequest == null) {
