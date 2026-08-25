@@ -9,6 +9,7 @@ import io.github.daniele21.localllm.contracts.ConsumerPreparedId
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.TaskDefinition
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
@@ -124,12 +125,22 @@ internal class ConsumerHostOperations(
     }
 
     fun generateV2(caller: AuthorizedCaller, request: ConsumerGenerationRequestV2Parcel, callback: ConsumerHostEventCallback) {
-        val definitions = runCatching { request.taskDefinitions.map { it.toCoreTaskDefinition() } }.getOrNull()
-        if (definitions == null) {
-            callback.onEvent(failureEvent(request.request.externalRequestId, WireErrorCodes.INVALID_WIRE_REQUEST))
+        val baseRequest = request.request
+        val token = baseRequest.clientToken.toHostTokenOrNull()
+        val featureEnabled =
+            token?.let {
+                ledger.supportsFeature(it, caller, BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1).successOrNull()
+            } == true
+        if (!featureEnabled) {
+            callback.onEvent(failureEvent(baseRequest.externalRequestId, WireErrorCodes.FEATURE_UNAVAILABLE))
             return
         }
-        submitGeneration(caller, request.request, definitions, callback)
+        val definitions = runCatching { request.taskDefinitions.map { it.toCoreTaskDefinition() } }.getOrNull()
+        if (definitions == null) {
+            callback.onEvent(failureEvent(baseRequest.externalRequestId, WireErrorCodes.INVALID_WIRE_REQUEST))
+            return
+        }
+        submitGeneration(caller, baseRequest, definitions, callback)
     }
 
     fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) {
