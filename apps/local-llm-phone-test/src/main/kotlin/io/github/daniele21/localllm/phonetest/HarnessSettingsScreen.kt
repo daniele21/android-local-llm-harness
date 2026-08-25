@@ -142,5 +142,4 @@ private fun SettingsRow(destination: HarnessDestination, title: String, detail: 
     }
 }
 
-internal fun settingsSelectedModelStorageLabel(model: ImportedPhoneModel?): String =
-    if (model == null) "No selection" else "Selected"
+internal fun settingsSelectedModelStorageLabel(model: ImportedPhoneModel?): String = if (model == null) "No selection" else "Selected"
