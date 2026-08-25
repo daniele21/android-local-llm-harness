@@ -17,7 +17,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
-import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 
 internal fun harnessDiagnosticsOverviewState(
     diagnostics: DiagnosticsUiState,
@@ -93,6 +92,3 @@ private fun DiagnosticEntryCard(entry: HarnessDiagnosticsOverviewEntry, onClick:
         }
     }
 }
-
-@Suppress("unused")
-private fun diagnosticToneForCompatibility(tone: HarnessStatusTone): HarnessStatusTone = tone
