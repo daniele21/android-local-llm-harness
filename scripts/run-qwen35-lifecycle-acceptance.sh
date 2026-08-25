@@ -250,41 +250,70 @@ run_e2e_tier() {
     grep -Fq 'LOCAL_LLM_E2E memory pssSamplesKb=' "$RUN_DIR/$label.log" || { echo "$label missing repeated-memory evidence" >&2; exit 1; }
 }
 
+run_lifecycle_case() {
+    label="$1"
+    method="$2"
+    primary_path="$3"
+    primary_sha="$4"
+    primary_threads="$5"
+    secondary_path="$6"
+    secondary_sha="$7"
+    secondary_threads="$8"
+    run_instrumentation "$label" \
+        -e class "io.github.daniele21.localllm.devicetest.Qwen35LifecycleAcceptanceInstrumentedTest#$method" \
+        -e primaryModelRelativePath "$primary_path" \
+        -e primaryModelSha256 "$primary_sha" \
+        -e primaryCpuThreads "$primary_threads" \
+        -e secondaryModelRelativePath "$secondary_path" \
+        -e secondaryModelSha256 "$secondary_sha" \
+        -e secondaryCpuThreads "$secondary_threads" \
+        -e contextTokens 2048 \
+        -e batchSize 128 \
+        -e microBatchSize 64 \
+        -e batchThreads 4 \
+        -e switchOutputTokens 8 \
+        -e lowMemoryOutputTokens 256 \
+        -e timeoutSeconds "$TIMEOUT_SECONDS" \
+        -e harnessCommit "$HARNESS_COMMIT" \
+        -e backendRevision "$BACKEND_REVISION"
+}
+
 run_e2e_tier "08b-e2e" files/e2e/qwen35-08b.gguf "$ACTUAL_08B_SHA" 2
 run_e2e_tier "2b-e2e" files/e2e/qwen35-2b.gguf "$ACTUAL_2B_SHA" 4
 
-run_instrumentation "cross-tier-lifecycle" \
-    -e class io.github.daniele21.localllm.devicetest.Qwen35LifecycleAcceptanceInstrumentedTest \
-    -e primaryModelRelativePath files/e2e/qwen35-08b.gguf \
-    -e primaryModelSha256 "$ACTUAL_08B_SHA" \
-    -e primaryCpuThreads 2 \
-    -e secondaryModelRelativePath files/e2e/qwen35-2b.gguf \
-    -e secondaryModelSha256 "$ACTUAL_2B_SHA" \
-    -e secondaryCpuThreads 4 \
-    -e contextTokens 2048 \
-    -e batchSize 128 \
-    -e microBatchSize 64 \
-    -e batchThreads 4 \
-    -e switchOutputTokens 8 \
-    -e lowMemoryOutputTokens 256 \
-    -e timeoutSeconds "$TIMEOUT_SECONDS" \
-    -e harnessCommit "$HARNESS_COMMIT" \
-    -e backendRevision "$BACKEND_REVISION"
+run_lifecycle_case \
+    "08b-low-memory" \
+    lowMemoryDuringActiveGenerationCancelsAndReleasesEverything \
+    files/e2e/qwen35-08b.gguf "$ACTUAL_08B_SHA" 2 \
+    files/e2e/qwen35-2b.gguf "$ACTUAL_2B_SHA" 4
+run_lifecycle_case \
+    "2b-low-memory" \
+    lowMemoryDuringActiveGenerationCancelsAndReleasesEverything \
+    files/e2e/qwen35-2b.gguf "$ACTUAL_2B_SHA" 4 \
+    files/e2e/qwen35-08b.gguf "$ACTUAL_08B_SHA" 2
+run_lifecycle_case \
+    "cross-tier-switch" \
+    switchesBetweenReferenceModelsWithoutResidencyLeak \
+    files/e2e/qwen35-08b.gguf "$ACTUAL_08B_SHA" 2 \
+    files/e2e/qwen35-2b.gguf "$ACTUAL_2B_SHA" 4
 
 LIFECYCLE_JSONL="$RUN_DIR/lifecycle-evidence.jsonl"
-sed -n 's/^.*LOCAL_LLM_Q35_LIFECYCLE_JSON //p' "$RUN_DIR/cross-tier-lifecycle.log" > "$LIFECYCLE_JSONL"
-[[ "$(grep -c . "$LIFECYCLE_JSONL")" -eq 2 ]] || { echo "Expected exactly two structured lifecycle scenarios" >&2; exit 1; }
+: > "$LIFECYCLE_JSONL"
+for log_name in 08b-low-memory 2b-low-memory cross-tier-switch; do
+    sed -n 's/^.*LOCAL_LLM_Q35_LIFECYCLE_JSON //p' "$RUN_DIR/$log_name.log" >> "$LIFECYCLE_JSONL"
+done
+[[ "$(grep -c . "$LIFECYCLE_JSONL")" -eq 3 ]] || { echo "Expected exactly three structured lifecycle scenarios" >&2; exit 1; }
 
 MANIFEST="$RUN_DIR/manifest.json"
 python3 - "$MANIFEST" "$HARNESS_COMMIT" "$BACKEND_REVISION" "$DEVICE_MODEL" "$DEVICE_RELEASE" "$DEVICE_SDK" "$DEVICE_ABI" \
-    "$ACTUAL_08B_SHA" "$ACTUAL_2B_SHA" "$THERMAL_START_MAX" "$RUN_DIR" <<'PY'
+    "$ACTUAL_08B_SHA" "$ACTUAL_2B_SHA" "$THERMAL_START_MAX" "$MEMORY_REPEAT_COUNT" "$MAX_PSS_GROWTH_KB" "$TIMEOUT_SECONDS" "$RUN_DIR" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
 manifest = Path(sys.argv[1])
-run_dir = Path(sys.argv[11])
+run_dir = Path(sys.argv[14])
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -301,6 +330,9 @@ payload = {
     "model08bDigest": sys.argv[8],
     "model2bDigest": sys.argv[9],
     "thermalStartMax": int(sys.argv[10]),
+    "memoryRepeatCount": int(sys.argv[11]),
+    "maxPssGrowthKb": int(sys.argv[12]),
+    "timeoutSeconds": int(sys.argv[13]),
     "contextTokens": 2048,
     "batchSize": 128,
     "microBatchSize": 64,
@@ -309,7 +341,9 @@ payload = {
     "cases": {
         "08bE2e": digest(run_dir / "08b-e2e.log"),
         "2bE2e": digest(run_dir / "2b-e2e.log"),
-        "crossTierLifecycle": digest(run_dir / "cross-tier-lifecycle.log"),
+        "08bLowMemory": digest(run_dir / "08b-low-memory.log"),
+        "2bLowMemory": digest(run_dir / "2b-low-memory.log"),
+        "crossTierSwitch": digest(run_dir / "cross-tier-switch.log"),
         "structuredLifecycle": digest(run_dir / "lifecycle-evidence.jsonl"),
     },
     "automaticProfilePromotion": False,
