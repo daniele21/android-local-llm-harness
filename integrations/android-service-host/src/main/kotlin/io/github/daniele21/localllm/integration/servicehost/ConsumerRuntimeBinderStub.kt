@@ -15,6 +15,8 @@ import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmS
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 
+/** Mirrors the public Consumer AIDL transaction surface; keep transaction ownership in one auditable stub. */
+@Suppress("TooManyFunctions")
 internal class ConsumerRuntimeBinderStub(
     private val authorizer: CallerAuthorizer,
     private val delegate: SharedRuntimeHostDelegate,
