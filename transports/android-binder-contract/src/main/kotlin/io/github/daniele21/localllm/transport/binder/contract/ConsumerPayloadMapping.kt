@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraint
 import io.github.daniele21.localllm.contracts.ConversationMessage
 import io.github.daniele21.localllm.contracts.ConversationRole
+import io.github.daniele21.localllm.contracts.TaskDefinition
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 fun ConsumerGenerationInput.toConsumerWire(): ConsumerGenerationInputParcel = when (this) {
@@ -35,6 +36,20 @@ fun ConsumerGenerationInputParcel.toCoreConsumerInput(): ConsumerGenerationInput
 
     else -> throw invalidWireTag("consumer input", typeTag)
 }
+
+fun TaskDefinition.toConsumerWire(): TaskDefinitionParcel =
+    TaskDefinitionParcel(
+        id = id,
+        description = description,
+        example = example,
+    )
+
+fun TaskDefinitionParcel.toCoreTaskDefinition(): TaskDefinition =
+    TaskDefinition(
+        id = id,
+        description = description,
+        example = example,
+    )
 
 fun ConsumerOutputConstraint.toConsumerWire(): ConsumerOutputConstraintParcel = when (this) {
     ConsumerOutputConstraint.Text -> ConsumerOutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null)
