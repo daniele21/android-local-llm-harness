@@ -45,7 +45,7 @@ jobs:
           path.write_text(text)
           PY
       - name: Format changed Kotlin
-        run: ./gradlew :apps:local-llm-phone-test:spotlessApply
+        run: ./gradlew --no-configuration-cache spotlessApply
       - name: Commit integration patch
         run: |
           git config user.name 'Daniele21'
