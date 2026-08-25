@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.transport.binder.contract.CloseSessionReques
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
@@ -29,16 +30,6 @@ import io.github.daniele21.localllm.transport.binder.contract.RegistrationResult
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
 internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmService) : SharedRuntimeRemoteService {
-    /**
-     * The Consumer API is intentionally resolved lazily.
-     *
-     * A newly installed client can bind to an older Harness host whose AIDL surface predates
-     * `consumerApi`. Touching that transaction from the service-connected callback would happen
-     * before protocol/feature negotiation and could escape as a Binder failure on the main thread.
-     * Keeping this lazy lets [SharedRuntimeConnection] negotiate `protocolInfo` and the required
-     * consumer feature first, so an older host becomes the typed INCOMPATIBLE state instead of a
-     * process-level startup failure.
-     */
     override val consumer: ConsumerSharedRuntimeRemoteService by lazy {
         AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi)
     }
@@ -109,12 +100,11 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
     }
 
     override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
-        delegate.generate(
-            request,
-            object : IConsumerGenerationCallback.Stub() {
-                override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
-            },
-        )
+        delegate.generate(request, generationCallback(callback))
+    }
+
+    override fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+        delegate.generateV2(request, generationCallback(callback))
     }
 
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
@@ -141,6 +131,11 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
 private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback = object : IConsumerResultCallback.Stub() {
     override fun onResult(result: ConsumerResultParcel) = callback(result)
 }
+
+private fun generationCallback(callback: (ConsumerGenerationEventParcel) -> Unit): IConsumerGenerationCallback =
+    object : IConsumerGenerationCallback.Stub() {
+        override fun onEvent(event: ConsumerGenerationEventParcel) = callback(event)
+    }
 
 private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParcel) -> Unit): IConsumerControlPlaneResultCallback =
     object : IConsumerControlPlaneResultCallback.Stub() {
