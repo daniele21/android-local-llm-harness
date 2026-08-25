@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: apps/local-llm-phone-test
 Canonical scope: workstream.phone-product-experience
 Read when: coordinating the repo-template-sw 0.5 UX/UI realignment of the Harness Android phone application
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 
 Canonical repository status remains in [`docs/current-state.md`](../current-state.md); this file owns only temporary implementation sequencing and dependency state for this bounded UX/UI change.
 
@@ -28,6 +28,29 @@ user outcome
 -> validation
 ```
 
+## Integration topology
+
+This workstream uses a bounded integration line so parallel UX/UI work can converge without destabilizing `dev`:
+
+```text
+dev
+  └── uxui/product-experience-rework
+        ├── uxui/uxr-10-overview
+        ├── uxui/uxr-20-playground
+        ├── uxui/uxr-30-diagnostics
+        └── uxui/uxr-40-settings
+```
+
+Rules:
+
+- `uxui/product-experience-rework` was created from the exact `dev` baseline and is the temporary merge target for this workstream.
+- Workstream PRs target `uxui/product-experience-rework`, not `dev`.
+- Parallel branches must have disjoint screen/state ownership. Shared-component changes are deferred to UXR-50 unless a lane cannot proceed without them.
+- After UXR-10/20/30/40 converge, UXR-50 and UXR-60 may proceed in parallel where ownership remains disjoint.
+- UXR-70 owns the final state/effect convergence after the presentation lanes settle.
+- UXR-80 validates the integrated branch. Only after that evidence is green is a single final PR opened from `uxui/product-experience-rework` to `dev`.
+- No workstream PR is merged directly to `dev` while this integration line is active.
+
 ## Non-goals
 
 - redesign the Harness brand or create a second design system;
@@ -38,7 +61,7 @@ user outcome
 
 ## Invariants
 
-- `dev` remains base/target; this work starts from the latest green `dev`.
+- `dev` remains the canonical final target; `uxui/product-experience-rework` is the bounded temporary integration target for this workstream.
 - Every displayed runtime/model/resource/benchmark value is source-backed or explicitly unavailable/not-run.
 - Installed, selected, resident and running model states remain distinct.
 - Navigation/refresh stays observational; execution requires an explicit action.
@@ -64,9 +87,9 @@ user outcome
 
 ## Parallel execution policy
 
-`UXR-00` was the intentional serialization point because the original monolithic `MainActivity.kt` created overlapping write ownership. Overview, Playground and Settings now have dedicated files, while Diagnostics alone owns the remaining legacy Activity diagnostics block. `UXR-10`, `UXR-20`, `UXR-30` and `UXR-40` therefore run concurrently. Later, `UXR-50` and `UXR-60` may overlap after their prerequisites; final state/effect migration and evidence converge through `UXR-70/80`.
+`UXR-00` was the intentional serialization point because the original monolithic `MainActivity.kt` created overlapping write ownership. Overview, Playground and Settings now have dedicated files, while Diagnostics alone owns the remaining legacy Activity diagnostics block. `UXR-10`, `UXR-20`, `UXR-30` and `UXR-40` therefore run concurrently on separate branches and merge into the bounded integration branch.
 
-Do not parallelize two slices that mutate the same screen/state owner. Prefer moving ownership once over resolving repeated merge conflicts.
+Do not parallelize two slices that mutate the same screen/state owner. Prefer moving ownership once over resolving repeated merge conflicts. If a shared component becomes necessary for more than one lane, either keep the lane-specific composition local or serialize the reusable extraction into UXR-50.
 
 ## Current executable slices
 
