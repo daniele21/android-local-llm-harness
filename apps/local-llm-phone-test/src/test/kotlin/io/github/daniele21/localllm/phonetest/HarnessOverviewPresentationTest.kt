@@ -41,6 +41,8 @@ class HarnessOverviewPresentationTest {
         assertEquals("Selected", presentation.selectedModelStatus)
         assertEquals("Not resident", presentation.residencyStatus)
         assertFalse(presentation.residencyPositive)
+        assertTrue(presentation.heroDetail.contains("Performance"))
+        assertTrue(presentation.heroDetail.contains("repeatable evaluation"))
     }
 
     @Test
@@ -79,6 +81,7 @@ class HarnessOverviewPresentationTest {
         assertTrue(presentation.residencyPositive)
         assertEquals("1.2 GiB", presentation.processPss)
         assertEquals("LIGHT", presentation.thermalStatus)
+        assertTrue(presentation.heroDetail.contains("Performance"))
     }
 
     @Test
