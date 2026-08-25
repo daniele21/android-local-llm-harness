@@ -56,12 +56,7 @@ internal fun PerformanceScreen(
                     availableLabel = "installed datasets",
                 )
 
-                PerformanceSection.HISTORY -> PerformanceCollectionSection(
-                    title = "History",
-                    state = performanceHistorySurfaceState(state.history),
-                    emptyMessage = "No completed evaluation runs are available yet.",
-                    availableLabel = "evaluation runs",
-                )
+                PerformanceSection.HISTORY -> PerformanceHistorySection(state)
 
                 PerformanceSection.COMPARE -> PerformanceCompareSection(state)
             }
