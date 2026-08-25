@@ -33,6 +33,7 @@ internal fun HarnessModelDetailScreen(
     onConfirmRecovery: () -> Unit,
     onCancelRecovery: () -> Unit,
 ) {
+    val stackDenseContent = currentHarnessAdaptivePolicy().stackDenseContent
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("model-detail"),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
@@ -53,14 +54,15 @@ internal fun HarnessModelDetailScreen(
         }
 
         item { ModelIdentityCard(presentation) }
-        item { ModelStateCard(presentation) }
-        item { ModelTechnicalCard(presentation) }
+        item { ModelStateCard(presentation, stackDenseContent) }
+        item { ModelTechnicalCard(presentation, stackDenseContent) }
         if (presentation.recoveryOptions.isNotEmpty()) {
             item {
                 ModelRecoveryCard(
                     presentation = presentation,
                     pendingRecovery = pendingRecovery,
                     busy = busy,
+                    stackDenseContent = stackDenseContent,
                     onRequestRecovery = onRequestRecovery,
                     onConfirmRecovery = onConfirmRecovery,
                     onCancelRecovery = onCancelRecovery,
@@ -83,34 +85,73 @@ private fun ModelIdentityCard(presentation: HarnessModelDetailPresentation) {
 }
 
 @Composable
-private fun ModelStateCard(presentation: HarnessModelDetailPresentation) {
+private fun ModelStateCard(
+    presentation: HarnessModelDetailPresentation,
+    stackDenseContent: Boolean,
+) {
     HarnessCard {
         Text("Model state", style = MaterialTheme.typography.titleLarge)
-        HarnessMetricRow {
-            HarnessMetric("Compatibility", presentation.compatibility, Modifier.weight(1f))
-            HarnessMetric("Integrity", presentation.integrity, Modifier.weight(1f))
-        }
-        HarnessMetricRow {
-            HarnessMetric("Installation", presentation.installation, Modifier.weight(1f))
-            HarnessMetric("Selection", presentation.selection, Modifier.weight(1f))
-        }
+        ModelMetricPair(
+            firstLabel = "Compatibility",
+            firstValue = presentation.compatibility,
+            secondLabel = "Integrity",
+            secondValue = presentation.integrity,
+            stackDenseContent = stackDenseContent,
+        )
+        ModelMetricPair(
+            firstLabel = "Installation",
+            firstValue = presentation.installation,
+            secondLabel = "Selection",
+            secondValue = presentation.selection,
+            stackDenseContent = stackDenseContent,
+        )
         HarnessMetric("Runtime", presentation.runtimeOwnership)
     }
 }
 
 @Composable
-private fun ModelTechnicalCard(presentation: HarnessModelDetailPresentation) {
+private fun ModelTechnicalCard(
+    presentation: HarnessModelDetailPresentation,
+    stackDenseContent: Boolean,
+) {
     HarnessCard {
         Text("Technical metadata", style = MaterialTheme.typography.titleLarge)
-        HarnessMetricRow {
-            HarnessMetric("Origin", presentation.origin, Modifier.weight(1f))
-            HarnessMetric("Size", presentation.size, Modifier.weight(1f))
-        }
-        HarnessMetricRow {
-            HarnessMetric("Architecture", presentation.architecture, Modifier.weight(1f))
-            HarnessMetric("Quantization", presentation.quantization, Modifier.weight(1f))
-        }
+        ModelMetricPair(
+            firstLabel = "Origin",
+            firstValue = presentation.origin,
+            secondLabel = "Size",
+            secondValue = presentation.size,
+            stackDenseContent = stackDenseContent,
+        )
+        ModelMetricPair(
+            firstLabel = "Architecture",
+            firstValue = presentation.architecture,
+            secondLabel = "Quantization",
+            secondValue = presentation.quantization,
+            stackDenseContent = stackDenseContent,
+        )
         HarnessMetric("Digest", presentation.digest)
+    }
+}
+
+@Composable
+private fun ModelMetricPair(
+    firstLabel: String,
+    firstValue: String,
+    secondLabel: String,
+    secondValue: String,
+    stackDenseContent: Boolean,
+) {
+    if (stackDenseContent) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HarnessMetric(firstLabel, firstValue, Modifier.fillMaxWidth())
+            HarnessMetric(secondLabel, secondValue, Modifier.fillMaxWidth())
+        }
+    } else {
+        HarnessMetricRow {
+            HarnessMetric(firstLabel, firstValue, Modifier.weight(1f))
+            HarnessMetric(secondLabel, secondValue, Modifier.weight(1f))
+        }
     }
 }
 
@@ -119,6 +160,7 @@ private fun ModelRecoveryCard(
     presentation: HarnessModelDetailPresentation,
     pendingRecovery: HarnessModelRecoveryRequest?,
     busy: Boolean,
+    stackDenseContent: Boolean,
     onRequestRecovery: (String, HarnessModelRecoveryAction) -> Unit,
     onConfirmRecovery: () -> Unit,
     onCancelRecovery: () -> Unit,
@@ -143,21 +185,40 @@ private fun ModelRecoveryCard(
                 "Confirm runtime release. This unloads the current owner but does not delete model files.",
                 color = MaterialTheme.colorScheme.error,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                HarnessPrimaryButton(
-                    text = "Confirm release",
-                    enabled = !busy,
-                    modifier = Modifier.weight(1f),
-                    onClick = onConfirmRecovery,
-                )
-                HarnessSecondaryButton(
-                    text = "Cancel",
-                    modifier = Modifier.weight(1f),
-                    onClick = onCancelRecovery,
-                )
+            if (stackDenseContent) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    HarnessPrimaryButton(
+                        text = "Confirm release",
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onConfirmRecovery,
+                    )
+                    HarnessSecondaryButton(
+                        text = "Cancel",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onCancelRecovery,
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    HarnessPrimaryButton(
+                        text = "Confirm release",
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                        onClick = onConfirmRecovery,
+                    )
+                    HarnessSecondaryButton(
+                        text = "Cancel",
+                        modifier = Modifier.weight(1f),
+                        onClick = onCancelRecovery,
+                    )
+                }
             }
         }
     }
