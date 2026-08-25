@@ -9,9 +9,11 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationListener
 import io.github.daniele21.localllm.contracts.ConsumerGenerationRequest
 import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventReconstructor
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.toConsumerWire
 import java.util.UUID
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 internal class BinderConsumerGenerationAdapter(
     private val endpointProvider: () -> RegisteredSharedRuntimeEndpoint?,
+    private val enabledFeaturesProvider: () -> Set<String> = { emptySet() },
     endpointInvalidations: SharedRuntimeEndpointInvalidationSource? = null,
     private val externalRequestIds: CorrelationIdSource = CorrelationIdSource { UUID.randomUUID().toString() },
     private val callbackExecutor: ExecutorService = consumerSerialExecutor(DEFAULT_CALLBACK_QUEUE_CAPACITY),
@@ -44,6 +47,17 @@ internal class BinderConsumerGenerationAdapter(
     fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
         val endpoint = endpointProvider()
         if (endpoint == null) return rejectedTransport()
+        if (
+            request.taskDefinitions.isNotEmpty() &&
+            BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1 !in enabledFeaturesProvider()
+        ) {
+            return ConsumerGenerationStartResult.Rejected(
+                ConsumerFailure(
+                    ConsumerErrorCode.CAPABILITY_INCOMPATIBLE,
+                    "Shared runtime does not support task definitions",
+                ),
+            )
+        }
         val externalRequestId = externalRequestIds.nextId()
         val generation =
             ActiveConsumerGeneration(
@@ -82,7 +96,7 @@ internal class BinderConsumerGenerationAdapter(
         request: ConsumerGenerationRequest,
         generation: ActiveConsumerGeneration,
     ): ConsumerGenerationStartResult {
-        val wire =
+        val baseWire =
             ConsumerRequestParcel(
                 clientToken = endpoint.clientToken,
                 operationId = generation.externalRequestId,
@@ -90,10 +104,18 @@ internal class BinderConsumerGenerationAdapter(
                 externalRequestId = generation.externalRequestId,
                 input = request.input.toConsumerWire(),
                 outputConstraint = request.outputConstraint.toConsumerWire(),
-                taskDefinitions = request.taskDefinitions.map { it.toConsumerWire() },
             )
         return try {
-            endpoint.service.consumer.generate(wire) { event -> enqueue(generation, event) }
+            if (request.taskDefinitions.isEmpty()) {
+                endpoint.service.consumer.generate(baseWire) { event -> enqueue(generation, event) }
+            } else {
+                endpoint.service.consumer.generateV2(
+                    ConsumerGenerationRequestV2Parcel(
+                        request = baseWire,
+                        taskDefinitions = request.taskDefinitions.map { it.toConsumerWire() },
+                    ),
+                ) { event -> enqueue(generation, event) }
+            }
             ConsumerGenerationStartResult.Accepted(
                 BinderConsumerGenerationHandle(request.requestId) { cancel(generation) },
             )
