@@ -144,7 +144,7 @@ private fun OverviewCurrentStatePanel(
 @Composable
 private fun OverviewDeviceEvidencePanel(presentation: HarnessOverviewPresentation, onOpenDiagnostics: () -> Unit) {
     OverviewSectionPanel("Device evidence") {
-        if (presentation.processPss == "Unavailable" && presentation.thermalStatus == "Unavailable") {
+        if (!presentation.resourceEvidenceAvailable) {
             Text(
                 "No resource snapshot has been captured yet. Memory and thermal state remain unavailable until an explicit capture runs.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -168,7 +168,7 @@ private fun OverviewDeviceEvidencePanel(presentation: HarnessOverviewPresentatio
                 )
             }
             Text(
-                "Values come from the latest explicit resource snapshot.",
+                "Values come from the latest explicit resource snapshot. Missing measurements remain unavailable rather than being inferred.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
