@@ -202,6 +202,7 @@ class ConsumerLocalLlmFacade(
                     input = input,
                     overrides = overrides,
                     outputConstraint = output,
+                    taskDefinitions = request.taskDefinitions,
                 )
             }.fold(
                 onSuccess = RequestMapping::Accepted,
@@ -333,7 +334,7 @@ private fun GenerationMetrics.toConsumerMetrics(reasoningMode: EffectiveConsumer
 private fun StopReason.toConsumerStopReason(): ConsumerStopReason = when (this) {
     StopReason.END_OF_GENERATION -> ConsumerStopReason.END_OF_GENERATION
     StopReason.MAX_OUTPUT_TOKENS -> ConsumerStopReason.MAX_OUTPUT_TOKENS
-    StopReason.STOP_SEQUENCE -> ConsumerStopReason.STOP_SEQUENCE
+    StopReason.STOP_SEQUENCE -> ConsumerStopReason.STOP_STOP_SEQUENCE
     StopReason.GRAMMAR_COMPLETE -> ConsumerStopReason.GRAMMAR_COMPLETE
     StopReason.GENERATION_GUARD_REPETITION -> ConsumerStopReason.GENERATION_GUARD_REPETITION
     StopReason.GENERATION_GUARD_THINKING_BUDGET -> ConsumerStopReason.GENERATION_GUARD_THINKING_BUDGET
