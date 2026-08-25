@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,11 @@ internal sealed interface HarnessApplicationsMutationState {
 
     data object Saving : HarnessApplicationsMutationState
 
-    data class Saved(val message: String) : HarnessApplicationsMutationState
+    data class Saved(
+        val message: String,
+        val presetId: String? = null,
+        val presetRevision: Int? = null,
+    ) : HarnessApplicationsMutationState
 
     data class Conflict(val message: String) : HarnessApplicationsMutationState
 
@@ -103,6 +108,54 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         }
     }
 
+    fun createCustomPreset(
+        applicationId: String,
+        assignment: HarnessAssignmentSummary,
+        basePreset: HarnessPresetSummary,
+        displayName: String,
+        automaticModelSelection: Boolean,
+        contextTokens: Int?,
+    ) {
+        val attached = gateway as? HarnessCustomPresetGateway
+        if (attached == null) {
+            mutableMutationState.value = HarnessApplicationsMutationState.Failed(
+                "Custom preset creation is unavailable in this build.",
+            )
+            return
+        }
+        val token = generation.incrementAndGet()
+        mutableMutationState.value = HarnessApplicationsMutationState.Saving
+        val presetId = "custom-${UUID.randomUUID()}"
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                attached.createCustomPreset(
+                    HarnessCreateCustomPresetCommand(
+                        applicationId = applicationId,
+                        useCaseId = assignment.useCaseId,
+                        expectedBindingRevision = assignment.bindingRevision,
+                        presetId = presetId,
+                        basePresetId = basePreset.presetId,
+                        basePresetRevision = basePreset.revision,
+                        displayName = displayName,
+                        modelProfileId = if (automaticModelSelection) null else basePreset.modelProfileId,
+                        contextTokens = contextTokens,
+                    ),
+                )
+            }.getOrElse {
+                if (isCurrent(token, attached)) {
+                    mutableMutationState.value = HarnessApplicationsMutationState.Failed(
+                        "Custom preset could not be saved. Nothing was retried automatically.",
+                    )
+                }
+                return@launch
+            }
+            val canonical = runCatching(attached::snapshot).getOrNull()
+            if (!isCurrent(token, attached)) return@launch
+            canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
+            mutableMutationState.value = result.toMutationState(canonical != null)
+        }
+    }
+
     fun clearMutationFeedback() {
         if (mutableMutationState.value != HarnessApplicationsMutationState.Saving) {
             mutableMutationState.value = HarnessApplicationsMutationState.Idle
@@ -134,5 +187,27 @@ private fun HarnessControlPlaneMutationResult.toMutationState(canonicalReloaded:
 
     is HarnessControlPlaneMutationResult.Rejected -> HarnessApplicationsMutationState.Failed(
         message.ifBlank { "Configuration could not be updated." },
+    )
+}
+
+private fun HarnessCustomPresetMutationResult.toMutationState(canonicalReloaded: Boolean): HarnessApplicationsMutationState = when (this) {
+    is HarnessCustomPresetMutationResult.Success -> if (canonicalReloaded) {
+        HarnessApplicationsMutationState.Saved(
+            message = "Preset saved and reloaded from the control plane.",
+            presetId = presetId,
+            presetRevision = presetRevision,
+        )
+    } else {
+        HarnessApplicationsMutationState.Failed(
+            "The preset was saved, but canonical state could not be reloaded. Reload Applications before continuing.",
+        )
+    }
+
+    is HarnessCustomPresetMutationResult.StaleRevision -> HarnessApplicationsMutationState.Conflict(
+        "Configuration changed elsewhere. Reload the assignment before saving again.",
+    )
+
+    is HarnessCustomPresetMutationResult.Rejected -> HarnessApplicationsMutationState.Failed(
+        message.ifBlank { "Custom preset could not be saved." },
     )
 }
