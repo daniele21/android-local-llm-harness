@@ -62,50 +62,50 @@ Rules:
 ## Invariants
 
 - `dev` remains the canonical final target; `uxui/product-experience-rework` is the bounded temporary integration target for this workstream.
-- Every displayed runtime/model/resource/benchmark value is source-backed or explicitly unavailable/not-run.
+- Every displayed runtime/model/resource/benchmark/evaluation value is source-backed or explicitly unavailable/not-run.
 - Installed, selected, resident and running model states remain distinct.
 - Navigation/refresh stays observational; execution requires an explicit action.
 - Advanced/expert inference controls remain available but do not dominate the common Playground path.
 - Shared visual semantics stay owned by `ui/design-system`; app-specific composition stays in `apps/local-llm-phone-test`.
 - Reachable loading/empty/error/disabled/cancelling/recovery states remain explicit.
 - Compact/large-font/TalkBack behavior is part of correctness.
+- Performance must fail closed rather than fabricate a model/configuration ranking when comparable evidence is unavailable.
 
 ## Execution DAG
 
 | ID | State | Depends on | Owns / writes | Can run with | Acceptance |
 | --- | --- | --- | --- | --- | --- |
-| UXR-00 | DONE | — | `MainActivity.kt`, screen ownership boundaries only | UXR-01 | Overview, Playground and Settings now have dedicated owners; Diagnostics is the only remaining lane allowed to edit its legacy Activity block, so all four UI lanes can proceed without overlapping screen edits. |
+| UXR-00 | DONE | — | `MainActivity.kt`, screen ownership boundaries only | UXR-01 | Overview, Playground and Settings have dedicated owners; Diagnostics retained only the Android effect/composition boundary required for its final migration. |
 | UXR-01 | DONE | — | this workstream, `docs/current-state.md`, UX target/progress docs | UXR-00 | Active dependency state is linked from the canonical current-state ledger without creating a second plan/progress pair. |
-| UXR-10 | ACTIVE | UXR-00 | Overview screen/presentation + focused tests | UXR-20, UXR-30, UXR-40 | No inferred `Loaded/Warm/Normal` or decorative resource progress; one state-dependent primary next action; explicit unavailable/not-run evidence. |
-| UXR-20 | ACTIVE | UXR-00 | Playground screen/presentation + focused tests | UXR-10, UXR-30, UXR-40 | Default path is model -> prompt -> preset -> run; Advanced is collapsed by default; Expert controls are a second disclosure layer; duplicate controls removed; validation/recovery is inline where deterministic. |
-| UXR-30 | ACTIVE | UXR-00 | Diagnostics IA/presentation + focused tests | UXR-10, UXR-20, UXR-40 | Diagnostics opens as an evidence overview and drills into Health/Runs/Resources/Benchmarks/Logs/Validation; section changes never execute work; Back/restoration deterministic. |
-| UXR-40 | ACTIVE | UXR-00 | Settings screen/presentation + focused tests | UXR-10, UXR-20, UXR-30 | Remove non-task brand-palette UI; retain Appearance/Privacy/Storage/About/Advanced; theme state has one ViewModel render owner and survives the declared lifecycle. |
-| UXR-50 | BLOCKED | UXR-10, UXR-20, UXR-30, UXR-40 | adaptive/accessibility refinements + shared components only when genuinely reusable | UXR-60 | Compact/landscape/medium/expanded and large-font layouts preserve priority; touch/focus/semantics/contrast are verified; no critical meaning is color-only. |
-| UXR-60 | BLOCKED | UXR-10, UXR-20 | result/evaluation decision layer + evaluation adapters/presentation | UXR-50 | Terminal inference/evaluation surfaces answer a user decision with source-backed latency/throughput/memory/quality evidence and link to raw evidence without inventing rankings. |
-| UXR-70 | BLOCKED | UXR-30, UXR-50 | state/effect migration for remaining Diagnostics/Settings Activity debt | UXR-60 | Renderable state immutable/ViewModel-owned; Activity remains lifecycle/result/effect root; stale callbacks cannot overwrite terminal state. |
-| UXR-80 | BLOCKED | UXR-50, UXR-60, UXR-70 | tests/evidence/docs finalization | — | Focused unit/Compose semantics + app compile/lint/package gates pass; representative-device TalkBack/large-font/physical GGUF evidence remains explicitly PENDING until run. |
+| UXR-10 | DONE | UXR-00 | Overview screen/presentation + focused tests | UXR-20, UXR-30, UXR-40 | No inferred `Loaded/Warm/Normal` or decorative resource progress; one state-dependent primary next action; explicit unavailable/not-run evidence. |
+| UXR-20 | DONE | UXR-00 | Playground screen/presentation + focused tests | UXR-10, UXR-30, UXR-40 | Default path is model -> prompt -> preset -> run; Advanced is collapsed by default; Expert controls are a second disclosure layer; duplicate controls removed; validation/recovery is inline where deterministic. |
+| UXR-30 | DONE | UXR-00 | Diagnostics IA/presentation + focused tests | UXR-10, UXR-20, UXR-40 | Diagnostics opens as an evidence overview and drills into Health/Runs/Resources/Benchmarks/Logs/Validation; section changes never execute work; Back behavior is deterministic. |
+| UXR-40 | DONE | UXR-00 | Settings screen/presentation + focused tests | UXR-10, UXR-20, UXR-30 | Non-task brand-palette UI removed; Appearance/Privacy/Storage/About/Advanced hierarchy retained; theme state has one render owner and durable persistence. |
+| UXR-50 | DONE | UXR-10, UXR-20, UXR-30, UXR-40 | adaptive/accessibility refinements + shared components only when genuinely reusable | UXR-60 | Compact/landscape/medium/expanded and large-font layouts preserve priority; canonical touch targets and non-color-only status semantics are enforced in the connected surfaces. |
+| UXR-60 | DONE | UXR-10, UXR-20 | result/evaluation decision layer + evaluation presentation | UXR-50 | Playground quick checks and repeatable Performance evaluation are distinct; History/Compare state explicitly fails closed until compatible source-backed evidence can support a choice. |
+| UXR-70 | DONE | UXR-30, UXR-50 | state/effect migration for remaining Diagnostics Activity debt | UXR-60 | Renderable Diagnostics resource state is immutable/ViewModel-owned; Activity remains lifecycle/result/effect root; generation tokens prevent stale Health/resource/benchmark callbacks from overwriting current state. |
+| UXR-80 | ACTIVE | UXR-50, UXR-60, UXR-70 | tests/evidence/docs finalization | — | Focused unit/Compose semantics + app compile/lint/package gates pass; representative-device TalkBack/large-font/physical GGUF evidence remains explicitly PENDING until run. |
 
 ## Parallel execution policy
 
-`UXR-00` was the intentional serialization point because the original monolithic `MainActivity.kt` created overlapping write ownership. Overview, Playground and Settings now have dedicated files, while Diagnostics alone owns the remaining legacy Activity diagnostics block. `UXR-10`, `UXR-20`, `UXR-30` and `UXR-40` therefore run concurrently on separate branches and merge into the bounded integration branch.
+`UXR-00` was the intentional serialization point because the original monolithic `MainActivity.kt` created overlapping write ownership. UXR-10/20/30/40 then ran as disjoint presentation lanes. UXR-50 and UXR-60 converged adaptive/accessibility and decision-evidence behavior without sharing primary ownership. UXR-70 serialized the remaining Diagnostics state/effect migration after those surfaces settled.
 
-Do not parallelize two slices that mutate the same screen/state owner. Prefer moving ownership once over resolving repeated merge conflicts. If a shared component becomes necessary for more than one lane, either keep the lane-specific composition local or serialize the reusable extraction into UXR-50.
+Do not parallelize two slices that mutate the same screen/state owner. Prefer moving ownership once over resolving repeated merge conflicts. If a shared component becomes necessary for more than one lane, keep lane-specific composition local until a genuinely reusable extraction is clear.
 
-## Current executable slices
+## Current executable slice
 
-- `UXR-10` — validate and refine evidence-backed Overview behavior.
-- `UXR-20` — validate and refine Basic -> Advanced -> Expert Playground disclosure and recovery.
-- `UXR-30` — replace the six-tab diagnostics entry with an evidence overview + drill-down while preserving explicit execution semantics.
-- `UXR-40` — validate Settings hierarchy and move remaining preference persistence behind its durable owner.
+- `UXR-80` — validate the exact integrated UX/UI composition, keep the instrumentation semantics contract current, reconcile durable architecture/status documentation and prepare the single final integration PR to `dev`.
+
+Physical TalkBack, representative large-font/landscape behavior and real-GGUF device evidence are not repo-side substitutes for UXR-80 automation; they remain explicit device gates after repository-side validation.
 
 ## Validation by slice
 
 - UXR-00: focused phone-test compilation/unit tests; navigation tests; verify no side-effect changes.
 - UXR-10/20/30/40: focused presentation/unit tests, Compose semantics, compile + lint.
-- UXR-50: compact/landscape/expanded/large-font instrumentation plus accessibility semantics; physical TalkBack evidence remains a real-device gate.
-- UXR-60: deterministic comparison/presentation tests using source-backed evaluation/telemetry data; no synthetic quality claim is promoted to device evidence.
-- UXR-70: reducer/effect race/recreation/back-stack tests.
-- UXR-80: repository product-experience checks, targeted app validation, packaging and bounded evidence cleanup.
+- UXR-50: compact/landscape/expanded/large-font composition policy plus accessibility semantics; physical TalkBack evidence remains a real-device gate.
+- UXR-60: deterministic comparison/presentation tests using source-backed evaluation/telemetry state; no synthetic quality claim is promoted to device evidence.
+- UXR-70: reducer/effect race tests, stale-generation invalidation and render-state ownership checks.
+- UXR-80: repository product-experience checks, targeted phone-app unit/Compose source validation, lint, packaging and bounded evidence cleanup.
 
 Canonical repository commands and physical evidence rules remain owned by `.engineering/commands.json`, `skills/validate-change/SKILL.md` and `apps/local-llm-phone-test/AGENTS.md`.
 
@@ -120,4 +120,4 @@ Transfer durable behavior/decisions to:
 - [`docs/current-state.md`](../current-state.md) for integrated status/blockers;
 - `ui/design-system` and `docs/design-system.md` for genuinely reusable components/tokens.
 
-When all slices are integrated and durable knowledge has moved, remove this temporary workstream by default.
+When UXR-80 is integrated, the exact composite is rebased/reconciled with current `dev`, and the final integration PR is green, durable knowledge must remain in the destinations above and this temporary workstream should be removed by default. Device-only evidence stays in its owning evidence/runbook documents rather than being inferred from CI.

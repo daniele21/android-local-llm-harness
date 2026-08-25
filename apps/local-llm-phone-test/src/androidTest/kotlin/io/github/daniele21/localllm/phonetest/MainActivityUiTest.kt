@@ -101,6 +101,20 @@ class MainActivityUiTest {
         assertTextAbsent("Back to diagnostics")
     }
 
+    @Test
+    fun performanceHistoryAlwaysStatesWhetherEvidenceSupportsADecision() {
+        composeRule.onNodeWithTag("nav-performance").performClick()
+        composeRule.onNodeWithText("Performance").assertIsDisplayed()
+        composeRule.onNodeWithTag("performance-section-history").performClick()
+
+        assertAnyTextPresent(
+            "Decision evidence is loading",
+            "No supported choice can be made",
+            "No supported choice yet",
+            "Recorded runs are not enough to rank choices",
+        )
+    }
+
     private fun assertTextAbsent(text: String) {
         assertTrue(
             "$text must not be present in the UI",
@@ -112,6 +126,15 @@ class MainActivityUiTest {
         assertTrue(
             "$tag must not be present in the UI",
             composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty(),
+        )
+    }
+
+    private fun assertAnyTextPresent(vararg options: String) {
+        assertTrue(
+            "One source-backed decision state must be present: ${options.joinToString()}",
+            options.any { option ->
+                composeRule.onAllNodesWithText(option).fetchSemanticsNodes().isNotEmpty()
+            },
         )
     }
 }
