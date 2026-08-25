@@ -84,9 +84,7 @@ The repository-side tuning harness is implemented:
 
 ### LLRT-6 canonical `2048 / 64` KV-cache findings
 
-LLRT-6C ran on Samsung `SM-A566B`, Android 16 / SDK 36 / arm64-v8a, Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9`, pinned llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, seed `42`, `b128/ub64`, thinking disabled and one cold plus three warm samples per case. All six cases per tier were evidence-eligible and thermal status remained `0`.
-
-The comparison contract is intentionally split: K-only candidates are compared with `release-default` under Flash Attention off, while quantized K+V candidates are compared only with the `f16/f16 + FA` control because this llama.cpp pin requires Flash Attention for quantized V cache.
+LLRT-6C ran on `SM-A566B` (Android 16 / SDK 36 / arm64), Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9`, pinned llama.cpp, seed `42`, `b128/ub64`, thinking off, with 1 cold + 3 warm samples. All cases were eligible and thermal status stayed `0`. K-only/FA-off compares with `release-default`; quantized K+V compares with `f16/f16 + FA` because quantized V requires FA on this pin.
 
 #### Qwen3.5 0.8B (`t2/bt4`)
 
@@ -96,27 +94,25 @@ The comparison contract is intentionally split: K-only candidates are compared w
 | `K=q8_0`, FA off | 82.019 s | 1,194,665 KB | REJECT: ~0.1% faster, ~2 MiB lower PSS, digest differs |
 | `K=q4_0`, FA off | 82.110 s | 1,192,122 KB | REJECT: latency neutral, ~5 MiB lower PSS, digest differs |
 | `f16/f16 + FA` | 81.853 s | 1,064,813 KB | FA-on control only |
-| `q8_0/q8_0 + FA` | 81.938 s | 1,192,377 KB | REJECT: latency neutral, ~125 MiB higher PSS than FA control, digest differs |
-| `q4_0/q4_0 + FA` | 81.730 s | 1,187,535 KB | REJECT: latency neutral, ~120 MiB higher PSS than FA control, digest differs |
+| `q8_0/q8_0 + FA` | 81.938 s | 1,192,377 KB | REJECT: ~125 MiB higher PSS, digest differs |
+| `q4_0/q4_0 + FA` | 81.730 s | 1,187,535 KB | REJECT: ~120 MiB higher PSS, digest differs |
 
-The 0.8B cache policy therefore stays at release defaults. The lower PSS observed for the `f16/f16 + FA` control relative to the release baseline cannot be attributed to KV type because Flash Attention changes at the same time; it is not an LLRT-6 promotion signal.
+The 0.8B policy stays at release defaults. Lower PSS for the FA control versus release baseline is not attributable to KV type because FA also changes.
 
 #### Qwen3.5 2B (`t4/bt4`)
 
 | Case | Warm total median | Peak observed PSS | Decision |
 | --- | ---: | ---: | --- |
 | `release-default` | 217.839 s | 2,132,802 KB | control |
-| `K=q8_0`, FA off | 218.220 s | 2,645,895 KB | REJECT: +0.17% latency and ~501 MiB higher PSS, digest differs |
-| `K=q4_0`, FA off | 237.354 s | 2,642,881 KB | REJECT: +8.96% latency and ~498 MiB higher PSS, digest differs |
+| `K=q8_0`, FA off | 218.220 s | 2,645,895 KB | REJECT: +0.17% latency, ~501 MiB higher PSS, digest differs |
+| `K=q4_0`, FA off | 237.354 s | 2,642,881 KB | REJECT: +8.96% latency, ~498 MiB higher PSS, digest differs |
 | `f16/f16 + FA` | 219.067 s | 2,571,445 KB | FA-on control only |
-| `q8_0/q8_0 + FA` | 233.648 s | 1,897,476 KB | REJECT as default: ~658 MiB lower PSS but +6.66% latency and digest differs |
-| `q4_0/q4_0 + FA` | 218.048 s | 2,433,852 KB | KEEP RESEARCH-ONLY: ~134 MiB lower PSS and latency neutral, but digest differs |
-
-The 2B default also remains unchanged. `q4_0/q4_0 + FA` is preserved only as a memory-constrained research candidate because the single-device signal is favorable on PSS without a latency penalty, but output-digest drift means it is not eligible for promotion without explicit quality validation. `q8_0/q8_0 + FA` trades substantial observed memory reduction for a clear latency regression and is not a default candidate.
+| `q8_0/q8_0 + FA` | 233.648 s | 1,897,476 KB | REJECT default: ~658 MiB lower PSS, +6.66% latency, digest differs |
+| `q4_0/q4_0 + FA` | 218.048 s | 2,433,852 KB | RESEARCH ONLY: ~134 MiB lower PSS, latency neutral, digest differs |
 
 ### LLRT-6 decision
 
-For this exact device/backend/profile identity, LLRT-6C closes **KEEP DEFAULTS** for both curated tiers. K-only quantization is rejected on both tiers; quantized K+V is not promoted. No runtime profile becomes `MEASURED` from this result, and the 2B `q4_0/q4_0 + FA` signal remains research-only until a separate quality/evidence wave justifies reopening policy selection.
+LLRT-6C closes **KEEP DEFAULTS** for both tiers. K-only quantization is rejected and quantized K+V is not promoted. The 2B `q4_0/q4_0 + FA` signal remains research-only pending explicit quality evidence; no profile becomes `MEASURED`.
 
 ### LLRT-9 short-profile diagnosis
 
