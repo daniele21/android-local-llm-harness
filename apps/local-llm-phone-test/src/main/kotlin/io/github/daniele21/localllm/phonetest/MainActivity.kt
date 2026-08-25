@@ -83,9 +83,11 @@ class MainActivity :
     private lateinit var selectedModelManagement: PhoneModelManagementGateway
     private lateinit var playgroundController: PhonePlaygroundController
     private lateinit var themePreferenceStore: HarnessThemePreferenceStore
+    private lateinit var applicationsGateway: HarnessApplicationsGateway
     private val diagnosticsExecutor = Executors.newSingleThreadExecutor()
     private val harnessViewModel: HarnessViewModel by viewModels()
     private val performanceViewModel: PerformanceViewModel by viewModels()
+    private val applicationsViewModel: HarnessApplicationsReadViewModel by viewModels()
 
     private var latestReport: String
         get() = harnessViewModel.uiState.value.latestReport
@@ -128,6 +130,8 @@ class MainActivity :
         harnessViewModel.updateThemePreference(themePreferenceStore.read())
         latestReport = savedInstanceState?.getString(STATE_REPORT).orEmpty()
         runtimeGraph = HarnessRuntimeGraph.from(this)
+        applicationsGateway = StoreHarnessApplicationsGateway(runtimeGraph.controlPlaneStore)
+        applicationsViewModel.attach(applicationsGateway)
         resourceSource = HarnessResourceSource(
             recorder = ResourceSnapshotRecorder(
                 AndroidResourceSnapshotProvider(this),
@@ -200,6 +204,7 @@ class MainActivity :
     }
 
     override fun onDestroy() {
+        if (::applicationsGateway.isInitialized) applicationsViewModel.detach(applicationsGateway)
         harnessViewModel.invalidateDiagnosticActions()
         diagnosticsExecutor.shutdownNow()
         modelDistributionController.close()
@@ -387,6 +392,8 @@ class MainActivity :
     private fun HarnessApp() {
         val uiState by harnessViewModel.uiState.collectAsStateWithLifecycle()
         val performanceState by performanceViewModel.state.collectAsStateWithLifecycle()
+        val applicationsState by applicationsViewModel.state.collectAsStateWithLifecycle()
+        val applicationsMutationState by applicationsViewModel.mutationState.collectAsStateWithLifecycle()
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val shellState = HarnessRoutes.shellState(backStackEntry?.destination?.route)
@@ -476,6 +483,14 @@ class MainActivity :
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
                 ) {
+                    installHarnessApplicationsGraph(
+                        navController = navController,
+                        state = applicationsState,
+                        mutationState = applicationsMutationState,
+                        onRefresh = applicationsViewModel::refresh,
+                        onSetDefaultPreset = applicationsViewModel::setDefaultPreset,
+                        onClearMutationFeedback = applicationsViewModel::clearMutationFeedback,
+                    )
                     composable(HarnessDestination.OVERVIEW.route) {
                         val resource = uiState.resourceHistory.snapshots.firstOrNull()
                         HarnessOverviewScreen(

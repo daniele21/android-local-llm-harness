@@ -21,6 +21,8 @@ internal object HarnessApplicationRoutes {
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}"
     const val PRESET_PATTERN =
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}/presets/{$PRESET_ID_ARGUMENT}/{$PRESET_REVISION_ARGUMENT}"
+    const val TECHNICAL_DETAILS_PATTERN =
+        "$PRESET_PATTERN/technical"
     const val NEW_PRESET_PATTERN =
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}/presets/new"
 
@@ -37,6 +39,9 @@ internal object HarnessApplicationRoutes {
         require(presetRevision > 0) { "presetRevision must be positive" }
         return assignment(applicationId, useCaseId) + PRESET_SEGMENT + encode(presetId, "presetId") + "/$presetRevision"
     }
+
+    fun technicalDetails(applicationId: String, useCaseId: String, presetId: String, presetRevision: Int): String =
+        preset(applicationId, useCaseId, presetId, presetRevision) + "/technical"
 
     fun newPreset(applicationId: String, useCaseId: String): String = assignment(applicationId, useCaseId) + PRESET_SEGMENT + "new"
 
