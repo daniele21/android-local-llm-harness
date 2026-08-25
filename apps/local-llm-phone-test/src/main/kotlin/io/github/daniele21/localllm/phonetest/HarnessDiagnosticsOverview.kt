@@ -73,11 +73,7 @@ private fun DiagnosticGroupLabel(group: HarnessDiagnosticsEvidenceGroup) {
 }
 
 @Composable
-private fun DiagnosticEntryCard(
-    entry: HarnessDiagnosticsOverviewEntry,
-    stackDenseContent: Boolean,
-    onClick: () -> Unit,
-) {
+private fun DiagnosticEntryCard(entry: HarnessDiagnosticsOverviewEntry, stackDenseContent: Boolean, onClick: () -> Unit) {
     HarnessCard(
         modifier = Modifier
             .fillMaxWidth()
