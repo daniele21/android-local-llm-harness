@@ -27,81 +27,96 @@ internal data class HarnessDiagnosticsOverviewEntry(
 )
 
 internal fun harnessDiagnosticsOverviewEntries(state: HarnessDiagnosticsOverviewState): List<HarnessDiagnosticsOverviewEntry> = listOf(
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.HEALTH,
-        group = HarnessDiagnosticsEvidenceGroup.READINESS,
-        title = "Health",
-        detail = if (state.health == "Not run") {
-            "Runtime and model checks have not been run yet."
-        } else {
-            "Latest aggregate status: ${state.health}."
-        },
-        status = state.health,
-        tone = when (state.health.lowercase()) {
-            "pass" -> HarnessStatusTone.SUCCESS
-            "warning" -> HarnessStatusTone.WARNING
-            "fail", "failed", "error" -> HarnessStatusTone.ERROR
-            else -> HarnessStatusTone.NEUTRAL
-        },
-    ),
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.RUNS,
-        group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
-        title = "Runs",
-        detail = if (state.runCount == 0) {
-            "No local inference runs recorded yet."
-        } else {
-            "${state.runCount} privacy-safe run records available."
-        },
-        status = if (state.runCount == 0) "Not run" else state.runCount.toString(),
-        tone = if (state.runCount == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO,
-    ),
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.RESOURCES,
-        group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
-        title = "Resources",
-        detail = if (state.resourceCount == 0) {
-            "No explicit memory or thermal snapshot captured yet."
-        } else {
-            "${state.resourceCount} bounded device resource snapshots available."
-        },
-        status = if (state.resourceCount == 0) "Not captured" else state.resourceCount.toString(),
-        tone = if (state.resourceCount == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO,
-    ),
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.BENCHMARKS,
-        group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
-        title = "Benchmarks",
-        detail = if (state.benchmarkCount == 0) {
-            "No active benchmark baseline for the current model."
-        } else {
-            "${state.benchmarkCount} active benchmark baseline(s) available."
-        },
-        status = if (state.benchmarkCount == 0) "Not captured" else state.benchmarkCount.toString(),
-        tone = if (state.benchmarkCount == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO,
-    ),
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.VALIDATION,
-        group = HarnessDiagnosticsEvidenceGroup.PROOF_AND_TROUBLESHOOTING,
-        title = "Physical validation",
-        detail = if (state.validationAvailable) {
-            "A privacy-safe validation report is available."
-        } else {
-            "No physical-device validation report is available in this process."
-        },
-        status = if (state.validationAvailable) "Report ready" else "Not run",
-        tone = if (state.validationAvailable) HarnessStatusTone.SUCCESS else HarnessStatusTone.NEUTRAL,
-    ),
-    HarnessDiagnosticsOverviewEntry(
-        section = DiagnosticsSection.LOGS,
-        group = HarnessDiagnosticsEvidenceGroup.PROOF_AND_TROUBLESHOOTING,
-        title = "Logs",
-        detail = if (state.logCount == 0) {
-            "No structured privacy-safe logs recorded yet."
-        } else {
-            "${state.logCount} bounded log entries available."
-        },
-        status = if (state.logCount == 0) "Empty" else state.logCount.toString(),
-        tone = if (state.logCount == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO,
-    ),
+    diagnosticsHealthEntry(state.health),
+    diagnosticsRunsEntry(state.runCount),
+    diagnosticsResourcesEntry(state.resourceCount),
+    diagnosticsBenchmarksEntry(state.benchmarkCount),
+    diagnosticsValidationEntry(state.validationAvailable),
+    diagnosticsLogsEntry(state.logCount),
 )
+
+private fun diagnosticsHealthEntry(health: String): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.HEALTH,
+    group = HarnessDiagnosticsEvidenceGroup.READINESS,
+    title = "Health",
+    detail = if (health == "Not run") {
+        "Runtime and model checks have not been run yet."
+    } else {
+        "Latest aggregate status: $health."
+    },
+    status = health,
+    tone = when (health.lowercase()) {
+        "pass" -> HarnessStatusTone.SUCCESS
+        "warning" -> HarnessStatusTone.WARNING
+        "fail", "failed", "error" -> HarnessStatusTone.ERROR
+        else -> HarnessStatusTone.NEUTRAL
+    },
+)
+
+private fun diagnosticsRunsEntry(count: Int): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.RUNS,
+    group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
+    title = "Runs",
+    detail = if (count == 0) {
+        "No local inference runs recorded yet."
+    } else {
+        "$count privacy-safe run records available."
+    },
+    status = if (count == 0) "Not run" else count.toString(),
+    tone = evidenceCountTone(count),
+)
+
+private fun diagnosticsResourcesEntry(count: Int): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.RESOURCES,
+    group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
+    title = "Resources",
+    detail = if (count == 0) {
+        "No explicit memory or thermal snapshot captured yet."
+    } else {
+        "$count bounded device resource snapshots available."
+    },
+    status = if (count == 0) "Not captured" else count.toString(),
+    tone = evidenceCountTone(count),
+)
+
+private fun diagnosticsBenchmarksEntry(count: Int): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.BENCHMARKS,
+    group = HarnessDiagnosticsEvidenceGroup.MEASURED_EVIDENCE,
+    title = "Benchmarks",
+    detail = if (count == 0) {
+        "No active benchmark baseline for the current model."
+    } else {
+        "$count active benchmark baseline(s) available."
+    },
+    status = if (count == 0) "Not captured" else count.toString(),
+    tone = evidenceCountTone(count),
+)
+
+private fun diagnosticsValidationEntry(available: Boolean): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.VALIDATION,
+    group = HarnessDiagnosticsEvidenceGroup.PROOF_AND_TROUBLESHOOTING,
+    title = "Physical validation",
+    detail = if (available) {
+        "A privacy-safe validation report is available."
+    } else {
+        "No physical-device validation report is available in this process."
+    },
+    status = if (available) "Report ready" else "Not run",
+    tone = if (available) HarnessStatusTone.SUCCESS else HarnessStatusTone.NEUTRAL,
+)
+
+private fun diagnosticsLogsEntry(count: Int): HarnessDiagnosticsOverviewEntry = HarnessDiagnosticsOverviewEntry(
+    section = DiagnosticsSection.LOGS,
+    group = HarnessDiagnosticsEvidenceGroup.PROOF_AND_TROUBLESHOOTING,
+    title = "Logs",
+    detail = if (count == 0) {
+        "No structured privacy-safe logs recorded yet."
+    } else {
+        "$count bounded log entries available."
+    },
+    status = if (count == 0) "Empty" else count.toString(),
+    tone = evidenceCountTone(count),
+)
+
+private fun evidenceCountTone(count: Int): HarnessStatusTone =
+    if (count == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO
