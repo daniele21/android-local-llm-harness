@@ -70,8 +70,8 @@ internal fun HarnessSettingsScreen(
             SettingsRow(
                 destination = HarnessDestination.MODELS,
                 title = "Models & local data",
-                detail = "Inspect model storage and protected cleanup behavior.",
-                trailing = model?.let { "${formatSettingsBytes(it.sizeBytes)} used" } ?: "Empty",
+                detail = "Inspect selected-model storage and protected cleanup behavior.",
+                trailing = settingsSelectedModelStorageLabel(model),
                 onClick = onOpenStorage,
             )
         }
@@ -142,4 +142,4 @@ private fun SettingsRow(destination: HarnessDestination, title: String, detail: 
     }
 }
 
-private fun formatSettingsBytes(bytes: Long): String = "%.1f MB".format(java.util.Locale.ROOT, bytes / 1_048_576.0)
+internal fun settingsSelectedModelStorageLabel(model: ImportedPhoneModel?): String = if (model == null) "No selection" else "Selected"
