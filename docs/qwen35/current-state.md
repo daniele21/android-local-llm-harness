@@ -19,7 +19,7 @@ This ledger reports only Qwen3.5-only product progress. Repository-wide integrat
 | Q35-3 | Thinking/template/sampling | DONE | Neutral thinking intent, typed Jinja kwargs, tier-aware profiles and sampler fields resolve end-to-end. |
 | Q35-4 | Generation guard | DONE | Runaway/repetitive thinking is bounded with typed stop reasons and deterministic runtime tests. |
 | Q35-5 | Runtime/context/cache capability model | DONE | Context and reuse paths are backend-revision-bound and do not assume pure KV-cache semantics. |
-| Q35-6 | Android runtime tuning | IN PROGRESS | Software matrix/evidence tooling is complete; representative 0.8B/2B physical qualification and measured-profile selection remain. |
+| Q35-6 | Android runtime tuning | IN PROGRESS | Promotion/lifecycle tooling is integrated; canonical lifecycle evidence, broader representative 0.8B/2B qualification and reviewed profile selection remain. |
 | Q35-7 | Validation suite | PLANNED | Golden/integration/device gates pass for the supported matrix. |
 | Q35-8 | Certification | PLANNED | Exact curated artifacts receive evidence-backed certification independently of catalog availability. |
 
@@ -71,7 +71,7 @@ This ledger reports only Qwen3.5-only product progress. Repository-wide integrat
 
 ## Current slice: Q35-6 Android runtime tuning
 
-The repository-side tuning harness is implemented:
+The repository-side tuning and acceptance harness is implemented:
 
 1. exact benchmark execution identity is SHA-256 fingerprinted from context, preset/version, thinking, sampler, seed, template and output configuration;
 2. baseline matching rejects incompatible execution identities;
@@ -80,7 +80,8 @@ The repository-side tuning harness is implemented:
 5. each case records one true cold sample followed by at least three warm samples in the same loaded runtime;
 6. evidence schema v2 records model/backend/harness/profile/device identity plus TTFT, prefill/decode throughput, memory and thermal snapshots;
 7. the summarizer validates identity/sample completeness and marks only comparable cases as `eligibleForProfileSelection`;
-8. no script automatically promotes a runtime profile from `CANDIDATE` to `MEASURED`.
+8. PR #427 integrated an explicit reviewed `CANDIDATE -> MEASURED` gate bound to exact profile/version/tier/backend identity plus benchmark/lifecycle SHA-256 provenance, reviewed device classes and lifecycle/memory/representative acceptance; `KEEP_CANDIDATE` remains the fail-safe decision;
+9. PR #428 integrated the provenance-gated physical lifecycle/memory runner for both curated tiers, including E2E generation/unload/cancellation/PSS cycles, LOW_MEMORY active cancellation/release on both tiers and 0.8B -> 2B -> 0.8B switching. This is tooling only until physical evidence is actually run and reviewed.
 
 ### LLRT-6 canonical `2048 / 64` KV-cache findings
 
@@ -151,16 +152,16 @@ For this exact device/backend/profile identity:
 
 This is evidence against one global Qwen3.5 batching policy. Correctness gates remain fail-closed and no result promotes a runtime profile to `MEASURED`.
 
-Q35-6 remains `IN PROGRESS`: canonical LLRT-6 and LLRT-9 on this device are complete, but broader representative-device evidence and lifecycle/memory acceptance remain before profile promotion or generalized production policy.
+Q35-6 remains `IN PROGRESS`: canonical LLRT-6 and LLRT-9 on this device are complete and the reviewed promotion plus lifecycle/memory tooling is integrated, but canonical lifecycle/memory physical evidence and broader representative-device evidence remain before profile promotion or generalized production policy.
 
 ## Remaining Q35-6 evidence
 
+- run the integrated canonical lifecycle/memory acceptance suite on one clean fixed `dev` identity, with the Samsung evidence reviewed rather than inferred from CI;
 - continue broader/representative 0.8B and 2B physical tuning required by measured-profile acceptance;
 - keep KV-cache release defaults for both tiers on this exact device/profile unless later quality-backed evidence reopens the decision;
 - preserve 2B `q4_0/q4_0 + FA` only as a research-only memory signal, not a runtime policy;
 - keep 0.8B native batching rejected and 2B width `4` unqualified for this exact device/profile unless superseded by a later evidence wave;
-- mark profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
-- validate cancellation, model switching, memory pressure and idle unload on measured configurations.
+- promote a profile to `MEASURED` only through the reviewed acceptance gate after benchmark/lifecycle provenance, lifecycle/memory acceptance and representative-device coverage are complete.
 
 ## State transition rule
 
