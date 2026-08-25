@@ -11,13 +11,29 @@ class HarnessPlaygroundDisclosureTest {
     }
 
     @Test
-    fun `invalid temperature exposes the owning validation message`() {
+    fun `default sampling has no disabled-control guidance`() {
+        assertNull(playgroundSamplingGuidance(HarnessUiState()))
+    }
+
+    @Test
+    fun `temperature zero explains inactive stochastic controls`() {
+        val state = HarnessUiState(playgroundTemperature = "0")
+
+        assertEquals(
+            "Temperature 0 disables stochastic sampling; Top-p, Top-k and Min-p are inactive.",
+            playgroundSamplingGuidance(state),
+        )
+    }
+
+    @Test
+    fun `invalid temperature exposes the owning validation message without greedy guidance`() {
         val state = HarnessUiState(playgroundTemperature = "3.7")
 
         assertEquals(
             "Temperature must be between 0.0 and 2.0",
             playgroundSettingsValidationMessage(state),
         )
+        assertNull(playgroundSamplingGuidance(state))
     }
 
     @Test
