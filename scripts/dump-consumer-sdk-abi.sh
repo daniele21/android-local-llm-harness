@@ -13,7 +13,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 is_supported_contract() {
   local simple_name="${1%%\$*}"
   case "$simple_name" in
-    UseCaseId|SessionId|RequestId|InferencePresetId|InferencePresetRef|SessionKind|ConversationRole|ConversationMessage|UseCaseReadiness|UseCaseCapabilities|EffectiveConsumerReasoningMode|Consumer*)
+    UseCaseId|SessionId|RequestId|InferencePresetId|InferencePresetRef|SessionKind|ConversationRole|ConversationMessage|UseCaseReadiness|UseCaseCapabilities|EffectiveConsumerReasoningMode|TaskDefinition|Consumer*)
       return 0
       ;;
     *)
