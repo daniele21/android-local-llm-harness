@@ -1,6 +1,6 @@
 # Applications control-plane UX
 
-Status: target
+Status: active
 Document type: feature-specification
 Owner: apps/local-llm-phone-test
 Canonical scope: feature.application-control-plane-ux
