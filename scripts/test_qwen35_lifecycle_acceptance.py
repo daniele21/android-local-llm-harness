@@ -41,6 +41,10 @@ def main() -> None:
         'LocalLlmDeviceE2eTest',
         'Qwen35LifecycleAcceptanceInstrumentedTest',
         'memoryRepeatCount "$MEMORY_REPEAT_COUNT"',
+        '-e switchOutputTokens 8',
+        '-e lowMemoryOutputTokens 256',
+        '"switchOutputTokens": 8',
+        '"lowMemoryOutputTokens": 256',
         'Thermal gate satisfied:',
     ):
         require(runner, needle, "Q35 lifecycle runner")
@@ -50,6 +54,8 @@ def main() -> None:
         "REFERENCE_MODEL_SWITCH",
         "RuntimeMemoryPressure.LOW_MEMORY",
         "RuntimeMemoryAction.CANCEL_AND_RELEASE_ALL",
+        "lowMemoryOutputTokens",
+        "switchOutputTokens",
         "LOCAL_LLM_Q35_LIFECYCLE_JSON",
         "secondaryModelSha256",
         "harnessCommit",
