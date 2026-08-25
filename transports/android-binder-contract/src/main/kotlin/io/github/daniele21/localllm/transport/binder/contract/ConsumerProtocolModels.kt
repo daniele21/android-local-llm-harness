@@ -120,6 +120,7 @@ data class ConsumerInferenceMetricsParcel(
     val stopReasonTag: String,
 ) : Parcelable
 
+/** Frozen Consumer API v1 request parcel. Do not add fields; use a versioned parcel instead. */
 @Parcelize
 data class ConsumerRequestParcel(
     val clientToken: ClientTokenParcel,
@@ -131,7 +132,13 @@ data class ConsumerRequestParcel(
     val externalRequestId: String? = null,
     val input: ConsumerGenerationInputParcel? = null,
     val outputConstraint: ConsumerOutputConstraintParcel? = null,
-    val taskDefinitions: List<TaskDefinitionParcel> = emptyList(),
+) : Parcelable
+
+/** Minor-v3 generation envelope. The embedded v1 request remains byte-layout compatible. */
+@Parcelize
+data class ConsumerGenerationRequestV2Parcel(
+    val request: ConsumerRequestParcel,
+    val taskDefinitions: List<TaskDefinitionParcel>,
 ) : Parcelable
 
 @Parcelize
