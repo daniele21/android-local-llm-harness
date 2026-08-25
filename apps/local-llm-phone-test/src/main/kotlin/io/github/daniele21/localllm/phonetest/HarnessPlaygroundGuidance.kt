@@ -27,8 +27,6 @@ internal fun playgroundSamplingGuidance(state: HarnessUiState): String? = if (st
     null
 }
 
-internal fun playgroundTemperature(state: HarnessUiState): Float =
-    state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
+internal fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
 
-internal fun formatPlaygroundControlValue(value: Float): String =
-    "%.2f".format(Locale.ROOT, value).trimEnd('0').trimEnd('.')
+internal fun formatPlaygroundControlValue(value: Float): String = "%.2f".format(Locale.ROOT, value).trimEnd('0').trimEnd('.')
