@@ -22,6 +22,8 @@ import io.github.daniele21.localllm.transport.binder.contract.SessionResultParce
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 
+/** Mirrors the negotiated Consumer Binder surface; splitting it would obscure transaction ownership. */
+@Suppress("TooManyFunctions")
 internal interface ConsumerSharedRuntimeRemoteService {
     @Throws(RemoteException::class)
     fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
