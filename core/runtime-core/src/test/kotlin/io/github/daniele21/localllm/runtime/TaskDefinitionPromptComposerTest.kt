@@ -32,7 +32,10 @@ class TaskDefinitionPromptComposerTest {
         assertTrue(composed.contains("\"description\":\"Email address\""))
         assertTrue(composed.contains("\"example\":\"ada@example.test\""))
         assertTrue(composed.endsWith("[/HARNESS_TASK_DEFINITIONS_V1]"))
-        assertEquals("system-v3+task-definitions-v1", TaskDefinitionPromptComposer.effectiveVersion("system-v3", listOf(TaskDefinition("email", "Email address"))))
+        assertEquals(
+            "system-v3+task-definitions-v1",
+            TaskDefinitionPromptComposer.effectiveVersion("system-v3", listOf(TaskDefinition("email", "Email address"))),
+        )
     }
 
     @Test
