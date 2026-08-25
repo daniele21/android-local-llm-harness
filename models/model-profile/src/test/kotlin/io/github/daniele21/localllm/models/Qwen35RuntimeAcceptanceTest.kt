@@ -9,14 +9,8 @@ class Qwen35RuntimeAcceptanceTest {
     fun `keep candidate never promotes a profile`() {
         val candidate = Qwen35RuntimeTuningProfiles.candidateForTier(Qwen35ModelTier.B0_8)
         val evidence = acceptanceFor(
-            candidate = candidate,
-            decision = Qwen35RuntimeAcceptanceDecision.KEEP_CANDIDATE,
-            benchmarkEvidenceSha256 = emptySet(),
-            lifecycleEvidenceSha256 = emptySet(),
-            reviewedDeviceClasses = emptySet(),
-            lifecycleValidated = false,
-            memoryValidated = false,
-            representativeCoverageValidated = false,
+            candidate,
+            AcceptanceFixture(decision = Qwen35RuntimeAcceptanceDecision.KEEP_CANDIDATE),
         )
 
         val reviewed = Qwen35RuntimeProfileAcceptance.reviewedProfileForTier(candidate.tier, evidence)
@@ -29,14 +23,8 @@ class Qwen35RuntimeAcceptanceTest {
     fun `measured promotion requires every acceptance gate`() {
         val candidate = Qwen35RuntimeTuningProfiles.candidateForTier(Qwen35ModelTier.B2)
         val incomplete = acceptanceFor(
-            candidate = candidate,
-            decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
-            benchmarkEvidenceSha256 = setOf(SHA_A),
-            lifecycleEvidenceSha256 = setOf(SHA_B),
-            reviewedDeviceClasses = setOf("representative-arm64"),
-            lifecycleValidated = true,
-            memoryValidated = false,
-            representativeCoverageValidated = true,
+            candidate,
+            completePromotionFixture().copy(memoryValidated = false),
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -48,14 +36,10 @@ class Qwen35RuntimeAcceptanceTest {
     fun `measured promotion is explicit and provenance bound`() {
         val candidate = Qwen35RuntimeTuningProfiles.candidateForTier(Qwen35ModelTier.B2)
         val evidence = acceptanceFor(
-            candidate = candidate,
-            decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
-            benchmarkEvidenceSha256 = setOf(SHA_A),
-            lifecycleEvidenceSha256 = setOf(SHA_B),
-            reviewedDeviceClasses = setOf("representative-arm64-a", "representative-arm64-b"),
-            lifecycleValidated = true,
-            memoryValidated = true,
-            representativeCoverageValidated = true,
+            candidate,
+            completePromotionFixture(
+                reviewedDeviceClasses = setOf("representative-arm64-a", "representative-arm64-b"),
+            ),
         )
 
         val measured = Qwen35RuntimeProfileAcceptance.reviewedProfileForTier(candidate.tier, evidence)
@@ -69,16 +53,8 @@ class Qwen35RuntimeAcceptanceTest {
     @Test
     fun `promotion rejects evidence for another profile identity`() {
         val candidate = Qwen35RuntimeTuningProfiles.candidateForTier(Qwen35ModelTier.B0_8)
-        val wrongIdentity = acceptanceFor(
-            candidate = candidate,
-            decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
-            benchmarkEvidenceSha256 = setOf(SHA_A),
-            lifecycleEvidenceSha256 = setOf(SHA_B),
-            reviewedDeviceClasses = setOf("representative-arm64"),
-            lifecycleValidated = true,
-            memoryValidated = true,
-            representativeCoverageValidated = true,
-        ).copy(runtimeProfileId = "another-profile")
+        val wrongIdentity = acceptanceFor(candidate, completePromotionFixture())
+            .copy(runtimeProfileId = "another-profile")
 
         assertThrows(IllegalArgumentException::class.java) {
             Qwen35RuntimeProfileAcceptance.reviewedProfileForTier(candidate.tier, wrongIdentity)
@@ -89,14 +65,8 @@ class Qwen35RuntimeAcceptanceTest {
     fun `promotion rejects malformed evidence digests`() {
         val candidate = Qwen35RuntimeTuningProfiles.candidateForTier(Qwen35ModelTier.B2)
         val malformed = acceptanceFor(
-            candidate = candidate,
-            decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
-            benchmarkEvidenceSha256 = setOf("not-a-sha"),
-            lifecycleEvidenceSha256 = setOf(SHA_B),
-            reviewedDeviceClasses = setOf("representative-arm64"),
-            lifecycleValidated = true,
-            memoryValidated = true,
-            representativeCoverageValidated = true,
+            candidate,
+            completePromotionFixture().copy(benchmarkEvidenceSha256 = setOf("not-a-sha")),
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -106,25 +76,41 @@ class Qwen35RuntimeAcceptanceTest {
 
     private fun acceptanceFor(
         candidate: Qwen35RuntimeTuningProfile,
-        decision: Qwen35RuntimeAcceptanceDecision,
-        benchmarkEvidenceSha256: Set<String>,
-        lifecycleEvidenceSha256: Set<String>,
-        reviewedDeviceClasses: Set<String>,
-        lifecycleValidated: Boolean,
-        memoryValidated: Boolean,
-        representativeCoverageValidated: Boolean,
+        fixture: AcceptanceFixture,
     ) = Qwen35RuntimeAcceptanceEvidence(
         runtimeProfileId = candidate.id,
         runtimeProfileVersion = candidate.version,
         tier = candidate.tier,
         backendRevision = Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION,
-        benchmarkEvidenceSha256 = benchmarkEvidenceSha256,
-        lifecycleEvidenceSha256 = lifecycleEvidenceSha256,
+        benchmarkEvidenceSha256 = fixture.benchmarkEvidenceSha256,
+        lifecycleEvidenceSha256 = fixture.lifecycleEvidenceSha256,
+        reviewedDeviceClasses = fixture.reviewedDeviceClasses,
+        lifecycleValidated = fixture.lifecycleValidated,
+        memoryValidated = fixture.memoryValidated,
+        representativeCoverageValidated = fixture.representativeCoverageValidated,
+        decision = fixture.decision,
+    )
+
+    private fun completePromotionFixture(
+        reviewedDeviceClasses: Set<String> = setOf("representative-arm64"),
+    ) = AcceptanceFixture(
+        decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
+        benchmarkEvidenceSha256 = setOf(SHA_A),
+        lifecycleEvidenceSha256 = setOf(SHA_B),
         reviewedDeviceClasses = reviewedDeviceClasses,
-        lifecycleValidated = lifecycleValidated,
-        memoryValidated = memoryValidated,
-        representativeCoverageValidated = representativeCoverageValidated,
-        decision = decision,
+        lifecycleValidated = true,
+        memoryValidated = true,
+        representativeCoverageValidated = true,
+    )
+
+    private data class AcceptanceFixture(
+        val decision: Qwen35RuntimeAcceptanceDecision,
+        val benchmarkEvidenceSha256: Set<String> = emptySet(),
+        val lifecycleEvidenceSha256: Set<String> = emptySet(),
+        val reviewedDeviceClasses: Set<String> = emptySet(),
+        val lifecycleValidated: Boolean = false,
+        val memoryValidated: Boolean = false,
+        val representativeCoverageValidated: Boolean = false,
     )
 
     private companion object {
