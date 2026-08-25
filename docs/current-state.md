@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -29,16 +29,20 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Models, Diagnostics and Settings surfaces with real model management, inference, streaming/cancellation, telemetry, health, resources, benchmarks and request timelines.
+`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings surfaces with real model management, inference, streaming/cancellation, telemetry, health, resources, benchmarks, evaluation state and request timelines.
 
-Remaining app hardening is primarily:
+The bounded repo-template-sw 0.5 phone product-experience realignment has completed UXR-00 through UXR-70 on its integration line. The connected UI now has a task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-overview Diagnostics, task-backed Settings hierarchy, adaptive/accessibility composition rules, an evidence-gated Performance decision surface and generation-guarded Diagnostics state/effects. Renderable resource history is ViewModel-owned; stale Health/resource/benchmark callbacks cannot overwrite current state.
 
-- UDF migration for Overview, Diagnostics and Settings;
-- recreation/back-stack and state-restoration evidence;
-- accessibility, large-font, landscape/expanded and screenshot coverage;
-- final signed Internal Testing evidence.
+UXR-80 is the remaining repository-side closeout slice. It owns exact-composite tests/evidence/docs validation and preparation of the single final integration PR to `dev`.
 
-Active phone UX/UI realignment: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). Overview, Playground, Diagnostics and Settings proceed as disjoint lanes after the screen-ownership split.
+Remaining phone hardening after repo-side UXR-80 is primarily:
+
+- process recreation, back-stack and state-restoration evidence;
+- representative TalkBack, large-font, landscape/expanded and screenshot evidence;
+- explicit RAM-residency/warm-idle TTL product controls only after their policy is defined;
+- representative physical GGUF behavior plus final signed Internal Testing evidence.
+
+Active phone UX/UI closeout: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). Repository automation must not be promoted to representative-device evidence.
 
 ### Shared Android runtime
 
@@ -77,6 +81,8 @@ EVAL-0, EVAL-1 and EVAL-3 are complete. `evaluation/contracts` is the concrete b
 
 The dataset lane has integrated schema, bounded parsing, validation, canonical digest, atomic installation, registry/discovery, stratified sampling, preset resolution and reusable regression fixtures (`EVAL-D-01` through `D-09`). Android document import (`D-10`) is the next dataset slice. Runner preparation/case isolation, Room persistence/comparison and connected Performance UI continue in parallel. Canonical state and dependency routing: [`model-evaluation/README.md`](model-evaluation/README.md).
 
+The connected Performance surface intentionally fails closed until the evaluation backend exposes compatible aggregated evidence sufficient for a supported model/configuration comparison. A recorded run count is not promoted to a ranking.
+
 This parallel capability does not replace the existing telemetry-derived benchmark engine and does not change the current OMBRA-focused repository sequencing.
 
 ## Open blockers
@@ -108,17 +114,20 @@ Before any Qwen3.5 model/category support claim:
 
 ### 3. Physical Android evidence
 
-Three device-dependent tracks remain open and can share representative hardware sessions where appropriate:
+Four device-dependent tracks remain open and can share representative hardware sessions where appropriate without conflating their exit gates:
 
+- **Phone UX** — run representative TalkBack/focus-order, large-font, landscape/expanded, restoration and real-GGUF interaction evidence on the exact integrated build;
 - **Q35-6** — run the controlled Qwen3.5 0.8B/2B tuning matrix, collect cold/warm timing, throughput, PSS, available-memory and thermal evidence, then select measured defaults;
 - **SR-6** — run release-like same-signer Binder evidence, invalid-signer denial, process-death/reconnect and matching Binder-vs-in-process overhead evidence;
 - **OMB-8** — run the OMBRA corpus and full two-APK import -> analysis -> review -> export/failure scenarios on the exact supported build, then record quality and privacy-safe release evidence.
 
-Do not promote Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
+Do not promote phone UX to representative-device validated, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
 
 ### 4. Follow-on validation and product hardening
 
-After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation. Remaining phone work includes UDF completion, RAM warm-idle TTL policy, accessibility/responsive coverage and signed release evidence.
+UXR-80 must close repository-side product-experience validation and reconcile the integration line with current `dev` before the final UX/UI PR. After that, remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle TTL/product-control decision.
+
+After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
@@ -126,7 +135,8 @@ After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lif
 2. execute the active OMBRA corpus v2 against the reviewed Qwen3.5 artifacts using the already integrated policy v1 and record deterministic quality evidence;
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence on representative Android hardware and independently verify exported output;
 4. keep Q35-6 and SR-6 physical evidence in parallel where hardware sessions can be shared without conflating their exit gates;
-5. complete privacy/security, packaged-APK, versioning/signing and release-documentation checks only against the exact distributed build.
+5. close UXR-80 repository-side UX/UI validation and the single integration PR independently; keep representative phone UX/device evidence explicitly separate;
+6. complete privacy/security, packaged-APK, versioning/signing and release-documentation checks only against the exact distributed build.
 
 ## Source links
 
