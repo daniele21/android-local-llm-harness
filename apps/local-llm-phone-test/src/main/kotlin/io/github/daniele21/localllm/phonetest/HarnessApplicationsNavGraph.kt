@@ -32,6 +32,7 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     mutationState: HarnessApplicationsMutationState,
     onRefresh: () -> Unit,
     onSetDefaultPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary) -> Unit,
+    onCreateCustomPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary, String, Boolean, Int?) -> Unit,
     onClearMutationFeedback: () -> Unit,
 ) {
     composable(HarnessDestination.APPS.route) {
@@ -85,6 +86,20 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
                         )
                     }
                 },
+                onCreatePreset = if (
+                    application != null &&
+                    assignment?.status == HarnessAssignmentStatus.ACTIVE &&
+                    assignment.availablePresets.isNotEmpty()
+                ) {
+                    {
+                        onClearMutationFeedback()
+                        navController.navigate(
+                            HarnessApplicationRoutes.newPreset(application.applicationId, assignment.useCaseId),
+                        )
+                    }
+                } else {
+                    null
+                },
             )
         }
     }
@@ -118,6 +133,49 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
                         )
                     }
                 },
+            )
+        }
+    }
+    composable(
+        route = HarnessApplicationRoutes.NEW_PRESET_PATTERN,
+        arguments = applicationUseCaseArguments(),
+    ) { entry ->
+        val identity = entry.applicationIdentity()
+        LaunchedEffect(identity) { onClearMutationFeedback() }
+        HarnessApplicationsRouteContent(state = state, onRefresh = onRefresh) { snapshot ->
+            val application = snapshot.application(identity?.applicationId)
+            val assignment = application?.assignment(identity?.useCaseId)
+            HarnessCreatePresetScreen(
+                application = application,
+                assignment = assignment,
+                mutationState = mutationState,
+                onSave = { basePreset, displayName, automaticModelSelection, contextTokens ->
+                    if (application != null && assignment != null) {
+                        onCreateCustomPreset(
+                            application.applicationId,
+                            assignment,
+                            basePreset,
+                            displayName,
+                            automaticModelSelection,
+                            contextTokens,
+                        )
+                    }
+                },
+                onReload = onRefresh,
+                onClearFeedback = onClearMutationFeedback,
+                onViewSavedPreset = { presetId, presetRevision ->
+                    if (application != null && assignment != null) {
+                        navController.navigate(
+                            HarnessApplicationRoutes.preset(
+                                application.applicationId,
+                                assignment.useCaseId,
+                                presetId,
+                                presetRevision,
+                            ),
+                        )
+                    }
+                },
+                onDone = { navController.popBackStack() },
             )
         }
     }
