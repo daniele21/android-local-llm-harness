@@ -8,20 +8,28 @@ DEFAULT_STORE_FILE="${HOME}/.keystore/local-llm-phone-test-upload.jks"
 DEFAULT_KEY_ALIAS="local-llm-phone-test-upload"
 DEFAULT_UNSIGNED_AAB="${ROOT_DIR}/local-llm-phone-test-release-unsigned.aab"
 DEFAULT_SIGNED_AAB="${ROOT_DIR}/local-llm-phone-test-release-signed.aab"
+RELEASE_APK="${ROOT_DIR}/apps/local-llm-phone-test/build/outputs/apk/release/local-llm-phone-test-release.apk"
 
 usage() {
     cat <<'EOF'
 Usage:
   bash scripts/build-phone-test-release.sh setup
   bash scripts/build-phone-test-release.sh build
+  bash scripts/build-phone-test-release.sh build-apk
   bash scripts/build-phone-test-release.sh sign-ci-aab [INPUT_AAB] [OUTPUT_AAB]
 
 The setup command stores the existing PKCS12 upload-keystore password in the
 user's default macOS Keychain. It does not create the upload keystore.
 
-The build command retrieves the password without printing it and creates a
-signed release bundle through Gradle. The sign-ci-aab command signs an existing
-unsigned CI bundle and verifies the resulting JAR signature.
+The build command retrieves the password without printing it, increments the
+phone-test versionCode and creates a signed release bundle through Gradle.
+
+The build-apk command is for exact-candidate physical E2E. It requires a clean
+Git checkout, keeps the current version.properties identity unchanged, builds a
+signed release APK with the shared upload key and verifies its APK signature.
+
+The sign-ci-aab command signs an existing unsigned CI bundle and verifies the
+resulting JAR signature.
 
 Optional non-secret overrides:
   LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE  Upload keystore path
@@ -92,6 +100,11 @@ configure_android_sdk() {
     exit 1
 }
 
+find_android_build_tool() {
+    local tool="$1"
+    find "${ANDROID_HOME}/build-tools" -type f -name "${tool}" 2>/dev/null | sort -V | tail -n 1
+}
+
 load_signing_configuration() {
     STORE_FILE="${LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE:-${DEFAULT_STORE_FILE}}"
     KEY_ALIAS="${LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS:-${DEFAULT_KEY_ALIAS}}"
@@ -122,6 +135,23 @@ clear_signing_configuration() {
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
     unset PHONE_TEST_JARSIGNER_PASSWORD
+}
+
+require_clean_source() {
+    if ! command -v git >/dev/null 2>&1; then
+        echo "git is required to create exact physical-E2E build identity." >&2
+        exit 1
+    fi
+    SOURCE_REVISION="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
+    if [[ ! "${SOURCE_REVISION}" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
+        echo "Unable to determine a full source revision." >&2
+        exit 1
+    fi
+    if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain --untracked-files=normal)" ]]; then
+        echo "Refusing exact-candidate APK build from a dirty source checkout." >&2
+        echo "Commit, stash or remove local changes before build-apk." >&2
+        exit 1
+    fi
 }
 
 increment_version_code() {
@@ -155,6 +185,37 @@ build_release() {
     echo "Signed Android App Bundle created:"
     echo "${ROOT_DIR}/apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab"
     echo "Bundle Version: versionCode: ${v_code:-N/A} versionName: ${v_name:-N/A}"
+}
+
+build_release_apk() {
+    load_signing_configuration
+    configure_android_sdk
+    require_clean_source
+    cd "${ROOT_DIR}"
+    ./gradlew :apps:local-llm-phone-test:assembleRelease
+
+    [[ -f "${RELEASE_APK}" ]] || {
+        echo "Expected signed release APK not found: ${RELEASE_APK}" >&2
+        exit 1
+    }
+
+    local apksigner
+    apksigner="$(find_android_build_tool apksigner)"
+    [[ -n "${apksigner}" ]] || {
+        echo "apksigner was not found below ${ANDROID_HOME}/build-tools." >&2
+        exit 1
+    }
+    "${apksigner}" verify --print-certs "${RELEASE_APK}"
+
+    local prop_file="${ROOT_DIR}/apps/local-llm-phone-test/version.properties"
+    local v_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
+    local v_name="$(sed -n 's/^versionName=//p' "${prop_file}")"
+
+    echo
+    echo "Signed physical-E2E release APK created:"
+    echo "${RELEASE_APK}"
+    echo "APK Version:     versionCode: ${v_code:-N/A} versionName: ${v_name:-N/A}"
+    echo "Source revision: ${SOURCE_REVISION}"
 }
 
 sign_ci_aab() {
@@ -197,6 +258,9 @@ case "${1:-help}" in
         ;;
     build)
         build_release
+        ;;
+    build-apk)
+        build_release_apk
         ;;
     sign-ci-aab)
         sign_ci_aab "${2:-}" "${3:-}"
