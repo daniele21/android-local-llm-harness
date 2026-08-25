@@ -14,11 +14,13 @@
     "primary_jobs": [
       "compare candidate models and inference configurations for a concrete use case and device",
       "install, select and run a local model while inspecting evidence-backed performance, health and diagnostics",
+      "inspect consumer applications, assigned use cases and effective inference presets, then configure them without relying on internal binding or transport concepts",
       "validate shared-runtime integration without silent cloud fallback"
     ],
     "primary_surfaces": [
       "Harness Android phone application",
       "model evaluation and benchmark surfaces",
+      "application and assigned-use-case control-plane surfaces",
       "shared-runtime consumer and diagnostics surfaces"
     ]
   },
@@ -114,6 +116,11 @@
       "e2e": "required"
     },
     {
+      "id": "consumer-configuration",
+      "name": "Open a consumer application, inspect its assigned use cases, select or create an inference preset, persist the default assignment and verify the effective configuration after restart",
+      "e2e": "required"
+    },
+    {
       "id": "diagnostics-evidence",
       "name": "Inspect source-backed diagnostics and export a privacy-safe evidence snapshot",
       "e2e": "recommended"
@@ -126,6 +133,7 @@
   ],
   "reference_views": [
     "docs/harness-ux-ui-implementation-plan.md",
+    "docs/features/application-control-plane-ux.md",
     "docs/features/phone-app-architecture.md",
     "docs/design-system.md",
     "ui/design-system Compose previews"
@@ -134,7 +142,7 @@
     "accessibility_automation": "ui/design-system contrast and touch-target JVM tests, Compose semantics coverage and Android Lint",
     "visual_regression": "code-owned Compose previews and scoped screenshot evidence where the owning UX specification requires it; no blanket golden suite is claimed",
     "manual_accessibility": "representative-device TalkBack, dynamic-text, focus, portrait/landscape and low-motion acceptance before release claims",
-    "usability_evidence": "task-based physical-device acceptance for primary model, generation and diagnostics flows; no formal representative-user study is claimed"
+    "usability_evidence": "task-based physical-device acceptance for primary model, generation, consumer-configuration and diagnostics flows; no formal representative-user study is claimed"
   },
   "evidence": {
     "bounded_ci_retention": true,

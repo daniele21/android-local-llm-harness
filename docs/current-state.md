@@ -33,6 +33,8 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
 
+Applications control-plane UX is now a separately specified, not-yet-integrated capability: durable behavior is in [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md) and the temporary parallel execution DAG is in [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md). Final effective-consumer proof remains downstream of the accepted HCP control-plane/cutover path.
+
 ### Shared Android runtime
 
 SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures.
