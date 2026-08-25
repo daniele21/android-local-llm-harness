@@ -6,11 +6,7 @@ package io.github.daniele21.localllm.contracts
  * This is deliberately not a free-form system prompt. The runtime owns prompt composition and must
  * treat these values as untrusted data rather than instructions.
  */
-data class TaskDefinition(
-    val id: String,
-    val description: String,
-    val example: String? = null,
-) {
+data class TaskDefinition(val id: String, val description: String, val example: String? = null) {
     init {
         require(id.matches(ID_PATTERN)) { "Task definition ID is invalid" }
         require(id.length <= TaskDefinitionLimits.MAX_ID_CHARACTERS) { "Task definition ID is too long" }
