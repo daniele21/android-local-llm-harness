@@ -348,9 +348,8 @@ private data class LifecycleBinding(val applicationId: ApplicationId, val useCas
 private class MultiBindingRegistry(resolved: List<ResolvedUseCase>) : ModelProfileRegistry {
     private val entries = resolved.associateBy { it.binding.applicationId to it.binding.useCaseId }
 
-    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
-        entries[applicationId to useCaseId]
-            ?: error("Unknown binding ${applicationId.value}/${useCaseId.value}")
+    override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = entries[applicationId to useCaseId]
+        ?: error("Unknown binding ${applicationId.value}/${useCaseId.value}")
 }
 
 private data class LifecycleAcceptanceConfig(
