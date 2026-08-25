@@ -265,6 +265,8 @@ run_instrumentation "cross-tier-lifecycle" \
     -e batchSize 128 \
     -e microBatchSize 64 \
     -e batchThreads 4 \
+    -e switchOutputTokens 8 \
+    -e lowMemoryOutputTokens 256 \
     -e timeoutSeconds "$TIMEOUT_SECONDS" \
     -e harnessCommit "$HARNESS_COMMIT" \
     -e backendRevision "$BACKEND_REVISION"
@@ -302,6 +304,8 @@ payload = {
     "contextTokens": 2048,
     "batchSize": 128,
     "microBatchSize": 64,
+    "switchOutputTokens": 8,
+    "lowMemoryOutputTokens": 256,
     "cases": {
         "08bE2e": digest(run_dir / "08b-e2e.log"),
         "2bE2e": digest(run_dir / "2b-e2e.log"),
