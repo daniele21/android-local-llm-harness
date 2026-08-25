@@ -31,7 +31,9 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 `apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
 
-Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
+Remaining existing phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
+
+A new separately scoped structural capability is now specified for **Applications control-plane UX**: application -> assigned use case -> default/effective preset configuration, with Suggested/Custom handling, revision-safe mutations, progressive Technical details, adaptive layouts and two-APK effective-consumer evidence. The target behavior is owned by [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md) and temporary parallel implementation sequencing by [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md). This capability is not yet implemented on `dev`; final effective-consumer proof remains downstream of the accepted HCP consumer-control-plane/cutover line.
 
 ### Shared Android runtime
 
@@ -105,9 +107,13 @@ Device-dependent tracks can share hardware sessions without conflating exit gate
 
 Do not promote phone UX to representative-device validated, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
 
+Applications control-plane physical/effective-consumer evidence is an additional future two-APK gate after its repository-side UX and the accepted HCP consumer-control-plane/cutover behavior are integrated; it must not be inferred from host-only UI tests.
+
 ### 4. Follow-on validation and product hardening
 
-Repository-side UX/UI implementation is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI realignment is complete. Remaining existing phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. Applications control-plane UX is a new separately scoped structural capability, not unfinished work from the earlier realignment.
+
+After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
@@ -115,7 +121,8 @@ Repository-side UX/UI implementation is complete. Remaining phone work is device
 2. execute OMBRA corpus v2 against reviewed Qwen3.5 artifacts using policy v1;
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
 4. keep Q35-6, SR-6 and phone UX device evidence parallel where hardware can be shared without conflating exit gates;
-5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
+5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build;
+6. for the new Applications control-plane capability, start the repo-side ACUX foundation wave from current green `dev` with gateway, navigation and any genuinely reusable design-system slice in parallel; keep final effective-consumer E2E downstream of the accepted HCP control-plane/cutover line.
 
 ## Source links
 
@@ -124,6 +131,8 @@ Repository-side UX/UI implementation is complete. Remaining phone work is device
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
 - OMBRA roadmap: [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
+- Applications UX target: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md)
+- Applications active workstream: [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
 - Shared runtime roadmap: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - SR-6 evidence runbook: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5 status: [`qwen35/README.md`](qwen35/README.md)
