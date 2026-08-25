@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
@@ -22,6 +23,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessColors
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetric
 import io.github.daniele21.localllm.ui.designsystem.HarnessMetricRow
+import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
@@ -41,12 +43,26 @@ internal fun HarnessOverviewScreen(
         processPss = processPss,
         thermalStatus = thermalStatus,
     )
+    val stackDenseContent = currentHarnessAdaptivePolicy().stackDenseContent
 
     HarnessScreenList(title = null) {
         item { OverviewPolicyLabel() }
-        item { OverviewHeroCard(presentation, onOpenPlayground, onOpenModels) }
+        item {
+            OverviewHeroCard(
+                presentation = presentation,
+                stackDenseContent = stackDenseContent,
+                onOpenPlayground = onOpenPlayground,
+                onOpenModels = onOpenModels,
+            )
+        }
         item { OverviewCurrentStatePanel(presentation, onOpenModels, onOpenPlayground, onOpenDiagnostics) }
-        item { OverviewDeviceEvidencePanel(presentation, onOpenDiagnostics) }
+        item {
+            OverviewDeviceEvidencePanel(
+                presentation = presentation,
+                stackDenseContent = stackDenseContent,
+                onOpenDiagnostics = onOpenDiagnostics,
+            )
+        }
         item { OverviewRecentActivityPanel(presentation, onOpenPlayground) }
     }
 }
@@ -61,7 +77,12 @@ private fun OverviewPolicyLabel() {
 }
 
 @Composable
-private fun OverviewHeroCard(presentation: HarnessOverviewPresentation, onOpenPlayground: () -> Unit, onOpenModels: () -> Unit) {
+private fun OverviewHeroCard(
+    presentation: HarnessOverviewPresentation,
+    stackDenseContent: Boolean,
+    onOpenPlayground: () -> Unit,
+    onOpenModels: () -> Unit,
+) {
     HarnessCard(emphasized = true) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -84,15 +105,21 @@ private fun OverviewHeroCard(presentation: HarnessOverviewPresentation, onOpenPl
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            HarnessRuntimeGlyph(
-                ready = presentation.primaryAction == HarnessOverviewPrimaryAction.RUN_PROMPT,
-                modifier = Modifier.size(58.dp),
-            )
+            if (!stackDenseContent) {
+                HarnessRuntimeGlyph(
+                    ready = presentation.primaryAction == HarnessOverviewPrimaryAction.RUN_PROMPT,
+                    modifier = Modifier.size(58.dp),
+                )
+            }
         }
         HarnessPrimaryButton(
             text = overviewPrimaryActionLabel(presentation.primaryAction),
             modifier = Modifier.fillMaxWidth(),
-            onClick = overviewPrimaryActionClick(presentation.primaryAction, onOpenPlayground, onOpenModels),
+            onClick = overviewPrimaryActionClick(
+                presentation.primaryAction,
+                onOpenPlayground,
+                onOpenModels,
+            ),
         )
     }
 }
@@ -142,7 +169,11 @@ private fun OverviewCurrentStatePanel(
 }
 
 @Composable
-private fun OverviewDeviceEvidencePanel(presentation: HarnessOverviewPresentation, onOpenDiagnostics: () -> Unit) {
+private fun OverviewDeviceEvidencePanel(
+    presentation: HarnessOverviewPresentation,
+    stackDenseContent: Boolean,
+    onOpenDiagnostics: () -> Unit,
+) {
     OverviewSectionPanel("Device evidence") {
         if (!presentation.resourceEvidenceAvailable) {
             Text(
@@ -155,17 +186,28 @@ private fun OverviewDeviceEvidencePanel(presentation: HarnessOverviewPresentatio
                 onClick = onOpenDiagnostics,
             )
         } else {
-            HarnessMetricRow {
+            if (stackDenseContent) {
                 HarnessMetric(
                     label = "Process PSS",
                     value = presentation.processPss,
-                    modifier = Modifier.weight(1f),
                 )
                 HarnessMetric(
                     label = "Thermal",
                     value = presentation.thermalStatus,
-                    modifier = Modifier.weight(1f),
                 )
+            } else {
+                HarnessMetricRow {
+                    HarnessMetric(
+                        label = "Process PSS",
+                        value = presentation.processPss,
+                        modifier = Modifier.weight(1f),
+                    )
+                    HarnessMetric(
+                        label = "Thermal",
+                        value = presentation.thermalStatus,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             Text(
                 "Values come from the latest explicit resource snapshot. Missing measurements remain unavailable rather than being inferred.",
@@ -213,6 +255,7 @@ private fun OverviewInfoRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = HarnessMinimumTouchTarget)
             .clickable(
                 onClickLabel = "Open $label",
                 role = Role.Button,
@@ -224,12 +267,15 @@ private fun OverviewInfoRow(
     ) {
         HarnessDestinationIcon(icon, selected = false, modifier = Modifier.size(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(
                 value,
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = if (label == "Runtime / residency") FontFamily.Monospace else null,
-                maxLines = 2,
             )
         }
         Text(
