@@ -90,6 +90,7 @@ internal class BinderConsumerGenerationAdapter(
                 externalRequestId = generation.externalRequestId,
                 input = request.input.toConsumerWire(),
                 outputConstraint = request.outputConstraint.toConsumerWire(),
+                taskDefinitions = request.taskDefinitions.map { it.toConsumerWire() },
             )
         return try {
             endpoint.service.consumer.generate(wire) { event -> enqueue(generation, event) }
