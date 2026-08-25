@@ -391,12 +391,11 @@ internal fun playgroundSettingsValidationMessage(state: HarnessUiState): String?
     )
 }.exceptionOrNull()?.message
 
-internal fun playgroundSamplingGuidance(state: HarnessUiState): String? =
-    if (state.playgroundTemperature.toFloatOrNull() == 0f) {
-        "Temperature 0 disables stochastic sampling; Top-p, Top-k and Min-p are inactive."
-    } else {
-        null
-    }
+internal fun playgroundSamplingGuidance(state: HarnessUiState): String? = if (state.playgroundTemperature.toFloatOrNull() == 0f) {
+    "Temperature 0 disables stochastic sampling; Top-p, Top-k and Min-p are inactive."
+} else {
+    null
+}
 
 private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
 
