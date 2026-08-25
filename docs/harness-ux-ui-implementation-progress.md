@@ -22,6 +22,7 @@ This tracker records concise workstream status only. Detailed repository state a
 
 | Workstream | Status | Integrated boundary | Remaining gate |
 | --- | --- | --- | --- |
+| Repository-side product-experience realignment | DONE | Task-first/source-backed Overview, progressive Playground, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility policy, fail-closed Performance decisions and Diagnostics state/effect convergence validated on the reconciled repository composition | — |
 | Launcher identity and shared design system | DONE | Reproducible launcher assets, light/dark/system tokens, shared components, contrast and touch-target checks | Screenshot regression expansion |
 | Responsive application shell | DEVICE | Navigation Compose, compact bottom navigation, expanded rail, detail-aware top bars and adaptive content policy | Process recreation plus representative responsive/large-font evidence |
 | Overview | DEVICE | Evidence-backed selected-model/runtime/resource/latest-run presentation with one state-dependent next action | Representative large-font/TalkBack/device evidence |
@@ -33,7 +34,7 @@ This tracker records concise workstream status only. Detailed repository state a
 | Request timeline and detail navigation | PARTIAL | Typed Settings, request-timeline and model-detail routes with opaque arguments | Back-stack restoration and process recreation matrix |
 | Durable model-identity state | PARTIAL | Catalog/import/selection/runtime projection and explicit degraded states | Qwen3.5-only migration completion, `lastUsedAt`, restart tests and physical reconciliation evidence |
 | RAM residency controls | PENDING | Runtime supports opaque load/unload and safe idle release | Product load/unload actions and monotonic warm-idle TTL |
-| Compose state and screenshot tests | PARTIAL | Shell/destination instrumentation, progressive-disclosure/Diagnostics semantics and pure presentation coverage | Connected execution of full semantics/golden/large-font/landscape/expanded matrix |
+| Compose state and screenshot tests | PARTIAL | Shell/destination instrumentation, progressive-disclosure/Diagnostics/Performance semantics and pure presentation coverage | Connected execution of full semantics/golden/large-font/landscape/expanded matrix |
 | Accessibility | DEVICE | Canonical 48 dp interaction targets, adaptive dense-content stacking, contrast foundations and non-color-only status semantics | Representative TalkBack/focus-order and large-font device evidence |
 | Physical-device validation | DEVICE | Production contracts and Play/ADB validation paths exist | Representative download/install/inference/cancellation/memory and UX accessibility evidence |
 
@@ -49,16 +50,16 @@ The earlier Diagnostics state/effect debt is closed repo-side: renderable resour
 
 ## Next UX block
 
-Close repository-side validation on the exact integrated product-experience branch, then reconcile it with current `dev` and run the single final integration PR. Do not use repository automation as a substitute for representative-device evidence.
+Repository-side realignment is complete. The next UX work is evidence acquisition and the separately scoped residual capability work; it must not reopen the completed hierarchy/progressive-disclosure/state-ownership migration without a new product reason.
 
-Acceptance for that block:
+Acceptance for the remaining device/evidence block:
 
-- focused reducer/presentation tests and the connected Compose semantics source cover the task-first shell, progressive Playground disclosure, deterministic Diagnostics drill-down and evidence-gated Performance decision state;
-- Spotless, repository guards, phone-app unit tests, Lint, compilation and packaging pass on the exact integration composition;
-- durable phone architecture, current-state and this progress ledger agree on state/effect ownership and remaining device gates;
-- current `dev` is reconciled before the final workstream PR, without dropping intervening versioning/documentation changes;
-- physical TalkBack, representative font-scale/layout and real-GGUF evidence remain explicitly `PENDING`/`DEVICE` until captured.
+- exercise representative TalkBack/focus order and large-font/landscape/expanded layouts on physical hardware;
+- demonstrate process recreation and back-stack restoration without persisting sensitive prompt/output state;
+- execute representative real-GGUF download/install/inference/cancellation/memory flows on the exact build;
+- retain Performance's fail-closed decision behavior until compatible aggregated evaluation evidence exists;
+- keep RAM warm-idle TTL/load-unload product controls as a separate capability slice with source-backed state and deterministic lifecycle tests.
 
 ## Release boundary
 
-Repository-side UX/UI implementation can close independently of physical release evidence, but the connected phone product must not claim representative-device UX, thermal/performance or real-GGUF readiness until those exact device gates are recorded. Current Harness 0.5 release gates are maintained in [`releases/harness-0.5.md`](releases/harness-0.5.md).
+Repository-side UX/UI implementation is complete independently of physical release evidence, but the connected phone product must not claim representative-device UX, thermal/performance or real-GGUF readiness until those exact device gates are recorded. Current Harness 0.5 release gates are maintained in [`releases/harness-0.5.md`](releases/harness-0.5.md).
