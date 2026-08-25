@@ -88,11 +88,7 @@ data class ConsumerGenerationInputParcel(val typeTag: String, val text: String?,
     Parcelable
 
 @Parcelize
-data class TaskDefinitionParcel(
-    val id: String,
-    val description: String,
-    val example: String? = null,
-) : Parcelable
+data class TaskDefinitionParcel(val id: String, val description: String, val example: String? = null) : Parcelable
 
 @Parcelize
 data class ConsumerOutputConstraintParcel(val typeTag: String, val jsonSchema: String?) : Parcelable
