@@ -14,6 +14,7 @@ A workstream belongs here only while it is active. It is not a second project-st
 ## Active bounded work
 
 - [`q35-runtime-qualification-wave.md`](q35-runtime-qualification-wave.md) — coordinates the temporary Qwen3.5 CPU runtime qualification wave, including measured-profile acceptance, lifecycle/memory evidence, representative-device gates and final review dependencies.
+- [`application-control-plane-ux.md`](application-control-plane-ux.md) — coordinates the Applications -> assigned use case -> preset-control UX implementation, including parallel UI/control-plane slices, revision-safe mutations, adaptive/accessibility convergence and effective two-APK evidence.
 
 ## Lifecycle
 
