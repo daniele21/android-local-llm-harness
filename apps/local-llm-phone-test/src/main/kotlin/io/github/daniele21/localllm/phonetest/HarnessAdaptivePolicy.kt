@@ -1,5 +1,8 @@
 package io.github.daniele21.localllm.phonetest
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
+
 internal enum class HarnessWidthClass {
     COMPACT,
     MEDIUM,
@@ -25,6 +28,15 @@ internal fun harnessAdaptivePolicy(widthDp: Int, fontScale: Float): HarnessAdapt
         widthClass = widthClass,
         useNavigationRail = widthClass != HarnessWidthClass.COMPACT,
         stackDenseContent = widthClass == HarnessWidthClass.COMPACT || fontScale >= LARGE_FONT_SCALE,
+    )
+}
+
+@Composable
+internal fun currentHarnessAdaptivePolicy(): HarnessAdaptivePolicy {
+    val configuration = LocalConfiguration.current
+    return harnessAdaptivePolicy(
+        widthDp = configuration.screenWidthDp,
+        fontScale = configuration.fontScale,
     )
 }
 
