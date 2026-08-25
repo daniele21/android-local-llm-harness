@@ -23,6 +23,7 @@ internal data class HarnessOverviewPresentation(
     val healthPositive: Boolean,
     val processPss: String,
     val thermalStatus: String,
+    val resourceEvidenceAvailable: Boolean,
     val latestRunValue: String,
     val latestRunStatus: String,
     val latestRunPositive: Boolean,
@@ -30,6 +31,7 @@ internal data class HarnessOverviewPresentation(
 
 private data class OverviewModelState(
     val selectedModel: ImportedPhoneModel?,
+    val selectedDisplayName: String?,
     val loadedDigest: String?,
     val mismatch: Boolean,
     val selectedResident: Boolean,
@@ -54,7 +56,7 @@ internal fun harnessOverviewPresentation(
         heroTitle = hero.title,
         heroDetail = hero.detail,
         primaryAction = primaryAction,
-        selectedModelValue = state.modelInventory.selectedItem?.displayName ?: modelState.selectedModel?.fileName ?: "No model selected",
+        selectedModelValue = modelState.selectedDisplayName ?: "No model selected",
         selectedModelStatus = overviewSelectedModelStatus(modelState),
         selectedModelPositive = modelState.selectedModel != null && !modelState.mismatch,
         runtimeValue = diagnostics.runtime?.state?.name?.lowercase()?.replaceFirstChar(Char::uppercase) ?: "Unavailable",
@@ -66,6 +68,7 @@ internal fun harnessOverviewPresentation(
         healthPositive = healthValue.equals("Pass", ignoreCase = true),
         processPss = processPss ?: "Unavailable",
         thermalStatus = thermalStatus ?: "Unavailable",
+        resourceEvidenceAvailable = processPss != null || thermalStatus != null,
         latestRunValue = latestMetrics?.totalMs?.let { "$it ms total" } ?: "No runs yet",
         latestRunStatus = overviewLatestRunStatus(state),
         latestRunPositive = latestMetrics != null && state.playground.phase == PlaygroundPhase.COMPLETED,
@@ -76,12 +79,14 @@ private fun overviewModelState(state: HarnessUiState): OverviewModelState {
     val selectedModel = state.importedModel
     val selectedDigest = selectedModel?.digest?.sha256
     val loadedDigest = state.modelInventory.loadedDigest
-    val mismatch = state.modelInventory.degradedCount > 0 ||
-        (selectedDigest != null && loadedDigest != null && selectedDigest != loadedDigest)
+    val selectedInventoryItem = state.modelInventory.selectedItem
+    val selectedItemDegraded = selectedInventoryItem?.degradation != null
+    val residencyConflict = selectedDigest != null && loadedDigest != null && selectedDigest != loadedDigest
     return OverviewModelState(
         selectedModel = selectedModel,
+        selectedDisplayName = selectedInventoryItem?.displayName ?: selectedModel?.fileName,
         loadedDigest = loadedDigest,
-        mismatch = mismatch,
+        mismatch = selectedItemDegraded || residencyConflict,
         selectedResident = selectedDigest != null && selectedDigest == loadedDigest,
     )
 }
@@ -102,7 +107,7 @@ private fun overviewHeroCopy(primaryAction: HarnessOverviewPrimaryAction, modelS
         title = when (primaryAction) {
             HarnessOverviewPrimaryAction.CHOOSE_MODEL -> "Choose a model to begin"
             HarnessOverviewPrimaryAction.RESOLVE_MODEL_STATE -> "Reconcile model state before the next run"
-            HarnessOverviewPrimaryAction.RUN_PROMPT -> modelState.selectedModel?.fileName ?: "Ready to evaluate"
+            HarnessOverviewPrimaryAction.RUN_PROMPT -> modelState.selectedDisplayName ?: "Ready to evaluate"
         },
         detail = overviewHeroDetail(primaryAction, modelState.selectedResident),
     )
@@ -115,10 +120,10 @@ private fun overviewHeroDetail(primaryAction: HarnessOverviewPrimaryAction, sele
         "The selected model and runtime residency do not agree. Review Models before running another inference."
 
     selectedResident ->
-        "Selected and currently resident in memory. The next run can reuse the local runtime when policy allows."
+        "Run a prompt for a quick measured check, or open Performance for repeatable evaluation before choosing a model or configuration."
 
     else ->
-        "Selected on this device. The runtime will load it explicitly when the next inference requires it."
+        "Selected on this device. Run a prompt for a quick measured check, or open Performance for repeatable evaluation; the runtime will load the model explicitly when needed."
 }
 
 private fun overviewSelectedModelStatus(modelState: OverviewModelState): String = when {
@@ -132,7 +137,7 @@ private fun overviewResidencyStatus(state: HarnessUiState, modelState: OverviewM
     state.playground.active -> "Running"
     modelState.mismatch -> "Mismatch"
     modelState.selectedResident -> "Resident"
-    modelState.loadedDigest != null -> "Resident"
+    modelState.loadedDigest != null -> "Other model resident"
     else -> "Not resident"
 }
 

@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -29,16 +29,9 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Models, Diagnostics and Settings surfaces with real model management, inference, streaming/cancellation, telemetry, health, resources, benchmarks and request timelines.
+`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
 
-Remaining app hardening is primarily:
-
-- UDF migration for Overview, Diagnostics and Settings;
-- recreation/back-stack and state-restoration evidence;
-- accessibility, large-font, landscape/expanded and screenshot coverage;
-- final signed Internal Testing evidence.
-
-Active phone UX/UI realignment: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md). Overview, Playground, Diagnostics and Settings proceed as disjoint lanes after the screen-ownership split.
+Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
 
 ### Shared Android runtime
 
@@ -75,7 +68,7 @@ Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-run
 
 EVAL-0, EVAL-1 and EVAL-3 are complete. `evaluation/contracts` is the concrete backend-independent boundary for dataset/case/evaluator/sampling/run/result value semantics, deterministic SHA-256 identity, compatibility reasons and bounded evaluation failures. `evaluation/evaluators` freezes the six deterministic v1 scorer families and suite aggregation without an external LLM judge. These modules do not introduce a second runtime, model store, telemetry path or persistence implementation.
 
-The dataset lane has integrated schema, bounded parsing, validation, canonical digest, atomic installation, registry/discovery, stratified sampling, preset resolution and reusable regression fixtures (`EVAL-D-01` through `D-09`). Android document import (`D-10`) is the next dataset slice. Runner preparation/case isolation, Room persistence/comparison and connected Performance UI continue in parallel. Canonical state and dependency routing: [`model-evaluation/README.md`](model-evaluation/README.md).
+The dataset lane has integrated schema, bounded parsing, validation, canonical digest, atomic installation, registry/discovery, stratified sampling, preset resolution and reusable regression fixtures (`EVAL-D-01` through `D-09`). Android document import (`D-10`) is the next dataset slice. Runner preparation/case isolation, Room persistence/comparison and connected Performance UI continue in parallel. Performance fails closed until compatible aggregated evidence can support a model/configuration comparison. Canonical routing: [`model-evaluation/README.md`](model-evaluation/README.md).
 
 This parallel capability does not replace the existing telemetry-derived benchmark engine and does not change the current OMBRA-focused repository sequencing.
 
@@ -108,30 +101,25 @@ Before any Qwen3.5 model/category support claim:
 
 ### 3. Physical Android evidence
 
-Three device-dependent tracks remain open and can share representative hardware sessions where appropriate:
+Device-dependent tracks can share hardware sessions without conflating exit gates: phone UX (TalkBack/font/layout/restoration/real-GGUF), Q35-6 tuning, SR-6 Binder release evidence and OMB-8 quality/two-APK flows.
 
-- **Q35-6** — run the controlled Qwen3.5 0.8B/2B tuning matrix, collect cold/warm timing, throughput, PSS, available-memory and thermal evidence, then select measured defaults;
-- **SR-6** — run release-like same-signer Binder evidence, invalid-signer denial, process-death/reconnect and matching Binder-vs-in-process overhead evidence;
-- **OMB-8** — run the OMBRA corpus and full two-APK import -> analysis -> review -> export/failure scenarios on the exact supported build, then record quality and privacy-safe release evidence.
-
-Do not promote Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
+Do not promote phone UX to representative-device validated, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
 
 ### 4. Follow-on validation and product hardening
 
-After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation. Remaining phone work includes UDF completion, RAM warm-idle TTL policy, accessibility/responsive coverage and signed release evidence.
+Repository-side UX/UI implementation is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
-1. complete OMB-6B visual review and integrate approved deterministic launcher/identity assets; this is the remaining OMB-7 closure dependency;
-2. execute the active OMBRA corpus v2 against the reviewed Qwen3.5 artifacts using the already integrated policy v1 and record deterministic quality evidence;
-3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence on representative Android hardware and independently verify exported output;
-4. keep Q35-6 and SR-6 physical evidence in parallel where hardware sessions can be shared without conflating their exit gates;
-5. complete privacy/security, packaged-APK, versioning/signing and release-documentation checks only against the exact distributed build.
+1. complete OMB-6B visual review and integrate approved deterministic launcher/identity assets;
+2. execute OMBRA corpus v2 against reviewed Qwen3.5 artifacts using policy v1;
+3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
+4. keep Q35-6, SR-6 and phone UX device evidence parallel where hardware can be shared without conflating exit gates;
+5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
-- Harness product-experience workstream: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md)
 - Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
