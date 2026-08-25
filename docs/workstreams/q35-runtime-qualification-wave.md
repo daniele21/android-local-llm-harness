@@ -47,29 +47,28 @@ No slice in this workstream may automatically promote a profile, generalize one-
 | ID | State | Depends on | Owns / writes | Can run with | Acceptance |
 | --- | --- | --- | --- | --- | --- |
 | QRT-00 | DONE | — | wave decomposition only | — | Write ownership and physical serialization boundaries are explicit. |
-| QRT-10 | ACTIVE | QRT-00 | `models:model-profile` acceptance contract + focused tests | QRT-20, QRT-30 | Promotion remains explicit, exact-identity/provenance-bound and fail-closed when benchmark/lifecycle/memory/representative gates are incomplete. |
-| QRT-20 | ACTIVE | QRT-00 | `apps:device-test-runner`, lifecycle evidence runner, regression guard | QRT-10, QRT-30 | Existing generation/unload/cancellation/PSS-cycle evidence is reused; LOW_MEMORY active cancellation/release and 0.8B <-> 2B switching are added; exact model/backend/Harness identity and thermal/cleanliness gates are recorded. |
-| QRT-30 | ACTIVE | QRT-00 | this workstream only | QRT-10, QRT-20 | Dependency state stays current without duplicating canonical LLRT/Q35 status. |
-| QRT-40 | BLOCKED | QRT-20 integrated | physical Samsung lifecycle/memory evidence | QRT-50 on another device | Both curated tiers pass the canonical lifecycle suite on one exact Harness/backend/device identity; evidence manifest is hashed and reviewed. |
-| QRT-50 | BLOCKED | QRT-10 integrated | broader CPU benchmark evidence on representative devices | QRT-40 | Required candidate configurations have complete TTFT/prefill/decode/PSS/thermal evidence with exact comparable identities; no one-device result is generalized. |
+| QRT-10 | DONE | QRT-00 | `models:model-profile` acceptance contract + focused tests | QRT-20, QRT-30 | Promotion is explicit, exact-identity/provenance-bound and fail-closed when benchmark/lifecycle/memory/representative gates are incomplete. Integrated by PR #427. |
+| QRT-20 | DONE | QRT-00 | `apps:device-test-runner`, lifecycle evidence runner, regression guard | QRT-10, QRT-30 | E2E evidence runs on both tiers; LOW_MEMORY active cancellation/release runs on both tiers; 0.8B -> 2B -> 0.8B switching is covered; exact model/backend/Harness identity plus thermal/cleanliness gates are recorded. Integrated by PR #428. |
+| QRT-30 | DONE | QRT-00 | this workstream only | QRT-10, QRT-20 | Dependency state is reachable from `docs/workstreams` and does not duplicate canonical LLRT/Q35 decisions. Integrated by PR #429. |
+| QRT-40 | READY | QRT-20 | physical Samsung lifecycle/memory evidence | QRT-50 on another device | Both curated tiers pass the canonical lifecycle suite on one exact Harness/backend/device identity; evidence manifest is hashed and reviewed. No physical result has been claimed yet. |
+| QRT-50 | READY | QRT-10 | broader CPU benchmark evidence on representative devices | QRT-40 on another device | Required candidate configurations have complete TTFT/prefill/decode/PSS/thermal evidence with exact comparable identities; no one-device result is generalized. Execution requires a suitable representative CPU device. |
 | QRT-60 | BLOCKED | QRT-40, QRT-50 | explicit profile review + durable Q35/LLRT docs | — | Review either keeps `CANDIDATE` or promotes a provenance-bound `MEASURED` profile; no implicit/default promotion exists. |
 | QRT-70 | BLOCKED | QRT-60 | final lifecycle/docs cleanup | LLRT-7C on representative Adreno | Q35-6 CPU-side acceptance criteria are transferred to durable owners and this temporary workstream is removed. |
 
 ## Parallel execution policy
 
-`QRT-10`, `QRT-20` and `QRT-30` are intentionally independent. `QRT-10` owns only the model-profile promotion contract; `QRT-20` owns only physical lifecycle instrumentation/evidence tooling; `QRT-30` owns only temporary sequencing. They must not edit the same files.
+The three software preparation slices are integrated. QRT-10 owns the model-profile promotion contract, QRT-20 owns physical lifecycle instrumentation/evidence tooling and QRT-30 owns temporary sequencing; their write boundaries remain separate in history.
 
-After the software slices are integrated, `QRT-40` and representative-device `QRT-50` may run in parallel only when they use different physical devices. On the same phone, all physical performance/lifecycle suites are serialized to avoid thermal and residency contamination.
+QRT-40 and representative-device QRT-50 may now run in parallel only when they use different physical devices. On the same phone, all physical performance/lifecycle suites are serialized to avoid thermal and residency contamination.
 
 LLRT-7C is not on the critical path for CPU-side Q35-6 acceptance and should proceed independently only when an eligible Adreno 750/830 device is available. LLRT-8 remains downstream of representative LLRT-7 evidence. LLRT-10 remains downstream of reviewed `MEASURED` profiles.
 
-## Current branches / merge order
+## Integrated software slices
 
-1. `feat/q35-measured-profile-acceptance` — QRT-10; independent, may merge first.
-2. `feat/q35-lifecycle-memory-evidence` — QRT-20; independent, may merge first.
-3. `docs/q35-runtime-qualification-wave` — QRT-30; documentation-only coordination.
-4. Rebase/refresh remaining branches from `dev` after each merge only when required by their base policy; do not alter physical evidence identities after a wave has started.
-5. Physical QRT-40 starts only from a single clean merged `dev` identity containing QRT-10 and QRT-20.
+1. PR #429 (`docs/q35-runtime-qualification-wave`) integrated QRT-30 as merge `2c7f67dc4434a9f2907ffb62343928c3494ebf85`.
+2. PR #427 (`feat/q35-measured-profile-acceptance`) integrated QRT-10 as merge `cfcfceb7e1cf80d7e1bc38fb1b2ee145fb807c3d`.
+3. PR #428 (`feat/q35-lifecycle-memory-evidence`) integrated QRT-20 as merge `47598663378dc4c342e84c67219f94aae4a91f0a` after exact-head Repository health, Validate and Package Android Artifacts all passed.
+4. Physical QRT-40 must start from one clean, fixed `dev` identity after this documentation synchronization. Once the physical wave starts, do not pull or otherwise change Harness identity between its constituent cases.
 
 ## Physical acceptance boundary
 
@@ -78,10 +77,10 @@ The canonical same-device lifecycle wave must cover, for both curated tiers wher
 - load -> generate -> close session -> unload;
 - cooperative cancellation after streaming starts;
 - repeated load/generate/unload with bounded PSS growth;
-- active-generation `LOW_MEMORY` cancellation and full resource release;
+- active-generation `LOW_MEMORY` cancellation and full resource release on both 0.8B and 2B;
 - 0.8B -> 2B -> 0.8B model switching with no stale residency;
 - exact Harness commit, llama.cpp revision, model digests, device identity and thermal-start gate;
-- append-only/log-backed evidence plus a SHA-256 manifest;
+- log-backed evidence plus a SHA-256 manifest that records switch/LOW_MEMORY output budgets, memory repeat count, PSS growth budget and timeout;
 - no automatic profile promotion.
 
 Performance/quality tuning remains owned by the existing Qwen3.5/LLRT runners; this wave does not redefine benchmark thresholds or reuse pre-normalization stale evidence.

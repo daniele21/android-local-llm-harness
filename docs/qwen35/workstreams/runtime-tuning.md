@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.runtime-tuning
 Read when: changing Qwen3.5 context policy, cache/session reuse, Android CPU parameters or performance benchmark keys
-Last reviewed: 2026-08-24
+Last reviewed: 2026-08-25
 
 ## Goal
 
@@ -141,6 +141,22 @@ thinking: DISABLED
 
 This is not yet a `MEASURED` default. Broader product workloads, representative-device evidence and lifecycle/memory acceptance remain separate gates.
 
+## Reviewed profile promotion gate
+
+PR #427 integrates the explicit acceptance path from `CANDIDATE` to `MEASURED`. Promotion is not inferred from `eligibleForProfileSelection`, a benchmark summary or CI success.
+
+The reviewed acceptance evidence must match the exact runtime profile ID/version, tier and pinned llama.cpp revision and must provide:
+
+- non-empty lowercase SHA-256 benchmark evidence identities;
+- non-empty lowercase SHA-256 lifecycle evidence identities;
+- non-empty reviewed representative-device classes;
+- explicit lifecycle acceptance;
+- explicit memory acceptance;
+- explicit representative-device coverage acceptance;
+- explicit `PROMOTE_MEASURED` decision.
+
+`KEEP_CANDIDATE` is always a valid fail-safe review result and leaves the candidate unchanged. The gate changes evidence status only; it does not silently alter runtime knobs or production defaults.
+
 ## Physical-device evidence runners
 
 ### Bounded LLRT-3 CPU delta runner
@@ -187,6 +203,27 @@ bash scripts/run-qwen35-prefill-validation.sh \
 ```
 
 The runner compares baseline `t4/bt4/b128/ub64` with candidate `t4/bt2/b128/ub64` across deterministic 256/512/1024-word prompts. Word tiers are workload construction labels only; the runtime-recorded input token count is authoritative. The 1024-word workload may require a larger per-generation timeout on CPU-only devices; interrupted incomplete cases can be resumed without overwriting complete evidence.
+
+### Lifecycle/memory acceptance runner
+
+PR #428 integrates the canonical same-device lifecycle/memory runner:
+
+```bash
+bash scripts/run-qwen35-lifecycle-acceptance.sh \
+  --model-08b /path/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --model-2b /path/Qwen3.5-2B-Q4_K_M.gguf \
+  --device <adb-serial>
+```
+
+The runner requires the exact curated Q4_K_M digests, a clean tracked Harness worktree, a clean exact pinned llama.cpp submodule and arm64-v8a. It serializes same-device suites behind the thermal-start gate and runs:
+
+- existing generation/unload, active cancellation and repeated PSS-cycle acceptance for 0.8B;
+- the same E2E acceptance for 2B;
+- active-generation `LOW_MEMORY` cancellation and full release for 0.8B;
+- active-generation `LOW_MEMORY` cancellation and full release for 2B;
+- 0.8B -> 2B -> 0.8B switching with no stale model residency.
+
+The SHA-256 manifest records exact Harness/backend/model/device identity plus context/batch settings, switch and LOW_MEMORY output budgets, memory repeat count, PSS growth budget, timeout and hashes of the underlying logs/structured evidence. CI proves only the tooling contract. Physical acceptance remains pending until the runner is executed on the target device and the resulting manifest is reviewed.
 
 ### 2026-08-20 bounded 2B evidence
 
@@ -299,7 +336,31 @@ short-profile 2B width 3 Quality: qualified signal
 short-profile 2B width 4 Quality: UNQUALIFIED
 ```
 
-Within this exact short-profile/device envelope, width `3` is the highest concurrency width that passed exact serial/native equivalence. This is not a production cap and must not be generalized to the canonical `2048` context / `64` output profile or to other devices. A future canonical evidence wave may re-evaluate width `4`, but it must pass the same exact-output gate; the gate is not relaxed because the divergence is sampling-sensitive.
+Within this exact short-profile/device envelope, width `3` is the highest concurrency width that passed exact serial/native equivalence. This is not a production cap and must not be generalized to the canonical `2048` context / `64` output profile or to other devices.
+
+### 2026-08-25 canonical LLRT-9C evidence
+
+The canonical `2048 / 64` serial-versus-native-batch wave completed on Samsung `SM-A566B` with pinned llama.cpp, seed `42`, `b128/ub64`, thinking disabled and four order-balanced samples per passing width.
+
+For 2B (`t4/bt4`):
+
+| Width | Correctness | Serial median | Native-batch median | Result |
+| ---: | --- | ---: | ---: | --- |
+| 2 | PASS, 4/4 exact digest + token parity | 91.50 s | 84.71 s | `1.080x`, positive |
+| 3 | PASS, 4/4 exact digest + token parity | 131.71 s | 119.40 s | `1.103x`, positive |
+| 4 | FAIL at sample 0 | n/a | n/a | UNQUALIFIED |
+
+Width 4 reproduces the source-prompt-2 digest divergence; widths 2/3 improve median wall time by about 7.4%/9.4%. Width 3 is only the highest passing width for this exact device/profile, not a production cap.
+
+For 0.8B (`t2/bt4`):
+
+| Width | Correctness | Serial median | Native-batch median | Result |
+| ---: | --- | ---: | ---: | --- |
+| 2 | PASS, 4/4 exact digest + token parity | 100.69 s | 115.39 s | batch `14.6%` slower |
+| 3 | PASS, 4/4 exact digest + token parity | 119.42 s | 132.53 s | batch `11.0%` slower |
+| 4 | FAIL at sample 0 | n/a | n/a | UNQUALIFIED |
+
+Width 4 fails the per-case output-token count gate. Because passing widths 2/3 are already slower, native batching is rejected for the canonical 0.8B device/profile identity. These findings remain tier- and device-specific and do not create one global batching policy.
 
 ### Full Q35-6 tuning matrix
 
@@ -334,7 +395,10 @@ The priority evidence checkpoint is complete, but Q35-6 remains a broader certif
 2. **2B realistic prefill:** DONE; `t4/bt2/b128/ub64` is REJECTED and baseline `t4/bt4/b128/ub64` remains the current CPU candidate.
 3. **Recurrent-state correctness:** DONE; both tiers return `KEEP_DISABLED` because partial rollback is unsupported.
 4. **LLRT-9 short-profile width-4 diagnosis:** DONE; mismatch follows source prompt `2`, not slot `2`, and disappears under greedy. Quality width `4` remains unqualified while the exact-output gate stays unchanged.
-5. **Profile promotion:** still blocked on broader/representative evidence plus lifecycle/memory acceptance; no bounded result is automatically `MEASURED`.
+5. **LLRT-9C canonical batching:** DONE on the current Samsung identity; 0.8B native batching is rejected, while 2B widths 2/3 are positive and width 4 remains unqualified.
+6. **Profile promotion contract:** DONE in software; reviewed exact-provenance evidence is mandatory and `KEEP_CANDIDATE` remains fail-safe.
+7. **Lifecycle/memory acceptance tooling:** DONE in software; canonical physical execution and evidence review are still pending.
+8. **Profile promotion:** blocked on canonical lifecycle/memory physical evidence plus broader representative CPU evidence; no existing one-device result is sufficient for `MEASURED`.
 
 ## Task ledger
 
@@ -345,11 +409,11 @@ The priority evidence checkpoint is complete, but Q35-6 remains a broader certif
 | Q35-RT-03 | DONE | Gate prefix/session restore and reuse capabilities for Qwen3.5; 2026-08-21 physical evidence explicitly confirms `KEEP_DISABLED` for both curated tiers. |
 | Q35-RT-04 | DONE | Extend benchmark identity and persistence with exact execution-configuration identity. |
 | Q35-RT-05 | DONE | Define controlled tuning matrix plus repeatable physical-device evidence tooling. |
-| Q35-RT-06 | IN PROGRESS | 0.8B physical tuning track: bounded screening is DONE with `t2/bt4/b128/ub64` as the bounded priority candidate; broader/representative validation remains before profile promotion. |
-| Q35-RT-07 | IN PROGRESS | 2B physical tuning track: bounded and realistic longer-prompt validation are DONE; `t4/bt2/b128/ub64` is REJECTED, baseline remains current candidate, LLRT-9 short-profile width `4` Quality is unqualified, and broader representative validation remains. |
-| Q35-RT-08 | BLOCKED | Select versioned default profiles only after both model tracks provide sufficient measured memory/TTFT/throughput/thermal evidence. |
-| Q35-RT-09 | BLOCKED | Validate model switch, memory pressure, cancellation and idle unload after measured configuration candidates are selected. |
-| Q35-RT-10 | DONE | Diagnostic candidate profiles and evidence summarization cannot masquerade as measured/certified defaults. |
+| Q35-RT-06 | IN PROGRESS | 0.8B track: bounded screening favors `t2/bt4/b128/ub64`; canonical LLRT-9C rejects native batching on the current Samsung identity; broader/representative validation remains before promotion. |
+| Q35-RT-07 | IN PROGRESS | 2B track: `t4/bt2/b128/ub64` is rejected, `t4/bt4/b128/ub64` remains the CPU candidate, canonical LLRT-9C passes native widths 2/3 and leaves width 4 unqualified; broader representative validation remains. |
+| Q35-RT-08 | BLOCKED | Select versioned measured/default profiles only after representative benchmark coverage and lifecycle/memory evidence satisfy the reviewed acceptance gate. |
+| Q35-RT-09 | IN PROGRESS | Lifecycle/memory tooling is integrated for both tiers; physical Samsung cancellation, switch, LOW_MEMORY, repeated PSS and idle-unload evidence remains to be run and reviewed. |
+| Q35-RT-10 | DONE | Candidate/evidence outputs cannot masquerade as measured defaults; explicit provenance-bound promotion is the only reviewed `MEASURED` path. |
 | Q35-RT-11 | DONE | Classify the short-profile 2B LLRT-9 width-4 mismatch without relaxing the exact-output correctness gate. |
 
 ## Acceptance criteria
@@ -358,12 +422,14 @@ Q35-5 is complete because context selection is bounded, exact-backend capabiliti
 
 Q35-6 remains `IN PROGRESS` until:
 
-- 0.8B and 2B have separately measured default profiles;
-- selected defaults have recorded TTFT, prefill/decode throughput, peak memory and thermal evidence;
-- cancellation, close, switch and memory-pressure paths leave the measured runtime reusable;
+- 0.8B and 2B have separately reviewed measured/default profile decisions;
+- selected candidates have recorded TTFT, prefill/decode throughput, peak memory and thermal evidence across required representative coverage;
+- cancellation, close, switch and memory-pressure paths leave the reviewed runtime reusable;
+- lifecycle evidence and benchmark evidence are bound by exact SHA-256 provenance;
+- the explicit acceptance review records either `KEEP_CANDIDATE` or `PROMOTE_MEASURED`;
 - physical-device evidence is ready for certification consumption.
 
-The completed bounded/focused evidence satisfies search-space reduction and candidate rejection/selection only. It must remain preserved as immutable evidence rather than being overwritten or reinterpreted as the final Q35-6 matrix.
+The completed bounded/focused/canonical single-device evidence satisfies search-space reduction and device-scoped candidate decisions only. It must remain preserved as immutable evidence rather than being overwritten or reinterpreted as generalized Q35-6 certification.
 
 ## Upstream reference
 
