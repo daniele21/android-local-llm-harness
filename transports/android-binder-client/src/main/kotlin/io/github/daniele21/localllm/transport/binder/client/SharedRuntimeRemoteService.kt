@@ -36,7 +36,10 @@ internal interface ConsumerSharedRuntimeRemoteService {
     fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
 
     @Throws(RemoteException::class)
-    fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
+    fun generateV2(
+        request: ConsumerGenerationRequestV2Parcel,
+        callback: (ConsumerGenerationEventParcel) -> Unit,
+    ) {
         throw RemoteException("Consumer generation v2 is unavailable")
     }
 
