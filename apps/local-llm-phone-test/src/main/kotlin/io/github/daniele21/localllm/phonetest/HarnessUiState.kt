@@ -18,6 +18,8 @@ internal enum class HarnessDiagnosticAction {
     BENCHMARK_CAPTURE,
 }
 
+internal data class HarnessDiagnosticActionToken(val action: HarnessDiagnosticAction, val generation: Long)
+
 internal data class PlaygroundPresetOption(
     val id: String,
     val profileId: Qwen35GenerationProfileId,
@@ -86,6 +88,7 @@ internal data class HarnessUiState(
     val operationStatus: String = "Ready",
     val playground: PlaygroundState = PlaygroundState(),
     val diagnostics: DiagnosticsUiState = DiagnosticsUiState(null, emptyList(), emptyList()),
+    val resourceHistory: DiagnosticsResourceHistoryUi = DiagnosticsResourceHistoryUi(),
     val benchmark: BenchmarkUiState = BenchmarkUiState(),
     val logFilter: DiagnosticsLogFilter = DiagnosticsLogFilter(),
     val logs: DiagnosticsLogUiState = DiagnosticsLogUiState(),
@@ -191,6 +194,8 @@ internal sealed interface HarnessUiEvent {
     data class DiagnosticActionChanged(val action: HarnessDiagnosticAction, val running: Boolean) : Diagnostics
 
     data class DiagnosticsChanged(val state: DiagnosticsUiState) : Diagnostics
+
+    data class ResourceHistoryChanged(val state: DiagnosticsResourceHistoryUi) : Diagnostics
 
     data class BenchmarkChanged(val state: BenchmarkUiState) : Diagnostics
 
@@ -347,6 +352,8 @@ internal object HarnessUiReducer {
         )
 
         is HarnessUiEvent.DiagnosticsChanged -> state.copy(diagnostics = event.state)
+
+        is HarnessUiEvent.ResourceHistoryChanged -> state.copy(resourceHistory = event.state)
 
         is HarnessUiEvent.BenchmarkChanged -> state.copy(benchmark = event.state)
 

@@ -95,24 +95,6 @@ class MainActivity :
         get() = harnessViewModel.uiState.value.controllerBusy
         set(value) = harnessViewModel.dispatch(HarnessUiEvent.ControllerBusyChanged(value))
 
-    private var healthRunning: Boolean
-        get() = HarnessDiagnosticAction.HEALTH in harnessViewModel.uiState.value.activeDiagnosticActions
-        set(value) = harnessViewModel.dispatch(
-            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.HEALTH, value),
-        )
-
-    private var resourceCaptureRunning: Boolean
-        get() = HarnessDiagnosticAction.RESOURCE_CAPTURE in harnessViewModel.uiState.value.activeDiagnosticActions
-        set(value) = harnessViewModel.dispatch(
-            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.RESOURCE_CAPTURE, value),
-        )
-
-    private var benchmarkCaptureRunning: Boolean
-        get() = HarnessDiagnosticAction.BENCHMARK_CAPTURE in harnessViewModel.uiState.value.activeDiagnosticActions
-        set(value) = harnessViewModel.dispatch(
-            HarnessUiEvent.DiagnosticActionChanged(HarnessDiagnosticAction.BENCHMARK_CAPTURE, value),
-        )
-
     private var operationStatus: String
         get() = harnessViewModel.uiState.value.operationStatus
         set(value) = harnessViewModel.dispatch(HarnessUiEvent.OperationStatusChanged(value))
@@ -218,6 +200,7 @@ class MainActivity :
     }
 
     override fun onDestroy() {
+        harnessViewModel.invalidateDiagnosticActions()
         diagnosticsExecutor.shutdownNow()
         modelDistributionController.close()
         harnessViewModel.detachPlaygroundEffects(playgroundController)
@@ -289,6 +272,9 @@ class MainActivity :
 
     private fun refreshDiagnostics() {
         if (::diagnosticsSource.isInitialized) diagnosticsState = diagnosticsSource.snapshot()
+        if (::resourceSource.isInitialized) {
+            harnessViewModel.dispatch(HarnessUiEvent.ResourceHistoryChanged(resourceSource.history()))
+        }
         if (::benchmarkSource.isInitialized) {
             benchmarkState = benchmarkSource.snapshot(benchmarkState.captureDetail)
         }
@@ -302,12 +288,12 @@ class MainActivity :
 
     private fun runHealthChecks() {
         if (diagnosticActionRunning() || isBusy()) return
-        healthRunning = true
+        val token = harnessViewModel.beginDiagnosticAction(HarnessDiagnosticAction.HEALTH)
         operationStatus = "Running health checks…"
         diagnosticsExecutor.execute {
             val result = runCatching { healthSource.runAll() }
             runOnUiThread {
-                healthRunning = false
+                if (!harnessViewModel.finishDiagnosticAction(token)) return@runOnUiThread
                 operationStatus = result.fold(
                     onSuccess = { "Health checks completed: ${it.status.name}" },
                     onFailure = { "Health checks could not be completed" },
@@ -319,12 +305,12 @@ class MainActivity :
 
     private fun captureResourceSnapshot() {
         if (diagnosticActionRunning() || isBusy()) return
-        resourceCaptureRunning = true
+        val token = harnessViewModel.beginDiagnosticAction(HarnessDiagnosticAction.RESOURCE_CAPTURE)
         operationStatus = "Capturing device resources…"
         diagnosticsExecutor.execute {
             val result = runCatching(resourceSource::capture)
             runOnUiThread {
-                resourceCaptureRunning = false
+                if (!harnessViewModel.finishDiagnosticAction(token)) return@runOnUiThread
                 operationStatus = if (result.isSuccess) {
                     "Resource snapshot captured"
                 } else {
@@ -337,12 +323,12 @@ class MainActivity :
 
     private fun captureBenchmarkBaselines() {
         if (diagnosticActionRunning() || isBusy()) return
-        benchmarkCaptureRunning = true
+        val token = harnessViewModel.beginDiagnosticAction(HarnessDiagnosticAction.BENCHMARK_CAPTURE)
         operationStatus = "Capturing benchmark baselines…"
         diagnosticsExecutor.execute {
             val result = runCatching(benchmarkSource::captureEligible)
             runOnUiThread {
-                benchmarkCaptureRunning = false
+                if (!harnessViewModel.finishDiagnosticAction(token)) return@runOnUiThread
                 benchmarkState = result.getOrElse {
                     BenchmarkUiState(sourceError = "Benchmark capture could not be completed.")
                 }
@@ -356,12 +342,12 @@ class MainActivity :
 
     private fun captureBenchmarkBaseline(stableId: String) {
         if (diagnosticActionRunning() || isBusy()) return
-        benchmarkCaptureRunning = true
+        val token = harnessViewModel.beginDiagnosticAction(HarnessDiagnosticAction.BENCHMARK_CAPTURE)
         operationStatus = "Capturing selected benchmark baseline…"
         diagnosticsExecutor.execute {
             val result = runCatching { benchmarkSource.capture(stableId) }
             runOnUiThread {
-                benchmarkCaptureRunning = false
+                if (!harnessViewModel.finishDiagnosticAction(token)) return@runOnUiThread
                 benchmarkState = result.getOrElse {
                     BenchmarkUiState(sourceError = "Benchmark capture could not be completed.")
                 }
@@ -491,7 +477,7 @@ class MainActivity :
                     popExitTransition = { ExitTransition.None },
                 ) {
                     composable(HarnessDestination.OVERVIEW.route) {
-                        val resource = resourceSource.history().snapshots.firstOrNull()
+                        val resource = uiState.resourceHistory.snapshots.firstOrNull()
                         HarnessOverviewScreen(
                             state = uiState,
                             diagnostics = diagnosticsState,
@@ -751,7 +737,7 @@ class MainActivity :
                     HarnessDiagnosticsOverview(
                         state = harnessDiagnosticsOverviewState(
                             diagnostics = diagnosticsState,
-                            resources = resourceSource.history(),
+                            resources = state.resourceHistory,
                             benchmarks = benchmarkState,
                             logs = logState,
                             validationReport = latestReport,
@@ -781,7 +767,7 @@ class MainActivity :
 
                     DiagnosticsSection.RESOURCES -> {
                         runtimeDiagnostics()
-                        resourceDiagnostics()
+                        resourceDiagnostics(state.resourceHistory)
                     }
 
                     DiagnosticsSection.BENCHMARKS -> {
@@ -911,8 +897,7 @@ class MainActivity :
         if (showDivider) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
     }
 
-    private fun androidx.compose.foundation.lazy.LazyListScope.resourceDiagnostics() {
-        val history = resourceSource.history()
+    private fun androidx.compose.foundation.lazy.LazyListScope.resourceDiagnostics(history: DiagnosticsResourceHistoryUi) {
         item {
             HarnessCard {
                 Text("Device resources", style = MaterialTheme.typography.titleLarge)
@@ -1263,7 +1248,7 @@ class MainActivity :
         }
     }
 
-    private fun diagnosticActionRunning(): Boolean = healthRunning || resourceCaptureRunning || benchmarkCaptureRunning
+    private fun diagnosticActionRunning(): Boolean = harnessViewModel.uiState.value.diagnosticActionRunning
 
     private fun isBusy(): Boolean = harnessViewModel.uiState.value.busy
 
