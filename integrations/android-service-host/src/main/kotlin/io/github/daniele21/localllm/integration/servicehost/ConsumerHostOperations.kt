@@ -19,6 +19,7 @@ import io.github.daniele21.localllm.transport.binder.contract.toConsumerWire
 import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerInput
 import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerOutput
 import io.github.daniele21.localllm.transport.binder.contract.toCoreSelection
+import io.github.daniele21.localllm.transport.binder.contract.toCoreTaskDefinition
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class ConsumerHostOperations(
@@ -178,6 +179,7 @@ internal class ConsumerHostOperations(
                     sessionId = sessionId,
                     input = requireNotNull(request.input).toCoreConsumerInput(),
                     outputConstraint = requireNotNull(request.outputConstraint).toCoreConsumerOutput(),
+                    taskDefinitions = request.taskDefinitions.map { it.toCoreTaskDefinition() },
                 )
             }.getOrNull()
         if (coreRequest == null) {
