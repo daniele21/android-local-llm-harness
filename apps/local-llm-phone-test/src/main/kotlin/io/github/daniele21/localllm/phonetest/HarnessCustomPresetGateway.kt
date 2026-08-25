@@ -91,7 +91,7 @@ private fun HostControlPlaneState.withCustomPreset(
     val assignment = resolveCustomPresetAssignment(command, identity)
     val basePreset = resolveBasePreset(command, identity.useCaseId, assignment.binding)
     val fields = resolveCustomPresetFields(command, identity.useCaseId)
-    validateContext(command.contextTokens, assignment.useCase)
+    CustomPresetValidation.context(command.contextTokens, assignment.useCase)
     val customPreset = buildCustomPreset(
         command = command,
         useCaseId = identity.useCaseId,
@@ -107,26 +107,11 @@ private fun HostControlPlaneState.resolveCustomPresetAssignment(
 ): CustomPresetAssignment {
     val binding = latestBinding(identity.applicationId, identity.useCaseId)
         ?: throw CustomPresetRejected("Assignment is no longer available")
-    validateBinding(command.expectedBindingRevision, binding)
+    CustomPresetValidation.binding(command.expectedBindingRevision, binding)
     val useCase = latestUseCase(identity.useCaseId)
         ?: throw CustomPresetRejected("Use case is no longer available")
-    validateUseCase(useCase)
+    CustomPresetValidation.useCase(useCase)
     return CustomPresetAssignment(binding, useCase)
-}
-
-private fun validateBinding(expectedRevision: Int, binding: ApplicationUseCaseBinding) {
-    if (binding.revision != expectedRevision) {
-        throw CustomPresetStaleBindingRevision(expectedRevision, binding.revision)
-    }
-    if (!binding.enabled) {
-        throw CustomPresetRejected("Assignment is disabled")
-    }
-}
-
-private fun validateUseCase(useCase: UseCaseDefinition) {
-    if (useCase.state != UseCaseDefinitionState.ACTIVE) {
-        throw CustomPresetRejected("Use case is not active")
-    }
 }
 
 private fun HostControlPlaneState.resolveBasePreset(
@@ -150,8 +135,8 @@ private fun HostControlPlaneState.resolveCustomPresetFields(
     useCaseId: UseCaseId,
 ): CustomPresetFields = CustomPresetFields(
     presetId = validatePresetId(command.presetId, useCaseId),
-    displayName = validateDisplayName(command.displayName),
-    modelProfileId = validateModelProfileId(command.modelProfileId),
+    displayName = CustomPresetValidation.displayName(command.displayName),
+    modelProfileId = CustomPresetValidation.modelProfileId(command.modelProfileId),
 )
 
 private fun HostControlPlaneState.validatePresetId(rawPresetId: String, useCaseId: UseCaseId): String {
@@ -163,30 +148,6 @@ private fun HostControlPlaneState.validatePresetId(rawPresetId: String, useCaseI
         throw CustomPresetRejected("Preset identity is already in use")
     }
     return presetId
-}
-
-private fun validateDisplayName(rawDisplayName: String): String {
-    val displayName = rawDisplayName.trim()
-    if (displayName.isBlank()) {
-        throw CustomPresetRejected("Preset name is required")
-    }
-    return displayName
-}
-
-private fun validateModelProfileId(rawModelProfileId: String?): String? {
-    val modelProfileId = rawModelProfileId?.trim()
-    if (modelProfileId != null && modelProfileId.isBlank()) {
-        throw CustomPresetRejected("Model profile identity is invalid")
-    }
-    return modelProfileId
-}
-
-private fun validateContext(contextTokens: Int?, useCase: UseCaseDefinition) {
-    if (contextTokens != null && contextTokens < useCase.requirements.minimumContextTokens) {
-        throw CustomPresetRejected(
-            "Context must be at least ${useCase.requirements.minimumContextTokens} tokens for this use case",
-        )
-    }
 }
 
 private fun buildCustomPreset(
@@ -223,6 +184,47 @@ private fun HostControlPlaneState.addCustomPreset(
         isDefault = false,
     ),
 )
+
+private object CustomPresetValidation {
+    fun binding(expectedRevision: Int, binding: ApplicationUseCaseBinding) {
+        if (binding.revision != expectedRevision) {
+            throw CustomPresetStaleBindingRevision(expectedRevision, binding.revision)
+        }
+        if (!binding.enabled) {
+            throw CustomPresetRejected("Assignment is disabled")
+        }
+    }
+
+    fun useCase(useCase: UseCaseDefinition) {
+        if (useCase.state != UseCaseDefinitionState.ACTIVE) {
+            throw CustomPresetRejected("Use case is not active")
+        }
+    }
+
+    fun displayName(rawDisplayName: String): String {
+        val displayName = rawDisplayName.trim()
+        if (displayName.isBlank()) {
+            throw CustomPresetRejected("Preset name is required")
+        }
+        return displayName
+    }
+
+    fun modelProfileId(rawModelProfileId: String?): String? {
+        val modelProfileId = rawModelProfileId?.trim()
+        if (modelProfileId != null && modelProfileId.isBlank()) {
+            throw CustomPresetRejected("Model profile identity is invalid")
+        }
+        return modelProfileId
+    }
+
+    fun context(contextTokens: Int?, useCase: UseCaseDefinition) {
+        if (contextTokens != null && contextTokens < useCase.requirements.minimumContextTokens) {
+            throw CustomPresetRejected(
+                "Context must be at least ${useCase.requirements.minimumContextTokens} tokens for this use case",
+            )
+        }
+    }
+}
 
 private class CustomPresetStaleBindingRevision(val expectedRevision: Int, val actualRevision: Int) : RuntimeException()
 
