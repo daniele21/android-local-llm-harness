@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: qwen35
 Canonical scope: qwen35.state
 Read when: determining Qwen3.5-only product progress, blockers or the next implementation slice
-Last reviewed: 2026-08-24
+Last reviewed: 2026-08-25
 
 This ledger reports only Qwen3.5-only product progress. Repository-wide integrated state remains owned by [`../current-state.md`](../current-state.md).
 
@@ -82,6 +82,38 @@ The repository-side tuning harness is implemented:
 7. the summarizer validates identity/sample completeness and marks only comparable cases as `eligibleForProfileSelection`;
 8. no script automatically promotes a runtime profile from `CANDIDATE` to `MEASURED`.
 
+### LLRT-6 canonical `2048 / 64` KV-cache findings
+
+LLRT-6C ran on `SM-A566B` (Android 16 / SDK 36 / arm64), Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9`, pinned llama.cpp, seed `42`, `b128/ub64`, thinking off, with 1 cold + 3 warm samples. All cases were eligible and thermal status stayed `0`. K-only/FA-off compares with `release-default`; quantized K+V compares with `f16/f16 + FA` because quantized V requires FA on this pin.
+
+#### Qwen3.5 0.8B (`t2/bt4`)
+
+| Case | Warm total median | Peak observed PSS | Decision |
+| --- | ---: | ---: | --- |
+| `release-default` | 82.110 s | 1,196,873 KB | control |
+| `K=q8_0`, FA off | 82.019 s | 1,194,665 KB | REJECT: ~0.1% faster, ~2 MiB lower PSS, digest differs |
+| `K=q4_0`, FA off | 82.110 s | 1,192,122 KB | REJECT: latency neutral, ~5 MiB lower PSS, digest differs |
+| `f16/f16 + FA` | 81.853 s | 1,064,813 KB | FA-on control only |
+| `q8_0/q8_0 + FA` | 81.938 s | 1,192,377 KB | REJECT: ~125 MiB higher PSS, digest differs |
+| `q4_0/q4_0 + FA` | 81.730 s | 1,187,535 KB | REJECT: ~120 MiB higher PSS, digest differs |
+
+The 0.8B policy stays at release defaults. Lower PSS for the FA control versus release baseline is not attributable to KV type because FA also changes.
+
+#### Qwen3.5 2B (`t4/bt4`)
+
+| Case | Warm total median | Peak observed PSS | Decision |
+| --- | ---: | ---: | --- |
+| `release-default` | 217.839 s | 2,132,802 KB | control |
+| `K=q8_0`, FA off | 218.220 s | 2,645,895 KB | REJECT: +0.17% latency, ~501 MiB higher PSS, digest differs |
+| `K=q4_0`, FA off | 237.354 s | 2,642,881 KB | REJECT: +8.96% latency, ~498 MiB higher PSS, digest differs |
+| `f16/f16 + FA` | 219.067 s | 2,571,445 KB | FA-on control only |
+| `q8_0/q8_0 + FA` | 233.648 s | 1,897,476 KB | REJECT default: ~658 MiB lower PSS, +6.66% latency, digest differs |
+| `q4_0/q4_0 + FA` | 218.048 s | 2,433,852 KB | RESEARCH ONLY: ~134 MiB lower PSS, latency neutral, digest differs |
+
+### LLRT-6 decision
+
+LLRT-6C closes **KEEP DEFAULTS** for both tiers. K-only quantization is rejected and quantized K+V is not promoted. The 2B `q4_0/q4_0 + FA` signal remains research-only pending explicit quality evidence; no profile becomes `MEASURED`.
+
 ### LLRT-9 short-profile diagnosis
 
 On Samsung `SM-A566B`, Qwen3.5 2B at `1024 / 8` passed exact serial/native parity at widths `2` and `3`, then failed at width `4` for source prompt `2`. A dedicated follow-up on Harness `0ec8b1bf44c700a57f7f50fa512e8c1ea03a518e` showed that the mismatch followed source prompt `2` after prompt permutation and disappeared under greedy sampling. The evidence therefore favors prompt-sensitive numerical/stochastic divergence rather than a slot/sequence/KV attribution defect. The exact-output gate remains unchanged.
@@ -119,12 +151,13 @@ For this exact device/backend/profile identity:
 
 This is evidence against one global Qwen3.5 batching policy. Correctness gates remain fail-closed and no result promotes a runtime profile to `MEASURED`.
 
-Q35-6 remains `IN PROGRESS`: canonical LLRT-9 on this device is complete, but broader representative-device evidence and lifecycle/memory acceptance remain before profile promotion or generalized production policy.
+Q35-6 remains `IN PROGRESS`: canonical LLRT-6 and LLRT-9 on this device are complete, but broader representative-device evidence and lifecycle/memory acceptance remain before profile promotion or generalized production policy.
 
 ## Remaining Q35-6 evidence
 
 - continue broader/representative 0.8B and 2B physical tuning required by measured-profile acceptance;
-- review eligible evidence separately by tier and choose runtime defaults;
+- keep KV-cache release defaults for both tiers on this exact device/profile unless later quality-backed evidence reopens the decision;
+- preserve 2B `q4_0/q4_0 + FA` only as a research-only memory signal, not a runtime policy;
 - keep 0.8B native batching rejected and 2B width `4` unqualified for this exact device/profile unless superseded by a later evidence wave;
 - mark profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
 - validate cancellation, model switching, memory pressure and idle unload on measured configurations.
