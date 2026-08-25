@@ -49,7 +49,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
 
     @Test
     fun lowMemoryDuringActiveGenerationCancelsAndReleasesEverything() {
-        val harness = buildHarness()
+        val harness = buildHarness(config.runtime.lowMemoryOutputTokens)
         val runtime = harness.runtime
         try {
             val prepared = runtime.prepare(harness.primary.applicationId, harness.primary.useCaseId)
@@ -64,7 +64,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
                 request(
                     binding = harness.primary,
                     session = session,
-                    prompt = config.lowMemoryPrompt,
+                    prompt = config.prompts.lowMemoryPrompt,
                 ),
                 GenerationListener { event ->
                     if (event is GenerationEvent.TextDelta) firstDelta.countDown()
@@ -77,14 +77,14 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
 
             assertTrue(
                 "No streaming delta arrived before low-memory pressure",
-                firstDelta.await(config.timeoutSeconds, TimeUnit.SECONDS),
+                firstDelta.await(config.runtime.timeoutSeconds, TimeUnit.SECONDS),
             )
             val pssBeforeKb = totalPssKb()
             val pressureResult = runtime.handleMemoryPressure(RuntimeMemoryPressure.LOW_MEMORY)
             assertEquals(RuntimeMemoryAction.CANCEL_AND_RELEASE_ALL, pressureResult.action)
             assertTrue(
                 "Low-memory cancellation did not reach a terminal event",
-                terminal.await(config.timeoutSeconds, TimeUnit.SECONDS),
+                terminal.await(config.runtime.timeoutSeconds, TimeUnit.SECONDS),
             )
             val terminalResult = terminalEvent.get()
             assertTrue(
@@ -93,7 +93,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             )
             assertTrue(
                 "LOW_MEMORY did not release runtime resources",
-                eventually(config.timeoutSeconds) {
+                eventually(config.runtime.timeoutSeconds) {
                     val resources = runtime.memoryResourceSnapshot()
                     !resources.modelLoaded &&
                         resources.activeSessions == 0 &&
@@ -106,6 +106,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
                 scenario = "LOW_MEMORY_ACTIVE_GENERATION",
                 values = mapOf(
                     "primaryModelDigest" to config.primary.digest.sha256,
+                    "maxOutputTokens" to config.runtime.lowMemoryOutputTokens,
                     "action" to pressureResult.action.name,
                     "cancelledRequests" to pressureResult.cancelledRequests,
                     "initialModelUnloaded" to pressureResult.modelUnloaded,
@@ -121,12 +122,12 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
 
     @Test
     fun switchesBetweenReferenceModelsWithoutResidencyLeak() {
-        val harness = buildHarness()
+        val harness = buildHarness(config.runtime.switchOutputTokens)
         val runtime = harness.runtime
         try {
             prepareAndAssert(runtime, harness.primary, config.primary.digest)
             val primarySession = runtime.createSession(harness.primary.applicationId, harness.primary.useCaseId)
-            generateAndAwait(runtime, harness.primary, primarySession, config.switchPrompt)
+            generateAndAwait(runtime, harness.primary, primarySession, config.prompts.switchPrompt)
             closeSessionOnly(runtime, primarySession)
             val primaryPssKb = totalPssKb()
 
@@ -134,7 +135,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             assertEquals(config.secondary.digest, runtime.runtimeSnapshot().loadedModel)
             assertEquals(0, runtime.runtimeSnapshot().activeSessions)
             val secondarySession = runtime.createSession(harness.secondary.applicationId, harness.secondary.useCaseId)
-            generateAndAwait(runtime, harness.secondary, secondarySession, config.switchPrompt)
+            generateAndAwait(runtime, harness.secondary, secondarySession, config.prompts.switchPrompt)
             closeSessionOnly(runtime, secondarySession)
             val secondaryPssKb = totalPssKb()
 
@@ -151,6 +152,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
                 values = mapOf(
                     "primaryModelDigest" to config.primary.digest.sha256,
                     "secondaryModelDigest" to config.secondary.digest.sha256,
+                    "maxOutputTokens" to config.runtime.switchOutputTokens,
                     "primaryPssKb" to primaryPssKb,
                     "secondaryPssKb" to secondaryPssKb,
                     "primaryReloadPssKb" to primaryReloadPssKb,
@@ -162,7 +164,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         }
     }
 
-    private fun buildHarness(): LifecycleHarness {
+    private fun buildHarness(maxOutputTokens: Int): LifecycleHarness {
         val primaryApplicationId = ApplicationId("q35-lifecycle-primary")
         val primaryUseCaseId = UseCaseId("generation")
         val secondaryApplicationId = ApplicationId("q35-lifecycle-secondary")
@@ -173,6 +175,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             modelId = "q35-lifecycle-primary-model",
             useCaseProfileId = "q35-lifecycle-primary-use-case",
             model = config.primary,
+            maxOutputTokens = maxOutputTokens,
         )
         val secondaryResolved = resolvedUseCase(
             applicationId = secondaryApplicationId,
@@ -180,6 +183,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             modelId = "q35-lifecycle-secondary-model",
             useCaseProfileId = "q35-lifecycle-secondary-use-case",
             model = config.secondary,
+            maxOutputTokens = maxOutputTokens,
         )
 
         val storeRoot = File(context.noBackupFilesDir, "q35-lifecycle-acceptance")
@@ -208,17 +212,18 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         modelId: String,
         useCaseProfileId: String,
         model: LifecycleModelArguments,
+        maxOutputTokens: Int,
     ): ResolvedUseCase {
         val source = model.resolveModelFile(context)
         val artifact = artifactFor(source, model)
         val profile = GgufModelProfile(
             id = modelId,
             artifact = artifact,
-            contextSize = config.contextTokens,
-            batchSize = config.batchSize,
-            microBatchSize = config.microBatchSize,
+            contextSize = config.runtime.contextTokens,
+            batchSize = config.runtime.batchSize,
+            microBatchSize = config.runtime.microBatchSize,
             cpuThreads = model.cpuThreads,
-            batchThreads = config.batchThreads,
+            batchThreads = config.runtime.batchThreads,
             gpuLayers = 0,
         )
         val useCase = UseCaseProfile(
@@ -226,7 +231,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             modelProfileId = modelId,
             systemPromptVersion = "q35-lifecycle-acceptance-v1",
             generationDefaults = GenerationDefaults(
-                maxOutputTokens = config.switchOutputTokens,
+                maxOutputTokens = maxOutputTokens,
                 temperature = 0f,
                 topP = 1f,
                 topK = 0,
@@ -257,22 +262,13 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         source = ArtifactSource.Imported(model.relativePath),
     )
 
-    private fun prepareAndAssert(
-        runtime: RuntimeOrchestrator,
-        binding: LifecycleBinding,
-        expectedDigest: ModelDigest,
-    ) {
+    private fun prepareAndAssert(runtime: RuntimeOrchestrator, binding: LifecycleBinding, expectedDigest: ModelDigest) {
         val prepared = runtime.prepare(binding.applicationId, binding.useCaseId)
         assertTrue("Prepare failed: ${prepared.detail}", prepared.ready)
         assertEquals(expectedDigest, prepared.modelDigest)
     }
 
-    private fun generateAndAwait(
-        runtime: RuntimeOrchestrator,
-        binding: LifecycleBinding,
-        session: SessionId,
-        prompt: String,
-    ) {
+    private fun generateAndAwait(runtime: RuntimeOrchestrator, binding: LifecycleBinding, session: SessionId, prompt: String) {
         val terminal = CountDownLatch(1)
         val terminalEvent = AtomicReference<GenerationEvent>()
         runtime.generate(
@@ -285,8 +281,8 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
             },
         )
         assertTrue(
-            "Generation did not terminate within ${config.timeoutSeconds}s",
-            terminal.await(config.timeoutSeconds, TimeUnit.SECONDS),
+            "Generation did not terminate within ${config.runtime.timeoutSeconds}s",
+            terminal.await(config.runtime.timeoutSeconds, TimeUnit.SECONDS),
         )
         when (val result = terminalEvent.get()) {
             is GenerationEvent.Completed -> assertTrue("Generation output was empty", result.output.isNotBlank())
@@ -295,11 +291,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         }
     }
 
-    private fun request(
-        binding: LifecycleBinding,
-        session: SessionId,
-        prompt: String,
-    ) = GenerationRequest(
+    private fun request(binding: LifecycleBinding, session: SessionId, prompt: String) = GenerationRequest(
         requestId = RequestId(UUID.randomUUID().toString()),
         sessionId = session,
         applicationId = binding.applicationId,
@@ -311,7 +303,7 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         runtime.closeSession(session)
         assertTrue(
             "Session context was not released",
-            eventually(config.timeoutSeconds) { runtime.runtimeSnapshot().activeSessions == 0 },
+            eventually(config.runtime.timeoutSeconds) { runtime.runtimeSnapshot().activeSessions == 0 },
         )
     }
 
@@ -334,31 +326,24 @@ class Qwen35LifecycleAcceptanceInstrumentedTest {
         val json = JSONObject()
             .put("schemaVersion", 1)
             .put("scenario", scenario)
-            .put("harnessCommit", config.harnessCommit)
-            .put("backendRevision", config.backendRevision)
+            .put("harnessCommit", config.evidence.harnessCommit)
+            .put("backendRevision", config.evidence.backendRevision)
             .put("deviceModel", Build.MODEL)
             .put("androidRelease", Build.VERSION.RELEASE)
             .put("sdkInt", Build.VERSION.SDK_INT)
             .put("abi", Build.SUPPORTED_ABIS.firstOrNull().orEmpty())
-            .put("contextTokens", config.contextTokens)
-            .put("batchSize", config.batchSize)
-            .put("microBatchSize", config.microBatchSize)
-            .put("batchThreads", config.batchThreads)
+            .put("contextTokens", config.runtime.contextTokens)
+            .put("batchSize", config.runtime.batchSize)
+            .put("microBatchSize", config.runtime.microBatchSize)
+            .put("batchThreads", config.runtime.batchThreads)
         values.forEach { (key, value) -> json.put(key, value) }
         println("LOCAL_LLM_Q35_LIFECYCLE_JSON $json")
     }
 }
 
-private data class LifecycleHarness(
-    val runtime: RuntimeOrchestrator,
-    val primary: LifecycleBinding,
-    val secondary: LifecycleBinding,
-)
+private data class LifecycleHarness(val runtime: RuntimeOrchestrator, val primary: LifecycleBinding, val secondary: LifecycleBinding)
 
-private data class LifecycleBinding(
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+private data class LifecycleBinding(val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
 private class MultiBindingRegistry(resolved: List<ResolvedUseCase>) : ModelProfileRegistry {
     private val entries = resolved.associateBy { it.binding.applicationId to it.binding.useCaseId }
@@ -371,16 +356,9 @@ private class MultiBindingRegistry(resolved: List<ResolvedUseCase>) : ModelProfi
 private data class LifecycleAcceptanceConfig(
     val primary: LifecycleModelArguments,
     val secondary: LifecycleModelArguments,
-    val contextTokens: Int,
-    val batchSize: Int,
-    val microBatchSize: Int,
-    val batchThreads: Int,
-    val switchOutputTokens: Int,
-    val switchPrompt: String,
-    val lowMemoryPrompt: String,
-    val timeoutSeconds: Long,
-    val harnessCommit: String,
-    val backendRevision: String,
+    val runtime: LifecycleRuntimeArguments,
+    val prompts: LifecyclePromptArguments,
+    val evidence: LifecycleEvidenceIdentity,
 ) {
     companion object {
         fun fromInstrumentation(): LifecycleAcceptanceConfig {
@@ -403,27 +381,44 @@ private data class LifecycleAcceptanceConfig(
                     digest = ModelDigest(required("secondaryModelSha256").lowercase()),
                     cpuThreads = positiveInt("secondaryCpuThreads", 4),
                 ),
-                contextTokens = positiveInt("contextTokens", 2_048),
-                batchSize = positiveInt("batchSize", 128),
-                microBatchSize = positiveInt("microBatchSize", 64),
-                batchThreads = positiveInt("batchThreads", 4),
-                switchOutputTokens = positiveInt("switchOutputTokens", 8),
-                switchPrompt = args.getString("switchPrompt") ?: "Reply with READY.",
-                lowMemoryPrompt = args.getString("lowMemoryPrompt")
-                    ?: "Write a numbered list from 1 to 1000 and do not stop early.",
-                timeoutSeconds = positiveLong("timeoutSeconds", 900),
-                harnessCommit = required("harnessCommit"),
-                backendRevision = required("backendRevision"),
+                runtime = LifecycleRuntimeArguments(
+                    contextTokens = positiveInt("contextTokens", 2_048),
+                    batchSize = positiveInt("batchSize", 128),
+                    microBatchSize = positiveInt("microBatchSize", 64),
+                    batchThreads = positiveInt("batchThreads", 4),
+                    switchOutputTokens = positiveInt("switchOutputTokens", 8),
+                    lowMemoryOutputTokens = positiveInt("lowMemoryOutputTokens", 256),
+                    timeoutSeconds = positiveLong("timeoutSeconds", 900),
+                ),
+                prompts = LifecyclePromptArguments(
+                    switchPrompt = args.getString("switchPrompt") ?: "Reply with READY.",
+                    lowMemoryPrompt = args.getString("lowMemoryPrompt")
+                        ?: "Write a numbered list from 1 to 1000 and do not stop early.",
+                ),
+                evidence = LifecycleEvidenceIdentity(
+                    harnessCommit = required("harnessCommit"),
+                    backendRevision = required("backendRevision"),
+                ),
             )
         }
     }
 }
 
-private data class LifecycleModelArguments(
-    val relativePath: String,
-    val digest: ModelDigest,
-    val cpuThreads: Int,
-) {
+private data class LifecycleRuntimeArguments(
+    val contextTokens: Int,
+    val batchSize: Int,
+    val microBatchSize: Int,
+    val batchThreads: Int,
+    val switchOutputTokens: Int,
+    val lowMemoryOutputTokens: Int,
+    val timeoutSeconds: Long,
+)
+
+private data class LifecyclePromptArguments(val switchPrompt: String, val lowMemoryPrompt: String)
+
+private data class LifecycleEvidenceIdentity(val harnessCommit: String, val backendRevision: String)
+
+private data class LifecycleModelArguments(val relativePath: String, val digest: ModelDigest, val cpuThreads: Int) {
     fun resolveModelFile(context: Context): File {
         require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) {
             "Model path must be relative to the application data directory"
