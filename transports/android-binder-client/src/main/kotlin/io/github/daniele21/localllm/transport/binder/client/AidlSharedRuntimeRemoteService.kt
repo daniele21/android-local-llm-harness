@@ -86,6 +86,8 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
 }
 
+/** Mirrors the AIDL Consumer service exactly so wire transactions remain easy to audit. */
+@Suppress("TooManyFunctions")
 private class AidlConsumerSharedRuntimeRemoteService(private val delegate: IConsumerLocalLlmService) : ConsumerSharedRuntimeRemoteService {
     override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
         delegate.capabilities(request, resultCallback(callback))
