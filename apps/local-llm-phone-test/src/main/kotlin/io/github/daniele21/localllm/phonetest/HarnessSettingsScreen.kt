@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessColors
+import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 
 @Composable
 internal fun HarnessSettingsScreen(
@@ -32,6 +34,7 @@ internal fun HarnessSettingsScreen(
     onOpenBuild: () -> Unit,
     onOpenDeveloperTools: () -> Unit,
 ) {
+    val stackDenseContent = currentHarnessAdaptivePolicy().stackDenseContent
     HarnessScreenList(title = null) {
         item { SettingsSectionLabel("Appearance") }
         item {
@@ -61,6 +64,7 @@ internal fun HarnessSettingsScreen(
                 title = "Local inference & privacy",
                 detail = "Prompts and generated output are not persisted by normal Harness telemetry.",
                 trailing = "On-device",
+                stackDenseContent = stackDenseContent,
                 onClick = onOpenPrivacy,
             )
         }
@@ -72,6 +76,7 @@ internal fun HarnessSettingsScreen(
                 title = "Models & local data",
                 detail = "Inspect selected-model storage and protected cleanup behavior.",
                 trailing = settingsSelectedModelStorageLabel(model),
+                stackDenseContent = stackDenseContent,
                 onClick = onOpenStorage,
             )
         }
@@ -83,6 +88,7 @@ internal fun HarnessSettingsScreen(
                 title = "Build & runtime info",
                 detail = "Version, build identity and runtime metadata.",
                 trailing = "›",
+                stackDenseContent = stackDenseContent,
                 onClick = onOpenBuild,
             )
         }
@@ -94,6 +100,7 @@ internal fun HarnessSettingsScreen(
                 title = "Developer tools",
                 detail = "Health, logs, validation and advanced evidence surfaces.",
                 trailing = "›",
+                stackDenseContent = stackDenseContent,
                 onClick = onOpenDeveloperTools,
             )
         }
@@ -110,10 +117,18 @@ private fun SettingsSectionLabel(text: String) {
 }
 
 @Composable
-private fun SettingsRow(destination: HarnessDestination, title: String, detail: String, trailing: String, onClick: () -> Unit) {
+private fun SettingsRow(
+    destination: HarnessDestination,
+    title: String,
+    detail: String,
+    trailing: String,
+    stackDenseContent: Boolean,
+    onClick: () -> Unit,
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = HarnessMinimumTouchTarget)
             .clickable(
                 onClickLabel = "Open $title",
                 role = Role.Button,
@@ -123,21 +138,43 @@ private fun SettingsRow(destination: HarnessDestination, title: String, detail: 
         shape = MaterialTheme.shapes.medium,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            HarnessDestinationIcon(destination, selected = true, modifier = Modifier.padding(1.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+        if (stackDenseContent) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    HarnessDestinationIcon(destination, selected = true, modifier = Modifier.padding(1.dp))
+                    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                }
                 Text(
                     detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(trailing, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
             }
-            Text(trailing, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
+        } else {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                HarnessDestinationIcon(destination, selected = true, modifier = Modifier.padding(1.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(trailing, style = MaterialTheme.typography.labelLarge, color = HarnessColors.Secondary)
+            }
         }
     }
 }
