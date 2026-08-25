@@ -115,10 +115,10 @@ private fun overviewHeroDetail(primaryAction: HarnessOverviewPrimaryAction, sele
         "The selected model and runtime residency do not agree. Review Models before running another inference."
 
     selectedResident ->
-        "Selected and currently resident in memory. The next run can reuse the local runtime when policy allows."
+        "Run a prompt for a quick measured check, or open Performance from the main navigation to prepare repeatable evaluation. The selected model is already resident in memory."
 
     else ->
-        "Selected on this device. The runtime will load it explicitly when the next inference requires it."
+        "Run a prompt for a quick measured check, or open Performance from the main navigation to prepare repeatable evaluation. The runtime will load the selected model explicitly when inference requires it."
 }
 
 private fun overviewSelectedModelStatus(modelState: OverviewModelState): String = when {
