@@ -79,10 +79,10 @@ class ParcelableRoundTripTest {
             ConsumerGenerationRequestV2Parcel(
                 request = baseRequest,
                 taskDefinitions =
-                    listOf(
-                        TaskDefinitionParcel("email", "An email address", "ada@example.test"),
-                        TaskDefinitionParcel("health-condition", "A diagnosed health condition"),
-                    ),
+                listOf(
+                    TaskDefinitionParcel("email", "An email address", "ada@example.test"),
+                    TaskDefinitionParcel("health-condition", "A diagnosed health condition"),
+                ),
             )
 
         assertEquals(value, roundTrip(value, parcelableCreator<ConsumerGenerationRequestV2Parcel>()))
