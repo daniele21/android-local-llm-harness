@@ -28,12 +28,13 @@ internal fun PerformanceRunSection(
     onIntent: (PerformanceIntent) -> Unit,
     onOpenModels: () -> Unit,
 ) {
+    val stackDenseContent = currentHarnessAdaptivePolicy().stackDenseContent
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PerformanceDatasetSelector(state)
         PerformanceModelSelector(state, modelOptions, onIntent, onOpenModels)
-        PerformanceSampleSelector(state, onIntent)
+        PerformanceSampleSelector(state, onIntent, stackDenseContent)
         PerformanceProfileSelector(state, profileOptions, onIntent)
-        PerformanceReadinessCard(state, runnerAvailable, onIntent)
+        PerformanceReadinessCard(state, runnerAvailable, onIntent, stackDenseContent)
     }
 }
 
@@ -92,7 +93,9 @@ private fun PerformanceModelSelector(
                         selected = state.runSetup.model == option.identity,
                         onClick = { onIntent(PerformanceIntent.SelectModel(option.identity)) },
                         label = { Text(option.displayName) },
-                        modifier = Modifier.testTag("performance-model-${option.identity.artifactDigest.sha256.take(12)}"),
+                        modifier = Modifier.testTag(
+                            "performance-model-${option.identity.artifactDigest.sha256.take(12)}",
+                        ),
                     )
                     if (state.runSetup.model == option.identity) {
                         Text(
@@ -108,7 +111,11 @@ private fun PerformanceModelSelector(
 }
 
 @Composable
-private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (PerformanceIntent) -> Unit) {
+private fun PerformanceSampleSelector(
+    state: PerformanceState,
+    onIntent: (PerformanceIntent) -> Unit,
+    stackDenseContent: Boolean,
+) {
     HarnessCard {
         Text("3 · Samples", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -117,15 +124,16 @@ private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (Perfor
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            performanceFixedSamples.chunked(2).forEach { rowSelections ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowSelections.forEach { selection ->
-                        FilterChip(
-                            selected = state.runSetup.sampleSelection == selection,
-                            enabled = performanceSampleEnabled(selection, state.runSetup.dataset?.caseCount),
-                            onClick = { onIntent(PerformanceIntent.SelectSample(selection)) },
-                            label = { Text(performanceSampleLabel(selection)) },
-                        )
+            if (stackDenseContent) {
+                performanceFixedSamples.forEach { selection ->
+                    PerformanceSampleChip(state, selection, onIntent, Modifier.fillMaxWidth())
+                }
+            } else {
+                performanceFixedSamples.chunked(2).forEach { rowSelections ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowSelections.forEach { selection ->
+                            PerformanceSampleChip(state, selection, onIntent)
+                        }
                     }
                 }
             }
@@ -138,6 +146,22 @@ private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (Perfor
             )
         }
     }
+}
+
+@Composable
+private fun PerformanceSampleChip(
+    state: PerformanceState,
+    selection: PerformanceSampleSelection.Fixed,
+    onIntent: (PerformanceIntent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = state.runSetup.sampleSelection == selection,
+        enabled = performanceSampleEnabled(selection, state.runSetup.dataset?.caseCount),
+        onClick = { onIntent(PerformanceIntent.SelectSample(selection)) },
+        label = { Text(performanceSampleLabel(selection)) },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -175,22 +199,33 @@ private fun PerformanceProfileSelector(
 }
 
 @Composable
-private fun PerformanceReadinessCard(state: PerformanceState, runnerAvailable: Boolean, onIntent: (PerformanceIntent) -> Unit) {
+private fun PerformanceReadinessCard(
+    state: PerformanceState,
+    runnerAvailable: Boolean,
+    onIntent: (PerformanceIntent) -> Unit,
+    stackDenseContent: Boolean,
+) {
     val ready = state.runSetup.readiness == PerformanceRunReadiness.Ready
+    val statusLabel = when {
+        !runnerAvailable -> "Unavailable"
+        ready -> "Ready"
+        else -> "Setup incomplete"
+    }
+    val statusTone = if (runnerAvailable && ready) HarnessStatusTone.SUCCESS else HarnessStatusTone.NEUTRAL
     HarnessCard(emphasized = true) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Ready to run?", style = MaterialTheme.typography.titleMedium)
-            HarnessStatusBadge(
-                label = when {
-                    !runnerAvailable -> "Unavailable"
-                    ready -> "Ready"
-                    else -> "Setup incomplete"
-                },
-                tone = if (runnerAvailable && ready) HarnessStatusTone.SUCCESS else HarnessStatusTone.NEUTRAL,
-            )
+        if (stackDenseContent) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Ready to run?", style = MaterialTheme.typography.titleMedium)
+                HarnessStatusBadge(label = statusLabel, tone = statusTone)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Ready to run?", style = MaterialTheme.typography.titleMedium)
+                HarnessStatusBadge(label = statusLabel, tone = statusTone)
+            }
         }
         Text(
             performanceReadinessDetail(state.runSetup.readiness, runnerAvailable),
