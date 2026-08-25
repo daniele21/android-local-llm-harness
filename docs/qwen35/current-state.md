@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: qwen35
 Canonical scope: qwen35.state
 Read when: determining Qwen3.5-only product progress, blockers or the next implementation slice
-Last reviewed: 2026-08-24
+Last reviewed: 2026-08-25
 
 This ledger reports only Qwen3.5-only product progress. Repository-wide integrated state remains owned by [`../current-state.md`](../current-state.md).
 
@@ -82,6 +82,42 @@ The repository-side tuning harness is implemented:
 7. the summarizer validates identity/sample completeness and marks only comparable cases as `eligibleForProfileSelection`;
 8. no script automatically promotes a runtime profile from `CANDIDATE` to `MEASURED`.
 
+### LLRT-6 canonical `2048 / 64` KV-cache findings
+
+LLRT-6C ran on Samsung `SM-A566B`, Android 16 / SDK 36 / arm64-v8a, Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9`, pinned llama.cpp `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`, seed `42`, `b128/ub64`, thinking disabled and one cold plus three warm samples per case. All six cases per tier were evidence-eligible and thermal status remained `0`.
+
+The comparison contract is intentionally split: K-only candidates are compared with `release-default` under Flash Attention off, while quantized K+V candidates are compared only with the `f16/f16 + FA` control because this llama.cpp pin requires Flash Attention for quantized V cache.
+
+#### Qwen3.5 0.8B (`t2/bt4`)
+
+| Case | Warm total median | Peak observed PSS | Decision |
+| --- | ---: | ---: | --- |
+| `release-default` | 82.110 s | 1,196,873 KB | control |
+| `K=q8_0`, FA off | 82.019 s | 1,194,665 KB | REJECT: ~0.1% faster, ~2 MiB lower PSS, digest differs |
+| `K=q4_0`, FA off | 82.110 s | 1,192,122 KB | REJECT: latency neutral, ~5 MiB lower PSS, digest differs |
+| `f16/f16 + FA` | 81.853 s | 1,064,813 KB | FA-on control only |
+| `q8_0/q8_0 + FA` | 81.938 s | 1,192,377 KB | REJECT: latency neutral, ~125 MiB higher PSS than FA control, digest differs |
+| `q4_0/q4_0 + FA` | 81.730 s | 1,187,535 KB | REJECT: latency neutral, ~120 MiB higher PSS than FA control, digest differs |
+
+The 0.8B cache policy therefore stays at release defaults. The lower PSS observed for the `f16/f16 + FA` control relative to the release baseline cannot be attributed to KV type because Flash Attention changes at the same time; it is not an LLRT-6 promotion signal.
+
+#### Qwen3.5 2B (`t4/bt4`)
+
+| Case | Warm total median | Peak observed PSS | Decision |
+| --- | ---: | ---: | --- |
+| `release-default` | 217.839 s | 2,132,802 KB | control |
+| `K=q8_0`, FA off | 218.220 s | 2,645,895 KB | REJECT: +0.17% latency and ~501 MiB higher PSS, digest differs |
+| `K=q4_0`, FA off | 237.354 s | 2,642,881 KB | REJECT: +8.96% latency and ~498 MiB higher PSS, digest differs |
+| `f16/f16 + FA` | 219.067 s | 2,571,445 KB | FA-on control only |
+| `q8_0/q8_0 + FA` | 233.648 s | 1,897,476 KB | REJECT as default: ~658 MiB lower PSS but +6.66% latency and digest differs |
+| `q4_0/q4_0 + FA` | 218.048 s | 2,433,852 KB | KEEP RESEARCH-ONLY: ~134 MiB lower PSS and latency neutral, but digest differs |
+
+The 2B default also remains unchanged. `q4_0/q4_0 + FA` is preserved only as a memory-constrained research candidate because the single-device signal is favorable on PSS without a latency penalty, but output-digest drift means it is not eligible for promotion without explicit quality validation. `q8_0/q8_0 + FA` trades substantial observed memory reduction for a clear latency regression and is not a default candidate.
+
+### LLRT-6 decision
+
+For this exact device/backend/profile identity, LLRT-6C closes **KEEP DEFAULTS** for both curated tiers. K-only quantization is rejected on both tiers; quantized K+V is not promoted. No runtime profile becomes `MEASURED` from this result, and the 2B `q4_0/q4_0 + FA` signal remains research-only until a separate quality/evidence wave justifies reopening policy selection.
+
 ### LLRT-9 short-profile diagnosis
 
 On Samsung `SM-A566B`, Qwen3.5 2B at `1024 / 8` passed exact serial/native parity at widths `2` and `3`, then failed at width `4` for source prompt `2`. A dedicated follow-up on Harness `0ec8b1bf44c700a57f7f50fa512e8c1ea03a518e` showed that the mismatch followed source prompt `2` after prompt permutation and disappeared under greedy sampling. The evidence therefore favors prompt-sensitive numerical/stochastic divergence rather than a slot/sequence/KV attribution defect. The exact-output gate remains unchanged.
@@ -119,12 +155,13 @@ For this exact device/backend/profile identity:
 
 This is evidence against one global Qwen3.5 batching policy. Correctness gates remain fail-closed and no result promotes a runtime profile to `MEASURED`.
 
-Q35-6 remains `IN PROGRESS`: canonical LLRT-9 on this device is complete, but broader representative-device evidence and lifecycle/memory acceptance remain before profile promotion or generalized production policy.
+Q35-6 remains `IN PROGRESS`: canonical LLRT-6 and LLRT-9 on this device are complete, but broader representative-device evidence and lifecycle/memory acceptance remain before profile promotion or generalized production policy.
 
 ## Remaining Q35-6 evidence
 
 - continue broader/representative 0.8B and 2B physical tuning required by measured-profile acceptance;
-- review eligible evidence separately by tier and choose runtime defaults;
+- keep KV-cache release defaults for both tiers on this exact device/profile unless later quality-backed evidence reopens the decision;
+- preserve 2B `q4_0/q4_0 + FA` only as a research-only memory signal, not a runtime policy;
 - keep 0.8B native batching rejected and 2B width `4` unqualified for this exact device/profile unless superseded by a later evidence wave;
 - mark profiles `MEASURED` only after TTFT, prefill/decode throughput, peak PSS and thermal evidence is recorded;
 - validate cancellation, model switching, memory pressure and idle unload on measured configurations.
