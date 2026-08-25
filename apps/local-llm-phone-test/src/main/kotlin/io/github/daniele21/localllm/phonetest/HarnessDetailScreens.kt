@@ -109,8 +109,9 @@ internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModel
             HarnessCard(emphasized = true) {
                 Text("Local model storage", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    importedModel?.let { "One active GGUF model is selected for this application." }
-                        ?: "No GGUF model is currently selected.",
+                    importedModel?.let {
+                        "A GGUF model is selected for this application. This view does not infer total installed storage."
+                    } ?: "No GGUF model is currently selected.",
                 )
                 HarnessMetricRow {
                     HarnessMetric(
@@ -120,12 +121,20 @@ internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModel
                     )
                     HarnessMetric(
                         label = "Selected size",
-                        value = importedModel?.sizeBytes?.let(::formatDetailBytes) ?: "0 MB",
+                        value = importedModel?.sizeBytes?.let(::formatDetailBytes) ?: "Unavailable",
                         modifier = Modifier.weight(1f),
                     )
                 }
                 HarnessPrimaryButton("Manage models", onClick = onOpenModels)
             }
+        }
+        item {
+            DetailCard(
+                title = "Storage accounting",
+                detail =
+                "This surface reports only source-backed selected-model size. " +
+                    "It does not derive total installed storage from selection state.",
+            )
         }
         item {
             DetailCard(
