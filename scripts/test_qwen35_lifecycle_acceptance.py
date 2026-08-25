@@ -45,6 +45,13 @@ def main() -> None:
         '-e lowMemoryOutputTokens 256',
         '"switchOutputTokens": 8',
         '"lowMemoryOutputTokens": 256',
+        '"memoryRepeatCount": int(sys.argv[11])',
+        '"maxPssGrowthKb": int(sys.argv[12])',
+        '"timeoutSeconds": int(sys.argv[13])',
+        '"08b-low-memory"',
+        '"2b-low-memory"',
+        '"cross-tier-switch"',
+        'Expected exactly three structured lifecycle scenarios',
         'Thermal gate satisfied:',
     ):
         require(runner, needle, "Q35 lifecycle runner")
