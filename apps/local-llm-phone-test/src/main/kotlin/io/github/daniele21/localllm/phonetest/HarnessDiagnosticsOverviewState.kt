@@ -118,5 +118,4 @@ private fun diagnosticsLogsEntry(count: Int): HarnessDiagnosticsOverviewEntry = 
     tone = evidenceCountTone(count),
 )
 
-private fun evidenceCountTone(count: Int): HarnessStatusTone =
-    if (count == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO
+private fun evidenceCountTone(count: Int): HarnessStatusTone = if (count == 0) HarnessStatusTone.NEUTRAL else HarnessStatusTone.INFO
