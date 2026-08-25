@@ -72,6 +72,8 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
                 "Raw completion is not allowed for this model profile",
             )
         }
+        val baseSystemPromptVersion = preset?.systemPromptVersion ?: useCase.systemPromptVersion
+        val baseSystemPrompt = preset?.systemPrompt ?: useCase.systemPrompt
         return ResolvedRequestConfiguration(
             preset = preset,
             maxOutputTokens = maxOutputTokens,
@@ -85,8 +87,8 @@ internal class GenerationPlanningPolicy(private val seedSource: SeedSource) {
             repeatLastN = repeatLastN,
             seedPolicy = seedPolicy,
             effectiveSeed = effectiveSeed,
-            systemPromptVersion = preset?.systemPromptVersion ?: useCase.systemPromptVersion,
-            systemPrompt = preset?.systemPrompt ?: useCase.systemPrompt,
+            systemPromptVersion = TaskDefinitionPromptComposer.effectiveVersion(baseSystemPromptVersion, request.taskDefinitions),
+            systemPrompt = TaskDefinitionPromptComposer.compose(baseSystemPrompt, request.taskDefinitions),
             contextPreference = preset?.contextPreference ?: ContextPreference(),
             guardPolicy = defaults.guardPolicy,
         )
