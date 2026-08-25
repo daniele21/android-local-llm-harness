@@ -29,9 +29,9 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. UXR-00 through UXR-70 are integrated on the bounded UX/UI line: task-first Overview, progressive Playground, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions.
+`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
 
-UXR-80 is the remaining repository-side closeout: exact-composite validation, status/evidence reconciliation and the single final PR to `dev`. After that, open phone work is process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. See [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md).
+Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
 
 ### Shared Android runtime
 
@@ -107,21 +107,19 @@ Do not promote phone UX to representative-device validated, Q35 profiles to `MEA
 
 ### 4. Follow-on validation and product hardening
 
-UXR-80 must close repo-side UX/UI validation and reconcile with current `dev`. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI implementation is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
 1. complete OMB-6B visual review and integrate approved deterministic launcher/identity assets;
 2. execute OMBRA corpus v2 against reviewed Qwen3.5 artifacts using policy v1;
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
-4. keep Q35-6 and SR-6 physical evidence parallel where hardware can be shared;
-5. close UXR-80 and its single final UX/UI integration PR independently, without claiming device evidence;
-6. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
+4. keep Q35-6, SR-6 and phone UX device evidence parallel where hardware can be shared without conflating exit gates;
+5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
-- Harness product-experience workstream: [`workstreams/harness-product-experience-realignment.md`](workstreams/harness-product-experience-realignment.md)
 - Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
