@@ -111,11 +111,7 @@ private fun PerformanceModelSelector(
 }
 
 @Composable
-private fun PerformanceSampleSelector(
-    state: PerformanceState,
-    onIntent: (PerformanceIntent) -> Unit,
-    stackDenseContent: Boolean,
-) {
+private fun PerformanceSampleSelector(state: PerformanceState, onIntent: (PerformanceIntent) -> Unit, stackDenseContent: Boolean) {
     HarnessCard {
         Text("Samples", style = MaterialTheme.typography.titleMedium)
         Text(
