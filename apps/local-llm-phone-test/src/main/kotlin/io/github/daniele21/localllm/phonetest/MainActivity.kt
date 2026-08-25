@@ -130,7 +130,7 @@ class MainActivity :
         harnessViewModel.updateThemePreference(themePreferenceStore.read())
         latestReport = savedInstanceState?.getString(STATE_REPORT).orEmpty()
         runtimeGraph = HarnessRuntimeGraph.from(this)
-        applicationsGateway = StoreHarnessApplicationsGateway(runtimeGraph.controlPlaneStore)
+        applicationsGateway = StoreHarnessCustomPresetGateway(runtimeGraph.controlPlaneStore)
         applicationsViewModel.attach(applicationsGateway)
         resourceSource = HarnessResourceSource(
             recorder = ResourceSnapshotRecorder(
@@ -489,6 +489,7 @@ class MainActivity :
                         mutationState = applicationsMutationState,
                         onRefresh = applicationsViewModel::refresh,
                         onSetDefaultPreset = applicationsViewModel::setDefaultPreset,
+                        onCreateCustomPreset = applicationsViewModel::createCustomPreset,
                         onClearMutationFeedback = applicationsViewModel::clearMutationFeedback,
                     )
                     composable(HarnessDestination.OVERVIEW.route) {
