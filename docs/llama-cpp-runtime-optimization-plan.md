@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: llama-cpp-runtime
 Canonical scope: target.llama-cpp-runtime-optimization
 Read when: changing the llama.cpp upstream pin, prompt/context reuse, backend device execution, native performance knobs or hardware acceleration policy
-Last reviewed: 2026-08-22
+Last reviewed: 2026-08-25
 
 ## Purpose
 
@@ -74,10 +74,10 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-3 | P1 | IN PROGRESS | Bounded 0.8B/2B CPU screening and focused 2B prefill evidence complete; broader Q35 evidence still gates `MEASURED` promotion. |
 | LLRT-4 | P1/P2 | DONE | Recurrent-state probe closed `KEEP_DISABLED`: supported restores are exact, partial rollback is unsupported. |
 | LLRT-5 | P2 | IN PROGRESS | Load-mode compatibility/materialized identity and Flash Attention tri-state integrated; AUTO/pin promotion remain evidence-gated. |
-| LLRT-6 | P2 | IN PROGRESS | K/V materialization and fixed-seed physical-evidence tooling are integrated; curated device evidence is the next policy gate. |
+| LLRT-6 | P2 | DONE | Canonical 0.8B/2B KV-cache evidence closes `KEEP DEFAULTS`; quantized cache policies are not promoted. |
 | LLRT-7 | P2 | IN PROGRESS | Reproducible default-off OpenCL build/preflight/evidence tooling is integrated; representative exact-artifact device evidence remains required. |
 | LLRT-8 | P2 | PLANNED | Bounded OpenCL compiled-kernel cache ownership and cleanup. |
-| LLRT-9 | P2 | IN PROGRESS | Evaluation orchestration, exact-pin multi-sequence qualification, native multi-sequence execution, runtime/evaluation composition and schema-v7 physical comparison tooling are integrated; curated serial-vs-native-batch device evidence remains. |
+| LLRT-9 | P2 | IN PROGRESS | Canonical serial-vs-native-batch evidence is complete on the current Samsung device; generalized evaluation policy still waits for reviewed broader profiles. |
 | LLRT-10 | P2 | PLANNED | Deterministic evidence-driven execution planner using reviewed measured profiles. |
 | LLRT-11 | P2 | DONE | Material backend execution identity is fingerprinted, propagated and persisted. |
 | LLRT-12 | P3 | DEFERRED | Hexagon/HTP evaluation after CPU/OpenCL evidence is stable. |
@@ -97,7 +97,7 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-5D | BLOCKED | AUTO/FA performance and any future pin promotion require physical evidence. |
 | LLRT-6A | DONE | Exact cache names fail closed and explicit K/V values materialize atomically into `type_k/type_v`; null preserves defaults. |
 | LLRT-6B | DONE | Schema-v5 fixed-seed runner records K/V, FA, output digest, memory, latency and thermal evidence without changing release defaults. |
-| LLRT-6C | READY | Run curated 0.8B/2B device evidence and either select an evidence-backed policy or keep defaults. |
+| LLRT-6C | DONE | Canonical `2048/64` 0.8B/2B device evidence closes `KEEP DEFAULTS`; 2B `q4_0/q4_0 + FA` remains research-only because digest drift blocks promotion. |
 | LLRT-7A/B | DONE | OpenCL remains default-off; representative Adreno 750/830 loader preflight is not a support claim. |
 | LLRT-7C | IN PROGRESS | Reproducible OpenCL build, packaging checks and schema-v6 runner are ready; representative exact-artifact physical evidence is still required. |
 | LLRT-9A | DONE | Evaluation-only bounded batch planning/execution with exact ordered attribution and a serial compatibility path is integrated; production concurrency is unchanged. |
@@ -108,11 +108,11 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | LLRT-9B2B2b | DONE | Runtime seam schedules one bounded evaluation batch as one background decode unit, reuses only the resident model, owns a dedicated evaluation context, admits aggregate context memory fail-closed, preserves ordered attribution/per-case cancellation and leaves ordinary `session.context` plus production `generate()` semantics unchanged. |
 | LLRT-9B2B2c | DONE | The llama.cpp backend/JNI bridge reuses the already-resident model, owns a dedicated bounded multi-sequence context, shares cancellation identity with normal generation and fingerprints width plus aggregate/per-sequence context without widening production `generate()`. |
 | LLRT-9B2B2d | DONE | `evaluation:runtime-adapter` composes `EvaluationBatchExecutionPort` onto the runtime-only batch client with isolated stateless sessions, exact ordered attribution, timeout/cancellation and serial one-case fallback; `evaluation:engine` remains backend-neutral. |
-| LLRT-9C | READY | Schema-v7 tooling compares the normal serial runtime path with evaluation-only native batching at widths 2..4 using fixed-seed digest equality, elapsed time, observed PSS/memory and thermal snapshots; curated 0.8B/2B physical evidence remains required. |
+| LLRT-9C | DONE | Canonical `2048/64` 0.8B/2B physical comparison is complete: 0.8B rejects native batching, 2B passes widths 2/3 and leaves width 4 unqualified. |
 
 ## Physical evidence snapshot
 
-All current CPU evidence uses the production llama.cpp pin, Samsung `SM-A566B`, Android 16 / SDK 36 / arm64-v8a, context 2048, 64 output tokens and thinking disabled.
+All current CPU evidence uses the production llama.cpp pin, Samsung `SM-A566B`, Android 16 / SDK 36 / arm64-v8a, context 2048, 64 output tokens and thinking disabled unless a narrower diagnostic identity is stated.
 
 For Qwen3.5 0.8B Q4_K_M (`bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517`), `t2/bt4/b128/ub64` improved bounded warm total latency from about 70.0 s to 65.9 s with thermal status 0. This is search-space evidence only.
 
@@ -120,15 +120,19 @@ For Qwen3.5 2B Q4_K_M (`aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee9
 
 LLRT-4 physical probes on both curated tiers show exact supported restore equivalence (`maxDelta=0`) but `partial-rollback UNSUPPORTED`; recurrent/prefix reuse therefore stays disabled.
 
+LLRT-6C canonical KV-cache evidence ran on exact Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9`. On 0.8B, K-only q8/q4 changed output digest for only ~0-0.1% latency change and ~2-5 MiB PSS reduction; quantized K+V under FA showed no useful memory/latency advantage over the `f16/f16 + FA` control. On 2B, K-only q8/q4 increased peak observed PSS by about 501/498 MiB and q4 was ~9% slower. Under FA, q8/q8 reduced peak observed PSS by ~658 MiB but was ~6.7% slower; q4/q4 reduced PSS by ~134 MiB with roughly neutral latency, but both changed output digest. The reviewed policy is therefore `KEEP DEFAULTS`; 2B q4/q4+FA remains research-only pending explicit quality validation.
+
+LLRT-9C canonical evidence on the same phone rejects native batching for 0.8B because widths 2/3 are slower and width 4 fails correctness. For 2B, widths 2/3 pass exact serial/native parity and improve median wall time by about 7.4%/9.4%, while width 4 fails the exact-output gate and remains unqualified. These are device/profile-scoped findings, not a generalized production concurrency policy.
+
 Physical performance/thermal runs on the same phone are serialized and thermal-gated. Parallel software preparation is allowed; separate devices may run independent evidence lanes.
 
-Sampler acceptance normalization changes generation state semantics for penalties and optional grammar constraints. Historical latency/memory search-space observations remain historical performance evidence, but deterministic output digests and correctness comparisons that depend on sampler history are stale until replayed under the normalized semantics.
+Sampler acceptance normalization changes generation state semantics for penalties and optional grammar constraints. Historical deterministic evidence from before that correction remains stale. The canonical LLRT-6C and LLRT-9C waves above were replayed after the normalization under exact Harness/backend identities and are the current evidence for those slices.
 
 ## Evidence checkpoint
 
-The P2 checkpoint is **SATISFIED**: bounded 0.8B evidence is complete, the 2B CPU candidate has an explicit reject decision, LLRT-4 has an evidence-backed `KEEP_DISABLED` verdict and LLRT-5 mechanical compatibility is integrated without moving the release pin.
+The P2 checkpoint is **SATISFIED**: bounded 0.8B evidence is complete, the 2B CPU candidate has an explicit reject decision, LLRT-4 has an evidence-backed `KEEP_DISABLED` verdict, LLRT-6 closes `KEEP DEFAULTS`, and LLRT-5 mechanical compatibility is integrated without moving the release pin.
 
-LLRT-6 and LLRT-7 may therefore proceed experimentally with release defaults unchanged. LLRT-6 now waits on the curated KV-cache device matrix; LLRT-7 now waits on representative exact-artifact OpenCL device evidence. The LLRT-9 software path through the native llama.cpp/JNI bridge and backend-neutral evaluation runtime adapter is integrated without changing production concurrency policy. LLRT-9C schema-v7 tooling now replays deterministic correctness directly by comparing fixed-seed serial and native-batch output digests on the same resident model before recording throughput, observed memory and thermal evidence; curated 0.8B/2B physical runs remain the gate. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
+LLRT-6 is closed with release KV defaults unchanged. LLRT-7 waits on representative exact-artifact OpenCL device evidence. LLRT-9C canonical device evidence is complete without changing production concurrency policy: 0.8B batching is rejected for the measured identity, while 2B native widths 2/3 remain device/profile-scoped positive evidence and width 4 remains unqualified. LLRT-8 follows representative LLRT-7 evidence; LLRT-10 still waits for reviewed measured CPU/memory/hardware profiles.
 
 ## Integrated execution identity
 
@@ -166,7 +170,7 @@ Any compiled-kernel cache introduced by LLRT-8 must be app-owned, bounded, inval
 
 Exact supported K/V cache names fail closed and explicit values materialize in the pinned llama.cpp context. Quantized V cache requires Flash Attention on this pin, so LLRT-6 separates K-only/FA-off comparisons from K+V/FA-on comparisons.
 
-The LLRT-6 runner records fixed-seed output digest, memory, latency and thermal evidence. Output-digest drift is a review signal, not an automatic verdict. No cache type becomes default from theoretical memory estimates or CI alone.
+The LLRT-6 runner records fixed-seed output digest, memory, latency and thermal evidence. Output-digest drift is a review signal, not an automatic verdict. Canonical 0.8B/2B evidence on Harness `67ccc05474e3d99f024dfe53ac832dbefcb6cce9` closes the slice `KEEP DEFAULTS`: K-only quantization is rejected on both tiers and no quantized K+V policy is promoted. The 2B `q4_0/q4_0 + FA` memory signal remains research-only because its digest differs from the FA control and the evidence is single-device/profile scoped.
 
 ### Hexagon/HTP
 
@@ -186,9 +190,9 @@ LLRT-9B2B2b integrates that runtime owner. One evaluation batch enters `SingleDe
 
 LLRT-9B2B2c adapts `LlamaCppInferenceBackend` through a dedicated evaluation JNI API to the integrated native kernel while preserving the flat production `createContext` ABI and fingerprinting batch width plus per-sequence and aggregate context capacity. LLRT-9B2B2d composes that runtime operation into `EvaluationBatchExecutionPort` through `evaluation:runtime-adapter`, preserving immutable sample order, isolated stateless sessions, timeout/cancellation and serial one-case fallback while keeping `evaluation:engine` backend-neutral. Neither slice changes `SingleDecodeScheduler` production policy.
 
-Issue #370 is resolved in software by normalizing sampled-token acceptance at the shared generation-sampler boundary: one token sampled through `llama_sampler_sample()` reaches stateful sampler `accept` exactly once even while the current decode loops retain their compatibility accept, while explicitly injected tokens still reach sampler state. Because this correction can change penalty and grammar state evolution, deterministic output/correctness evidence collected under the previous semantics is stale and must be refreshed before LLRT-9C.
+Issue #370 is resolved in software by normalizing sampled-token acceptance at the shared generation-sampler boundary: one token sampled through `llama_sampler_sample()` reaches stateful sampler `accept` exactly once even while the current decode loops retain their compatibility accept, while explicitly injected tokens still reach sampler state. Because this correction can change penalty and grammar state evolution, deterministic output/correctness evidence collected under the previous semantics is stale. The canonical LLRT-9C wave was replayed after this correction.
 
-LLRT-9C then requires representative correctness, throughput, memory and thermal evidence before any evaluation execution policy selects the native path.
+LLRT-9C canonical device qualification is complete; broader representative evidence and reviewed measured profiles still gate any generalized evaluation execution policy that selects the native path.
 
 ## Deterministic device policy
 
