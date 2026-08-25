@@ -90,22 +90,22 @@ private constructor(
             return BinderConsumerLocalLlmClient(
                 connection = connection,
                 lifecycle =
-                    BinderConsumerLifecycleAdapter(
-                        endpointProvider = { connection.endpoint },
-                        endpointInvalidations = connection.endpointInvalidations,
-                    ),
+                BinderConsumerLifecycleAdapter(
+                    endpointProvider = { connection.endpoint },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
                 generation =
-                    BinderConsumerGenerationAdapter(
-                        endpointProvider = { connection.endpoint },
-                        enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
-                        endpointInvalidations = connection.endpointInvalidations,
-                    ),
+                BinderConsumerGenerationAdapter(
+                    endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
                 controlPlane =
-                    BinderConsumerControlPlaneAdapter(
-                        endpointProvider = { connection.endpoint },
-                        enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
-                        endpointInvalidations = connection.endpointInvalidations,
-                    ),
+                BinderConsumerControlPlaneAdapter(
+                    endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
             )
         }
     }
