@@ -59,43 +59,6 @@ fun ConsumerOutputConstraint.toConsumerWire(): ConsumerOutputConstraintParcel = 
 }
 
 fun ConsumerOutputConstraintParcel.toCoreConsumerOutput(): ConsumerOutputConstraint = when (typeTag) {
-    WireTags.INPUT_TEXT -> ConsumerGenerationInput.Text(requireNotNull(text))
-
-    WireTags.INPUT_MESSAGES ->
-        ConsumerGenerationInput.Messages(
-            messages.map {
-                ConversationMessage(
-                    role = enumTag<ConversationRole>(it.roleTag, "conversation role"),
-                    content = it.content,
-                )
-            },
-        )
-
-    else -> throw invalidWireTag("consumer input", typeTag)
-}
-
-fun TaskDefinition.toConsumerWire(): TaskDefinitionParcel = TaskDefinitionParcel(
-    id = id,
-    description = description,
-    example = example,
-)
-
-fun TaskDefinitionParcel.toCoreTaskDefinition(): TaskDefinition = TaskDefinition(
-    id = id,
-    description = description,
-    example = example,
-)
-
-fun ConsumerOutputConstraint.toConsumerWire(): ConsumerOutputConstraintParcel = when (this) {
-    ConsumerOutputConstraint.Text -> ConsumerOutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null)
-
-    ConsumerOutputConstraint.Json -> ConsumerOutputConstraintParcel(WireTags.CONSTRAINT_JSON, null)
-
-    is ConsumerOutputConstraint.JsonSchema ->
-        ConsumerOutputConstraintParcel(WireTags.CONSTRAINT_JSON_SCHEMA, schema)
-}
-
-fun ConsumerOutputConstraintParcel.toCoreConsumerOutput(): ConsumerOutputConstraint = when (typeTag) {
     WireTags.CONSTRAINT_TEXT -> ConsumerOutputConstraint.Text
     WireTags.CONSTRAINT_JSON -> ConsumerOutputConstraint.Json
     WireTags.CONSTRAINT_JSON_SCHEMA -> ConsumerOutputConstraint.JsonSchema(requireNotNull(jsonSchema))
