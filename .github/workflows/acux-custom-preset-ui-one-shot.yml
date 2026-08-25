@@ -1,0 +1,56 @@
+name: ACUX Custom preset UI one-shot
+
+on:
+  push:
+    branches:
+      - ux/acux-50-custom-preset-ui-stage
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[acux-custom-ui]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ux/acux-50-custom-preset-ui-stage
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Wire Custom preset host
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt')
+          text = path.read_text()
+          replacements = [
+              (
+                  'applicationsGateway = StoreHarnessApplicationsGateway(runtimeGraph.controlPlaneStore)',
+                  'applicationsGateway = StoreHarnessCustomPresetGateway(runtimeGraph.controlPlaneStore)',
+              ),
+              (
+                  'onSetDefaultPreset = applicationsViewModel::setDefaultPreset,\n                        onClearMutationFeedback = applicationsViewModel::clearMutationFeedback,',
+                  'onSetDefaultPreset = applicationsViewModel::setDefaultPreset,\n                        onCreateCustomPreset = applicationsViewModel::createCustomPreset,\n                        onClearMutationFeedback = applicationsViewModel::clearMutationFeedback,',
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:80]}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+      - name: Format changed Kotlin
+        run: ./gradlew :apps:local-llm-phone-test:spotlessApply
+      - name: Commit integration patch
+        run: |
+          git config user.name 'Daniele21'
+          git config user.email 'daniele21@users.noreply.github.com'
+          git add apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/MainActivity.kt
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat(ux): wire Custom preset host [acux-custom-ui]'
+          git push origin HEAD:ux/acux-50-custom-preset-ui-stage
