@@ -25,6 +25,8 @@ import io.github.daniele21.localllm.transport.binder.contract.toCoreSelection
 import io.github.daniele21.localllm.transport.binder.contract.toCoreTaskDefinition
 import java.util.concurrent.atomic.AtomicBoolean
 
+/** Consumer host facade: methods intentionally map one-to-one to authenticated Consumer operations. */
+@Suppress("TooManyFunctions")
 internal class ConsumerHostOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
