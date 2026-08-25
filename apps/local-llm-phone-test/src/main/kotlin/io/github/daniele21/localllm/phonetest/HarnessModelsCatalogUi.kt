@@ -110,40 +110,6 @@ internal fun UnifiedModelsCatalog(
     }
 }
 
-internal fun modelActionStatusTone(tone: ModelActionFeedbackTone): HarnessStatusTone = when (tone) {
-    ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
-    ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
-    ModelActionFeedbackTone.ERROR -> HarnessStatusTone.ERROR
-}
-
-@Composable
-private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HarnessStatusBadge(
-            label = when (feedback.tone) {
-                ModelActionFeedbackTone.INFO -> "STATUS"
-                ModelActionFeedbackTone.SUCCESS -> "OK"
-                ModelActionFeedbackTone.ERROR -> "ERROR"
-            },
-            tone = modelActionStatusTone(feedback.tone),
-        )
-        Text(
-            text = feedback.latest,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (feedback.tone == ModelActionFeedbackTone.ERROR) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-    }
-}
-
 @Composable
 private fun ModelsCatalogSummary(state: HarnessUiState, catalogCount: Int) {
     HarnessCard {
