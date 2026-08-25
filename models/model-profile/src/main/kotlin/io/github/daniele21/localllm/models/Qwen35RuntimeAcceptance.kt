@@ -72,8 +72,6 @@ data class Qwen35RuntimeAcceptanceEvidence(
 }
 
 object Qwen35RuntimeProfileAcceptance {
-    fun reviewedProfileForTier(
-        tier: Qwen35ModelTier,
-        evidence: Qwen35RuntimeAcceptanceEvidence,
-    ): Qwen35RuntimeTuningProfile = evidence.applyTo(Qwen35RuntimeTuningProfiles.candidateForTier(tier))
+    fun reviewedProfileForTier(tier: Qwen35ModelTier, evidence: Qwen35RuntimeAcceptanceEvidence): Qwen35RuntimeTuningProfile =
+        evidence.applyTo(Qwen35RuntimeTuningProfiles.candidateForTier(tier))
 }
