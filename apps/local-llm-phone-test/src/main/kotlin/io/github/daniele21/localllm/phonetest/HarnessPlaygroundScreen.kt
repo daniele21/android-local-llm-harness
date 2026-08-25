@@ -23,6 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -66,7 +69,13 @@ internal fun HarnessPlaygroundScreen(state: HarnessUiState, actions: HarnessPlay
 @Composable
 private fun PlaygroundModelState(model: ImportedPhoneModel?, onOpenModels: () -> Unit) {
     HarnessCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenModels),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = if (model == null) "Choose model" else "Change model",
+                role = Role.Button,
+                onClick = onOpenModels,
+            ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -82,7 +91,11 @@ private fun PlaygroundModelState(model: ImportedPhoneModel?, onOpenModels: () ->
                 )
                 Text(model?.fileName ?: "Choose a reviewed Qwen3.5 model", style = MaterialTheme.typography.bodyMedium)
             }
-            Text("Change ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(
+                if (model == null) "Choose ›" else "Change ›",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -124,14 +137,25 @@ private fun PlaygroundPromptCard(
 
         HarnessSecondaryButton(
             text = if (advancedVisible) "Advanced settings · Hide" else "Advanced settings · Show",
-            modifier = Modifier.fillMaxWidth().testTag("playground-advanced-toggle"),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("playground-advanced-toggle")
+                .semantics { stateDescription = if (advancedVisible) "Expanded" else "Collapsed" },
             onClick = onToggleAdvanced,
         )
         if (advancedVisible) {
+            Text(
+                "Tune sampling and output only when the preset is not enough.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             PlaygroundAdvancedControls(state, presentation, actions)
             HarnessSecondaryButton(
                 text = if (expertVisible) "Expert settings · Hide" else "Expert settings · Show",
-                modifier = Modifier.fillMaxWidth().testTag("playground-expert-toggle"),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("playground-expert-toggle")
+                    .semantics { stateDescription = if (expertVisible) "Expanded" else "Collapsed" },
                 onClick = onToggleExpert,
             )
             if (expertVisible) {
@@ -215,6 +239,14 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
         enabled = presentation.inputsEnabled && temperature != 0f,
         modifier = Modifier.fillMaxWidth().testTag("playground-top-p-slider"),
     )
+    playgroundSamplingGuidance(state)?.let { guidance ->
+        Text(
+            guidance,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("playground-sampling-guidance"),
+        )
+    }
 
     OutlinedTextField(
         value = state.playgroundMaxTokens,
@@ -227,7 +259,15 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
 
 @Composable
 private fun PlaygroundExpertControls(state: HarnessUiState, presentation: PlaygroundPresentation, actions: HarnessPlaygroundActions) {
-    val samplingEnabled = presentation.inputsEnabled && state.playgroundTemperature.toFloatOrNull() != 0f
+    val parsedTemperature = state.playgroundTemperature.toFloatOrNull()
+    val samplingEnabled = presentation.inputsEnabled && parsedTemperature != null && parsedTemperature != 0f
+
+    Text("Expert overrides", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "These controls override preset behavior and are intended for measured configuration experiments.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
     OutlinedTextField(
         value = state.playgroundTopK,
@@ -331,26 +371,3 @@ private fun PlaygroundRunControls(presentation: PlaygroundPresentation, actions:
         }
     }
 }
-
-internal fun playgroundSettingsValidationMessage(state: HarnessUiState): String? = runCatching {
-    PlaygroundRequestOptions.parse(
-        PlaygroundRequestFields(
-            presetId = state.playgroundPreset,
-            maxOutputTokens = state.playgroundMaxTokens,
-            temperature = state.playgroundTemperature,
-            topP = state.playgroundTopP,
-            topK = state.playgroundTopK,
-            minP = state.playgroundMinP,
-            presencePenalty = state.playgroundPresencePenalty,
-            thinkingMode = state.playgroundThinkingMode,
-            repeatPenalty = state.playgroundRepeatPenalty,
-            repeatLastN = state.playgroundRepeatLastN,
-            seed = state.playgroundSeed,
-            context = state.playgroundContext,
-        ),
-    )
-}.exceptionOrNull()?.message
-
-private fun playgroundTemperature(state: HarnessUiState): Float = state.playgroundTemperature.toFloatOrNull()?.coerceIn(0f, 2f) ?: 0f
-
-private fun formatPlaygroundControlValue(value: Float): String = "%.2f".format(java.util.Locale.ROOT, value).trimEnd('0').trimEnd('.')
