@@ -95,9 +95,8 @@ data class ConsumerGenerationRequest(
         TaskDefinitionLimits.validate(taskDefinitions)
     }
 
-    override fun toString(): String =
-        "ConsumerGenerationRequest(requestId=$requestId, sessionId=$sessionId, input=<redacted>, " +
-            "outputConstraint=${outputConstraint::class.simpleName}, taskDefinitionCount=${taskDefinitions.size})"
+    override fun toString(): String = "ConsumerGenerationRequest(requestId=$requestId, sessionId=$sessionId, input=<redacted>, " +
+        "outputConstraint=${outputConstraint::class.simpleName}, taskDefinitionCount=${taskDefinitions.size})"
 }
 
 enum class ConsumerContentType {
