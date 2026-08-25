@@ -74,10 +74,7 @@ class Qwen35RuntimeAcceptanceTest {
         }
     }
 
-    private fun acceptanceFor(
-        candidate: Qwen35RuntimeTuningProfile,
-        fixture: AcceptanceFixture,
-    ) = Qwen35RuntimeAcceptanceEvidence(
+    private fun acceptanceFor(candidate: Qwen35RuntimeTuningProfile, fixture: AcceptanceFixture) = Qwen35RuntimeAcceptanceEvidence(
         runtimeProfileId = candidate.id,
         runtimeProfileVersion = candidate.version,
         tier = candidate.tier,
@@ -91,9 +88,7 @@ class Qwen35RuntimeAcceptanceTest {
         decision = fixture.decision,
     )
 
-    private fun completePromotionFixture(
-        reviewedDeviceClasses: Set<String> = setOf("representative-arm64"),
-    ) = AcceptanceFixture(
+    private fun completePromotionFixture(reviewedDeviceClasses: Set<String> = setOf("representative-arm64")) = AcceptanceFixture(
         decision = Qwen35RuntimeAcceptanceDecision.PROMOTE_MEASURED,
         benchmarkEvidenceSha256 = setOf(SHA_A),
         lifecycleEvidenceSha256 = setOf(SHA_B),
