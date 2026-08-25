@@ -19,10 +19,18 @@ class PerformancePresentationTest {
     }
 
     @Test
-    fun `runner unavailable is stated before setup readiness`() {
+    fun `runner unavailable is stated before setup readiness without implementation jargon`() {
         val detail = performanceReadinessDetail(PerformanceRunReadiness.Ready, runnerAvailable = false)
-        assertTrue(detail.contains("not connected"))
+        assertTrue(detail.contains("cannot be started"))
+        assertFalse(detail.contains("connected"))
         assertFalse(detail.contains("All required"))
+    }
+
+    @Test
+    fun `blocked reasons are phrased as user decisions`() {
+        assertTrue(performanceBlockReasonLabel(PerformanceBlockReason.MODEL_REQUIRED).startsWith("Choose"))
+        assertTrue(performanceBlockReasonLabel(PerformanceBlockReason.DATASET_REQUIRED).startsWith("Choose"))
+        assertTrue(performanceBlockReasonLabel(PerformanceBlockReason.EXECUTION_PROFILE_REQUIRED).startsWith("Choose"))
     }
 
     @Test(expected = IllegalArgumentException::class)
