@@ -85,10 +85,7 @@ private fun ModelIdentityCard(presentation: HarnessModelDetailPresentation) {
 }
 
 @Composable
-private fun ModelStateCard(
-    presentation: HarnessModelDetailPresentation,
-    stackDenseContent: Boolean,
-) {
+private fun ModelStateCard(presentation: HarnessModelDetailPresentation, stackDenseContent: Boolean) {
     HarnessCard {
         Text("Model state", style = MaterialTheme.typography.titleLarge)
         ModelMetricPair(
@@ -110,10 +107,7 @@ private fun ModelStateCard(
 }
 
 @Composable
-private fun ModelTechnicalCard(
-    presentation: HarnessModelDetailPresentation,
-    stackDenseContent: Boolean,
-) {
+private fun ModelTechnicalCard(presentation: HarnessModelDetailPresentation, stackDenseContent: Boolean) {
     HarnessCard {
         Text("Technical metadata", style = MaterialTheme.typography.titleLarge)
         ModelMetricPair(
@@ -135,13 +129,7 @@ private fun ModelTechnicalCard(
 }
 
 @Composable
-private fun ModelMetricPair(
-    firstLabel: String,
-    firstValue: String,
-    secondLabel: String,
-    secondValue: String,
-    stackDenseContent: Boolean,
-) {
+private fun ModelMetricPair(firstLabel: String, firstValue: String, secondLabel: String, secondValue: String, stackDenseContent: Boolean) {
     if (stackDenseContent) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             HarnessMetric(firstLabel, firstValue, Modifier.fillMaxWidth())
