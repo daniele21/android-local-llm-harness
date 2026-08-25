@@ -151,7 +151,7 @@ private fun PerformanceSampleSelector(
 @Composable
 private fun PerformanceSampleChip(
     state: PerformanceState,
-    selection: PerformanceSampleSelection.Fixed,
+    selection: PerformanceSampleSelection,
     onIntent: (PerformanceIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
