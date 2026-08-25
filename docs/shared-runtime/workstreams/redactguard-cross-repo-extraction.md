@@ -88,16 +88,16 @@ Harness already authorizes only the intended RedactGuard package identities/use 
 
 Repository-side preparation for RC-4 is complete; the remaining acceptance boundary is real-device execution.
 
-Current candidate identities and tooling:
+Frozen physical source identities and tooling:
 
-- Harness phone candidate remains `versionCode=28`, `versionName=1.0.0`;
-- the exact-candidate same-signer release APK helper was integrated by PR #443 and merged as `4f0b486a479f203050f9297dd7dc10d45346e647`;
-- the phone Host uses the process-scoped Control Plane store integrated after the v28 candidate bump, and subsequent Harness UX/control-plane gateway work remains layered on top of that runtime boundary;
-- RedactGuard candidate is `versionCode=9`, `versionName=0.1.4`; its same-signer release APK helper and canonical physical runbook were integrated by PR #92 and merged as `8ca1f50f0ca07c04bd19dbc3a870366f77f06689`;
-- Consumer SDK is `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.4`;
-- a clean Host Control Plane seed for `document-pii-detection` publishes default preset `qwen35-json` revision `3`.
+- Harness: `9699cb0ae9bd6b49f68c07fa49c004360e8d7d92`, `versionCode=28`, `versionName=1.0.0`;
+- the exact-candidate same-signer release APK helper was integrated by PR #443 and is present in that frozen source;
+- the frozen Harness source includes the process-scoped Control Plane store and Applications control-plane gateway, and its push `Repository health`, `Validate` and `Package Android Artifacts` workflows are green;
+- RedactGuard: `8ca1f50f0ca07c04bd19dbc3a870366f77f06689`, `versionCode=9`, `versionName=0.1.4`; its same-signer release APK helper and canonical physical runner are present at that source;
+- Consumer SDK: `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.4`;
+- clean Host Control Plane seed: `document-pii-detection` with default preset `qwen35-json` revision `3`.
 
-For the actual RC-4 run, freeze the exact current Harness `dev` revision only after that same revision's push `Repository health`, `Validate` and `Package Android Artifacts` workflows are green. Build both release APKs from clean checkouts using the shared upload signing identity and record the exact source revision, APK SHA-256 and signer in RedactGuard's canonical evidence runner. A later Harness `dev` commit invalidates earlier exact-head CI as proof for the newly selected source revision.
+Later documentation-only descendants do not replace these frozen APK source identities. Build both release APKs from clean detached checkouts at the revisions above using the shared upload signing identity. Run RedactGuard's canonical E2E script from the same frozen RedactGuard checkout with `--release`, Harness source revision `9699cb0ae9bd6b49f68c07fa49c004360e8d7d92` and preset revision `3`; record APK SHA-256 and signer in the generated evidence.
 
 ## RC-1 implementation scope
 
