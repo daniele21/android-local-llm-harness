@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +24,37 @@ class PerformancePresentationTest {
         val detail = performanceReadinessDetail(PerformanceRunReadiness.Ready, runnerAvailable = false)
         assertTrue(detail.contains("not connected"))
         assertFalse(detail.contains("All required"))
+    }
+
+    @Test
+    fun `no completed runs cannot produce a supported choice`() {
+        val presentation = performanceDecisionPresentation(PerformanceState())
+
+        assertEquals(PerformanceDecisionState.NO_EVIDENCE, presentation.state)
+        assertEquals("No supported choice yet", presentation.title)
+        assertTrue(presentation.detail.contains("Complete repeatable evaluation runs"))
+    }
+
+    @Test
+    fun `recorded runs remain fail closed until comparable deltas exist`() {
+        val presentation = performanceDecisionPresentation(
+            PerformanceState(history = PerformanceHistoryState(runCount = 3)),
+        )
+
+        assertEquals(PerformanceDecisionState.EVIDENCE_NOT_COMPARABLE, presentation.state)
+        assertTrue(presentation.detail.contains("3 evaluation run(s)"))
+        assertTrue(presentation.detail.contains("will not rank models or configurations"))
+    }
+
+    @Test
+    fun `history failures block the decision instead of falling back to a ranking`() {
+        val presentation = performanceDecisionPresentation(
+            PerformanceState(history = PerformanceHistoryState(error = "History unavailable")),
+        )
+
+        assertEquals(PerformanceDecisionState.UNAVAILABLE, presentation.state)
+        assertEquals("No supported choice can be made", presentation.title)
+        assertEquals("History unavailable", presentation.detail)
     }
 
     @Test(expected = IllegalArgumentException::class)
