@@ -132,10 +132,8 @@ data class ConsumerRequestParcel(
 
 /** Minor-v3 generation envelope. The embedded v1 request remains byte-layout compatible. */
 @Parcelize
-data class ConsumerGenerationRequestV2Parcel(
-    val request: ConsumerRequestParcel,
-    val taskDefinitions: List<TaskDefinitionParcel>,
-) : Parcelable
+data class ConsumerGenerationRequestV2Parcel(val request: ConsumerRequestParcel, val taskDefinitions: List<TaskDefinitionParcel>) :
+    Parcelable
 
 @Parcelize
 data class ConsumerResultParcel(
