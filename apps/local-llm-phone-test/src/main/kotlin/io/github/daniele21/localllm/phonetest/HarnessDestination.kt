@@ -262,22 +262,7 @@ private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestinatio
             drawPath(play, color)
         }
 
-        HarnessDestination.APPS -> {
-            listOf(0.32f, 0.68f).forEach { row ->
-                drawCircle(
-                    color = color,
-                    radius = width * 0.08f,
-                    center = Offset(width * 0.22f, height * row),
-                    style = stroke,
-                )
-                drawLine(
-                    color = color,
-                    start = Offset(width * 0.42f, height * row),
-                    end = Offset(width * 0.86f, height * row),
-                    strokeWidth = stroke.width,
-                )
-            }
-        }
+        HarnessDestination.APPS -> drawAppsGlyph(color, stroke)
 
         HarnessDestination.PERFORMANCE -> {
             drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)
@@ -317,21 +302,44 @@ private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestinatio
             drawPath(pulse, color, style = stroke)
         }
 
-        HarnessDestination.SETTINGS -> {
-            drawCircle(color, radius = width * 0.24f, style = stroke)
-            drawCircle(color, radius = width * 0.07f, style = stroke)
-            listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
-                val radians = Math.toRadians(degrees.toDouble())
-                val inner = Offset(
-                    x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
-                    y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
-                )
-                val outer = Offset(
-                    x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
-                    y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
-                )
-                drawLine(color, inner, outer, stroke.width)
-            }
-        }
+        HarnessDestination.SETTINGS -> drawSettingsGlyph(color, stroke)
+    }
+}
+
+private fun DrawScope.drawAppsGlyph(color: Color, stroke: Stroke) {
+    val width = size.width
+    val height = size.height
+    listOf(0.32f, 0.68f).forEach { row ->
+        drawCircle(
+            color = color,
+            radius = width * 0.08f,
+            center = Offset(width * 0.22f, height * row),
+            style = stroke,
+        )
+        drawLine(
+            color = color,
+            start = Offset(width * 0.42f, height * row),
+            end = Offset(width * 0.86f, height * row),
+            strokeWidth = stroke.width,
+        )
+    }
+}
+
+private fun DrawScope.drawSettingsGlyph(color: Color, stroke: Stroke) {
+    val width = size.width
+    val height = size.height
+    drawCircle(color, radius = width * 0.24f, style = stroke)
+    drawCircle(color, radius = width * 0.07f, style = stroke)
+    listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
+        val radians = Math.toRadians(degrees.toDouble())
+        val inner = Offset(
+            x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
+            y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
+        )
+        val outer = Offset(
+            x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
+            y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
+        )
+        drawLine(color, inner, outer, stroke.width)
     }
 }
