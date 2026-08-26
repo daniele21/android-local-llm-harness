@@ -128,7 +128,7 @@ class DetectCiScopeTest(unittest.TestCase):
             ]
         )
         self.assertEqual(scope.profile, "scoped")
-        self.assertEqual(scope.modules, ("observability:health-engine", "evaluation:evaluators"))
+        self.assertEqual(scope.modules, ("evaluation:evaluators", "observability:health-engine"))
 
     def test_mixed_documentation_and_runtime_code_is_strong(self) -> None:
         scope = classify_paths(["README.md", "core/runtime-core/src/main/kotlin/Runtime.kt"])
