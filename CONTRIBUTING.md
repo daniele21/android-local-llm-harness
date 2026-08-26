@@ -49,6 +49,18 @@ Do not introduce dynamic versions such as `latest.release`, `+` or unbounded ran
 - Any native runtime upgrade requires benchmark and sanity-suite comparison.
 - Add an ADR for choices that materially constrain public contracts, native source ownership, storage or process boundaries.
 
+## Material ambiguity and failure diagnosis
+
+Resolve requirements from canonical code/contracts/docs/ADRs/consumers/tests before implementation. If two reasonable interpretations still materially change behavior, public contracts, persistence, privacy/security, resource/lifecycle semantics, compatibility, acceptance criteria or meaningful UX, ask the user/owner instead of silently choosing.
+
+When validation fails, classify it as current-change regression, baseline failure, environment/toolchain issue, flaky behavior, stale-base effect or incorrect assumption/contract before editing production code. Fix the owning invariant; do not weaken legitimate gates or repeat symptom patches without a new falsifiable hypothesis.
+
+## Pre-publication readiness
+
+Use `skills/preflight-change/SKILL.md` before pushing or updating a PR for normal readiness confirmation. Refresh the intended `dev` revision, review the complete diff, record exact head/base identity and run every required locally reproducible deterministic gate selected by blast radius. CI/device/hardware-only evidence must be declared `PENDING`, never inferred.
+
+CI should confirm the project-owned deterministic validation semantics, not become the normal edit-test loop for formatting, static analysis, compilation or host tests.
+
 ## Pull-request checks
 
-A change is ready only when formatting, static analysis, unit tests, Android lint and debug/internal builds pass from a clean checkout.
+A change is ready only when formatting, static analysis, compilation, affected unit/contract tests, Android lint and applicable debug/internal builds pass from a clean checkout. The PR must distinguish `PASS`, `FAIL`, `PENDING` and `N/A` evidence and record `READY_FOR_CI` only for the exact validated head/base pair.

@@ -1,6 +1,6 @@
 ---
 name: validate-change
-description: Select and execute the narrowest sufficient validation for a change while iterating, then expand to the correct final integration, end-to-end, product-experience, repository, artifact, device or hardware gate based on blast radius and claims.
+description: Select and execute the narrowest sufficient validation for a change while iterating, diagnose failures at their owning invariant, then expand to the correct final integration, end-to-end, product-experience, repository, artifact, device or hardware gate based on blast radius and claims.
 ---
 
 # Validate Change
@@ -10,6 +10,8 @@ description: Select and execute the narrowest sufficient validation for a change
 Do not run the entire repository for every edit, and do not stop at a local unit test when a shared contract, runtime boundary or critical user experience changed. Validation follows blast radius and the strength of the claim.
 
 Use `.engineering/commands.json` as the canonical repository-level command routing surface. When `product-ui` is adopted and user-facing behavior changes, also read `design/ux-contract.json` and `design/brand-kit.json`.
+
+This Skill owns iterative validation selection. `preflight-change` owns the final exact-head publication decision.
 
 ## Validation ladder
 
@@ -105,6 +107,21 @@ A build passing is not equivalent to the built artifact working, and smoke is no
 
 Use both when both claims matter.
 
+## Failure diagnosis
+
+A red gate must be understood before it drives another code edit. Classify it as:
+
+- current-change regression;
+- baseline/pre-existing failure;
+- environment/toolchain/dependency issue;
+- flaky/non-deterministic behavior;
+- stale-base/stack integration effect;
+- incorrect requirement/design/contract assumption.
+
+Identify the violated invariant and owner. Fix the owner and add regression evidence at the lowest useful level.
+
+Never weaken/delete/suppress a legitimate failing test or requirement merely to make the change green without explicitly changing the owning contract. If the same gate fails after an attempted fix, do not repeat symptom patches: re-evaluate the hypothesis, ownership and assumptions first.
+
 ## Operational validation
 
 When the change affects runtime/build/package/E2E/lifecycle behavior, validate applicable operating-contract invariants:
@@ -129,20 +146,21 @@ A strong E2E extends that lifecycle with one complete critical workflow before t
 2. Read the nearest agent guide and `.engineering/commands.json`; read design contracts when `product-ui` and UI behavior are relevant.
 3. For meaningful UX/UI semantics, confirm `design-product-experience` was applied at proportional depth before validating the implementation.
 4. Run the cheapest deterministic gate that can falsify the current edit quickly.
-5. Expand only when the change crosses a boundary or is ready for final integration.
-6. Use E2E only when the full product/system outcome is part of the claim.
-7. Add accessibility/adaptive/motion/visual/usability evidence only when the changed experience claim requires it.
-8. If a gate cannot run, record the exact missing dependency/environment and do not silently treat it as passed.
-9. Never weaken/delete/suppress a legitimate failing test or experience requirement merely to make the change green without explicitly changing the owning contract.
+5. On failure, classify cause and owner before editing again.
+6. Expand only when the change crosses a boundary or is ready for final integration.
+7. Use E2E only when the full product/system outcome is part of the claim.
+8. Add accessibility/adaptive/motion/visual/usability evidence only when the changed experience claim requires it.
+9. If a gate cannot run, record the exact missing dependency/environment and do not silently treat it as passed.
 10. Report exact validation executed and evidence still pending.
+11. Before publication, hand the accumulated evidence to `preflight-change`; do not infer `READY_FOR_CI` from partial iteration results.
 
 ## Output
 
-A final change summary should distinguish:
+An iteration/final change summary should distinguish:
 
 - PASS — executed and passed;
 - FAIL — executed and failed;
 - PENDING — required but unavailable/not executed;
 - N/A — genuinely not applicable.
 
-This prevents absence of evidence from becoming evidence of correctness.
+This prevents absence of evidence from becoming evidence of correctness. `preflight-change` additionally records exact head/base and determines `READY_FOR_CI` vs `NOT_READY_FOR_CI`.

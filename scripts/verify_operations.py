@@ -25,6 +25,16 @@ COMMANDS = (
 REQUIRED_NON_NA = {"setup", "check", "test", "build", "clean"}
 STATUSES = {"required", "recommended", "optional", "n/a"}
 PLACEHOLDER_MARKERS = ("<REPLACE_WITH_", "<PROJECT_")
+REQUIRED_PUBLICATION_FLAGS = (
+    "local_preflight_required",
+    "target_base_freshness_required",
+    "full_diff_review_required",
+    "material_ambiguity_must_be_resolved",
+    "failure_root_cause_required",
+    "deterministic_ci_local_parity_required",
+    "ci_only_evidence_must_be_declared",
+    "exact_head_evidence_required",
+)
 REQUIRED_CLEANUP_PATHS = {
     "success",
     "failure",
@@ -111,6 +121,13 @@ def main() -> int:
             for marker in PLACEHOLDER_MARKERS:
                 if marker in run:
                     errors.append(f"unresolved command placeholder in commands.{name}.run")
+
+    publication = data.get("publication_gate")
+    if not isinstance(publication, dict):
+        errors.append("publication_gate must be an object")
+        publication = {}
+    for key in REQUIRED_PUBLICATION_FLAGS:
+        expect_true(publication, key, errors, "publication_gate")
 
     e2e = data.get("end_to_end")
     if not isinstance(e2e, dict):

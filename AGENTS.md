@@ -8,7 +8,7 @@ Read this guide, then only:
 
 1. the closest scoped `AGENTS.md`;
 2. the owning architecture, feature or active-workstream source;
-3. [`.engineering/commands.json`](.engineering/commands.json) when operational behavior matters;
+3. [`.engineering/commands.json`](.engineering/commands.json) when operational or publication-readiness behavior matters;
 4. the relevant project-local Skill under [`skills/`](skills/README.md);
 5. for user-facing/visual semantics, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md);
 6. implementation, direct consumers, fakes and nearby tests.
@@ -104,15 +104,16 @@ Classify first:
 ## Change workflow
 
 1. Confirm owner and smallest coherent scope.
-2. Use [`skills/plan-workstream/SKILL.md`](skills/plan-workstream/SKILL.md) only for persistent dependency/state coordination.
-3. Use [`skills/structured-change/SKILL.md`](skills/structured-change/SKILL.md) around meaningful behavior/cross-layer changes.
-4. For meaningful user-facing changes, use `design-product-experience` before implementation at appropriate depth.
-5. Inspect owner, consumers, fakes and tests before shared-contract changes.
-6. Implement one vertical slice; avoid parallel domain logic.
-7. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) for iteration and final blast-radius gates.
-8. Update only the canonical durable owner.
-9. Finalize workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
-10. Inspect the complete diff before publishing.
+2. Resolve material ambiguity from canonical code/contracts/docs/ADRs/consumers/tests. If reasonable alternatives still materially change behavior, contracts, persistence, security/privacy, lifecycle, compatibility, acceptance criteria or meaningful UX, ask the user before implementing that decision.
+3. Use [`skills/plan-workstream/SKILL.md`](skills/plan-workstream/SKILL.md) only for persistent dependency/state coordination.
+4. Use [`skills/structured-change/SKILL.md`](skills/structured-change/SKILL.md) around meaningful behavior/cross-layer changes.
+5. For meaningful user-facing changes, use `design-product-experience` before implementation at appropriate depth.
+6. Inspect owner, consumers, fakes and tests before shared-contract changes.
+7. Implement one vertical slice; avoid parallel domain logic.
+8. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) while iterating. When a gate fails, classify the failure and owning invariant before editing; repeated failure requires a new hypothesis rather than another symptom patch.
+9. Update only the canonical durable owner.
+10. Finalize workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
+11. Use [`skills/preflight-change/SKILL.md`](skills/preflight-change/SKILL.md) before publication: refresh the intended `dev` base, review the complete diff, run every required locally reproducible deterministic gate on the exact head, and declare CI/device-only evidence.
 
 Ordinary work starts from latest green `dev` and targets `dev`; `main` is promotion/hotfix only under [`BRANCHING.md`](BRANCHING.md).
 
@@ -129,6 +130,12 @@ Use the scoped guide, [`skills/validate-change/SKILL.md`](skills/validate-change
 
 Missing device/usability evidence remains pending; never upgrade synthetic evidence into a stronger claim.
 
+## Publication readiness
+
+The governing rule is **CI should confirm, not discover** locally reproducible deterministic failures. `READY_FOR_CI` requires no unresolved material ambiguity, current target-base identity, complete-diff review, exact-head identity and all required locally reproducible gates passing. A later edit, rebase/replay, dependency change or material `dev` movement invalidates affected evidence.
+
+For Android blast radius, preflight includes the applicable formatter/Spotless, detekt/static analysis, Kotlin/Java compilation, affected unit/contract tests, Android Lint and assemble/package gates. Real-device, thermal, memory and packaged cross-app evidence may remain explicitly `PENDING` when it cannot be reproduced locally, but still blocks stronger claims that depend on it.
+
 ## Documentation lifecycle
 
 - [`docs/architecture.md`](docs/architecture.md), `docs/features/` and `docs/adr/` own durable knowledge.
@@ -144,4 +151,4 @@ Keep durable routing, hazards, invariants and validation selection. Put recurrin
 
 ## Stop conditions
 
-Surface conflicts instead of bypassing accepted contracts, privacy/native boundaries, signing/model safety, canonical validation/artifact lifecycle, product-experience/design-system ownership, destructive-review requirements or physical-evidence gates.
+Surface conflicts instead of bypassing accepted contracts, unresolved material product/contract ambiguity, privacy/native boundaries, signing/model safety, canonical validation/artifact lifecycle, product-experience/design-system ownership, the publication gate, destructive-review requirements or physical-evidence gates.
