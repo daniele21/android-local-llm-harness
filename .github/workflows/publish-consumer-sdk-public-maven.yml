@@ -9,6 +9,9 @@ on:
       - '.github/workflows/publish-consumer-sdk-public-maven.yml'
       - 'docs/shared-runtime/consumer-sdk-version.txt'
       - 'samples/external-consumer-android/settings.gradle.kts'
+      - 'samples/external-consumer-android/consumer-app/**'
+      - 'scripts/verify-consumer-sdk-publication.sh'
+      - 'transports/android-binder-contract/**'
 
 permissions:
   contents: write
@@ -88,3 +91,4 @@ jobs:
           -PconsumerSdkVersion=$SDK_VERSION
           -PconsumerSdkRepositoryUrl=https://raw.githubusercontent.com/daniele21/android-local-llm-harness/consumer-sdk-maven/maven
           :consumer:assembleDebug
+          :consumer-app:assembleRelease
