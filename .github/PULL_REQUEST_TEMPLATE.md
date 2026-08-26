@@ -26,7 +26,7 @@ Harness invariants to call out when relevant:
 
 ## Product experience
 
-If user-facing behavior changes, classify it as structural UX, interaction or visual-only and describe the affected user outcome/task, information/action hierarchy, progressive disclosure/defaults, critical states/feedback/recovery, accessibility/adaptive behavior, design-system ownership and any purposeful motion/graphics semantics. Confirm that structure/interaction was resolved before motion or polish. Otherwise `N/A`.
+If user-facing behavior changes, classify it as structural UX, interaction or visual-only and describe the affected user outcome/task, information/action hierarchy, progressive disclosure/defaults, critical states/feedback/recovery, accessibility/adaptive behavior, design-system ownership and any purposeful motion/graphics semantics. Otherwise `N/A`.
 
 ## Build / runtime / artifact lifecycle
 
@@ -34,31 +34,37 @@ State affected `.engineering/commands.json` intents and any build identity, mani
 
 ## Pre-publication readiness
 
-Record the final preflight for the exact branch state being published.
+Record exact publication state:
 
 - HEAD: `<revision>`
 - TARGET: `dev@<revision>` (or explicit promotion/hotfix target)
 - AMBIGUITY: `PASS|FAIL`
 - BASE_FRESHNESS: `PASS|FAIL`
 - FULL_DIFF_REVIEW: `PASS|FAIL`
-- READINESS: `READY_FOR_CI|NOT_READY_FOR_CI`
+- READINESS: `READY_FOR_CI|READY_FOR_REMOTE_PREFLIGHT|AUTOMATED_PREFLIGHT_CONFIRMED|NOT_READY_FOR_AUTOMATED_PREFLIGHT`
 
-List locally reproducible gates as `PASS|FAIL|PENDING|N/A`. A known-red draft must be explicitly identified and may not claim `READY_FOR_CI`.
+A known-red draft must be explicit and may not claim automated readiness.
 
-## Validation
+## Validation profile
 
-List exact checks and evidence executed; never claim evidence not run.
+- AUTO resolution: `LEAN|SCOPED|STRONG|FULL`
+- Reason: `<selector reason>`
+- Affected modules/jobs: `<scope>`
+- Override: `N/A|strong|full` and why
 
-- [ ] `LOCAL PREFLIGHT COMPLETE` for the recorded HEAD/TARGET pair.
-- [ ] Relevant targeted tests cover the changed behavior.
-- [ ] Required local deterministic preflight gates passed on the recorded HEAD.
-- [ ] `Repository validation` is green on the current head.
-- [ ] `Repository health` is green on the current head.
-- [ ] Relevant Android packaging/native checks are green.
+`FULL` is not the default. Stronger explicit validation is allowed; weaker-than-auto requires an explicit exception and justification.
 
-## CI-only / real-environment evidence
+## Agent-local validation
 
-Declare physical-device, hardware, thermal/performance, packaged cross-app or other evidence unavailable locally as `PENDING` or `N/A`. Pending evidence still blocks any stronger production/device claim that depends on it.
+List deterministic selected-profile gates the current coding agent executed directly as `PASS|FAIL|N/A`.
+
+## Remote automated validation
+
+List deterministic selected-profile gates unavailable agent-local as `PASS|FAIL|PENDING|N/A`, including `/preflight` trigger/run identity. Do not delegate Gradle/R8/Lint/build work to the user merely because the agent lacks Android tooling.
+
+## Real-environment evidence
+
+Declare physical-device, hardware, thermal/performance, packaged cross-app or representative usability evidence as `PASS|PENDING|N/A`. Pending evidence still blocks any stronger claim that depends on it.
 
 ## E2E / experience evidence
 
@@ -81,9 +87,8 @@ For a complete critical workflow or stable high-risk UI surface, describe journe
 
 Complete only for `dev -> main`.
 
-- [ ] The head is the current protected `dev` candidate.
-- [ ] Full non-scoped repository validation passed on the exact candidate.
-- [ ] Repository health passed on the exact candidate.
+- [ ] Validation profile is `FULL` on the exact promotion candidate.
+- [ ] Repository validation and repository health passed on the exact candidate.
 - [ ] Android packaging and native host tests passed on the exact candidate.
 - [ ] Required physical/device/release evidence for the promoted claims is attached.
 - [ ] All conversations are resolved and the branch is up to date.
