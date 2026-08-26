@@ -85,6 +85,7 @@ internal object HarnessRoutes {
             )
 
             applicationDetail != null -> applicationDetail
+
             route == HarnessDestination.DIAGNOSTICS.route -> HarnessShellState(
                 destination = HarnessDestination.DIAGNOSTICS,
                 detailTitle = "Diagnostics",
