@@ -33,7 +33,9 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 Applications control-plane implementation is complete through ACUX-80: Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations with canonical re-read; Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
 
-ACUX-90 representative physical two-APK evidence is the only remaining Applications feature gate. ACUX-100 cleanup remains blocked until that proof exists. General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
+A persisted control-plane startup/upgrade regression is now active: current Binder discovery/activation can seed only an exactly empty store, so a partially populated but valid Room state may remain permanently incomplete. The bounded repair is tracked in [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md). ACUX-90 is blocked until the reconciled exact-head repository candidate reaches CPREC-70.
+
+General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
 
 ### Shared Android runtime
 
@@ -72,22 +74,26 @@ PR #248 contains a review-gated symbol candidate, not approved production identi
 
 Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 support claim, execute each reviewed artifact/configuration, evaluate aggregate/per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates, preserve exact identities and fail closed on threshold/category/identity failure. Policy v1 must not be lowered to fit observed results.
 
-### 3. Physical Android evidence
+### 3. Persisted control-plane reconciliation
 
-Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path.
+The current host bootstrap mutates persistent state from Binder-path discovery/activation and only seeds when the entire `HostControlPlaneState` is empty. Partial valid state can therefore survive upgrades/restarts without mandatory built-in application/use-case/preset/binding/exposure data. Repair must be atomic, conservative and idempotent; preserve unrelated/custom/disabled/default state; fail closed on conflicting built-in identity; and complete before UI or Binder observation. CPREC-10 and CPREC-20 are the first parallel implementation slices; physical Applications/HCP proof waits for CPREC-70.
+
+### 4. Physical Android evidence
+
+Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path. ACUX-90 cannot start until the reconciled CPREC-70 candidate exists.
 
 Do not claim representative-device UX, external-consumer Applications effectiveness, `MEASURED` Q35 profiles, publish-ready Binder client AAR or production-ready OMBRA/shared-host transport from CI/emulator evidence alone.
 
-### 4. Follow-on validation and product hardening
+### 5. Follow-on validation and product hardening
 
 Repository-side UX/UI, including Applications through ACUX-80, is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
-1. complete OMB-6B identity review and deterministic launcher assets;
-2. execute OMBRA corpus v2 on reviewed Qwen3.5 artifacts against policy v1;
-3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
-4. execute ACUX-90 physical persist/restart/discover/activate/infer plus stale/invalid fail-closed proof;
+1. execute CPREC-10 canonical built-in spec/reconciler and CPREC-20 Room partial-state persistence tests in parallel;
+2. after the reconciliation contract settles, execute CPREC-30 startup composition cutover and CPREC-40 regression matrix in parallel, then close CPREC-50/70 exact-head integration;
+3. complete OMB-6B identity review and deterministic launcher assets, and continue OMBRA corpus v2 quality execution independently where ownership does not conflict;
+4. on the CPREC-70 candidate, run upgrade-repair evidence and clean two-APK HCP/ACUX evidence, then resume ACUX-90;
 5. run Q35-6, SR-6 and broader phone UX evidence in parallel where hardware can be shared;
 6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact build.
 
