@@ -125,4 +125,7 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // The release AndroidTest APK is minified too. AndroidX Test 1.7.0 bytecode references
+    // Error Prone annotations that R8 requires on the shrinker classpath.
+    androidTestImplementation(libs.error.prone.annotations)
 }
