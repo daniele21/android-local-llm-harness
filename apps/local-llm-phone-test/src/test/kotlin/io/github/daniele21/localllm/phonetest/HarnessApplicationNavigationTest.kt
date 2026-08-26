@@ -39,6 +39,33 @@ class HarnessApplicationNavigationTest {
     }
 
     @Test
+    fun `technical details route extends the opaque preset identity`() {
+        val route = HarnessApplicationRoutes.technicalDetails(
+            applicationId = "redactguard",
+            useCaseId = "document/pii detection",
+            presetId = "balanced local pii",
+            presetRevision = 3,
+        )
+        val parts = route.split('/')
+
+        assertEquals("technical", parts.last())
+        assertEquals(
+            HarnessApplicationRouteIdentity(
+                applicationId = "redactguard",
+                useCaseId = "document/pii detection",
+                presetId = "balanced local pii",
+                presetRevision = 3,
+            ),
+            HarnessApplicationRoutes.identity(
+                encodedApplicationId = parts[1],
+                encodedUseCaseId = parts[3],
+                encodedPresetId = parts[5],
+                presetRevision = parts[6].toInt(),
+            ),
+        )
+    }
+
+    @Test
     fun `new preset route does not serialize domain objects`() {
         val route = HarnessApplicationRoutes.newPreset("redactguard", "document-pii-detection")
 

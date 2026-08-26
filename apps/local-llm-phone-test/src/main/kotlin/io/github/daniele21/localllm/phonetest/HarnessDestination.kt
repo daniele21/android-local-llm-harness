@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 internal enum class HarnessDestination(val route: String, val label: String, val compactLabel: String = label) {
     OVERVIEW("overview", "Overview"),
     PLAYGROUND("playground", "Playground"),
+    APPS("applications", "Apps"),
     PERFORMANCE("performance", "Performance", "Perf"),
     MODELS("models", "Models"),
     DIAGNOSTICS("diagnostics", "Diagnostics", "Diag"),
@@ -53,7 +54,7 @@ internal enum class HarnessDestination(val route: String, val label: String, val
     ;
 
     companion object {
-        val main = listOf(OVERVIEW, PLAYGROUND, PERFORMANCE, MODELS, DIAGNOSTICS)
+        val main = listOf(OVERVIEW, PLAYGROUND, APPS, PERFORMANCE, MODELS)
 
         fun fromRoute(route: String?): HarnessDestination = entries.firstOrNull { it.route == route } ?: OVERVIEW
     }
@@ -259,6 +260,23 @@ private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestinatio
                 close()
             }
             drawPath(play, color)
+        }
+
+        HarnessDestination.APPS -> {
+            listOf(0.32f, 0.68f).forEach { row ->
+                drawCircle(
+                    color = color,
+                    radius = width * 0.08f,
+                    center = Offset(width * 0.22f, height * row),
+                    style = stroke,
+                )
+                drawLine(
+                    color = color,
+                    start = Offset(width * 0.42f, height * row),
+                    end = Offset(width * 0.86f, height * row),
+                    strokeWidth = stroke.width,
+                )
+            }
         }
 
         HarnessDestination.PERFORMANCE -> {
