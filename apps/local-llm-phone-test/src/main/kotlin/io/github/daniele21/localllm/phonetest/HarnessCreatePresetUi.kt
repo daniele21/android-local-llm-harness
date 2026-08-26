@@ -36,16 +36,20 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
 
+internal data class HarnessCreatePresetActions(
+    val onSave: (HarnessPresetSummary, String, Boolean, Int?) -> Unit,
+    val onReload: () -> Unit,
+    val onClearFeedback: () -> Unit,
+    val onViewSavedPreset: (String, Int) -> Unit,
+    val onDone: () -> Unit,
+)
+
 @Composable
 internal fun HarnessCreatePresetScreen(
     application: HarnessApplicationSummary?,
     assignment: HarnessAssignmentSummary?,
     mutationState: HarnessApplicationsMutationState,
-    onSave: (HarnessPresetSummary, String, Boolean, Int?) -> Unit,
-    onReload: () -> Unit,
-    onClearFeedback: () -> Unit,
-    onViewSavedPreset: (String, Int) -> Unit,
-    onDone: () -> Unit,
+    actions: HarnessCreatePresetActions,
     modifier: Modifier = Modifier,
 ) {
     if (application == null || assignment == null) {
@@ -65,7 +69,25 @@ internal fun HarnessCreatePresetScreen(
         )
         return
     }
+    HarnessCreatePresetReadyContent(
+        application = application,
+        assignment = assignment,
+        initialBase = initialBase,
+        mutationState = mutationState,
+        actions = actions,
+        modifier = modifier,
+    )
+}
 
+@Composable
+private fun HarnessCreatePresetReadyContent(
+    application: HarnessApplicationSummary,
+    assignment: HarnessAssignmentSummary,
+    initialBase: HarnessPresetSummary,
+    mutationState: HarnessApplicationsMutationState,
+    actions: HarnessCreatePresetActions,
+    modifier: Modifier,
+) {
     var displayName by rememberSaveable(application.applicationId, assignment.useCaseId) { mutableStateOf("") }
     var selectedBaseKey by rememberSaveable(application.applicationId, assignment.useCaseId) {
         mutableStateOf(initialBase.identityKey())
@@ -97,145 +119,65 @@ internal fun HarnessCreatePresetScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(LocalHarnessSpacing.current.large),
         verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
     ) {
+        item { HarnessCreatePresetHeader(assignment.displayName) }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall)) {
-                Text("Create preset", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    "Create a Custom configuration for ${assignment.displayName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        item {
-            OutlinedTextField(
+            HarnessPresetNameField(
                 value = displayName,
-                onValueChange = { displayName = it },
-                modifier = Modifier.fillMaxWidth().testTag("custom-preset-name"),
                 enabled = !saving && customSaved == null,
-                singleLine = true,
-                label = { Text("Preset name") },
-                supportingText = { Text("Shown in this application’s assigned-use-case configuration.") },
+                onValueChange = { displayName = it },
+            )
+        }
+        item { Text("Start from", style = MaterialTheme.typography.titleMedium) }
+        items(items = assignment.availablePresets, key = HarnessPresetSummary::identityKey) { preset ->
+            HarnessPresetBaseCard(
+                preset = preset,
+                selected = preset.identityKey() == selectedBase.identityKey(),
+                enabled = !saving && customSaved == null,
+                onSelect = {
+                    selectedBaseKey = preset.identityKey()
+                    contextText = preset.contextTokens?.toString().orEmpty()
+                    automaticModelSelection = preset.modelProfileId == null
+                    actions.onClearFeedback()
+                },
             )
         }
         item {
-            Text("Start from", style = MaterialTheme.typography.titleMedium)
-        }
-        items(
-            items = assignment.availablePresets,
-            key = HarnessPresetSummary::identityKey,
-        ) { preset ->
-            val selected = preset.identityKey() == selectedBase.identityKey()
-            HarnessCard(
-                emphasized = selected,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = HarnessMinimumTouchTarget)
-                    .clickable(enabled = !saving && customSaved == null) {
-                        selectedBaseKey = preset.identityKey()
-                        contextText = preset.contextTokens?.toString().orEmpty()
-                        automaticModelSelection = preset.modelProfileId == null
-                        onClearFeedback()
-                    },
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
-                    ) {
-                        Text(preset.displayName, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            preset.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    HarnessStatusBadge(preset.originLabel(), HarnessStatusTone.INFO)
-                    if (selected) HarnessStatusBadge("Selected", HarnessStatusTone.SUCCESS)
-                }
-            }
+            HarnessModelPolicyCard(
+                selectedBase = selectedBase,
+                automaticModelSelection = automaticModelSelection,
+                enabled = !saving && customSaved == null,
+                onAutomaticModelSelectionChanged = {
+                    automaticModelSelection = it
+                    actions.onClearFeedback()
+                },
+            )
         }
         item {
-            HarnessCard {
-                Text("Model policy", style = MaterialTheme.typography.titleMedium)
-                HarnessKeyValueRow(
-                    label = "Base preset",
-                    value = selectedBase.modelProfileId ?: "Automatic selection",
-                    monospacedValue = selectedBase.modelProfileId != null,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = HarnessMinimumTouchTarget),
-                    horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Automatic model selection", style = MaterialTheme.typography.labelLarge)
-                        Text(
-                            if (selectedBase.modelProfileId == null) {
-                                "The selected base preset already uses automatic selection."
-                            } else {
-                                "When disabled, the Custom preset keeps the base model policy."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = automaticModelSelection,
-                        onCheckedChange = {
-                            automaticModelSelection = it
-                            onClearFeedback()
-                        },
-                        enabled = !saving && customSaved == null && selectedBase.modelProfileId != null,
-                    )
-                }
-            }
-        }
-        item {
-            OutlinedTextField(
+            HarnessContextTokensField(
                 value = contextText,
+                valid = contextValid,
+                enabled = !saving && customSaved == null,
                 onValueChange = { value ->
                     if (value.isEmpty() || value.all(Char::isDigit)) {
                         contextText = value
-                        onClearFeedback()
+                        actions.onClearFeedback()
                     }
-                },
-                modifier = Modifier.fillMaxWidth().testTag("custom-preset-context"),
-                enabled = !saving && customSaved == null,
-                singleLine = true,
-                isError = !contextValid,
-                label = { Text("Context tokens") },
-                supportingText = {
-                    Text(
-                        if (contextValid) {
-                            "Blank uses the use-case default. The canonical minimum is enforced when saved."
-                        } else {
-                            "Enter a positive whole number or leave the field blank."
-                        },
-                    )
                 },
             )
         }
         item {
             HarnessCustomPresetFeedback(
                 state = mutationState,
-                onReload = onReload,
-                onClearFeedback = onClearFeedback,
-                onViewSavedPreset = onViewSavedPreset,
-                onDone = onDone,
+                actions = actions,
             )
         }
         if (customSaved == null) {
             item {
-                HarnessPrimaryButton(
-                    text = if (saving) "Saving preset…" else "Save preset",
+                HarnessSavePresetButton(
+                    saving = saving,
                     enabled = !saving && displayName.isNotBlank() && contextValid,
-                    onClick = {
-                        onSave(
+                    onSave = {
+                        actions.onSave(
                             selectedBase,
                             displayName.trim(),
                             automaticModelSelection,
@@ -249,12 +191,154 @@ internal fun HarnessCreatePresetScreen(
 }
 
 @Composable
+private fun HarnessCreatePresetHeader(assignmentName: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall)) {
+        Text("Create preset", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Create a Custom configuration for $assignmentName",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun HarnessPresetNameField(
+    value: String,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().testTag("custom-preset-name"),
+        enabled = enabled,
+        singleLine = true,
+        label = { Text("Preset name") },
+        supportingText = { Text("Shown in this application’s assigned-use-case configuration.") },
+    )
+}
+
+@Composable
+private fun HarnessPresetBaseCard(
+    preset: HarnessPresetSummary,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+) {
+    HarnessCard(
+        emphasized = selected,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = HarnessMinimumTouchTarget)
+            .clickable(enabled = enabled, onClick = onSelect),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
+            ) {
+                Text(preset.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    preset.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HarnessStatusBadge(preset.originLabel(), HarnessStatusTone.INFO)
+            if (selected) HarnessStatusBadge("Selected", HarnessStatusTone.SUCCESS)
+        }
+    }
+}
+
+@Composable
+private fun HarnessModelPolicyCard(
+    selectedBase: HarnessPresetSummary,
+    automaticModelSelection: Boolean,
+    enabled: Boolean,
+    onAutomaticModelSelectionChanged: (Boolean) -> Unit,
+) {
+    HarnessCard {
+        Text("Model policy", style = MaterialTheme.typography.titleMedium)
+        HarnessKeyValueRow(
+            label = "Base preset",
+            value = selectedBase.modelProfileId ?: "Automatic selection",
+            monospacedValue = selectedBase.modelProfileId != null,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = HarnessMinimumTouchTarget),
+            horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Automatic model selection", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    if (selectedBase.modelProfileId == null) {
+                        "The selected base preset already uses automatic selection."
+                    } else {
+                        "When disabled, the Custom preset keeps the base model policy."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = automaticModelSelection,
+                onCheckedChange = onAutomaticModelSelectionChanged,
+                enabled = enabled && selectedBase.modelProfileId != null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HarnessContextTokensField(
+    value: String,
+    valid: Boolean,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().testTag("custom-preset-context"),
+        enabled = enabled,
+        singleLine = true,
+        isError = !valid,
+        label = { Text("Context tokens") },
+        supportingText = {
+            Text(
+                if (valid) {
+                    "Blank uses the use-case default. The canonical minimum is enforced when saved."
+                } else {
+                    "Enter a positive whole number or leave the field blank."
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun HarnessSavePresetButton(
+    saving: Boolean,
+    enabled: Boolean,
+    onSave: () -> Unit,
+) {
+    HarnessPrimaryButton(
+        text = if (saving) "Saving preset…" else "Save preset",
+        enabled = enabled,
+        onClick = onSave,
+    )
+}
+
+@Composable
 private fun HarnessCustomPresetFeedback(
     state: HarnessApplicationsMutationState,
-    onReload: () -> Unit,
-    onClearFeedback: () -> Unit,
-    onViewSavedPreset: (String, Int) -> Unit,
-    onDone: () -> Unit,
+    actions: HarnessCreatePresetActions,
 ) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
@@ -271,8 +355,8 @@ private fun HarnessCustomPresetFeedback(
                 HarnessCard(emphasized = true) {
                     HarnessStatusBadge("Preset saved", HarnessStatusTone.SUCCESS)
                     Text(state.message)
-                    HarnessPrimaryButton("View preset") { onViewSavedPreset(presetId, presetRevision) }
-                    HarnessSecondaryButton("Done", onClick = onDone)
+                    HarnessPrimaryButton("View preset") { actions.onViewSavedPreset(presetId, presetRevision) }
+                    HarnessSecondaryButton("Done", onClick = actions.onDone)
                 }
             }
         }
@@ -281,7 +365,7 @@ private fun HarnessCustomPresetFeedback(
             title = "Configuration changed",
             detail = state.message,
             actionLabel = "Reload changes",
-            onAction = onReload,
+            onAction = actions.onReload,
             tone = HarnessStatusTone.WARNING,
         )
 
@@ -289,7 +373,7 @@ private fun HarnessCustomPresetFeedback(
             title = "Preset not saved",
             detail = state.message,
             actionLabel = "Review fields",
-            onAction = onClearFeedback,
+            onAction = actions.onClearFeedback,
             tone = HarnessStatusTone.ERROR,
         )
     }
