@@ -44,6 +44,27 @@ internal data class HarnessCreatePresetActions(
     val onDone: () -> Unit,
 )
 
+private data class HarnessCreatePresetDraft(
+    val displayName: String,
+    val selectedBase: HarnessPresetSummary,
+    val contextText: String,
+    val automaticModelSelection: Boolean,
+    val parsedContext: Int?,
+    val contextValid: Boolean,
+)
+
+private data class HarnessCreatePresetStatus(
+    val saving: Boolean,
+    val customSaved: HarnessApplicationsMutationState.Saved?,
+)
+
+private data class HarnessCreatePresetDraftActions(
+    val onDisplayNameChanged: (String) -> Unit,
+    val onBaseSelected: (HarnessPresetSummary) -> Unit,
+    val onAutomaticModelSelectionChanged: (Boolean) -> Unit,
+    val onContextChanged: (String) -> Unit,
+)
+
 @Composable
 internal fun HarnessCreatePresetScreen(
     application: HarnessApplicationSummary?,
@@ -109,11 +130,59 @@ private fun HarnessCreatePresetReadyContent(
     }
 
     val parsedContext = contextText.toIntOrNull()
-    val contextValid = contextText.isBlank() || (parsedContext != null && parsedContext > 0)
-    val saving = mutationState == HarnessApplicationsMutationState.Saving
     val saved = mutationState as? HarnessApplicationsMutationState.Saved
-    val customSaved = saved?.takeIf { it.presetId != null && it.presetRevision != null }
+    val draft = HarnessCreatePresetDraft(
+        displayName = displayName,
+        selectedBase = selectedBase,
+        contextText = contextText,
+        automaticModelSelection = automaticModelSelection,
+        parsedContext = parsedContext,
+        contextValid = contextText.isBlank() || (parsedContext != null && parsedContext > 0),
+    )
+    val status = HarnessCreatePresetStatus(
+        saving = mutationState == HarnessApplicationsMutationState.Saving,
+        customSaved = saved?.takeIf { it.presetId != null && it.presetRevision != null },
+    )
+    val draftActions = HarnessCreatePresetDraftActions(
+        onDisplayNameChanged = { displayName = it },
+        onBaseSelected = { preset ->
+            selectedBaseKey = preset.identityKey()
+            contextText = preset.contextTokens?.toString().orEmpty()
+            automaticModelSelection = preset.modelProfileId == null
+            actions.onClearFeedback()
+        },
+        onAutomaticModelSelectionChanged = {
+            automaticModelSelection = it
+            actions.onClearFeedback()
+        },
+        onContextChanged = { value ->
+            if (value.isEmpty() || value.all(Char::isDigit)) {
+                contextText = value
+                actions.onClearFeedback()
+            }
+        },
+    )
+    HarnessCreatePresetForm(
+        assignment = assignment,
+        mutationState = mutationState,
+        draft = draft,
+        status = status,
+        actions = actions,
+        draftActions = draftActions,
+        modifier = modifier,
+    )
+}
 
+@Composable
+private fun HarnessCreatePresetForm(
+    assignment: HarnessAssignmentSummary,
+    mutationState: HarnessApplicationsMutationState,
+    draft: HarnessCreatePresetDraft,
+    status: HarnessCreatePresetStatus,
+    actions: HarnessCreatePresetActions,
+    draftActions: HarnessCreatePresetDraftActions,
+    modifier: Modifier,
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("create-custom-preset"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(LocalHarnessSpacing.current.large),
@@ -122,66 +191,48 @@ private fun HarnessCreatePresetReadyContent(
         item { HarnessCreatePresetHeader(assignment.displayName) }
         item {
             HarnessPresetNameField(
-                value = displayName,
-                enabled = !saving && customSaved == null,
-                onValueChange = { displayName = it },
+                value = draft.displayName,
+                enabled = !status.saving && status.customSaved == null,
+                onValueChange = draftActions.onDisplayNameChanged,
             )
         }
         item { Text("Start from", style = MaterialTheme.typography.titleMedium) }
         items(items = assignment.availablePresets, key = HarnessPresetSummary::identityKey) { preset ->
             HarnessPresetBaseCard(
                 preset = preset,
-                selected = preset.identityKey() == selectedBase.identityKey(),
-                enabled = !saving && customSaved == null,
-                onSelect = {
-                    selectedBaseKey = preset.identityKey()
-                    contextText = preset.contextTokens?.toString().orEmpty()
-                    automaticModelSelection = preset.modelProfileId == null
-                    actions.onClearFeedback()
-                },
+                selected = preset.identityKey() == draft.selectedBase.identityKey(),
+                enabled = !status.saving && status.customSaved == null,
+                onSelect = { draftActions.onBaseSelected(preset) },
             )
         }
         item {
             HarnessModelPolicyCard(
-                selectedBase = selectedBase,
-                automaticModelSelection = automaticModelSelection,
-                enabled = !saving && customSaved == null,
-                onAutomaticModelSelectionChanged = {
-                    automaticModelSelection = it
-                    actions.onClearFeedback()
-                },
+                selectedBase = draft.selectedBase,
+                automaticModelSelection = draft.automaticModelSelection,
+                enabled = !status.saving && status.customSaved == null,
+                onAutomaticModelSelectionChanged = draftActions.onAutomaticModelSelectionChanged,
             )
         }
         item {
             HarnessContextTokensField(
-                value = contextText,
-                valid = contextValid,
-                enabled = !saving && customSaved == null,
-                onValueChange = { value ->
-                    if (value.isEmpty() || value.all(Char::isDigit)) {
-                        contextText = value
-                        actions.onClearFeedback()
-                    }
-                },
+                value = draft.contextText,
+                valid = draft.contextValid,
+                enabled = !status.saving && status.customSaved == null,
+                onValueChange = draftActions.onContextChanged,
             )
         }
-        item {
-            HarnessCustomPresetFeedback(
-                state = mutationState,
-                actions = actions,
-            )
-        }
-        if (customSaved == null) {
+        item { HarnessCustomPresetFeedback(state = mutationState, actions = actions) }
+        if (status.customSaved == null) {
             item {
                 HarnessSavePresetButton(
-                    saving = saving,
-                    enabled = !saving && displayName.isNotBlank() && contextValid,
+                    saving = status.saving,
+                    enabled = !status.saving && draft.displayName.isNotBlank() && draft.contextValid,
                     onSave = {
                         actions.onSave(
-                            selectedBase,
-                            displayName.trim(),
-                            automaticModelSelection,
-                            parsedContext,
+                            draft.selectedBase,
+                            draft.displayName.trim(),
+                            draft.automaticModelSelection,
+                            draft.parsedContext,
                         )
                     },
                 )
