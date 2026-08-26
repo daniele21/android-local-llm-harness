@@ -26,32 +26,23 @@ REQUIRED_NON_NA = {"setup", "check", "test", "build", "clean"}
 STATUSES = {"required", "recommended", "optional", "n/a"}
 PLACEHOLDER_MARKERS = ("<REPLACE_WITH_", "<PROJECT_")
 REQUIRED_PUBLICATION_FLAGS = (
-    "local_preflight_required",
+    "agent_preflight_required",
     "target_base_freshness_required",
     "full_diff_review_required",
     "material_ambiguity_must_be_resolved",
     "failure_root_cause_required",
-    "deterministic_ci_local_parity_required",
-    "ci_only_evidence_must_be_declared",
+    "execution_capability_classification_required",
+    "blast_radius_profile_selection_required",
+    "automatable_gates_must_not_be_delegated_to_user",
+    "remote_automated_fallback_required_when_agent_local_unavailable",
+    "deterministic_ci_command_parity_required",
+    "non_automated_evidence_must_be_declared",
     "exact_head_evidence_required",
 )
-REQUIRED_CLEANUP_PATHS = {
-    "success",
-    "failure",
-    "timeout",
-    "cancellation",
-    "interrupt",
-    "partial-initialization",
-}
-REQUIRED_DELTA_DIMENSIONS = {
-    "source",
-    "dependencies",
-    "toolchain",
-    "configuration",
-    "compatibility_migrations",
-    "artifact_metrics",
-    "validation",
-}
+REQUIRED_EXECUTION_CLASSES = {"agent_local", "remote_automated", "real_environment"}
+REQUIRED_VALIDATION_PROFILES = {"lean", "scoped", "strong", "full"}
+REQUIRED_CLEANUP_PATHS = {"success", "failure", "timeout", "cancellation", "interrupt", "partial-initialization"}
+REQUIRED_DELTA_DIMENSIONS = {"source", "dependencies", "toolchain", "configuration", "compatibility_migrations", "artifact_metrics", "validation"}
 REQUIRED_E2E_FLAGS = (
     "recommended_when_full_workflow_boundary_exists",
     "critical_journeys_prioritized",
@@ -96,8 +87,8 @@ def main() -> int:
 
     if data.get("schema_version") != 1:
         errors.append("schema_version must be 1")
-    if not data.get("contract_version"):
-        errors.append("contract_version is required")
+    if data.get("contract_version") != "0.5.0":
+        errors.append("contract_version must be 0.5.0")
 
     commands = data.get("commands")
     if not isinstance(commands, dict):
@@ -129,6 +120,69 @@ def main() -> int:
     for key in REQUIRED_PUBLICATION_FLAGS:
         expect_true(publication, key, errors, "publication_gate")
 
+    execution = data.get("validation_execution")
+    if not isinstance(execution, dict):
+        errors.append("validation_execution must be an object")
+        execution = {}
+    classes = set(execution.get("classes") or [])
+    missing_classes = sorted(REQUIRED_EXECUTION_CLASSES - classes)
+    if missing_classes:
+        errors.append("validation_execution.classes missing: " + ", ".join(missing_classes))
+    expect_true(execution, "no_human_runner_for_automatable_gates", errors, "validation_execution")
+    expect_true(execution, "remote_automation_required_when_agent_local_unavailable", errors, "validation_execution")
+
+    profiles = data.get("validation_profiles")
+    if not isinstance(profiles, dict):
+        errors.append("validation_profiles must be an object")
+        profiles = {}
+    if profiles.get("default") != "auto":
+        errors.append("validation_profiles.default must be auto")
+    configured_profiles = set(profiles.get("profiles") or [])
+    missing_profiles = sorted(REQUIRED_VALIDATION_PROFILES - configured_profiles)
+    if missing_profiles:
+        errors.append("validation_profiles.profiles missing: " + ", ".join(missing_profiles))
+    selector = profiles.get("selector")
+    if not isinstance(selector, str) or not selector.strip():
+        errors.append("validation_profiles.selector is required")
+    elif not args.template_mode and any(marker in selector for marker in PLACEHOLDER_MARKERS):
+        errors.append("unresolved validation_profiles.selector placeholder")
+    for key in (
+        "unknown_executable_paths_fail_safe",
+        "selector_changes_force_full",
+        "promotion_validation_full",
+        "automatic_escalation_allowed",
+        "silent_downgrade_below_auto_forbidden",
+        "report_selected_profile_and_reason",
+    ):
+        expect_true(profiles, key, errors, "validation_profiles")
+
+    remote = data.get("remote_preflight")
+    if not isinstance(remote, dict):
+        errors.append("remote_preflight must be an object")
+        remote = {}
+    remote_status = remote.get("status")
+    if remote_status not in {"required", "recommended", "n/a"}:
+        errors.append("remote_preflight.status must be required, recommended or n/a")
+    if remote_status != "n/a":
+        trigger = remote.get("trigger")
+        if not isinstance(trigger, str) or not trigger.strip():
+            errors.append("remote_preflight.trigger is required when remote preflight is enabled")
+        elif not args.template_mode and any(marker in trigger for marker in PLACEHOLDER_MARKERS):
+            errors.append("unresolved remote_preflight.trigger placeholder")
+        if remote.get("default_profile") != "auto":
+            errors.append("remote_preflight.default_profile must be auto")
+        for key in (
+            "stronger_profile_override_allowed",
+            "weaker_profile_override_requires_explicit_justification",
+            "exact_head_required",
+            "trusted_requesters_only",
+            "same_repository_prs_only_by_default",
+            "report_result_to_pr",
+        ):
+            expect_true(remote, key, errors, "remote_preflight")
+        if remote.get("execution_job_write_credentials") is not False:
+            errors.append("remote_preflight.execution_job_write_credentials must be false")
+
     e2e = data.get("end_to_end")
     if not isinstance(e2e, dict):
         errors.append("end_to_end must be an object")
@@ -155,12 +209,7 @@ def main() -> int:
     if not isinstance(artifacts, dict):
         errors.append("artifact_lifecycle must be an object")
         artifacts = {}
-    for key in (
-        "immutable_successful_artifacts",
-        "promote_only_after_success",
-        "manifest_required",
-        "release_artifacts_immutable",
-    ):
+    for key in ("immutable_successful_artifacts", "promote_only_after_success", "manifest_required", "release_artifacts_immutable"):
         expect_true(artifacts, key, errors, "artifact_lifecycle")
     if str(artifacts.get("checksum_algorithm", "")).lower() != "sha256":
         errors.append("artifact_lifecycle.checksum_algorithm must be sha256")
@@ -201,25 +250,14 @@ def main() -> int:
             errors.append("local_runtime.bind_default must be loopback when local runtime is applicable")
         if runtime.get("port_strategy") != "configurable-with-collision-check":
             errors.append("local_runtime.port_strategy must be configurable-with-collision-check")
-        for key in (
-            "foreground_default",
-            "readiness_required",
-            "graceful_shutdown_required",
-            "verify_no_project_listener_after_stop",
-        ):
+        for key in ("foreground_default", "readiness_required", "graceful_shutdown_required", "verify_no_project_listener_after_stop"):
             expect_true(runtime, key, errors, "local_runtime")
 
     ephemeral = data.get("ephemeral_resources")
     if not isinstance(ephemeral, dict):
         errors.append("ephemeral_resources must be an object")
         ephemeral = {}
-    for key in (
-        "run_identity",
-        "isolated_workspace",
-        "stale_resource_recovery",
-        "ownership_required_before_cleanup",
-        "post_cleanup_verification",
-    ):
+    for key in ("run_identity", "isolated_workspace", "stale_resource_recovery", "ownership_required_before_cleanup", "post_cleanup_verification"):
         expect_true(ephemeral, key, errors, "ephemeral_resources")
     cleanup_paths = set(ephemeral.get("cleanup_paths") or [])
     missing_cleanup = sorted(REQUIRED_CLEANUP_PATHS - cleanup_paths)
