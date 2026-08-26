@@ -29,10 +29,7 @@ private data class HarnessCreatePresetDraft(
     val contextValid: Boolean,
 )
 
-private data class HarnessCreatePresetStatus(
-    val saving: Boolean,
-    val customSaved: HarnessApplicationsMutationState.Saved?,
-)
+private data class HarnessCreatePresetStatus(val saving: Boolean, val customSaved: HarnessApplicationsMutationState.Saved?)
 
 private data class HarnessCreatePresetDraftActions(
     val onDisplayNameChanged: (String) -> Unit,
