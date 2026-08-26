@@ -41,6 +41,8 @@ General phone work still includes process/back-stack evidence, representative Ta
 
 SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures. Production/release readiness still requires representative physical SR-6 evidence. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
+A physical RedactGuard release run now exposes a packaged Consumer Control Plane Binder/Parcel compatibility regression before inference: the signed/granted/bound two-APK pair keeps both processes alive while `assignedUseCases()` coincides with `libbinder.Parcel` protected-data errors at the following Binder callback boundary. The release consumer is R8-minified while the current packaged consumer fixture is not. Root-cause isolation and the SDK-owned compatibility fix are tracked in [`workstreams/shared-runtime-binder-ipc-compatibility.md`](workstreams/shared-runtime-binder-ipc-compatibility.md); R8 remains a leading hypothesis until the minified fixture reproduces or falsifies it.
+
 ### Public Consumer API and OMBRA
 
 CA-0 through CA-4 are integrated in `dev`; PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, lifecycle/generation adapters, privacy/compatibility coverage and packaged release-AAR compilation evidence.
@@ -78,29 +80,35 @@ Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 su
 
 The current host bootstrap mutates persistent state from Binder-path discovery/activation and only seeds when the entire `HostControlPlaneState` is empty. Partial valid state can therefore survive upgrades/restarts without mandatory built-in application/use-case/preset/binding/exposure data. Repair must be atomic, conservative and idempotent; preserve unrelated/custom/disabled/default state; fail closed on conflicting built-in identity; and complete before UI or Binder observation. CPREC-10 and CPREC-20 are the first parallel implementation slices; physical Applications/HCP proof waits for CPREC-70.
 
-### 4. Physical Android evidence
+### 4. Packaged Binder IPC compatibility
 
-Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path. ACUX-90 cannot start until the reconciled CPREC-70 candidate exists.
+The RedactGuard release consumer reaches the shared-runtime connection but fails at Consumer Control Plane discovery with protected-Parcel evidence before inference. Source-level DTO/AIDL identity matches the consumed SDK lineage, so the immediate work is to make the packaged consumer fixture production-like with R8, isolate the first wire divergence, then fix the owning Binder/package boundary. Do not add RedactGuard-local Harness keep rules or change protocol semantics without the SR-BIPC root-cause gate.
+
+### 5. Physical Android evidence
+
+Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6, SR-BIPC-90 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path. ACUX-90 cannot start until the reconciled CPREC-70 candidate exists. SR-BIPC-90 additionally requires a release/minified external consumer proving the protected-Parcel regression is absent on exact artifacts.
 
 Do not claim representative-device UX, external-consumer Applications effectiveness, `MEASURED` Q35 profiles, publish-ready Binder client AAR or production-ready OMBRA/shared-host transport from CI/emulator evidence alone.
 
-### 5. Follow-on validation and product hardening
+### 6. Follow-on validation and product hardening
 
 Repository-side UX/UI, including Applications through ACUX-80, is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
-1. execute CPREC-10 canonical built-in spec/reconciler and CPREC-20 Room partial-state persistence tests in parallel;
-2. after the reconciliation contract settles, execute CPREC-30 startup composition cutover and CPREC-40 regression matrix in parallel, then close CPREC-50/70 exact-head integration;
-3. complete OMB-6B identity review and deterministic launcher assets, and continue OMBRA corpus v2 quality execution independently where ownership does not conflict;
-4. on the CPREC-70 candidate, run upgrade-repair evidence and clean two-APK HCP/ACUX evidence, then resume ACUX-90;
-5. run Q35-6, SR-6 and broader phone UX evidence in parallel where hardware can be shared;
+1. execute SR-BIPC-10 minified packaged-consumer reproduction, SR-BIPC-20 wire/package isolation and the RedactGuard diagnostic correction in parallel; stop at the SR-BIPC-30 root-cause gate before choosing a compatibility fix;
+2. continue CPREC reconciliation independently where ownership does not conflict, then run its exact-head upgrade/two-APK evidence before ACUX-90;
+3. after SR-BIPC-30, implement the minimal owner-level Binder/package fix, prove the minified fixture plus Maven-only consumer and publish the next Consumer SDK prerelease before updating RedactGuard;
+4. complete OMB-6B identity review and deterministic launcher assets, and continue OMBRA corpus v2 quality execution independently where ownership does not conflict;
+5. run Q35-6, SR-6, SR-BIPC-90 and broader phone UX evidence in parallel where hardware can be shared;
 6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact build.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
 - Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
+- Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
+- Binder IPC compatibility: [`workstreams/shared-runtime-binder-ipc-compatibility.md`](workstreams/shared-runtime-binder-ipc-compatibility.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
