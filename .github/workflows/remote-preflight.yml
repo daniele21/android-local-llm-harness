@@ -1,0 +1,66 @@
+name: Remote preflight dispatcher
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/preflight') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      pull-requests: read
+      issues: write
+      contents: read
+    steps:
+      - name: Resolve trusted request and dispatch exact-head validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          command=$(printf '%s' "$COMMENT_BODY" | tr -d '\r' | xargs)
+          case "$command" in
+            /preflight|"/preflight auto") profile=auto ;;
+            "/preflight strong") profile=strong ;;
+            "/preflight full") profile=full ;;
+            *)
+              echo "Ignoring unsupported preflight command: $command"
+              exit 0
+              ;;
+          esac
+
+          pr_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr_json")
+          head_ref=$(jq -r '.head.ref' <<<"$pr_json")
+          head_sha=$(jq -r '.head.sha' <<<"$pr_json")
+          base_sha=$(jq -r '.base.sha' <<<"$pr_json")
+
+          [[ "$head_repo" == "$GITHUB_REPOSITORY" ]] || {
+            echo "Remote preflight is restricted to same-repository PRs" >&2
+            exit 1
+          }
+
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/validate.yml/dispatches" \
+            -f ref="$head_ref" \
+            -f "inputs[validation_profile]=$profile" \
+            -f "inputs[base_sha]=$base_sha" \
+            -f "inputs[expected_head_sha]=$head_sha" \
+            -f "inputs[pr_number]=$PR_NUMBER"
+
+          body=$(printf 'Remote preflight requested: `%s` for exact head `%s`. Validation will resolve the blast-radius profile and report the result back here.' "$profile" "$head_sha")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"

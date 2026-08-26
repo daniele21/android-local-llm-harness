@@ -9,7 +9,7 @@ As of August 2026:
 - `main` is the stable, protected and release-oriented line;
 - `dev` is the canonical integration base and target for ordinary feature, fix, documentation, dependency and UX/UI work;
 - changes reach both long-lived branches through pull requests;
-- `dev -> main` is the normal promotion path and is validated as one release candidate;
+- `dev -> main` is the normal promotion path and is validated as one release candidate with `FULL` validation;
 - direct pull requests to `main` are reserved for the `dev` promotion or an explicit emergency hotfix;
 - the physical-device GGUF gate remains open and blocks production readiness, application-consumer releases and device-performance claims.
 
@@ -73,7 +73,7 @@ PR #20 remains the isolated review line for the `gradle/actions` v6 licensing an
 5. Do not continue committing to a branch whose pull request has merged or been closed as superseded.
 6. Before opening a new implementation branch, compare the proposed scope with open pull requests and `docs/roadmap.md`.
 7. Keep dependency upgrades separate from feature and runtime changes.
-8. Sync the active implementation branch with its base before final validation, then run the cumulative clean CI gate.
+8. Sync the active implementation branch with its base before final validation, then run the clean validation profile selected by `scripts/detect_ci_scope.py`; ordinary PRs use `auto`, while promotion/release validation is always `FULL`.
 9. Close superseded pull requests with a note identifying the canonical replacement and any selectively recovered behavior.
 10. Delete merged or superseded remote branches after the replacement is safely integrated and audited.
 
@@ -88,14 +88,15 @@ Repository settings for both `main` and `dev` must require:
 - force pushes and branch deletion to be disabled;
 - repository administrators to follow the same protection rules, except for documented emergency recovery.
 
-`main` additionally requires at least one approval and normally accepts only `dev` promotions. `dev` remains the daily integration target and is frozen when its cumulative post-merge validation is red.
+`main` additionally requires at least one approval and normally accepts only `dev` promotions. `dev` remains the daily integration target and is frozen when its required post-merge validation is red.
 
 Physical-device evidence is not required for every repository pull request. It is required before a production-ready release, before distributing the runtime to application consumers and before making device compatibility or performance claims. A pull request that itself introduces such a claim must include or reference the relevant evidence.
 
 ## Merge and promotion strategy
 
-- Feature, fix, documentation, dependency and UX/UI pull requests target `dev` and normally use squash merge.
+- Feature, fix, documentation, dependency and UX/UI pull requests target `dev` and normally use squash merge; their validation depth is selected automatically from blast radius.
 - Promotion pull requests use `dev` as head and `main` as base, run complete non-scoped Android, native and packaging gates, and use a merge commit.
+- Full distributable artifact packaging is not duplicated on ordinary PRs to `dev`; it runs for stable promotion/hotfix PRs, after relevant integration pushes, or by explicit dispatch when a device-test candidate is needed.
 - After promotion, synchronize the resulting `main` merge commit back into `dev` before the next promotion cycle.
 - Emergency hotfixes start from `main`, use squash merge into `main`, then return through a `main -> dev` forward-port pull request.
 - Tags and release artifacts are created only from validated `main` commits.
@@ -105,7 +106,7 @@ Physical-device evidence is not required for every repository pull request. It i
 A pull request may be merged only when:
 
 - it is based on the intended target branch and is conflict-free;
-- required CI is green on the current head commit;
+- all gates required by its selected validation profile are green on the current head commit;
 - documentation and implementation status agree;
 - there is no open pull request carrying a competing implementation of the same responsibility;
 - required physical-device evidence is attached when the pull request or release candidate makes a production, compatibility or performance claim.

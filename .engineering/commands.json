@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.4.0",
+  "contract_version": "0.5.0",
   "commands": {
     "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
     "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
@@ -15,14 +15,46 @@
     "clean": {"status": "required", "run": "./gradlew clean && rm -rf build/native-tests build/llrt-suite"}
   },
   "publication_gate": {
-    "local_preflight_required": true,
+    "agent_preflight_required": true,
     "target_base_freshness_required": true,
     "full_diff_review_required": true,
     "material_ambiguity_must_be_resolved": true,
     "failure_root_cause_required": true,
-    "deterministic_ci_local_parity_required": true,
-    "ci_only_evidence_must_be_declared": true,
+    "execution_capability_classification_required": true,
+    "blast_radius_profile_selection_required": true,
+    "automatable_gates_must_not_be_delegated_to_user": true,
+    "remote_automated_fallback_required_when_agent_local_unavailable": true,
+    "deterministic_ci_command_parity_required": true,
+    "non_automated_evidence_must_be_declared": true,
     "exact_head_evidence_required": true
+  },
+  "validation_execution": {
+    "classes": ["agent_local", "remote_automated", "real_environment"],
+    "no_human_runner_for_automatable_gates": true,
+    "remote_automation_required_when_agent_local_unavailable": true
+  },
+  "validation_profiles": {
+    "default": "auto",
+    "profiles": ["lean", "scoped", "strong", "full"],
+    "selector": "python3 scripts/detect_ci_scope.py",
+    "unknown_executable_paths_fail_safe": true,
+    "selector_changes_force_full": true,
+    "promotion_validation_full": true,
+    "automatic_escalation_allowed": true,
+    "silent_downgrade_below_auto_forbidden": true,
+    "report_selected_profile_and_reason": true
+  },
+  "remote_preflight": {
+    "status": "required",
+    "trigger": "/preflight [auto|strong|full] on a same-repository pull request",
+    "default_profile": "auto",
+    "stronger_profile_override_allowed": true,
+    "weaker_profile_override_requires_explicit_justification": true,
+    "exact_head_required": true,
+    "trusted_requesters_only": true,
+    "same_repository_prs_only_by_default": true,
+    "execution_job_write_credentials": false,
+    "report_result_to_pr": true
   },
   "end_to_end": {
     "recommended_when_full_workflow_boundary_exists": true,
@@ -57,15 +89,7 @@
     "compare_to": "previous-successful-comparable-build",
     "output": "BUILD_CHANGELOG.md",
     "bundle_with_artifact": true,
-    "dimensions": [
-      "source",
-      "dependencies",
-      "toolchain",
-      "configuration",
-      "compatibility_migrations",
-      "artifact_metrics",
-      "validation"
-    ]
+    "dimensions": ["source", "dependencies", "toolchain", "configuration", "compatibility_migrations", "artifact_metrics", "validation"]
   },
   "local_runtime": {
     "applicable": false,

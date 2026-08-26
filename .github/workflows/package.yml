@@ -24,8 +24,12 @@ on:
       - "scripts/test_package_artifact_metadata.py"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
+  # Ordinary PRs to dev are validated by the blast-radius-aware Validate
+  # workflow. Full distributable packaging remains automatic for stable
+  # promotion/hotfix PRs; dev artifacts are produced after integration or on
+  # explicit workflow_dispatch when a candidate is needed for device evidence.
   pull_request:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - "apps/**"
       - "backends/**"

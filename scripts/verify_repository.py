@@ -14,6 +14,7 @@ CORE_SKILLS = (
     "design-product-experience",
     "validate-change",
     "preflight-change",
+    "remote-preflight",
     "finalize-workstream",
     "review-reference-quality",
 )
@@ -23,6 +24,7 @@ REQUIRED = (
     "AGENTS.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
+    "EXECUTION-CAPABILITY-CONTRACT.md",
     ".editorconfig",
     ".gitignore",
     ".engineering/baseline.json",
@@ -37,6 +39,7 @@ REQUIRED = (
     "docs/workstreams/README.md",
     "scripts/verify_operations.py",
     "scripts/verify_product_experience.py",
+    "scripts/detect_ci_scope.py",
 )
 
 PR_TEMPLATE_CANDIDATES = (
@@ -44,22 +47,13 @@ PR_TEMPLATE_CANDIDATES = (
     ".github/pull_request_template.md",
 )
 
-PLACEHOLDER_MARKERS = (
-    "<PROJECT_NAME>",
-    "<REPLACE_WITH_",
-    "<DESCRIBE_",
-    "<LIST_",
-)
+PLACEHOLDER_MARKERS = ("<PROJECT_NAME>", "<REPLACE_WITH_", "<DESCRIBE_", "<LIST_")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
-    parser.add_argument(
-        "--template-mode",
-        action="store_true",
-        help="Allow adopter placeholders while validating the source template.",
-    )
+    parser.add_argument("--template-mode", action="store_true")
     return parser.parse_args()
 
 
@@ -93,8 +87,8 @@ def main() -> int:
             standard = baseline.get("standard", {})
             if standard.get("source") != "daniele21/repo-template-sw":
                 errors.append("baseline standard.source must identify daniele21/repo-template-sw")
-            if standard.get("version") != "0.6.0":
-                errors.append("baseline standard.version must be 0.6.0")
+            if standard.get("version") != "0.7.0":
+                errors.append("baseline standard.version must be 0.7.0")
             if baseline.get("target_level") not in {"L0", "L1", "L2"}:
                 errors.append("target_level must be L0, L1 or L2")
             profiles = baseline.get("profiles")
@@ -111,12 +105,7 @@ def main() -> int:
                 if not isinstance(entry.get("customized"), bool):
                     errors.append(f"skill {name} customized must be boolean")
 
-    candidate_files = [
-        root / "README.md",
-        root / "AGENTS.md",
-        root / "docs/architecture.md",
-        root / "SECURITY.md",
-    ]
+    candidate_files = [root / "README.md", root / "AGENTS.md", root / "docs/architecture.md", root / "SECURITY.md"]
     if not args.template_mode:
         for path in candidate_files:
             if not path.is_file():
