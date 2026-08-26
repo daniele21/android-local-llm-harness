@@ -16,4 +16,6 @@ Harness may specialize local copies. Record customization in `.engineering/basel
 
 `design-product-experience` is active because Harness adopts `product-ui`; use it for meaningful structural UX, interaction or motion/visual-system changes. Local visual-only token/style edits should stay proportional rather than expanding into unnecessary design process.
 
-Before publication, `preflight-change` owns the readiness decision; `validate-change` remains the iterative validation procedure. Do not create a Skill for one-off instructions.
+Before publication, `preflight-change` owns the readiness decision; `validate-change` remains the iterative validation procedure.
+
+Do not create a Skill for one-off instructions. A Skill is justified when a procedure recurs, is conditional, has non-obvious ordering/hazards, or saves substantial repeated agent context.
