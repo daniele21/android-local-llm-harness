@@ -83,9 +83,17 @@ After the Parcelize runtime correction, the release app minification progressed,
 
 Classification: **current-change reproduction-fixture test-packaging regression**, still before any Binder transaction and therefore not evidence for or against the Binder root-cause hypothesis. Because `testBuildType = "release"`, the instrumentation APK is also shrunk and its shrinker classpath must include annotation types referenced by the AndroidX Test bytecode. This is independent from the Harness wire contract.
 
-Owning correction: add the matching Error Prone annotations artifact to `androidTestImplementation`. Do not suppress the missing classes with `-dontwarn`, do not add Harness keep rules, and do not disable release AndroidTest shrinking merely to make the reproduction pass.
+Owning correction: add Error Prone annotations to `androidTestImplementation`. Do not suppress the missing classes with `-dontwarn`, do not add Harness keep rules, and do not disable release AndroidTest shrinking merely to make the reproduction pass.
 
-`SR-BIPC-10` remains **ACTIVE** and must be rerun from the corrected exact branch head. `SR-BIPC-30` remains **BLOCKED**; no conclusion about R8/Parcelable wire compatibility has been accepted from either build-only failure.
+### SR-BIPC-10 third minified build
+
+With Error Prone annotations 2.30.0 present, the release instrumentation shrinker advanced again but failed on `javax.lang.model.element.Modifier`, referenced by `com.google.errorprone.annotations.IncompatibleModifiers`. This is a known Android-incompatibility in the older Error Prone annotation API: it exposed a JDK compiler-model enum that is not part of Android's runtime API.
+
+Classification: **current-change test-dependency compatibility regression**, still entirely inside fixture packaging. It does not exercise the Binder transaction and cannot confirm or falsify the Binder root-cause hypothesis.
+
+Owning correction: use Error Prone annotations 2.46.0 for the release instrumentation fixture. That release replaces the JDK compiler-model modifier type in `IncompatibleModifiers` with Error Prone's own Android-safe `Modifier` enum. This is preferable to packaging JDK compiler APIs, suppressing the missing class, or weakening the shrinker. AndroidX Test only requires the annotation types referenced from its bytecode; the Binder/product dependency graph is unchanged.
+
+`SR-BIPC-10` remains **ACTIVE** and must be rerun from the corrected exact branch head. `SR-BIPC-30` remains **BLOCKED**; no conclusion about R8/Parcelable wire compatibility has been accepted from any build-only failure.
 
 ## Validation
 
