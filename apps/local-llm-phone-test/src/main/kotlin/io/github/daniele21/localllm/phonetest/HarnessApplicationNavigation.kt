@@ -47,19 +47,15 @@ internal object HarnessApplicationRoutes {
 
     fun decodeApplicationId(encoded: String?): String? = decode(encoded)
 
-    fun decodeUseCaseId(encoded: String?): String? = decode(encoded)
-
-    fun decodePresetId(encoded: String?): String? = decode(encoded)
-
     fun identity(
         encodedApplicationId: String?,
         encodedUseCaseId: String? = null,
         encodedPresetId: String? = null,
         presetRevision: Int? = null,
     ): HarnessApplicationRouteIdentity? {
-        val applicationId = decodeApplicationId(encodedApplicationId)
-        val useCaseId = encodedUseCaseId?.let(::decodeUseCaseId)
-        val presetId = encodedPresetId?.let(::decodePresetId)
+        val applicationId = decode(encodedApplicationId)
+        val useCaseId = encodedUseCaseId?.let(::decode)
+        val presetId = encodedPresetId?.let(::decode)
         val invalid = applicationId == null ||
             (encodedUseCaseId != null && useCaseId == null) ||
             (encodedPresetId != null && presetId == null) ||
