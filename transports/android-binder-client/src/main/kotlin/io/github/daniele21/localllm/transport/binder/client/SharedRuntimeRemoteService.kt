@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.transport.binder.contract.CloseSessionReques
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
@@ -21,6 +22,8 @@ import io.github.daniele21.localllm.transport.binder.contract.SessionResultParce
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 
+/** Mirrors the negotiated Consumer Binder surface; splitting it would obscure transaction ownership. */
+@Suppress("TooManyFunctions")
 internal interface ConsumerSharedRuntimeRemoteService {
     @Throws(RemoteException::class)
     fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit)
@@ -33,6 +36,10 @@ internal interface ConsumerSharedRuntimeRemoteService {
 
     @Throws(RemoteException::class)
     fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit)
+
+    @Throws(RemoteException::class)
+    fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: (ConsumerGenerationEventParcel) -> Unit): Unit =
+        throw RemoteException("Consumer generation v2 is unavailable")
 
     @Throws(RemoteException::class)
     fun cancel(request: CancelRequestParcel)

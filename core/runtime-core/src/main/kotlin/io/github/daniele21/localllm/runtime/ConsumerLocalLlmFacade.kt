@@ -202,6 +202,7 @@ class ConsumerLocalLlmFacade(
                     input = input,
                     overrides = overrides,
                     outputConstraint = output,
+                    taskDefinitions = request.taskDefinitions,
                 )
             }.fold(
                 onSuccess = RequestMapping::Accepted,

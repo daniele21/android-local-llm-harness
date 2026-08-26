@@ -8,7 +8,12 @@ data class GenerationRequest(
     val input: GenerationInput,
     val overrides: GenerationOverrides = GenerationOverrides(),
     val outputConstraint: OutputConstraint = OutputConstraint.Text,
+    val taskDefinitions: List<TaskDefinition> = emptyList(),
 ) {
+    init {
+        TaskDefinitionLimits.validate(taskDefinitions)
+    }
+
     constructor(
         requestId: RequestId,
         sessionId: SessionId,
@@ -17,6 +22,7 @@ data class GenerationRequest(
         input: String,
         overrides: GenerationOverrides = GenerationOverrides(),
         outputConstraint: OutputConstraint = OutputConstraint.Text,
+        taskDefinitions: List<TaskDefinition> = emptyList(),
     ) : this(
         requestId = requestId,
         sessionId = sessionId,
@@ -25,7 +31,13 @@ data class GenerationRequest(
         input = GenerationInput.Text(input),
         overrides = overrides,
         outputConstraint = outputConstraint,
+        taskDefinitions = taskDefinitions,
     )
+
+    override fun toString(): String =
+        "GenerationRequest(requestId=$requestId, sessionId=$sessionId, applicationId=$applicationId, useCaseId=$useCaseId, " +
+            "input=<redacted>, overrides=$overrides, outputConstraint=${outputConstraint::class.simpleName}, " +
+            "taskDefinitionCount=${taskDefinitions.size})"
 }
 
 data class GenerationOverrides(

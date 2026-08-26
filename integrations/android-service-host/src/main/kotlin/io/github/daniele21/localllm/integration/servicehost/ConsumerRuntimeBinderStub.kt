@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.transport.binder.contract.CloseSessionReques
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
@@ -14,6 +15,8 @@ import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmS
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 
+/** Mirrors the public Consumer AIDL transaction surface; keep transaction ownership in one auditable stub. */
+@Suppress("TooManyFunctions")
 internal class ConsumerRuntimeBinderStub(
     private val authorizer: CallerAuthorizer,
     private val delegate: SharedRuntimeHostDelegate,
@@ -49,22 +52,26 @@ internal class ConsumerRuntimeBinderStub(
     override fun generate(request: ConsumerRequestParcel, callback: IConsumerGenerationCallback) {
         val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
         if (caller == null) {
-            deliverRemote {
-                callback.onEvent(
-                    ConsumerGenerationEventParcel(
-                        externalRequestId = request.externalRequestId.orEmpty(),
-                        sequence = 0L,
-                        eventTag = ConsumerWireTags.EVENT_FAILED,
-                        error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
-                    ),
-                )
-            }
+            deliverConsumerUnauthorized(request.externalRequestId, callback)
             return
         }
         delegate.consumerOperations.generate(
             caller,
             request,
             remoteConsumerGenerationCallback(delegate, caller, request.clientToken, callback),
+        )
+    }
+
+    override fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: IConsumerGenerationCallback) {
+        val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
+        if (caller == null) {
+            deliverConsumerUnauthorized(request.request.externalRequestId, callback)
+            return
+        }
+        delegate.consumerOperations.generateV2(
+            caller,
+            request,
+            remoteConsumerGenerationCallback(delegate, caller, request.request.clientToken, callback),
         )
     }
 
@@ -111,6 +118,19 @@ internal class ConsumerRuntimeBinderStub(
                 remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
             )
         }
+}
+
+private fun deliverConsumerUnauthorized(externalRequestId: String?, callback: IConsumerGenerationCallback) {
+    deliverRemote {
+        callback.onEvent(
+            ConsumerGenerationEventParcel(
+                externalRequestId = externalRequestId.orEmpty(),
+                sequence = 0L,
+                eventTag = ConsumerWireTags.EVENT_FAILED,
+                error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+            ),
+        )
+    }
 }
 
 private inline fun withResultCaller(

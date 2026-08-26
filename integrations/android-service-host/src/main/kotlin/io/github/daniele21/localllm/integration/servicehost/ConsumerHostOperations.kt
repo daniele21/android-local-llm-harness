@@ -7,10 +7,13 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
+import io.github.daniele21.localllm.contracts.TaskDefinition
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
@@ -19,8 +22,11 @@ import io.github.daniele21.localllm.transport.binder.contract.toConsumerWire
 import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerInput
 import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerOutput
 import io.github.daniele21.localllm.transport.binder.contract.toCoreSelection
+import io.github.daniele21.localllm.transport.binder.contract.toCoreTaskDefinition
 import java.util.concurrent.atomic.AtomicBoolean
 
+/** Consumer host facade: methods intentionally map one-to-one to authenticated Consumer operations. */
+@Suppress("TooManyFunctions")
 internal class ConsumerHostOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
@@ -117,11 +123,26 @@ internal class ConsumerHostOperations(
     }
 
     fun generate(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
-        controlExecutor.submitOrReject(
-            onRejected = { callback.onEvent(failureEvent(request.externalRequestId, WireErrorCodes.TRANSPORT_FAILURE)) },
-        ) {
-            runGeneration(caller, request, callback)
+        submitGeneration(caller, request, emptyList(), callback)
+    }
+
+    fun generateV2(caller: AuthorizedCaller, request: ConsumerGenerationRequestV2Parcel, callback: ConsumerHostEventCallback) {
+        val baseRequest = request.request
+        val token = baseRequest.clientToken.toHostTokenOrNull()
+        val featureEnabled =
+            token?.let {
+                ledger.supportsFeature(it, caller, BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1).successOrNull()
+            } == true
+        if (!featureEnabled) {
+            callback.onEvent(failureEvent(baseRequest.externalRequestId, WireErrorCodes.FEATURE_UNAVAILABLE))
+            return
         }
+        val definitions = runCatching { request.taskDefinitions.map { it.toCoreTaskDefinition() } }.getOrNull()
+        if (definitions == null) {
+            callback.onEvent(failureEvent(baseRequest.externalRequestId, WireErrorCodes.INVALID_WIRE_REQUEST))
+            return
+        }
+        submitGeneration(caller, baseRequest, definitions, callback)
     }
 
     fun cancel(caller: AuthorizedCaller, request: CancelRequestParcel) {
@@ -152,7 +173,25 @@ internal class ConsumerHostOperations(
         }
     }
 
-    private fun runGeneration(caller: AuthorizedCaller, request: ConsumerRequestParcel, callback: ConsumerHostEventCallback) {
+    private fun submitGeneration(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        taskDefinitions: List<TaskDefinition>,
+        callback: ConsumerHostEventCallback,
+    ) {
+        controlExecutor.submitOrReject(
+            onRejected = { callback.onEvent(failureEvent(request.externalRequestId, WireErrorCodes.TRANSPORT_FAILURE)) },
+        ) {
+            runGeneration(caller, request, taskDefinitions, callback)
+        }
+    }
+
+    private fun runGeneration(
+        caller: AuthorizedCaller,
+        request: ConsumerRequestParcel,
+        taskDefinitions: List<TaskDefinition>,
+        callback: ConsumerHostEventCallback,
+    ) {
         val context = resolveContext(caller, request)
         val externalRequestId = request.externalRequestId?.takeIf(String::isNotBlank)
         val externalSessionId = request.externalSessionId?.takeIf(String::isNotBlank)
@@ -178,6 +217,7 @@ internal class ConsumerHostOperations(
                     sessionId = sessionId,
                     input = requireNotNull(request.input).toCoreConsumerInput(),
                     outputConstraint = requireNotNull(request.outputConstraint).toCoreConsumerOutput(),
+                    taskDefinitions = taskDefinitions,
                 )
             }.getOrNull()
         if (coreRequest == null) {

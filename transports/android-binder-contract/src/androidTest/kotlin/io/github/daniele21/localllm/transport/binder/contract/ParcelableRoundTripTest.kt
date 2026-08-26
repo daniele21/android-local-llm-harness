@@ -65,6 +65,30 @@ class ParcelableRoundTripTest {
     }
 
     @Test
+    fun consumerGenerationV2WithTaskDefinitionsRoundTripsThroughParcel() {
+        val baseRequest =
+            ConsumerRequestParcel(
+                clientToken = ClientTokenParcel("consumer-token"),
+                operationId = "operation-1",
+                externalSessionId = "session-1",
+                externalRequestId = "request-1",
+                input = ConsumerGenerationInputParcel(WireTags.INPUT_TEXT, "document text", emptyList()),
+                outputConstraint = ConsumerOutputConstraintParcel(WireTags.CONSTRAINT_JSON, null),
+            )
+        val value =
+            ConsumerGenerationRequestV2Parcel(
+                request = baseRequest,
+                taskDefinitions =
+                listOf(
+                    TaskDefinitionParcel("email", "An email address", "ada@example.test"),
+                    TaskDefinitionParcel("health-condition", "A diagnosed health condition"),
+                ),
+            )
+
+        assertEquals(value, roundTrip(value, parcelableCreator<ConsumerGenerationRequestV2Parcel>()))
+    }
+
+    @Test
     fun generationEventRoundTripsThroughParcel() {
         val value =
             GenerationEventParcel(

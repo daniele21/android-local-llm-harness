@@ -97,6 +97,7 @@ private constructor(
                 generation =
                 BinderConsumerGenerationAdapter(
                     endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
                     endpointInvalidations = connection.endpointInvalidations,
                 ),
                 controlPlane =

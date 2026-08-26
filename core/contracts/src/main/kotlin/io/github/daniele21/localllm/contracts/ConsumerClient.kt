@@ -89,7 +89,15 @@ data class ConsumerGenerationRequest(
     val sessionId: SessionId,
     val input: ConsumerGenerationInput,
     val outputConstraint: ConsumerOutputConstraint,
-)
+    val taskDefinitions: List<TaskDefinition> = emptyList(),
+) {
+    init {
+        TaskDefinitionLimits.validate(taskDefinitions)
+    }
+
+    override fun toString(): String = "ConsumerGenerationRequest(requestId=$requestId, sessionId=$sessionId, input=<redacted>, " +
+        "outputConstraint=${outputConstraint::class.simpleName}, taskDefinitionCount=${taskDefinitions.size})"
+}
 
 enum class ConsumerContentType {
     REASONING,
