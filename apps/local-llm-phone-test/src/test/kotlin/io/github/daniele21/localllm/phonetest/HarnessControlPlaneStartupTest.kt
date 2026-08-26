@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.HostControlPlaneTransaction
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -40,6 +41,21 @@ class HarnessControlPlaneStartupTest {
     }
 
     @Test
+    fun startupTransactionRunsOffCallingThread() {
+        val store = RecordingStore(HostControlPlaneState())
+        val callingThread = Thread.currentThread()
+        val startup = HarnessControlPlaneStartup(
+            store = store,
+            reconciler = HarnessControlPlaneReconciler(spec),
+            epochClock = { 100 },
+        )
+
+        startup.reconcile()
+
+        assertNotEquals(callingThread, store.lastTransactionThread)
+    }
+
+    @Test
     fun startupConflictAbortsTransactionWithoutMutatingStore() {
         val incompatible = requirement.newRegistration(10).copy(signerSha256 = "b".repeat(64))
         val original = HostControlPlaneState(applications = listOf(incompatible))
@@ -63,6 +79,8 @@ class HarnessControlPlaneStartupTest {
         private var state = initial
         var transactionCount: Int = 0
             private set
+        var lastTransactionThread: Thread? = null
+            private set
 
         override fun snapshot(): HostControlPlaneState = state
 
@@ -72,6 +90,7 @@ class HarnessControlPlaneStartupTest {
 
         override fun transact(transaction: HostControlPlaneTransaction): HostControlPlaneState {
             transactionCount += 1
+            lastTransactionThread = Thread.currentThread()
             val updated = transaction.apply(state)
             state = updated
             return updated
