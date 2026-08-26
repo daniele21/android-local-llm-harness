@@ -53,10 +53,7 @@ private data class HarnessCreatePresetDraft(
     val contextValid: Boolean,
 )
 
-private data class HarnessCreatePresetStatus(
-    val saving: Boolean,
-    val customSaved: HarnessApplicationsMutationState.Saved?,
-)
+private data class HarnessCreatePresetStatus(val saving: Boolean, val customSaved: HarnessApplicationsMutationState.Saved?)
 
 private data class HarnessCreatePresetDraftActions(
     val onDisplayNameChanged: (String) -> Unit,
@@ -254,11 +251,7 @@ private fun HarnessCreatePresetHeader(assignmentName: String) {
 }
 
 @Composable
-private fun HarnessPresetNameField(
-    value: String,
-    enabled: Boolean,
-    onValueChange: (String) -> Unit,
-) {
+private fun HarnessPresetNameField(value: String, enabled: Boolean, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -271,12 +264,7 @@ private fun HarnessPresetNameField(
 }
 
 @Composable
-private fun HarnessPresetBaseCard(
-    preset: HarnessPresetSummary,
-    selected: Boolean,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-) {
+private fun HarnessPresetBaseCard(preset: HarnessPresetSummary, selected: Boolean, enabled: Boolean, onSelect: () -> Unit) {
     HarnessCard(
         emphasized = selected,
         modifier = Modifier
@@ -347,12 +335,7 @@ private fun HarnessModelPolicyCard(
 }
 
 @Composable
-private fun HarnessContextTokensField(
-    value: String,
-    valid: Boolean,
-    enabled: Boolean,
-    onValueChange: (String) -> Unit,
-) {
+private fun HarnessContextTokensField(value: String, valid: Boolean, enabled: Boolean, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
