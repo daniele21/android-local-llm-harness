@@ -30,9 +30,15 @@ with zipfile.ZipFile(path) as archive:
     except KeyError as exc:
         raise SystemExit("Published Binder contract AAR does not carry consumer ProGuard/R8 rules") from exc
 
-required = "-keep class io.github.daniele21.localllm.transport.binder.contract.** { *; }"
-if required not in rules:
-    raise SystemExit("Published Binder contract AAR is missing the cross-process wire keep rule")
+required = {
+    "-keep class io.github.daniele21.localllm.transport.binder.contract.*Parcel { *; }",
+    "-keep class io.github.daniele21.localllm.transport.binder.contract.*Parcel$* { *; }",
+    "-keep interface io.github.daniele21.localllm.transport.binder.contract.I* { *; }",
+    "-keep class io.github.daniele21.localllm.transport.binder.contract.I*$* { *; }",
+}
+missing = sorted(rule for rule in required if rule not in rules)
+if missing:
+    raise SystemExit("Published Binder contract AAR is missing cross-process wire rules: " + ", ".join(missing))
 PY
 
 ./gradlew -p samples/external-consumer-android \
