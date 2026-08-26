@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
+import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSha256
 import java.security.MessageDigest
@@ -53,6 +54,26 @@ internal object HarnessSharedRuntimePolicy {
         return listOf(internal) + consoleClients + redactGuardClients + releaseEvidenceClient
     }
 
+    fun builtInOmbraControlPlaneSpec(policies: Collection<AuthorizedClientPolicy>): HarnessBuiltInControlPlaneSpec {
+        val applications =
+            policies
+                .filter { HarnessSharedRuntimeBindings.ombraUseCaseId in it.allowedUseCases }
+                .groupBy(AuthorizedClientPolicy::applicationId)
+                .map { (applicationId, applicationPolicies) ->
+                    HarnessBuiltInApplicationRequirement(
+                        applicationId = applicationId,
+                        acceptedPackageNames = applicationPolicies.map(AuthorizedClientPolicy::packageName).toSet(),
+                        acceptedSignerSha256 =
+                        applicationPolicies
+                            .flatMap(AuthorizedClientPolicy::acceptedSigningCertificates)
+                            .map(SigningCertificateSha256::hex)
+                            .toSet(),
+                        displayName = displayName(applicationId),
+                    )
+                }
+        return HarnessBuiltInControlPlaneSpec.ombra(applications)
+    }
+
     @Suppress("DEPRECATION")
     private fun currentPackageSigningCertificates(context: Context): Set<SigningCertificateSha256> {
         val packageManager = context.packageManager
@@ -76,6 +97,12 @@ internal object HarnessSharedRuntimePolicy {
             }
         check(signatures.isNotEmpty()) { "Host signing certificate is unavailable" }
         return signatures.map(::sha256).toSet()
+    }
+
+    private fun displayName(applicationId: ApplicationId): String = when (applicationId) {
+        HarnessSharedRuntimeBindings.consoleApplicationId -> "Local LLM Console"
+        HarnessSharedRuntimeBindings.redactGuardApplicationId -> "RedactGuard"
+        else -> applicationId.value
     }
 
     private fun sha256(signature: Signature): SigningCertificateSha256 {

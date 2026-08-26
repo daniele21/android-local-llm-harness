@@ -16,38 +16,22 @@ import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
-import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.ConsumerControlPlaneHost
-import io.github.daniele21.localllm.models.ApplicationRegistrationState
-import io.github.daniele21.localllm.models.ApplicationUseCaseBinding
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscovery
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscoveryFailure
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscoveryResult
-import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.HostExecutionEnvironment
 import io.github.daniele21.localllm.models.HostExecutionFailureCode
 import io.github.daniele21.localllm.models.HostExecutionRequest
 import io.github.daniele21.localllm.models.HostExecutionResolution
 import io.github.daniele21.localllm.models.HostExecutionResolver
-import io.github.daniele21.localllm.models.OutputMode
-import io.github.daniele21.localllm.models.PresetConsumerMetadata
-import io.github.daniele21.localllm.models.PresetCreationSource
-import io.github.daniele21.localllm.models.PresetExecutionPolicy
-import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.PublishedPresetDiscovery
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryFailure
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryResult
 import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
-import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.ResolvedUseCase
-import io.github.daniele21.localllm.models.StoredPresetExposure
-import io.github.daniele21.localllm.models.UseCaseCachePolicy
-import io.github.daniele21.localllm.models.UseCaseDefinition
-import io.github.daniele21.localllm.models.UseCaseDefinitionState
-import io.github.daniele21.localllm.models.UseCasePresetDefinition
-import io.github.daniele21.localllm.models.UseCaseRequirements
 import io.github.daniele21.localllm.runtime.ActivationLeaseFailure
 import io.github.daniele21.localllm.runtime.ActivationOwnerId
 import io.github.daniele21.localllm.runtime.ActivationResidencyFailure
@@ -57,18 +41,12 @@ import io.github.daniele21.localllm.runtime.UseCaseActivationLease
 import io.github.daniele21.localllm.runtime.UseCaseActivationRequest
 import io.github.daniele21.localllm.store.ModelStore
 
-private const val SEED_REVISION = 1
-private const val OMBRA_MINIMUM_CONTEXT_TOKENS = 4_096
-private const val OMBRA_MAX_INPUT_CHARACTERS = 12_000
-private const val OMBRA_MAX_SCHEMA_CHARACTERS = 4_096
-private const val MIGRATION_WARM_RETENTION_MS = 60_000L
 private const val LLAMA_CPP_BACKEND_ID = "llama.cpp"
 
 internal class HarnessConsumerControlPlaneHost(
     private val store: HostControlPlaneStore,
     private val modelStore: ModelStore,
     private val runtimeGraph: HarnessRuntimeGraph,
-    private val applicationSeeds: List<RegisteredApplication>,
     private val epochClock: () -> Long = System::currentTimeMillis,
     private val onWarmRetention: (ModelDigest, Long) -> Unit = { _, _ -> },
 ) : ConsumerControlPlaneHost {
@@ -76,9 +54,8 @@ internal class HarnessConsumerControlPlaneHost(
     private val useCaseDiscovery = AssignedUseCaseDiscovery(store)
     private val presetDiscovery = PublishedPresetDiscovery(store)
 
-    override fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult {
-        ensureSeeded()
-        return when (val result = useCaseDiscovery.discover(applicationId)) {
+    override fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult =
+        when (val result = useCaseDiscovery.discover(applicationId)) {
             is AssignedUseCaseDiscoveryResult.Success -> ConsumerAssignedUseCasesResult.Available(
                 result.assignments.map { assignment ->
                     ConsumerAssignedUseCase(
@@ -96,11 +73,9 @@ internal class HarnessConsumerControlPlaneHost(
                 result.reason.toConsumerFailure(),
             )
         }
-    }
 
-    override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult {
-        ensureSeeded()
-        return when (val result = presetDiscovery.discover(applicationId, useCaseId)) {
+    override fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
+        when (val result = presetDiscovery.discover(applicationId, useCaseId)) {
             is PublishedPresetDiscoveryResult.Success -> ConsumerPublishedPresetsResult.Available(
                 useCaseId = useCaseId,
                 bindingRevision = result.bindingRevision,
@@ -118,10 +93,8 @@ internal class HarnessConsumerControlPlaneHost(
                 result.reason.toConsumerFailure(),
             )
         }
-    }
 
     override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
-        ensureSeeded()
         val resolution = resolver.resolve(
             HostExecutionRequest(
                 applicationId = applicationId,
@@ -248,41 +221,6 @@ internal class HarnessConsumerControlPlaneHost(
         )
     }
 
-    @Synchronized
-    private fun ensureSeeded() {
-        val current = store.snapshot()
-        if (current != HostControlPlaneState()) return
-        val seeds = applicationSeeds.distinctBy(RegisteredApplication::applicationId)
-        if (seeds.isEmpty()) return
-        val bindings = seeds.map { application ->
-            ApplicationUseCaseBinding(
-                bindingId = "seed-${application.applicationId.value}-${HarnessSharedRuntimeBindings.ombraUseCaseId.value}",
-                applicationId = application.applicationId,
-                useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-                revision = SEED_REVISION,
-                enabled = true,
-                isDefault = true,
-            )
-        }
-        store.replace(
-            HostControlPlaneState(
-                applications = seeds,
-                useCases = listOf(seedUseCase()),
-                presets = listOf(seedPreset()),
-                bindings = bindings,
-                exposures = bindings.map { binding ->
-                    StoredPresetExposure(
-                        bindingId = binding.bindingId,
-                        bindingRevision = binding.revision,
-                        presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
-                        presetRevision = HarnessSharedRuntimeBindings.ombraDefaultPreset.version,
-                        isDefault = true,
-                    )
-                },
-            ),
-        )
-    }
-
     private fun executionEnvironment(applicationId: ApplicationId): HostExecutionEnvironment {
         val installed = modelStore.snapshot().entries.filter { it.verified }
         val profiles = installed.mapNotNull { stored ->
@@ -341,45 +279,6 @@ private fun activationPreparationFailure(
 
     else -> null
 }
-
-private fun seedUseCase() = UseCaseDefinition(
-    useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-    displayName = "Document PII detection",
-    description = "Detect configured PII locally from document text",
-    requirements = UseCaseRequirements(
-        outputMode = OutputMode.JSON_SCHEMA,
-        sessionKind = SessionKind.STATELESS,
-        reasoningSupported = false,
-        minimumContextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
-        maxInputCharacters = OMBRA_MAX_INPUT_CHARACTERS,
-        maxJsonSchemaCharacters = OMBRA_MAX_SCHEMA_CHARACTERS,
-    ),
-    state = UseCaseDefinitionState.ACTIVE,
-    revision = SEED_REVISION,
-)
-
-private fun seedPreset() = UseCasePresetDefinition(
-    useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-    metadata = PresetConsumerMetadata(
-        presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
-        revision = HarnessSharedRuntimeBindings.ombraDefaultPreset.version,
-        displayName = "Balanced local PII",
-        description = "Automatic local Qwen3.5 selection for structured PII detection",
-    ),
-    creationSource = PresetCreationSource.SUGGESTED,
-    state = PresetLifecycleState.PUBLISHED,
-    execution = PresetExecutionPolicy(
-        modelProfileId = null,
-        inferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
-        contextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
-        cachePolicy = UseCaseCachePolicy(
-            retainModelWarmMs = MIGRATION_WARM_RETENTION_MS,
-            reuseStatelessContext = false,
-            enablePrefixSnapshot = false,
-            enableDeterministicResultCache = false,
-        ),
-    ),
-)
 
 private fun AssignedUseCaseDiscoveryFailure.toConsumerFailure(): ConsumerControlPlaneFailure = when (this) {
     AssignedUseCaseDiscoveryFailure.UNKNOWN_APPLICATION ->

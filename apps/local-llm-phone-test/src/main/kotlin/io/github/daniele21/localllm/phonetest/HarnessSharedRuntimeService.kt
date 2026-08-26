@@ -6,8 +6,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
-import io.github.daniele21.localllm.models.ApplicationRegistrationState
-import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.runtime.ActivityManagerLowMemoryProbe
 import io.github.daniele21.localllm.runtime.AndroidMemoryPressureCallbacks
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
@@ -23,13 +21,12 @@ class HarnessSharedRuntimeService : Service() {
         super.onCreate()
         runtimeGraph = HarnessRuntimeGraph.from(this)
         val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(runtimeGraph)
-        val policies = HarnessSharedRuntimePolicy.authorizedClients(this)
+        val policies = runtimeGraph.authorizedClientPolicies
         val controlPlaneHost = HarnessWarmRetentionAwareControlPlaneHost(
             delegate = HarnessConsumerControlPlaneHost(
                 store = runtimeGraph.controlPlaneStore,
                 modelStore = runtimeGraph.modelStore,
                 runtimeGraph = runtimeGraph,
-                applicationSeeds = applicationSeeds(policies),
                 onWarmRetention = resolvedWarmRetention::schedule,
             ),
             warmRetention = resolvedWarmRetention,
@@ -95,29 +92,6 @@ class HarnessSharedRuntimeService : Service() {
         hostComposition.close()
         warmIdleResidency.close()
         super.onDestroy()
-    }
-
-    private fun applicationSeeds(
-        policies: List<io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy>,
-    ): List<RegisteredApplication> {
-        val now = System.currentTimeMillis()
-        return policies
-            .distinctBy { it.applicationId }
-            .map { policy ->
-                RegisteredApplication(
-                    applicationId = policy.applicationId,
-                    packageName = policy.packageName,
-                    signerSha256 = policy.acceptedSigningCertificates.minOf { it.hex },
-                    displayName = when (policy.applicationId) {
-                        HarnessSharedRuntimeBindings.consoleApplicationId -> "Local LLM Console"
-                        HarnessSharedRuntimeBindings.redactGuardApplicationId -> "RedactGuard"
-                        else -> policy.applicationId.value
-                    },
-                    state = ApplicationRegistrationState.AUTHORIZED,
-                    firstSeenAtEpochMs = now,
-                    lastSeenAtEpochMs = now,
-                )
-            }
     }
 
     private companion object {
