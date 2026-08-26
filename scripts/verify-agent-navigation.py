@@ -25,13 +25,16 @@ REQUIRED_HEADINGS = {
     "## Read only what the task requires",
     "## Non-negotiable invariants",
     "## Find the owning boundary",
-    "## Validation levels",
+    "## Validation profiles",
+    "## Publication readiness",
     "## Maintaining agent guides",
 }
 
 REQUIRED_LINK_TARGETS = {
     "README.md",
     "BRANCHING.md",
+    "EXECUTION-CAPABILITY-CONTRACT.md",
+    ".engineering/commands.json",
     "docs/README.md",
     "docs/current-state.md",
     "docs/architecture.md",
@@ -74,14 +77,10 @@ def validate_links(guide: Path, errors: list[str]) -> None:
         try:
             resolved.relative_to(ROOT)
         except ValueError:
-            errors.append(
-                f"{guide.relative_to(ROOT)}: link escapes repository: {raw_target}"
-            )
+            errors.append(f"{guide.relative_to(ROOT)}: link escapes repository: {raw_target}")
             continue
         if not resolved.exists():
-            errors.append(
-                f"{guide.relative_to(ROOT)}: missing link target: {raw_target}"
-            )
+            errors.append(f"{guide.relative_to(ROOT)}: missing link target: {raw_target}")
 
 
 def validate_root_guide(errors: list[str]) -> None:
@@ -114,18 +113,12 @@ def validate_module_discoverability(guides: list[Path], errors: list[str]) -> No
         errors.append("settings.gradle.kts: no Gradle modules discovered")
         return
 
-    navigation_text = "\n".join(
-        [README.read_text(encoding="utf-8")]
-        + [guide.read_text(encoding="utf-8") for guide in guides]
-    )
+    navigation_text = "\n".join([README.read_text(encoding="utf-8")] + [guide.read_text(encoding="utf-8") for guide in guides])
 
     for module in modules:
         module_path = module.lstrip(":").replace(":", "/")
         if f"`{module_path}`" not in navigation_text and module_path not in navigation_text:
-            errors.append(
-                "configured Gradle module is not discoverable in README or an agent guide: "
-                f"{module} -> {module_path}"
-            )
+            errors.append("configured Gradle module is not discoverable in README or an agent guide: " f"{module} -> {module_path}")
 
 
 def validate_filename_casing(errors: list[str]) -> None:
@@ -134,13 +127,9 @@ def validate_filename_casing(errors: list[str]) -> None:
         if any(part in IGNORED_PARTS for part in relative.parts):
             continue
         if path.name.lower() == "agents.md" and path.name != "AGENTS.md":
-            errors.append(
-                f"use exact AGENTS.md casing instead of {relative.as_posix()}"
-            )
+            errors.append(f"use exact AGENTS.md casing instead of {relative.as_posix()}")
         if path.name.lower() == "agent.md":
-            errors.append(
-                f"remove competing guide {relative.as_posix()}; use AGENTS.md"
-            )
+            errors.append(f"remove competing guide {relative.as_posix()}; use AGENTS.md")
 
 
 def main() -> int:
@@ -164,10 +153,7 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print(
-        "Agent navigation is valid: "
-        f"{len(guides)} guide(s), all configured modules discoverable."
-    )
+    print("Agent navigation is valid: " f"{len(guides)} guide(s), all configured modules discoverable.")
     return 0
 
 
