@@ -17,16 +17,22 @@ ZERO_SHA = "0" * 40
 PROFILE_RANK = {"lean": 0, "scoped": 1, "strong": 2, "full": 3}
 
 DOC_ONLY_PATHS = {
+    ".engineering/baseline.json",
+    ".engineering/documentation-policy.json",
     ".github/CODEOWNERS",
     ".github/dependabot.yml",
     ".gitattributes",
     ".gitignore",
+    "AGENTS.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
+    "EXECUTION-CAPABILITY-CONTRACT.md",
     "LICENSE",
     "NOTICE",
     "README.md",
     "SECURITY.md",
+    "design/brand-kit.json",
+    "design/ux-contract.json",
 }
 DOC_ONLY_PREFIXES = ("docs/",)
 DOC_ONLY_SUFFIXES = (".md", ".mdx", ".rst")
@@ -63,6 +69,12 @@ PACKAGING_PATHS = {
     "third_party/llama.cpp",
 }
 PACKAGING_PREFIXES = ("apps/", "backends/llama-cpp/", "gradle/", "third_party/llama.cpp/")
+PACKAGE_BOUNDARY_PREFIXES = (
+    "transports/android-binder-contract/",
+    "transports/android-binder-client/",
+    "integrations/android-service-host/",
+    "apps/shared-runtime-client-consumer-fixture/",
+)
 PACKAGING_SUFFIXES = (".gradle", ".gradle.kts")
 
 GRADLE_MODULES = load_gradle_modules()
@@ -71,6 +83,9 @@ GLOBAL_GRADLE_PATHS = {"build.gradle.kts", "gradle.properties", "settings.gradle
 GLOBAL_GRADLE_PREFIXES = ("build-logic/", "gradle/")
 PUBLIC_CONTRACT_PREFIXES = ("core/contracts/", "evaluation/contracts/", "observability/contracts/")
 CROSS_BOUNDARY_PREFIXES = (
+    "core/backend-spi/",
+    "core/runtime-core/",
+    "models/model-store/",
     "transports/android-binder-contract/",
     "transports/android-binder-client/",
     "integrations/android-service-host/",
@@ -109,6 +124,7 @@ def affects_packaging(path: str) -> bool:
         affects_native(path)
         or path in PACKAGING_PATHS
         or path.startswith(PACKAGING_PREFIXES)
+        or path.startswith(PACKAGE_BOUNDARY_PREFIXES)
         or path.endswith(PACKAGING_SUFFIXES)
         or filename == "AndroidManifest.xml"
         or filename.startswith("proguard")
@@ -156,7 +172,7 @@ def affected_gradle_modules(paths: Sequence[str]) -> tuple[str, ...]:
             continue
         if path == "third_party/llama.cpp" or path.startswith("third_party/llama.cpp/") or path in NATIVE_PATHS:
             modules.add("backends:llama-cpp")
-        elif path.startswith((".engineering/", "skills/", "docs/")) or path in DOC_ONLY_PATHS:
+        elif path.startswith((".engineering/", "skills/", "docs/", "design/")) or path in DOC_ONLY_PATHS:
             # Governance is handled by repository guards; it does not imply an
             # Android module unless it changes validation routing (FORCE_ALL_PATHS).
             continue
@@ -204,7 +220,7 @@ def classify_paths(paths: Iterable[str], *, force_all: bool = False) -> Validati
         reason = "shared public contract changed"
     elif cross_boundary:
         profile = "strong"
-        reason = "Binder, consumer, persistence or cross-boundary owner changed"
+        reason = "runtime, Binder, consumer, persistence or cross-boundary owner changed"
     elif release_sensitive:
         profile = "strong"
         reason = "release-sensitive Android build/manifest/package input changed"
