@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "external-consumer-android"
 include(":consumer")
+include(":consumer-app")
