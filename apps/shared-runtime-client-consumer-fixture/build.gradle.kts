@@ -118,6 +118,9 @@ android {
 dependencies {
     implementation(binderClientAar)
     implementation(binderContractAar)
+    // Raw AAR file dependencies bypass Maven metadata, so mirror the Binder contract's
+    // published Parcelize runtime dependency for the release/R8 fixture.
+    implementation(libs.kotlin.parcelize.runtime)
     implementation(project(":core:contracts"))
 
     androidTestImplementation(libs.androidx.test.ext.junit)
