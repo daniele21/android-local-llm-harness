@@ -119,40 +119,11 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         val bindings = canonicalCurrent.bindings.toMutableList()
         val exposures = canonicalCurrent.exposures.toMutableList()
 
-        for (requirement in spec.applications) {
-            val existing = applications.singleOrNull { it.applicationId == requirement.applicationId }
-            if (existing == null) {
-                applications += requirement.newRegistration(observedAtEpochMs)
-            } else if (!requirement.accepts(existing)) {
-                return conflict(HarnessControlPlaneConflictCode.APPLICATION_IDENTITY, requirement.applicationId.value)
-            }
-        }
-
-        reconcileUseCase(useCases)?.let { return it }
-        reconcilePreset(presets)?.let { return it }
-
-        for (requirement in spec.applications) {
-            val canonicalBinding = spec.bindingFor(requirement.applicationId)
-            val assignmentBindings = bindings.filter {
-                it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
-            }
-            if (assignmentBindings.any { it.bindingId != canonicalBinding.bindingId }) {
-                return conflict(HarnessControlPlaneConflictCode.BINDING_IDENTITY, requirement.applicationId.value)
-            }
-            val baseline = assignmentBindings.singleOrNull { it.revision == BUILT_IN_BINDING_REVISION }
-            if (baseline == null) {
-                bindings += canonicalBinding
-            } else if (baseline != canonicalBinding) {
-                return conflict(HarnessControlPlaneConflictCode.BINDING_BASELINE, canonicalBinding.bindingId)
-            }
-
-            val currentBinding = (
-                bindings.filter {
-                    it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
-                }.maxByOrNull(ApplicationUseCaseBinding::revision)
-                ) ?: canonicalBinding
-            reconcileExposure(currentBinding, exposures)
-        }
+        var reconciliationConflict = reconcileApplications(applications, observedAtEpochMs)
+        if (reconciliationConflict == null) reconciliationConflict = reconcileUseCase(useCases)
+        if (reconciliationConflict == null) reconciliationConflict = reconcilePreset(presets)
+        if (reconciliationConflict == null) reconciliationConflict = reconcileBindings(bindings, exposures)
+        if (reconciliationConflict != null) return reconciliationConflict
 
         val next = HostControlPlaneState(
             applications = applications,
@@ -162,6 +133,21 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
             exposures = exposures,
         ).canonical()
         return HarnessControlPlaneReconciliationResult.Success(next, changed = next != canonicalCurrent)
+    }
+
+    private fun reconcileApplications(
+        applications: MutableList<RegisteredApplication>,
+        observedAtEpochMs: Long,
+    ): HarnessControlPlaneReconciliationResult.Conflict? {
+        for (requirement in spec.applications) {
+            val existing = applications.singleOrNull { it.applicationId == requirement.applicationId }
+            if (existing == null) {
+                applications += requirement.newRegistration(observedAtEpochMs)
+            } else if (!requirement.accepts(existing)) {
+                return conflict(HarnessControlPlaneConflictCode.APPLICATION_IDENTITY, requirement.applicationId.value)
+            }
+        }
+        return null
     }
 
     private fun reconcileUseCase(useCases: MutableList<UseCaseDefinition>): HarnessControlPlaneReconciliationResult.Conflict? {
@@ -190,6 +176,35 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
             presets += spec.preset
         } else if (sameRevision != spec.preset) {
             return conflict(HarnessControlPlaneConflictCode.PRESET_DEFINITION, spec.preset.metadata.presetId)
+        }
+        return null
+    }
+
+    private fun reconcileBindings(
+        bindings: MutableList<ApplicationUseCaseBinding>,
+        exposures: MutableList<StoredPresetExposure>,
+    ): HarnessControlPlaneReconciliationResult.Conflict? {
+        for (requirement in spec.applications) {
+            val canonicalBinding = spec.bindingFor(requirement.applicationId)
+            val assignmentBindings = bindings.filter {
+                it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
+            }
+            if (assignmentBindings.any { it.bindingId != canonicalBinding.bindingId }) {
+                return conflict(HarnessControlPlaneConflictCode.BINDING_IDENTITY, requirement.applicationId.value)
+            }
+            val baseline = assignmentBindings.singleOrNull { it.revision == BUILT_IN_BINDING_REVISION }
+            if (baseline == null) {
+                bindings += canonicalBinding
+            } else if (baseline != canonicalBinding) {
+                return conflict(HarnessControlPlaneConflictCode.BINDING_BASELINE, canonicalBinding.bindingId)
+            }
+
+            val currentBinding = (
+                bindings.filter {
+                    it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
+                }.maxByOrNull(ApplicationUseCaseBinding::revision)
+                ) ?: canonicalBinding
+            reconcileExposure(currentBinding, exposures)
         }
         return null
     }
