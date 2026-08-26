@@ -7,7 +7,7 @@ Canonical scope: workstream.application-control-plane-ux
 Read when: coordinating implementation of Applications, assigned-use-case and preset-management UX
 Last reviewed: 2026-08-26
 
-Durable behavior: [`../features/application-control-plane-ux.md`](../features/application-control-plane-ux.md). This file owns only temporary execution state, dependencies and write boundaries.
+Durable behavior: [`../features/application-control-plane-ux.md`](../features/application-control-plane-ux.md). Operational ledger: [`../current-state.md`](../current-state.md). This file owns only temporary execution state, dependencies and write boundaries.
 
 ## Goal
 
