@@ -357,11 +357,7 @@ private fun HarnessContextTokensField(value: String, valid: Boolean, enabled: Bo
 }
 
 @Composable
-private fun HarnessSavePresetButton(
-    saving: Boolean,
-    enabled: Boolean,
-    onSave: () -> Unit,
-) {
+private fun HarnessSavePresetButton(saving: Boolean, enabled: Boolean, onSave: () -> Unit) {
     HarnessPrimaryButton(
         text = if (saving) "Saving preset…" else "Save preset",
         enabled = enabled,
@@ -370,10 +366,7 @@ private fun HarnessSavePresetButton(
 }
 
 @Composable
-private fun HarnessCustomPresetFeedback(
-    state: HarnessApplicationsMutationState,
-    actions: HarnessCreatePresetActions,
-) {
+private fun HarnessCustomPresetFeedback(state: HarnessApplicationsMutationState, actions: HarnessCreatePresetActions) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
 
