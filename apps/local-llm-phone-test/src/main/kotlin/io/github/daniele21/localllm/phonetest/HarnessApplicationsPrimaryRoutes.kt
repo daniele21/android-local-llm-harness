@@ -37,12 +37,29 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
             entry.arguments?.getString(HarnessApplicationRoutes.APPLICATION_ID_ARGUMENT),
         )
         HarnessApplicationsRouteContent(state = state, onRefresh = callbacks.onRefresh) { snapshot ->
-            HarnessApplicationDetailScreen(
-                application = snapshot.application(applicationId),
-                onOpenAssignment = { appId, useCaseId ->
-                    navController.navigate(HarnessApplicationRoutes.assignment(appId, useCaseId))
-                },
-            )
+            val selectedApplication = snapshot.application(applicationId)
+            val onOpenAssignment: (String, String) -> Unit = { appId, useCaseId ->
+                navController.navigate(HarnessApplicationRoutes.assignment(appId, useCaseId))
+            }
+            if (useHarnessApplicationsMasterDetail(currentHarnessAdaptivePolicy())) {
+                HarnessApplicationsMasterDetailScreen(
+                    snapshot = snapshot,
+                    selectedApplication = selectedApplication,
+                    onRefresh = callbacks.onRefresh,
+                    onOpenApplication = { selectedApplicationId ->
+                        navController.navigate(HarnessApplicationRoutes.application(selectedApplicationId)) {
+                            popUpTo(HarnessDestination.APPS.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenAssignment = onOpenAssignment,
+                )
+            } else {
+                HarnessApplicationDetailScreen(
+                    application = selectedApplication,
+                    onOpenAssignment = onOpenAssignment,
+                )
+            }
         }
     }
 }
