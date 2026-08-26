@@ -1,50 +1,37 @@
 # Android Local LLM Harness — Coding Agent Guide
 
-Repository-wide routing, invariants and validation selection.
+Repository-wide routing and invariants. Keep procedures in Skills and deterministic validation policy in scripts/CI.
 
 ## Read only what the task requires
 
 Read this guide, then only:
 
 1. the closest scoped `AGENTS.md`;
-2. the owning architecture, feature or active-workstream source;
-3. [`.engineering/commands.json`](.engineering/commands.json) and [`EXECUTION-CAPABILITY-CONTRACT.md`](EXECUTION-CAPABILITY-CONTRACT.md) when operational, validation or publication-readiness behavior matters;
-4. the relevant project-local Skill under [`skills/`](skills/README.md);
-5. for user-facing/visual semantics, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md);
-6. implementation, direct consumers, fakes and nearby tests.
-
-Scoped guides: [`models/AGENTS.md`](models/AGENTS.md), [`backends/llama-cpp/AGENTS.md`](backends/llama-cpp/AGENTS.md), [`observability/AGENTS.md`](observability/AGENTS.md), [`evaluation/AGENTS.md`](evaluation/AGENTS.md), [`apps/local-llm-phone-test/AGENTS.md`](apps/local-llm-phone-test/AGENTS.md), [`integrations/android-service-host/AGENTS.md`](integrations/android-service-host/AGENTS.md), [`transports/android-binder-client/AGENTS.md`](transports/android-binder-client/AGENTS.md), [`transports/android-binder-contract/AGENTS.md`](transports/android-binder-contract/AGENTS.md).
+2. the owning architecture/feature/workstream source and direct consumers/tests;
+3. [`.engineering/commands.json`](.engineering/commands.json) plus [`EXECUTION-CAPABILITY-CONTRACT.md`](EXECUTION-CAPABILITY-CONTRACT.md) for validation/publication work;
+4. the relevant Skill under [`skills/`](skills/README.md);
+5. for meaningful UX/UI, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and `design-product-experience`.
 
 Canonical routing:
 
-- [`README.md`](README.md) — purpose/modules;
-- [`BRANCHING.md`](BRANCHING.md) — branch/PR policy;
-- [`docs/README.md`](docs/README.md) — documentation map;
-- [`docs/current-state.md`](docs/current-state.md) — integrated state/blockers;
-- [`docs/roadmap.md`](docs/roadmap.md) — capability milestones;
-- [`docs/implementation-plan.md`](docs/implementation-plan.md) — repository target;
+- [`README.md`](README.md) — purpose/modules; [`BRANCHING.md`](BRANCHING.md) — branch/PR policy;
+- [`docs/README.md`](docs/README.md) — doc map; [`docs/current-state.md`](docs/current-state.md) — integrated state;
+- [`docs/roadmap.md`](docs/roadmap.md), [`docs/implementation-plan.md`](docs/implementation-plan.md) — milestones/target;
 - [`docs/architecture.md`](docs/architecture.md), [`docs/adr/README.md`](docs/adr/README.md) — architecture/decisions;
-- [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — completion/release gates;
-- [`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) — documentation policy;
-- [`docs/workstreams/README.md`](docs/workstreams/README.md) — active-workstream lifecycle;
-- [`skills/README.md`](skills/README.md) — recurring procedures;
-- [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) — product-experience/brand contracts.
-
-[`docs/documentation-policy.json`](docs/documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
+- [`docs/definition-of-done.md`](docs/definition-of-done.md), [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) — completion/release evidence;
+- [`.engineering/documentation-policy.json`](.engineering/documentation-policy.json) — policy; [`docs/documentation-policy.json`](docs/documentation-policy.json) is its byte-identical compatibility mirror.
 
 ## Repository purpose
 
-Harness answers: **for this use case, device and candidate models, which local model/configuration is the best supported choice?** It provides on-device model lifecycle, inference, evaluation, observability and shared-runtime infrastructure while public/domain contracts remain backend-neutral.
+Harness answers: **for this use case, device and candidate models, which local model/configuration is the best supported choice?** It owns on-device model lifecycle, inference, evaluation, observability and shared-runtime infrastructure while public/domain contracts remain backend-neutral.
 
 ## Non-negotiable invariants
 
-- Public contracts stay independent from Android UI, Capacitor and `llama.cpp` types.
-- `core/backend-spi` stays backend-neutral; runtime-core does not depend on concrete backends.
-- Native pointers/structures never leave the backend boundary.
-- Runtime orchestration stays independent from transport and persistence.
+- Public contracts stay independent from Android UI and `llama.cpp`; `core/backend-spi` stays backend-neutral.
+- Native pointers/structures never leave the backend boundary; runtime orchestration stays independent from transport/persistence.
 - External consumers resolve models through explicit application/use-case control-plane state; no phone-global fallback.
-- Catalog selection, verified transfer, installation, activation and residency remain explicit operations.
-- GGUF artifacts use immutable SHA-256 identity; never commit model binaries.
+- Catalog selection, verified transfer, installation, activation and residency remain explicit.
+- GGUF identity is immutable SHA-256; never commit model binaries.
 - Prompts/generated content stay out of normal telemetry, persistence and shared validation reports.
 - Cancellation, timeout, shutdown, pressure, partial failure and cleanup are normal lifecycle paths.
 - Keep one resident model and one production active decode by default until evidence approves another policy.
@@ -52,107 +39,71 @@ Harness answers: **for this use case, device and candidate models, which local m
 
 ## Find the owning boundary
 
-Inspect the owner, direct consumers and tests before editing.
+Inspect owner, direct consumers and tests before editing.
 
 | Change | Start here | Inspect next |
 | --- | --- | --- |
-| Public request/session/generation/error contracts | `core/contracts` | runtime, transports, observability, consumers |
-| Backend execution/capabilities | `core/backend-spi` | runtime-core, backends, fakes |
-| Runtime lifecycle/scheduling/memory/residency | `core/runtime-core` | backend SPI, model store, transports, apps |
+| Public request/session/error contracts | `core/contracts` | runtime, transports, observability, consumers |
+| Backend capabilities | `core/backend-spi` | runtime-core, backends, fakes |
+| Runtime/memory/residency | `core/runtime-core` | backend SPI, model store, transports, apps |
 | Model profiles/use cases/bindings | `models/model-profile` | resolver, installer, app registries |
-| GGUF store/import/integrity | `models/model-store` | runtime, installer, model UI |
-| Catalog/download/install | matching `models/*` owner | adjacent lifecycle owner, phone UI |
-| Model evaluation | `evaluation/contracts` | engine, adapters, store, UI |
-| llama.cpp/JNI/native generation | `backends/llama-cpp` | backend SPI, runtime, device validation |
-| Telemetry/health/resources/benchmarks | matching `observability/*` owner | stores, engines, presenters |
-| Embedded transport | `transports/in-process` | contracts/runtime |
-| Shared Binder/control plane | `transports/android-binder-*`, `integrations/android-service-host` | contracts/fixtures |
-| Packaged consumer validation | `apps/shared-runtime-client-consumer-fixture` | Binder AARs, packaging |
-| Product experience / shared Compose UI | `design/ux-contract.json`, `ui/design-system` | `skills/design-product-experience/SKILL.md`, Android apps, accessibility |
+| Model store/catalog/download/install | matching `models/*` owner | adjacent lifecycle owner, UI |
+| Evaluation | `evaluation/contracts` | engine, adapters, stores, UI |
+| llama.cpp/JNI | `backends/llama-cpp` | backend SPI, runtime, device validation |
+| Telemetry/resources/benchmarks | matching `observability/*` owner | stores, engines, presenters |
+| Shared Binder/control plane | `transports/android-binder-*`, `integrations/android-service-host` | contracts, fixtures |
+| Packaged consumer compatibility | `apps/shared-runtime-client-consumer-fixture` | Binder AARs, packaging/R8 |
+| Product experience | `design/ux-contract.json`, `ui/design-system` | design Skill, apps, accessibility |
 | Connected phone behavior | `apps/local-llm-phone-test` | owning domain contracts |
-| CI/packaging/governance | `.github`, `.engineering`, `scripts` | affected validation/docs |
+| CI/packaging/governance | `.github`, `.engineering`, `scripts` | validation/docs |
 
-`settings.gradle.kts` is the Gradle module inventory. Exclude build output and `third_party/llama.cpp` unless relevant.
+`settings.gradle.kts` is the canonical Gradle module inventory.
 
 ## Product experience routing
 
-Harness adopts `product-ui`. Meaningful UX/UI work follows [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md) at proportional depth.
-
-Decision order:
-
-```text
-user outcome
--> task model
--> information architecture / critical journey
--> information + action hierarchy
--> progressive disclosure / defaults
--> interactions / states / feedback / recovery
--> adaptive / platform behavior
--> accessibility
--> design system / components
--> motion
--> visual polish / graphics
--> validation
-```
-
-Classify first:
-
-- **structural UX** — full sequence;
-- **interaction** — owning task/journey plus affected state, feedback, accessibility, adaptive/component and motion layers;
-- **visual-only** — preserve settled flow/interaction semantics; stay with the design-system/brand owner.
+Harness adopts `product-ui`. Use `skills/design-product-experience/SKILL.md` at proportional depth: structural UX resolves task/journey/hierarchy before polish; interaction changes cover affected states/recovery/accessibility; visual-only changes preserve settled semantics and stay with the design-system/brand owner.
 
 ## Change workflow
 
-1. Confirm owner and smallest coherent scope.
-2. Resolve material ambiguity from canonical code/contracts/docs/ADRs/consumers/tests. If reasonable alternatives still materially change behavior, contracts, persistence, security/privacy, lifecycle, compatibility, acceptance criteria or meaningful UX, ask the user before implementing that decision.
-3. Use [`skills/plan-workstream/SKILL.md`](skills/plan-workstream/SKILL.md) only for persistent dependency/state coordination.
-4. Use [`skills/structured-change/SKILL.md`](skills/structured-change/SKILL.md) around meaningful behavior/cross-layer changes.
-5. For meaningful user-facing changes, use `design-product-experience` before implementation at appropriate depth.
-6. Inspect owner, consumers, fakes and tests before shared-contract changes.
-7. Implement one vertical slice; avoid parallel domain logic.
-8. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) while iterating. When a gate fails, classify the failure and owning invariant before editing; repeated failure requires a new hypothesis rather than another symptom patch.
-9. Update only the canonical durable owner.
-10. Finalize workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
-11. Use [`skills/preflight-change/SKILL.md`](skills/preflight-change/SKILL.md) before publication: refresh the intended `dev` base, review the complete diff, run the blast-radius selector, record `LEAN|SCOPED|STRONG|FULL`, and classify each selected gate as `AGENT_LOCAL`, `REMOTE_AUTOMATED` or `REAL_ENVIRONMENT`.
-12. If deterministic selected gates are unavailable agent-local, immediately use [`skills/remote-preflight/SKILL.md`](skills/remote-preflight/SKILL.md) and the declared `/preflight` automation. Do not ask the user to run Gradle/R8/Lint merely because the current agent lacks Android tooling.
+1. Confirm canonical owner and smallest coherent scope; resolve material ambiguity from code/contracts/docs/ADRs/consumers/tests.
+2. Use `structured-change` for meaningful cross-layer behavior and `plan-workstream` only when persistent coordination is justified.
+3. Inspect consumers/fakes/tests before shared-contract changes; implement one coherent vertical slice and update only canonical durable owners.
+4. Use `validate-change` while iterating. Diagnose the failure class and owning invariant before editing; repeated failure requires a new hypothesis.
+5. Finalize temporary workstreams with `finalize-workstream`.
+6. Before publication use `preflight-change`: refresh `dev`, review the full diff, select validation profile, classify execution capability and route unavailable deterministic gates to `remote-preflight` rather than the user.
 
 Ordinary work starts from latest green `dev` and targets `dev`; `main` is promotion/hotfix only under [`BRANCHING.md`](BRANCHING.md).
 
 ## Validation profiles
 
-The canonical selector is `python3 scripts/detect_ci_scope.py` and `auto` is the default.
+`python3 scripts/detect_ci_scope.py` is canonical; `auto` is the default.
 
-- **LEAN:** docs/governance/metadata and cheap repository guards; no Android/NDK initialization when unnecessary.
-- **SCOPED:** contained implementation module plus direct consumers, compile/unit/lint/static gates.
-- **STRONG:** public/shared contracts, Binder/control-plane, persistence, native/JNI, manifest, dependency, R8/ProGuard, packaging/variant or other cross-boundary/release-sensitive changes.
-- **FULL:** `dev -> main` promotion/release, selector/CI/global Gradle/module inventory/toolchain changes, unknown executable paths or explicit full request.
+- **LEAN** — docs/governance/metadata and cheap guards; no Android/NDK setup when unnecessary.
+- **SCOPED** — contained module plus relevant compile/unit/lint/direct-consumer evidence.
+- **STRONG** — runtime/backend/model-store, shared contracts, Binder/control plane, persistence, native/JNI, manifest/dependency/R8/packaging or other cross-boundary/release-sensitive changes.
+- **FULL** — promotion/release, selector/CI/global Gradle/module inventory/toolchain changes, unknown executable paths or explicit full request.
 
-`FULL` is exceptional for ordinary feature PRs. Stronger explicit validation is allowed; silent downgrade below `auto` is forbidden. If a narrow profile misses a deterministic impacted failure, strengthen the selector/dependency mapping rather than making every PR full forever.
+`FULL` is exceptional. Stronger validation is allowed; silent downgrade below `auto` is forbidden. If scoped validation misses an impacted deterministic failure, repair the selector/dependency mapping instead of making every PR full.
 
 ## Publication readiness
 
-Two questions are separate: **how much** validation is needed and **where** it can execute.
+Validation depth and execution location are separate:
 
-- `READY_FOR_CI` — all deterministic gates required by the selected profile could run agent-local and passed; CI can confirm.
-- `READY_FOR_REMOTE_PREFLIGHT` — semantic/base/diff checks and available local gates passed, but required selected gates are `REMOTE_AUTOMATED`; the agent must trigger `/preflight` rather than delegate them to the user.
-- `AUTOMATED_PREFLIGHT_CONFIRMED` — all deterministic automated gates required by the selected profile passed on the exact head/base.
-- `NOT_READY_FOR_AUTOMATED_PREFLIGHT` — a required gate failed, scope is unsafe, automation routing is missing or another blocker remains.
+- `READY_FOR_CI` — selected deterministic gates ran agent-local and passed;
+- `READY_FOR_REMOTE_PREFLIGHT` — required deterministic gates are `REMOTE_AUTOMATED`; the agent triggers `/preflight` instead of asking the user to run Gradle/R8/Lint;
+- `AUTOMATED_PREFLIGHT_CONFIRMED` — all deterministic gates selected for the exact head/base passed;
+- `NOT_READY_FOR_AUTOMATED_PREFLIGHT` — required evidence, safe scope selection or automation routing is missing/failed.
 
-Physical-device, thermal, memory, packaged cross-app and representative usability evidence remains `REAL_ENVIRONMENT`. It may be `PENDING` after automated preflight but still blocks stronger claims that depend on it.
+Physical-device, thermal, memory, representative usability and protected signing evidence is `REAL_ENVIRONMENT`; it may remain `PENDING` after automated preflight but still blocks claims that depend on it.
 
 ## Documentation lifecycle
 
-- [`docs/architecture.md`](docs/architecture.md), `docs/features/` and `docs/adr/` own durable knowledge.
-- [`docs/current-state.md`](docs/current-state.md) is the single repository operational ledger.
-- [`docs/workstreams/`](docs/workstreams/README.md) holds active bounded workstreams.
-- `design/` owns durable product-experience/brand routing; generated screenshots are evidence, not default design truth.
-- Completed workstreams are deleted after durable transfer; archive only for independent audit/release/regulatory value.
-- Git history owns normal implementation history.
+Durable truth belongs in architecture/features/ADRs/tests; `docs/current-state.md` owns current operational state and `docs/workstreams/` temporary active coordination. Transfer durable knowledge and delete completed workstreams by default. Git owns normal implementation history.
 
 ## Maintaining agent guides
 
-Keep durable routing, hazards, invariants and validation selection. Put recurring procedure in Skills and deterministic rules in scripts/CI. Update routing when owners move and rerun guards.
+Keep only durable routing, hazards, invariants and validation selection. Put recurring procedures in Skills and deterministic rules in scripts/CI. Update routing when owners move and rerun guards.
 
 ## Stop conditions
 
-Surface conflicts instead of bypassing accepted contracts, unresolved material product/contract ambiguity, privacy/native boundaries, signing/model safety, canonical validation/artifact lifecycle, product-experience/design-system ownership, the publication gate, destructive-review requirements or physical-evidence gates.
+Surface conflicts instead of bypassing accepted contracts, material ambiguity, privacy/native/signing/model-safety boundaries, canonical validation/artifact lifecycle, design-system ownership or required real-environment evidence.
