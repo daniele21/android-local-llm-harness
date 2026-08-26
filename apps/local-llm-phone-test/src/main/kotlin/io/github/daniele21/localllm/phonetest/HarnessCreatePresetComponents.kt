@@ -52,12 +52,7 @@ internal fun HarnessPresetNameField(value: String, enabled: Boolean, onValueChan
 }
 
 @Composable
-internal fun HarnessPresetBaseCard(
-    preset: HarnessPresetSummary,
-    selected: Boolean,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-) {
+internal fun HarnessPresetBaseCard(preset: HarnessPresetSummary, selected: Boolean, enabled: Boolean, onSelect: () -> Unit) {
     HarnessCard(
         emphasized = selected,
         modifier = Modifier
