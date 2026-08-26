@@ -51,10 +51,9 @@ internal data class HarnessBuiltInApplicationRequirement(
         lastSeenAtEpochMs = observedAtEpochMs,
     )
 
-    fun accepts(application: RegisteredApplication): Boolean =
-        application.applicationId == applicationId &&
-            application.packageName in acceptedPackageNames &&
-            application.signerSha256.lowercase() in acceptedSignerSha256.map(String::lowercase).toSet()
+    fun accepts(application: RegisteredApplication): Boolean = application.applicationId == applicationId &&
+        application.packageName in acceptedPackageNames &&
+        application.signerSha256.lowercase() in acceptedSignerSha256.map(String::lowercase).toSet()
 }
 
 /** Canonical app-owned built-in graph. It contains no Room, Android, Binder or transport types. */
@@ -103,10 +102,7 @@ internal enum class HarnessControlPlaneConflictCode {
 internal sealed interface HarnessControlPlaneReconciliationResult {
     data class Success(val state: HostControlPlaneState, val changed: Boolean) : HarnessControlPlaneReconciliationResult
 
-    data class Conflict(
-        val code: HarnessControlPlaneConflictCode,
-        val identity: String,
-    ) : HarnessControlPlaneReconciliationResult
+    data class Conflict(val code: HarnessControlPlaneConflictCode, val identity: String) : HarnessControlPlaneReconciliationResult
 }
 
 /**
@@ -150,9 +146,11 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
                 return conflict(HarnessControlPlaneConflictCode.BINDING_BASELINE, canonicalBinding.bindingId)
             }
 
-            val currentBinding = (bindings.filter {
-                it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
-            }.maxByOrNull(ApplicationUseCaseBinding::revision)) ?: canonicalBinding
+            val currentBinding = (
+                bindings.filter {
+                    it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
+                }.maxByOrNull(ApplicationUseCaseBinding::revision)
+                ) ?: canonicalBinding
             reconcileExposure(currentBinding, exposures)
         }
 
@@ -196,10 +194,7 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         return null
     }
 
-    private fun reconcileExposure(
-        binding: ApplicationUseCaseBinding,
-        exposures: MutableList<StoredPresetExposure>,
-    ) {
+    private fun reconcileExposure(binding: ApplicationUseCaseBinding, exposures: MutableList<StoredPresetExposure>) {
         val bindingExposures = exposures.filter {
             it.bindingId == binding.bindingId && it.bindingRevision == binding.revision
         }
