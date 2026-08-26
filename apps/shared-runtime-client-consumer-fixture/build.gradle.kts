@@ -77,7 +77,11 @@ android {
         }
         release {
             isDebuggable = false
-            isMinifyEnabled = false
+            // This fixture represents a real external release consumer. Keep R8 enabled so
+            // packaged Binder/Parcelable compatibility is exercised instead of inferred from
+            // an unminified repository-local APK.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
             manifestPlaceholders["sharedRuntimeHostPackage"] = sharedRuntimeReleaseHostPackage
             buildConfigField("String", "SHARED_RUNTIME_HOST_PACKAGE", "\"$sharedRuntimeReleaseHostPackage\"")
