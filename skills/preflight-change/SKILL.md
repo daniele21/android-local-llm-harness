@@ -1,103 +1,64 @@
 ---
 name: preflight-change
-description: Establish exact-head READY_FOR_CI before publishing by resolving material ambiguity, verifying target-base freshness, reviewing the complete diff, diagnosing failures at their owner and running every required locally reproducible deterministic gate selected by blast radius.
+description: Establish exact-head automated-validation readiness by resolving material ambiguity, verifying target-base freshness, reviewing the complete diff, selecting validation depth from blast radius, classifying execution capability and routing every required deterministic gate without turning the user into a test runner.
 ---
 
 # Preflight Change
 
-Use this Skill immediately before pushing, opening/updating a PR, or otherwise intentionally triggering CI as readiness confirmation. `validate-change` owns the iterative test loop; this Skill owns the final publication decision.
+Use immediately before publishing/updating a PR. `validate-change` owns iterative validation; this Skill owns final blast-radius selection, execution routing and readiness.
 
-The governing rule is:
+Read `EXECUTION-CAPABILITY-CONTRACT.md` when execution capability matters.
 
-> CI should confirm, not discover, deterministic repository failures that the supported local environment can reproduce.
+Governing rules:
 
-## 1. Resolve material ambiguity
+> Validation depth follows blast radius: use the narrowest profile that proves the changed invariants.
 
-Before claiming readiness, confirm that implementation is not resting on an unresolved material assumption.
+> CI should confirm locally reproducible failures when the agent has equivalent execution capability.
 
-First inspect canonical evidence:
+> An automatable deterministic gate must not be delegated to the user merely because the current agent cannot run it locally.
 
-- owning contract/state/config/design source;
-- architecture/feature docs and accepted ADRs;
-- direct consumers, fakes/adapters and nearby tests;
-- active workstream acceptance criteria when applicable.
+## 1. Resolve ambiguity, base and diff
 
-Ask the user only when two reasonable interpretations remain and they would materially change product behavior, public/API/protocol contracts, persisted data/migration semantics, security/trust/privacy boundaries, failure/resource/concurrency/lifecycle behavior, backward compatibility, acceptance criteria or meaningful UX.
+- Resolve material ambiguity from canonical contracts/code/docs/ADRs/consumers/tests; ask the user only when reasonable alternatives materially change behavior, contracts, persistence, security/privacy, lifecycle, compatibility, acceptance criteria or meaningful UX.
+- Record exact feature HEAD and intended `dev` base. Refresh evidence after any edit/rebase/dependency/base movement.
+- Review the complete diff for unrelated/generated/private files, weakened tests, duplicated ownership, stale docs/contracts, missed consumers and resource/security/UX drift.
 
-Do not ask about local naming/style/implementation choices that preserve observable semantics. If material ambiguity remains unresolved, status is `NOT_READY_FOR_CI`.
+## 2. Select validation depth
 
-## 2. Verify the intended base
+Run the project selector from `.engineering/commands.json` using `auto` and record `LEAN | SCOPED | STRONG | FULL`, reason and affected modules/jobs.
 
-Read the intended target branch/ref again before final validation.
+Harness guidance:
 
-- Record exact target/base revision and feature head revision.
-- Verify the feature is based on, reconciled with, or proven merge-compatible with the current target according to repository policy.
-- Treat stacked work as conditional while parent PRs/dependencies are not integrated.
-- After a base/dependency/head change, invalidate prior affected evidence and rerun it.
+- `LEAN` — docs/governance/metadata-only and cheap repository guards.
+- `SCOPED` — contained module implementation plus affected compile/unit/lint/direct-consumer evidence.
+- `STRONG` — shared/public contracts, Binder/control-plane boundaries, persistence, native/JNI, manifest, dependency, R8/ProGuard, packaging/variant or other cross-boundary/release-sensitive behavior.
+- `FULL` — promotion/release, selector/CI/global Gradle/module inventory/toolchain changes, unknown executable paths or explicit full request.
 
-Do not reuse green evidence from an obsolete head/base relationship.
+Unknown executable scope fails safe stronger. Selector/build-inventory changes force `FULL`. Do not silently downgrade below `auto`; stronger validation is always allowed.
 
-## 3. Review the complete diff
+## 3. Classify execution capability
 
-Inspect the whole diff against the intended base, not only the last edited files.
+Assign every required gate in the selected profile to:
 
-Look for:
+- `AGENT_LOCAL` — executable by the current agent on exact HEAD;
+- `REMOTE_AUTOMATED` — deterministic/automatable but unavailable in the current agent environment;
+- `REAL_ENVIRONMENT` — genuinely requires representative hardware, protected authority/external environment or manual evidence.
 
-- accidental/generated/private files or debug/logging residue;
-- unrelated edits or hidden scope expansion;
-- duplicated ownership/policy or a second source of truth;
-- weakened/deleted/suppressed tests or validation;
-- stale docs/contracts after behavior changed;
-- missed direct consumers/fakes/adapters;
-- unbounded resources, missing cleanup or changed failure semantics;
-- accidental compatibility/migration/security/UX drift.
+Gradle, Kotlin compilation, Lint, R8, unit tests and ordinary unsigned Android builds are `REMOTE_AUTOMATED`, not `REAL_ENVIRONMENT`, when ChatGPT lacks Android tooling.
 
-A diff review is a semantic review, not only a formatting pass.
+Run all `AGENT_LOCAL` gates. If any selected gate is `REMOTE_AUTOMATED`, status becomes `READY_FOR_REMOTE_PREFLIGHT` and control passes to `skills/remote-preflight/SKILL.md`; do not ask the user to run Gradle.
 
-## 4. Run the final local deterministic matrix
+## 4. Failure discipline
 
-Use `validate-change` and `.engineering/commands.json` to select the narrowest sufficient final matrix for the actual blast radius.
+Classify failures as `CHANGE_REGRESSION`, `BASELINE_FAILURE`, `ENVIRONMENT`, `FLAKY`, `BASE_DRIFT` or `ASSUMPTION`. Identify violated invariant and owner before editing. Never suppress/weaken a legitimate gate merely to go green. If the same gate fails after a repair, form a new falsifiable hypothesis before another edit.
 
-Every required gate that is reproducible in the supported local environment must pass on the exact current head. Depending on scope this can include:
+Re-run blast-radius selection after material fixes because the repair may broaden scope.
 
-- formatting/formatter check;
-- lint/static analysis/typecheck;
-- touched module/package compilation;
-- focused unit/component tests;
-- direct-consumer/contract/integration tests;
-- canonical repository `check`/`test`;
-- build/package/smoke/E2E where the claim requires them.
+## 5. Command parity
 
-Do not run unrelated expensive suites by default. Do not publish a cross-boundary change after only a narrow unit test.
+Local and remote validation must invoke the same project-owned commands/scripts/selector semantics. Workflow YAML may orchestrate environment/cache/evidence but must not own a divergent test policy. If remote runs are routinely broader than required, improve the selector rather than accepting full CI by default.
 
-Evidence that genuinely requires CI, a physical device, specialized hardware, an external service or representative users may remain pending for `READY_FOR_CI`, but it must be explicitly labelled and still blocks any stronger claim that depends on it.
-
-## 5. Diagnose failures before editing
-
-For every failure, classify it before changing production code:
-
-- `CHANGE_REGRESSION` — introduced by this change;
-- `BASELINE_FAILURE` — reproducible on the intended target base;
-- `ENVIRONMENT` — toolchain/dependency/environment mismatch;
-- `FLAKY` — non-deterministic and reproduced as such;
-- `BASE_DRIFT` — stale/stacked integration effect;
-- `ASSUMPTION` — requirement/design/contract assumption is wrong or unresolved.
-
-Then identify the violated invariant and its owner. Fix the owner and add/strengthen regression evidence at the lowest useful level.
-
-Never delete, suppress, weaken or rewrite a legitimate gate simply to make the branch green unless the owning contract itself is intentionally changed.
-
-If the same gate fails again after an attempted fix, stop symptom patching. Re-examine the cause, owner and assumptions and form a new falsifiable hypothesis before editing again. If that exposes material ambiguity, return to section 1 and ask the user.
-
-## 6. Check local/CI parity
-
-When deterministic CI logic exists, confirm that local validation uses the same project-owned commands/scripts where practical. Workflow YAML may orchestrate environment setup, caching and artifacts, but should not secretly own a different formatter/test/build policy.
-
-If a prior CI run found a deterministic failure that local preflight missed, treat that class of failure as a preflight/parity defect and close the gap before declaring readiness again.
-
-## 7. Output readiness
-
-Report:
+## Output
 
 ```text
 HEAD: <revision>
@@ -105,22 +66,14 @@ TARGET: <branch>@<revision>
 AMBIGUITY: PASS|FAIL
 BASE_FRESHNESS: PASS|FAIL
 FULL_DIFF_REVIEW: PASS|FAIL
-LOCAL_GATES:
+VALIDATION_PROFILE: LEAN|SCOPED|STRONG|FULL
+PROFILE_REASON: <reason>
+EXECUTION_CAPABILITY: local|mixed|remote-only
+AGENT_LOCAL:
+  <gate>: PASS|FAIL|N/A
+REMOTE_AUTOMATED:
   <gate>: PASS|FAIL|PENDING|N/A
-CI_ONLY / REAL_ENVIRONMENT:
-  <gate>: PENDING|N/A
-READINESS: READY_FOR_CI|NOT_READY_FOR_CI
+REAL_ENVIRONMENT:
+  <gate>: PASS|PENDING|N/A
+READINESS: READY_FOR_CI|READY_FOR_REMOTE_PREFLIGHT|AUTOMATED_PREFLIGHT_CONFIRMED|NOT_READY_FOR_AUTOMATED_PREFLIGHT
 ```
-
-`READY_FOR_CI` requires all of:
-
-- no unresolved material ambiguity;
-- current target/base relationship verified;
-- complete diff reviewed;
-- every required locally reproducible deterministic gate is `PASS`;
-- exact head recorded;
-- non-local evidence explicitly declared.
-
-Any later edit, rebase/merge/replay, dependency change or material target-base movement invalidates the affected readiness evidence.
-
-A known-red draft may be published only when the user explicitly wants a collaboration/investigation artifact. State the known-red condition clearly; do not label it `READY_FOR_CI`.
