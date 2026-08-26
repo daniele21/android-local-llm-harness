@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -85,6 +86,37 @@ class HarnessPhoneBindingRegistryTest {
             registry.resolve(ApplicationId("other-app"), HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         }
 
+        assertTrue(failure.message?.contains("control-plane activation") == true)
+    }
+
+    @Test
+    fun `external application resolves exact active control-plane configuration and fails closed after deactivation`() {
+        val registry = HarnessPhoneBindingRegistry()
+        val externalApplicationId = ApplicationId("consumer-fixture")
+        val externalUseCaseId = UseCaseId("configured-generation")
+        val activationId = UseCaseActivationId("activation-acux-90")
+        val expected = resolvedPhonePlaygroundUseCase(model).let { resolved ->
+            resolved.copy(
+                binding = resolved.binding.copy(
+                    applicationId = externalApplicationId,
+                    useCaseId = externalUseCaseId,
+                ),
+            )
+        }
+
+        registry.installActivationBinding(
+            activationId = activationId,
+            applicationId = externalApplicationId,
+            useCaseId = externalUseCaseId,
+            resolved = expected,
+        )
+
+        assertEquals(expected, registry.resolve(externalApplicationId, externalUseCaseId))
+
+        registry.removeActivationBinding(activationId)
+        val failure = assertThrows(IllegalStateException::class.java) {
+            registry.resolve(externalApplicationId, externalUseCaseId)
+        }
         assertTrue(failure.message?.contains("control-plane activation") == true)
     }
 
