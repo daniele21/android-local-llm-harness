@@ -16,6 +16,7 @@ A workstream belongs here only while it is active. It is not a second project-st
 - [`q35-runtime-qualification-wave.md`](q35-runtime-qualification-wave.md) — coordinates the temporary Qwen3.5 CPU runtime qualification wave, including measured-profile acceptance, lifecycle/memory evidence, representative-device gates and final review dependencies.
 - [`application-control-plane-ux.md`](application-control-plane-ux.md) — coordinates the Applications -> assigned use case -> preset-control UX implementation, including parallel UI/control-plane slices, revision-safe mutations, adaptive/accessibility convergence and effective two-APK evidence.
 - [`control-plane-state-reconciliation.md`](control-plane-state-reconciliation.md) — coordinates startup reconciliation of persisted mandatory built-in control-plane state, conservative upgrade repair, cross-surface consistency and the dependent physical upgrade/two-APK gates.
+- [`shared-runtime-binder-ipc-compatibility.md`](shared-runtime-binder-ipc-compatibility.md) — coordinates release-minified consumer reproduction, Binder/Parcel root-cause isolation, SDK-owned optimizer compatibility and the dependent RedactGuard two-APK proof.
 
 ## Lifecycle
 
