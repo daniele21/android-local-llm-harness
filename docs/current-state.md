@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-25
+Last reviewed: 2026-08-26
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -29,11 +29,13 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
+`apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
 
-Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
+Applications control-plane repository implementation is complete through ACUX-80. The canonical flow now includes Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations followed by canonical re-read; progressive Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
 
-Applications control-plane UX is now a separately specified, not-yet-integrated capability: durable behavior is in [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md) and the temporary parallel execution DAG is in [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md). Final effective-consumer proof remains downstream of the accepted HCP control-plane/cutover path.
+The only remaining Applications feature gate is ACUX-90 representative physical two-APK evidence: persist the intended default, restart Harness, have a real consumer discover/activate/use the expected app/use-case/binding/preset identity, correlate privacy-safe evidence and demonstrate stale/invalid failure-closed behavior. ACUX-100 workstream cleanup stays blocked until that proof exists.
+
+Remaining general phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
 
 ### Shared Android runtime
 
@@ -103,25 +105,30 @@ Before any Qwen3.5 model/category support claim:
 
 ### 3. Physical Android evidence
 
-Device-dependent tracks can share hardware sessions without conflating exit gates: phone UX (TalkBack/font/layout/restoration/real-GGUF), Q35-6 tuning, SR-6 Binder release evidence and OMB-8 quality/two-APK flows.
+Device-dependent tracks can share hardware sessions without conflating exit gates: phone UX (TalkBack/font/layout/restoration/real-GGUF), ACUX-90 Applications effective two-APK configuration, Q35-6 tuning, SR-6 Binder release evidence and OMB-8 quality/two-APK flows.
 
-Do not promote phone UX to representative-device validated, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
+For ACUX-90 specifically, repository implementation is already complete: the remaining proof is real consumer behavior on representative hardware after Harness restart, with exact app/use-case/binding/preset identity and a fail-closed invalid/stale path.
+
+Do not promote phone UX to representative-device validated, Applications to externally effective, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
 
 ### 4. Follow-on validation and product hardening
 
-Repository-side UX/UI implementation is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI implementation, including Applications through ACUX-80, is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
 1. complete OMB-6B visual review and integrate approved deterministic launcher/identity assets;
 2. execute OMBRA corpus v2 against reviewed Qwen3.5 artifacts using policy v1;
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
-4. keep Q35-6, SR-6 and phone UX device evidence parallel where hardware can be shared without conflating exit gates;
-5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
+4. execute ACUX-90 on representative hardware: persist/restart/discover/activate/infer with exact effective configuration identity plus stale/invalid fail-closed proof;
+5. keep Q35-6, SR-6 and broader phone UX device evidence parallel where hardware can be shared without conflating exit gates;
+6. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
+- Applications UX specification: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md)
+- Applications active evidence workstream: [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
 - Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
