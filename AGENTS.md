@@ -8,7 +8,7 @@ Read this guide, then only:
 
 1. the closest scoped `AGENTS.md`;
 2. the owning architecture, feature or active-workstream source;
-3. [`.engineering/commands.json`](.engineering/commands.json) when operational or publication-readiness behavior matters;
+3. [`.engineering/commands.json`](.engineering/commands.json) and [`EXECUTION-CAPABILITY-CONTRACT.md`](EXECUTION-CAPABILITY-CONTRACT.md) when operational, validation or publication-readiness behavior matters;
 4. the relevant project-local Skill under [`skills/`](skills/README.md);
 5. for user-facing/visual semantics, [`design/ux-contract.json`](design/ux-contract.json), [`design/brand-kit.json`](design/brand-kit.json) and [`skills/design-product-experience/SKILL.md`](skills/design-product-experience/SKILL.md);
 6. implementation, direct consumers, fakes and nearby tests.
@@ -113,28 +113,32 @@ Classify first:
 8. Use [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) while iterating. When a gate fails, classify the failure and owning invariant before editing; repeated failure requires a new hypothesis rather than another symptom patch.
 9. Update only the canonical durable owner.
 10. Finalize workstreams with [`skills/finalize-workstream/SKILL.md`](skills/finalize-workstream/SKILL.md); transfer durable knowledge and delete the temporary plan by default.
-11. Use [`skills/preflight-change/SKILL.md`](skills/preflight-change/SKILL.md) before publication: refresh the intended `dev` base, review the complete diff, run every required locally reproducible deterministic gate on the exact head, and declare CI/device-only evidence.
+11. Use [`skills/preflight-change/SKILL.md`](skills/preflight-change/SKILL.md) before publication: refresh the intended `dev` base, review the complete diff, run the blast-radius selector, record `LEAN|SCOPED|STRONG|FULL`, and classify each selected gate as `AGENT_LOCAL`, `REMOTE_AUTOMATED` or `REAL_ENVIRONMENT`.
+12. If deterministic selected gates are unavailable agent-local, immediately use [`skills/remote-preflight/SKILL.md`](skills/remote-preflight/SKILL.md) and the declared `/preflight` automation. Do not ask the user to run Gradle/R8/Lint merely because the current agent lacks Android tooling.
 
 Ordinary work starts from latest green `dev` and targets `dev`; `main` is promotion/hotfix only under [`BRANCHING.md`](BRANCHING.md).
 
-## Validation levels
+## Validation profiles
 
-Use the scoped guide, [`skills/validate-change/SKILL.md`](skills/validate-change/SKILL.md) and [`.engineering/commands.json`](.engineering/commands.json).
+The canonical selector is `python3 scripts/detect_ci_scope.py` and `auto` is the default.
 
-- **Documentation/navigation:** documentation and agent guards.
-- **Targeted:** owning module plus direct consumers.
-- **Repository-wide:** shared contracts, Gradle, CI, packaging or multi-domain changes.
-- **Product experience:** task/journey, hierarchy, states/recovery, accessibility/adaptive behavior, design-system reuse and purposeful motion/graphics.
-- **Native:** CMake/CTest for native ownership changes.
-- **Physical device:** hardware-, memory-, thermal-, packaged cross-app or representative usability claims CI cannot prove.
+- **LEAN:** docs/governance/metadata and cheap repository guards; no Android/NDK initialization when unnecessary.
+- **SCOPED:** contained implementation module plus direct consumers, compile/unit/lint/static gates.
+- **STRONG:** public/shared contracts, Binder/control-plane, persistence, native/JNI, manifest, dependency, R8/ProGuard, packaging/variant or other cross-boundary/release-sensitive changes.
+- **FULL:** `dev -> main` promotion/release, selector/CI/global Gradle/module inventory/toolchain changes, unknown executable paths or explicit full request.
 
-Missing device/usability evidence remains pending; never upgrade synthetic evidence into a stronger claim.
+`FULL` is exceptional for ordinary feature PRs. Stronger explicit validation is allowed; silent downgrade below `auto` is forbidden. If a narrow profile misses a deterministic impacted failure, strengthen the selector/dependency mapping rather than making every PR full forever.
 
 ## Publication readiness
 
-The governing rule is **CI should confirm, not discover** locally reproducible deterministic failures. `READY_FOR_CI` requires no unresolved material ambiguity, current target-base identity, complete-diff review, exact-head identity and all required locally reproducible gates passing. A later edit, rebase/replay, dependency change or material `dev` movement invalidates affected evidence.
+Two questions are separate: **how much** validation is needed and **where** it can execute.
 
-For Android blast radius, preflight includes the applicable formatter/Spotless, detekt/static analysis, Kotlin/Java compilation, affected unit/contract tests, Android Lint and assemble/package gates. Real-device, thermal, memory and packaged cross-app evidence may remain explicitly `PENDING` when it cannot be reproduced locally, but still blocks stronger claims that depend on it.
+- `READY_FOR_CI` — all deterministic gates required by the selected profile could run agent-local and passed; CI can confirm.
+- `READY_FOR_REMOTE_PREFLIGHT` — semantic/base/diff checks and available local gates passed, but required selected gates are `REMOTE_AUTOMATED`; the agent must trigger `/preflight` rather than delegate them to the user.
+- `AUTOMATED_PREFLIGHT_CONFIRMED` — all deterministic automated gates required by the selected profile passed on the exact head/base.
+- `NOT_READY_FOR_AUTOMATED_PREFLIGHT` — a required gate failed, scope is unsafe, automation routing is missing or another blocker remains.
+
+Physical-device, thermal, memory, packaged cross-app and representative usability evidence remains `REAL_ENVIRONMENT`. It may be `PENDING` after automated preflight but still blocks stronger claims that depend on it.
 
 ## Documentation lifecycle
 
