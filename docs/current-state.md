@@ -5,9 +5,9 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-25
+Last reviewed: 2026-08-26
 
-This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); focused milestone detail belongs in its workstream roadmap/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
+This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
 ## Integration lines
 
@@ -29,104 +29,74 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability sources. The repository-side product-experience realignment is complete: task-first Overview, Basic -> Advanced -> Expert Playground disclosure, evidence-map Diagnostics, task-backed Settings, adaptive/accessibility rules, fail-closed Performance decisions and ViewModel-owned generation guards for asynchronous Diagnostics actions are integrated and validated on the exact reconciled repository composition.
+`apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
 
-Remaining phone work is device/evidence or separately scoped capability work: process/back-stack restoration evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence. CI/emulator validation does not satisfy those representative-device gates.
+Applications control-plane implementation is complete through ACUX-80: Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations with canonical re-read; Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
 
-Applications control-plane UX is now a separately specified, not-yet-integrated capability: durable behavior is in [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md) and the temporary parallel execution DAG is in [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md). Final effective-consumer proof remains downstream of the accepted HCP control-plane/cutover path.
+ACUX-90 representative physical two-APK evidence is the only remaining Applications feature gate. ACUX-100 cleanup remains blocked until that proof exists. General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
 
 ### Shared Android runtime
 
-SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures.
-
-The shared runtime is not production/release ready until the physical SR-6 evidence is executed on representative hardware. Canonical status and runbook: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
+SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures. Production/release readiness still requires representative physical SR-6 evidence. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
 ### Public Consumer API and OMBRA
 
-CA-0 through CA-4 are integrated in `dev`. PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, Binder lifecycle/generation adapters, deterministic privacy/compatibility coverage and packaged release-AAR compilation evidence.
+CA-0 through CA-4 are integrated in `dev`; PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, lifecycle/generation adapters, privacy/compatibility coverage and packaged release-AAR compilation evidence.
 
-CA-5 is active through OMBRA. The repository-side document pipeline and product/quality preparation are substantially integrated:
+CA-5 is active through OMBRA. Repository-side preparation includes:
 
-- **OMB-0** — isolated PdfBox parser/export decision and runtime evidence through PR #106;
+- **OMB-0** — PdfBox parser/export decision and runtime evidence through PR #106;
 - **OMB-1** — pure domain/application workflow through PRs #107/#108;
-- **OMB-2** — production PDF picker, extraction, typed failures and source cleanup through PR #154;
-- **OMB-3** — deterministic prompt/schema/chunk planning and structured finding validation/orchestration through PRs #148/#202;
-- **OMB-4** — host-owned `document-pii-detection` policy and packaged Binder Consumer API analysis adapter through PRs #144/#210;
-- **OMB-5** — deterministic redaction, flattened PDF export and safe hidden/reveal projection through PRs #146/#157/#218;
-- **OMB-6A** — OMBRA themes/tokens and reusable task/review components through PRs #145/#200/#220;
-- **OMB-7A** — Compose Import -> Definitions -> Analysis -> Review-ready product flow through PR #232;
-- **OMB-7B** — Review decisions/reveal/navigation, `CreateDocument` export, zero-PII handling, legacy Console retirement and pure-consumer dependency cleanup through PR #235;
-- **OMB-7C/evidence closeout** — review privacy/accessibility evidence through PR #250 and the remaining reset/cancellation, portrait/landscape and code-owned screenshot matrix through PR #259;
-- **OMB-8A** — deterministic synthetic quality corpus/scorer through PR #223, strengthened by PR #253 to active `ombra-pii-synthetic-v2` with 32 cases and at least five positive exact occurrences per supported category;
-- **OMB-8B policy preparation** — pre-registered deterministic support-policy v1 through PR #252, pinned to the active corpus v2 identity/hash and required type set with fail-closed identity/category checks.
+- **OMB-2** — PDF picker, extraction, typed failures and cleanup through PR #154;
+- **OMB-3** — deterministic prompt/schema/chunk planning and finding validation/orchestration through PRs #148/#202;
+- **OMB-4** — host-owned `document-pii-detection` policy and Binder Consumer API adapter through PRs #144/#210;
+- **OMB-5** — deterministic redaction, flattened export and safe hidden/reveal projection through PRs #146/#157/#218;
+- **OMB-6A** — OMBRA themes/tokens and reusable components through PRs #145/#200/#220;
+- **OMB-7A/B/C** — Import -> Definitions -> Analysis -> Review/export flow plus privacy/accessibility/state evidence through PRs #232/#235/#250/#259;
+- **OMB-8A** — active `ombra-pii-synthetic-v2` corpus with 32 cases and at least five positive exact occurrences per supported category through PRs #223/#253;
+- **OMB-8B** — pre-registered support-policy v1 through PR #252, pinned to corpus v2 identity/hash and required type set with fail-closed checks.
 
-`apps/local-llm-console` no longer owns the retired Console model-management, observability, health, cache or raw inference surfaces and remains on public Consumer API/document/design-system boundaries. Repository-side OMB-7 product-state evidence is now integrated through PR #259. OMB-7 must still not be marked `DONE` until the approved OMB-6B production identity is integrated, as required by its exit gate.
-
-**OMB-6B** remains independently open and review-gated in PR #248: the symbol candidate is not yet approved, and final wordmark/lockup plus adaptive/monochrome launcher assets are still pending. **OMB-8** now has both the active corpus v2 and pre-registered policy v1 integrated, but no supported-model/category claim is made until the exact reviewed Qwen3.5 artifacts are executed and the policy passes. Physical two-APK/device and release evidence also remain open.
-
-Canonical milestone state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
+`apps/local-llm-console` no longer owns retired model-management, observability, health, cache or raw inference surfaces. OMB-7 still depends on approved OMB-6B production identity. OMB-6B remains review-gated in PR #248; OMB-8 has corpus/policy integrated but no model/category support claim until exact reviewed Qwen3.5 artifacts pass policy. Physical two-APK/device and release evidence remain open. Canonical state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
 ### Model evaluation
 
-EVAL-0, EVAL-1 and EVAL-3 are complete. `evaluation/contracts` is the concrete backend-independent boundary for dataset/case/evaluator/sampling/run/result value semantics, deterministic SHA-256 identity, compatibility reasons and bounded evaluation failures. `evaluation/evaluators` freezes the six deterministic v1 scorer families and suite aggregation without an external LLM judge. These modules do not introduce a second runtime, model store, telemetry path or persistence implementation.
-
-The dataset lane has integrated schema, bounded parsing, validation, canonical digest, atomic installation, registry/discovery, stratified sampling, preset resolution and reusable regression fixtures (`EVAL-D-01` through `D-09`). Android document import (`D-10`) is the next dataset slice. Runner preparation/case isolation, Room persistence/comparison and connected Performance UI continue in parallel. Performance fails closed until compatible aggregated evidence can support a model/configuration comparison. Canonical routing: [`model-evaluation/README.md`](model-evaluation/README.md).
-
-This parallel capability does not replace the existing telemetry-derived benchmark engine and does not change the current OMBRA-focused repository sequencing.
+EVAL-0, EVAL-1 and EVAL-3 are complete. Contracts/evaluators provide backend-independent value semantics, deterministic identity, compatibility failures and six deterministic v1 scorer families without an external judge. Dataset work has integrated schema, parsing, validation, digest, atomic installation, registry/discovery, stratified sampling, preset resolution and regression fixtures (`EVAL-D-01` through `D-09`); Android import `D-10` is next. Runner/persistence/comparison/Performance work continues, with Performance failing closed until compatible aggregated evidence supports comparison. See [`model-evaluation/README.md`](model-evaluation/README.md).
 
 ## Open blockers
 
 ### 1. OMB-6B final identity review
 
-Repository-side OMB-7 product-state evidence is integrated through PR #259. The remaining OMB-7 closure dependency is the separately owned OMB-6B production identity gate.
-
-PR #248 contains a review-gated symbol candidate and deterministic safety validator, not an approved production identity. Before OMBRA can claim final app identity or mark OMB-7 complete:
-
-- approve or revise the symbol candidate;
-- freeze final wordmark/lockup decisions;
-- generate deterministic adaptive and monochrome launcher assets from approved vector masters;
-- add packaging checks without changing the accepted package/signing boundary.
-
-Do not infer visual approval from a green identity-candidate workflow.
+PR #248 contains a review-gated symbol candidate, not approved production identity. Closure requires approved symbol/wordmark/lockup, deterministic adaptive/monochrome launcher assets and packaging checks without changing package/signing boundaries. Do not infer visual approval from a green candidate workflow.
 
 ### 2. OMB-8 quality execution
 
-The active 32-case corpus v2 from PR #253 and pre-registered support-policy v1 from PR #252 are integrated and identity-bound. The next quality gate is execution, not threshold design.
-
-Before any Qwen3.5 model/category support claim:
-
-- execute the exact active corpus on each reviewed supported artifact/configuration;
-- evaluate aggregate and per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates against policy v1;
-- preserve exact artifact/preset/corpus identities in the evidence;
-- fail closed on identity mismatch, missing required categories or any threshold failure;
-- do not lower policy v1 to fit observed results; a changed policy requires a new version.
+Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 support claim, execute each reviewed artifact/configuration, evaluate aggregate/per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates, preserve exact identities and fail closed on threshold/category/identity failure. Policy v1 must not be lowered to fit observed results.
 
 ### 3. Physical Android evidence
 
-Device-dependent tracks can share hardware sessions without conflating exit gates: phone UX (TalkBack/font/layout/restoration/real-GGUF), Q35-6 tuning, SR-6 Binder release evidence and OMB-8 quality/two-APK flows.
+Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path.
 
-Do not promote phone UX to representative-device validated, Q35 profiles to `MEASURED`, publish the Binder client AAR or describe OMBRA/shared host transport as production-ready from CI/emulator evidence alone.
+Do not claim representative-device UX, external-consumer Applications effectiveness, `MEASURED` Q35 profiles, publish-ready Binder client AAR or production-ready OMBRA/shared-host transport from CI/emulator evidence alone.
 
 ### 4. Follow-on validation and product hardening
 
-Repository-side UX/UI implementation is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 must run semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI, including Applications through ACUX-80, is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
-1. complete OMB-6B visual review and integrate approved deterministic launcher/identity assets;
-2. execute OMBRA corpus v2 against reviewed Qwen3.5 artifacts using policy v1;
+1. complete OMB-6B identity review and deterministic launcher assets;
+2. execute OMBRA corpus v2 on reviewed Qwen3.5 artifacts against policy v1;
 3. run OMB-8 physical same-signer two-APK import -> analysis -> review -> export/failure evidence;
-4. keep Q35-6, SR-6 and phone UX device evidence parallel where hardware can be shared without conflating exit gates;
-5. complete release privacy/security, packaging, versioning/signing and documentation checks against the exact build.
+4. execute ACUX-90 physical persist/restart/discover/activate/infer plus stale/invalid fail-closed proof;
+5. run Q35-6, SR-6 and broader phone UX evidence in parallel where hardware can be shared;
+6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact build.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
-- Model evaluation plan: [`model-evaluation/README.md`](model-evaluation/README.md)
-- Consumer API roadmap: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
-- CA-4 Binder specification: [`shared-runtime/consumer-api/ca4-binder-protocol.md`](shared-runtime/consumer-api/ca4-binder-protocol.md)
-- OMBRA roadmap: [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
-- Shared runtime roadmap: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
-- SR-6 evidence runbook: [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
-- Qwen3.5 status: [`qwen35/README.md`](qwen35/README.md)
-- Harness 0.5 release gates: [`releases/harness-0.5.md`](releases/harness-0.5.md)
+- Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
+- Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
+- Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
+- Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
+- Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
+- Harness 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
