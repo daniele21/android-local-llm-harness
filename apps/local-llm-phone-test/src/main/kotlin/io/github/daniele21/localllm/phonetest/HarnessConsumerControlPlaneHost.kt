@@ -46,10 +46,24 @@ private const val LLAMA_CPP_BACKEND_ID = "llama.cpp"
 internal class HarnessConsumerControlPlaneHost(
     private val store: HostControlPlaneStore,
     private val modelStore: ModelStore,
-    private val runtimeGraph: HarnessRuntimeGraph,
+    private val runtimeControl: HarnessConsumerRuntimeControl,
     private val epochClock: () -> Long = System::currentTimeMillis,
     private val onWarmRetention: (ModelDigest, Long) -> Unit = { _, _ -> },
 ) : ConsumerControlPlaneHost {
+    constructor(
+        store: HostControlPlaneStore,
+        modelStore: ModelStore,
+        runtimeGraph: HarnessRuntimeGraph,
+        epochClock: () -> Long = System::currentTimeMillis,
+        onWarmRetention: (ModelDigest, Long) -> Unit = { _, _ -> },
+    ) : this(
+        store = store,
+        modelStore = modelStore,
+        runtimeControl = HarnessRuntimeGraphConsumerControl(runtimeGraph),
+        epochClock = epochClock,
+        onWarmRetention = onWarmRetention,
+    )
+
     private val resolver = HostExecutionResolver(store)
     private val useCaseDiscovery = AssignedUseCaseDiscovery(store)
     private val presetDiscovery = PublishedPresetDiscovery(store)
@@ -115,7 +129,7 @@ internal class HarnessConsumerControlPlaneHost(
 
     override fun deactivate(ownerId: String, applicationId: ApplicationId, activationId: ConsumerActivationId): ConsumerDeactivationResult {
         val runtimeActivationId = UseCaseActivationId(activationId.value)
-        val released = runtimeGraph.activationResidency.release(runtimeActivationId, ActivationOwnerId(ownerId))
+        val released = runtimeControl.activationResidency.release(runtimeActivationId, ActivationOwnerId(ownerId))
         return when (released) {
             is ActivationResidencyResult.Failure -> when (released.leaseFailure) {
                 ActivationLeaseFailure.NOT_FOUND -> ConsumerDeactivationResult.Released
@@ -134,7 +148,7 @@ internal class HarnessConsumerControlPlaneHost(
                         failure(ConsumerControlPlaneErrorCode.INVALID_REQUEST, "Activation belongs to another application"),
                     )
                 }
-                runtimeGraph.removeActivationBinding(runtimeActivationId)
+                runtimeControl.removeActivationBinding(runtimeActivationId)
                 released.value.warmRetentionByModelMs.forEach(onWarmRetention)
                 ConsumerDeactivationResult.Released
             }
@@ -142,10 +156,10 @@ internal class HarnessConsumerControlPlaneHost(
     }
 
     override fun releaseAll(ownerId: String, applicationId: ApplicationId) {
-        val released = runtimeGraph.activationResidency.releaseAll(ActivationOwnerId(ownerId))
+        val released = runtimeControl.activationResidency.releaseAll(ActivationOwnerId(ownerId))
         released.releasedLeases
             .filter { it.applicationId == applicationId }
-            .forEach { runtimeGraph.removeActivationBinding(it.activationId) }
+            .forEach { runtimeControl.removeActivationBinding(it.activationId) }
         released.warmRetentionByModelMs.forEach(onWarmRetention)
     }
 
@@ -169,7 +183,7 @@ internal class HarnessConsumerControlPlaneHost(
         if (preparationFailure != null) {
             return ConsumerActivationResult.Rejected(preparationFailure)
         }
-        val acquired = runtimeGraph.activationResidency.acquireExclusiveUseCase(
+        val acquired = runtimeControl.activationResidency.acquireExclusiveUseCase(
             request = UseCaseActivationRequest(
                 ownerId = ActivationOwnerId(ownerId),
                 applicationId = applicationId,
@@ -197,7 +211,7 @@ internal class HarnessConsumerControlPlaneHost(
         runtimeResolved: ResolvedUseCase,
     ): ConsumerActivationResult {
         val installedBinding = runCatching {
-            runtimeGraph.installActivationBinding(
+            runtimeControl.installActivationBinding(
                 activationId = lease.activationId,
                 applicationId = applicationId,
                 useCaseId = request.useCaseId,
@@ -205,7 +219,7 @@ internal class HarnessConsumerControlPlaneHost(
             )
         }
         if (installedBinding.isFailure) {
-            runtimeGraph.activationResidency.release(lease.activationId, lease.ownerId)
+            runtimeControl.activationResidency.release(lease.activationId, lease.ownerId)
             return ConsumerActivationResult.Rejected(
                 failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Unable to bind activated execution"),
             )
