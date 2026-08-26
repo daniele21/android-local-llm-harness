@@ -254,7 +254,6 @@ private fun builtInOmbraPreset() = UseCasePresetDefinition(
     ),
 )
 
-private fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String =
-    "seed-${applicationId.value}-$useCaseId"
+private fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "seed-${applicationId.value}-$useCaseId"
 
 private val SIGNER_SHA256 = Regex("[0-9a-fA-F]{64}")
