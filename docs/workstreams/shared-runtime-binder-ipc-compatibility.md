@@ -77,7 +77,15 @@ Classification: **current-change reproduction-fixture packaging regression**, no
 
 Owning correction: explicitly mirror `libs.kotlin.parcelize.runtime` in the raw-AAR release fixture. Do not use the generated R8 missing-rules file, `-dontwarn`, or Harness wire keep rules to hide a genuinely missing runtime dependency. The app-local ProGuard file remains neutral.
 
-`SR-BIPC-10` remains **ACTIVE** and must be rerun from the corrected exact branch head. `SR-BIPC-30` remains **BLOCKED**; no conclusion about R8/Parcelable wire compatibility has been accepted from this failed attempt.
+### SR-BIPC-10 second minified build
+
+After the Parcelize runtime correction, the release app minification progressed, but the release instrumentation APK stopped during `:apps:shared-runtime-client-consumer-fixture:minifyReleaseAndroidTestWithR8`. R8 reported missing `com.google.errorprone.annotations.CanIgnoreReturnValue` and `MustBeClosed`, referenced by AndroidX Test implementation bytecode.
+
+Classification: **current-change reproduction-fixture test-packaging regression**, still before any Binder transaction and therefore not evidence for or against the Binder root-cause hypothesis. Because `testBuildType = "release"`, the instrumentation APK is also shrunk and its shrinker classpath must include annotation types referenced by the AndroidX Test bytecode. This is independent from the Harness wire contract.
+
+Owning correction: add the matching Error Prone annotations artifact to `androidTestImplementation`. Do not suppress the missing classes with `-dontwarn`, do not add Harness keep rules, and do not disable release AndroidTest shrinking merely to make the reproduction pass.
+
+`SR-BIPC-10` remains **ACTIVE** and must be rerun from the corrected exact branch head. `SR-BIPC-30` remains **BLOCKED**; no conclusion about R8/Parcelable wire compatibility has been accepted from either build-only failure.
 
 ## Validation
 
