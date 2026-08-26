@@ -2,12 +2,12 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 internal sealed interface HarnessApplicationsReadState {
     data object Loading : HarnessApplicationsReadState
@@ -22,11 +22,7 @@ internal sealed interface HarnessApplicationsMutationState {
 
     data object Saving : HarnessApplicationsMutationState
 
-    data class Saved(
-        val message: String,
-        val presetId: String? = null,
-        val presetRevision: Int? = null,
-    ) : HarnessApplicationsMutationState
+    data class Saved(val message: String, val presetId: String? = null, val presetRevision: Int? = null) : HarnessApplicationsMutationState
 
     data class Conflict(val message: String) : HarnessApplicationsMutationState
 
