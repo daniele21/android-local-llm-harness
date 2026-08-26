@@ -64,36 +64,35 @@ internal object HarnessRoutes {
 
     fun shellState(route: String?): HarnessShellState {
         val settingsDetail = HarnessSettingsDetail.entries.firstOrNull { it.route == route }
-        if (settingsDetail != null) {
-            return HarnessShellState(
+        val applicationDetail = applicationDetailShellState(route)
+        return when {
+            settingsDetail != null -> HarnessShellState(
                 destination = HarnessDestination.SETTINGS,
                 detailTitle = settingsDetail.title,
                 detailSubtitle = settingsDetail.subtitle,
             )
-        }
-        if (route == REQUEST_TIMELINE_PATTERN || route?.startsWith(REQUEST_TIMELINE_PREFIX) == true) {
-            return HarnessShellState(
+
+            route == REQUEST_TIMELINE_PATTERN || route?.startsWith(REQUEST_TIMELINE_PREFIX) == true -> HarnessShellState(
                 destination = HarnessDestination.DIAGNOSTICS,
                 detailTitle = "Request timeline",
                 detailSubtitle = "Privacy-safe correlated events",
             )
-        }
-        if (route == MODEL_DETAIL_PATTERN || route?.startsWith(MODEL_DETAIL_PREFIX) == true) {
-            return HarnessShellState(
+
+            route == MODEL_DETAIL_PATTERN || route?.startsWith(MODEL_DETAIL_PREFIX) == true -> HarnessShellState(
                 destination = HarnessDestination.MODELS,
                 detailTitle = "Model details",
                 detailSubtitle = "Compatibility, integrity and runtime ownership",
             )
-        }
-        applicationDetailShellState(route)?.let { return it }
-        if (route == HarnessDestination.DIAGNOSTICS.route) {
-            return HarnessShellState(
+
+            applicationDetail != null -> applicationDetail
+            route == HarnessDestination.DIAGNOSTICS.route -> HarnessShellState(
                 destination = HarnessDestination.DIAGNOSTICS,
                 detailTitle = "Diagnostics",
                 detailSubtitle = "Developer evidence and validation",
             )
+
+            else -> HarnessShellState(destination = HarnessDestination.fromRoute(route))
         }
-        return HarnessShellState(destination = HarnessDestination.fromRoute(route))
     }
 
     private fun applicationDetailShellState(route: String?): HarnessShellState? {
