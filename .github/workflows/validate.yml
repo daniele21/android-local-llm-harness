@@ -6,7 +6,24 @@ on:
   pull_request: {}
   workflow_dispatch:
     inputs:
-      profile:
+      validation_profile:
+        description: Validation depth override; auto is the normal path
+        type: choice
+        options: [auto, strong, full]
+        default: auto
+      base_sha:
+        description: Exact comparison base SHA for remote preflight
+        type: string
+        required: false
+      expected_head_sha:
+        description: Exact head SHA expected by remote preflight
+        type: string
+        required: false
+      pr_number:
+        description: PR number to report remote-preflight result to
+        type: string
+        required: false
+      gradle_profile:
         description: Generate Gradle performance reports
         type: boolean
         default: false
@@ -15,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-${{ github.ref }}
+  group: validate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
+      profile: ${{ steps.scope.outputs.profile }}
+      reason: ${{ steps.scope.outputs.reason }}
       android: ${{ steps.scope.outputs.android }}
       native: ${{ steps.scope.outputs.native }}
       packaging: ${{ steps.scope.outputs.packaging }}
@@ -32,7 +51,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Verify remote-preflight exact head
+        if: github.event_name == 'workflow_dispatch' && inputs.expected_head_sha != ''
+        env:
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          ACTUAL_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ACTUAL_HEAD_SHA" == "$EXPECTED_HEAD_SHA" ]] || {
+            echo "Expected remote-preflight head $EXPECTED_HEAD_SHA but workflow runs $ACTUAL_HEAD_SHA" >&2
+            exit 1
+          }
 
       - name: Enforce pull request base policy
         if: github.event_name == 'pull_request'
@@ -45,31 +76,30 @@ jobs:
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
           HEAD_SHA: ${{ github.sha }}
-          FORCE_CUMULATIVE_DEV: ${{ github.event_name == 'push' && github.ref_name == 'dev' }}
-          FORCE_PROMOTION_VALIDATION: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.validation_profile || 'auto' }}
+          FORCE_PROMOTION: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref_name == 'main') }}
         shell: bash
         run: |
           set -euo pipefail
-          effective_event="$EVENT_NAME"
-          if [[ "$FORCE_PROMOTION_VALIDATION" == "true" ]]; then
-            effective_event="workflow_dispatch"
+          base_sha="$EVENT_BASE_SHA"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            base_sha="$DISPATCH_BASE_SHA"
           fi
 
-          python3 scripts/detect_ci_scope.py \
-            --event "$effective_event" \
-            --base-sha "$BASE_SHA" \
-            --head-sha "$HEAD_SHA" \
+          args=(
+            --event "$EVENT_NAME"
+            --base-sha "$base_sha"
+            --head-sha "$HEAD_SHA"
             --github-output "$GITHUB_OUTPUT"
-
-          if [[ "$FORCE_CUMULATIVE_DEV" == "true" ]]; then
-            echo "android=true" >> "$GITHUB_OUTPUT"
-            echo "native=true" >> "$GITHUB_OUTPUT"
-            echo "packaging=false" >> "$GITHUB_OUTPUT"
-            echo "modules=all" >> "$GITHUB_OUTPUT"
-            echo "dev merge push: forcing cumulative Android and native validation"
+            --profile "$REQUESTED_PROFILE"
+          )
+          if [[ "$FORCE_PROMOTION" == "true" ]]; then
+            args+=(--force-full)
           fi
+          python3 scripts/detect_ci_scope.py "${args[@]}"
 
       - name: Verify coding-agent navigation
         run: python3 scripts/verify-agent-navigation.py
@@ -81,6 +111,8 @@ jobs:
             bash -n "$script"
           done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
+          python3 scripts/verify_repository.py
+          python3 scripts/verify_operations.py
           python3 scripts/test_summarize_qwen35_tuning.py
           python3 scripts/test_llrt7_opencl_tools.py
           python3 scripts/test_render_llrt_device_suite_report.py
@@ -104,25 +136,20 @@ jobs:
     if: needs.scope.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: recursive
-
       - name: Verify llama.cpp pin
         run: ./scripts/verify-llama-cpp-pin.sh
-
       - name: Install ccache
         run: sudo apt-get install -y ccache
-
       - name: Determine native cache key
         id: native-cache-key
-        shell: bash
-        run: |
-          echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
+        run: echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Restore native compiler cache
         uses: actions/cache@v5
         with:
@@ -131,50 +158,41 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-
             ccache-${{ runner.os }}-
-
       - name: Configure ccache
-        shell: bash
         run: |
           mkdir -p "$HOME/.cache/ccache"
           ccache --set-config=cache_dir="$HOME/.cache/ccache"
           ccache --set-config=max_size=750M
           ccache --set-config=compression=true
           ccache --zero-stats
-
       - name: Run native host tests
-        shell: bash
         run: |
-          cmake \
-            -S backends/llama-cpp/src/test-native \
-            -B build/native-tests \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build/native-tests --parallel "$(nproc)"
           ctest --test-dir build/native-tests --output-on-failure
-
       - name: Report native compiler cache
         if: always()
         run: ccache --show-stats
 
   android:
-    name: Android validation
+    name: Android validation (${{ needs.scope.outputs.profile }})
     needs: scope
     if: needs.scope.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Initialize native sources
-        if: needs.scope.outputs.packaging == 'true'
+        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
         run: git submodule update --init --depth=1 --recursive
 
       - name: Verify llama.cpp pin
-        if: needs.scope.outputs.packaging == 'true'
+        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
         run: ./scripts/verify-llama-cpp-pin.sh
 
       - uses: actions/setup-java@v5
@@ -182,81 +200,34 @@ jobs:
           distribution: temurin
           java-version: "17"
           check-latest: false
-
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-
       - name: Install Android SDK components
-        shell: bash
-        run: |
-          sdkmanager \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "ndk;28.2.13676358"
-
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-      - name: Install ccache
-        if: needs.scope.outputs.packaging == 'true'
-        run: sudo apt-get install -y ccache
-
-      - name: Determine Android native cache key
-        if: needs.scope.outputs.packaging == 'true'
-        id: android-native-cache-key
-        shell: bash
-        run: |
-          echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Android native compiler cache
-        if: needs.scope.outputs.packaging == 'true'
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ccache
-          key: android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**') }}
-          restore-keys: |
-            android-ccache-${{ runner.os }}-${{ steps.android-native-cache-key.outputs.llama-sha }}-
-            android-ccache-${{ runner.os }}-
-
-      - name: Configure Android native compiler cache
-        if: needs.scope.outputs.packaging == 'true'
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.cache/ccache"
-          ccache --set-config=cache_dir="$HOME/.cache/ccache"
-          ccache --set-config=max_size=1G
-          ccache --set-config=compression=true
-          ccache --zero-stats
-          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
-
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Run scoped Android validation
+      - name: Run selected Android validation
         env:
-          ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          ENABLE_GRADLE_PROFILE: ${{ inputs.gradle_profile }}
+          VALIDATION_PROFILE: ${{ needs.scope.outputs.profile }}
           GRADLE_MODULES: ${{ needs.scope.outputs.modules }}
-          RUN_PACKAGING: ${{ needs.scope.outputs.packaging }}
+          PACKAGING_SENSITIVE: ${{ needs.scope.outputs.packaging }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build
-
           gradle_args=(--no-configuration-cache --stacktrace)
-          if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then
-            gradle_args+=(--profile)
-          fi
+          if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then gradle_args+=(--profile); fi
 
           mapfile -t all_modules < <(python3 scripts/gradle_module_inventory.py)
-          if [[ "${#all_modules[@]}" -eq 0 ]]; then
-            echo "Canonical Gradle module inventory is empty" >&2
-            exit 1
-          fi
-
+          [[ "${#all_modules[@]}" -gt 0 ]] || { echo "Canonical Gradle module inventory is empty" >&2; exit 1; }
           if [[ "$GRADLE_MODULES" == "all" ]]; then
             selected_modules=("${all_modules[@]}")
           else
@@ -271,12 +242,15 @@ jobs:
             else
               tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
             fi
-            if [[ "$module" == "apps:local-llm-console" ]]; then
-              tasks+=(":apps:local-llm-console:lintInternal")
-            fi
+            if [[ "$module" == "apps:local-llm-console" ]]; then tasks+=(":apps:local-llm-console:lintInternal"); fi
           done
 
-          if [[ "$RUN_PACKAGING" == "true" ]]; then
+          run_packaging=false
+          if [[ "$PACKAGING_SENSITIVE" == "true" && ("$VALIDATION_PROFILE" == "strong" || "$VALIDATION_PROFILE" == "full") ]]; then
+            run_packaging=true
+          fi
+
+          if [[ "$run_packaging" == "true" ]]; then
             tasks+=(
               :backends:llama-cpp:assembleDebug
               :transports:android-binder-contract:assembleDebug
@@ -302,21 +276,17 @@ jobs:
             )
           fi
 
+          printf 'Validation profile: %s\n' "$VALIDATION_PROFILE"
           printf 'Gradle modules: %s\n' "${selected_modules[*]}"
           printf 'Gradle tasks: %s\n' "${tasks[*]}"
-          ./gradlew "${gradle_args[@]}" "${tasks[@]}" \
-            2>&1 | tee build/android-validation.log
+          ./gradlew "${gradle_args[@]}" "${tasks[@]}" 2>&1 | tee build/android-validation.log
 
       - name: Verify Android native packaging
-        if: needs.scope.outputs.packaging == 'true'
+        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
         run: python3 scripts/verify-android-packaging.py
 
-      - name: Report Android native compiler cache
-        if: always() && needs.scope.outputs.packaging == 'true'
-        run: ccache --show-stats
-
       - name: Upload Gradle profile
-        if: always() && inputs.profile == true
+        if: always() && inputs.gradle_profile == true
         uses: actions/upload-artifact@v7
         with:
           name: gradle-validation-profile
@@ -341,27 +311,39 @@ jobs:
     needs: [scope, native, android]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
       - name: Evaluate validation jobs
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
           NATIVE_RESULT: ${{ needs.native.result }}
           ANDROID_RESULT: ${{ needs.android.result }}
-        shell: bash
+          PROFILE: ${{ needs.scope.outputs.profile }}
+          REASON: ${{ needs.scope.outputs.reason }}
         run: |
           set -euo pipefail
-
-          if [[ "$SCOPE_RESULT" != "success" ]]; then
-            echo "Validation scope and repository guards failed: $SCOPE_RESULT" >&2
-            exit 1
-          fi
-
-          for job_result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
-            if [[ "$job_result" != "success" && "$job_result" != "skipped" ]]; then
-              echo "Required validation job failed: $job_result" >&2
-              exit 1
-            fi
+          [[ "$SCOPE_RESULT" == "success" ]] || { echo "Validation scope failed: $SCOPE_RESULT" >&2; exit 1; }
+          for result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
+            [[ "$result" == "success" || "$result" == "skipped" ]] || { echo "Required validation job failed: $result" >&2; exit 1; }
           done
+          echo "Repository validation passed: profile=$PROFILE reason=$REASON"
 
-          echo "Repository validation passed."
+  report-remote-preflight:
+    name: Report remote preflight
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
+    needs: [scope, validation]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Comment result on pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+          PROFILE: ${{ needs.scope.outputs.profile }}
+          REASON: ${{ needs.scope.outputs.reason }}
+          RESULT: ${{ needs.validation.result }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body=$(printf 'Remote preflight `%s` for `%s`: **%s**\n\nReason: %s\nRun: %s' "$PROFILE" "$EXPECTED_HEAD" "$RESULT" "$REASON" "$RUN_URL")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"
