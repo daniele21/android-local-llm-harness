@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.phonetest
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
+import io.github.daniele21.localllm.models.HostControlPlaneTransaction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -65,14 +66,13 @@ class HarnessControlPlaneStartupTest {
 
         override fun snapshot(): HostControlPlaneState = state
 
-        override fun replace(state: HostControlPlaneState): HostControlPlaneState {
+        override fun replace(state: HostControlPlaneState) {
             this.state = state
-            return state
         }
 
-        override fun transact(update: (HostControlPlaneState) -> HostControlPlaneState): HostControlPlaneState {
+        override fun transact(transaction: HostControlPlaneTransaction): HostControlPlaneState {
             transactionCount += 1
-            val updated = update(state)
+            val updated = transaction.apply(state)
             state = updated
             return updated
         }
