@@ -10,6 +10,7 @@ import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
@@ -47,8 +48,21 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private val activationLeases = UseCaseActivationLeaseRegistry(
         idFactory = ActivationIdFactory { UseCaseActivationId(UUID.randomUUID().toString()) },
     )
+
+    val authorizedClientPolicies: List<AuthorizedClientPolicy> = HarnessSharedRuntimePolicy.authorizedClients(appContext)
+
     private val controlPlaneStoreOwner =
         RoomHostControlPlaneStoreOwner.open(appContext, CONTROL_PLANE_DATABASE_NAME)
+
+    init {
+        HarnessControlPlaneStartup(
+            store = controlPlaneStoreOwner.store,
+            reconciler =
+            HarnessControlPlaneReconciler(
+                HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(authorizedClientPolicies),
+            ),
+        ).reconcile()
+    }
 
     val activationResidency = ActivationResidencyCoordinator(activationLeases)
     val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
