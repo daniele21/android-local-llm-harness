@@ -16,18 +16,35 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ())
 
+    def test_governance_only_is_lean(self) -> None:
+        scope = classify_paths([".engineering/baseline.json", "AGENTS.md"])
+        self.assertEqual(scope.profile, "lean")
+        self.assertFalse(scope.android)
+        self.assertEqual(scope.modules, ())
+
     def test_dependabot_configuration_is_metadata_only(self) -> None:
         scope = classify_paths([".github/dependabot.yml"])
         self.assertEqual(scope.profile, "lean")
         self.assertFalse(scope.android)
 
-    def test_core_kotlin_change_is_scoped_to_changed_module(self) -> None:
-        scope = classify_paths(["core/runtime-core/src/main/kotlin/Runtime.kt"])
+    def test_contained_model_download_change_is_scoped(self) -> None:
+        scope = classify_paths(["models/model-download/src/main/kotlin/Download.kt"])
         self.assertEqual(scope.profile, "scoped")
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
         self.assertFalse(scope.packaging)
+        self.assertEqual(scope.modules, ("models:model-download",))
+
+    def test_runtime_core_change_is_strong_boundary(self) -> None:
+        scope = classify_paths(["core/runtime-core/src/main/kotlin/Runtime.kt"])
+        self.assertEqual(scope.profile, "strong")
+        self.assertFalse(scope.packaging)
         self.assertEqual(scope.modules, ("core:runtime-core",))
+
+    def test_backend_spi_change_is_strong_boundary(self) -> None:
+        scope = classify_paths(["core/backend-spi/src/main/kotlin/Backend.kt"])
+        self.assertEqual(scope.profile, "strong")
+        self.assertEqual(scope.modules, ("core:backend-spi",))
 
     def test_evaluator_change_selects_only_evaluator_module(self) -> None:
         scope = classify_paths(["evaluation/evaluators/src/main/kotlin/ExactMatchEvaluator.kt"])
@@ -60,11 +77,17 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.profile, "scoped")
         self.assertEqual(scope.modules, ("models:model-catalog", "models:model-download", "models:model-install"))
 
-    def test_binder_contract_change_is_strong(self) -> None:
+    def test_model_store_is_strong_lifecycle_boundary(self) -> None:
+        scope = classify_paths(["models/model-store/src/main/kotlin/ModelStore.kt"])
+        self.assertEqual(scope.profile, "strong")
+        self.assertEqual(scope.modules, ("models:model-store",))
+
+    def test_binder_contract_change_is_strong_and_packaging_sensitive(self) -> None:
         scope = classify_paths(["transports/android-binder-contract/src/main/kotlin/ProtocolModels.kt"])
         self.assertEqual(scope.profile, "strong")
         self.assertTrue(scope.android)
         self.assertFalse(scope.native)
+        self.assertTrue(scope.packaging)
         self.assertEqual(scope.modules, ("transports:android-binder-contract",))
 
     def test_binder_contract_build_change_is_strong_and_packaging_sensitive(self) -> None:
@@ -73,10 +96,17 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertTrue(scope.packaging)
         self.assertEqual(scope.modules, ("transports:android-binder-contract",))
 
-    def test_host_service_change_is_strong_cross_boundary(self) -> None:
+    def test_host_service_change_is_strong_and_packaging_sensitive(self) -> None:
         scope = classify_paths(["integrations/android-service-host/src/main/kotlin/CallerAuthorization.kt"])
         self.assertEqual(scope.profile, "strong")
+        self.assertTrue(scope.packaging)
         self.assertEqual(scope.modules, ("integrations:android-service-host",))
+
+    def test_consumer_fixture_change_is_strong_and_packaging_sensitive(self) -> None:
+        scope = classify_paths(["apps/shared-runtime-client-consumer-fixture/src/main/kotlin/Fixture.kt"])
+        self.assertEqual(scope.profile, "strong")
+        self.assertTrue(scope.packaging)
+        self.assertEqual(scope.modules, ("apps:shared-runtime-client-consumer-fixture",))
 
     def test_normal_app_kotlin_change_stays_scoped(self) -> None:
         scope = classify_paths(["apps/local-llm-phone-test/src/main/kotlin/MainActivity.kt"])
@@ -90,19 +120,19 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertTrue(scope.packaging)
         self.assertEqual(scope.modules, ("apps:local-llm-console",))
 
-    def test_mixed_modules_preserve_repository_order(self) -> None:
+    def test_mixed_scoped_modules_preserve_repository_order(self) -> None:
         scope = classify_paths(
             [
                 "observability/health-engine/src/main/kotlin/Health.kt",
-                "core/runtime-core/src/main/kotlin/Runtime.kt",
+                "evaluation/evaluators/src/main/kotlin/Evaluator.kt",
             ]
         )
         self.assertEqual(scope.profile, "scoped")
-        self.assertEqual(scope.modules, ("core:runtime-core", "observability:health-engine"))
+        self.assertEqual(scope.modules, ("observability:health-engine", "evaluation:evaluators"))
 
-    def test_mixed_documentation_and_core_code_runs_scoped_android(self) -> None:
+    def test_mixed_documentation_and_runtime_code_is_strong(self) -> None:
         scope = classify_paths(["README.md", "core/runtime-core/src/main/kotlin/Runtime.kt"])
-        self.assertEqual(scope.profile, "scoped")
+        self.assertEqual(scope.profile, "strong")
         self.assertEqual(scope.modules, ("core:runtime-core",))
 
     def test_core_contract_change_is_strong_and_runs_all_android_modules(self) -> None:
@@ -161,10 +191,10 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("all",))
 
     def test_explicit_strong_can_escalate_scoped(self) -> None:
-        auto = classify_paths(["core/runtime-core/src/main/kotlin/Runtime.kt"])
+        auto = classify_paths(["models/model-download/src/main/kotlin/Download.kt"])
         scope = apply_requested_profile(auto, "strong")
         self.assertEqual(scope.profile, "strong")
-        self.assertEqual(scope.modules, ("core:runtime-core",))
+        self.assertEqual(scope.modules, ("models:model-download",))
 
     def test_explicit_strong_does_not_downgrade_full(self) -> None:
         auto = classify_paths(["settings.gradle.kts"])
@@ -172,7 +202,7 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.profile, "full")
 
     def test_explicit_full_forces_all(self) -> None:
-        auto = classify_paths(["core/runtime-core/src/main/kotlin/Runtime.kt"])
+        auto = classify_paths(["models/model-download/src/main/kotlin/Download.kt"])
         scope = apply_requested_profile(auto, "full")
         self.assertEqual(scope.profile, "full")
         self.assertEqual(scope.modules, ("all",))
