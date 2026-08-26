@@ -16,6 +16,7 @@ class ConsumerProtocolCompatibilityTest {
         setOf(
             BinderProtocolV1.FEATURE_CONSUMER_API_V1,
             BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1,
         )
 
     @Test
@@ -58,7 +59,7 @@ class ConsumerProtocolCompatibilityTest {
     }
 
     @Test
-    fun `consumer client negotiates protocol minor one only when feature is advertised`() {
+    fun `consumer client negotiates current protocol minor when feature is advertised`() {
         val service = FakeSharedRuntimeRemoteService()
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, consumerHello(), binding)
