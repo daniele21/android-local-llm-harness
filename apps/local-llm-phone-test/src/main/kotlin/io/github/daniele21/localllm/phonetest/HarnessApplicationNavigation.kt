@@ -21,6 +21,8 @@ internal object HarnessApplicationRoutes {
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}"
     const val PRESET_PATTERN =
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}/presets/{$PRESET_ID_ARGUMENT}/{$PRESET_REVISION_ARGUMENT}"
+    const val TECHNICAL_DETAILS_PATTERN =
+        "$PRESET_PATTERN/technical"
     const val NEW_PRESET_PATTERN =
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}/presets/new"
 
@@ -38,13 +40,12 @@ internal object HarnessApplicationRoutes {
         return assignment(applicationId, useCaseId) + PRESET_SEGMENT + encode(presetId, "presetId") + "/$presetRevision"
     }
 
+    fun technicalDetails(applicationId: String, useCaseId: String, presetId: String, presetRevision: Int): String =
+        preset(applicationId, useCaseId, presetId, presetRevision) + "/technical"
+
     fun newPreset(applicationId: String, useCaseId: String): String = assignment(applicationId, useCaseId) + PRESET_SEGMENT + "new"
 
     fun decodeApplicationId(encoded: String?): String? = decode(encoded)
-
-    fun decodeUseCaseId(encoded: String?): String? = decode(encoded)
-
-    fun decodePresetId(encoded: String?): String? = decode(encoded)
 
     fun identity(
         encodedApplicationId: String?,
@@ -52,9 +53,9 @@ internal object HarnessApplicationRoutes {
         encodedPresetId: String? = null,
         presetRevision: Int? = null,
     ): HarnessApplicationRouteIdentity? {
-        val applicationId = decodeApplicationId(encodedApplicationId)
-        val useCaseId = encodedUseCaseId?.let(::decodeUseCaseId)
-        val presetId = encodedPresetId?.let(::decodePresetId)
+        val applicationId = decode(encodedApplicationId)
+        val useCaseId = encodedUseCaseId?.let(::decode)
+        val presetId = encodedPresetId?.let(::decode)
         val invalid = applicationId == null ||
             (encodedUseCaseId != null && useCaseId == null) ||
             (encodedPresetId != null && presetId == null) ||
