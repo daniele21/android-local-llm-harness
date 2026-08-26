@@ -49,6 +49,7 @@ List locally reproducible gates as `PASS|FAIL|PENDING|N/A`. A known-red draft mu
 
 List exact checks and evidence executed; never claim evidence not run.
 
+- [ ] `LOCAL PREFLIGHT COMPLETE` for the recorded HEAD/TARGET pair.
 - [ ] Relevant targeted tests cover the changed behavior.
 - [ ] Required local deterministic preflight gates passed on the recorded HEAD.
 - [ ] `Repository validation` is green on the current head.
