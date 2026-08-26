@@ -1,0 +1,989 @@
+# artifact=core-contracts
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerActivation {
+  public final java.lang.String getActivationId-dd-yXto();
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final int getUseCaseRevision();
+  public final int getBindingRevision();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final java.lang.String component1-dd-yXto();
+  public final java.lang.String component2-2huUbWg();
+  public final int component3();
+  public final int component4();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component5();
+  public final io.github.daniele21.localllm.contracts.ConsumerActivation copy-3rV1qdY(java.lang.String, java.lang.String, int, int, io.github.daniele21.localllm.contracts.InferencePresetRef);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerActivationId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerActivationRequest {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final int getUseCaseRevision();
+  public final int getBindingRevision();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final java.lang.String component1-2huUbWg();
+  public final int component2();
+  public final int component3();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component4();
+  public final io.github.daniele21.localllm.contracts.ConsumerActivationRequest copy-yu9Yj78(java.lang.String, int, int, io.github.daniele21.localllm.contracts.InferencePresetRef);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerActivationResult$Activated implements io.github.daniele21.localllm.contracts.ConsumerActivationResult {
+  public io.github.daniele21.localllm.contracts.ConsumerActivationResult$Activated(io.github.daniele21.localllm.contracts.ConsumerActivation);
+  public final io.github.daniele21.localllm.contracts.ConsumerActivation getActivation();
+  public final io.github.daniele21.localllm.contracts.ConsumerActivation component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerActivationResult$Activated copy(io.github.daniele21.localllm.contracts.ConsumerActivation);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerActivationResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerActivationResult {
+  public io.github.daniele21.localllm.contracts.ConsumerActivationResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerActivationResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerActivationResult {
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final int getUseCaseRevision();
+  public final int getBindingRevision();
+  public final java.lang.String getDisplayName();
+  public final java.lang.String getDescription();
+  public final boolean isDefault();
+  public final java.lang.String component1-2huUbWg();
+  public final int component2();
+  public final int component3();
+  public final java.lang.String component4();
+  public final java.lang.String component5();
+  public final boolean component6();
+  public final io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase copy-o1AdSCw(java.lang.String, int, int, java.lang.String, java.lang.String, boolean);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Available implements io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult {
+  public io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Available(java.util.List<io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase>);
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase> getAssignments();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase> component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Available copy(java.util.List<io.github.daniele21.localllm.contracts.ConsumerAssignedUseCase>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult {
+  public io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult {
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode USE_CASE_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode STALE_CAPABILITY;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode MODEL_UNAVAILABLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode CAPABILITY_INCOMPATIBLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode PRESET_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode REASONING_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode REASONING_REQUIRED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode OUTPUT_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode SESSION_KIND_NOT_ALLOWED;
+  public static io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode> getEntries();
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Available implements io.github.daniele21.localllm.contracts.ConsumerCapabilityResult {
+  public io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Available(io.github.daniele21.localllm.contracts.UseCaseCapabilities);
+  public final io.github.daniele21.localllm.contracts.UseCaseCapabilities getCapabilities();
+  public final io.github.daniele21.localllm.contracts.UseCaseCapabilities component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Available copy(io.github.daniele21.localllm.contracts.UseCaseCapabilities);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerCapabilityResult {
+  public io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode, java.lang.String);
+  public final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode getCode();
+  public final java.lang.String getDetail();
+  public final io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode component1();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerCapabilityResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerCapabilityErrorCode, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerCapabilityResult {
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerContentType extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerContentType> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerContentType REASONING;
+  public static final io.github.daniele21.localllm.contracts.ConsumerContentType ANSWER;
+  public static io.github.daniele21.localllm.contracts.ConsumerContentType[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerContentType valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerContentType> getEntries();
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerControlPlaneClient {
+  public abstract io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult assignedUseCases();
+  public abstract io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult publishedPresets-qjXt9FU(java.lang.String);
+  public abstract io.github.daniele21.localllm.contracts.ConsumerActivationResult activate(io.github.daniele21.localllm.contracts.ConsumerActivationRequest);
+  public abstract io.github.daniele21.localllm.contracts.ConsumerDeactivationResult deactivate-jFZ7Tx8(java.lang.String);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode FEATURE_UNAVAILABLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode UNKNOWN_APPLICATION;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode APPLICATION_NOT_AUTHORIZED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode USE_CASE_NOT_ASSIGNED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode PRESET_NOT_EXPOSED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode STALE_REVISION;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode MODEL_UNAVAILABLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode MODEL_CONFLICT;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode ACTIVATION_ALREADY_ACTIVE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode CONFIGURATION_REQUIRED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode INVALID_REQUEST;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode TRANSPORT_FAILURE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode RUNTIME_FAILURE;
+  public static io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode> getEntries();
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure {
+  public io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure(io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode, java.lang.String);
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode getCode();
+  public final java.lang.String getMessage();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode component1();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure copy(io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerDeactivationResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerDeactivationResult {
+  public io.github.daniele21.localllm.contracts.ConsumerDeactivationResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerDeactivationResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerDeactivationResult$Released implements io.github.daniele21.localllm.contracts.ConsumerDeactivationResult {
+  public static final io.github.daniele21.localllm.contracts.ConsumerDeactivationResult$Released INSTANCE;
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerDeactivationResult {
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerErrorCode extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerErrorCode> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode USE_CASE_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode STALE_CAPABILITY;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode MODEL_UNAVAILABLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode CAPABILITY_INCOMPATIBLE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode PRESET_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode REASONING_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode REASONING_REQUIRED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode OUTPUT_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode SESSION_KIND_NOT_ALLOWED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode INVALID_INPUT;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode PREPARE_FAILED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode PREPARED_SELECTION_STALE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode PREPARED_SELECTION_NOT_FOUND;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode SESSION_NOT_FOUND;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode CANCELLED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerErrorCode RUNTIME_FAILURE;
+  public static io.github.daniele21.localllm.contracts.ConsumerErrorCode[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerErrorCode valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerErrorCode> getEntries();
+}
+
+Compiled from "ConsumerResults.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final java.lang.String getCapabilityRevision();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode getReasoningMode();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind getOutputConstraint();
+  public final io.github.daniele21.localllm.contracts.SessionKind getSessionKind();
+  public final java.lang.String component1-2huUbWg();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component3();
+  public final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode component4();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind component5();
+  public final io.github.daniele21.localllm.contracts.SessionKind component6();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity copy-o1AdSCw(java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.InferencePresetRef, io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode, io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind, io.github.daniele21.localllm.contracts.SessionKind);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerFailure {
+  public io.github.daniele21.localllm.contracts.ConsumerFailure(io.github.daniele21.localllm.contracts.ConsumerErrorCode, java.lang.String);
+  public final io.github.daniele21.localllm.contracts.ConsumerErrorCode getCode();
+  public final java.lang.String getMessage();
+  public final io.github.daniele21.localllm.contracts.ConsumerErrorCode component1();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure copy(io.github.daniele21.localllm.contracts.ConsumerErrorCode, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Completed implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceResult getResult();
+  public final java.lang.String getAnswer();
+  public final java.lang.String getSurfacedReasoning();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics getMetrics();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity getExecution();
+  public final java.lang.String component1-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceResult component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Completed copy-1R5r1EE(java.lang.String, io.github.daniele21.localllm.contracts.ConsumerInferenceResult);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$ContentDelta implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final java.lang.String getText();
+  public final io.github.daniele21.localllm.contracts.ConsumerContentType getContentType();
+  public final java.lang.String component1-QeKFRqM();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerContentType component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$ContentDelta copy-AKpIERI(java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.ConsumerContentType);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Failed implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure getFailure();
+  public final java.lang.String component1-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Failed copy-1R5r1EE(java.lang.String, io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Prepared implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity getExecution();
+  public final java.lang.String component1-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Prepared copy-1R5r1EE(java.lang.String, io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Queued implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final int getPosition();
+  public final java.lang.String component1-QeKFRqM();
+  public final int component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Queued copy-1R5r1EE(java.lang.String, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Started implements io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public java.lang.String getRequestId-QeKFRqM();
+  public final java.lang.String component1-QeKFRqM();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationEvent$Started copy-GDJm7zE(java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerGenerationEvent {
+  public abstract java.lang.String getRequestId-QeKFRqM();
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerGenerationHandle {
+  public abstract java.lang.String getRequestId-QeKFRqM();
+  public abstract void cancel();
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Messages implements io.github.daniele21.localllm.contracts.ConsumerGenerationInput {
+  public io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Messages(java.util.List<io.github.daniele21.localllm.contracts.ConversationMessage>);
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConversationMessage> getValues();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConversationMessage> component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Messages copy(java.util.List<io.github.daniele21.localllm.contracts.ConversationMessage>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Text implements io.github.daniele21.localllm.contracts.ConsumerGenerationInput {
+  public io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Text(java.lang.String);
+  public final java.lang.String getValue();
+  public final java.lang.String component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationInput$Text copy(java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerGenerationInput {
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerGenerationListener {
+  public abstract void onEvent(io.github.daniele21.localllm.contracts.ConsumerGenerationEvent);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationRequest {
+  public final java.lang.String getRequestId-QeKFRqM();
+  public final java.lang.String getSessionId-8llndVU();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationInput getInput();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraint getOutputConstraint();
+  public final java.util.List<io.github.daniele21.localllm.contracts.TaskDefinition> getTaskDefinitions();
+  public java.lang.String toString();
+  public final java.lang.String component1-QeKFRqM();
+  public final java.lang.String component2-8llndVU();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationInput component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraint component4();
+  public final java.util.List<io.github.daniele21.localllm.contracts.TaskDefinition> component5();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationRequest copy-risjoIk(java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.ConsumerGenerationInput, io.github.daniele21.localllm.contracts.ConsumerOutputConstraint, java.util.List<io.github.daniele21.localllm.contracts.TaskDefinition>);
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Accepted implements io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult {
+  public io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Accepted(io.github.daniele21.localllm.contracts.ConsumerGenerationHandle);
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationHandle getHandle();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationHandle component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Accepted copy(io.github.daniele21.localllm.contracts.ConsumerGenerationHandle);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult {
+  public io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult {
+}
+
+Compiled from "ConsumerResults.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics {
+  public io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics(java.lang.Integer, java.lang.Long, long, java.lang.Double, java.lang.Integer, java.lang.Integer, java.lang.Integer, long, io.github.daniele21.localllm.contracts.ConsumerStopReason);
+  public final java.lang.Integer getOutputTokens();
+  public final java.lang.Long getTimeToFirstTokenMs();
+  public final long getTotalMs();
+  public final java.lang.Double getDecodeTokensPerSecond();
+  public final java.lang.Integer getInputTokens();
+  public final java.lang.Integer getReasoningTokens();
+  public final java.lang.Integer getAnswerTokens();
+  public final long getQueueMs();
+  public final io.github.daniele21.localllm.contracts.ConsumerStopReason getStopReason();
+  public final java.lang.Integer component1();
+  public final java.lang.Long component2();
+  public final long component3();
+  public final java.lang.Double component4();
+  public final java.lang.Integer component5();
+  public final java.lang.Integer component6();
+  public final java.lang.Integer component7();
+  public final long component8();
+  public final io.github.daniele21.localllm.contracts.ConsumerStopReason component9();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics copy(java.lang.Integer, java.lang.Long, long, java.lang.Double, java.lang.Integer, java.lang.Integer, java.lang.Integer, long, io.github.daniele21.localllm.contracts.ConsumerStopReason);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerResults.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerInferenceResult {
+  public io.github.daniele21.localllm.contracts.ConsumerInferenceResult(java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics, io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity);
+  public final java.lang.String getAnswer();
+  public final java.lang.String getSurfacedReasoning();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics getMetrics();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity getExecution();
+  public final java.lang.String component1();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity component4();
+  public final io.github.daniele21.localllm.contracts.ConsumerInferenceResult copy(java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.ConsumerInferenceMetrics, io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerLimits {
+  public io.github.daniele21.localllm.contracts.ConsumerLimits(int, int, int);
+  public final int getMaxInputCharacters();
+  public final int getMaxConversationMessages();
+  public final int getMaxJsonSchemaCharacters();
+  public final int component1();
+  public final int component2();
+  public final int component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerLimits copy(int, int, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient {
+  public abstract io.github.daniele21.localllm.contracts.ConsumerCapabilityResult capabilities-qjXt9FU(java.lang.String);
+  public abstract io.github.daniele21.localllm.contracts.ConsumerPrepareResult prepare(io.github.daniele21.localllm.contracts.ConsumerPrepareRequest);
+  public abstract io.github.daniele21.localllm.contracts.ConsumerSessionResult createSession-lUFHS7M(java.lang.String);
+  public abstract io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult generate(io.github.daniele21.localllm.contracts.ConsumerGenerationRequest, io.github.daniele21.localllm.contracts.ConsumerGenerationListener);
+  public abstract void closeSession-YJt0FeQ(java.lang.String);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$Json implements io.github.daniele21.localllm.contracts.ConsumerOutputConstraint {
+  public static final io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$Json INSTANCE;
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$JsonSchema implements io.github.daniele21.localllm.contracts.ConsumerOutputConstraint {
+  public io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$JsonSchema(java.lang.String);
+  public final java.lang.String getSchema();
+  public final java.lang.String component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$JsonSchema copy(java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$Text implements io.github.daniele21.localllm.contracts.ConsumerOutputConstraint {
+  public static final io.github.daniele21.localllm.contracts.ConsumerOutputConstraint$Text INSTANCE;
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerOutputConstraint {
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind TEXT;
+  public static final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind JSON;
+  public static final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind JSON_SCHEMA;
+  public static io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind> getEntries();
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPrepareRequest {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final io.github.daniele21.localllm.contracts.ConsumerSelectionRequest getSelection();
+  public final java.lang.String component1-2huUbWg();
+  public final io.github.daniele21.localllm.contracts.ConsumerSelectionRequest component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerPrepareRequest copy-Ud-N35w(java.lang.String, io.github.daniele21.localllm.contracts.ConsumerSelectionRequest);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Prepared implements io.github.daniele21.localllm.contracts.ConsumerPrepareResult {
+  public io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Prepared(io.github.daniele21.localllm.contracts.ConsumerPreparedSelection);
+  public final io.github.daniele21.localllm.contracts.ConsumerPreparedSelection getSelection();
+  public final io.github.daniele21.localllm.contracts.ConsumerPreparedSelection component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Prepared copy(io.github.daniele21.localllm.contracts.ConsumerPreparedSelection);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerPrepareResult {
+  public io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerPrepareResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerPrepareResult {
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPreparedId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPreparedSelection {
+  public final java.lang.String getPreparedId-lDAk_JQ();
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final java.lang.String getCapabilityRevision();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode getReasoningMode();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind getOutputConstraint();
+  public final io.github.daniele21.localllm.contracts.SessionKind getSessionKind();
+  public final java.lang.String component1-lDAk_JQ();
+  public final java.lang.String component2-2huUbWg();
+  public final java.lang.String component3();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component4();
+  public final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode component5();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind component6();
+  public final io.github.daniele21.localllm.contracts.SessionKind component7();
+  public final io.github.daniele21.localllm.contracts.ConsumerPreparedSelection copy-8NkIdl4(java.lang.String, java.lang.String, java.lang.String, io.github.daniele21.localllm.contracts.InferencePresetRef, io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode, io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind, io.github.daniele21.localllm.contracts.SessionKind);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPresetOption {
+  public io.github.daniele21.localllm.contracts.ConsumerPresetOption(io.github.daniele21.localllm.contracts.InferencePresetRef, boolean);
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getRef();
+  public final boolean isDefault();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component1();
+  public final boolean component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerPresetOption copy(io.github.daniele21.localllm.contracts.InferencePresetRef, boolean);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPublishedPreset {
+  public io.github.daniele21.localllm.contracts.ConsumerPublishedPreset(io.github.daniele21.localllm.contracts.InferencePresetRef, java.lang.String, java.lang.String, boolean);
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final java.lang.String getDisplayName();
+  public final java.lang.String getDescription();
+  public final boolean isDefault();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component1();
+  public final java.lang.String component2();
+  public final java.lang.String component3();
+  public final boolean component4();
+  public final io.github.daniele21.localllm.contracts.ConsumerPublishedPreset copy(io.github.daniele21.localllm.contracts.InferencePresetRef, java.lang.String, java.lang.String, boolean);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult$Available implements io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final int getBindingRevision();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerPublishedPreset> getPresets();
+  public final java.lang.String component1-2huUbWg();
+  public final int component2();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerPublishedPreset> component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult$Available copy-LlAZusY(java.lang.String, int, java.util.List<io.github.daniele21.localllm.contracts.ConsumerPublishedPreset>);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult {
+  public io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerControlPlane.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult {
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerReasoningCapability extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerReasoningCapability> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability NOT_SUPPORTED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability SUPPORTED_NOT_SURFACED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability SURFACED_OPTIONAL;
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability SURFACED_REQUIRED_BY_POLICY;
+  public static io.github.daniele21.localllm.contracts.ConsumerReasoningCapability[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerReasoningCapability valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerReasoningCapability> getEntries();
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerReasoningPreference extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerReasoningPreference> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningPreference DEFAULT;
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningPreference DISABLED;
+  public static final io.github.daniele21.localllm.contracts.ConsumerReasoningPreference SURFACED_IF_SUPPORTED;
+  public static io.github.daniele21.localllm.contracts.ConsumerReasoningPreference[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerReasoningPreference valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerReasoningPreference> getEntries();
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerSelectionRequest {
+  public io.github.daniele21.localllm.contracts.ConsumerSelectionRequest(java.lang.String, io.github.daniele21.localllm.contracts.InferencePresetRef, io.github.daniele21.localllm.contracts.ConsumerReasoningPreference, io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind, io.github.daniele21.localllm.contracts.SessionKind);
+  public final java.lang.String getCapabilityRevision();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getPreset();
+  public final io.github.daniele21.localllm.contracts.ConsumerReasoningPreference getReasoning();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind getOutputConstraint();
+  public final io.github.daniele21.localllm.contracts.SessionKind getSessionKind();
+  public final java.lang.String component1();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component2();
+  public final io.github.daniele21.localllm.contracts.ConsumerReasoningPreference component3();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind component4();
+  public final io.github.daniele21.localllm.contracts.SessionKind component5();
+  public final io.github.daniele21.localllm.contracts.ConsumerSelectionRequest copy(java.lang.String, io.github.daniele21.localllm.contracts.InferencePresetRef, io.github.daniele21.localllm.contracts.ConsumerReasoningPreference, io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind, io.github.daniele21.localllm.contracts.SessionKind);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+  public io.github.daniele21.localllm.contracts.ConsumerSelectionRequest();
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerSessionResult$Created implements io.github.daniele21.localllm.contracts.ConsumerSessionResult {
+  public final java.lang.String getSessionId-8llndVU();
+  public final java.lang.String component1-8llndVU();
+  public final io.github.daniele21.localllm.contracts.ConsumerSessionResult$Created copy-YJt0FeQ(java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerSessionResult$Rejected implements io.github.daniele21.localllm.contracts.ConsumerSessionResult {
+  public io.github.daniele21.localllm.contracts.ConsumerSessionResult$Rejected(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure getFailure();
+  public final io.github.daniele21.localllm.contracts.ConsumerFailure component1();
+  public final io.github.daniele21.localllm.contracts.ConsumerSessionResult$Rejected copy(io.github.daniele21.localllm.contracts.ConsumerFailure);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerClient.kt"
+public interface io.github.daniele21.localllm.contracts.ConsumerSessionResult {
+}
+
+Compiled from "ConsumerResults.kt"
+public final class io.github.daniele21.localllm.contracts.ConsumerStopReason extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConsumerStopReason> {
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason END_OF_GENERATION;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason MAX_OUTPUT_TOKENS;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason STOP_SEQUENCE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason GRAMMAR_COMPLETE;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason GENERATION_GUARD_REPETITION;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason GENERATION_GUARD_THINKING_BUDGET;
+  public static final io.github.daniele21.localllm.contracts.ConsumerStopReason UNKNOWN;
+  public static io.github.daniele21.localllm.contracts.ConsumerStopReason[] values();
+  public static io.github.daniele21.localllm.contracts.ConsumerStopReason valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConsumerStopReason> getEntries();
+}
+
+Compiled from "GenerationConfiguration.kt"
+public final class io.github.daniele21.localllm.contracts.ConversationMessage {
+  public io.github.daniele21.localllm.contracts.ConversationMessage(io.github.daniele21.localllm.contracts.ConversationRole, java.lang.String);
+  public final io.github.daniele21.localllm.contracts.ConversationRole getRole();
+  public final java.lang.String getContent();
+  public final io.github.daniele21.localllm.contracts.ConversationRole component1();
+  public final java.lang.String component2();
+  public final io.github.daniele21.localllm.contracts.ConversationMessage copy(io.github.daniele21.localllm.contracts.ConversationRole, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "GenerationConfiguration.kt"
+public final class io.github.daniele21.localllm.contracts.ConversationRole extends java.lang.Enum<io.github.daniele21.localllm.contracts.ConversationRole> {
+  public static final io.github.daniele21.localllm.contracts.ConversationRole USER;
+  public static final io.github.daniele21.localllm.contracts.ConversationRole ASSISTANT;
+  public static io.github.daniele21.localllm.contracts.ConversationRole[] values();
+  public static io.github.daniele21.localllm.contracts.ConversationRole valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.ConversationRole> getEntries();
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode extends java.lang.Enum<io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode> {
+  public static final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode DISABLED;
+  public static final io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode SURFACED;
+  public static io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode[] values();
+  public static io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode> getEntries();
+}
+
+Compiled from "GenerationConfiguration.kt"
+public final class io.github.daniele21.localllm.contracts.InferencePresetId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "GenerationConfiguration.kt"
+public final class io.github.daniele21.localllm.contracts.InferencePresetRef {
+  public final java.lang.String getId-U1854jE();
+  public final int getVersion();
+  public final java.lang.String component1-U1854jE();
+  public final int component2();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef copy-awKcMIk(java.lang.String, int);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "Identifiers.kt"
+public final class io.github.daniele21.localllm.contracts.RequestId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "Identifiers.kt"
+public final class io.github.daniele21.localllm.contracts.SessionId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "GenerationConfiguration.kt"
+public final class io.github.daniele21.localllm.contracts.SessionKind extends java.lang.Enum<io.github.daniele21.localllm.contracts.SessionKind> {
+  public static final io.github.daniele21.localllm.contracts.SessionKind STATELESS;
+  public static final io.github.daniele21.localllm.contracts.SessionKind CONVERSATIONAL;
+  public static io.github.daniele21.localllm.contracts.SessionKind[] values();
+  public static io.github.daniele21.localllm.contracts.SessionKind valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.SessionKind> getEntries();
+}
+
+Compiled from "TaskDefinitions.kt"
+final class io.github.daniele21.localllm.contracts.TaskDefinition$Companion {
+  public final kotlin.text.Regex getID_PATTERN();
+}
+
+Compiled from "TaskDefinitions.kt"
+public final class io.github.daniele21.localllm.contracts.TaskDefinition {
+  public io.github.daniele21.localllm.contracts.TaskDefinition(java.lang.String, java.lang.String, java.lang.String);
+  public final java.lang.String getId();
+  public final java.lang.String getDescription();
+  public final java.lang.String getExample();
+  public java.lang.String toString();
+  public final java.lang.String component1();
+  public final java.lang.String component2();
+  public final java.lang.String component3();
+  public final io.github.daniele21.localllm.contracts.TaskDefinition copy(java.lang.String, java.lang.String, java.lang.String);
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+  public static final kotlin.text.Regex access$getID_PATTERN$cp();
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.UseCaseCapabilities {
+  public final java.lang.String getUseCaseId-2huUbWg();
+  public final io.github.daniele21.localllm.contracts.UseCaseReadiness getReadiness();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerPresetOption> getPresets();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef getDefaultPreset();
+  public final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability getReasoning();
+  public final java.util.Set<io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind> getOutputConstraints();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind getDefaultOutputConstraint();
+  public final java.util.Set<io.github.daniele21.localllm.contracts.SessionKind> getSessionKinds();
+  public final io.github.daniele21.localllm.contracts.SessionKind getDefaultSessionKind();
+  public final io.github.daniele21.localllm.contracts.ConsumerLimits getLimits();
+  public final java.lang.String getCapabilityRevision();
+  public final java.lang.String component1-2huUbWg();
+  public final io.github.daniele21.localllm.contracts.UseCaseReadiness component2();
+  public final java.util.List<io.github.daniele21.localllm.contracts.ConsumerPresetOption> component3();
+  public final io.github.daniele21.localllm.contracts.InferencePresetRef component4();
+  public final io.github.daniele21.localllm.contracts.ConsumerReasoningCapability component5();
+  public final java.util.Set<io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind> component6();
+  public final io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind component7();
+  public final java.util.Set<io.github.daniele21.localllm.contracts.SessionKind> component8();
+  public final io.github.daniele21.localllm.contracts.SessionKind component9();
+  public final io.github.daniele21.localllm.contracts.ConsumerLimits component10();
+  public final java.lang.String component11();
+  public final io.github.daniele21.localllm.contracts.UseCaseCapabilities copy-E1xERRI(java.lang.String, io.github.daniele21.localllm.contracts.UseCaseReadiness, java.util.List<io.github.daniele21.localllm.contracts.ConsumerPresetOption>, io.github.daniele21.localllm.contracts.InferencePresetRef, io.github.daniele21.localllm.contracts.ConsumerReasoningCapability, java.util.Set<? extends io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind>, io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind, java.util.Set<? extends io.github.daniele21.localllm.contracts.SessionKind>, io.github.daniele21.localllm.contracts.SessionKind, io.github.daniele21.localllm.contracts.ConsumerLimits, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "Identifiers.kt"
+public final class io.github.daniele21.localllm.contracts.UseCaseId {
+  public final java.lang.String getValue();
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "ConsumerCapabilities.kt"
+public final class io.github.daniele21.localllm.contracts.UseCaseReadiness extends java.lang.Enum<io.github.daniele21.localllm.contracts.UseCaseReadiness> {
+  public static final io.github.daniele21.localllm.contracts.UseCaseReadiness READY;
+  public static final io.github.daniele21.localllm.contracts.UseCaseReadiness AVAILABLE_REQUIRES_PREPARATION;
+  public static final io.github.daniele21.localllm.contracts.UseCaseReadiness UNAVAILABLE_MODEL;
+  public static final io.github.daniele21.localllm.contracts.UseCaseReadiness UNAVAILABLE_HOST_POLICY;
+  public static final io.github.daniele21.localllm.contracts.UseCaseReadiness INCOMPATIBLE;
+  public static io.github.daniele21.localllm.contracts.UseCaseReadiness[] values();
+  public static io.github.daniele21.localllm.contracts.UseCaseReadiness valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.contracts.UseCaseReadiness> getEntries();
+}
+
+# artifact=consumer-android
+Compiled from "BinderConsumerLocalLlmClient.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.BinderConsumerLocalLlmClient$Companion {
+  public final io.github.daniele21.localllm.transport.binder.client.BinderConsumerLocalLlmClient create(android.content.Context, io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig, java.lang.String, io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionObserver);
+}
+
+Compiled from "BinderConsumerLocalLlmClient.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.BinderConsumerLocalLlmClient implements io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient,io.github.daniele21.localllm.contracts.ConsumerControlPlaneClient,java.lang.AutoCloseable {
+  public static final io.github.daniele21.localllm.transport.binder.client.BinderConsumerLocalLlmClient$Companion Companion;
+  public final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot getConnectionSnapshot();
+  public final void connect();
+  public io.github.daniele21.localllm.contracts.ConsumerCapabilityResult capabilities-qjXt9FU(java.lang.String);
+  public io.github.daniele21.localllm.contracts.ConsumerPrepareResult prepare(io.github.daniele21.localllm.contracts.ConsumerPrepareRequest);
+  public io.github.daniele21.localllm.contracts.ConsumerSessionResult createSession-lUFHS7M(java.lang.String);
+  public io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult generate(io.github.daniele21.localllm.contracts.ConsumerGenerationRequest, io.github.daniele21.localllm.contracts.ConsumerGenerationListener);
+  public void closeSession-YJt0FeQ(java.lang.String);
+  public void close();
+  public io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult assignedUseCases();
+  public io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult publishedPresets-qjXt9FU(java.lang.String);
+  public io.github.daniele21.localllm.contracts.ConsumerActivationResult activate(io.github.daniele21.localllm.contracts.ConsumerActivationRequest);
+  public io.github.daniele21.localllm.contracts.ConsumerDeactivationResult deactivate-jFZ7Tx8(java.lang.String);
+}
+
+Compiled from "SharedRuntimeConnection.kt"
+public interface io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionObserver {
+  public abstract void onStateChanged(io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot);
+}
+
+Compiled from "SharedRuntimeConnection.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot {
+  public io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot(io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState, java.lang.Integer, java.util.Set<java.lang.String>, java.lang.String);
+  public final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState getState();
+  public final java.lang.Integer getNegotiatedMinor();
+  public final java.util.Set<java.lang.String> getEnabledFeatures();
+  public final java.lang.String getDetail();
+  public final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState component1();
+  public final java.lang.Integer component2();
+  public final java.util.Set<java.lang.String> component3();
+  public final java.lang.String component4();
+  public final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionSnapshot copy(io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState, java.lang.Integer, java.util.Set<java.lang.String>, java.lang.String);
+  public java.lang.String toString();
+  public int hashCode();
+  public boolean equals(java.lang.Object);
+}
+
+Compiled from "SharedRuntimeConnection.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState extends java.lang.Enum<io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState> {
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState DISCONNECTED;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState BINDING;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState NEGOTIATING;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState CONNECTED;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState HOST_NOT_INSTALLED;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState PERMISSION_DENIED;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState INCOMPATIBLE;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState CONNECTION_LOST;
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState CLOSED;
+  public static io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState[] values();
+  public static io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState valueOf(java.lang.String);
+  public static kotlin.enums.EnumEntries<io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnectionState> getEntries();
+}
+
+Compiled from "SharedRuntimeHostConfig.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig$Companion {
+  public final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig create(java.lang.String, java.lang.String);
+}
+
+Compiled from "SharedRuntimeHostConfig.kt"
+public final class io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig {
+  public static final io.github.daniele21.localllm.transport.binder.client.SharedRuntimeHostConfig$Companion Companion;
+  public final java.lang.String getPackageName();
+  public final java.lang.String getServiceClassName();
+  public boolean equals(java.lang.Object);
+  public int hashCode();
+  public java.lang.String toString();
+}
+
