@@ -67,6 +67,18 @@ Run in parallel where write ownership does not conflict:
 
 `SR-BIPC-30` is the integration gate. Do not infer the corrective mechanism from the current symptom alone.
 
+## Iteration evidence
+
+### SR-BIPC-10 first minified build
+
+The first physical reproduction attempt stopped during `:apps:shared-runtime-client-consumer-fixture:minifyReleaseWithR8` before any Binder transaction. R8 reported `Missing class kotlinx.parcelize.Parcelize` referenced from the Binder contract Parcelable types.
+
+Classification: **current-change reproduction-fixture packaging regression**, not evidence for or against the RedactGuard Binder root cause. The fixture consumes the locally built Binder client/contract as raw AAR file dependencies. That intentionally exercises packaged AAR code but bypasses Maven/POM transitive metadata, while the published Binder contract declares the Parcelize runtime as a runtime dependency. The fixture therefore did not have the runtime annotation class on the R8 classpath.
+
+Owning correction: explicitly mirror `libs.kotlin.parcelize.runtime` in the raw-AAR release fixture. Do not use the generated R8 missing-rules file, `-dontwarn`, or Harness wire keep rules to hide a genuinely missing runtime dependency. The app-local ProGuard file remains neutral.
+
+`SR-BIPC-10` remains **ACTIVE** and must be rerun from the corrected exact branch head. `SR-BIPC-30` remains **BLOCKED**; no conclusion about R8/Parcelable wire compatibility has been accepted from this failed attempt.
+
 ## Validation
 
 ### Harness focused iteration
