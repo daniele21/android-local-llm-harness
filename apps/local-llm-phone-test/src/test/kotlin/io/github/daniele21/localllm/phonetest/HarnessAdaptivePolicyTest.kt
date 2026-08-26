@@ -13,23 +13,36 @@ class HarnessAdaptivePolicyTest {
         assertEquals(HarnessWidthClass.COMPACT, policy.widthClass)
         assertFalse(policy.useNavigationRail)
         assertTrue(policy.stackDenseContent)
+        assertFalse(useHarnessApplicationsMasterDetail(policy))
     }
 
     @Test
-    fun mediumUsesRailWithoutForcingDenseContentToStack() {
+    fun mediumUsesRailAndApplicationsMasterDetail() {
         val policy = harnessAdaptivePolicy(widthDp = 600, fontScale = 1f)
 
         assertEquals(HarnessWidthClass.MEDIUM, policy.widthClass)
         assertTrue(policy.useNavigationRail)
         assertFalse(policy.stackDenseContent)
+        assertTrue(useHarnessApplicationsMasterDetail(policy))
     }
 
     @Test
-    fun expandedUsesRailAndLargeFontStillRequestsReflow() {
+    fun expandedUsesApplicationsMasterDetailAtStandardFontScale() {
+        val policy = harnessAdaptivePolicy(widthDp = 840, fontScale = 1f)
+
+        assertEquals(HarnessWidthClass.EXPANDED, policy.widthClass)
+        assertTrue(policy.useNavigationRail)
+        assertFalse(policy.stackDenseContent)
+        assertTrue(useHarnessApplicationsMasterDetail(policy))
+    }
+
+    @Test
+    fun expandedLargeFontRequestsSinglePaneReflow() {
         val policy = harnessAdaptivePolicy(widthDp = 840, fontScale = 1.3f)
 
         assertEquals(HarnessWidthClass.EXPANDED, policy.widthClass)
         assertTrue(policy.useNavigationRail)
         assertTrue(policy.stackDenseContent)
+        assertFalse(useHarnessApplicationsMasterDetail(policy))
     }
 }
