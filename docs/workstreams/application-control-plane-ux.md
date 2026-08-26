@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: apps/local-llm-phone-test
 Canonical scope: workstream.application-control-plane-ux
 Read when: coordinating implementation of Applications, assigned-use-case and preset-management UX
-Last reviewed: 2026-08-25
+Last reviewed: 2026-08-26
 
 Durable behavior: [`../features/application-control-plane-ux.md`](../features/application-control-plane-ux.md). This file owns only temporary execution state, dependencies and write boundaries.
 
@@ -24,7 +24,7 @@ without exposing bindings, Room rows or Binder protocol as the primary task mode
 
 - no rewrite/duplicate of the host control-plane store;
 - no direct Compose-to-Room/Binder access;
-- no duplication of HCP-21 PR #343 or HCP-27 PR #348;
+- no duplication of HCP consumer-control-plane/runtime ownership;
 - no implicit activate/load/download/infer on navigation;
 - no prompt/output/private-path persistence;
 - suggested presets are not edited in place;
@@ -34,35 +34,42 @@ without exposing bindings, Room rows or Binder protocol as the primary task mode
 - reusable visuals belong in `ui/design-system`, app composition in `apps/local-llm-phone-test`;
 - physical/effective-consumer claims require real two-APK evidence where applicable.
 
-PRs #343/#348 currently own overlapping transport/runtime effectiveness. Re-check their canonical status before implementation; final effective-consumer E2E waits for their accepted or superseding current-`dev` line.
+The repository-side HCP/control-plane prerequisite is now represented by the canonical `dev` composition. The remaining effectiveness claim is deliberately held behind ACUX-90 physical two-APK evidence.
 
 ## Execution DAG
 
 | ID | State | Depends on | Owns / writes | Parallel with | Acceptance |
 | --- | --- | --- | --- | --- | --- |
 | ACUX-00 | DONE | — | UX spec + workstream | — | IA, nine view contracts, states, adaptive/accessibility and DAG are explicit. |
-| ACUX-10 | READY | ACUX-00 | neutral control-plane UI gateway, mappers, fakes/tests; smallest host contract extension if required | ACUX-20, ACUX-70 | Read apps/assignments/presets/default/effective config through one source; supported mutations are revision-aware; no Room/UI coupling. |
-| ACUX-20 | READY | ACUX-00 | destination/routes/shell; Apps primary nav; preserve Diagnostics via Settings/deep links | ACUX-10, ACUX-70 | Compact/rail Apps navigation, opaque detail routes and side-effect-free Back/restoration. |
-| ACUX-30 | BLOCKED | ACUX-10, ACUX-20 | Applications + Application detail state/presentation/Compose | ACUX-40 | Source-backed loading/empty/populated/error/auth/identity states and app drill-down. |
-| ACUX-40 | BLOCKED | ACUX-10, ACUX-20 | Assigned use case + preset list/detail | ACUX-30 | Default, Suggested/Custom and effective configuration are obvious with Advanced/Technical disclosure. |
-| ACUX-50 | BLOCKED | ACUX-10, ACUX-40 | custom preset creation/edit + Advanced settings | ACUX-60 if contracts do not collide | Real base preset, canonical validation, guarded save, persisted re-read, accessible exact-value controls. |
-| ACUX-60 | BLOCKED | ACUX-10, ACUX-40 | set-default and assignment enable/disable/assign/unassign where host supports it | ACUX-50 if contracts do not collide | Explicit revision-safe mutation, recovery/confirmation and canonical refresh. Unsupported mutations do not get fake UI. |
-| ACUX-70 | READY | ACUX-00 | only reusable semantic components/tests/previews in `ui/design-system` | ACUX-10, ACUX-20 | Reuse first; new shared components only for repeated semantic roles. |
-| ACUX-80 | BLOCKED | ACUX-30, ACUX-40, ACUX-50, ACUX-60, ACUX-70 | cross-screen recovery, adaptive master-detail, accessibility, restoration tests | — | Compact/landscape/medium/expanded, TalkBack/large text, 48dp, stale conflict and process/Back behavior pass. |
-| ACUX-90 | BLOCKED | ACUX-80 + accepted HCP effective-consumer line | integration/E2E + representative two-APK evidence | — | Persisted default survives restart and is honored by a real consumer with exact app/use-case/binding/preset identity; failure path fails closed. |
-| ACUX-100 | BLOCKED | ACUX-90 | durable docs/state transfer + workstream cleanup | — | Durable owners updated; temporary workstream deleted by default. |
+| ACUX-10 | DONE | ACUX-00 | neutral control-plane UI gateway, mappers, fakes/tests; smallest host contract extension if required | ACUX-20, ACUX-70 | Apps/assignments/presets/default/effective config read through one source; supported mutations are revision-aware; no Room/UI coupling. |
+| ACUX-20 | DONE | ACUX-00 | destination/routes/shell; Apps primary nav; preserve Diagnostics via Settings/deep links | ACUX-10, ACUX-70 | Compact/rail Apps navigation, opaque detail routes and side-effect-free Back/restoration are integrated. |
+| ACUX-30 | DONE | ACUX-10, ACUX-20 | Applications + Application detail state/presentation/Compose | ACUX-40 | Source-backed loading/empty/populated/error/auth/identity states and app drill-down are integrated. |
+| ACUX-40 | DONE | ACUX-10, ACUX-20 | Assigned use case + preset list/detail | ACUX-30 | Default, Suggested/Custom and effective configuration are visible with Advanced/Technical disclosure. |
+| ACUX-50 | DONE | ACUX-10, ACUX-40 | custom preset creation/edit + Advanced settings | ACUX-60 if contracts do not collide | Real base preset, canonical validation, guarded save, persisted re-read and exact-value controls are integrated. |
+| ACUX-60 | DONE | ACUX-10, ACUX-40 | set-default and assignment mutations only where host supports them | ACUX-50 if contracts do not collide | Supported mutations are explicit, revision-safe and canonically refreshed; unsupported actions are not fabricated. |
+| ACUX-70 | DONE | ACUX-00 | only reusable semantic components/tests/previews in `ui/design-system` | ACUX-10, ACUX-20 | Existing semantic components are reused; no speculative shared-component layer was introduced. |
+| ACUX-80 | DONE | ACUX-30, ACUX-40, ACUX-50, ACUX-60, ACUX-70 | cross-screen recovery, adaptive master-detail, accessibility, restoration tests | — | Compact and wide-layout policy, large-font reflow, master-detail behavior and repository-side recovery/accessibility coverage are integrated. |
+| ACUX-90 | READY | ACUX-80 + canonical HCP consumer-control-plane path | integration/E2E + representative two-APK evidence | — | Persisted default survives restart and is honored by a real consumer with exact app/use-case/binding/preset identity; failure path fails closed. Physical evidence is the only remaining ACUX feature gate. |
+| ACUX-100 | BLOCKED | ACUX-90 | durable docs/state transfer + workstream cleanup | — | After ACUX-90, transfer the final device evidence to durable owners and delete this temporary workstream by default. |
+
+## Integrated repository-side baseline
+
+- PR #447 integrated the canonical Applications flow on `dev`: Apps primary navigation, source-backed Application -> Assigned use case -> Preset drill-down, custom preset creation, revision-safe supported mutations and canonical re-read behavior.
+- PR #449 integrated ACUX-80 adaptive convergence from a clean current-`dev` base: medium/expanded `Applications list | Selected application` master-detail, compact/large-font single-pane fallback and focused adaptive-policy coverage.
+- #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge; canonical `dev` now contains the result at `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
+- No repository-side Applications implementation task remains before ACUX-90. Do not reopen Waves A-D unless a concrete regression or new product requirement appears.
 
 ## Parallel waves
 
-**Wave A — foundations:** run ACUX-10, ACUX-20 and ACUX-70 in parallel. Keep gateway, navigation and design-system writes separate.
+**Wave A — foundations: COMPLETE.** ACUX-10, ACUX-20 and ACUX-70 are integrated.
 
-**Wave B — read surfaces:** after ACUX-10/20, run ACUX-30 and ACUX-40 in parallel using stable gateway/UI contracts.
+**Wave B — read surfaces: COMPLETE.** ACUX-30 and ACUX-40 are integrated on stable gateway/UI contracts.
 
-**Wave C — mutations:** after ACUX-40, run ACUX-50 and ACUX-60 concurrently only if they do not require competing changes to the same host contract. Land the smallest shared contract first when they do.
+**Wave C — mutations: COMPLETE.** ACUX-50 and ACUX-60 are integrated with revision-aware canonical refresh and no fabricated unsupported mutation.
 
-**Wave D — convergence:** ACUX-80 integrates state/recovery/adaptive/accessibility; it must not introduce new domain policy.
+**Wave D — convergence: COMPLETE.** ACUX-80 adaptive/accessibility/recovery convergence is integrated without introducing new domain policy.
 
-**Wave E — effective proof:** ACUX-90 starts only from the accepted current-`dev` HCP path. Serialize same-device runtime/thermal-sensitive evidence with other physical suites.
+**Wave E — effective proof: NEXT.** ACUX-90 is the only remaining feature gate. Serialize same-device runtime/thermal-sensitive evidence with other physical suites when useful, but preserve the ACUX identity and pass/fail criteria independently.
 
 ## Slice detail
 
@@ -96,15 +103,19 @@ No silent stale retry. Suggested preset customization creates Custom identity. D
 
 ### ACUX-80 matrix
 
-Automate representative compact portrait, landscape, medium/expanded master-detail, large text, TalkBack/focus, non-color status, loading/empty/error/saving/success, stale revision, unavailable capability and process/back restoration. Sensitive content never enters saved state.
+Repository-side convergence is complete. Compact uses the normal single-pane drill-down; medium/expanded uses Applications master-detail when dense-content reflow is not required; large-font policy falls back to the safer single-pane composition. Existing source-backed states and mutation recovery remain the only state owner.
 
 ### ACUX-90 E2E
 
 Minimum proof: authorized app visible -> assignment opened -> preset selected/created and set default -> Harness restart -> default still visible -> consumer discovers/activates -> inference uses expected assignment/config identity -> privacy-safe evidence correlates revisions -> invalid/stale case fails closed.
 
+This must run with two real APKs on representative hardware. CI/emulator evidence does not satisfy ACUX-90.
+
 ## Validation
 
-Expected repo-side cumulative gates:
+Repository-side cumulative gates are complete through ACUX-80. The exact ACUX-80 head passed the repository workflows before merge, including scoped Android compilation/tests/lint/packaging plus repository-health checks.
+
+For future repository-side changes, retain the canonical gate set:
 
 ```bash
 ./gradlew spotlessCheck
@@ -118,10 +129,10 @@ python3 scripts/verify-agent-navigation.py
 python3 scripts/verify-documentation.py
 ```
 
-Add owning control-plane module tests for shared contract/store changes, Compose instrumentation for UI slices and physical device evidence only at ACUX-90.
+Physical device evidence is required only at ACUX-90 for this feature closeout.
 
 ## Exit
 
-Repository-side completion requires Apps primary navigation, source-backed app/use-case/preset drill-down, revision-safe supported mutations, progressive Technical details, adaptive/accessibility tests and no privacy-boundary regressions.
+Repository-side completion is achieved: Apps primary navigation, source-backed app/use-case/preset drill-down, revision-safe supported mutations, progressive Technical details and adaptive/accessibility repository coverage are integrated.
 
-End-to-end completion additionally requires ACUX-90 effective-consumer proof. Transfer durable results to the feature spec, phone architecture if ownership changed, UX target/contract, HCP durable owners and `current-state.md`; then remove this temporary workstream.
+End-to-end completion still requires ACUX-90 effective-consumer proof. After that proof, transfer the evidence/result to the durable feature/current-state/release owners, mark ACUX-100 complete and remove this temporary workstream by default.
