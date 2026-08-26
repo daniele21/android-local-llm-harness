@@ -34,7 +34,7 @@ without exposing bindings, Room rows or Binder protocol as the primary task mode
 - reusable visuals belong in `ui/design-system`, app composition in `apps/local-llm-phone-test`;
 - physical/effective-consumer claims require real two-APK evidence where applicable.
 
-The repository-side HCP/control-plane prerequisite is now represented by the canonical `dev` composition. The remaining effectiveness claim is deliberately held behind ACUX-90 physical two-APK evidence.
+The repository-side HCP/control-plane prerequisite is represented by the canonical `dev` composition, but a persisted-state startup/upgrade reconciliation regression now blocks the effective-device proof. The bounded repair is tracked in [`control-plane-state-reconciliation.md`](control-plane-state-reconciliation.md); ACUX-90 remains blocked until its repository candidate gate CPREC-70 is complete.
 
 ## Execution DAG
 
@@ -49,7 +49,7 @@ The repository-side HCP/control-plane prerequisite is now represented by the can
 | ACUX-60 | DONE | ACUX-10, ACUX-40 | set-default and assignment mutations only where host supports them | ACUX-50 if contracts do not collide | Supported mutations are explicit, revision-safe and canonically refreshed; unsupported actions are not fabricated. |
 | ACUX-70 | DONE | ACUX-00 | only reusable semantic components/tests/previews in `ui/design-system` | ACUX-10, ACUX-20 | Existing semantic components are reused; no speculative shared-component layer was introduced. |
 | ACUX-80 | DONE | ACUX-30, ACUX-40, ACUX-50, ACUX-60, ACUX-70 | cross-screen recovery, adaptive master-detail, accessibility, restoration tests | — | Compact and wide-layout policy, large-font reflow, master-detail behavior and repository-side recovery/accessibility coverage are integrated. |
-| ACUX-90 | READY | ACUX-80 + canonical HCP consumer-control-plane path | integration/E2E + representative two-APK evidence | — | Persisted default survives restart and is honored by a real consumer with exact app/use-case/binding/preset identity; failure path fails closed. Physical evidence is the only remaining ACUX feature gate. |
+| ACUX-90 | BLOCKED | ACUX-80 + CPREC-70 + canonical HCP consumer-control-plane path | integration/E2E + representative two-APK evidence | — | Persisted default survives restart and is honored by a real consumer with exact app/use-case/binding/preset identity; failure path fails closed. Physical evidence is the only remaining ACUX feature gate after reconciliation. |
 | ACUX-100 | BLOCKED | ACUX-90 | durable docs/state transfer + workstream cleanup | — | After ACUX-90, transfer the final device evidence to durable owners and delete this temporary workstream by default. |
 
 ## Integrated repository-side baseline
@@ -57,7 +57,7 @@ The repository-side HCP/control-plane prerequisite is now represented by the can
 - PR #447 integrated the canonical Applications flow on `dev`: Apps primary navigation, source-backed Application -> Assigned use case -> Preset drill-down, custom preset creation, revision-safe supported mutations and canonical re-read behavior.
 - PR #449 integrated ACUX-80 adaptive convergence from a clean current-`dev` base: medium/expanded `Applications list | Selected application` master-detail, compact/large-font single-pane fallback and focused adaptive-policy coverage.
 - #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge; canonical `dev` now contains the result at `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
-- No repository-side Applications implementation task remains before ACUX-90. Do not reopen Waves A-D unless a concrete regression or new product requirement appears.
+- No repository-side Applications UX implementation task remains before ACUX-90. The newly identified control-plane reconciliation work is a host-state correctness prerequisite, not a reopening of Waves A-D.
 
 ## Parallel waves
 
@@ -69,7 +69,7 @@ The repository-side HCP/control-plane prerequisite is now represented by the can
 
 **Wave D — convergence: COMPLETE.** ACUX-80 adaptive/accessibility/recovery convergence is integrated without introducing new domain policy.
 
-**Wave E — effective proof: NEXT.** ACUX-90 is the only remaining feature gate. Serialize same-device runtime/thermal-sensitive evidence with other physical suites when useful, but preserve the ACUX identity and pass/fail criteria independently.
+**Wave E — effective proof: BLOCKED ON CPREC-70.** After the reconciled exact-head candidate exists, ACUX-90 is the only remaining Applications feature gate. Serialize same-device runtime/thermal-sensitive evidence with other physical suites when useful, but preserve the ACUX identity and pass/fail criteria independently.
 
 ## Slice detail
 
@@ -109,11 +109,11 @@ Repository-side convergence is complete. Compact uses the normal single-pane dri
 
 Minimum proof: authorized app visible -> assignment opened -> preset selected/created and set default -> Harness restart -> default still visible -> consumer discovers/activates -> inference uses expected assignment/config identity -> privacy-safe evidence correlates revisions -> invalid/stale case fails closed.
 
-This must run with two real APKs on representative hardware. CI/emulator evidence does not satisfy ACUX-90.
+This must run with two real APKs on representative hardware after CPREC-70 produces the reconciled exact-head candidate. CI/emulator evidence does not satisfy ACUX-90.
 
 ## Validation
 
-Repository-side cumulative gates are complete through ACUX-80. The exact ACUX-80 head passed the repository workflows before merge, including scoped Android compilation/tests/lint/packaging plus repository-health checks.
+Repository-side cumulative UX gates are complete through ACUX-80. The exact ACUX-80 head passed the repository workflows before merge, including scoped Android compilation/tests/lint/packaging plus repository-health checks.
 
 For future repository-side changes, retain the canonical gate set:
 
@@ -129,10 +129,10 @@ python3 scripts/verify-agent-navigation.py
 python3 scripts/verify-documentation.py
 ```
 
-Physical device evidence is required only at ACUX-90 for this feature closeout.
+Physical device evidence is required only at ACUX-90 for this feature closeout, after the control-plane reconciliation repository candidate is accepted.
 
 ## Exit
 
-Repository-side completion is achieved: Apps primary navigation, source-backed app/use-case/preset drill-down, revision-safe supported mutations, progressive Technical details and adaptive/accessibility repository coverage are integrated.
+Repository-side Applications UX completion is achieved: Apps primary navigation, source-backed app/use-case/preset drill-down, revision-safe supported mutations, progressive Technical details and adaptive/accessibility repository coverage are integrated.
 
-End-to-end completion still requires ACUX-90 effective-consumer proof. After that proof, transfer the evidence/result to the durable feature/current-state/release owners, mark ACUX-100 complete and remove this temporary workstream by default.
+End-to-end completion is blocked first by CPREC-70 and then requires ACUX-90 effective-consumer proof. After that proof, transfer the evidence/result to the durable feature/current-state/release owners, mark ACUX-100 complete and remove this temporary workstream by default.
