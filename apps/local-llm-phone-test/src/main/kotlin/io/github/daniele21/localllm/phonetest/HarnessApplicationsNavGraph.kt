@@ -55,12 +55,28 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
         )
         HarnessApplicationsRouteContent(state = state, onRefresh = onRefresh) { snapshot ->
             val application = snapshot.application(applicationId)
-            HarnessApplicationDetailScreen(
-                application = application,
-                onOpenAssignment = { appId, useCaseId ->
-                    navController.navigate(HarnessApplicationRoutes.assignment(appId, useCaseId))
-                },
-            )
+            val onOpenAssignment: (String, String) -> Unit = { appId, useCaseId ->
+                navController.navigate(HarnessApplicationRoutes.assignment(appId, useCaseId))
+            }
+            if (useHarnessApplicationsMasterDetail(currentHarnessAdaptivePolicy())) {
+                HarnessApplicationsMasterDetailScreen(
+                    snapshot = snapshot,
+                    selectedApplication = application,
+                    onRefresh = onRefresh,
+                    onOpenApplication = { targetApplicationId ->
+                        navController.navigate(HarnessApplicationRoutes.application(targetApplicationId)) {
+                            popUpTo(HarnessDestination.APPS.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenAssignment = onOpenAssignment,
+                )
+            } else {
+                HarnessApplicationDetailScreen(
+                    application = application,
+                    onOpenAssignment = onOpenAssignment,
+                )
+            }
         }
     }
     composable(

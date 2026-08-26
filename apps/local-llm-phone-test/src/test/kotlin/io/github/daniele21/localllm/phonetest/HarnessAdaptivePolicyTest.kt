@@ -32,4 +32,12 @@ class HarnessAdaptivePolicyTest {
         assertTrue(policy.useNavigationRail)
         assertTrue(policy.stackDenseContent)
     }
+
+    @Test
+    fun applicationsMasterDetailUsesWideLayoutsButFallsBackForLargeText() {
+        assertFalse(useHarnessApplicationsMasterDetail(harnessAdaptivePolicy(widthDp = 599, fontScale = 1f)))
+        assertTrue(useHarnessApplicationsMasterDetail(harnessAdaptivePolicy(widthDp = 600, fontScale = 1f)))
+        assertTrue(useHarnessApplicationsMasterDetail(harnessAdaptivePolicy(widthDp = 840, fontScale = 1f)))
+        assertFalse(useHarnessApplicationsMasterDetail(harnessAdaptivePolicy(widthDp = 840, fontScale = 1.3f)))
+    }
 }
