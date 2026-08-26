@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime
 Canonical scope: shared-runtime.redactguard-cross-repo-extraction
 Read when: coordinating Harness-owned SDK, identity, security, Control Plane, validation or final cutover work for the external RedactGuard application
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-25
 Started: 2026-08-17
 
 ## Purpose
@@ -55,7 +55,7 @@ Harness must not remain a build-time source dependency of RedactGuard after cuto
 State: DONE
 Issue: #310
 
-The external Consumer SDK is published through a token-free public Maven channel and RedactGuard consumes the SDK without a Harness source checkout. The current cutover slice advances the API to the next immutable alpha because Consumer Control Plane contracts are additive public ABI.
+The external Consumer SDK is published through a token-free public Maven channel and RedactGuard consumes `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.4` without a Harness source checkout. Alpha.4 contains the additive Consumer Control Plane contracts required by the cutover.
 
 ### HHOST-1 — RedactGuard identity/authorization
 
@@ -77,16 +77,31 @@ Harness already authorizes only the intended RedactGuard package identities/use 
 
 | Slice | State | Depends on | Acceptance |
 | --- | --- | --- | --- |
-| RC-1 Clean Control Plane replay | ACTIVE | — | Replay the still-required Binder 1.2 discovery/activation/residency semantics from current `dev`; external consumers cannot fall back to the global selected model; focused wire/lifecycle/cutover tests are present. |
-| RC-2 Exact-head software gate | BLOCKED | RC-1 | Repository health, documentation validation, Consumer SDK ABI validation, scoped Android tests/lint/build and packaging are green on one exact head. |
-| RC-3 RedactGuard SDK adaptation | BLOCKED | RC-2 + published SDK | RedactGuard discovers assigned use cases/presets, activates before Consumer API prepare/session/generate, deactivates/cleans up deterministically and remains consumer-only. |
-| RC-4 Cross-repository physical proof | BLOCKED | RC-3 | Independently built same-signer Harness Host + RedactGuard APKs pass activation, generation, cancellation, Host death/recovery and representative import -> analysis -> Review -> export/failure scenarios on real arm64 hardware with exact identities recorded. |
+| RC-1 Clean Control Plane replay | DONE | — | Binder 1.2 discovery/activation/residency semantics are integrated; external consumers cannot fall back to the global selected model; focused wire/lifecycle/cutover tests are present. |
+| RC-2 Exact-head software gate | DONE | RC-1 | Repository health, Consumer SDK ABI validation, scoped Android tests/lint/build and packaging have passed on the integrated Control Plane/candidate slices. |
+| RC-3 RedactGuard SDK adaptation | DONE | RC-2 + published SDK | RedactGuard discovers assigned use cases/presets, activates before Consumer API prepare/session/generate, deactivates/cleans up deterministically and remains consumer-only. |
+| RC-4 Cross-repository physical proof | ACTIVE | RC-3 | Independently built same-signer Harness Host + RedactGuard APKs must pass activation, generation, cancellation, Host death/recovery and representative import -> analysis -> Review -> export/failure scenarios on real arm64 hardware with exact identities recorded. |
 | RC-5 HCUT-1 legacy removal | BLOCKED | RC-4 | Remove in-repo OMBRA product source/aliases/duplicated product data/docs while retaining the generic Consumer fixture, public SDK/Binder/Host and host-owned `document-pii-detection` policy. |
 | RC-6 Final reconciliation | BLOCKED | RC-5 | Durable shared-runtime/current-state/roadmap docs describe the final ownership boundary; superseded HCP branches/PRs and HCUT issue are reconciled after unique-commit audit. |
 
+## Current physical-proof checkpoint
+
+Repository-side preparation for RC-4 is complete; the remaining acceptance boundary is real-device execution.
+
+Frozen physical source identities and tooling:
+
+- Harness: `9699cb0ae9bd6b49f68c07fa49c004360e8d7d92`, `versionCode=28`, `versionName=1.0.0`;
+- the exact-candidate same-signer release APK helper was integrated by PR #443 and is present in that frozen source;
+- the frozen Harness source includes the process-scoped Control Plane store and Applications control-plane gateway, and its push `Repository health`, `Validate` and `Package Android Artifacts` workflows are green;
+- RedactGuard: `8ca1f50f0ca07c04bd19dbc3a870366f77f06689`, `versionCode=9`, `versionName=0.1.4`; its same-signer release APK helper and canonical physical runner are present at that source;
+- Consumer SDK: `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.4`;
+- clean Host Control Plane seed: `document-pii-detection` with default preset `qwen35-json` revision `3`.
+
+Later documentation-only descendants do not replace these frozen APK source identities. Build both release APKs from clean detached checkouts at the revisions above using the shared upload signing identity. Run RedactGuard's canonical E2E script from the same frozen RedactGuard checkout with `--release`, Harness source revision `9699cb0ae9bd6b49f68c07fa49c004360e8d7d92` and preset revision `3`; record APK SHA-256 and signer in the generated evidence.
+
 ## RC-1 implementation scope
 
-The old stacked HCP branches are evidence only, not merge lines. They diverged materially from current `dev`; the current cutover replays the required behavior onto the latest baseline and deliberately excludes one-shot CI trigger files.
+The old stacked HCP branches are evidence only, not merge lines. The required behavior has been replayed onto current `dev` and integrated without retaining one-shot CI trigger files.
 
 RC-1 owns:
 
@@ -95,12 +110,10 @@ RC-1 owns:
 - Binder client discovery/activate/deactivate adapter;
 - Host control-plane authorization and connection lifecycle;
 - activation-residency acquisition/release and Binder-death cleanup;
-- phone Host composition with persistent control-plane store;
+- phone Host composition with persistent process-scoped control-plane store;
 - explicit activation binding in the runtime model-profile registry;
 - removal of external selected-model fallback while preserving internal Harness manual selection;
-- next immutable Consumer SDK alpha and generic release fixture coverage.
-
-The old HCP branch had a known Spotless failure in `HarnessCatalogResolution.kt`; the clean replay uses the current formatter contract rather than preserving that stale exact-head failure.
+- immutable Consumer SDK alpha.4 and generic release fixture coverage.
 
 ## HCUT-1 removal boundary
 

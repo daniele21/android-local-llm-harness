@@ -8,7 +8,6 @@ import android.os.Looper
 import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.RegisteredApplication
-import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
 import io.github.daniele21.localllm.runtime.ActivityManagerLowMemoryProbe
 import io.github.daniele21.localllm.runtime.AndroidMemoryPressureCallbacks
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
@@ -19,17 +18,15 @@ class HarnessSharedRuntimeService : Service() {
     private lateinit var hostComposition: SharedRuntimeHostComposition
     private lateinit var memoryPressureCallbacks: AndroidMemoryPressureCallbacks
     private lateinit var warmIdleResidency: HarnessWarmIdleResidencyCoordinator
-    private lateinit var controlPlaneStoreOwner: RoomHostControlPlaneStoreOwner
 
     override fun onCreate() {
         super.onCreate()
         runtimeGraph = HarnessRuntimeGraph.from(this)
         val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(runtimeGraph)
         val policies = HarnessSharedRuntimePolicy.authorizedClients(this)
-        controlPlaneStoreOwner = RoomHostControlPlaneStoreOwner.open(this, CONTROL_PLANE_DATABASE_NAME)
         val controlPlaneHost = HarnessWarmRetentionAwareControlPlaneHost(
             delegate = HarnessConsumerControlPlaneHost(
-                store = controlPlaneStoreOwner.store,
+                store = runtimeGraph.controlPlaneStore,
                 modelStore = runtimeGraph.modelStore,
                 runtimeGraph = runtimeGraph,
                 applicationSeeds = applicationSeeds(policies),
@@ -96,7 +93,6 @@ class HarnessSharedRuntimeService : Service() {
 
     override fun onDestroy() {
         hostComposition.close()
-        controlPlaneStoreOwner.close()
         warmIdleResidency.close()
         super.onDestroy()
     }
@@ -125,8 +121,6 @@ class HarnessSharedRuntimeService : Service() {
     }
 
     private companion object {
-        const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
-
         // Compatibility-only policy for v1.1 consumers. v1.2 activations use resolved preset retention.
         const val CANDIDATE_WARM_IDLE_TTL_MS = 60_000L
     }

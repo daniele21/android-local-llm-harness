@@ -10,8 +10,10 @@ import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
+import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
@@ -37,7 +39,7 @@ import java.util.UUID
 private const val DEFAULT_RUN_LIMIT = 50
 private const val DEFAULT_LOG_LIMIT = 200
 
-/** Process-scoped owner of the embedded Harness runtime and observability sources. */
+/** Process-scoped owner of the embedded Harness runtime, control plane and observability sources. */
 internal class HarnessRuntimeGraph private constructor(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
     private val lock = Any()
@@ -45,9 +47,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private val activationLeases = UseCaseActivationLeaseRegistry(
         idFactory = ActivationIdFactory { UseCaseActivationId(UUID.randomUUID().toString()) },
     )
+    private val controlPlaneStoreOwner =
+        RoomHostControlPlaneStoreOwner.open(appContext, CONTROL_PLANE_DATABASE_NAME)
 
     val activationResidency = ActivationResidencyCoordinator(activationLeases)
     val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
+    val controlPlaneStore: HostControlPlaneStore
+        get() = controlPlaneStoreOwner.store
 
     val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
         TelemetryRetentionPolicy(
@@ -174,6 +180,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             registry.clearActivationBindings()
             registry.selectedModel = null
         }
+        controlPlaneStoreOwner.close()
     }
 
     private fun ensureRuntime() {
@@ -203,6 +210,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     companion object {
         private const val MODEL_STORE_DIRECTORY = "local-llm-phone-test"
+        private const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
