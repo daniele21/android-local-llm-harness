@@ -13,6 +13,7 @@ CORE_SKILLS = (
     "structured-change",
     "design-product-experience",
     "validate-change",
+    "preflight-change",
     "finalize-workstream",
     "review-reference-quality",
 )
@@ -92,8 +93,8 @@ def main() -> int:
             standard = baseline.get("standard", {})
             if standard.get("source") != "daniele21/repo-template-sw":
                 errors.append("baseline standard.source must identify daniele21/repo-template-sw")
-            if standard.get("version") != "0.5.0":
-                errors.append("baseline standard.version must be 0.5.0")
+            if standard.get("version") != "0.6.0":
+                errors.append("baseline standard.version must be 0.6.0")
             if baseline.get("target_level") not in {"L0", "L1", "L2"}:
                 errors.append("target_level must be L0, L1 or L2")
             profiles = baseline.get("profiles")

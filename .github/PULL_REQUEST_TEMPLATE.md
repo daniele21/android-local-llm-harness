@@ -32,15 +32,33 @@ If user-facing behavior changes, classify it as structural UX, interaction or vi
 
 State affected `.engineering/commands.json` intents and any build identity, manifest/checksum/build-delta/retention or cleanup implications. Otherwise `N/A`.
 
+## Pre-publication readiness
+
+Record the final preflight for the exact branch state being published.
+
+- HEAD: `<revision>`
+- TARGET: `dev@<revision>` (or explicit promotion/hotfix target)
+- AMBIGUITY: `PASS|FAIL`
+- BASE_FRESHNESS: `PASS|FAIL`
+- FULL_DIFF_REVIEW: `PASS|FAIL`
+- READINESS: `READY_FOR_CI|NOT_READY_FOR_CI`
+
+List locally reproducible gates as `PASS|FAIL|PENDING|N/A`. A known-red draft must be explicitly identified and may not claim `READY_FOR_CI`.
+
 ## Validation
 
 List exact checks and evidence executed; never claim evidence not run.
 
+- [ ] `LOCAL PREFLIGHT COMPLETE` for the recorded HEAD/TARGET pair.
 - [ ] Relevant targeted tests cover the changed behavior.
+- [ ] Required local deterministic preflight gates passed on the recorded HEAD.
 - [ ] `Repository validation` is green on the current head.
 - [ ] `Repository health` is green on the current head.
 - [ ] Relevant Android packaging/native checks are green.
-- [ ] Missing physical-device or representative-usability evidence is explicitly pending rather than inferred.
+
+## CI-only / real-environment evidence
+
+Declare physical-device, hardware, thermal/performance, packaged cross-app or other evidence unavailable locally as `PENDING` or `N/A`. Pending evidence still blocks any stronger production/device claim that depends on it.
 
 ## E2E / experience evidence
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.3.0",
+  "contract_version": "0.4.0",
   "commands": {
     "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
     "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
@@ -13,6 +13,16 @@
     "package": {"status": "optional", "run": "LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true ./gradlew :apps:local-llm-phone-test:bundleRelease"},
     "stop": {"status": "n/a", "run": "n/a"},
     "clean": {"status": "required", "run": "./gradlew clean && rm -rf build/native-tests build/llrt-suite"}
+  },
+  "publication_gate": {
+    "local_preflight_required": true,
+    "target_base_freshness_required": true,
+    "full_diff_review_required": true,
+    "material_ambiguity_must_be_resolved": true,
+    "failure_root_cause_required": true,
+    "deterministic_ci_local_parity_required": true,
+    "ci_only_evidence_must_be_declared": true,
+    "exact_head_evidence_required": true
   },
   "end_to_end": {
     "recommended_when_full_workflow_boundary_exists": true,

@@ -1,6 +1,6 @@
 ---
 name: structured-change
-description: Guard meaningful code and product changes against duplicated ownership, unnecessary complexity, unbounded resources, incomplete failure handling, unsafe data lifecycle changes, operational residue, weak UX hierarchy and cross-layer contract drift.
+description: Guard meaningful code and product changes against duplicated ownership, unresolved material assumptions, unnecessary complexity, unbounded resources, incomplete failure handling, unsafe data lifecycle changes, operational residue, weak UX hierarchy and cross-layer contract drift.
 ---
 
 # Structured Change
@@ -17,7 +17,17 @@ Use this Skill as a pre-edit and pre-final review for meaningful behavior, archi
 
 Ask: **who owns this after my change?** If there is no clear answer, fix ownership before adding behavior.
 
-## 2. Spend complexity deliberately
+## 2. Resolve material ambiguity before implementation
+
+Do not turn an unresolved product/contract decision into an implementation assumption merely to keep moving.
+
+First inspect the canonical owner, durable docs/ADRs, direct consumers/fakes and tests. If two reasonable interpretations remain and they would materially change product behavior, public/API/protocol contracts, persistence/migration semantics, security/trust/privacy boundaries, failure/resource/concurrency/lifecycle semantics, backward compatibility, acceptance criteria or meaningful UX, ask the user before implementing that decision.
+
+When asking, state the smallest decision required, the concrete alternatives and a recommendation when the repository evidence supports one.
+
+Do not ask about implementation-local naming, formatting or equivalent choices that preserve observable semantics. If interaction is unavailable, mark the dependent work blocked/conditional rather than silently guessing.
+
+## 3. Spend complexity deliberately
 
 For every new abstraction, dependency, cache, service, worker, queue, layer, UI component or interaction pattern ask:
 
@@ -28,7 +38,7 @@ For every new abstraction, dependency, cache, service, worker, queue, layer, UI 
 
 Do not add speculative extensibility or visual novelty without a product reason.
 
-## 3. Respect the project operating contract
+## 4. Respect the project operating contract
 
 Read `.engineering/commands.json` when the change affects setup, local runtime, validation, build, packaging, artifacts or cleanup.
 
@@ -43,7 +53,7 @@ Preserve the common semantics even when the underlying tool changes:
 
 Do not introduce a second undocumented way to run/build/package the project when the canonical command contract already owns that intent.
 
-## 4. Respect the product experience contract when applicable
+## 5. Respect the product experience contract when applicable
 
 When `.engineering/baseline.json` includes `product-ui`, read `design/ux-contract.json` and `design/brand-kit.json` before meaningful UI changes.
 
@@ -65,7 +75,7 @@ Check that the change:
 
 Do not treat "show all available information" as a neutral choice; excess simultaneous information has cognitive cost. Do not use animation, illustration or visual polish to compensate for an unresolved task flow, hierarchy or feedback model.
 
-## 5. Define resource lifecycle when applicable
+## 6. Define resource lifecycle when applicable
 
 For each new/changed significant resource identify owner/acquisition, lifetime/cardinality, budgets, concurrency/backpressure, timeout/cancellation, release/failure cleanup, idle/pressure behavior and metrics.
 
@@ -73,7 +83,7 @@ No unbounded queue/list/cache on an unbounded input path. Prefer admission/reser
 
 Temporary processes, sockets, locks, test stores, workspaces, build staging areas, logs and caches are resources too. Cleanup must cover success, failure, timeout, cancellation, user interrupt and partial initialization.
 
-## 6. Treat failure as normal behavior
+## 7. Treat failure as normal behavior
 
 Check applicable paths:
 
@@ -91,21 +101,24 @@ Check applicable paths:
 
 Cleanup and UI recovery must restore useful ownership/invariants rather than merely catch an exception or show a generic error.
 
-## 7. Preserve data/security semantics
+When validation fails, classify the failure and identify the violated invariant/owner before editing production code. Do not use repeated local patches without a new hypothesis to chase a green check.
+
+## 8. Preserve data/security semantics
 
 When data changes, check creation, storage, owner, trust/encryption boundary, retention, deletion, backup/export, logging, migration and recovery.
 
 Never introduce silent cloud fallback, content logging, secret persistence or destructive migration behavior without explicit contract/review. Temporary credentials/signing data must not leak into logs, caches or distributed artifacts. UI/E2E screenshots/traces must remain privacy-safe.
 
-## 8. Verify cross-layer contracts
+## 9. Verify cross-layer contracts
 
 When changing a public/shared boundary, inspect every material adapter/consumer and test. Keep domain policy out of UI/transport/persistence adapters unless that layer genuinely owns the policy.
 
 UI text and controls should translate domain capability into the user's task rather than mirror internal object/service names mechanically.
 
-## 9. Pre-final questions
+## 10. Pre-final questions
 
 - Is there exactly one owner/source of truth?
+- Did I resolve every material ambiguity from repository evidence or the user rather than silently choosing?
 - Did the change add more complexity than the problem requires?
 - Are resource bounds and cleanup explicit?
 - Are cancellation/shutdown/failure states coherent?
@@ -121,4 +134,4 @@ UI text and controls should translate domain capability into the user's task rat
 - Did documentation/design contracts update only durable current truth?
 - Can deterministic parts of this rule move from prose into tooling/CI?
 
-A change is complete only when applicable code, integration, failure/resource semantics, operating-contract behavior, product-experience behavior, validation and durable documentation agree.
+A change is implementation-complete only when applicable code, integration, failure/resource semantics, operating-contract behavior, product-experience behavior, validation and durable documentation agree. Before publication, use `preflight-change` to establish exact-head `READY_FOR_CI`.
