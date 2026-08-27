@@ -69,10 +69,7 @@ internal interface ConsumerSharedRuntimeRemoteService {
     }
 
     @Throws(RemoteException::class)
-    fun runtimeReadiness(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
-    ) {
+    fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
         callback(runtimeReadinessUnavailable(request.operationId))
     }
 }
