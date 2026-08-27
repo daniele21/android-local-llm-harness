@@ -121,16 +121,14 @@ internal class ConsumerRuntimeBinderStub(
             )
         }
 
-    override fun runtimeReadiness(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: IConsumerRuntimeReadinessResultCallback,
-    ) = withRuntimeReadinessCaller(authorizer, callingProcessSource, request, callback) { caller ->
-        delegate.readinessOperations.runtimeReadiness(
-            caller,
-            request,
-            remoteConsumerRuntimeReadinessResultCallback(delegate, caller, request.clientToken, callback),
-        )
-    }
+    override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: IConsumerRuntimeReadinessResultCallback) =
+        withRuntimeReadinessCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.readinessOperations.runtimeReadiness(
+                caller,
+                request,
+                remoteConsumerRuntimeReadinessResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 }
 
 private fun deliverConsumerUnauthorized(externalRequestId: String?, callback: IConsumerGenerationCallback) {
