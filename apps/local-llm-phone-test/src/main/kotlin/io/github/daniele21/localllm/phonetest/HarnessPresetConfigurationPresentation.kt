@@ -23,19 +23,19 @@ internal data class HarnessPresetConfigurationSummary(
         get() = unavailableReason == null
 }
 
-internal fun harnessPresetModelOptions(useCaseId: String): List<HarnessPresetModelOption> {
-    if (useCaseId != HarnessSharedRuntimeBindings.ombraUseCaseId.value) return emptyList()
-    return CuratedModelCatalog.releases.mapNotNull { release ->
+internal fun harnessPresetModelOptions(useCaseId: String): List<HarnessPresetModelOption> =
+    CuratedModelCatalog.releases.mapNotNull { release ->
+        val modelProfileId = HarnessSharedRuntimeBindings.modelProfileId(useCaseId, release.profileKey.value)
+            ?: return@mapNotNull null
         val tier = runCatching { Qwen35PhoneModelPolicy.tierFor(release) }.getOrNull() ?: return@mapNotNull null
         HarnessPresetModelOption(
             modelId = release.id.modelId.value,
-            modelProfileId = HarnessSharedRuntimeBindings.ombraModelProfileId(release.profileKey.value),
+            modelProfileId = modelProfileId,
             displayName = release.displayName,
             description = release.description,
             tier = tier,
         )
     }
-}
 
 internal fun isHarnessPresetModelSelectionValid(
     useCaseId: String,
@@ -102,7 +102,7 @@ private fun profileRow(
     value: (GenerationDefaults) -> String,
 ): HarnessPresetConfigurationRow {
     val values = defaults.map { (tier, generation) -> tier to value(generation) }
-    val distinct = values.map(Pair<Qwen35ModelTier, String>::second).distinct()
+    val distinct = values.map { it.second }.distinct()
     val rendered = if (distinct.size == 1) {
         distinct.single()
     } else {
