@@ -9,6 +9,7 @@ import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
+import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.StoredPresetExposure
@@ -60,47 +61,65 @@ internal class HarnessControlPlaneConsumerPolicyRegistry(
     private val store: HostControlPlaneStore,
     private val fallback: ConsumerUseCasePolicyRegistry? = null,
 ) : ConsumerUseCasePolicyRegistry {
-    override fun find(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerUseCasePolicy? {
-        if (applicationId !in HarnessSharedRuntimeBindings.piiConsumerApplicationIds ||
-            useCaseId != HarnessSharedRuntimeBindings.ombraUseCaseId
-        ) {
-            return fallback?.find(applicationId, useCaseId)
+    override fun find(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerUseCasePolicy? =
+        if (isPiiPolicyTarget(applicationId, useCaseId)) {
+            findPiiPolicy(applicationId, useCaseId)
+        } else {
+            fallback?.find(applicationId, useCaseId)
         }
+
+    private fun findPiiPolicy(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerUseCasePolicy? {
         val state = store.snapshot()
-        val application = state.applications.singleOrNull { it.applicationId == applicationId }
+        val application = authorizedApplication(state, applicationId) ?: return null
+        val binding = state.latestBinding(application.applicationId, useCaseId)?.takeIf { it.enabled } ?: return null
+        val useCaseRevision = activeUseCaseRevision(state, useCaseId) ?: return null
+        val exposures = state.exposuresFor(binding.bindingId, binding.revision)
+        val exposedPresets = publishedPresetRefs(state, useCaseId, exposures)
+        return exposedPresets
+            ?.takeIf(Set<InferencePresetRef>::isNotEmpty)
+            ?.takeIf { it.size == exposures.size }
+            ?.let { refs ->
+                HarnessOmbraConsumerPolicy.create(
+                    applicationId = applicationId,
+                    revision = buildRevision(useCaseRevision, binding.revision, exposures),
+                    exposedPresets = refs,
+                    defaultPreset = exposures.singleOrNull(StoredPresetExposure::isDefault)?.toPresetRef(),
+                )
+            }
+    }
+
+    private fun isPiiPolicyTarget(applicationId: ApplicationId, useCaseId: UseCaseId): Boolean =
+        applicationId in HarnessSharedRuntimeBindings.piiConsumerApplicationIds &&
+            useCaseId == HarnessSharedRuntimeBindings.ombraUseCaseId
+
+    private fun authorizedApplication(state: HostControlPlaneState, applicationId: ApplicationId) =
+        state.applications.singleOrNull { it.applicationId == applicationId }
             ?.takeIf { it.state == ApplicationRegistrationState.AUTHORIZED }
-            ?: return null
-        val binding = state.latestBinding(application.applicationId, useCaseId)
-            ?.takeIf { it.enabled }
-            ?: return null
-        val useCase = state.latestUseCase(useCaseId)
+
+    private fun activeUseCaseRevision(state: HostControlPlaneState, useCaseId: UseCaseId): Int? =
+        state.latestUseCase(useCaseId)
             ?.takeIf { it.state == UseCaseDefinitionState.ACTIVE }
-            ?: return null
-        val exposures = state.exposures
-            .filter { it.bindingId == binding.bindingId && it.bindingRevision == binding.revision }
-            .sortedWith(compareBy({ it.presetId }, { it.presetRevision }))
-        val exposedPresets = exposures.mapNotNull { exposure ->
+            ?.revision
+
+    private fun HostControlPlaneState.exposuresFor(bindingId: String, bindingRevision: Int): List<StoredPresetExposure> = exposures
+        .filter { it.bindingId == bindingId && it.bindingRevision == bindingRevision }
+        .sortedWith(compareBy({ it.presetId }, { it.presetRevision }))
+
+    private fun publishedPresetRefs(
+        state: HostControlPlaneState,
+        useCaseId: UseCaseId,
+        exposures: List<StoredPresetExposure>,
+    ): Set<InferencePresetRef>? {
+        val refs = exposures.mapNotNull { exposure ->
             state.preset(useCaseId, exposure.presetId, exposure.presetRevision)
                 ?.takeIf { it.state == PresetLifecycleState.PUBLISHED }
-                ?.let {
-                    InferencePresetRef(
-                        InferencePresetId(it.metadata.presetId),
-                        it.metadata.revision,
-                    )
-                }
+                ?.let { InferencePresetRef(InferencePresetId(it.metadata.presetId), it.metadata.revision) }
         }.toSet()
-        if (exposedPresets.size != exposures.size || exposedPresets.isEmpty()) return null
-        val defaultExposure = exposures.singleOrNull { it.isDefault }
-        val defaultPreset = defaultExposure?.let {
-            InferencePresetRef(InferencePresetId(it.presetId), it.presetRevision)
-        }
-        return HarnessOmbraConsumerPolicy.create(
-            applicationId = applicationId,
-            revision = buildRevision(useCase.revision, binding.revision, exposures),
-            exposedPresets = exposedPresets,
-            defaultPreset = defaultPreset,
-        )
+        return refs.takeIf { it.size == exposures.size }
     }
+
+    private fun StoredPresetExposure.toPresetRef(): InferencePresetRef =
+        InferencePresetRef(InferencePresetId(presetId), presetRevision)
 
     private fun buildRevision(useCaseRevision: Int, bindingRevision: Int, exposures: List<StoredPresetExposure>): String = buildString {
         append(HarnessOmbraConsumerPolicy.REVISION)
