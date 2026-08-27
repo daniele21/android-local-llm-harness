@@ -56,15 +56,7 @@ class SharedRuntimeReadinessConcurrencyTest {
                     consumerControlPlaneEnabled = true,
                     consumerRuntimeReadinessEnabled = true,
                 ),
-                consumerRuntimeReadinessHost =
-                    ConsumerRuntimeReadinessHost { _, _, activationId ->
-                        ConsumerRuntimeReadinessResult.Available(
-                            ConsumerRuntimeReadiness(
-                                activationId = activationId,
-                                phase = ConsumerRuntimePhase.READY,
-                            ),
-                        )
-                    },
+                consumerRuntimeReadinessHost = ReadyReadinessHost,
                 ledger = ledger,
                 controlExecutor = controlExecutor,
                 readinessExecutor = readinessExecutor,
@@ -102,6 +94,20 @@ class SharedRuntimeReadinessConcurrencyTest {
 
         releaseControl.countDown()
         delegate.close()
+    }
+
+    private object ReadyReadinessHost : ConsumerRuntimeReadinessHost {
+        override fun runtimeReadiness(
+            ownerId: String,
+            applicationId: ApplicationId,
+            activationId: ConsumerActivationId,
+        ): ConsumerRuntimeReadinessResult =
+            ConsumerRuntimeReadinessResult.Available(
+                ConsumerRuntimeReadiness(
+                    activationId = activationId,
+                    phase = ConsumerRuntimePhase.READY,
+                ),
+            )
     }
 
     private object UnusedLocalLlmClient : LocalLlmClient {
