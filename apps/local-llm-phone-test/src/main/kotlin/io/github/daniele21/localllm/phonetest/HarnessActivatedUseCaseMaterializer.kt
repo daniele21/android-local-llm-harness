@@ -40,15 +40,15 @@ internal object HarnessActivatedUseCaseMaterializer {
             canonical.copy(
                 ref = consumerRef(exposure),
                 contextPreference =
-                    if (contextTokens == null) {
-                        canonical.contextPreference
-                    } else {
-                        ContextPreference(
-                            preferredTokens = contextTokens,
-                            recommendedMaximumTokens = contextTokens,
-                            maximumTokens = contextTokens,
-                        )
-                    },
+                if (contextTokens == null) {
+                    canonical.contextPreference
+                } else {
+                    ContextPreference(
+                        preferredTokens = contextTokens,
+                        recommendedMaximumTokens = contextTokens,
+                        maximumTokens = contextTokens,
+                    )
+                },
             )
         }
         val selectedRef = InferencePresetRef(InferencePresetId(execution.presetId), execution.presetRevision)
@@ -70,10 +70,9 @@ internal object HarnessActivatedUseCaseMaterializer {
         )
     }
 
-    private fun HostControlPlaneState.exposuresFor(bindingId: String, bindingRevision: Int): List<StoredPresetExposure> =
-        exposures
-            .filter { it.bindingId == bindingId && it.bindingRevision == bindingRevision }
-            .sortedWith(compareBy({ it.presetId }, { it.presetRevision }))
+    private fun HostControlPlaneState.exposuresFor(bindingId: String, bindingRevision: Int): List<StoredPresetExposure> = exposures
+        .filter { it.bindingId == bindingId && it.bindingRevision == bindingRevision }
+        .sortedWith(compareBy({ it.presetId }, { it.presetRevision }))
 
     private fun consumerRef(exposure: StoredPresetExposure): InferencePresetRef =
         InferencePresetRef(InferencePresetId(exposure.presetId), exposure.presetRevision)
