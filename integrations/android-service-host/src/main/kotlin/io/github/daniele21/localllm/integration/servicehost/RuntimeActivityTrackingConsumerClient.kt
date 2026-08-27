@@ -31,7 +31,7 @@ internal class RuntimeActivityTrackingConsumerClient(
                 val issue = (result as? ConsumerPrepareResult.Rejected)?.failure?.code?.toRuntimeIssue()
                 activity.finishPreparation(token, issue)
             }
-        } catch (error: Throwable) {
+        } catch (error: RuntimeException) {
             activity.finishPreparation(token, ConsumerRuntimeIssue.RUNTIME_FAILED)
             throw error
         }
@@ -60,7 +60,7 @@ internal class RuntimeActivityTrackingConsumerClient(
                     activity.finishGeneration(token, result.failure.code.toRuntimeIssue())
                 }
             }
-        } catch (error: Throwable) {
+        } catch (error: RuntimeException) {
             if (terminal.compareAndSet(false, true)) {
                 activity.finishGeneration(token, ConsumerRuntimeIssue.RUNTIME_FAILED)
             }
