@@ -102,11 +102,7 @@ internal class HarnessControlPlaneConsumerPolicyRegistry(
         )
     }
 
-    private fun buildRevision(
-        useCaseRevision: Int,
-        bindingRevision: Int,
-        exposures: List<StoredPresetExposure>,
-    ): String = buildString {
+    private fun buildRevision(useCaseRevision: Int, bindingRevision: Int, exposures: List<StoredPresetExposure>): String = buildString {
         append(HarnessOmbraConsumerPolicy.REVISION)
         append("|uc=").append(useCaseRevision)
         append("|binding=").append(bindingRevision)
