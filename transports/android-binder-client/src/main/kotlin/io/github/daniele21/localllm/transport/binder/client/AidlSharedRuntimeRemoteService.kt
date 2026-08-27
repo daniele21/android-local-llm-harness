@@ -131,10 +131,7 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
         delegate.deactivate(request, controlPlaneResultCallback(callback))
     }
 
-    override fun runtimeReadiness(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
-    ) {
+    override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
         delegate.runtimeReadiness(request, runtimeReadinessResultCallback(callback))
     }
 }
@@ -153,8 +150,7 @@ private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParc
         override fun onResult(result: ConsumerControlPlaneResultParcel) = callback(result)
     }
 
-private fun runtimeReadinessResultCallback(
-    callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
-): IConsumerRuntimeReadinessResultCallback = object : IConsumerRuntimeReadinessResultCallback.Stub() {
-    override fun onResult(result: ConsumerRuntimeReadinessResultParcel) = callback(result)
-}
+private fun runtimeReadinessResultCallback(callback: (ConsumerRuntimeReadinessResultParcel) -> Unit): IConsumerRuntimeReadinessResultCallback =
+    object : IConsumerRuntimeReadinessResultCallback.Stub() {
+        override fun onResult(result: ConsumerRuntimeReadinessResultParcel) = callback(result)
+    }
