@@ -8,6 +8,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestPar
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback;
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback;
 
 interface IConsumerLocalLlmService {
     void capabilities(in ConsumerRequestParcel request, IConsumerResultCallback callback);
@@ -24,4 +25,7 @@ interface IConsumerLocalLlmService {
 
     // Appended in protocol minor 3 so existing transaction IDs remain stable.
     void generateV2(in ConsumerGenerationRequestV2Parcel request, IConsumerGenerationCallback callback);
+
+    // Appended in protocol minor 4; the request reuses control-plane activation identity only.
+    void runtimeReadiness(in ConsumerControlPlaneRequestParcel request, IConsumerRuntimeReadinessResultCallback callback);
 }
