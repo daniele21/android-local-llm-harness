@@ -37,10 +37,8 @@ internal fun harnessPresetModelOptions(useCaseId: String): List<HarnessPresetMod
         )
     }
 
-internal fun isHarnessPresetModelSelectionValid(
-    useCaseId: String,
-    modelProfileId: String?,
-): Boolean = modelProfileId == null || harnessPresetModelOptions(useCaseId).any { it.modelProfileId == modelProfileId }
+internal fun isHarnessPresetModelSelectionValid(useCaseId: String, modelProfileId: String?): Boolean =
+    modelProfileId == null || harnessPresetModelOptions(useCaseId).any { it.modelProfileId == modelProfileId }
 
 internal fun harnessPresetConfigurationSummary(
     useCaseId: String,
