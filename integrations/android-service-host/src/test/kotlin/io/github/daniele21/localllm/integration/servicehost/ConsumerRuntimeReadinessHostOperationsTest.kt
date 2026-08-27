@@ -110,29 +110,25 @@ class ConsumerRuntimeReadinessHostOperationsTest {
         return Fixture(
             token = token.value,
             operations =
-                ConsumerRuntimeReadinessHostOperations(
-                    ledger = ledger,
-                    host = host,
-                    controlExecutor =
-                        HostControlExecutor { task ->
-                            task()
-                            true
-                        },
-                ),
+            ConsumerRuntimeReadinessHostOperations(
+                ledger = ledger,
+                host = host,
+                controlExecutor =
+                HostControlExecutor { task ->
+                    task()
+                    true
+                },
+            ),
         )
     }
 
-    private fun request(token: HostClientToken, operationId: String, activationId: String?) =
-        ConsumerControlPlaneRequestParcel(
-            clientToken = ClientTokenParcel(token.value),
-            operationId = operationId,
-            activationId = activationId,
-        )
-
-    private data class Fixture(
-        val token: HostClientToken,
-        val operations: ConsumerRuntimeReadinessHostOperations,
+    private fun request(token: HostClientToken, operationId: String, activationId: String?) = ConsumerControlPlaneRequestParcel(
+        clientToken = ClientTokenParcel(token.value),
+        operationId = operationId,
+        activationId = activationId,
     )
+
+    private data class Fixture(val token: HostClientToken, val operations: ConsumerRuntimeReadinessHostOperations)
 
     private class RecordingReadinessHost : ConsumerRuntimeReadinessHost {
         var calls = 0
