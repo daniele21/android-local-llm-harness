@@ -110,10 +110,7 @@ internal class FakeSharedRuntimeRemoteService(
         requireNotNull(consumerGenerationHandler) { "Consumer generation handler not configured" }(request, callback)
     }
 
-    fun consumerRuntimeReadiness(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
-    ) {
+    fun consumerRuntimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
         lastRuntimeReadinessRequest = request
         requireNotNull(consumerRuntimeReadinessHandler) { "Consumer runtime-readiness handler not configured" }(request, callback)
     }
@@ -149,10 +146,8 @@ private class FakeConsumerRemoteService(private val parent: FakeSharedRuntimeRem
         parent.consumerGenerate(request, callback)
     override fun cancel(request: CancelRequestParcel) = parent.consumerCancel(request)
     override fun closeSession(request: CloseSessionRequestParcel) = parent.consumerCloseSession(request)
-    override fun runtimeReadiness(
-        request: ConsumerControlPlaneRequestParcel,
-        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
-    ) = parent.consumerRuntimeReadiness(request, callback)
+    override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) =
+        parent.consumerRuntimeReadiness(request, callback)
 }
 
 internal class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSource {
