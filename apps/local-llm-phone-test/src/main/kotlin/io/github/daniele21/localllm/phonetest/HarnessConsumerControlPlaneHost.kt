@@ -184,9 +184,9 @@ internal class HarnessConsumerControlPlaneHost(
             return ConsumerActivationResult.Rejected(preparationFailure)
         }
         val runtimeResolved = runCatching {
-            requireNotNull(baseRuntimeResolved).aliasActivatedPreset(
+            requireNotNull(baseRuntimeResolved).withActivatedPresetAlias(
                 publicPreset = request.preset,
-                canonicalPreset = execution.inferencePreset,
+                canonicalInferencePreset = execution.inferencePreset,
             )
         }.getOrElse {
             return ConsumerActivationResult.Rejected(
