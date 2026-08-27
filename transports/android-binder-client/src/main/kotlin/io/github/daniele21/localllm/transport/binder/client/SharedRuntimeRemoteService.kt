@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerGeneration
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
@@ -65,6 +66,11 @@ internal interface ConsumerSharedRuntimeRemoteService {
     @Throws(RemoteException::class)
     fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         callback(controlPlaneUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
+        callback(runtimeReadinessUnavailable(request.operationId))
     }
 }
 
@@ -134,6 +140,15 @@ private fun controlPlaneUnavailable(operationId: String) = ConsumerControlPlaneR
     error = WireErrorParcel(
         code = WireErrorCodes.FEATURE_UNAVAILABLE,
         safeMessage = "Consumer control plane is unavailable",
+        retryable = false,
+    ),
+)
+
+private fun runtimeReadinessUnavailable(operationId: String) = ConsumerRuntimeReadinessResultParcel(
+    operationId = operationId,
+    error = WireErrorParcel(
+        code = WireErrorCodes.FEATURE_UNAVAILABLE,
+        safeMessage = "Consumer runtime readiness is unavailable",
         retryable = false,
     ),
 )

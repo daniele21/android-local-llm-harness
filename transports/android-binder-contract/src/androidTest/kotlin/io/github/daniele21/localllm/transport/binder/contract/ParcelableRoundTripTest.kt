@@ -3,6 +3,8 @@ package io.github.daniele21.localllm.transport.binder.contract
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
+import io.github.daniele21.localllm.contracts.ConsumerRuntimePhase
 import kotlinx.parcelize.parcelableCreator
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -86,6 +88,20 @@ class ParcelableRoundTripTest {
             )
 
         assertEquals(value, roundTrip(value, parcelableCreator<ConsumerGenerationRequestV2Parcel>()))
+    }
+
+    @Test
+    fun consumerRuntimeReadinessRoundTripsThroughParcel() {
+        val value =
+            ConsumerRuntimeReadinessResultParcel(
+                operationId = "readiness-operation",
+                activationId = "activation-opaque",
+                phaseTag = ConsumerRuntimePhase.PREPARING.name,
+                preparationActionTag = ConsumerPreparationAction.SWITCHING.name,
+                retryable = false,
+            )
+
+        assertEquals(value, roundTrip(value, parcelableCreator<ConsumerRuntimeReadinessResultParcel>()))
     }
 
     @Test

@@ -23,6 +23,7 @@ class SharedRuntimeHostDelegate(
     val protocolInfo: ProtocolInfoParcel,
     private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
+    private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
     private val ledger: ClientConnectionLedger = ClientConnectionLedger(),
     private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
@@ -38,6 +39,8 @@ class SharedRuntimeHostDelegate(
         ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
     internal val controlPlaneOperations =
         ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
+    internal val readinessOperations =
+        ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, controlExecutor)
 
     fun registerClient(
         caller: AuthorizedCaller,

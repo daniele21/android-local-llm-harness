@@ -4,9 +4,11 @@ import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IPrepareCallback
 import io.github.daniele21.localllm.transport.binder.contract.IRegistrationCallback
@@ -76,6 +78,17 @@ internal fun remoteConsumerControlPlaneResultCallback(
     token: ClientTokenParcel,
     remote: IConsumerControlPlaneResultCallback,
 ): HostResultCallback<ConsumerControlPlaneResultParcel> = HostResultCallback { result ->
+    if (!deliverRemote { remote.onResult(result) }) {
+        delegate.unregisterClient(caller, token.value)
+    }
+}
+
+internal fun remoteConsumerRuntimeReadinessResultCallback(
+    delegate: SharedRuntimeHostDelegate,
+    caller: AuthorizedCaller,
+    token: ClientTokenParcel,
+    remote: IConsumerRuntimeReadinessResultCallback,
+): HostResultCallback<ConsumerRuntimeReadinessResultParcel> = HostResultCallback { result ->
     if (!deliverRemote { remote.onResult(result) }) {
         delegate.unregisterClient(caller, token.value)
     }
