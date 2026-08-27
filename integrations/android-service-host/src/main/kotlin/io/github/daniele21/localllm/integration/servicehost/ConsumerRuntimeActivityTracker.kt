@@ -26,11 +26,7 @@ internal class ConsumerRuntimeActivityTracker {
 
     fun finishPreparation(token: HostClientToken, issue: ConsumerRuntimeIssue?) {
         preparing.remove(token)
-        if (issue == null) {
-            issues.remove(token)
-        } else {
-            issues[token] = issue
-        }
+        updateIssue(token, issue)
     }
 
     fun beginGeneration(token: HostClientToken) {
@@ -38,11 +34,12 @@ internal class ConsumerRuntimeActivityTracker {
         generations.computeIfAbsent(token) { AtomicInteger() }.incrementAndGet()
     }
 
-    fun finishGeneration(token: HostClientToken) {
-        val counter = generations[token] ?: return
-        if (counter.decrementAndGet() <= 0) {
+    fun finishGeneration(token: HostClientToken, issue: ConsumerRuntimeIssue? = null) {
+        val counter = generations[token]
+        if (counter != null && counter.decrementAndGet() <= 0) {
             generations.remove(token, counter)
         }
+        updateIssue(token, issue)
     }
 
     fun snapshot(token: HostClientToken): ConsumerRuntimeActivitySnapshot = ConsumerRuntimeActivitySnapshot(
@@ -61,5 +58,13 @@ internal class ConsumerRuntimeActivityTracker {
         preparing.clear()
         generations.clear()
         issues.clear()
+    }
+
+    private fun updateIssue(token: HostClientToken, issue: ConsumerRuntimeIssue?) {
+        if (issue == null) {
+            issues.remove(token)
+        } else {
+            issues[token] = issue
+        }
     }
 }
