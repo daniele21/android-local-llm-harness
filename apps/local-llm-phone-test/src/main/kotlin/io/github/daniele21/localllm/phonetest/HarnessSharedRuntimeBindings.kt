@@ -51,13 +51,26 @@ internal object HarnessSharedRuntimeBindings {
         redactGuardPackages(debugHost) +
         if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
+    fun modelProfileId(useCaseId: String, catalogProfileKey: String): String? {
+        require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
+        val suffix = when (useCaseId) {
+            consoleUseCaseId.value -> CONSOLE_PROFILE_SUFFIX
+            ombraUseCaseId.value -> OMBRA_PROFILE_SUFFIX
+            else -> return null
+        }
+        return "$catalogProfileKey-$suffix"
+    }
+
+    /** Exact model-profile identity exposed by the current document-PII runtime environment. */
+    fun ombraModelProfileId(catalogProfileKey: String): String = requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
+
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
                 maxOutputTokens = CONSOLE_DEFAULT_MAX_OUTPUT_TOKENS,
                 useCaseValue = consoleUseCaseId.value,
-                profileSuffix = "shared-console",
+                profileSuffix = CONSOLE_PROFILE_SUFFIX,
                 contextSize = CONSOLE_CONTEXT_SIZE,
             )
         return resolved.copy(
@@ -78,7 +91,7 @@ internal object HarnessSharedRuntimeBindings {
                 model = model,
                 maxOutputTokens = OMBRA_DEFAULT_MAX_OUTPUT_TOKENS,
                 useCaseValue = ombraUseCaseId.value,
-                profileSuffix = "ombra-pii",
+                profileSuffix = OMBRA_PROFILE_SUFFIX,
                 contextSize = OMBRA_CONTEXT_SIZE,
             )
         val useCase =
@@ -103,4 +116,6 @@ internal object HarnessSharedRuntimeBindings {
     private const val CONSOLE_CONTEXT_SIZE = 4_096
     private const val OMBRA_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val OMBRA_CONTEXT_SIZE = 4_096
+    private const val CONSOLE_PROFILE_SUFFIX = "shared-console"
+    private const val OMBRA_PROFILE_SUFFIX = "ombra-pii"
 }

@@ -22,6 +22,7 @@ import io.github.daniele21.localllm.models.UseCaseDefinitionState
 import io.github.daniele21.localllm.models.UseCasePresetDefinition
 import io.github.daniele21.localllm.models.UseCaseRequirements
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,6 +45,14 @@ class HarnessApplicationsGatewayTest {
         assertEquals(HarnessAssignmentStatus.ACTIVE, assignment.status)
         assertEquals("Balanced", assignment.defaultPreset?.displayName)
         assertEquals(listOf("Balanced", "Fast"), assignment.availablePresets.map { it.displayName })
+
+        val balanced = requireNotNull(assignment.defaultPreset)
+        assertEquals("balanced-generation", balanced.inferencePresetId)
+        assertEquals(1, balanced.inferencePresetRevision)
+        assertEquals(60_000L, balanced.retainModelWarmMs)
+        assertFalse(requireNotNull(balanced.reuseStatelessContext))
+        assertFalse(requireNotNull(balanced.enablePrefixSnapshot))
+        assertFalse(requireNotNull(balanced.enableDeterministicResultCache))
     }
 
     @Test
