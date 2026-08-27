@@ -172,11 +172,22 @@ internal class HarnessConsumerControlPlaneHost(
         val execution = resolution.execution
         val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
         val imported = installed?.let { importedModel(it.digest, it.sizeBytes) }
-        val runtimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
+        val runtimeResolved =
+            imported?.let { model ->
+                runCatching {
+                    HarnessActivatedUseCaseMaterializer.materialize(
+                        model = model,
+                        applicationId = applicationId,
+                        execution = execution,
+                        state = store.snapshot(),
+                    )
+                }.getOrNull()
+            }
         val preparationFailure = activationPreparationFailure(
             staleRevision = execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision,
             modelInstalled = installed != null,
             modelImported = imported != null,
+            runtimeMaterialized = runtimeResolved != null,
             expectedModelDigest = execution.modelDigest,
             runtimeModelDigest = runtimeResolved?.model?.artifact?.digest,
         )
@@ -268,6 +279,7 @@ private fun activationPreparationFailure(
     staleRevision: Boolean,
     modelInstalled: Boolean,
     modelImported: Boolean,
+    runtimeMaterialized: Boolean,
     expectedModelDigest: ModelDigest,
     runtimeModelDigest: ModelDigest?,
 ): ConsumerControlPlaneFailure? = when {
@@ -284,6 +296,11 @@ private fun activationPreparationFailure(
     !modelImported -> failure(
         ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
         "Required local model is unsupported",
+    )
+
+    !runtimeMaterialized -> failure(
+        ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+        "Resolved preset cannot be materialized by the local runtime",
     )
 
     runtimeModelDigest != expectedModelDigest -> failure(
