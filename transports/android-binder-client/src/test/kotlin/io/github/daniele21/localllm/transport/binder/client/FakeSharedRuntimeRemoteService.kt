@@ -6,9 +6,11 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.OpenSessionRequestParcel
@@ -36,6 +38,7 @@ internal class FakeSharedRuntimeRemoteService(
     var lastCancelRequest: CancelRequestParcel? = null
     var lastConsumerRequest: ConsumerRequestParcel? = null
     var lastConsumerCloseSessionRequest: CloseSessionRequestParcel? = null
+    var lastRuntimeReadinessRequest: ConsumerControlPlaneRequestParcel? = null
     var cancelFailure: RemoteException? = null
     var registrationHandler: ((ClientHelloParcel, (RegistrationResultParcel) -> Unit) -> Unit)? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
@@ -45,6 +48,8 @@ internal class FakeSharedRuntimeRemoteService(
     var consumerPrepareHandler: ((ConsumerRequestParcel, (ConsumerResultParcel) -> Unit) -> Unit)? = null
     var consumerOpenSessionHandler: ((ConsumerRequestParcel, (ConsumerResultParcel) -> Unit) -> Unit)? = null
     var consumerGenerationHandler: ((ConsumerRequestParcel, (ConsumerGenerationEventParcel) -> Unit) -> Unit)? = null
+    var consumerRuntimeReadinessHandler:
+        ((ConsumerControlPlaneRequestParcel, (ConsumerRuntimeReadinessResultParcel) -> Unit) -> Unit)? = null
     private var hostDisconnecting: (() -> Unit)? = null
 
     override fun protocolInfo(): ProtocolInfoParcel = protocol
@@ -105,6 +110,14 @@ internal class FakeSharedRuntimeRemoteService(
         requireNotNull(consumerGenerationHandler) { "Consumer generation handler not configured" }(request, callback)
     }
 
+    fun consumerRuntimeReadiness(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
+    ) {
+        lastRuntimeReadinessRequest = request
+        requireNotNull(consumerRuntimeReadinessHandler) { "Consumer runtime-readiness handler not configured" }(request, callback)
+    }
+
     fun consumerCancel(request: CancelRequestParcel) {
         consumerCancelCalls += 1
         lastCancelRequest = request
@@ -136,6 +149,10 @@ private class FakeConsumerRemoteService(private val parent: FakeSharedRuntimeRem
         parent.consumerGenerate(request, callback)
     override fun cancel(request: CancelRequestParcel) = parent.consumerCancel(request)
     override fun closeSession(request: CloseSessionRequestParcel) = parent.consumerCloseSession(request)
+    override fun runtimeReadiness(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
+    ) = parent.consumerRuntimeReadiness(request, callback)
 }
 
 internal class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSource {
