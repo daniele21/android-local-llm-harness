@@ -8,11 +8,13 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerGeneration
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 
 /** Mirrors the public Consumer AIDL transaction surface; keep transaction ownership in one auditable stub. */
@@ -118,6 +120,17 @@ internal class ConsumerRuntimeBinderStub(
                 remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
             )
         }
+
+    override fun runtimeReadiness(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: IConsumerRuntimeReadinessResultCallback,
+    ) = withRuntimeReadinessCaller(authorizer, callingProcessSource, request, callback) { caller ->
+        delegate.readinessOperations.runtimeReadiness(
+            caller,
+            request,
+            remoteConsumerRuntimeReadinessResultCallback(delegate, caller, request.clientToken, callback),
+        )
+    }
 }
 
 private fun deliverConsumerUnauthorized(externalRequestId: String?, callback: IConsumerGenerationCallback) {
@@ -167,6 +180,28 @@ private inline fun withControlPlaneCaller(
         deliverRemote {
             callback.onResult(
                 ConsumerControlPlaneResultParcel(
+                    operationId = request.operationId,
+                    error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                ),
+            )
+        }
+    } else {
+        block(caller)
+    }
+}
+
+private inline fun withRuntimeReadinessCaller(
+    authorizer: CallerAuthorizer,
+    callingProcessSource: CallingProcessSource,
+    request: ConsumerControlPlaneRequestParcel,
+    callback: IConsumerRuntimeReadinessResultCallback,
+    block: (AuthorizedCaller) -> Unit,
+) {
+    val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
+    if (caller == null) {
+        deliverRemote {
+            callback.onResult(
+                ConsumerRuntimeReadinessResultParcel(
                     operationId = request.operationId,
                     error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
                 ),
