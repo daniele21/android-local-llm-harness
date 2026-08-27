@@ -31,6 +31,10 @@ class HarnessSharedRuntimeService : Service() {
             ),
             warmRetention = resolvedWarmRetention,
         )
+        val runtimeReadinessHost = HarnessConsumerRuntimeReadinessHost(
+            activationResidency = runtimeGraph.activationResidency,
+            snapshot = runtimeGraph::runtimeSnapshot,
+        )
         hostComposition = SharedRuntimeHostComposition(
             context = this,
             client = runtimeGraph.sharedRuntimeClient,
@@ -39,6 +43,7 @@ class HarnessSharedRuntimeService : Service() {
             hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
             consumerClientFactory = runtimeGraph.consumerClientFactory,
             consumerControlPlaneHost = controlPlaneHost,
+            consumerRuntimeReadinessHost = runtimeReadinessHost,
         )
         val warmIdleClock = WarmIdleEpochClock { System.currentTimeMillis() }
         warmIdleResidency = HarnessWarmIdleResidencyCoordinator(
