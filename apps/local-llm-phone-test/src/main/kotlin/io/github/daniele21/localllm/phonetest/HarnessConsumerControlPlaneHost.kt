@@ -172,16 +172,29 @@ internal class HarnessConsumerControlPlaneHost(
         val execution = resolution.execution
         val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
         val imported = installed?.let { importedModel(it.digest, it.sizeBytes) }
-        val runtimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
+        val baseRuntimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
         val preparationFailure = activationPreparationFailure(
             staleRevision = execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision,
             modelInstalled = installed != null,
             modelImported = imported != null,
             expectedModelDigest = execution.modelDigest,
-            runtimeModelDigest = runtimeResolved?.model?.artifact?.digest,
+            runtimeModelDigest = baseRuntimeResolved?.model?.artifact?.digest,
         )
         if (preparationFailure != null) {
             return ConsumerActivationResult.Rejected(preparationFailure)
+        }
+        val runtimeResolved = runCatching {
+            requireNotNull(baseRuntimeResolved).withActivatedPresetAlias(
+                publicPreset = request.preset,
+                canonicalInferencePreset = execution.inferencePreset,
+            )
+        }.getOrElse {
+            return ConsumerActivationResult.Rejected(
+                failure(
+                    ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+                    "Resolved inference preset is unavailable to the runtime",
+                ),
+            )
         }
         val acquired = runtimeControl.activationResidency.acquireExclusiveUseCase(
             request = UseCaseActivationRequest(
@@ -200,7 +213,7 @@ internal class HarnessConsumerControlPlaneHost(
             is ActivationResidencyResult.Failure -> ConsumerActivationResult.Rejected(acquired.toConsumerFailure())
 
             is ActivationResidencyResult.Success ->
-                activateRuntimeBinding(acquired.value, applicationId, request, requireNotNull(runtimeResolved))
+                activateRuntimeBinding(acquired.value, applicationId, request, runtimeResolved)
         }
     }
 

@@ -134,11 +134,16 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                     "Consumer API is not configured for applicationId ${applicationId.value}",
                 )
             }
+        val fallbackPolicyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies)
         val capabilityPolicy =
             ConsumerCapabilityPolicyService(
                 profileRegistry = registry,
                 modelStore = modelStore,
-                policyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies),
+                policyRegistry = HarnessActivationAwareConsumerPolicyRegistry(
+                    applicationId = applicationId,
+                    bindings = registry,
+                    fallback = fallbackPolicyRegistry,
+                ),
             )
         ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
     }
@@ -281,6 +286,12 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
         }
     }
 
+    fun activeResolved(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase? = synchronized(lock) {
+        activationBindings.values.lastOrNull {
+            it.applicationId == applicationId && it.useCaseId == useCaseId
+        }?.resolved
+    }
+
     fun removeActivationBinding(activationId: UseCaseActivationId) {
         synchronized(lock) { activationBindings.remove(activationId) }
     }
@@ -290,12 +301,7 @@ internal class HarnessPhoneBindingRegistry : ModelProfileRegistry {
     }
 
     override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        val activationResolved = synchronized(lock) {
-            activationBindings.values.lastOrNull {
-                it.applicationId == applicationId && it.useCaseId == useCaseId
-            }?.resolved
-        }
-        if (activationResolved != null) return activationResolved
+        activeResolved(applicationId, useCaseId)?.let { return it }
 
         check(applicationId == HarnessRuntimeGraph.APPLICATION_ID) {
             "External consumer requires an active Harness control-plane activation"

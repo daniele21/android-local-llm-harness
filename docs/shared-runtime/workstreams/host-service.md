@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-host
 Canonical scope: shared-runtime.host-service
 Read when: implementing or reviewing the exported service, caller authorization, runtime delegation or caller-owned cleanup
-Last reviewed: 2026-08-12
+Last reviewed: 2026-08-27
 
 ## Goal
 
@@ -64,6 +64,14 @@ The client never supplies the model digest, artifact, profile or runtime tuning.
 
 If no host model is selected, external `prepare()` returns a not-ready result without creating a runtime, selecting a model or loading GGUF bytes. A valid explicit prepare may lazily create the process-scoped runtime and then lets the existing `RuntimeOrchestrator` resolve and load the exact host-selected artifact.
 
+### Control-plane preset identity at runtime
+
+For control-plane consumers, the persisted public preset identity and the host-owned inference profile are deliberately separate. Activation resolves the exact persisted preset, model profile and canonical `InferencePresetRef` first. The host then creates an ephemeral runtime alias whose `InferencePreset.ref` is the public activated preset while generation settings, context preference, system prompt and allowed output modes remain copied from the canonical host-owned inference profile.
+
+The activation-bound `ResolvedUseCase` exposes only that public alias and makes it the runtime default. The Consumer API capability policy follows the active public preset for the same application/use case and falls back to the reviewed built-in policy after deactivation or connection cleanup. This keeps one identity across control-plane activation, Consumer API prepare/session/generation and telemetry without allowing the consumer to manufacture model or tuning state.
+
+`PresetExecutionPolicy.contextTokens` remains a host execution requirement used by `HostExecutionResolver` when checking model compatibility. It is not converted into a second consumer-side session override. Model loading also remains unchanged: activation does not import, verify or load GGUF bytes; a subsequent valid `prepare()` lets the existing `RuntimeOrchestrator` load or reuse the already installed and verified resolved model.
+
 ## Connection and resource ownership
 
 Every authenticated connection owns its sessions, request mappings, generation handles, death link and callback dispatcher. The ledger is bounded by explicit connection/session/request quotas and maps external correlation IDs to host-generated internal IDs.
@@ -115,6 +123,9 @@ Android onTrimMemory/onLowMemory
 
 - Pure bind, registration, handshake and snapshot do not create a runtime or load a model.
 - Explicit prepare remains inert while no host model is selected.
+- Control-plane activation resolves and binds execution identity but does not import, verify or load model bytes.
+- A public custom preset remains the same preset identity across activation, Consumer API capability validation and runtime generation while its tuning stays host-owned.
+- Deactivation and connection cleanup remove the activation-bound alias; later capability discovery falls back to the reviewed built-in policy.
 - Client death/disconnect releases only that client's work.
 - Host UI recreation does not recreate the process graph.
 - Service destruction drains service adapter resources without destroying the graph.
@@ -151,6 +162,9 @@ Coverage includes:
 - allowed/denied use cases and cross-UID token isolation;
 - external binding failure without a selected model;
 - exact external resolution to the host-selected curated model digest;
+- activation-time public preset alias preserving canonical host-owned generation configuration;
+- Consumer API capability exposure following the active public preset and reverting after release;
+- control-plane activation installing the public alias without importing, re-verifying or removing model bytes;
 - no runtime creation during bind/registration/snapshot or prepare-without-selection;
 - prepare/session/generation delegation and external/internal ID mapping;
 - cancellation, client death and idempotent connection cleanup;
@@ -165,6 +179,8 @@ Coverage includes:
 - Unauthorized callers cannot obtain runtime access.
 - Authorized callers can access only exact registered use cases.
 - Client input cannot select or mutate model acquisition, installation or artifact identity.
+- A published control-plane preset accepted by activation is the same public preset accepted by Consumer API prepare/session/generation.
+- Public custom preset identity never duplicates or transfers ownership of canonical model/generation policy to the consumer.
 - The service invokes the same process-scoped `LocalLlmClient` data plane used in-process.
 - Binder threads perform no model load or generation.
 - Every caller-owned resource is isolated and cleanable after death/disconnect/destruction.
