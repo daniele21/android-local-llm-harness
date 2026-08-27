@@ -109,7 +109,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         assignment: HarnessAssignmentSummary,
         basePreset: HarnessPresetSummary,
         displayName: String,
-        automaticModelSelection: Boolean,
+        modelProfileId: String?,
         contextTokens: Int?,
     ) {
         val attached = gateway as? HarnessCustomPresetGateway
@@ -133,7 +133,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                         basePresetId = basePreset.presetId,
                         basePresetRevision = basePreset.revision,
                         displayName = displayName,
-                        modelProfileId = if (automaticModelSelection) null else basePreset.modelProfileId,
+                        modelProfileId = modelProfileId,
                         contextTokens = contextTokens,
                     ),
                 )
