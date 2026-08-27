@@ -4,7 +4,7 @@ Status: active
 Document type: current-state
 Owner: repository
 Canonical scope: state.repository
-Read when: determining the integrated baseline, open blockers or next repository work block
+Read when: determining the integrated baseline, blockers or next repository work block
 Last reviewed: 2026-08-27
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
@@ -35,7 +35,7 @@ Applications control-plane implementation is complete through ACUX-80: Apps prim
 
 Consumer execution-readiness convergence is now tracked in [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md): Harness must make preset model/generation configuration effective and inspectable, automatically prepare the exact activated installed model for consumer inference, and expose transport/configuration/runtime state truthfully to both Harness and consumer UI without moving model/runtime ownership into RedactGuard.
 
-A persisted control-plane startup/upgrade regression is now active: current Binder discovery/activation can seed only an exactly empty store, so a partially populated but valid Room state may remain permanently incomplete. The bounded repair is tracked in [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md). ACUX-90 is blocked until the reconciled exact-head repository candidate reaches CPREC-70.
+Persisted control-plane reconciliation is integrated repository-side through the unambiguous Harness v30 candidate: the pure reconciler, Room partial-state regression, startup cutover, upgrade matrix, cross-surface consistency proof and main-thread startup fix are in `dev`. Remaining CPREC work is representative physical upgrade-repair and clean two-APK evidence; ACUX-90 remains gated on that exact-candidate device proof rather than on further repository implementation.
 
 General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
 
@@ -76,13 +76,13 @@ PR #248 contains a review-gated symbol candidate, not approved production identi
 
 Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 support claim, execute each reviewed artifact/configuration, evaluate aggregate/per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates, preserve exact identities and fail closed on threshold/category/identity failure. Policy v1 must not be lowered to fit observed results.
 
-### 3. Persisted control-plane reconciliation
+### 3. CPREC physical evidence
 
-The current host bootstrap mutates persistent state from Binder-path discovery/activation and only seeds when the entire `HostControlPlaneState` is empty. Partial valid state can therefore survive upgrades/restarts without mandatory built-in application/use-case/preset/binding/exposure data. Repair must be atomic, conservative and idempotent; preserve unrelated/custom/disabled/default state; fail closed on conflicting built-in identity; and complete before UI or Binder observation. CPREC-10 and CPREC-20 are the first parallel implementation slices; physical Applications/HCP proof waits for CPREC-70.
+Repository-side control-plane reconciliation is integrated. Closure still requires the exact signed candidate to prove non-destructive upgrade repair without uninstall/clear-data and then a clean same-signer two-APK path where Applications and the external consumer observe and use the same application/use-case/binding/preset identity. Stale/invalid identities must fail closed and valid persisted custom/default/disabled state must survive repair.
 
 ### 4. Physical Android evidence
 
-Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path. ACUX-90 cannot start until the reconciled CPREC-70 candidate exists.
+Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6, CPREC and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path.
 
 Do not claim representative-device UX, external-consumer Applications effectiveness, `MEASURED` Q35 profiles, publish-ready Binder client AAR or production-ready OMBRA/shared-host transport from CI/emulator evidence alone.
 
@@ -95,7 +95,7 @@ Repository-side UX/UI, including Applications through ACUX-80, is complete. Rema
 1. execute CRV-10, CRV-20, CRV-50 and cross-repo CRV-60 in parallel, keeping model/runtime ownership in Harness and consumer-safe product state in RedactGuard;
 2. after exact execution identity settles, connect activation to automatic runtime preparation/residency in CRV-30 and then establish source-backed runtime state in CRV-40;
 3. implement Harness and RedactGuard readiness UI in parallel as CRV-70/80, then run the cross-layer regression matrix and exact-head automated preflight;
-4. continue the independent CPREC reconciliation candidate/evidence path and OMB-6B/OMB-8 work where ownership does not conflict;
+4. continue independent CPREC-80/90 physical evidence and OMB-6B/OMB-8 work where ownership does not conflict;
 5. produce new exact integrated candidates after CRV automated gates, then use one representative two-APK session for compatible CRV/CPREC/ACUX/RG-HCP evidence while preserving each gate independently;
 6. complete Q35-6, SR-6 and broader phone UX evidence plus release privacy/security, packaging, versioning/signing and documentation checks on the relevant exact builds.
 
@@ -103,6 +103,7 @@ Repository-side UX/UI, including Applications through ACUX-80, is complete. Rema
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
 - Consumer runtime readiness: [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md)
+- Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
 - Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
