@@ -61,6 +61,12 @@ internal data class HarnessPresetSummary(
     val modelProfileId: String?,
     val contextTokens: Int?,
     val isDefault: Boolean,
+    val inferencePresetId: String? = null,
+    val inferencePresetRevision: Int? = null,
+    val retainModelWarmMs: Long? = null,
+    val reuseStatelessContext: Boolean? = null,
+    val enablePrefixSnapshot: Boolean? = null,
+    val enableDeterministicResultCache: Boolean? = null,
 )
 
 internal data class HarnessSetDefaultPresetCommand(
@@ -215,6 +221,12 @@ private fun HostControlPlaneState.assignmentSummary(binding: ApplicationUseCaseB
                 modelProfileId = preset.execution.modelProfileId,
                 contextTokens = preset.execution.contextTokens,
                 isDefault = exposure.isDefault,
+                inferencePresetId = preset.execution.inferencePreset?.id?.value,
+                inferencePresetRevision = preset.execution.inferencePreset?.version,
+                retainModelWarmMs = preset.execution.cachePolicy.retainModelWarmMs,
+                reuseStatelessContext = preset.execution.cachePolicy.reuseStatelessContext,
+                enablePrefixSnapshot = preset.execution.cachePolicy.enablePrefixSnapshot,
+                enableDeterministicResultCache = preset.execution.cachePolicy.enableDeterministicResultCache,
             )
         }
     }.sortedWith(compareByDescending<HarnessPresetSummary> { it.isDefault }.thenBy { it.displayName.lowercase() })
