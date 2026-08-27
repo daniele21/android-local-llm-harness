@@ -119,8 +119,8 @@ internal fun HarnessModelPolicyCard(
             HarnessRecoveryCard(
                 title = "Selected model is no longer available",
                 detail =
-                    "The saved runtime profile '$selectedModelProfileId' is not part of the current curated execution catalog. " +
-                        "Choose Automatic or another model before saving.",
+                "The saved runtime profile '$selectedModelProfileId' is not part of the current curated execution catalog. " +
+                    "Choose Automatic or another model before saving.",
                 actionLabel = "Use Automatic",
                 onAction = { onModelSelected(null) },
                 tone = HarnessStatusTone.WARNING,
