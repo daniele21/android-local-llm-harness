@@ -176,10 +176,7 @@ private class ConsumerRuntimePreparationFixture {
     }
 }
 
-private class ConsumerRuntimePreparationModelStore(
-    private val file: File,
-    private val available: Set<ModelDigest>,
-) : ModelStore {
+private class ConsumerRuntimePreparationModelStore(private val file: File, private val available: Set<ModelDigest>) : ModelStore {
     val verificationCallsByDigest = mutableMapOf<ModelDigest, Int>()
 
     override fun find(digest: ModelDigest): StoredModel? =
