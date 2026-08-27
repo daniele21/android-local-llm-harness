@@ -12,11 +12,7 @@ import io.github.daniele21.localllm.transport.binder.contract.toConsumerRuntimeR
 
 /** Host-owned provider for the consumer-safe runtime lifecycle projection. */
 interface ConsumerRuntimeReadinessHost {
-    fun runtimeReadiness(
-        ownerId: String,
-        applicationId: ApplicationId,
-        activationId: ConsumerActivationId,
-    ): ConsumerRuntimeReadinessResult
+    fun runtimeReadiness(ownerId: String, applicationId: ApplicationId, activationId: ConsumerActivationId): ConsumerRuntimeReadinessResult
 }
 
 internal class ConsumerRuntimeReadinessHostOperations(
@@ -46,6 +42,7 @@ internal class ConsumerRuntimeReadinessHostOperations(
                 )
             ) {
                 is LedgerResult.Failure -> callback.onResult(failure(request, ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE))
+
                 is LedgerResult.Success -> {
                     if (!support.value || host == null) {
                         callback.onResult(failure(request, ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE))
@@ -71,7 +68,6 @@ internal class ConsumerRuntimeReadinessHostOperations(
 private fun failure(
     request: ConsumerControlPlaneRequestParcel,
     code: ConsumerControlPlaneErrorCode,
-): ConsumerRuntimeReadinessResultParcel =
-    ConsumerRuntimeReadinessResult.Rejected(
-        ConsumerControlPlaneFailure(code, "Consumer runtime readiness is unavailable"),
-    ).toConsumerRuntimeReadinessWire(request.operationId)
+): ConsumerRuntimeReadinessResultParcel = ConsumerRuntimeReadinessResult.Rejected(
+    ConsumerControlPlaneFailure(code, "Consumer runtime readiness is unavailable"),
+).toConsumerRuntimeReadinessWire(request.operationId)
