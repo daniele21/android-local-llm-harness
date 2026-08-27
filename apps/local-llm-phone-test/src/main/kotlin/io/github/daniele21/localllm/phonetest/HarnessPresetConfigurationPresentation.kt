@@ -23,6 +23,16 @@ internal data class HarnessPresetConfigurationSummary(
         get() = unavailableReason == null
 }
 
+private data class HarnessInferenceProfileLookup(
+    val presetId: String? = null,
+    val revision: Int? = null,
+    val option: PlaygroundPresetOption? = null,
+    val unavailableReason: String? = null,
+) {
+    val available: Boolean
+        get() = presetId != null && revision != null && option != null && unavailableReason == null
+}
+
 internal fun harnessPresetModelOptions(useCaseId: String): List<HarnessPresetModelOption> =
     CuratedModelCatalog.releases.mapNotNull { release ->
         val modelProfileId = HarnessSharedRuntimeBindings.modelProfileId(useCaseId, release.profileKey.value)
@@ -45,17 +55,13 @@ internal fun harnessPresetConfigurationSummary(
     preset: HarnessPresetSummary,
     selectedModelProfileId: String?,
 ): HarnessPresetConfigurationSummary {
-    val inferencePresetId = preset.inferencePresetId
-        ?: return unavailableSummary("Inference profile is unavailable from the canonical preset definition.")
-    val inferenceRevision = preset.inferencePresetRevision
-        ?: return unavailableSummary("Inference profile revision is unavailable from the canonical preset definition.")
-    val option = playgroundPresetOptions.singleOrNull { it.id == inferencePresetId }
-        ?: return unavailableSummary("Inference profile '$inferencePresetId' is not supported by this phone runtime.")
-    if (inferenceRevision != Qwen35GenerationProfiles.VERSION) {
-        return unavailableSummary(
-            "Inference profile revision $inferenceRevision is not supported by runtime revision ${Qwen35GenerationProfiles.VERSION}.",
-        )
+    val inference = resolveInferenceProfile(preset)
+    if (!inference.available) {
+        return unavailableSummary(requireNotNull(inference.unavailableReason))
     }
+    val inferencePresetId = requireNotNull(inference.presetId)
+    val inferenceRevision = requireNotNull(inference.revision)
+    val option = requireNotNull(inference.option)
     val modelOptions = harnessPresetModelOptions(useCaseId)
     val tiers = if (selectedModelProfileId == null) {
         listOf(Qwen35ModelTier.B0_8, Qwen35ModelTier.B2)
@@ -92,6 +98,41 @@ internal fun harnessPresetConfigurationSummary(
             HarnessPresetConfigurationRow("Deterministic result cache", preset.enableDeterministicResultCache.toEnabledLabel()),
         ),
     )
+}
+
+private fun resolveInferenceProfile(preset: HarnessPresetSummary): HarnessInferenceProfileLookup {
+    val presetId = preset.inferencePresetId
+    val revision = preset.inferencePresetRevision
+    return when {
+        presetId == null -> HarnessInferenceProfileLookup(
+            unavailableReason = "Inference profile is unavailable from the canonical preset definition.",
+        )
+
+        revision == null -> HarnessInferenceProfileLookup(
+            unavailableReason = "Inference profile revision is unavailable from the canonical preset definition.",
+        )
+
+        else -> {
+            val option = playgroundPresetOptions.singleOrNull { it.id == presetId }
+            when {
+                option == null -> HarnessInferenceProfileLookup(
+                    unavailableReason = "Inference profile '$presetId' is not supported by this phone runtime.",
+                )
+
+                revision != Qwen35GenerationProfiles.VERSION -> HarnessInferenceProfileLookup(
+                    unavailableReason =
+                        "Inference profile revision $revision is not supported by runtime revision " +
+                            "${Qwen35GenerationProfiles.VERSION}.",
+                )
+
+                else -> HarnessInferenceProfileLookup(
+                    presetId = presetId,
+                    revision = revision,
+                    option = option,
+                )
+            }
+        }
+    }
 }
 
 private fun profileRow(
