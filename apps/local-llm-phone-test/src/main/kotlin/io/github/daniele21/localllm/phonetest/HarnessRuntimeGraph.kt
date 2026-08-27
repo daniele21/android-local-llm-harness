@@ -102,10 +102,10 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         get() = sharedRuntimeClientFacade
 
     val consumerClientFactory: (ApplicationId) -> ConsumerLocalLlmClient = { applicationId ->
-        val policies =
+        val fallbackPolicies =
             when (applicationId) {
                 HarnessSharedRuntimeBindings.consoleApplicationId -> {
-                    val legacyConsolePolicy =
+                    listOf(
                         ConsumerUseCasePolicy(
                             applicationId = applicationId,
                             useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
@@ -123,12 +123,11 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                                 maxConversationMessages = 128,
                                 maxJsonSchemaCharacters = 32_768,
                             ),
-                        )
-                    listOf(legacyConsolePolicy, HarnessOmbraConsumerPolicy.create(applicationId))
+                        ),
+                    )
                 }
 
-                HarnessSharedRuntimeBindings.redactGuardApplicationId ->
-                    listOf(HarnessOmbraConsumerPolicy.create(applicationId))
+                HarnessSharedRuntimeBindings.redactGuardApplicationId -> emptyList()
 
                 else -> throw IllegalArgumentException(
                     "Consumer API is not configured for applicationId ${applicationId.value}",
@@ -138,7 +137,11 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             ConsumerCapabilityPolicyService(
                 profileRegistry = registry,
                 modelStore = modelStore,
-                policyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies),
+                policyRegistry =
+                HarnessControlPlaneConsumerPolicyRegistry(
+                    store = controlPlaneStore,
+                    fallback = InMemoryConsumerUseCasePolicyRegistry(fallbackPolicies),
+                ),
             )
         ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
     }
