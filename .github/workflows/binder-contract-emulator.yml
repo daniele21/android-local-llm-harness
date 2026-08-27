@@ -1,0 +1,148 @@
+name: Binder contract emulator evidence
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "core/contracts/**"
+      - "transports/android-binder-contract/**"
+      - ".github/workflows/binder-contract-emulator.yml"
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Branch, tag, or commit to validate
+        type: string
+        default: dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binder-contract-emulator-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.candidate_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  binder-contract-emulator:
+    name: Binder Parcelable evidence on API 35
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || (github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.sha) }}
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/binder-contract-emulator"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/binder-contract-emulator/source-revision.txt"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Android AVD home
+        shell: bash
+        run: |
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/android-avd" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=$RUNNER_TEMP/android-user" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-avd" "$RUNNER_TEMP/android-user"
+
+      - name: Install emulator image
+        shell: bash
+        run: |
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Enable KVM access
+        shell: bash
+        run: |
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Create and start emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          test -x "$EMULATOR_BIN"
+
+          echo "no" | avdmanager create avd \
+            --force \
+            --name binder-contract-api35 \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6"
+
+          nohup "$EMULATOR_BIN" \
+            -avd binder-contract-api35 \
+            -port 5554 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            > "$RUNNER_TEMP/binder-contract-emulator/emulator.log" 2>&1 &
+
+          timeout 180 adb -s emulator-5554 wait-for-device
+          for attempt in $(seq 1 90); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              adb -s emulator-5554 shell settings put global window_animation_scale 0
+              adb -s emulator-5554 shell settings put global transition_animation_scale 0
+              adb -s emulator-5554 shell settings put global animator_duration_scale 0
+              exit 0
+            fi
+            sleep 2
+          done
+
+          adb devices -l >&2 || true
+          cat "$RUNNER_TEMP/binder-contract-emulator/emulator.log" >&2 || true
+          echo "Error: Binder contract emulator did not finish booting." >&2
+          exit 1
+
+      - name: Run Binder contract instrumented tests
+        env:
+          ANDROID_SERIAL: emulator-5554
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew \
+            --no-configuration-cache \
+            :transports:android-binder-contract:connectedDebugAndroidTest \
+            2>&1 | tee "$RUNNER_TEMP/binder-contract-emulator/connected-debug-android-test.log"
+
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: adb -s emulator-5554 emu kill || true
+
+      - name: Upload Binder emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: binder-contract-emulator-evidence
+          path: |
+            transports/android-binder-contract/build/reports/androidTests/**
+            transports/android-binder-contract/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/binder-contract-emulator/**
+          if-no-files-found: warn
+          retention-days: 14
