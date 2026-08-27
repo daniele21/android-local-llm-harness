@@ -11,6 +11,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.PresetLifecycleState
+import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCaseDefinitionState
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicyRegistry
@@ -52,19 +53,18 @@ internal object HarnessOmbraConsumerPolicy {
 }
 
 /**
- * Projects the canonical Host control-plane exposure into Consumer API capability policy.
- *
- * This keeps discovery/activation and data-plane preparation on one preset/default source. Reads are
- * observational only: no seeding, reconciliation, model load or runtime mutation is performed here.
+ * Projects canonical Host control-plane preset exposure into Consumer API capability policy.
+ * Reads are observational only: no reconciliation, model load or runtime mutation is performed.
  */
 internal class HarnessControlPlaneConsumerPolicyRegistry(
     private val store: HostControlPlaneStore,
+    private val fallback: ConsumerUseCasePolicyRegistry? = null,
 ) : ConsumerUseCasePolicyRegistry {
     override fun find(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerUseCasePolicy? {
         if (applicationId !in HarnessSharedRuntimeBindings.piiConsumerApplicationIds ||
             useCaseId != HarnessSharedRuntimeBindings.ombraUseCaseId
         ) {
-            return null
+            return fallback?.find(applicationId, useCaseId)
         }
         val state = store.snapshot()
         val application = state.applications.singleOrNull { it.applicationId == applicationId }
@@ -105,7 +105,7 @@ internal class HarnessControlPlaneConsumerPolicyRegistry(
     private fun buildRevision(
         useCaseRevision: Int,
         bindingRevision: Int,
-        exposures: List<io.github.daniele21.localllm.models.StoredPresetExposure>,
+        exposures: List<StoredPresetExposure>,
     ): String = buildString {
         append(HarnessOmbraConsumerPolicy.REVISION)
         append("|uc=").append(useCaseRevision)
