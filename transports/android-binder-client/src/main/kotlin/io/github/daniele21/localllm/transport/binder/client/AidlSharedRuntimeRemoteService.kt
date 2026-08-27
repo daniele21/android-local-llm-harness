@@ -150,7 +150,8 @@ private fun controlPlaneResultCallback(callback: (ConsumerControlPlaneResultParc
         override fun onResult(result: ConsumerControlPlaneResultParcel) = callback(result)
     }
 
-private fun runtimeReadinessResultCallback(callback: (ConsumerRuntimeReadinessResultParcel) -> Unit): IConsumerRuntimeReadinessResultCallback =
-    object : IConsumerRuntimeReadinessResultCallback.Stub() {
-        override fun onResult(result: ConsumerRuntimeReadinessResultParcel) = callback(result)
-    }
+private fun runtimeReadinessResultCallback(
+    callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
+): IConsumerRuntimeReadinessResultCallback = object : IConsumerRuntimeReadinessResultCallback.Stub() {
+    override fun onResult(result: ConsumerRuntimeReadinessResultParcel) = callback(result)
+}
