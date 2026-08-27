@@ -10,6 +10,7 @@ import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
+import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadinessClient
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -23,8 +24,10 @@ private constructor(
     private val lifecycle: BinderConsumerLifecycleAdapter,
     private val generation: BinderConsumerGenerationAdapter,
     private val controlPlane: BinderConsumerControlPlaneAdapter,
+    private val runtimeReadiness: BinderConsumerRuntimeReadinessAdapter,
 ) : ConsumerLocalLlmClient,
     ConsumerControlPlaneClient by controlPlane,
+    ConsumerRuntimeReadinessClient by runtimeReadiness,
     AutoCloseable {
     private val closed = AtomicBoolean(false)
 
@@ -102,6 +105,12 @@ private constructor(
                 ),
                 controlPlane =
                 BinderConsumerControlPlaneAdapter(
+                    endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
+                runtimeReadiness =
+                BinderConsumerRuntimeReadinessAdapter(
                     endpointProvider = { connection.endpoint },
                     enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
                     endpointInvalidations = connection.endpointInvalidations,
