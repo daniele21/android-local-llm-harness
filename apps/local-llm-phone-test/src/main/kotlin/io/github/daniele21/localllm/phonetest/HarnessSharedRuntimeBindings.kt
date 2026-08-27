@@ -62,8 +62,7 @@ internal object HarnessSharedRuntimeBindings {
     }
 
     /** Exact model-profile identity exposed by the current document-PII runtime environment. */
-    fun ombraModelProfileId(catalogProfileKey: String): String =
-        requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
+    fun ombraModelProfileId(catalogProfileKey: String): String = requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
