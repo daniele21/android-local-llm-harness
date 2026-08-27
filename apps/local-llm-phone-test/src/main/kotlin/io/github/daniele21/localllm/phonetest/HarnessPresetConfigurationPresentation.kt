@@ -121,8 +121,8 @@ private fun resolveInferenceProfile(preset: HarnessPresetSummary): HarnessInfere
 
                 revision != Qwen35GenerationProfiles.VERSION -> HarnessInferenceProfileLookup(
                     unavailableReason =
-                        "Inference profile revision $revision is not supported by runtime revision " +
-                            "${Qwen35GenerationProfiles.VERSION}.",
+                    "Inference profile revision $revision is not supported by runtime revision " +
+                        "${Qwen35GenerationProfiles.VERSION}.",
                 )
 
                 else -> HarnessInferenceProfileLookup(
