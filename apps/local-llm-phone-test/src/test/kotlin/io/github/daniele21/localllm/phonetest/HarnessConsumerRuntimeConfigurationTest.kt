@@ -92,84 +92,83 @@ class HarnessConsumerRuntimeConfigurationTest {
         assertEquals(USE_CASE_ID, materialized.binding.useCaseId)
     }
 
-    private fun state(modelProfileId: String? = null): HostControlPlaneState =
-        HostControlPlaneState(
-            applications =
-                listOf(
-                    RegisteredApplication(
-                        applicationId = APPLICATION_ID,
-                        packageName = "io.github.daniele21.redactguard",
-                        signerSha256 = "a".repeat(64),
-                        displayName = "RedactGuard",
-                        state = ApplicationRegistrationState.AUTHORIZED,
-                        firstSeenAtEpochMs = 10,
-                        lastSeenAtEpochMs = 20,
-                    ),
+    private fun state(modelProfileId: String? = null): HostControlPlaneState = HostControlPlaneState(
+        applications =
+        listOf(
+            RegisteredApplication(
+                applicationId = APPLICATION_ID,
+                packageName = "io.github.daniele21.redactguard",
+                signerSha256 = "a".repeat(64),
+                displayName = "RedactGuard",
+                state = ApplicationRegistrationState.AUTHORIZED,
+                firstSeenAtEpochMs = 10,
+                lastSeenAtEpochMs = 20,
+            ),
+        ),
+        useCases =
+        listOf(
+            UseCaseDefinition(
+                useCaseId = USE_CASE_ID,
+                displayName = "Document PII detection",
+                description = "Detect PII in local documents",
+                requirements =
+                UseCaseRequirements(
+                    outputMode = OutputMode.JSON_SCHEMA,
+                    sessionKind = SessionKind.STATELESS,
+                    reasoningSupported = false,
+                    minimumContextTokens = 2_048,
                 ),
-            useCases =
-                listOf(
-                    UseCaseDefinition(
-                        useCaseId = USE_CASE_ID,
-                        displayName = "Document PII detection",
-                        description = "Detect PII in local documents",
-                        requirements =
-                            UseCaseRequirements(
-                                outputMode = OutputMode.JSON_SCHEMA,
-                                sessionKind = SessionKind.STATELESS,
-                                reasoningSupported = false,
-                                minimumContextTokens = 2_048,
-                            ),
-                        state = UseCaseDefinitionState.ACTIVE,
-                        revision = USE_CASE_REVISION,
-                    ),
-                ),
-            presets =
-                listOf(
-                    preset(
-                        id = BASE_REF.id.value,
-                        revision = BASE_REF.version,
-                        displayName = "Balanced",
-                        modelProfileId = null,
-                        contextTokens = 4_096,
-                        cachePolicy = BASE_CACHE,
-                    ),
-                    preset(
-                        id = CUSTOM_REF.id.value,
-                        revision = CUSTOM_REF.version,
-                        displayName = "Private document accuracy",
-                        modelProfileId = modelProfileId,
-                        contextTokens = CUSTOM_CONTEXT,
-                        cachePolicy = CUSTOM_CACHE,
-                    ),
-                ),
-            bindings =
-                listOf(
-                    ApplicationUseCaseBinding(
-                        bindingId = BINDING_ID,
-                        applicationId = APPLICATION_ID,
-                        useCaseId = USE_CASE_ID,
-                        revision = BINDING_REVISION,
-                        enabled = true,
-                    ),
-                ),
-            exposures =
-                listOf(
-                    StoredPresetExposure(
-                        bindingId = BINDING_ID,
-                        bindingRevision = BINDING_REVISION,
-                        presetId = BASE_REF.id.value,
-                        presetRevision = BASE_REF.version,
-                        isDefault = false,
-                    ),
-                    StoredPresetExposure(
-                        bindingId = BINDING_ID,
-                        bindingRevision = BINDING_REVISION,
-                        presetId = CUSTOM_REF.id.value,
-                        presetRevision = CUSTOM_REF.version,
-                        isDefault = true,
-                    ),
-                ),
-        )
+                state = UseCaseDefinitionState.ACTIVE,
+                revision = USE_CASE_REVISION,
+            ),
+        ),
+        presets =
+        listOf(
+            preset(
+                id = BASE_REF.id.value,
+                revision = BASE_REF.version,
+                displayName = "Balanced",
+                modelProfileId = null,
+                contextTokens = 4_096,
+                cachePolicy = BASE_CACHE,
+            ),
+            preset(
+                id = CUSTOM_REF.id.value,
+                revision = CUSTOM_REF.version,
+                displayName = "Private document accuracy",
+                modelProfileId = modelProfileId,
+                contextTokens = CUSTOM_CONTEXT,
+                cachePolicy = CUSTOM_CACHE,
+            ),
+        ),
+        bindings =
+        listOf(
+            ApplicationUseCaseBinding(
+                bindingId = BINDING_ID,
+                applicationId = APPLICATION_ID,
+                useCaseId = USE_CASE_ID,
+                revision = BINDING_REVISION,
+                enabled = true,
+            ),
+        ),
+        exposures =
+        listOf(
+            StoredPresetExposure(
+                bindingId = BINDING_ID,
+                bindingRevision = BINDING_REVISION,
+                presetId = BASE_REF.id.value,
+                presetRevision = BASE_REF.version,
+                isDefault = false,
+            ),
+            StoredPresetExposure(
+                bindingId = BINDING_ID,
+                bindingRevision = BINDING_REVISION,
+                presetId = CUSTOM_REF.id.value,
+                presetRevision = CUSTOM_REF.version,
+                isDefault = true,
+            ),
+        ),
+    )
 
     private fun preset(
         id: String,
@@ -178,20 +177,19 @@ class HarnessConsumerRuntimeConfigurationTest {
         modelProfileId: String?,
         contextTokens: Int,
         cachePolicy: UseCaseCachePolicy,
-    ): UseCasePresetDefinition =
-        UseCasePresetDefinition(
-            useCaseId = USE_CASE_ID,
-            metadata = PresetConsumerMetadata(id, revision, displayName, "$displayName configuration"),
-            creationSource = if (id == BASE_REF.id.value) PresetCreationSource.SUGGESTED else PresetCreationSource.CUSTOM,
-            state = PresetLifecycleState.PUBLISHED,
-            execution =
-                PresetExecutionPolicy(
-                    modelProfileId = modelProfileId,
-                    inferencePreset = BASE_REF,
-                    contextTokens = contextTokens,
-                    cachePolicy = cachePolicy,
-                ),
-        )
+    ): UseCasePresetDefinition = UseCasePresetDefinition(
+        useCaseId = USE_CASE_ID,
+        metadata = PresetConsumerMetadata(id, revision, displayName, "$displayName configuration"),
+        creationSource = if (id == BASE_REF.id.value) PresetCreationSource.SUGGESTED else PresetCreationSource.CUSTOM,
+        state = PresetLifecycleState.PUBLISHED,
+        execution =
+        PresetExecutionPolicy(
+            modelProfileId = modelProfileId,
+            inferencePreset = BASE_REF,
+            contextTokens = contextTokens,
+            cachePolicy = cachePolicy,
+        ),
+    )
 
     private fun curatedModel(): ImportedPhoneModel {
         val artifact = CuratedModelCatalog.releases.first().artifact
