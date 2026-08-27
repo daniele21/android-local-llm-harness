@@ -9,7 +9,7 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     mutationState: HarnessApplicationsMutationState,
     onRefresh: () -> Unit,
     onSetDefaultPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary) -> Unit,
-    onCreateCustomPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary, String, Boolean, Int?) -> Unit,
+    onCreateCustomPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary, String, String?, Int?) -> Unit,
     onClearMutationFeedback: () -> Unit,
 ) {
     val callbacks = HarnessApplicationsGraphCallbacks(

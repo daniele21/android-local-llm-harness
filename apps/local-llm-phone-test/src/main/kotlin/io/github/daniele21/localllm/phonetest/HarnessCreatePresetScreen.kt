@@ -24,9 +24,11 @@ private data class HarnessCreatePresetDraft(
     val displayName: String,
     val selectedBase: HarnessPresetSummary,
     val contextText: String,
-    val automaticModelSelection: Boolean,
+    val selectedModelProfileId: String?,
+    val modelSelectionValid: Boolean,
     val parsedContext: Int?,
     val contextValid: Boolean,
+    val effectiveConfiguration: HarnessPresetConfigurationSummary,
 )
 
 private data class HarnessCreatePresetStatus(val saving: Boolean, val customSaved: HarnessApplicationsMutationState.Saved?)
@@ -34,7 +36,7 @@ private data class HarnessCreatePresetStatus(val saving: Boolean, val customSave
 private data class HarnessCreatePresetDraftActions(
     val onDisplayNameChanged: (String) -> Unit,
     val onBaseSelected: (HarnessPresetSummary) -> Unit,
-    val onAutomaticModelSelectionChanged: (Boolean) -> Unit,
+    val onModelSelected: (String?) -> Unit,
     val onContextChanged: (String) -> Unit,
 )
 
@@ -89,8 +91,8 @@ private fun HarnessCreatePresetReadyContent(
     var contextText by rememberSaveable(application.applicationId, assignment.useCaseId) {
         mutableStateOf(initialBase.contextTokens?.toString().orEmpty())
     }
-    var automaticModelSelection by rememberSaveable(application.applicationId, assignment.useCaseId) {
-        mutableStateOf(initialBase.modelProfileId == null)
+    var selectedModelProfileId by rememberSaveable(application.applicationId, assignment.useCaseId) {
+        mutableStateOf(initialBase.modelProfileId)
     }
 
     val selectedBase = assignment.availablePresets.firstOrNull { it.identityKey() == selectedBaseKey } ?: initialBase
@@ -98,19 +100,28 @@ private fun HarnessCreatePresetReadyContent(
         if (assignment.availablePresets.none { it.identityKey() == selectedBaseKey }) {
             selectedBaseKey = initialBase.identityKey()
             contextText = initialBase.contextTokens?.toString().orEmpty()
-            automaticModelSelection = initialBase.modelProfileId == null
+            selectedModelProfileId = initialBase.modelProfileId
         }
     }
 
     val parsedContext = contextText.toIntOrNull()
+    val contextValid = contextText.isBlank() || (parsedContext != null && parsedContext > 0)
+    val modelSelectionValid = isHarnessPresetModelSelectionValid(assignment.useCaseId, selectedModelProfileId)
+    val effectiveConfiguration = harnessPresetConfigurationSummary(
+        useCaseId = assignment.useCaseId,
+        preset = selectedBase.copy(contextTokens = parsedContext),
+        selectedModelProfileId = selectedModelProfileId,
+    )
     val saved = mutationState as? HarnessApplicationsMutationState.Saved
     val draft = HarnessCreatePresetDraft(
         displayName = displayName,
         selectedBase = selectedBase,
         contextText = contextText,
-        automaticModelSelection = automaticModelSelection,
+        selectedModelProfileId = selectedModelProfileId,
+        modelSelectionValid = modelSelectionValid,
         parsedContext = parsedContext,
-        contextValid = contextText.isBlank() || (parsedContext != null && parsedContext > 0),
+        contextValid = contextValid,
+        effectiveConfiguration = effectiveConfiguration,
     )
     val status = HarnessCreatePresetStatus(
         saving = mutationState == HarnessApplicationsMutationState.Saving,
@@ -121,11 +132,11 @@ private fun HarnessCreatePresetReadyContent(
         onBaseSelected = { preset ->
             selectedBaseKey = preset.identityKey()
             contextText = preset.contextTokens?.toString().orEmpty()
-            automaticModelSelection = preset.modelProfileId == null
+            selectedModelProfileId = preset.modelProfileId
             actions.onClearFeedback()
         },
-        onAutomaticModelSelectionChanged = {
-            automaticModelSelection = it
+        onModelSelected = { modelProfileId ->
+            selectedModelProfileId = modelProfileId
             actions.onClearFeedback()
         },
         onContextChanged = { value ->
@@ -156,6 +167,7 @@ private fun HarnessCreatePresetForm(
     draftActions: HarnessCreatePresetDraftActions,
     modifier: Modifier,
 ) {
+    val modelOptions = harnessPresetModelOptions(assignment.useCaseId)
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("create-custom-preset"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(LocalHarnessSpacing.current.large),
@@ -180,10 +192,11 @@ private fun HarnessCreatePresetForm(
         }
         item {
             HarnessModelPolicyCard(
-                selectedBase = draft.selectedBase,
-                automaticModelSelection = draft.automaticModelSelection,
+                modelOptions = modelOptions,
+                selectedModelProfileId = draft.selectedModelProfileId,
+                selectionValid = draft.modelSelectionValid,
                 enabled = !status.saving && status.customSaved == null,
-                onAutomaticModelSelectionChanged = draftActions.onAutomaticModelSelectionChanged,
+                onModelSelected = draftActions.onModelSelected,
             )
         }
         item {
@@ -194,17 +207,22 @@ private fun HarnessCreatePresetForm(
                 onValueChange = draftActions.onContextChanged,
             )
         }
+        item { HarnessEffectivePresetConfigurationCard(draft.effectiveConfiguration) }
         item { HarnessCustomPresetFeedback(state = mutationState, actions = actions) }
         if (status.customSaved == null) {
             item {
                 HarnessSavePresetButton(
                     saving = status.saving,
-                    enabled = !status.saving && draft.displayName.isNotBlank() && draft.contextValid,
+                    enabled = !status.saving &&
+                        draft.displayName.isNotBlank() &&
+                        draft.contextValid &&
+                        draft.modelSelectionValid &&
+                        draft.effectiveConfiguration.available,
                     onSave = {
                         actions.onSave(
                             draft.selectedBase,
                             draft.displayName.trim(),
-                            draft.automaticModelSelection,
+                            draft.selectedModelProfileId,
                             draft.parsedContext,
                         )
                     },
