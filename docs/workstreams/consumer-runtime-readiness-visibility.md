@@ -47,12 +47,12 @@ Harness must own model/configuration/residency. RedactGuard consumes only host-p
 | ID | State | Depends on | Owns / writes | Parallel with | Acceptance |
 | --- | --- | --- | --- | --- | --- |
 | CRV-00 | DONE | — | this scope/invariants + durable-owner mapping | — | Owners, lifecycle, non-goals, integration points and validation strategy are explicit. |
-| CRV-10 | ACTIVE | CRV-00 | `models/model-profile` resolver/preset execution semantics + focused tests only | CRV-20, CRV-50, CRV-60 | Explicit and automatic preset model policies deterministically resolve one installed compatible model; failures stay typed/fail-closed; no global fallback. |
-| CRV-20 | ACTIVE | CRV-00 | Consumer-safe readiness/progress contract and required Binder/host adapters + compatibility tests | CRV-10, CRV-50, CRV-60 | Consumer can distinguish transport/configuration/preparing/ready/generating/failure at the smallest compatible boundary without Host model identity leakage. |
+| CRV-10 | ACTIVE | CRV-00 | `models/model-profile` resolver/preset execution semantics + focused tests only | CRV-20, CRV-50 | Explicit and automatic preset model policies deterministically resolve one installed compatible model; failures stay typed/fail-closed; no global fallback. |
+| CRV-20 | ACTIVE | CRV-00 | Consumer-safe readiness/progress contract and required Binder/host adapters + compatibility tests | CRV-10, CRV-50 | Consumer can distinguish transport/configuration/preparing/ready/generating/failure at the smallest compatible boundary without Host model identity leakage. |
 | CRV-30 | BLOCKED | CRV-10 | runtime/host integration from activation binding into prepare/create-session + focused lifecycle tests | CRV-20 | Cold load, warm reuse and safe switch use the exact resolved execution; missing/conflicting resources fail closed; cancellation/disconnect clean up. |
 | CRV-40 | BLOCKED | CRV-20, CRV-30 | source-backed runtime/readiness observation and privacy-safe projection | — | Host and consumer projections observe real preparation/residency activity without changing resource ownership. |
-| CRV-50 | ACTIVE | CRV-00 | Harness Applications/preset UX contract and presentation mapping only | CRV-10, CRV-20, CRV-60 | Presets expose model policy, effective model when resolvable, inference configuration/context and truthful connection/runtime state with progressive disclosure. |
-| CRV-60 | ACTIVE | CRV-00 | RedactGuard UX/state contract and consumer-safe presentation only | CRV-10, CRV-20, CRV-50 | Binder-connected is no longer equivalent to analysis-ready; selected host mode and configuration/preparation/recovery are visible without leaking Host internals. |
+| CRV-50 | ACTIVE | CRV-00 | Harness Applications/preset UX contract and presentation mapping only | CRV-10, CRV-20 | Presets expose model policy, effective model when resolvable, inference configuration/context and truthful connection/runtime state with progressive disclosure. |
+| CRV-60 | DONE | CRV-00 | RedactGuard UX/state contract and consumer-safe presentation only | — | Binder-connected is no longer equivalent to analysis-ready; selected host mode and configuration/preparation/recovery are visible without leaking Host internals. |
 | CRV-70 | BLOCKED | CRV-10, CRV-40, CRV-50 | Harness phone Applications/readiness UI + tests | CRV-80 | Application/use-case/preset surfaces show canonical execution config plus current activation/preparation/runtime state; observation has no load side effect. |
 | CRV-80 | BLOCKED | CRV-20, CRV-40, CRV-60 | redactguard-android consumer composition/ViewModel/UI + tests | CRV-70 | Analysis automatically activates/prepares the Host path; UI truthfully transitions through configuration/preparation/analysis and exposes actionable recovery. |
 | CRV-90 | BLOCKED | CRV-30, CRV-40, CRV-70, CRV-80 | isolated cross-layer/cross-repo regression matrix | — | Covers cold, warm, model switch/conflict, missing model, stale config, disconnect, cancellation, restart and privacy-safe failure identity. |
@@ -64,12 +64,13 @@ Allowed states: `READY`, `ACTIVE`, `BLOCKED`, `DONE`.
 
 ## Current executable slices
 
-Four non-conflicting lanes may execute now:
+Three non-conflicting Harness lanes remain executable now:
 
 - **CRV-10** — resolver/preset execution semantics;
 - **CRV-20** — smallest consumer-safe readiness/progress contract;
-- **CRV-50** — Harness configuration/runtime UX contract and source mapping;
-- **CRV-60** — RedactGuard consumer-safe state/UX contract.
+- **CRV-50** — Harness configuration/runtime UX contract and source mapping.
+
+**CRV-60 is integrated** in `redactguard-android` through PR #100: raw Binder connectivity no longer publishes product-level analysis readiness; transport connection triggers side-effect-free assignment/preset discovery; normal UI retains the selected Host mode even when only one mode exists; and configuration/preparation/recovery copy remains consumer-safe. Exact PR-head Android validation ran at STRONG and repository validation passed before squash merge into RedactGuard `dev` as `29c37d4f4eb939f6c6798fe164283ed13807097a`. Post-merge push validation remains independent evidence for that integrated commit.
 
 CRV-30 starts as soon as CRV-10 settles exact execution identity. CRV-70 and CRV-80 then run in parallel after CRV-40 establishes the source-backed state boundary.
 
