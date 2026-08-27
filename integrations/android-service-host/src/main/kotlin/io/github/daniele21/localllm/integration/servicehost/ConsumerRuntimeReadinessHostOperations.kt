@@ -4,6 +4,9 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
+import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
+import io.github.daniele21.localllm.contracts.ConsumerRuntimePhase
+import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadiness
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadinessResult
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
@@ -18,7 +21,8 @@ interface ConsumerRuntimeReadinessHost {
 internal class ConsumerRuntimeReadinessHostOperations(
     private val ledger: ClientConnectionLedger,
     private val host: ConsumerRuntimeReadinessHost?,
-    private val controlExecutor: HostControlExecutor,
+    private val readinessExecutor: HostControlExecutor,
+    private val activity: ConsumerRuntimeActivityTracker = ConsumerRuntimeActivityTracker(),
 ) {
     fun runtimeReadiness(
         caller: AuthorizedCaller,
@@ -31,7 +35,7 @@ internal class ConsumerRuntimeReadinessHostOperations(
             callback.onResult(failure(request, ConsumerControlPlaneErrorCode.INVALID_REQUEST))
             return
         }
-        controlExecutor.submitOrReject(
+        readinessExecutor.submitOrReject(
             onRejected = { callback.onResult(failure(request, ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE)) },
         ) {
             when (
@@ -58,12 +62,58 @@ internal class ConsumerRuntimeReadinessHostOperations(
                                 ),
                             )
                         }
-                        callback.onResult(result.toConsumerRuntimeReadinessWire(request.operationId))
+                        callback.onResult(
+                            result
+                                .privacyScoped(activationId, activity.snapshot(token))
+                                .toConsumerRuntimeReadinessWire(request.operationId),
+                        )
                     }
                 }
             }
         }
     }
+}
+
+private fun ConsumerRuntimeReadinessResult.privacyScoped(
+    activationId: ConsumerActivationId,
+    activity: ConsumerRuntimeActivitySnapshot,
+): ConsumerRuntimeReadinessResult {
+    if (this !is ConsumerRuntimeReadinessResult.Available) return this
+    activity.lastIssue?.let { issue ->
+        return ConsumerRuntimeReadinessResult.Available(
+            ConsumerRuntimeReadiness(
+                activationId = activationId,
+                phase = ConsumerRuntimePhase.FAILED,
+                issue = issue,
+                retryable = issue != io.github.daniele21.localllm.contracts.ConsumerRuntimeIssue.CONFIGURATION_STALE,
+            ),
+        )
+    }
+    val source = readiness
+    val scoped = when (source.phase) {
+        ConsumerRuntimePhase.PREPARING -> if (activity.preparing) {
+            source
+        } else if (source.preparationAction == ConsumerPreparationAction.REUSING) {
+            source.copy(phase = ConsumerRuntimePhase.READY, preparationAction = ConsumerPreparationAction.NONE)
+        } else {
+            source.copy(phase = ConsumerRuntimePhase.IDLE, preparationAction = ConsumerPreparationAction.NONE)
+        }
+
+        ConsumerRuntimePhase.GENERATING -> if (activity.activeGenerations > 0) {
+            source
+        } else {
+            source.copy(phase = ConsumerRuntimePhase.READY)
+        }
+
+        ConsumerRuntimePhase.FAILED -> source.copy(
+            phase = ConsumerRuntimePhase.IDLE,
+            issue = null,
+            retryable = false,
+        )
+
+        else -> source
+    }
+    return ConsumerRuntimeReadinessResult.Available(scoped)
 }
 
 private fun failure(
