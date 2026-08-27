@@ -39,7 +39,10 @@ class HarnessActivatedPresetAliasTest {
         val source = base.useCase.presets.single { it.ref == HarnessSharedRuntimeBindings.ombraDefaultPreset }
         val publicPreset = customPresetRef()
 
-        val aliased = base.aliasActivatedPreset(publicPreset, HarnessSharedRuntimeBindings.ombraDefaultPreset)
+        val aliased = base.withActivatedPresetAlias(
+            publicPreset = publicPreset,
+            canonicalInferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
+        )
         val actual = aliased.useCase.presets.single()
 
         assertEquals(base.binding, aliased.binding)
@@ -58,7 +61,10 @@ class HarnessActivatedPresetAliasTest {
         val missing = InferencePresetRef(InferencePresetId("missing-profile"), 1)
 
         assertThrows(IllegalStateException::class.java) {
-            resolvedOmbra().aliasActivatedPreset(customPresetRef(), missing)
+            resolvedOmbra().withActivatedPresetAlias(
+                publicPreset = customPresetRef(),
+                canonicalInferencePreset = missing,
+            )
         }
     }
 
@@ -81,7 +87,10 @@ class HarnessActivatedPresetAliasTest {
             activationId = activationId,
             applicationId = applicationId,
             useCaseId = ombraUseCaseId(),
-            resolved = resolvedOmbra().aliasActivatedPreset(publicPreset, HarnessSharedRuntimeBindings.ombraDefaultPreset),
+            resolved = resolvedOmbra().withActivatedPresetAlias(
+                publicPreset = publicPreset,
+                canonicalInferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
+            ),
         )
 
         val active = registry.find(applicationId, ombraUseCaseId())
