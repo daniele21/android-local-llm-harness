@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-26
+Last reviewed: 2026-08-27
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -32,6 +32,8 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 `apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
 
 Applications control-plane implementation is complete through ACUX-80: Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations with canonical re-read; Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
+
+Consumer execution-readiness convergence is now tracked in [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md): Harness must make preset model/generation configuration effective and inspectable, automatically prepare the exact activated installed model for consumer inference, and expose transport/configuration/runtime state truthfully to both Harness and consumer UI without moving model/runtime ownership into RedactGuard.
 
 A persisted control-plane startup/upgrade regression is now active: current Binder discovery/activation can seed only an exactly empty store, so a partially populated but valid Room state may remain permanently incomplete. The bounded repair is tracked in [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md). ACUX-90 is blocked until the reconciled exact-head repository candidate reaches CPREC-70.
 
@@ -90,16 +92,17 @@ Repository-side UX/UI, including Applications through ACUX-80, is complete. Rema
 
 ## Immediate next block
 
-1. execute CPREC-10 canonical built-in spec/reconciler and CPREC-20 Room partial-state persistence tests in parallel;
-2. after the reconciliation contract settles, execute CPREC-30 startup composition cutover and CPREC-40 regression matrix in parallel, then close CPREC-50/70 exact-head integration;
-3. complete OMB-6B identity review and deterministic launcher assets, and continue OMBRA corpus v2 quality execution independently where ownership does not conflict;
-4. on the CPREC-70 candidate, run upgrade-repair evidence and clean two-APK HCP/ACUX evidence, then resume ACUX-90;
-5. run Q35-6, SR-6 and broader phone UX evidence in parallel where hardware can be shared;
-6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact build.
+1. execute CRV-10, CRV-20, CRV-50 and cross-repo CRV-60 in parallel, keeping model/runtime ownership in Harness and consumer-safe product state in RedactGuard;
+2. after exact execution identity settles, connect activation to automatic runtime preparation/residency in CRV-30 and then establish source-backed runtime state in CRV-40;
+3. implement Harness and RedactGuard readiness UI in parallel as CRV-70/80, then run the cross-layer regression matrix and exact-head automated preflight;
+4. continue the independent CPREC reconciliation candidate/evidence path and OMB-6B/OMB-8 work where ownership does not conflict;
+5. produce new exact integrated candidates after CRV automated gates, then use one representative two-APK session for compatible CRV/CPREC/ACUX/RG-HCP evidence while preserving each gate independently;
+6. complete Q35-6, SR-6 and broader phone UX evidence plus release privacy/security, packaging, versioning/signing and documentation checks on the relevant exact builds.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
+- Consumer runtime readiness: [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md)
 - Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
