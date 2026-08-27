@@ -2,7 +2,6 @@ package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
-import io.github.daniele21.localllm.contracts.RuntimeState
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.AppModelBinding
 import io.github.daniele21.localllm.models.ArtifactSource
