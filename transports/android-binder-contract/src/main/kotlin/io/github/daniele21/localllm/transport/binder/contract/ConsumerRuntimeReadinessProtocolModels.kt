@@ -22,24 +22,23 @@ data class ConsumerRuntimeReadinessResultParcel(
     val error: WireErrorParcel? = null,
 ) : Parcelable
 
-fun ConsumerRuntimeReadinessResult.toConsumerRuntimeReadinessWire(operationId: String): ConsumerRuntimeReadinessResultParcel =
-    when (this) {
-        is ConsumerRuntimeReadinessResult.Available ->
-            ConsumerRuntimeReadinessResultParcel(
-                operationId = operationId,
-                activationId = readiness.activationId.value,
-                phaseTag = readiness.phase.name,
-                preparationActionTag = readiness.preparationAction.name,
-                issueTag = readiness.issue?.name,
-                retryable = readiness.retryable,
-            )
+fun ConsumerRuntimeReadinessResult.toConsumerRuntimeReadinessWire(operationId: String): ConsumerRuntimeReadinessResultParcel = when (this) {
+    is ConsumerRuntimeReadinessResult.Available ->
+        ConsumerRuntimeReadinessResultParcel(
+            operationId = operationId,
+            activationId = readiness.activationId.value,
+            phaseTag = readiness.phase.name,
+            preparationActionTag = readiness.preparationAction.name,
+            issueTag = readiness.issue?.name,
+            retryable = readiness.retryable,
+        )
 
-        is ConsumerRuntimeReadinessResult.Rejected ->
-            ConsumerRuntimeReadinessResultParcel(
-                operationId = operationId,
-                error = failure.toRuntimeReadinessWireError(),
-            )
-    }
+    is ConsumerRuntimeReadinessResult.Rejected ->
+        ConsumerRuntimeReadinessResultParcel(
+            operationId = operationId,
+            error = failure.toRuntimeReadinessWireError(),
+        )
+}
 
 fun ConsumerRuntimeReadinessResultParcel.toCoreRuntimeReadinessResult(): ConsumerRuntimeReadinessResult = error?.let {
     ConsumerRuntimeReadinessResult.Rejected(it.toConsumerControlPlaneFailure())
@@ -47,17 +46,14 @@ fun ConsumerRuntimeReadinessResultParcel.toCoreRuntimeReadinessResult(): Consume
     ConsumerRuntimeReadiness(
         activationId = ConsumerActivationId(requireNotNull(activationId)),
         phase = requireNotNull(enumTagOrNull<ConsumerRuntimePhase>(requireNotNull(phaseTag))),
-        preparationAction = requireNotNull(
-            enumTagOrNull<ConsumerPreparationAction>(requireNotNull(preparationActionTag)),
-        ),
+        preparationAction = requireNotNull(enumTagOrNull<ConsumerPreparationAction>(requireNotNull(preparationActionTag))),
         issue = issueTag?.let { requireNotNull(enumTagOrNull<ConsumerRuntimeIssue>(it)) },
         retryable = retryable,
     ),
 )
 
-private fun ConsumerControlPlaneFailure.toRuntimeReadinessWireError(): WireErrorParcel =
-    WireErrorParcel(
-        code = code.name,
-        safeMessage = "Consumer runtime readiness is unavailable",
-        retryable = code == ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE || code == ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
-    )
+private fun ConsumerControlPlaneFailure.toRuntimeReadinessWireError(): WireErrorParcel = WireErrorParcel(
+    code = code.name,
+    safeMessage = "Consumer runtime readiness is unavailable",
+    retryable = code == ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE || code == ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
+)
