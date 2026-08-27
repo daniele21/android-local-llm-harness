@@ -46,8 +46,10 @@ fun ConsumerRuntimeReadinessResultParcel.toCoreRuntimeReadinessResult(): Consume
 } ?: ConsumerRuntimeReadinessResult.Available(
     ConsumerRuntimeReadiness(
         activationId = ConsumerActivationId(requireNotNull(activationId)),
-        phase = requireNotNull(enumTagOrNull<ConsumerRuntimePhase>(phaseTag)),
-        preparationAction = requireNotNull(enumTagOrNull<ConsumerPreparationAction>(preparationActionTag)),
+        phase = requireNotNull(enumTagOrNull<ConsumerRuntimePhase>(requireNotNull(phaseTag))),
+        preparationAction = requireNotNull(
+            enumTagOrNull<ConsumerPreparationAction>(requireNotNull(preparationActionTag)),
+        ),
         issue = issueTag?.let { requireNotNull(enumTagOrNull<ConsumerRuntimeIssue>(it)) },
         retryable = retryable,
     ),
