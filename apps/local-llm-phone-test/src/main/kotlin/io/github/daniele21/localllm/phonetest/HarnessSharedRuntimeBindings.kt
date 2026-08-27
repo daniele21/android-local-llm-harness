@@ -51,6 +51,12 @@ internal object HarnessSharedRuntimeBindings {
         redactGuardPackages(debugHost) +
         if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
+    /** Exact model-profile identity exposed by the current document-PII runtime environment. */
+    fun ombraModelProfileId(catalogProfileKey: String): String {
+        require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
+        return "$catalogProfileKey-$OMBRA_PROFILE_SUFFIX"
+    }
+
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
             resolvedPhoneUseCase(
@@ -78,7 +84,7 @@ internal object HarnessSharedRuntimeBindings {
                 model = model,
                 maxOutputTokens = OMBRA_DEFAULT_MAX_OUTPUT_TOKENS,
                 useCaseValue = ombraUseCaseId.value,
-                profileSuffix = "ombra-pii",
+                profileSuffix = OMBRA_PROFILE_SUFFIX,
                 contextSize = OMBRA_CONTEXT_SIZE,
             )
         val useCase =
@@ -103,4 +109,5 @@ internal object HarnessSharedRuntimeBindings {
     private const val CONSOLE_CONTEXT_SIZE = 4_096
     private const val OMBRA_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val OMBRA_CONTEXT_SIZE = 4_096
+    private const val OMBRA_PROFILE_SUFFIX = "ombra-pii"
 }
