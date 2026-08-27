@@ -13,7 +13,7 @@ internal fun ResolvedUseCase.withActivatedPresetAlias(
     publicPreset: InferencePresetRef,
     canonicalInferencePreset: InferencePresetRef,
 ): ResolvedUseCase {
-    val canonicalPreset = requireNotNull(useCase.presets.singleOrNull { it.ref == canonicalInferencePreset }) {
+    val canonicalPreset = checkNotNull(useCase.presets.singleOrNull { it.ref == canonicalInferencePreset }) {
         "Resolved runtime does not expose inference preset ${canonicalInferencePreset.id.value} v${canonicalInferencePreset.version}"
     }
     val publicAlias = canonicalPreset.copy(ref = publicPreset)
