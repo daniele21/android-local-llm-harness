@@ -96,10 +96,9 @@ internal class HarnessControlPlaneConsumerPolicyRegistry(
         state.applications.singleOrNull { it.applicationId == applicationId }
             ?.takeIf { it.state == ApplicationRegistrationState.AUTHORIZED }
 
-    private fun activeUseCaseRevision(state: HostControlPlaneState, useCaseId: UseCaseId): Int? =
-        state.latestUseCase(useCaseId)
-            ?.takeIf { it.state == UseCaseDefinitionState.ACTIVE }
-            ?.revision
+    private fun activeUseCaseRevision(state: HostControlPlaneState, useCaseId: UseCaseId): Int? = state.latestUseCase(useCaseId)
+        ?.takeIf { it.state == UseCaseDefinitionState.ACTIVE }
+        ?.revision
 
     private fun HostControlPlaneState.exposuresFor(bindingId: String, bindingRevision: Int): List<StoredPresetExposure> = exposures
         .filter { it.bindingId == bindingId && it.bindingRevision == bindingRevision }
@@ -118,8 +117,7 @@ internal class HarnessControlPlaneConsumerPolicyRegistry(
         return refs.takeIf { it.size == exposures.size }
     }
 
-    private fun StoredPresetExposure.toPresetRef(): InferencePresetRef =
-        InferencePresetRef(InferencePresetId(presetId), presetRevision)
+    private fun StoredPresetExposure.toPresetRef(): InferencePresetRef = InferencePresetRef(InferencePresetId(presetId), presetRevision)
 
     private fun buildRevision(useCaseRevision: Int, bindingRevision: Int, exposures: List<StoredPresetExposure>): String = buildString {
         append(HarnessOmbraConsumerPolicy.REVISION)
