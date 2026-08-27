@@ -16,6 +16,7 @@ class SharedRuntimeHostComposition(
     hostBuildId: String,
     consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
+    consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
 ) : AutoCloseable {
     private val delegate = SharedRuntimeHostDelegate(
         client = client,
@@ -23,9 +24,11 @@ class SharedRuntimeHostComposition(
             hostBuildId = hostBuildId,
             consumerApiEnabled = consumerClientFactory != null,
             consumerControlPlaneEnabled = consumerControlPlaneHost != null,
+            consumerRuntimeReadinessEnabled = consumerRuntimeReadinessHost != null,
         ),
         consumerClientFactory = consumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
+        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
     )
     private val binderStub = SharedRuntimeBinderStub(
         authorizer = CallerAuthorizer(
@@ -48,6 +51,7 @@ internal fun hostProtocolInfo(
     hostBuildId: String,
     consumerApiEnabled: Boolean = false,
     consumerControlPlaneEnabled: Boolean = false,
+    consumerRuntimeReadinessEnabled: Boolean = false,
 ): ProtocolInfoParcel {
     require(hostBuildId.isNotBlank()) { "Host build ID must not be blank" }
     require(hostBuildId.length <= BinderProtocolV1.MAX_CLIENT_BUILD_ID_CHARACTERS) {
@@ -55,6 +59,9 @@ internal fun hostProtocolInfo(
     }
     require(!consumerControlPlaneEnabled || consumerApiEnabled) {
         "Consumer control plane requires Consumer API v1"
+    }
+    require(!consumerRuntimeReadinessEnabled || consumerControlPlaneEnabled) {
+        "Consumer runtime readiness requires the consumer control plane"
     }
     val features = BinderProtocolV1.KNOWN_FEATURES
         .let { known ->
@@ -65,6 +72,13 @@ internal fun hostProtocolInfo(
                 consumerFeatures
             } else {
                 consumerFeatures - BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1
+            }
+        }
+        .let { controlPlaneFeatures ->
+            if (consumerRuntimeReadinessEnabled) {
+                controlPlaneFeatures
+            } else {
+                controlPlaneFeatures - BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1
             }
         }
     return ProtocolInfoParcel(

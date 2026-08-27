@@ -17,6 +17,7 @@ class ConsumerProtocolCompatibilityTest {
             BinderProtocolV1.FEATURE_CONSUMER_API_V1,
             BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
             BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
         )
 
     @Test
