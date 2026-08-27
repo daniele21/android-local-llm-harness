@@ -44,11 +44,12 @@ internal class ConsumerRuntimeReadinessHostOperations(
                 is LedgerResult.Failure -> callback.onResult(failure(request, ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE))
 
                 is LedgerResult.Success -> {
-                    if (!support.value || host == null) {
+                    val readinessHost = host
+                    if (!support.value || readinessHost == null) {
                         callback.onResult(failure(request, ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE))
                     } else {
                         val result = runCatching {
-                            host.runtimeReadiness(token.value, caller.applicationId, activationId)
+                            readinessHost.runtimeReadiness(token.value, caller.applicationId, activationId)
                         }.getOrElse {
                             ConsumerRuntimeReadinessResult.Rejected(
                                 ConsumerControlPlaneFailure(
