@@ -25,12 +25,12 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class HarnessActivatedPresetAliasTest {
     @Test
@@ -121,11 +121,10 @@ class HarnessActivatedPresetAliasTest {
         assertEquals(fixture.storedModel.digest, installed.model.artifact.digest)
     }
 
-    private fun resolvedOmbra(): ResolvedUseCase =
-        HarnessSharedRuntimeBindings.resolveOmbra(
-            importedModel(),
-            HarnessSharedRuntimeBindings.redactGuardApplicationId,
-        )
+    private fun resolvedOmbra(): ResolvedUseCase = HarnessSharedRuntimeBindings.resolveOmbra(
+        importedModel(),
+        HarnessSharedRuntimeBindings.redactGuardApplicationId,
+    )
 
     private fun controlPlaneFixture(): ControlPlaneFixture {
         val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
