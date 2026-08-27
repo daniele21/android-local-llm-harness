@@ -33,7 +33,7 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 Applications control-plane implementation is complete through ACUX-80: Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations with canonical re-read; Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
 
-Consumer execution-readiness convergence is now tracked in [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md): Harness must make preset model/generation configuration effective and inspectable, automatically prepare the exact activated installed model for consumer inference, and expose transport/configuration/runtime state truthfully to both Harness and consumer UI without moving model/runtime ownership into RedactGuard.
+Consumer execution-readiness convergence is now tracked in [`workstreams/consumer-runtime-readiness-visibility.md`](workstreams/consumer-runtime-readiness-visibility.md): Harness must make preset model/generation configuration effective and inspectable, automatically prepare the exact activated installed model for consumer inference, and expose transport/configuration/runtime state truthfully to both Harness and consumer UI without moving model/runtime ownership into RedactGuard. The first RedactGuard readiness slice is integrated through PR #100: product readiness now requires side-effect-free Host assignment/preset discovery rather than raw Binder connectivity, while model/runtime identity remains Harness-owned.
 
 Persisted control-plane reconciliation is integrated repository-side through the unambiguous Harness v30 candidate: the pure reconciler, Room partial-state regression, startup cutover, upgrade matrix, cross-surface consistency proof and main-thread startup fix are in `dev`. Remaining CPREC work is representative physical upgrade-repair and clean two-APK evidence; ACUX-90 remains gated on that exact-candidate device proof rather than on further repository implementation.
 
@@ -80,6 +80,8 @@ Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 su
 
 Repository-side control-plane reconciliation is integrated. Closure still requires the exact signed candidate to prove non-destructive upgrade repair without uninstall/clear-data and then a clean same-signer two-APK path where Applications and the external consumer observe and use the same application/use-case/binding/preset identity. Stale/invalid identities must fail closed and valid persisted custom/default/disabled state must survive repair.
 
+Because CRV materially changes consumer activation/runtime readiness, CPREC closure evidence should be collected on the post-CRV exact integrated candidate rather than spent on the earlier v30 candidate and immediately invalidated.
+
 ### 4. Physical Android evidence
 
 Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6, CPREC and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path.
@@ -92,11 +94,11 @@ Repository-side UX/UI, including Applications through ACUX-80, is complete. Rema
 
 ## Immediate next block
 
-1. execute CRV-10, CRV-20, CRV-50 and cross-repo CRV-60 in parallel, keeping model/runtime ownership in Harness and consumer-safe product state in RedactGuard;
+1. complete the three remaining parallel CRV foundation lanes: CRV-10 exact execution semantics, CRV-20 consumer-safe readiness/progress contract and CRV-50 Harness configuration/runtime UX; CRV-60 is already integrated in RedactGuard through PR #100;
 2. after exact execution identity settles, connect activation to automatic runtime preparation/residency in CRV-30 and then establish source-backed runtime state in CRV-40;
 3. implement Harness and RedactGuard readiness UI in parallel as CRV-70/80, then run the cross-layer regression matrix and exact-head automated preflight;
-4. continue independent CPREC-80/90 physical evidence and OMB-6B/OMB-8 work where ownership does not conflict;
-5. produce new exact integrated candidates after CRV automated gates, then use one representative two-APK session for compatible CRV/CPREC/ACUX/RG-HCP evidence while preserving each gate independently;
+4. continue OMB-6B/OMB-8 and other non-conflicting repository work independently, but defer CPREC-80/90 closure evidence until the material CRV path is integrated;
+5. produce new exact Harness and RedactGuard candidates after CRV automated gates, then use one representative two-APK session for compatible CRV/CPREC/ACUX/RG-HCP evidence while preserving each gate independently;
 6. complete Q35-6, SR-6 and broader phone UX evidence plus release privacy/security, packaging, versioning/signing and documentation checks on the relevant exact builds.
 
 ## Source links
