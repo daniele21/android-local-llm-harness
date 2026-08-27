@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.integration.servicehost
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
+import io.github.daniele21.localllm.contracts.ConsumerRuntimeIssue
 import io.github.daniele21.localllm.contracts.ConsumerRuntimePhase
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadiness
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadinessResult
@@ -28,7 +29,9 @@ class ConsumerRuntimeReadinessHostOperationsTest {
     @Test
     fun `wired provider returns only consumer-safe runtime lifecycle`() {
         val host = RecordingReadinessHost()
-        val fixture = fixture(host = host, readinessFeature = true)
+        val activity = ConsumerRuntimeActivityTracker()
+        val fixture = fixture(host = host, readinessFeature = true, activity = activity)
+        activity.beginPreparation(fixture.token)
         var result: ConsumerRuntimeReadinessResultParcel? = null
 
         fixture.operations.runtimeReadiness(
@@ -46,6 +49,64 @@ class ConsumerRuntimeReadinessHostOperationsTest {
         assertFalse(actual.toString().contains("digest", ignoreCase = true))
         assertFalse(actual.toString().contains("path", ignoreCase = true))
         assertFalse(actual.toString().contains("model", ignoreCase = true))
+    }
+
+    @Test
+    fun `preparation owned by another connection is masked`() {
+        val host = RecordingReadinessHost()
+        val activity = ConsumerRuntimeActivityTracker()
+        val fixture = fixture(host = host, readinessFeature = true, activity = activity)
+        activity.beginPreparation(HostClientToken("other-connection"))
+        var result: ConsumerRuntimeReadinessResultParcel? = null
+
+        fixture.operations.runtimeReadiness(
+            caller,
+            request(fixture.token, "readiness-private-prep", "activation-1"),
+            HostResultCallback { result = it },
+        )
+
+        assertEquals(ConsumerRuntimePhase.READY.name, result?.phaseTag)
+        assertEquals(ConsumerPreparationAction.NONE.name, result?.preparationActionTag)
+    }
+
+    @Test
+    fun `generation owned by another connection is masked`() {
+        val host = RecordingReadinessHost(
+            ConsumerRuntimeReadiness(
+                activationId = ConsumerActivationId("activation-1"),
+                phase = ConsumerRuntimePhase.GENERATING,
+            ),
+        )
+        val activity = ConsumerRuntimeActivityTracker()
+        val fixture = fixture(host = host, readinessFeature = true, activity = activity)
+        activity.beginGeneration(HostClientToken("other-connection"))
+        var result: ConsumerRuntimeReadinessResultParcel? = null
+
+        fixture.operations.runtimeReadiness(
+            caller,
+            request(fixture.token, "readiness-private-generation", "activation-1"),
+            HostResultCallback { result = it },
+        )
+
+        assertEquals(ConsumerRuntimePhase.READY.name, result?.phaseTag)
+    }
+
+    @Test
+    fun `connection-scoped failure overrides shared runtime state`() {
+        val host = RecordingReadinessHost()
+        val activity = ConsumerRuntimeActivityTracker()
+        val fixture = fixture(host = host, readinessFeature = true, activity = activity)
+        activity.finishPreparation(fixture.token, ConsumerRuntimeIssue.MODEL_UNAVAILABLE)
+        var result: ConsumerRuntimeReadinessResultParcel? = null
+
+        fixture.operations.runtimeReadiness(
+            caller,
+            request(fixture.token, "readiness-failure", "activation-1"),
+            HostResultCallback { result = it },
+        )
+
+        assertEquals(ConsumerRuntimePhase.FAILED.name, result?.phaseTag)
+        assertEquals(ConsumerRuntimeIssue.MODEL_UNAVAILABLE.name, result?.issueTag)
     }
 
     @Test
@@ -94,7 +155,11 @@ class ConsumerRuntimeReadinessHostOperationsTest {
         assertEquals(0, host.calls)
     }
 
-    private fun fixture(host: ConsumerRuntimeReadinessHost?, readinessFeature: Boolean): Fixture {
+    private fun fixture(
+        host: ConsumerRuntimeReadinessHost?,
+        readinessFeature: Boolean,
+        activity: ConsumerRuntimeActivityTracker = ConsumerRuntimeActivityTracker(),
+    ): Fixture {
         val ledger = ClientConnectionLedger()
         val features = buildSet {
             add(BinderProtocolV1.FEATURE_CONSUMER_API_V1)
@@ -113,11 +178,12 @@ class ConsumerRuntimeReadinessHostOperationsTest {
             ConsumerRuntimeReadinessHostOperations(
                 ledger = ledger,
                 host = host,
-                controlExecutor =
+                readinessExecutor =
                 HostControlExecutor { task ->
                     task()
                     true
                 },
+                activity = activity,
             ),
         )
     }
@@ -130,7 +196,14 @@ class ConsumerRuntimeReadinessHostOperationsTest {
 
     private data class Fixture(val token: HostClientToken, val operations: ConsumerRuntimeReadinessHostOperations)
 
-    private class RecordingReadinessHost : ConsumerRuntimeReadinessHost {
+    private class RecordingReadinessHost(
+        private val readiness: ConsumerRuntimeReadiness =
+            ConsumerRuntimeReadiness(
+                activationId = ConsumerActivationId("activation-1"),
+                phase = ConsumerRuntimePhase.PREPARING,
+                preparationAction = ConsumerPreparationAction.REUSING,
+            ),
+    ) : ConsumerRuntimeReadinessHost {
         var calls = 0
 
         override fun runtimeReadiness(
@@ -139,13 +212,7 @@ class ConsumerRuntimeReadinessHostOperationsTest {
             activationId: ConsumerActivationId,
         ): ConsumerRuntimeReadinessResult {
             calls += 1
-            return ConsumerRuntimeReadinessResult.Available(
-                ConsumerRuntimeReadiness(
-                    activationId = activationId,
-                    phase = ConsumerRuntimePhase.PREPARING,
-                    preparationAction = ConsumerPreparationAction.REUSING,
-                ),
-            )
+            return ConsumerRuntimeReadinessResult.Available(readiness.copy(activationId = activationId))
         }
     }
 }
