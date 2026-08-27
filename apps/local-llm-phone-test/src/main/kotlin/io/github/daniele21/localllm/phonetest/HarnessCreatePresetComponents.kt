@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -84,40 +83,92 @@ internal fun HarnessPresetBaseCard(preset: HarnessPresetSummary, selected: Boole
 
 @Composable
 internal fun HarnessModelPolicyCard(
-    selectedBase: HarnessPresetSummary,
-    automaticModelSelection: Boolean,
+    modelOptions: List<HarnessPresetModelOption>,
+    selectedModelProfileId: String?,
+    selectionValid: Boolean,
     enabled: Boolean,
-    onAutomaticModelSelectionChanged: (Boolean) -> Unit,
+    onModelSelected: (String?) -> Unit,
 ) {
-    HarnessCard {
-        Text("Model policy", style = MaterialTheme.typography.titleMedium)
-        HarnessKeyValueRow(
-            label = "Base preset",
-            value = selectedBase.modelProfileId ?: "Automatic selection",
-            monospacedValue = selectedBase.modelProfileId != null,
+    HarnessCard(modifier = Modifier.testTag("custom-preset-model-policy")) {
+        Text("Model target", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Choose the runtime model profile this preset targets. This does not download or load a model; availability is checked fail-closed when the preset is activated.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        HarnessModelOptionCard(
+            title = "Automatic compatible model",
+            detail = "Harness resolves a compatible installed model at activation time.",
+            selected = selectedModelProfileId == null,
+            enabled = enabled,
+            testTag = "custom-preset-model-automatic",
+            onSelect = { onModelSelected(null) },
+        )
+        modelOptions.forEach { option ->
+            HarnessModelOptionCard(
+                title = option.displayName,
+                detail = option.description,
+                selected = selectedModelProfileId == option.modelProfileId,
+                enabled = enabled,
+                testTag = "custom-preset-model-${option.modelId}",
+                technicalValue = option.modelProfileId,
+                onSelect = { onModelSelected(option.modelProfileId) },
+            )
+        }
+        if (!selectionValid && selectedModelProfileId != null) {
+            HarnessRecoveryCard(
+                title = "Selected model is no longer available",
+                detail = "The saved runtime profile '$selectedModelProfileId' is not part of the current curated execution catalog. Choose Automatic or another model before saving.",
+                actionLabel = "Use Automatic",
+                onAction = { onModelSelected(null) },
+                tone = HarnessStatusTone.WARNING,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HarnessModelOptionCard(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    enabled: Boolean,
+    testTag: String,
+    technicalValue: String? = null,
+    onSelect: () -> Unit,
+) {
+    HarnessCard(
+        emphasized = selected,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = HarnessMinimumTouchTarget)
+            .testTag(testTag)
+            .clickable(enabled = enabled, onClick = onSelect),
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = HarnessMinimumTouchTarget),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Automatic model selection", style = MaterialTheme.typography.labelLarge)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
+            ) {
+                Text(title, style = MaterialTheme.typography.labelLarge)
                 Text(
-                    if (selectedBase.modelProfileId == null) {
-                        "The selected base preset already uses automatic selection."
-                    } else {
-                        "When disabled, the Custom preset keeps the base model policy."
-                    },
+                    detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                technicalValue?.let { profileId ->
+                    Text(
+                        profileId,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Switch(
-                checked = automaticModelSelection,
-                onCheckedChange = onAutomaticModelSelectionChanged,
-                enabled = enabled && selectedBase.modelProfileId != null,
-            )
+            if (selected) HarnessStatusBadge("Selected", HarnessStatusTone.SUCCESS)
         }
     }
 }
@@ -142,6 +193,31 @@ internal fun HarnessContextTokensField(value: String, valid: Boolean, enabled: B
             )
         },
     )
+}
+
+@Composable
+internal fun HarnessEffectivePresetConfigurationCard(summary: HarnessPresetConfigurationSummary) {
+    HarnessCard(modifier = Modifier.testTag("custom-preset-effective-configuration")) {
+        Text("Effective generation configuration", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Projected from the selected canonical inference profile and runtime model tier. These values are not duplicated as editable UI state.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (summary.available) {
+            HarnessStatusBadge("Resolved", HarnessStatusTone.SUCCESS)
+            summary.rows.forEach { row ->
+                HarnessKeyValueRow(label = row.label, value = row.value)
+            }
+        } else {
+            HarnessStatusBadge("Configuration unavailable", HarnessStatusTone.WARNING)
+            Text(
+                summary.unavailableReason.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable
