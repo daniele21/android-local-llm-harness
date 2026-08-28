@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: apps/local-llm-phone-test + models/control-plane-room-store
 Canonical scope: workstream.control-plane-state-reconciliation
 Read when: implementing or coordinating persisted Harness control-plane bootstrap, repair and upgrade safety
-Last reviewed: 2026-08-26
+Last reviewed: 2026-08-27
 
 ## Goal
 
@@ -35,64 +35,56 @@ Make the persisted Harness control plane converge at process startup to the mand
 | ID | Work | Owns/writes | Depends on | Parallel | State |
 | --- | --- | --- | --- | --- | --- |
 | CPREC-00 | Freeze root cause, scope, invariants and execution DAG | this workstream + state links only | — | — | DONE |
-| CPREC-10 | Canonical built-in control-plane spec + pure reconciliation contract/algorithm | new app-owned built-in spec/reconciler sources + focused unit tests | CPREC-00 | CPREC-20 | READY |
-| CPREC-20 | Persistence/atomicity/reopen regression harness for partial v2 state | `models/control-plane-room-store/src/androidTest/**` new/isolated tests and fixtures only | CPREC-00 | CPREC-10 | READY |
-| CPREC-30 | Cut startup composition over to reconciliation and remove Binder-path seeding | `HarnessRuntimeGraph.kt`, `HarnessSharedRuntimeService.kt`, `HarnessConsumerControlPlaneHost.kt` + direct tests | CPREC-10 | CPREC-40 | BLOCKED |
-| CPREC-40 | Build app-level regression matrix against the settled reconciliation contract | new/isolated phone-app test files/fixtures only; no production sources | CPREC-10 | CPREC-30 | BLOCKED |
-| CPREC-50 | Prove UI gateway and Binder discovery/activation observe one reconciled canonical graph | new integration tests across Applications gateway + consumer control-plane host | CPREC-20, CPREC-30, CPREC-40 | — | BLOCKED |
-| CPREC-70 | Integrate current `dev`, run cumulative exact-head repository gates and produce signed candidate | integration branch, validation/packaging metadata only | CPREC-50 | — | BLOCKED |
-| CPREC-80 | Physical upgrade-repair proof without uninstall/clear-data | device evidence/runbook output only | CPREC-70 | CPREC-90 logically; serialize on one device | BLOCKED |
-| CPREC-90 | Clean physical two-APK HCP/ACUX proof on the repaired candidate | device evidence/runbook output only | CPREC-70 | CPREC-80 logically; serialize on one device | BLOCKED |
+| CPREC-10 | Canonical built-in control-plane spec + pure reconciliation contract/algorithm | app-owned built-in spec/reconciler sources + focused unit tests | CPREC-00 | CPREC-20 | DONE |
+| CPREC-20 | Persistence/atomicity/reopen regression harness for partial v2 state | `models/control-plane-room-store/src/androidTest/**` isolated tests and fixtures | CPREC-00 | CPREC-10 | DONE |
+| CPREC-30 | Cut startup composition over to reconciliation and remove Binder-path seeding | `HarnessRuntimeGraph.kt`, `HarnessSharedRuntimeService.kt`, `HarnessConsumerControlPlaneHost.kt` + direct tests | CPREC-10 | CPREC-40 | DONE |
+| CPREC-40 | Build app-level regression matrix against the settled reconciliation contract | isolated phone-app test files/fixtures | CPREC-10 | CPREC-30 | DONE |
+| CPREC-50 | Prove UI gateway and Binder discovery/activation observe one reconciled canonical graph | integration tests across Applications gateway + consumer control-plane host | CPREC-20, CPREC-30, CPREC-40 | — | DONE |
+| CPREC-70 | Integrate current `dev`, run cumulative exact-head repository gates and produce unambiguous candidate | integration/validation/packaging metadata | CPREC-50 | — | DONE |
+| CPREC-80 | Physical upgrade-repair proof without uninstall/clear-data | device evidence/runbook output only | CPREC-70 | CPREC-90 logically; serialize on one device | READY |
+| CPREC-90 | Clean physical two-APK HCP/ACUX proof on the repaired candidate | device evidence/runbook output only | CPREC-70 | CPREC-80 logically; serialize on one device | READY |
 | CPREC-100 | Transfer durable behavior/evidence, unblock dependent work and delete temporary workstream | durable docs/current-state + workstream cleanup | CPREC-80, CPREC-90 | — | BLOCKED |
 
 Allowed states: `READY`, `ACTIVE`, `BLOCKED`, `DONE`.
 
-Parallel work has explicit non-conflicting write ownership. CPREC-10 and CPREC-20 may start immediately. After CPREC-10 fixes the integration contract, CPREC-30 production composition and CPREC-40 tests may proceed in parallel. CPREC-80 and CPREC-90 are logically independent evidence gates but cannot execute simultaneously on the same physical device.
+Repository implementation converged through PRs #455, #459, #457, #458, #460 and the main-thread startup regression fix #461. PR #464 cut the unambiguous post-reconciliation Harness v30 candidate. These repository-side slices are complete; physical evidence remains independent and cannot be inferred from CI.
 
 ## Current executable slices
 
-`CPREC-10` and `CPREC-20`.
+`CPREC-80` and `CPREC-90` are repository-ready physical gates. Because CRV now changes the same consumer activation/runtime path, do not spend closure evidence on a candidate that will immediately be invalidated by material CRV integration. Prefer the next exact integrated Harness/RedactGuard candidate after CRV deterministic gates, then reuse one representative two-APK session where criteria align while recording each CPREC/ACUX/HCP/CRV result independently.
 
-### CPREC-10 acceptance
+### Integrated repository acceptance
 
-- one canonical app-owned definition supplies mandatory built-in application/use-case/preset/binding/exposure identities;
-- reconciliation distinguishes missing state from incompatible built-in identity;
-- missing built-ins are merged conservatively without replacing unrelated state;
-- explicit disabled state and valid user-selected defaults remain unchanged;
-- repeated reconciliation does not create revisions, duplicate entities or timestamp churn;
-- no Room/app transport types leak into the pure reconciliation contract.
+Repository evidence covers:
 
-Validation:
-
-- focused `:models:model-profile` and phone-app unit tests covering canonical-state invariants and reconciliation behavior.
-
-### CPREC-20 acceptance
-
-- a Room v2 database can be opened with representative partial control-plane state;
-- transaction/reopen tests prove no partial write is exposed after failure and a successful reconciled state persists across close/reopen;
-- the generic Room module remains free of Harness/RedactGuard built-in policy.
-
-Validation:
-
-- `:models:control-plane-room-store` instrumented migration/store tests on emulator/device-capable CI where available; host-side checks remain preflight only.
+- one canonical app-owned definition for mandatory built-in application/use-case/preset/binding/exposure identities;
+- conservative repair of missing built-ins without replacing unrelated/custom/default/disabled state;
+- exact repeated-reconciliation no-op and fail-closed identity conflicts;
+- Room close/reopen atomic persistence and rollback behavior for partial state;
+- startup reconciliation before UI/Binder readers are exposed;
+- no Binder-path persistent seeding side effect;
+- startup persistence work kept off the Android main thread while preserving typed failures;
+- Applications gateway and consumer control-plane host observing the same reconciled graph.
 
 ## Required regression matrix
 
-Repository tests must cover at least: empty state; application present but PII graph absent; use case present but binding absent; binding present but exposure absent; unrelated app/custom preset preservation; valid custom/default preservation; explicit disabled-state preservation; exact second-pass no-op; conflicting built-in identity fail-closed; Room close/reopen persistence; Apps gateway and Binder discovery seeing the same app/use-case/binding/preset identity.
+Repository tests cover the required empty/partial/preservation/idempotence/conflict/reopen/cross-surface cases. Physical gates must additionally prove the same behavior survives real package/process lifecycle and same-signer cross-app execution.
 
 ## Integration points
 
-- `HarnessBuiltInControlPlaneSpec` (name may vary) is app-owned policy; the generic Room store persists state but does not know built-in semantics.
-- `HarnessControlPlaneReconciler` (name may vary) operates on neutral `HostControlPlaneState`/`HostControlPlaneStore` contracts and returns a bounded success/no-op/conflict outcome.
-- `HarnessRuntimeGraph.from(...)` completes reconciliation before exposing the process-scoped graph; service/UI do not open a parallel database owner.
-- `HarnessConsumerControlPlaneHost` becomes discovery/activation only; no `ensureSeeded()` or equivalent persistent mutation remains in read paths.
-- If CPREC-10 proves current identities cannot safely distinguish preserve-vs-conflict semantics, stop and explicitly re-plan a schema/provenance slice plus migration tests instead of adding an opportunistic Room v3 migration.
+- `HarnessBuiltInControlPlaneSpec` is app-owned policy; the generic Room store persists state but does not know built-in semantics.
+- `HarnessControlPlaneReconciler` operates on neutral `HostControlPlaneState`/`HostControlPlaneStore` contracts and returns bounded success/no-op/conflict behavior.
+- `HarnessRuntimeGraph` completes reconciliation before exposing the process-scoped graph; service/UI do not open a parallel database owner.
+- `HarnessConsumerControlPlaneHost` is discovery/activation only; no `ensureSeeded()` or equivalent persistent mutation remains in read paths.
+- Reconciliation persistence is executed off the Android main thread while remaining a startup readiness barrier.
 
 ## Physical evidence gates
 
-CPREC-80 must install the new signed Harness candidate over the existing application without uninstall or clear-data, then prove Apps/RedactGuard assignment recovery while already-installed GGUF and valid persisted configuration remain intact.
+CPREC-80 must install the exact signed Harness candidate over the existing application without uninstall or clear-data, then prove Apps/RedactGuard assignment recovery while already-installed GGUF and valid persisted configuration remain intact.
 
 CPREC-90 then runs the clean same-signer two-APK path and proves persisted default after Harness restart, real consumer discover/activate/infer with exact application/use-case/binding/preset identity, and stale/invalid fail-closed behavior. Existing ACUX-90/HCP evidence may be satisfied only by exact candidate evidence that meets their independent criteria.
+
+Material changes to control-plane activation, runtime binding or consumer execution after a device run invalidate the affected exact-head evidence. Therefore the preferred closure candidate is the post-CRV integrated build rather than the earlier v30 repository candidate.
 
 ## Durable documentation destinations
 
