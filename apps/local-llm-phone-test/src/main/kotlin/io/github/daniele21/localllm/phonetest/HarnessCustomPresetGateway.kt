@@ -37,8 +37,11 @@ internal interface HarnessCustomPresetGateway : HarnessApplicationsGateway {
     fun createCustomPreset(command: HarnessCreateCustomPresetCommand): HarnessCustomPresetMutationResult
 }
 
-internal class StoreHarnessCustomPresetGateway(private val store: HostControlPlaneStore) : HarnessCustomPresetGateway {
-    private val delegate = StoreHarnessApplicationsGateway(store)
+internal class StoreHarnessCustomPresetGateway(
+    private val store: HostControlPlaneStore,
+    runtimeSource: HarnessApplicationsRuntimeSource = NoHarnessApplicationsRuntimeSource,
+) : HarnessCustomPresetGateway {
+    private val delegate = StoreHarnessApplicationsGateway(store, runtimeSource)
 
     override fun snapshot(): HarnessApplicationsSnapshot = delegate.snapshot()
 
