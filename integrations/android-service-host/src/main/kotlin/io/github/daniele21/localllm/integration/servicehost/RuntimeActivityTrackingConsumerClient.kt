@@ -26,14 +26,17 @@ internal class RuntimeActivityTrackingConsumerClient(
 
     override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult {
         activity.beginPreparation(token)
-        return try {
-            delegate.prepare(request).also { result ->
-                val issue = (result as? ConsumerPrepareResult.Rejected)?.failure?.code?.toRuntimeIssue()
-                activity.finishPreparation(token, issue)
+        var completed = false
+        try {
+            val result = delegate.prepare(request)
+            val issue = (result as? ConsumerPrepareResult.Rejected)?.failure?.code?.toRuntimeIssue()
+            activity.finishPreparation(token, issue)
+            completed = true
+            return result
+        } finally {
+            if (!completed) {
+                activity.finishPreparation(token, ConsumerRuntimeIssue.RUNTIME_FAILED)
             }
-        } catch (error: RuntimeException) {
-            activity.finishPreparation(token, ConsumerRuntimeIssue.RUNTIME_FAILED)
-            throw error
         }
     }
 
@@ -51,17 +54,18 @@ internal class RuntimeActivityTrackingConsumerClient(
                 }
             }
         }
-        return try {
-            delegate.generate(request, trackingListener).also { result ->
-                if (result is ConsumerGenerationStartResult.Rejected && terminal.compareAndSet(false, true)) {
-                    activity.finishGeneration(token, result.failure.code.toRuntimeIssue())
-                }
+        var callCompleted = false
+        try {
+            val result = delegate.generate(request, trackingListener)
+            if (result is ConsumerGenerationStartResult.Rejected && terminal.compareAndSet(false, true)) {
+                activity.finishGeneration(token, result.failure.code.toRuntimeIssue())
             }
-        } catch (error: RuntimeException) {
-            if (terminal.compareAndSet(false, true)) {
+            callCompleted = true
+            return result
+        } finally {
+            if (!callCompleted && terminal.compareAndSet(false, true)) {
                 activity.finishGeneration(token, ConsumerRuntimeIssue.RUNTIME_FAILED)
             }
-            throw error
         }
     }
 
