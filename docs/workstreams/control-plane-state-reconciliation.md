@@ -7,7 +7,7 @@ Canonical scope: workstream.control-plane-state-reconciliation
 Read when: implementing or coordinating persisted Harness control-plane bootstrap, repair and upgrade safety
 Last reviewed: 2026-08-28
 
-Repository implementation is complete; physical evidence remains pending.
+Repository implementation is complete; physical evidence remains pending. Operational repository state: [`docs/current-state.md`](../current-state.md).
 
 ## Goal
 
