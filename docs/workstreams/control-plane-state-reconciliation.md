@@ -1,11 +1,13 @@
 # Control-plane state reconciliation workstream
 
-Status: active — repository implementation complete; physical evidence pending
+Status: active
 Document type: workstream-state
 Owner: apps/local-llm-phone-test + models/control-plane-room-store
 Canonical scope: workstream.control-plane-state-reconciliation
 Read when: implementing or coordinating persisted Harness control-plane bootstrap, repair and upgrade safety
 Last reviewed: 2026-08-28
+
+Repository implementation is complete; physical evidence remains pending.
 
 ## Goal
 
