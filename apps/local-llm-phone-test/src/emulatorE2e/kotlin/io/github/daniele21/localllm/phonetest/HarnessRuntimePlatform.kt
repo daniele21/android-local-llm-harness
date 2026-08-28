@@ -105,7 +105,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     )
 
     override fun planPrompt(model: BackendModelHandle, request: BackendPromptPlanningRequest): BackendPromptPlan {
-        val input = request.input.asEmulatorText()
+        val input = EmulatorE2eAnalysisResponder.promptText(request.input)
         val prompt = listOfNotNull(request.systemPrompt, input).joinToString("\n")
         return BackendPromptPlan(
             prompt = prompt,
@@ -128,7 +128,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
         request: BackendGenerationRequest,
         onChunk: (text: String, generatedTokens: Int) -> Boolean,
     ): BackendGenerationOutcome {
-        val output = deterministicAnalysisOutput(request.prompt)
+        val output = EmulatorE2eAnalysisResponder.output(request.prompt)
         val midpoint = (output.length / 2).coerceAtLeast(1)
         val chunks = listOf(output.substring(0, midpoint), output.substring(midpoint)).filter(String::isNotEmpty)
         var emitted = 0
@@ -159,26 +159,26 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     }
 
     override fun cancel(requestId: String): Boolean = cancelledRequestIds.add(requestId)
+}
 
-    private fun deterministicAnalysisOutput(prompt: String): String {
-        val typeId = SELECTED_TYPE.find(prompt)?.groupValues?.get(1)
-        val segmentId = SEGMENT_ID.find(prompt)?.groupValues?.get(1)
-        return if (typeId != null && segmentId != null && TEST_SURFACE in prompt) {
-            "{\"schemaVersion\":1,\"findings\":[{\"typeId\":\"$typeId\",\"surface\":\"$TEST_SURFACE\",\"segmentId\":\"$segmentId\"}]}"
+private object EmulatorE2eAnalysisResponder {
+    private const val TEST_SURFACE = "Ada Lovelace"
+    private val selectedType = Regex("\\\"selectedTypeIds\\\"\\s*:\\s*\\[\\s*\\\"([^\\\"]+)\\\"")
+    private val segmentId = Regex("\\\"segmentId\\\"\\s*:\\s*\\\"(p[0-9]{4}-b[0-9]{4}(?:-f[0-9]{4})?)\\\"")
+
+    fun promptText(input: GenerationInput): String = when (input) {
+        is GenerationInput.Text -> input.value
+        is GenerationInput.RawCompletion -> input.value
+        is GenerationInput.Messages -> input.values.joinToString("\n") { it.content }
+    }
+
+    fun output(prompt: String): String {
+        val typeId = selectedType.find(prompt)?.groupValues?.get(1)
+        val selectedSegmentId = segmentId.find(prompt)?.groupValues?.get(1)
+        return if (typeId != null && selectedSegmentId != null && TEST_SURFACE in prompt) {
+            "{\"schemaVersion\":1,\"findings\":[{\"typeId\":\"$typeId\",\"surface\":\"$TEST_SURFACE\",\"segmentId\":\"$selectedSegmentId\"}]}"
         } else {
             "{\"schemaVersion\":1,\"findings\":[]}"
         }
-    }
-
-    private fun GenerationInput.asEmulatorText(): String = when (this) {
-        is GenerationInput.Text -> value
-        is GenerationInput.RawCompletion -> value
-        is GenerationInput.Messages -> values.joinToString("\n") { it.content }
-    }
-
-    private companion object {
-        const val TEST_SURFACE = "Ada Lovelace"
-        val SELECTED_TYPE = Regex("\\\"selectedTypeIds\\\"\\s*:\\s*\\[\\s*\\\"([^\\\"]+)\\\"")
-        val SEGMENT_ID = Regex("\\\"segmentId\\\"\\s*:\\s*\\\"(p[0-9]{4}-b[0-9]{4}(?:-f[0-9]{4})?)\\\"")
     }
 }
