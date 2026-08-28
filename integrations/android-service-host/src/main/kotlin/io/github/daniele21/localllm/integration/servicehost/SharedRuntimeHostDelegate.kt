@@ -26,11 +26,13 @@ class SharedRuntimeHostDelegate(
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
     private val ledger: ClientConnectionLedger = ClientConnectionLedger(),
     private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+    private val readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
         HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
 ) : AutoCloseable {
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
+    private val consumerActivity = ConsumerRuntimeActivityTracker()
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
@@ -40,7 +42,7 @@ class SharedRuntimeHostDelegate(
     internal val controlPlaneOperations =
         ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
     internal val readinessOperations =
-        ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, controlExecutor)
+        ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, readinessExecutor, consumerActivity)
 
     fun registerClient(
         caller: AuthorizedCaller,
@@ -83,12 +85,14 @@ class SharedRuntimeHostDelegate(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         controlExecutor.closeSafely()
+        readinessExecutor.closeSafely()
         synchronized(lifecycleLock) {
             ledger.activeConnections.forEach { connection ->
                 cleanupConnection(connection.token, connection.caller)
             }
             resources.closeAll()
             consumerResources.clear()
+            consumerActivity.clear()
         }
     }
 
@@ -143,7 +147,12 @@ class SharedRuntimeHostDelegate(
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
             return
         }
-        consumer?.let { consumerResources.attachClient(token, it) }
+        consumer?.let {
+            consumerResources.attachClient(
+                token,
+                RuntimeActivityTrackingConsumerClient(token, it, consumerActivity),
+            )
+        }
         val deathLink = lifecycle.link {
             controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
         }
@@ -172,6 +181,7 @@ class SharedRuntimeHostDelegate(
         }
         runCatching { consumerControlPlaneHost?.releaseAll(token.value, caller.applicationId) }
         consumerResources.removeClient(token)
+        consumerActivity.clear(token)
         resources.removeDeathLink(token)?.unlinkSafely()
         resources.removeCallbackDispatcher(token)?.closeSafely()
         ledger.finishClose(token, caller)

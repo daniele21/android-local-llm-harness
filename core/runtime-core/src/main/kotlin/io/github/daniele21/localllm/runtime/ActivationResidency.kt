@@ -64,6 +64,8 @@ class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseR
         return acquireLocked(request, retainModelWarmMs)
     }
 
+    fun find(activationId: UseCaseActivationId): UseCaseActivationLease? = leases.find(activationId)
+
     @Synchronized
     fun release(activationId: UseCaseActivationId, ownerId: ActivationOwnerId): ActivationResidencyResult<ActivationResidencyRelease> =
         when (val released = leases.release(activationId, ownerId)) {
