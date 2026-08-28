@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-26
+Last reviewed: 2026-08-28
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -31,21 +31,31 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 `apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
 
-Applications control-plane implementation is complete through ACUX-80: Apps primary navigation; source-backed Application -> Assigned use case -> Preset drill-down; Suggested/Custom/default semantics; custom preset creation; revision-safe supported mutations with canonical re-read; Advanced/Technical disclosure; and medium/expanded master-detail with compact/large-font single-pane fallback. PR #449 passed Repository health, Validate and Package Android Artifacts on exact head `625747bcc6ef28a9cd0966a693550444fd4db1ed` before squash merge into `dev` as `d8caa3454c51c9c8e53ff3da95d31f7c3df6f1ed`.
-
-A persisted control-plane startup/upgrade regression is now active: current Binder discovery/activation can seed only an exactly empty store, so a partially populated but valid Room state may remain permanently incomplete. The bounded repair is tracked in [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md). ACUX-90 is blocked until the reconciled exact-head repository candidate reaches CPREC-70.
+Applications control-plane implementation is complete through ACUX-80. The subsequent control-plane persistence regression has also been repaired repository-side: CPREC-10 through CPREC-70 are integrated through PRs #455, #459, #457, #458, #460, #461 and #464. Startup now reconciles mandatory built-ins atomically before UI/Binder readers are exposed, preserves valid custom/default/disabled state, remains off the Android main thread and keeps Binder discovery/activation free of bootstrap mutation. CPREC-80/90 remain physical evidence gates; see [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
 
 General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
 
-### Shared Android runtime
+### Shared Android runtime and Consumer readiness convergence
 
 SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures. Production/release readiness still requires representative physical SR-6 evidence. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
+The Consumer Runtime Visibility/Readiness convergence (CRV) is repository-complete through its automated candidate gate:
+
+- exact activated preset/execution identity and custom-preset model policy are integrated through #467/#468;
+- the consumer-safe Binder readiness contract is integrated through #472 using Consumer SDK `0.1.0-alpha.6` and Binder protocol minor 4;
+- activation-bound automatic runtime preparation and fail-closed no-global-fallback behavior are covered by #474;
+- source-backed `IDLE / PREPARING / READY / GENERATING / FAILED` plus `LOADING / REUSING / SWITCHING` observation is wired through #475 without adding a second loader;
+- Harness Applications runtime/readiness presentation is integrated through #476;
+- focused runtime failure regression gaps are covered through #477;
+- RedactGuard consumes the source-backed readiness lifecycle through its own integrated #100/#101 slices.
+
+CRV-100 froze the automated physical candidate identities as Harness v31 source `a30f67b21e24adc6efea838e9a9d65cc78446f28` and RedactGuard v11 source `4679c23a9a22e5242761fe52af97f4eb7432aec7`. Both have exact-source automated package evidence. Later CI/documentation-only descendants do not replace those frozen APK source identities. CRV-110 remains the real-device same-signer + real-GGUF gate; CRV-120 cleanup follows only after that evidence passes.
+
 ### Public Consumer API and OMBRA
 
-CA-0 through CA-4 are integrated in `dev`; PR #104 completed the Binder v1.1 `consumer-api-v1` boundary with consumer AIDL/wire contracts, authenticated host mapping, lifecycle/generation adapters, privacy/compatibility coverage and packaged release-AAR compilation evidence.
+CA-0 through CA-4 are integrated in `dev`; the published consumer boundary has continued through the current Consumer SDK line used by CRV. RedactGuard remains a pure Consumer SDK client: concrete model/config/runtime/residency ownership stays in Harness and consumer surfaces receive only safe published state.
 
-CA-5 is active through OMBRA. Repository-side preparation includes:
+CA-5 remains active through the OMBRA/RedactGuard quality and evidence program. Repository-side preparation includes:
 
 - **OMB-0** — PdfBox parser/export decision and runtime evidence through PR #106;
 - **OMB-1** — pure domain/application workflow through PRs #107/#108;
@@ -58,7 +68,7 @@ CA-5 is active through OMBRA. Repository-side preparation includes:
 - **OMB-8A** — active `ombra-pii-synthetic-v2` corpus with 32 cases and at least five positive exact occurrences per supported category through PRs #223/#253;
 - **OMB-8B** — pre-registered support-policy v1 through PR #252, pinned to corpus v2 identity/hash and required type set with fail-closed checks.
 
-`apps/local-llm-console` no longer owns retired model-management, observability, health, cache or raw inference surfaces. OMB-7 still depends on approved OMB-6B production identity. OMB-6B remains review-gated in PR #248; OMB-8 has corpus/policy integrated but no model/category support claim until exact reviewed Qwen3.5 artifacts pass policy. Physical two-APK/device and release evidence remain open. Canonical state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
+`apps/local-llm-console` no longer owns retired model-management, observability, health, cache or raw inference surfaces. OMB-6B remains review-gated and OMB-8 has no model/category support claim until exact reviewed Qwen3.5 artifacts pass policy. Physical two-APK/device and release evidence remain open. Canonical state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
 ### Model evaluation
 
@@ -74,33 +84,36 @@ PR #248 contains a review-gated symbol candidate, not approved production identi
 
 Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 support claim, execute each reviewed artifact/configuration, evaluate aggregate/per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates, preserve exact identities and fail closed on threshold/category/identity failure. Policy v1 must not be lowered to fit observed results.
 
-### 3. Persisted control-plane reconciliation
+### 3. Physical control-plane / CRV evidence
 
-The current host bootstrap mutates persistent state from Binder-path discovery/activation and only seeds when the entire `HostControlPlaneState` is empty. Partial valid state can therefore survive upgrades/restarts without mandatory built-in application/use-case/preset/binding/exposure data. Repair must be atomic, conservative and idempotent; preserve unrelated/custom/disabled/default state; fail closed on conflicting built-in identity; and complete before UI or Binder observation. CPREC-10 and CPREC-20 are the first parallel implementation slices; physical Applications/HCP proof waits for CPREC-70.
+The persisted control-plane repair and Consumer runtime-readiness convergence are implemented and automatically validated. What remains is representative-device evidence, not repository implementation.
 
-### 4. Physical Android evidence
+A physical session must use same-signer release APKs built from the frozen Harness v31 and RedactGuard v11 source identities and a real GGUF. CRV-110 must prove Host absence/reconnect, exact assignment/preset activation, automatic cold preparation, source-backed ready/generating state, cancellation/recovery, Host restart, relevant fail-closed paths, review/export and privacy-safe evidence. CPREC-80 must additionally prove upgrade repair without uninstall/clear-data; CPREC-90/ACUX-90 may share the clean two-APK session where their independent acceptance criteria are all recorded.
 
-Hardware sessions may combine phone UX, ACUX-90, Q35-6, SR-6 and OMB-8 runs, but each exit gate stays independent. ACUX-90 specifically requires persisted default after Harness restart, real consumer discovery/activation/use of the exact app/use-case/binding/preset identity and a stale/invalid fail-closed path. ACUX-90 cannot start until the reconciled CPREC-70 candidate exists.
+CI, packaging and emulator evidence must not be reported as this physical gate.
 
-Do not claim representative-device UX, external-consumer Applications effectiveness, `MEASURED` Q35 profiles, publish-ready Binder client AAR or production-ready OMBRA/shared-host transport from CI/emulator evidence alone.
+### 4. Other representative Android evidence
+
+Hardware sessions may also combine phone UX, Q35-6, SR-6 and OMB-8 execution where practical, but each exit gate remains independent. Do not claim representative-device UX, `MEASURED` Q35 profiles, production-ready OMBRA/shared-host transport or physical Consumer readiness from CI/emulator evidence alone.
 
 ### 5. Follow-on validation and product hardening
 
-Repository-side UX/UI, including Applications through ACUX-80, is complete. Remaining phone work is device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work includes device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
 
 ## Immediate next block
 
-1. execute CPREC-10 canonical built-in spec/reconciler and CPREC-20 Room partial-state persistence tests in parallel;
-2. after the reconciliation contract settles, execute CPREC-30 startup composition cutover and CPREC-40 regression matrix in parallel, then close CPREC-50/70 exact-head integration;
-3. complete OMB-6B identity review and deterministic launcher assets, and continue OMBRA corpus v2 quality execution independently where ownership does not conflict;
-4. on the CPREC-70 candidate, run upgrade-repair evidence and clean two-APK HCP/ACUX evidence, then resume ACUX-90;
-5. run Q35-6, SR-6 and broader phone UX evidence in parallel where hardware can be shared;
-6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact build.
+1. build same-signer release APKs from the frozen Harness v31 and RedactGuard v11 source revisions using their repository release helpers;
+2. execute CRV-110 / RG-HCP-8 on a representative ARM64 Android device with a real GGUF, recording the exact candidate identity and privacy-safe evidence;
+3. in the same hardware window where appropriate, execute CPREC-80 upgrade-repair first and then the clean CPREC-90/ACUX-90 path without collapsing their independent acceptance criteria;
+4. keep OMB-6B review, OMB-8 quality execution, Q35-6, SR-6 and broader phone UX evidence parallel where their ownership does not conflict;
+5. after CRV-110 passes, perform CRV-120 durable handoff/cleanup and close the temporary CRV coordinator rather than merging its stale planning branch;
+6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact promoted build when a release promotion is intentionally requested.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
 - Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
+- Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
