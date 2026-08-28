@@ -35,8 +35,11 @@ internal class HarnessConsumerRuntimeReadinessHost(
         val runtime = snapshot()
         val readiness = when (runtime?.state ?: RuntimeState.IDLE) {
             RuntimeState.IDLE -> idle(activationId)
+
             RuntimeState.PREPARING -> preparing(activationId, runtime, lease.modelDigest)
+
             RuntimeState.READY -> if (runtime.loadedModel == lease.modelDigest) ready(activationId) else idle(activationId)
+
             RuntimeState.GENERATING -> if (runtime.loadedModel == lease.modelDigest) {
                 ConsumerRuntimeReadiness(
                     activationId = activationId,
@@ -85,11 +88,10 @@ internal class HarnessConsumerRuntimeReadinessHost(
         phase = ConsumerRuntimePhase.READY,
     )
 
-    private fun invalidActivation(): ConsumerRuntimeReadinessResult.Rejected =
-        ConsumerRuntimeReadinessResult.Rejected(
-            ConsumerControlPlaneFailure(
-                ConsumerControlPlaneErrorCode.INVALID_REQUEST,
-                "Consumer activation is unavailable",
-            ),
-        )
+    private fun invalidActivation(): ConsumerRuntimeReadinessResult.Rejected = ConsumerRuntimeReadinessResult.Rejected(
+        ConsumerControlPlaneFailure(
+            ConsumerControlPlaneErrorCode.INVALID_REQUEST,
+            "Consumer activation is unavailable",
+        ),
+    )
 }
