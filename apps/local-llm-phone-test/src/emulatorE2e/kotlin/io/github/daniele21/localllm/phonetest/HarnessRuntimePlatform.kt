@@ -21,8 +21,8 @@ import io.github.daniele21.localllm.runtime.BackendModelSource
 import io.github.daniele21.localllm.runtime.BackendPromptPlan
 import io.github.daniele21.localllm.runtime.BackendPromptPlanningRequest
 import io.github.daniele21.localllm.runtime.InferenceBackend
-import io.github.daniele21.localllm.store.ModelImportException
 import io.github.daniele21.localllm.store.ModelImportErrorCode
+import io.github.daniele21.localllm.store.ModelImportException
 import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
@@ -55,11 +55,10 @@ private class EmulatorE2eModelStore(context: Context) : ModelStore {
 
     override fun find(digest: ModelDigest): StoredModel? = stored.takeIf { it.digest == digest }
 
-    override fun import(source: File, artifact: GgufArtifact): StoredModel =
-        throw ModelImportException(
-            ModelImportErrorCode.INVALID_SOURCE,
-            "The emulator E2E model store is pre-provisioned and immutable",
-        )
+    override fun import(source: File, artifact: GgufArtifact): StoredModel = throw ModelImportException(
+        ModelImportErrorCode.INVALID_SOURCE,
+        "The emulator E2E model store is pre-provisioned and immutable",
+    )
 
     override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(
         valid = digest == stored.digest,
@@ -82,10 +81,7 @@ private data class EmulatorE2eModelHandle(
     override val loadDurationMs: Long = 5,
 ) : BackendModelHandle
 
-private data class EmulatorE2eContext(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class EmulatorE2eContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     override val id: String = "llama.cpp"
