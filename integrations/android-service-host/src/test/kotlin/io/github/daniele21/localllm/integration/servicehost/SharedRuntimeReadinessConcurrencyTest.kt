@@ -27,40 +27,37 @@ import org.junit.Test
 class SharedRuntimeReadinessConcurrencyTest {
     @Test
     fun `readiness completes while model control lane is occupied`() {
-        val caller =
-            AuthorizedCaller(
-                uid = 10001,
-                packageName = "io.example.client",
-                applicationId = ApplicationId("consumer-app"),
-                allowedUseCases = setOf(UseCaseId("document-pii-detection")),
-            )
+        val caller = AuthorizedCaller(
+            uid = 10001,
+            packageName = "io.example.client",
+            applicationId = ApplicationId("consumer-app"),
+            allowedUseCases = setOf(UseCaseId("document-pii-detection")),
+        )
         val ledger = ClientConnectionLedger()
-        val token =
-            (ledger.register(
-                caller = caller,
-                negotiatedMinor = 4,
-                enabledFeatures = setOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
-                ),
-            ) as LedgerResult.Success).value
+        val token = (ledger.register(
+            caller = caller,
+            negotiatedMinor = 4,
+            enabledFeatures = setOf(
+                BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+            ),
+        ) as LedgerResult.Success).value
         val controlExecutor = BoundedSerialHostControlExecutor()
         val readinessExecutor = BoundedSerialHostControlExecutor()
-        val delegate =
-            SharedRuntimeHostDelegate(
-                client = UnusedLocalLlmClient,
-                protocolInfo = hostProtocolInfo(
-                    hostBuildId = "test",
-                    consumerApiEnabled = true,
-                    consumerControlPlaneEnabled = true,
-                    consumerRuntimeReadinessEnabled = true,
-                ),
-                consumerRuntimeReadinessHost = ReadyReadinessHost,
-                ledger = ledger,
-                controlExecutor = controlExecutor,
-                readinessExecutor = readinessExecutor,
-            )
+        val delegate = SharedRuntimeHostDelegate(
+            client = UnusedLocalLlmClient,
+            protocolInfo = hostProtocolInfo(
+                hostBuildId = "test",
+                consumerApiEnabled = true,
+                consumerControlPlaneEnabled = true,
+                consumerRuntimeReadinessEnabled = true,
+            ),
+            consumerRuntimeReadinessHost = ReadyReadinessHost,
+            ledger = ledger,
+            controlExecutor = controlExecutor,
+            readinessExecutor = readinessExecutor,
+        )
         val controlStarted = CountDownLatch(1)
         val releaseControl = CountDownLatch(1)
         val readinessCompleted = CountDownLatch(1)
@@ -76,17 +73,15 @@ class SharedRuntimeReadinessConcurrencyTest {
 
         delegate.readinessOperations.runtimeReadiness(
             caller = caller,
-            request =
-                ConsumerControlPlaneRequestParcel(
-                    clientToken = ClientTokenParcel(token.value),
-                    operationId = "readiness-concurrent",
-                    activationId = "activation-1",
-                ),
-            callback =
-                HostResultCallback { value ->
-                    result = value
-                    readinessCompleted.countDown()
-                },
+            request = ConsumerControlPlaneRequestParcel(
+                clientToken = ClientTokenParcel(token.value),
+                operationId = "readiness-concurrent",
+                activationId = "activation-1",
+            ),
+            callback = HostResultCallback { value ->
+                result = value
+                readinessCompleted.countDown()
+            },
         )
 
         assertTrue(readinessCompleted.await(1, TimeUnit.SECONDS))
@@ -101,13 +96,12 @@ class SharedRuntimeReadinessConcurrencyTest {
             ownerId: String,
             applicationId: ApplicationId,
             activationId: ConsumerActivationId,
-        ): ConsumerRuntimeReadinessResult =
-            ConsumerRuntimeReadinessResult.Available(
-                ConsumerRuntimeReadiness(
-                    activationId = activationId,
-                    phase = ConsumerRuntimePhase.READY,
-                ),
-            )
+        ): ConsumerRuntimeReadinessResult = ConsumerRuntimeReadinessResult.Available(
+            ConsumerRuntimeReadiness(
+                activationId = activationId,
+                phase = ConsumerRuntimePhase.READY,
+            ),
+        )
     }
 
     private object UnusedLocalLlmClient : LocalLlmClient {
@@ -117,8 +111,7 @@ class SharedRuntimeReadinessConcurrencyTest {
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId = error("unused")
 
-        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId =
-            error("unused")
+        override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId = error("unused")
 
         override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle = error("unused")
 
