@@ -1,6 +1,10 @@
 name: Build physical E2E host
 
 on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/build-physical-e2e-host.yml"
   workflow_call:
     inputs:
       harness_ref:
@@ -23,13 +27,15 @@ jobs:
     name: Build exact unsigned ARM64 host APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      CANDIDATE_REF: ${{ github.event_name == 'pull_request' && 'a30f67b21e24adc6efea838e9a9d65cc78446f28' || inputs.harness_ref }}
 
     steps:
       - name: Checkout exact Harness source
         uses: actions/checkout@v7
         with:
           repository: daniele21/android-local-llm-harness
-          ref: ${{ inputs.harness_ref }}
+          ref: ${{ env.CANDIDATE_REF }}
           fetch-depth: 1
           submodules: recursive
           persist-credentials: false
@@ -38,7 +44,7 @@ jobs:
         id: identity
         shell: bash
         env:
-          EXPECTED_REF: ${{ inputs.harness_ref }}
+          EXPECTED_REF: ${{ env.CANDIDATE_REF }}
         run: |
           set -euo pipefail
           actual_sha="$(git rev-parse HEAD)"
