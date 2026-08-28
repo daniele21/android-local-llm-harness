@@ -59,9 +59,13 @@ internal class RuntimeGraphHarnessApplicationsRuntimeSource(
 private fun RuntimeSnapshot?.phaseFor(targetModel: io.github.daniele21.localllm.contracts.ModelDigest): ConsumerRuntimePhase =
     when (this?.state ?: RuntimeState.IDLE) {
         RuntimeState.IDLE -> ConsumerRuntimePhase.IDLE
+
         RuntimeState.PREPARING -> ConsumerRuntimePhase.PREPARING
+
         RuntimeState.READY -> if (loadedModel == targetModel) ConsumerRuntimePhase.READY else ConsumerRuntimePhase.IDLE
+
         RuntimeState.GENERATING -> if (loadedModel == targetModel) ConsumerRuntimePhase.GENERATING else ConsumerRuntimePhase.IDLE
+
         RuntimeState.DEGRADED,
         RuntimeState.FAILED,
         -> ConsumerRuntimePhase.FAILED
