@@ -41,6 +41,11 @@ internal class StoreHarnessCustomPresetGateway(
     private val store: HostControlPlaneStore,
     runtimeSource: HarnessApplicationsRuntimeSource = NoHarnessApplicationsRuntimeSource,
 ) : HarnessCustomPresetGateway {
+    constructor(access: HarnessPhoneControlPlaneAccess) : this(
+        store = access,
+        runtimeSource = access.applicationsRuntimeSource,
+    )
+
     private val delegate = StoreHarnessApplicationsGateway(store, runtimeSource)
 
     override fun snapshot(): HarnessApplicationsSnapshot = delegate.snapshot()
