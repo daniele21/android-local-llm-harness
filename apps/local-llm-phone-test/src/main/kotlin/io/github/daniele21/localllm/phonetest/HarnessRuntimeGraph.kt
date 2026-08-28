@@ -165,9 +165,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         registry.removeActivationBinding(activationId)
     }
 
-    fun activeConsumerResolved(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase? =
-        registry.activeResolved(applicationId, useCaseId)
-
     fun harnessFor(model: ImportedPhoneModel, purpose: HarnessRuntimePurpose): PhoneHarness = synchronized(lock) {
         Qwen35PhoneModelPolicy.requireCurated(model)
         registry.selectedModel = model
