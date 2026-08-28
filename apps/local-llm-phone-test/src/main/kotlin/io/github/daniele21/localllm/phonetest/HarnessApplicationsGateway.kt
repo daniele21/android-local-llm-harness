@@ -49,6 +49,7 @@ internal data class HarnessAssignmentSummary(
     val status: HarnessAssignmentStatus,
     val defaultPreset: HarnessPresetSummary?,
     val availablePresets: List<HarnessPresetSummary>,
+    val runtime: HarnessAssignmentRuntimeSummary = HarnessAssignmentRuntimeSummary(activationActive = false),
 )
 
 internal data class HarnessPresetSummary(
@@ -91,8 +92,11 @@ internal interface HarnessApplicationsGateway {
     fun setDefaultPreset(command: HarnessSetDefaultPresetCommand): HarnessControlPlaneMutationResult
 }
 
-internal class StoreHarnessApplicationsGateway(private val store: HostControlPlaneStore) : HarnessApplicationsGateway {
-    override fun snapshot(): HarnessApplicationsSnapshot = store.snapshot().toApplicationsSnapshot()
+internal class StoreHarnessApplicationsGateway(
+    private val store: HostControlPlaneStore,
+    private val runtimeSource: HarnessApplicationsRuntimeSource = NoHarnessApplicationsRuntimeSource,
+) : HarnessApplicationsGateway {
+    override fun snapshot(): HarnessApplicationsSnapshot = store.snapshot().toApplicationsSnapshot(runtimeSource)
 
     override fun setDefaultPreset(command: HarnessSetDefaultPresetCommand): HarnessControlPlaneMutationResult =
         when (val identity = command.identity()) {
@@ -105,7 +109,7 @@ internal class StoreHarnessApplicationsGateway(private val store: HostControlPla
         identity: ParsedCommandIdentity.Valid,
     ): HarnessControlPlaneMutationResult = try {
         val updated = store.transact { current -> current.withDefaultPreset(command, identity) }
-        HarnessControlPlaneMutationResult.Success(updated.toApplicationsSnapshot())
+        HarnessControlPlaneMutationResult.Success(updated.toApplicationsSnapshot(runtimeSource))
     } catch (stale: StaleBindingRevision) {
         HarnessControlPlaneMutationResult.StaleRevision(stale.expectedRevision, stale.actualRevision)
     } catch (rejected: ControlPlaneMutationRejected) {
@@ -177,7 +181,7 @@ private fun requireBindingRevision(binding: ApplicationUseCaseBinding, expectedR
     }
 }
 
-private fun HostControlPlaneState.toApplicationsSnapshot(): HarnessApplicationsSnapshot {
+private fun HostControlPlaneState.toApplicationsSnapshot(runtimeSource: HarnessApplicationsRuntimeSource): HarnessApplicationsSnapshot {
     val latestBindings = bindings
         .groupBy { it.applicationId to it.useCaseId }
         .values
@@ -198,13 +202,16 @@ private fun HostControlPlaneState.toApplicationsSnapshot(): HarnessApplicationsS
                     lastSeenAtEpochMs = application.lastSeenAtEpochMs,
                     assignments = latestBindings[application.applicationId].orEmpty()
                         .sortedBy { binding -> latestUseCase(binding.useCaseId)?.displayName.orEmpty().lowercase() }
-                        .mapNotNull { binding -> assignmentSummary(binding) },
+                        .mapNotNull { binding -> assignmentSummary(binding, runtimeSource) },
                 )
             },
     )
 }
 
-private fun HostControlPlaneState.assignmentSummary(binding: ApplicationUseCaseBinding): HarnessAssignmentSummary? {
+private fun HostControlPlaneState.assignmentSummary(
+    binding: ApplicationUseCaseBinding,
+    runtimeSource: HarnessApplicationsRuntimeSource,
+): HarnessAssignmentSummary? {
     val useCase = latestUseCase(binding.useCaseId) ?: return null
     val exposed = exposures.filter { exposure ->
         exposure.bindingId == binding.bindingId && exposure.bindingRevision == binding.revision
@@ -247,6 +254,7 @@ private fun HostControlPlaneState.assignmentSummary(binding: ApplicationUseCaseB
         },
         defaultPreset = summaries.singleOrNull(HarnessPresetSummary::isDefault),
         availablePresets = summaries,
+        runtime = runtimeSource.assignmentRuntime(binding.applicationId, binding.useCaseId),
     )
 }
 

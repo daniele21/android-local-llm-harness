@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
+import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.models.PresetCreationSource
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessEmptyState
@@ -63,10 +65,14 @@ internal fun HarnessAssignedUseCaseScreen(
             }
         }
         item {
+            HarnessAssignmentRuntimeCard(assignment.runtime, assignment.useCaseId)
+        }
+        item {
             Text("Default configuration", style = MaterialTheme.typography.titleMedium)
             assignment.defaultPreset?.let { preset ->
                 HarnessPresetCard(
                     preset = preset,
+                    activePreset = assignment.runtime.activePreset,
                     emphasized = true,
                     onClick = { onOpenPreset(preset) },
                 )
@@ -90,7 +96,11 @@ internal fun HarnessAssignedUseCaseScreen(
                 items = assignment.availablePresets,
                 key = { "${it.presetId}:${it.revision}" },
             ) { preset ->
-                HarnessPresetCard(preset = preset, onClick = { onOpenPreset(preset) })
+                HarnessPresetCard(
+                    preset = preset,
+                    activePreset = assignment.runtime.activePreset,
+                    onClick = { onOpenPreset(preset) },
+                )
             }
         }
         onCreatePreset?.let { create ->
@@ -179,7 +189,53 @@ internal fun HarnessPresetDetailScreen(
 }
 
 @Composable
-private fun HarnessPresetCard(preset: HarnessPresetSummary, emphasized: Boolean = false, onClick: () -> Unit) {
+private fun HarnessAssignmentRuntimeCard(runtime: HarnessAssignmentRuntimeSummary, useCaseId: String) {
+    HarnessCard(
+        emphasized = runtime.activationActive,
+        modifier = Modifier.testTag("assignment-runtime-$useCaseId"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
+            ) {
+                Text("Current runtime", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (runtime.activationActive) {
+                        "Activation is owned by this assignment. Runtime activity below is the shared Harness runtime."
+                    } else {
+                        "Not activated. The assigned local model is prepared automatically when the consumer starts analysis."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HarnessStatusBadge(runtime.runtimeLabel(), runtime.runtimeTone())
+        }
+        HarnessKeyValueRow("Activation", if (runtime.activationActive) "Active" else "Inactive")
+        if (runtime.activationActive) {
+            HarnessKeyValueRow("Shared runtime", runtime.phase.runtimePhaseLabel())
+            runtime.effectiveModelProfileId?.let { modelProfileId ->
+                HarnessKeyValueRow("Effective model", modelProfileId, monospacedValue = true)
+            }
+            if (runtime.preparationAction != ConsumerPreparationAction.NONE) {
+                HarnessKeyValueRow("Preparation", runtime.preparationAction.preparationLabel())
+            }
+        }
+    }
+}
+
+@Composable
+private fun HarnessPresetCard(
+    preset: HarnessPresetSummary,
+    activePreset: InferencePresetRef? = null,
+    emphasized: Boolean = false,
+    onClick: () -> Unit,
+) {
     HarnessCard(
         emphasized = emphasized,
         modifier = Modifier
@@ -209,6 +265,9 @@ private fun HarnessPresetCard(preset: HarnessPresetSummary, emphasized: Boolean 
             }
             HarnessStatusBadge(preset.originLabel(), HarnessStatusTone.INFO)
             if (preset.isDefault) HarnessStatusBadge("Default", HarnessStatusTone.SUCCESS)
+            if (activePreset?.id?.value == preset.presetId && activePreset.version == preset.revision) {
+                HarnessStatusBadge("In use", HarnessStatusTone.SUCCESS)
+            }
         }
     }
 }
