@@ -18,11 +18,11 @@ import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class SharedRuntimeReadinessConcurrencyTest {
     @Test
@@ -34,15 +34,17 @@ class SharedRuntimeReadinessConcurrencyTest {
             allowedUseCases = setOf(UseCaseId("document-pii-detection")),
         )
         val ledger = ClientConnectionLedger()
-        val token = (ledger.register(
-            caller = caller,
-            negotiatedMinor = 4,
-            enabledFeatures = setOf(
-                BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
-            ),
-        ) as LedgerResult.Success).value
+        val token = (
+            ledger.register(
+                caller = caller,
+                negotiatedMinor = 4,
+                enabledFeatures = setOf(
+                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                    BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+                ),
+            ) as LedgerResult.Success
+            ).value
         val controlExecutor = BoundedSerialHostControlExecutor()
         val readinessExecutor = BoundedSerialHostControlExecutor()
         val delegate = SharedRuntimeHostDelegate(
