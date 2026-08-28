@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
-import io.github.daniele21.localllm.contracts.ConsumerRuntimePhase
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.models.PresetCreationSource
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -276,39 +275,6 @@ private fun HarnessPresetCard(
 internal fun HarnessPresetSummary.originLabel(): String = when (source) {
     PresetCreationSource.SUGGESTED -> "Suggested"
     PresetCreationSource.CUSTOM -> "Custom"
-}
-
-internal fun HarnessAssignmentRuntimeSummary.runtimeLabel(): String = if (!activationActive) {
-    "Inactive"
-} else {
-    phase.runtimePhaseLabel()
-}
-
-internal fun HarnessAssignmentRuntimeSummary.runtimeTone(): HarnessStatusTone = if (!activationActive) {
-    HarnessStatusTone.NEUTRAL
-} else {
-    when (phase) {
-        ConsumerRuntimePhase.IDLE -> HarnessStatusTone.INFO
-        ConsumerRuntimePhase.PREPARING -> HarnessStatusTone.INFO
-        ConsumerRuntimePhase.READY -> HarnessStatusTone.SUCCESS
-        ConsumerRuntimePhase.GENERATING -> HarnessStatusTone.INFO
-        ConsumerRuntimePhase.FAILED -> HarnessStatusTone.ERROR
-    }
-}
-
-internal fun ConsumerRuntimePhase.runtimePhaseLabel(): String = when (this) {
-    ConsumerRuntimePhase.IDLE -> "Activated"
-    ConsumerRuntimePhase.PREPARING -> "Preparing"
-    ConsumerRuntimePhase.READY -> "Ready"
-    ConsumerRuntimePhase.GENERATING -> "Generating"
-    ConsumerRuntimePhase.FAILED -> "Failed"
-}
-
-internal fun ConsumerPreparationAction.preparationLabel(): String = when (this) {
-    ConsumerPreparationAction.NONE -> "None"
-    ConsumerPreparationAction.LOADING -> "Loading model"
-    ConsumerPreparationAction.REUSING -> "Reusing loaded model"
-    ConsumerPreparationAction.SWITCHING -> "Switching model"
 }
 
 private fun HarnessAssignmentStatus.assignmentLabel(): String = when (this) {
