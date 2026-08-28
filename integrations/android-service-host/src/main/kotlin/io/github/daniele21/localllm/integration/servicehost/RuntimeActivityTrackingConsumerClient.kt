@@ -39,10 +39,7 @@ internal class RuntimeActivityTrackingConsumerClient(
 
     override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult = delegate.createSession(preparedId)
 
-    override fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult {
+    override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
         val terminal = AtomicBoolean(false)
         activity.beginGeneration(token)
         val trackingListener = ConsumerGenerationListener { event ->
@@ -83,13 +80,17 @@ private fun ConsumerGenerationEvent.runtimeIssueOrNull(): ConsumerRuntimeIssue? 
 
 private fun ConsumerErrorCode.toRuntimeIssue(): ConsumerRuntimeIssue = when (this) {
     ConsumerErrorCode.MODEL_UNAVAILABLE -> ConsumerRuntimeIssue.MODEL_UNAVAILABLE
+
     ConsumerErrorCode.STALE_CAPABILITY,
     ConsumerErrorCode.PREPARED_SELECTION_STALE,
     ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
     -> ConsumerRuntimeIssue.CONFIGURATION_STALE
 
     ConsumerErrorCode.CANCELLED -> ConsumerRuntimeIssue.CANCELLED
+
     ConsumerErrorCode.RUNTIME_FAILURE -> ConsumerRuntimeIssue.RUNTIME_FAILED
+
     ConsumerErrorCode.PREPARE_FAILED -> ConsumerRuntimeIssue.PREPARATION_FAILED
+
     else -> ConsumerRuntimeIssue.PREPARATION_FAILED
 }
