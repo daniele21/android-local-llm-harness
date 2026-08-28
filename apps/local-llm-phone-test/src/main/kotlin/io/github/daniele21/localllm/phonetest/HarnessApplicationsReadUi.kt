@@ -68,12 +68,17 @@ internal fun HarnessApplicationsScreen(
                     verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
                 ) {
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
                             Text("Applications", style = MaterialTheme.typography.headlineSmall)
                             Text(
                                 "Apps using the Harness shared runtime",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            HarnessSecondaryButton(
+                                text = "Refresh status",
+                                modifier = Modifier.testTag("applications-refresh-status"),
+                                onClick = onRefresh,
                             )
                         }
                     }
@@ -219,7 +224,15 @@ private fun HarnessAssignmentRow(assignment: HarnessAssignmentSummary, onClick: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            HarnessStatusBadge(assignment.status.label(), assignment.status.tone())
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
+            ) {
+                HarnessStatusBadge(assignment.status.label(), assignment.status.tone())
+                if (assignment.runtime.activationActive) {
+                    HarnessStatusBadge(assignment.runtime.runtimeLabel(), assignment.runtime.runtimeTone())
+                }
+            }
         }
     }
 }
