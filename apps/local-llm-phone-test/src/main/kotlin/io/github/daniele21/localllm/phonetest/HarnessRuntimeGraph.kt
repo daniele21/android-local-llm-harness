@@ -11,7 +11,6 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
-import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
@@ -66,8 +65,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     val activationResidency = ActivationResidencyCoordinator(activationLeases)
     val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
-    val controlPlaneStore: HostControlPlaneStore
-        get() = controlPlaneStoreOwner.store
+    val controlPlaneStore = HarnessPhoneControlPlaneAccess(
+        store = controlPlaneStoreOwner.store,
+        applicationsRuntimeSource = RuntimeGraphHarnessApplicationsRuntimeSource(
+            activeResolved = registry::activeResolved,
+            runtimeSnapshot = ::runtimeSnapshot,
+        ),
+    )
 
     val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
         TelemetryRetentionPolicy(
