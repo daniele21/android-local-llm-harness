@@ -31,11 +31,6 @@ internal class RuntimeGraphHarnessApplicationsRuntimeSource(
     private val activeResolved: (ApplicationId, UseCaseId) -> ResolvedUseCase?,
     private val runtimeSnapshot: () -> RuntimeSnapshot?,
 ) : HarnessApplicationsRuntimeSource {
-    constructor(runtimeGraph: HarnessRuntimeGraph) : this(
-        activeResolved = runtimeGraph::activeConsumerResolved,
-        runtimeSnapshot = runtimeGraph::runtimeSnapshot,
-    )
-
     override fun assignmentRuntime(applicationId: ApplicationId, useCaseId: UseCaseId): HarnessAssignmentRuntimeSummary {
         val resolved = activeResolved(applicationId, useCaseId)
             ?: return HarnessAssignmentRuntimeSummary(activationActive = false)
@@ -62,9 +57,9 @@ private fun RuntimeSnapshot?.phaseFor(targetModel: io.github.daniele21.localllm.
 
         RuntimeState.PREPARING -> ConsumerRuntimePhase.PREPARING
 
-        RuntimeState.READY -> if (loadedModel == targetModel) ConsumerRuntimePhase.READY else ConsumerRuntimePhase.IDLE
+        RuntimeState.READY -> if (this?.loadedModel == targetModel) ConsumerRuntimePhase.READY else ConsumerRuntimePhase.IDLE
 
-        RuntimeState.GENERATING -> if (loadedModel == targetModel) ConsumerRuntimePhase.GENERATING else ConsumerRuntimePhase.IDLE
+        RuntimeState.GENERATING -> if (this?.loadedModel == targetModel) ConsumerRuntimePhase.GENERATING else ConsumerRuntimePhase.IDLE
 
         RuntimeState.DEGRADED,
         RuntimeState.FAILED,
