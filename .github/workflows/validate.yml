@@ -346,4 +346,6 @@ jobs:
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           body=$(printf 'Remote preflight `%s` for `%s`: **%s**\n\nReason: %s\nRun: %s' "$PROFILE" "$EXPECTED_HEAD" "$RESULT" "$REASON" "$RUN_URL")
-          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"; then
+            echo "::warning::Remote preflight result is $RESULT for exact head $EXPECTED_HEAD, but posting the result comment failed."
+          fi
