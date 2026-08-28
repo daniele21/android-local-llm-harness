@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationId
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerPreparationAction
+import io.github.daniele21.localllm.contracts.ConsumerRuntimeIssue
 import io.github.daniele21.localllm.contracts.ConsumerRuntimePhase
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadinessResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
@@ -85,6 +86,18 @@ class HarnessConsumerRuntimeReadinessHostTest {
 
         runtime = snapshot(RuntimeState.GENERATING, modelDigest)
         assertEquals(ConsumerRuntimePhase.GENERATING, available().readiness.phase)
+    }
+
+    @Test
+    fun `failed runtime projects a retryable consumer safe issue`() {
+        runtime = snapshot(RuntimeState.FAILED, modelDigest)
+
+        val readiness = available().readiness
+
+        assertEquals(ConsumerRuntimePhase.FAILED, readiness.phase)
+        assertEquals(ConsumerRuntimeIssue.RUNTIME_FAILED, readiness.issue)
+        assertTrue(readiness.retryable)
+        assertEquals(ConsumerPreparationAction.NONE, readiness.preparationAction)
     }
 
     @Test

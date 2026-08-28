@@ -79,6 +79,21 @@ class HarnessConsumerRuntimePreparationTest {
     }
 
     @Test
+    fun `consumer prepare fails closed when exact activation model is not installed`() {
+        val fixture = ConsumerRuntimePreparationFixture()
+        fixture.activate(fixture.activationMissing, fixture.resolvedMissing)
+
+        val missing = fixture.client.prepare(fixture.applicationId, fixture.useCaseId)
+
+        assertFalse(missing.ready)
+        assertEquals(null, missing.modelDigest)
+        assertTrue(fixture.backend.loadedDigests.isEmpty())
+        assertFalse(fixture.store.verificationCallsByDigest.containsKey(fixture.digestMissing))
+        assertEquals(null, fixture.client.runtimeSnapshot().loadedModel)
+        fixture.close()
+    }
+
+    @Test
     fun `consumer prepare fails closed after activation binding is released without reloading`() {
         val fixture = ConsumerRuntimePreparationFixture()
         fixture.activate(fixture.activationA, fixture.resolvedA)
@@ -100,8 +115,10 @@ private class ConsumerRuntimePreparationFixture {
     val useCaseId = UseCaseId("document-pii-detection")
     val activationA = UseCaseActivationId("activation-a")
     val activationB = UseCaseActivationId("activation-b")
+    val activationMissing = UseCaseActivationId("activation-missing")
     val digestA = ModelDigest("a".repeat(64))
     val digestB = ModelDigest("b".repeat(64))
+    val digestMissing = ModelDigest("c".repeat(64))
 
     private val modelFile = File.createTempFile("consumer-runtime-preparation", ".gguf").apply {
         writeText("model")
@@ -112,6 +129,7 @@ private class ConsumerRuntimePreparationFixture {
     val backend = ConsumerRuntimePreparationBackend()
     val resolvedA = resolved("profile-a", digestA)
     val resolvedB = resolved("profile-b", digestB)
+    val resolvedMissing = resolved("profile-missing", digestMissing)
 
     private var runtime: RuntimeOrchestrator? = null
     val client = HarnessSharedRuntimeClient(
