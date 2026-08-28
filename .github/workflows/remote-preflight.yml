@@ -63,4 +63,6 @@ jobs:
             -f "inputs[pr_number]=$PR_NUMBER"
 
           body=$(printf 'Remote preflight requested: `%s` for exact head `%s`. Validation will resolve the blast-radius profile and report the result back here.' "$profile" "$head_sha")
-          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"; then
+            echo "::warning::Remote preflight was dispatched for exact head $head_sha, but posting the acknowledgement comment failed."
+          fi
