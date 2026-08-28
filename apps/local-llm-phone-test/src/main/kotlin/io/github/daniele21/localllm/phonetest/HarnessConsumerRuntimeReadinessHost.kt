@@ -33,14 +33,15 @@ internal class HarnessConsumerRuntimeReadinessHost(
             return invalidActivation()
         }
         val runtime = snapshot()
-        val readiness = when (runtime?.state ?: RuntimeState.IDLE) {
+        val runtimeState = runtime?.state ?: RuntimeState.IDLE
+        val readiness = when (runtimeState) {
             RuntimeState.IDLE -> idle(activationId)
 
-            RuntimeState.PREPARING -> preparing(activationId, runtime, lease.modelDigest)
+            RuntimeState.PREPARING -> preparing(activationId, requireNotNull(runtime), lease.modelDigest)
 
-            RuntimeState.READY -> if (runtime.loadedModel == lease.modelDigest) ready(activationId) else idle(activationId)
+            RuntimeState.READY -> if (runtime?.loadedModel == lease.modelDigest) ready(activationId) else idle(activationId)
 
-            RuntimeState.GENERATING -> if (runtime.loadedModel == lease.modelDigest) {
+            RuntimeState.GENERATING -> if (runtime?.loadedModel == lease.modelDigest) {
                 ConsumerRuntimeReadiness(
                     activationId = activationId,
                     phase = ConsumerRuntimePhase.GENERATING,
