@@ -166,7 +166,7 @@ jobs:
         if: needs.scope.outputs.packaging == 'true'
         run: ./scripts/verify-llama-cpp-pin.sh
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
