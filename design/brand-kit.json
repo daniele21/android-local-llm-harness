@@ -7,6 +7,7 @@
     "logo_primary_dark": "docs/assets/brand/master/harness-lockup-dark.png",
     "logo_compact": "docs/assets/brand/master/harness-symbol.png",
     "logo_monochrome": "Android themed icon derives its alpha mask from the canonical H Bridge Core PNG symbol",
+    "app_icon": "docs/assets/brand/master/harness-app-icon-dark.png",
     "app_icon_light": "docs/assets/brand/master/harness-app-icon-light.png",
     "app_icon_dark": "docs/assets/brand/master/harness-app-icon-dark.png",
     "android_launcher": "generated Android launcher resources synchronized from the canonical PNG masters",
