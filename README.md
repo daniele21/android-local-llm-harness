@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/brand/master/harness-symbol.svg" width="128" alt="Harness symbol">
+  <img src="docs/assets/brand/master/harness-symbol.png" width="128" alt="Harness H Bridge Core symbol">
 </p>
 
 <h1 align="center">Android Local LLM Harness</h1>
