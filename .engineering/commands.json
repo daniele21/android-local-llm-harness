@@ -5,7 +5,7 @@
     "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
     "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
     "dev": {"status": "n/a", "run": "n/a"},
-    "check": {"status": "required", "run": "python3 scripts/verify_no_tracked_generated_artifacts.py && python3 scripts/test_llrt6_physical_evidence.py && bash -n scripts/run-llrt6-physical-evidence.sh && python3 scripts/test_llrt9_width4_diagnostic.py && bash -n scripts/run-llrt9-width4-diagnostic.sh && python3 scripts/verify-agent-navigation.py && python3 scripts/verify_architecture.py && ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts"},
+    "check": {"status": "required", "run": "python3 scripts/verify_no_tracked_generated_artifacts.py && python3 scripts/test_llrt6_physical_evidence.py && bash -n scripts/run-llrt6-physical-evidence.sh && python3 scripts/test_llrt9_width4_diagnostic.py && bash -n scripts/run-llrt9-width4-diagnostic.sh && bash -n scripts/build-android-aab.sh && python3 scripts/verify-agent-navigation.py && python3 scripts/verify_architecture.py && ./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts"},
     "test": {"status": "required", "run": "./gradlew --no-configuration-cache check"},
     "e2e": {"status": "recommended", "run": "bash scripts/capture-device-e2e-evidence.sh --model \"$MODEL_GGUF\" --architecture \"$MODEL_ARCHITECTURE\" --quantization \"$MODEL_QUANTIZATION\" --memory-repeat 5"},
     "build": {"status": "required", "run": "./gradlew assembleDebug"},
