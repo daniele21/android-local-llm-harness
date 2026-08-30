@@ -6,6 +6,20 @@ verifier="$script_dir/verify-llama-cpp-pin.sh"
 temporary_root="$(mktemp -d)"
 trap 'rm -rf "$temporary_root"' EXIT
 
+write_runtime_revision() {
+  local repository_path="$1"
+  local commit="$2"
+  local policy_path="$repository_path/models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuning.kt"
+  mkdir -p "$(dirname "$policy_path")"
+  cat > "$policy_path" <<EOF
+package io.github.daniele21.localllm.models
+
+object Qwen35RuntimeTuningProfiles {
+    const val LLAMA_CPP_REVISION = "$commit"
+}
+EOF
+}
+
 write_pin() {
   local repository_path="$1"
   local commit="$2"
@@ -18,12 +32,14 @@ write_pin() {
   "commit": "$commit"
 }
 EOF
+  write_runtime_revision "$repository_path" "$commit"
 }
 
 run_verifier() {
   local repository_path="$1"
   LLAMA_CPP_PIN_FILE="$repository_path/backends/llama-cpp/llama-cpp-pin.json" \
   LLAMA_CPP_SUBMODULE_PATH="$repository_path/third_party/llama.cpp" \
+  QWEN35_RUNTIME_TUNING_FILE="$repository_path/models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuning.kt" \
     bash "$verifier"
 }
 
@@ -83,6 +99,22 @@ if ! grep -Fq "fixture-tag ($matching_commit)" <<<"$matching_output"; then
   exit 1
 fi
 
+runtime_revision_mismatch_repository="$temporary_root/runtime-revision-mismatch"
+create_initialized_submodule "$runtime_revision_mismatch_repository"
+runtime_revision_commit="$(git -C "$runtime_revision_mismatch_repository/third_party/llama.cpp" rev-parse HEAD)"
+write_pin "$runtime_revision_mismatch_repository" "$runtime_revision_commit" "runtime-revision-pin"
+write_runtime_revision "$runtime_revision_mismatch_repository" "0000000000000000000000000000000000000000"
+runtime_revision_stderr="$temporary_root/runtime-revision-mismatch.stderr"
+if run_verifier "$runtime_revision_mismatch_repository" > /dev/null 2>"$runtime_revision_stderr"; then
+  echo "runtime revision mismatch unexpectedly passed" >&2
+  exit 1
+fi
+if ! grep -Fq "Qwen3.5 runtime backend revision mismatch" "$runtime_revision_stderr"; then
+  echo "runtime revision mismatch did not fail closed on policy drift" >&2
+  cat "$runtime_revision_stderr" >&2
+  exit 1
+fi
+
 mismatch_repository="$temporary_root/mismatch"
 create_initialized_submodule "$mismatch_repository"
 write_pin "$mismatch_repository" "0000000000000000000000000000000000000000" "wrong-pin"
@@ -102,6 +134,7 @@ create_initialized_submodule "$invalid_manifest_repository"
 mkdir -p "$invalid_manifest_repository/backends/llama-cpp"
 printf '{"schema_version":1,"tag":"bad tag","commit":"nope"}\n' > \
   "$invalid_manifest_repository/backends/llama-cpp/llama-cpp-pin.json"
+write_runtime_revision "$invalid_manifest_repository" "0000000000000000000000000000000000000000"
 invalid_stderr="$temporary_root/invalid.stderr"
 if run_verifier "$invalid_manifest_repository" > /dev/null 2>"$invalid_stderr"; then
   echo "invalid manifest unexpectedly passed" >&2
