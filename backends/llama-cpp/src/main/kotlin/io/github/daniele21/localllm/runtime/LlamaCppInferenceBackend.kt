@@ -247,7 +247,7 @@ class LlamaCppInferenceBackend(
 
     override fun releaseEvaluationBatchContext(context: BackendEvaluationBatchContextHandle) {
         val nativeContext = context.requireLlamaEvaluationContext()
-        when (val result = generationBridge.releaseContext(nativeContext.delegate)) {
+        when (val result = evaluationBatchBridge.releaseContext(nativeContext.delegate)) {
             GenerationNativeOperationResult.Success -> Unit
             is GenerationNativeOperationResult.Failure -> throw result.error.asBackendException()
         }
