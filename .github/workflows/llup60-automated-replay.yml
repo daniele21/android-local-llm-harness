@@ -7,6 +7,7 @@ on:
       - agent/llup60-automated-replay
     paths:
       - ".github/workflows/llup60-automated-replay.yml"
+      - "docs/workstreams/README.md"
       - "docs/workstreams/llup-v0-3-automated-replay.md"
 
 permissions:
@@ -42,7 +43,7 @@ jobs:
           set -euo pipefail
           git merge-base --is-ancestor "$RUNTIME_SOURCE_COMMIT" HEAD
           changed="$(git diff --name-only "$RUNTIME_SOURCE_COMMIT"...HEAD)"
-          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/llup60-automated-replay\.yml|docs/workstreams/llup-v0-3-automated-replay\.md)$' || true)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/llup60-automated-replay\.yml|docs/workstreams/(README\.md|llup-v0-3-automated-replay\.md))$' || true)"
           if [[ -n "$unexpected" ]]; then
             echo "LLUP-60 evidence branch changes runtime/product files:" >&2
             printf '%s\n' "$unexpected" >&2
