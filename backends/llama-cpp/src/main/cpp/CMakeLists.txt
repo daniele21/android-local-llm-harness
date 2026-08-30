@@ -11,9 +11,71 @@ get_filename_component(
     "${CMAKE_CURRENT_LIST_DIR}/../../../../../third_party/llama.cpp"
     ABSOLUTE
 )
+set(LLAMA_CPP_PIN_FILE "${CMAKE_CURRENT_LIST_DIR}/../../../llama-cpp-pin.json")
 
 if(NOT EXISTS "${LLAMA_CPP_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "Pinned llama.cpp submodule is missing. Run git submodule update --init --recursive.")
+endif()
+if(NOT EXISTS "${LLAMA_CPP_PIN_FILE}")
+    message(FATAL_ERROR "Canonical llama.cpp pin manifest is missing: ${LLAMA_CPP_PIN_FILE}")
+endif()
+
+file(READ "${LLAMA_CPP_PIN_FILE}" LLAMA_CPP_PIN_JSON)
+string(JSON LLAMA_CPP_PIN_SCHEMA ERROR_VARIABLE LLAMA_CPP_PIN_SCHEMA_ERROR GET "${LLAMA_CPP_PIN_JSON}" schema_version)
+string(JSON LLAMA_CPP_PIN_TAG ERROR_VARIABLE LLAMA_CPP_PIN_TAG_ERROR GET "${LLAMA_CPP_PIN_JSON}" tag)
+string(JSON LLAMA_CPP_PIN_COMMIT ERROR_VARIABLE LLAMA_CPP_PIN_COMMIT_ERROR GET "${LLAMA_CPP_PIN_JSON}" commit)
+if(LLAMA_CPP_PIN_SCHEMA_ERROR OR LLAMA_CPP_PIN_TAG_ERROR OR LLAMA_CPP_PIN_COMMIT_ERROR)
+    message(FATAL_ERROR "Canonical llama.cpp pin manifest is invalid JSON or missing required fields")
+endif()
+if(NOT LLAMA_CPP_PIN_SCHEMA STREQUAL "1")
+    message(FATAL_ERROR "Unsupported llama.cpp pin manifest schema: ${LLAMA_CPP_PIN_SCHEMA}")
+endif()
+if(NOT LLAMA_CPP_PIN_TAG MATCHES "^[^ \\t\\r\\n]+$")
+    message(FATAL_ERROR "Canonical llama.cpp pin tag must be a non-empty token")
+endif()
+string(LENGTH "${LLAMA_CPP_PIN_COMMIT}" LLAMA_CPP_PIN_COMMIT_LENGTH)
+if(NOT LLAMA_CPP_PIN_COMMIT MATCHES "^[0-9a-f]+$" OR NOT LLAMA_CPP_PIN_COMMIT_LENGTH EQUAL 40)
+    message(FATAL_ERROR "Canonical llama.cpp pin commit must be an exact lowercase 40-character SHA")
+endif()
+
+set(
+    LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT
+    ""
+    CACHE STRING
+    "Explicit exact llama.cpp candidate SHA for the LLRT qualification lane only"
+)
+if(LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT)
+    string(LENGTH "${LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT}" LLAMA_CPP_QUALIFICATION_COMMIT_LENGTH)
+    if(
+        NOT LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT MATCHES "^[0-9a-f]+$"
+        OR NOT LLAMA_CPP_QUALIFICATION_COMMIT_LENGTH EQUAL 40
+    )
+        message(FATAL_ERROR "LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT must be an exact lowercase 40-character SHA")
+    endif()
+    set(LLAMA_CPP_EXPECTED_COMMIT "${LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT}")
+    string(SUBSTRING "${LLAMA_CPP_EXPECTED_COMMIT}" 0 12 LLAMA_CPP_EXPECTED_SHORT_COMMIT)
+    set(LLAMA_CPP_EFFECTIVE_TAG "candidate-${LLAMA_CPP_EXPECTED_SHORT_COMMIT}")
+else()
+    set(LLAMA_CPP_EXPECTED_COMMIT "${LLAMA_CPP_PIN_COMMIT}")
+    set(LLAMA_CPP_EFFECTIVE_TAG "${LLAMA_CPP_PIN_TAG}")
+endif()
+
+find_package(Git REQUIRED)
+execute_process(
+    COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_DIR}" rev-parse HEAD
+    RESULT_VARIABLE LLAMA_CPP_GIT_RESULT
+    OUTPUT_VARIABLE LLAMA_CPP_ACTUAL_COMMIT
+    ERROR_VARIABLE LLAMA_CPP_GIT_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(NOT LLAMA_CPP_GIT_RESULT EQUAL 0)
+    message(FATAL_ERROR "Unable to resolve llama.cpp checkout identity: ${LLAMA_CPP_GIT_ERROR}")
+endif()
+if(NOT LLAMA_CPP_ACTUAL_COMMIT STREQUAL LLAMA_CPP_EXPECTED_COMMIT)
+    message(
+        FATAL_ERROR
+        "llama.cpp checkout identity mismatch: expected ${LLAMA_CPP_EXPECTED_COMMIT}, found ${LLAMA_CPP_ACTUAL_COMMIT}"
+    )
 endif()
 
 # Runtime-selected Android CPU variants are emitted as shared backend libraries.
@@ -68,8 +130,8 @@ add_library(
 target_compile_definitions(
     local_llm_jni
     PRIVATE
-    LOCAL_LLM_LLAMA_CPP_TAG="b9637"
-    LOCAL_LLM_LLAMA_CPP_COMMIT="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
+    LOCAL_LLM_LLAMA_CPP_TAG="${LLAMA_CPP_EFFECTIVE_TAG}"
+    LOCAL_LLM_LLAMA_CPP_COMMIT="${LLAMA_CPP_ACTUAL_COMMIT}"
 )
 
 target_include_directories(
