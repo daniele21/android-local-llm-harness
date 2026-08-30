@@ -4,6 +4,7 @@ Status: active
 Document type: workstream
 Owner: llama-cpp-runtime / runtime-memory
 Canonical scope: workstream.llama-cpp-v0-3-residency
+Read when: upgrading the llama.cpp production pin or evaluating bounded multi-model residency
 Base at plan creation: `dev@ace38169d4aba87540ca8d61ec4effee7aff28c5`
 Last reviewed: 2026-08-30
 
