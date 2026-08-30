@@ -1,6 +1,6 @@
 # H Bridge Core source references
 
-Status: approved
+Status: active
 Last reviewed: 2026-08-30
 
 This directory preserves the original PNG outputs approved for the H Bridge Core identity.
