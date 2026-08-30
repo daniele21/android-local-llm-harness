@@ -17,6 +17,8 @@ Harness uses the approved **H Bridge Core** identity. The canonical sources are 
 - `master/harness-app-icon-light.png` — light launcher/icon treatment.
 - `master/harness-app-icon-dark.png` — dark launcher/icon treatment.
 
+The original approved outputs are preserved in the [H Bridge Core source references](reference/hbridge-core/README.md) for provenance.
+
 ## Synced presentation assets
 
 Dark mode:
