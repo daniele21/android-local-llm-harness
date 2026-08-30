@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-28
+Last reviewed: 2026-08-30
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -98,7 +98,7 @@ Hardware sessions may also combine phone UX, Q35-6, SR-6 and OMB-8 execution whe
 
 ### 5. Follow-on validation and product hardening
 
-Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work includes device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
+Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work is device/restoration evidence, RAM warm-idle policy and Q35-7 semantic/lifecycle/memory/thermal validation. Parallel upgrade plan: [`LLUP`](workstreams/llama-cpp-v0-3-residency-qualification.md).
 
 ## Immediate next block
 
