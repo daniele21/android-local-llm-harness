@@ -27,6 +27,10 @@ jobs:
             evidence_sha: b1f661edc303089dd0ee5d3565bca43450838ab3
             runtime_sha: f796235f47899314b65a5abc95c998b396883c4b
             backend_revision: c1d0e7a004015f23bc0233470b747b596f29b264
+          - label: candidate-runtime
+            evidence_sha: f796235f47899314b65a5abc95c998b396883c4b
+            runtime_sha: f796235f47899314b65a5abc95c998b396883c4b
+            backend_revision: c1d0e7a004015f23bc0233470b747b596f29b264
 
     steps:
       - name: Checkout exact evidence source
