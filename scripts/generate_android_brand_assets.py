@@ -22,6 +22,7 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 LAUNCHER_BACKGROUND = "#0B1633"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 EXPECTED_MASTER_SIZE = (1254, 1254)
+FOREGROUND_SIZE_DP = 66
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -38,8 +39,8 @@ def foreground_drawable(monochrome: bool) -> str:
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="{ANDROID_NS}">
     <item
-        android:width="76dp"
-        android:height="76dp"
+        android:width="{FOREGROUND_SIZE_DP}dp"
+        android:height="{FOREGROUND_SIZE_DP}dp"
         android:gravity="center">
         <bitmap
             android:src="@drawable/harness_launcher_symbol"
