@@ -1,7 +1,7 @@
 # LLUP — llama.cpp v0.3.0 upgrade and bounded residency qualification
 
 Status: active
-Document type: workstream
+Document type: target-specification
 Owner: llama-cpp-runtime / runtime-memory
 Canonical scope: workstream.llama-cpp-v0-3-residency
 Read when: upgrading the llama.cpp production pin or evaluating bounded multi-model residency
@@ -18,9 +18,9 @@ The latest nightly may be evaluated as a diagnostic comparison candidate, not as
 
 ## Why now
 
-The current pin predates a large upstream evolution in `llama.cpp`/`ggml`. The repository already has mature runtime-memory, execution-identity and physical-evidence infrastructure, so the upgrade can be measured instead of treated as a blind dependency refresh.
+The current pin predates substantial upstream evolution in `llama.cpp`/`ggml`. The repository already owns runtime-memory, execution-identity and physical-evidence infrastructure, so the upgrade can be measured instead of treated as a blind dependency refresh.
 
-The existing [`../llama-cpp-runtime-optimization-plan.md`](../llama-cpp-runtime-optimization-plan.md) remains the canonical technical target for backend optimization. This workstream is the bounded execution plan for promoting a new upstream baseline and then, only if evidence supports it, extending the existing residency owner.
+The existing [`../llama-cpp-runtime-optimization-plan.md`](../llama-cpp-runtime-optimization-plan.md) remains the canonical technical target for backend optimization. This document is the bounded execution plan for promoting a new upstream baseline and then, only if evidence supports it, extending the existing residency owner.
 
 ## Source-of-truth boundaries
 
@@ -32,7 +32,7 @@ The existing [`../llama-cpp-runtime-optimization-plan.md`](../llama-cpp-runtime-
 - `evaluation`: quality and deterministic comparison where output behavior changes.
 - `third_party/llama.cpp`: exact upstream source; no Harness-local fork or ad-hoc patch is introduced by this workstream.
 
-Existing owners are extended, not duplicated. In particular, multi-model residency must evolve `ModelResidencyLifecycle` and the existing admission/memory policy rather than create a second loader, cache or residency manager.
+Existing owners are extended, not duplicated. Multi-model residency must evolve `ModelResidencyLifecycle` and the existing admission/memory policy rather than create a second loader, cache or residency manager.
 
 ## Invariants
 
@@ -40,22 +40,22 @@ Existing owners are extended, not duplicated. In particular, multi-model residen
 2. `v0.3.0` is the first promotion candidate because it is a stable upstream release. Nightlies are diagnostic unless a later explicit decision promotes one.
 3. The current `b9637` pin remains the control baseline until promotion evidence is complete.
 4. No `llama.cpp`/ggml type, pointer or backend-specific structure crosses backend-neutral contracts.
-5. Existing Android portability intent remains: `arm64-v8a`, `GGML_BACKEND_DL=ON`, `GGML_CPU_ALL_VARIANTS=ON`, `GGML_NATIVE=OFF`; any change is a separate evidence-backed decision.
+5. Android portability intent remains `arm64-v8a`, `GGML_BACKEND_DL=ON`, `GGML_CPU_ALL_VARIANTS=ON`, `GGML_NATIVE=OFF`; any change is a separate evidence-backed decision.
 6. OpenCL/GPU enablement is not bundled into the pin upgrade. Existing LLRT OpenCL work remains separate and default-off.
 7. Production keeps one active decode. Multi-model residency does not imply multi-decode concurrency.
 8. Default resident-model capacity remains `1` until representative physical evidence and an explicit policy decision qualify a larger bounded value.
 9. A model with a live context/session/activation lease cannot be selected for eviction.
 10. Aggregate admission must account for all resident model/context/backend state; file size alone is not a safe memory estimate.
-11. Memory pressure, cancellation, switch, shutdown and partial-failure cleanup remain idempotent and converge on the existing ownership model.
+11. Memory pressure, cancellation, switch, shutdown and partial-failure cleanup remain idempotent and converge on existing ownership.
 12. Backend-revision changes invalidate affected performance/memory evidence. Historical evidence is not silently reused for the promoted pin.
-13. Cross-version deterministic output equality is not assumed. Any material output/digest drift must be classified and quality-gated before promotion rather than suppressed.
-14. Promotion requires exact-HEAD automated evidence plus the separately required REAL_ENVIRONMENT evidence. Writing code is not completion.
+13. Cross-version deterministic output equality is not assumed. Material output/digest drift is classified and quality-gated, not suppressed.
+14. Promotion requires exact-HEAD automated evidence plus separately required REAL_ENVIRONMENT evidence. Writing code is not completion.
 
 ## Non-goals
 
-- enabling simultaneous production decodes;
-- adding a second scheduler, model store, loader or residency subsystem;
-- opportunistically enabling OpenCL/Hexagon/HTP while changing the pin;
+- simultaneous production decodes;
+- a second scheduler, model store, loader or residency subsystem;
+- opportunistic OpenCL/Hexagon/HTP enablement while changing the pin;
 - broadening supported model families without their own review;
 - weakening OMBRA/Q35/evaluation quality gates to accommodate changed outputs;
 - treating emulator/CI memory numbers as representative-device memory certification;
@@ -68,16 +68,16 @@ Status vocabulary: `PLANNED`, `READY`, `IN PROGRESS`, `BLOCKED`, `DONE`, `DEFERR
 | ID | State | Parallel lane | Outcome / next gate |
 | --- | --- | --- | --- |
 | LLUP-00 | READY | foundation | Freeze exact control/target identities, upstream/API delta and affected consumer/test map. |
-| LLUP-10 | READY | build identity | Remove pin-identity drift risk by making one repo-owned source authoritative for submodule/build/runtime/verifier identity. |
-| LLUP-20 | BLOCKED by LLUP-00 | native migration | Move to exact `v0.3.0` commit and adapt CMake/JNI/native API without widening public contracts. |
-| LLUP-30 | BLOCKED by LLUP-20 | correctness | Requalify generation, streaming, cancellation, context/model lifecycle, prompt reuse, cache/state and native ownership. |
+| LLUP-10 | READY | build identity | Make one repo-owned source authoritative for submodule/build/runtime/verifier identity. |
+| LLUP-20 | BLOCKED by LLUP-00 | native migration | Move to exact `v0.3.0` and adapt CMake/JNI/native API without widening public contracts. |
+| LLUP-30 | BLOCKED by LLUP-20 | correctness | Requalify generation, streaming, cancellation, model/context lifecycle, prompt reuse, cache/state and native ownership. |
 | LLUP-40 | BLOCKED by LLUP-20 | automated packaging | Requalify Android ARM64 build/package/R8/lint/native artifact invariants on exact HEAD. |
 | LLUP-50 | BLOCKED by LLUP-30/40 | physical A/B | Compare `b9637` vs `v0.3.0` on representative hardware with fixed model/profile/workload identity. |
-| LLUP-60 | BLOCKED by LLUP-30/50 | quality/evidence | Replay affected Q35, memory, OMBRA/evaluation and execution-identity evidence where the backend revision makes prior evidence stale. |
-| LLUP-70 | BLOCKED by LLUP-60 | promotion | Promote `v0.3.0`, retain `b9637`, or explicitly investigate a newer nightly based on classified evidence. |
-| MRES-00 | READY after LLUP-00 | residency design | Define bounded multi-resident contract as an extension of existing `ModelResidencyLifecycle`; default remains capacity `1`. |
-| MRES-10 | BLOCKED by LLUP-70/MRES-00 | residency implementation | Implement keyed bounded residency with aggregate admission and deterministic lease-safe eviction, preserving capacity-1 behavior. |
-| MRES-20 | BLOCKED by MRES-10 | automated correctness | Prove lifecycle, switch, lease, pressure, cleanup and compatibility invariants with capacity 1 and >1 test policies. |
+| LLUP-60 | BLOCKED by LLUP-30/50 | quality/evidence | Replay affected Q35, memory, OMBRA/evaluation and execution-identity evidence. |
+| LLUP-70 | BLOCKED by LLUP-60 | promotion | Promote `v0.3.0`, retain `b9637`, or investigate a newer exact nightly from classified evidence. |
+| MRES-00 | READY after LLUP-00 | residency design | Define bounded multi-resident semantics as an extension of `ModelResidencyLifecycle`; default remains capacity `1`. |
+| MRES-10 | BLOCKED by LLUP-70/MRES-00 | residency implementation | Implement keyed bounded residency with aggregate admission and deterministic lease-safe eviction. |
+| MRES-20 | BLOCKED by MRES-10 | automated correctness | Prove lifecycle, switch, lease, pressure, cleanup and capacity-1 compatibility. |
 | MRES-30 | BLOCKED by MRES-20 | physical qualification | Measure single-resident vs bounded two-resident scenarios and decide whether any device/profile policy may opt in. |
 | MRES-40 | BLOCKED by MRES-30 | product policy | Promote only evidence-qualified residency policies; global/default capacity remains 1 unless separately approved. |
 
@@ -88,16 +88,16 @@ LLUP-00
   |\
   | +--------------------> MRES-00  [design only]
   v
-LLUP-10 -----------+
-  |                |
-  v                |
-LLUP-20            |
-  |\                |
-  | +--> LLUP-40   |
-  v                |
-LLUP-30            |
-  |\                |
-  | +--> LLUP-50 <-+
+LLUP-10
+  |
+  v
+LLUP-20
+  |\
+  | +--> LLUP-40
+  v
+LLUP-30
+  |\
+  | +--> LLUP-50
   |        |
   +------> LLUP-60
              |
@@ -111,8 +111,8 @@ Parallel work is encouraged where ownership does not overlap:
 
 - LLUP-10 pin identity and MRES-00 contract/design can proceed after LLUP-00.
 - After LLUP-20 compiles, LLUP-30 correctness and LLUP-40 Android packaging can run in parallel.
-- Physical LLUP-50 waits for an exact automated candidate; physical runs themselves are serialized per device/thermal window.
-- MRES implementation waits until the backend promotion decision is stable so residency code is not debugged against a moving native baseline.
+- Physical LLUP-50 waits for an exact automated candidate; physical runs are serialized per device/thermal window.
+- MRES implementation waits until the backend promotion decision is stable so residency is not debugged against a moving native baseline.
 
 ## LLUP-00 — Baseline and delta inventory
 
@@ -122,8 +122,8 @@ Parallel work is encouraged where ownership does not overlap:
 - compare upstream changes from `aedb2a5...` to `c1d0e7a...`;
 - identify CMake, public C API and behavior changes consumed by Harness;
 - inspect direct JNI/native consumers and tests before editing shared contracts;
-- record known migration hazards already discovered by LLRT qualification, including sampler vocabulary requirements and model load-mode API evolution;
-- identify all evidence identities that include backend revision and therefore become stale after promotion.
+- record known migration hazards already found by LLRT qualification, including sampler vocabulary requirements and model load-mode API evolution;
+- identify evidence identities that include backend revision and become stale after promotion.
 
 ### Acceptance
 
@@ -134,20 +134,16 @@ Parallel work is encouraged where ownership does not overlap:
 
 ## LLUP-10 — Single authoritative backend pin identity
 
-### Problem
-
 The repository currently carries pin knowledge in more than one build/verification location. A pin change must not allow the submodule SHA, CMake revision metadata, runtime diagnostics and verification script to diverge.
 
-### Scope
+Introduce one repository-owned authoritative representation of the `llama.cpp` dependency identity and make build/runtime/verifier paths consume or verify it. The exact mechanism is chosen during implementation after checking scoped guidance; do not introduce an abstraction without a real owner.
 
-Introduce one repository-owned authoritative representation of the `llama.cpp` dependency identity and make build/runtime/verifier paths consume or verify it. The exact file/Gradle/CMake mechanism is chosen during implementation after checking the closest scoped guidance; do not add an abstraction that has no owner outside this dependency identity.
-
-### Acceptance
+Acceptance:
 
 - submodule SHA and declared backend revision cannot silently disagree;
 - runtime execution identity reports the exact promoted upstream revision;
 - repository verification fails closed on mismatch;
-- changing the pin requires one intentional source-of-truth update plus the submodule pointer, not independent magic strings across scripts.
+- pin maintenance does not require independent magic strings across scripts.
 
 ## LLUP-20 — Mechanical migration to `v0.3.0`
 
@@ -155,27 +151,22 @@ Introduce one repository-owned authoritative representation of the `llama.cpp` d
 
 - update `third_party/llama.cpp` to `c1d0e7a004015f23bc0233470b747b596f29b264`;
 - adapt native/JNI code to upstream API changes;
-- preserve existing backend-neutral Kotlin contracts unless a material upstream incompatibility makes a change unavoidable;
+- preserve backend-neutral Kotlin contracts unless a material incompatibility makes a change unavoidable;
 - keep portable Android CPU variant selection and existing package ownership;
 - do not add local upstream patches unless a separately documented blocking defect requires one.
 
-### Specific migration checks
+### Migration checks
 
 - sampler construction / vocabulary requirements;
 - model loading and effective load-mode mapping;
-- model/context parameter defaults that may have changed upstream;
+- model/context parameter defaults changed upstream;
 - KV/Flash-Attention enum/default compatibility;
 - tokenization, decode/logits and sequence APIs used by normal and evaluation-batch paths;
 - native handle/cancellation registries and destruction order;
 - dynamic backend discovery and packaged shared-library names;
 - compiler/NDK/CMake warnings or changed transitive requirements.
 
-### Acceptance
-
-- host-native qualification compiles where repository automation owns it;
-- Android `arm64-v8a` native build compiles;
-- no upstream implementation types leak into public/backend-neutral contracts;
-- no unclassified package/native-library delta remains.
+Acceptance requires host-native qualification where owned by repository automation, Android ARM64 native compilation, no backend type leakage and no unclassified native package delta.
 
 ## LLUP-30 — Correctness and lifecycle requalification
 
@@ -183,7 +174,7 @@ Re-run focused contract/native/runtime suites for:
 
 - model inspect/load/unload/reload;
 - context create/release/recreate;
-- generation and deterministic within-version fixed-seed replay;
+- generation and fixed-seed within-version replay;
 - streaming aggregation and cancellation;
 - prompt/token preparation reuse and fallback;
 - sampler/grammar/penalty behavior used by production profiles;
@@ -193,25 +184,23 @@ Re-run focused contract/native/runtime suites for:
 - pressure/shutdown cleanup and repeated close semantics;
 - execution fingerprint/backend revision propagation.
 
-If `v0.3.0` changes a deterministic output digest for an existing fixed identity, classify the cause. Do not alter a legitimate quality gate simply to recover the old digest.
+If `v0.3.0` changes an existing fixed-identity output digest, classify the cause. Do not alter a legitimate quality gate merely to recover the old digest.
 
 ## LLUP-40 — Android build/package validation
 
 Because this slice touches native/JNI/dependency/build/package boundaries, expected validation depth is **STRONG** unless the repository selector escalates to FULL.
 
-Required deterministic evidence is repository-owned and must run locally when an equivalent environment exists, otherwise through REMOTE_AUTOMATED preflight. It is not delegated to the user merely because Android SDK/NDK tooling is unavailable to the agent.
+Required deterministic evidence is repository-owned and runs locally with an equivalent environment, otherwise through REMOTE_AUTOMATED preflight. It is not delegated to the user solely because Android SDK/NDK tooling is unavailable to the agent.
 
 At minimum cover the selector-required subset of:
 
 - formatting/static analysis;
 - affected Kotlin/unit/contract tests;
 - host-native tests;
-- Android compile;
-- Android lint;
+- Android compile and lint;
 - CMake/NDK ARM64 build;
-- debug/release package assembly when selected;
-- R8/ProGuard/package checks when selected;
-- expected native `.so` inventory and ABI-only constraints;
+- selected debug/release assembly and R8/ProGuard/package checks;
+- expected native `.so` inventory and ABI constraints;
 - dependency/model-artifact guards;
 - exact backend revision in build/runtime evidence.
 
@@ -219,9 +208,7 @@ At minimum cover the selector-required subset of:
 
 This evidence is **REAL_ENVIRONMENT** because mobile memory, thermal and runtime behavior require representative hardware. Automated build/package gates remain separate and deterministic.
 
-Use the same device, exact GGUF, quantization, Harness profile, context/output limits, prompt/workload identity and thermal-start policy for the control and candidate.
-
-Primary comparison:
+Use the same device, exact GGUF, quantization, Harness profile, context/output limits, prompt/workload identity and thermal-start policy.
 
 ```text
 control:   b9637 / aedb2a5...
@@ -233,11 +220,10 @@ Record at least:
 
 - model load latency;
 - TTFT / first-token latency;
-- prompt/prefill throughput;
-- decode throughput;
+- prompt/prefill and decode throughput;
 - end-to-end latency;
 - process PSS baseline, peak, post-release residual and repeated-cycle trend;
-- native/Java heap where current evidence tooling already exposes them;
+- native/Java heap where current evidence tooling exposes them;
 - available memory and low-memory state;
 - model/context resident counts;
 - context/KV configuration identity;
@@ -247,16 +233,16 @@ Record at least:
 - thermal status at controlled checkpoints;
 - backend/execution fingerprint and exact source identities.
 
-Do not invent a new percentage threshold in this plan. Apply existing repository guardrails. Where promotion needs a new threshold not already owned by a canonical policy, record that as an explicit decision using baseline evidence rather than choosing a number ad hoc.
+Do not invent a percentage threshold in this plan. Apply existing repository guardrails. If promotion needs a threshold not already owned by canonical policy, record it as an explicit decision derived from baseline evidence rather than choosing it ad hoc.
 
 ## LLUP-60 — Affected quality/evidence replay
 
-A new backend revision changes execution identity. Replay only the evidence whose validity materially depends on that revision, but do not reuse stale evidence as if nothing changed.
+A new backend revision changes execution identity. Replay only evidence whose validity materially depends on that revision, while never treating stale evidence as current.
 
 Expected affected lanes include:
 
 - Q35 model/profile qualification relevant to promoted defaults;
-- memory-management cost/profile and lifecycle evidence;
+- memory cost/profile and lifecycle evidence;
 - OMBRA/evaluation quality runs whose generated outputs depend on backend behavior;
 - LLRT fixed-seed/cache/batch evidence used to justify active policies;
 - release/package identity where the backend binary is part of the promoted artifact.
@@ -269,42 +255,35 @@ Promotion is a deliberate decision, not the successful completion of a submodule
 
 Possible outcomes:
 
-1. **PROMOTE_V0_3_0** — automated exact-HEAD gates pass and required physical/quality evidence is acceptable; update production pin and canonical docs/evidence.
-2. **KEEP_B9637** — candidate has a classified unacceptable regression; retain the current production pin and record the blocker.
-3. **DIAGNOSE_NEWER_UPSTREAM** — a newer nightly demonstrably addresses the classified blocker; qualify that exact commit as a new candidate rather than floating to latest.
+1. **PROMOTE_V0_3_0** — automated exact-HEAD gates pass and required physical/quality evidence is acceptable.
+2. **KEEP_B9637** — the candidate has a classified unacceptable regression; retain the current production pin and record the blocker.
+3. **DIAGNOSE_NEWER_UPSTREAM** — a newer nightly demonstrably addresses the blocker; qualify that exact commit rather than floating to latest.
 
-Promotion invalidates affected old exact-head evidence and must update durable current state, LLRT target status, backend identity documentation and any release/evidence references that claim the old production pin.
+Promotion invalidates affected old exact-head evidence and updates durable current state, LLRT target status, backend identity documentation and release/evidence references that claim the old production pin.
 
 ## MRES-00 — Bounded multi-resident contract
 
 This design lane may start after LLUP-00, but implementation waits for the backend promotion decision.
 
-### Required semantics
+Required semantics:
 
-- `ModelResidencyLifecycle` remains the canonical residency owner.
-- Residency becomes model-keyed/bounded rather than a second singleton loader being added beside it.
-- Policy capacity is explicit; `1` remains the compatibility/default value.
-- A resident model may be `active/leased`, `warm-idle` or otherwise represented using the existing lifecycle vocabulary; new states are added only where a real invariant requires them.
-- Live session/context/activation leases pin their model against eviction.
-- Admission considers aggregate resident model/context cost plus safety reserve and current observation.
-- Eviction is deterministic among eligible lease-free residents; the exact ordering policy must be explicit and testable rather than incidental map iteration.
-- A capacity-1 configuration preserves existing switch semantics and compatibility.
-- Production active decode remains globally bounded by the existing scheduler policy.
-- Critical pressure/shutdown may converge all residents to release through existing idempotent cleanup ownership.
+- `ModelResidencyLifecycle` remains the canonical residency owner;
+- residency becomes model-keyed/bounded rather than adding a second singleton loader;
+- policy capacity is explicit and `1` remains the compatibility/default value;
+- live session/context/activation leases pin their model against eviction;
+- admission considers aggregate resident model/context cost plus safety reserve and current observation;
+- eviction is deterministic among eligible lease-free residents;
+- capacity 1 preserves existing switch semantics;
+- production active decode remains globally bounded by existing scheduler policy;
+- critical pressure/shutdown converges residents to release through existing idempotent cleanup ownership.
 
-### Design acceptance
-
-- state machine and invariants are documented before shared runtime changes;
-- ownership of model handles, contexts, leases and eviction is unambiguous;
-- public Consumer API does not gain backend/native details;
-- capacity 1 has a compatibility proof strategy;
-- capacity >1 remains opt-in/evidence-gated.
+Design acceptance requires documented state/invariants, unambiguous handle/context/lease ownership, no native details in the Consumer API, a capacity-1 compatibility proof strategy and evidence-gated capacity >1.
 
 ## MRES-10/20 — Implementation and automated proof
 
-Evolve the existing residency owner and its direct consumers rather than layering compensating caches.
+Evolve the existing residency owner and direct consumers rather than layering compensating caches.
 
-Automated cases must include:
+Automated cases include:
 
 - capacity-1 load/switch/reuse compatibility;
 - A+B resident under an explicitly larger test policy;
@@ -312,8 +291,7 @@ Automated cases must include:
 - released idle resident becomes eligible;
 - deterministic candidate selection;
 - aggregate admission reject/downshift/allow behavior;
-- context creation failure rollback;
-- model-load failure rollback;
+- context/model load failure rollback;
 - background/warm-idle expiry;
 - critical trim/pressure cleanup;
 - cancellation during switch/prepare;
@@ -326,23 +304,23 @@ Expected validation depth is **STRONG** because shared lifecycle, memory admissi
 
 ## MRES-30 — Physical bounded-residency qualification
 
-Compare, on the same representative device/profile identities:
+On the same representative device/profile identities compare:
 
 1. one resident model idle;
 2. one resident model active with context;
-3. two resident models with no active contexts where policy allows;
+3. two resident models without active contexts where policy allows;
 4. model A active while model B is warm-idle;
 5. A -> B -> A generation with one active decode;
 6. memory pressure while two models are resident;
 7. repeated prepare/release/switch cycles.
 
-Capture peak/residual PSS, available memory, thermal state, load/switch latency, eviction/reload behavior, admission decisions and recovery. A capacity >1 policy is not promoted solely because both models fit once.
+Capture peak/residual PSS, available memory, thermal state, load/switch latency, eviction/reload behavior, admission decisions and recovery. Capacity >1 is not promoted merely because both models fit once.
 
 ## Validation model
 
 ### Plan-only change
 
-This workstream document and its durable link are **LEAN** documentation/governance scope.
+This target specification and its durable link are **LEAN** documentation/governance scope.
 
 ### Implementation
 
@@ -359,7 +337,7 @@ This workstream document and its durable link are **LEAN** documentation/governa
 ### Readiness vocabulary
 
 - `READY_FOR_CI`: selected deterministic gates are local and passed;
-- `READY_FOR_REMOTE_PREFLIGHT`: available local gates pass and deterministic remote gates remain;
+- `READY_FOR_REMOTE_PREFLIGHT`: local gates pass and deterministic remote gates remain;
 - `AUTOMATED_PREFLIGHT_CONFIRMED`: all required selected deterministic gates pass on exact HEAD/base;
 - `NOT_READY_FOR_AUTOMATED_PREFLIGHT`: ambiguity, stale base, failed local gate, invalid scope or automation gap blocks a truthful claim.
 
@@ -367,35 +345,35 @@ This workstream document and its durable link are **LEAN** documentation/governa
 
 The following invalidate affected exact-head evidence:
 
-- changing the upstream pin or native build flags;
+- upstream pin or native build-flag changes;
 - JNI/native lifecycle edits;
 - generation/sampler/tokenization/cache behavior edits;
 - memory admission/residency policy edits;
-- rebasing/merging material base movement into the candidate;
+- material rebase/merge base movement;
 - R8/package/native-library composition changes relevant to the promoted artifact.
 
-After invalidation, rerun only the affected required gates at the correct depth; never reuse an older green run for a newer material HEAD.
+After invalidation rerun the affected required gates at the correct depth; never reuse an older green run for a newer material HEAD.
 
 ## Exit criteria
 
 The workstream is complete only when all applicable statements are true:
 
-- a production backend pin decision has been made and recorded with exact identity;
-- the promoted pin, build metadata, verifier and runtime execution identity agree;
+- a production backend pin decision is recorded with exact identity;
+- promoted pin, build metadata, verifier and runtime execution identity agree;
 - selected deterministic validation is confirmed on exact HEAD/base;
 - required representative-device Q35/memory/quality evidence for the promoted backend is recorded;
 - no legitimate quality gate was weakened to accommodate the upgrade;
-- multi-model residency either remains explicitly deferred/default-1 or has a bounded implementation with STRONG automated evidence and device/profile-scoped physical qualification;
-- one-active-production-decode invariant is preserved unless a later independent workstream explicitly changes it;
+- multi-model residency either remains explicitly deferred/default-1 or has bounded STRONG automated evidence plus device/profile-scoped physical qualification;
+- one-active-production-decode remains invariant unless a later independent workstream changes it;
 - canonical current-state/LLRT/memory/release documentation is reconciled;
-- obsolete temporary branches/evidence coordinators created for this wave are cleaned up after integration.
+- obsolete temporary branches/evidence coordinators for this wave are cleaned up after integration.
 
 ## First execution wave
 
 Start with these tasks, maximizing safe parallelism:
 
 1. **LLUP-00** — exact upstream delta + consumer/test impact inventory.
-2. **LLUP-10** — design and implement the single authoritative pin identity mechanism after LLUP-00 confirms the touched owners.
+2. **LLUP-10** — implement the single authoritative pin identity mechanism after LLUP-00 confirms owners.
 3. **MRES-00** — in parallel, write the bounded residency state/invariant contract against the existing lifecycle owner; no runtime implementation yet.
 4. **LLUP-20** — migrate the backend to exact `v0.3.0` once the delta inventory is frozen.
 5. **LLUP-30 + LLUP-40** — run correctness and Android build/package lanes in parallel on the same exact candidate.
