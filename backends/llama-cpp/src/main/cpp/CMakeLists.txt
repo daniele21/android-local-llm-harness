@@ -33,7 +33,8 @@ endif()
 if(NOT LLAMA_CPP_PIN_TAG MATCHES "^[^ \\t\\r\\n]+$")
     message(FATAL_ERROR "Canonical llama.cpp pin tag must be a non-empty token")
 endif()
-if(NOT LLAMA_CPP_PIN_COMMIT MATCHES "^[0-9a-f]{40}$")
+string(LENGTH "${LLAMA_CPP_PIN_COMMIT}" LLAMA_CPP_PIN_COMMIT_LENGTH)
+if(NOT LLAMA_CPP_PIN_COMMIT MATCHES "^[0-9a-f]+$" OR NOT LLAMA_CPP_PIN_COMMIT_LENGTH EQUAL 40)
     message(FATAL_ERROR "Canonical llama.cpp pin commit must be an exact lowercase 40-character SHA")
 endif()
 
@@ -44,7 +45,11 @@ set(
     "Explicit exact llama.cpp candidate SHA for the LLRT qualification lane only"
 )
 if(LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT)
-    if(NOT LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT MATCHES "^[0-9a-f]{40}$")
+    string(LENGTH "${LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT}" LLAMA_CPP_QUALIFICATION_COMMIT_LENGTH)
+    if(
+        NOT LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT MATCHES "^[0-9a-f]+$"
+        OR NOT LLAMA_CPP_QUALIFICATION_COMMIT_LENGTH EQUAL 40
+    )
         message(FATAL_ERROR "LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT must be an exact lowercase 40-character SHA")
     endif()
     set(LLAMA_CPP_EXPECTED_COMMIT "${LOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT}")
