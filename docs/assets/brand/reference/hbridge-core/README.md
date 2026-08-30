@@ -1,5 +1,16 @@
-# H Bridge Core references
+# H Bridge Core source references
 
-Staging area for approved H Bridge Core visual references.
+Status: approved
+Last reviewed: 2026-08-30
 
-Upload the generated PNG references here. These files are non-canonical design references; the repository-owned vector masters remain under `docs/assets/brand/master/` and will be updated from the approved concept before Android resources are regenerated.
+This directory preserves the original PNG outputs approved for the H Bridge Core identity.
+
+Named canonical copies now live under `docs/assets/brand/master/` and remain PNG files. The original uploads stay here as provenance/reference material; they are not converted to SVG.
+
+Canonical consumers should reference:
+
+- `../../master/harness-symbol.png`
+- `../../master/harness-lockup-light.png`
+- `../../master/harness-lockup-dark.png`
+- `../../master/harness-app-icon-light.png`
+- `../../master/harness-app-icon-dark.png`

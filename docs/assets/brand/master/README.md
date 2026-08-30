@@ -1,25 +1,32 @@
-# Harness vector masters
+# Harness PNG masters
 
 Status: active
 Document type: asset-index
 Owner: ui/design-system
 Canonical scope: brand.assets.masters
-Read when: editing or regenerating the canonical symbol, wordmark or lockup vectors
-Last reviewed: 2026-08-06
+Read when: editing or consuming the canonical Harness identity
+Last reviewed: 2026-08-30
 
-These SVG files are the repository-owned vector masters for the Harness identity.
+The approved Harness identity is **H Bridge Core**. Its repository-owned source of truth is the PNG set in this directory.
 
-- `harness-symbol.svg` is the canonical colored symbol and the only source used to generate Android launcher resources.
-- `harness-wordmark.svg` stores the outlined wordmark.
-- `harness-lockup.svg` combines the canonical symbol and outlined wordmark.
+The mark is intentionally an `H`: the two sides represent the consumer application and the local LLM/runtime boundary, while the three bridge lines make their connection the primary visual idea. Android is a secondary platform cue rather than the dominant symbol.
 
-The outlined lettering matches the existing approved PNG generator. No font binary is stored in the repository.
+Canonical files:
+
+- `harness-symbol.png` — compact transparent H Bridge Core mark.
+- `harness-lockup-light.png` — primary horizontal lockup for light/transparent surfaces.
+- `harness-lockup-dark.png` — horizontal lockup for dark surfaces.
+- `harness-app-icon-light.png` — light app-icon treatment.
+- `harness-app-icon-dark.png` — dark app-icon treatment.
+
+The historical `harness-symbol.svg`, `harness-wordmark.svg`, and `harness-lockup.svg` files are retained only for compatibility with old links/history. New references must use the PNG masters above.
 
 Run:
 
 ```bash
+python3 scripts/generate_brand_assets.py
 python3 scripts/generate_android_brand_assets.py
 python3 scripts/generate_android_brand_assets.py --check
 ```
 
-The check validates path order, approved colors, vector-only masters, adaptive-icon safe-zone bounds, generated Android XML and manifest linkage.
+The Android check validates PNG identity, deterministic launcher XML and manifest linkage.

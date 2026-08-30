@@ -3,11 +3,20 @@
   "contract_version": "0.5.0",
   "product_name": "Harness",
   "assets": {
-    "logo_primary": "docs/assets/brand/master/harness-lockup.svg",
-    "logo_compact": "docs/assets/brand/master/harness-symbol.svg",
-    "logo_monochrome": "docs/assets/brand/master/harness-symbol.svg (monochrome Android output is generated deterministically)",
-    "app_icon": "generated Android launcher resources from docs/assets/brand/master/harness-symbol.svg",
-    "favicon": "n/a — Android product surface"
+    "logo_primary": "docs/assets/brand/master/harness-lockup-light.png",
+    "logo_primary_dark": "docs/assets/brand/master/harness-lockup-dark.png",
+    "logo_compact": "docs/assets/brand/master/harness-symbol.png",
+    "logo_monochrome": "Android themed icon derives its alpha mask from the canonical H Bridge Core PNG symbol",
+    "app_icon_light": "docs/assets/brand/master/harness-app-icon-light.png",
+    "app_icon_dark": "docs/assets/brand/master/harness-app-icon-dark.png",
+    "android_launcher": "generated Android launcher resources synchronized from the canonical PNG masters",
+    "favicon": "docs/assets/brand/light/favicon.png and docs/assets/brand/dark/favicon.png"
+  },
+  "brand_mark": {
+    "name": "H Bridge Core",
+    "primary_meaning": "Harness is the connection layer between a consumer application and a local LLM/runtime",
+    "android_role": "secondary platform cue; Android must not dominate the H or the app-to-LLM connection",
+    "source_format": "PNG"
   },
   "themes": {
     "light": true,
