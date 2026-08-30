@@ -3,6 +3,9 @@
 Status: active
 Document type: execution checkpoint / promotion-readiness ledger
 Owner: llama-cpp-runtime / runtime-memory
+Canonical scope: workstream.llup-v0-3-automated-replay
+Read when: refreshing LLUP-60 evidence, preparing LLUP-50 device qualification, or evaluating LLUP-70 promotion readiness
+Last reviewed: 2026-08-30
 
 ## Frozen qualification identities
 
