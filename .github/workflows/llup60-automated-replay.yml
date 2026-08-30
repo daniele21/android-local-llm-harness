@@ -158,6 +158,47 @@ jobs:
           chmod +x gradlew
           ./gradlew --stacktrace :models:model-profile:test :core:runtime-core:test
 
+  evaluation-evidence:
+    name: Evaluation and benchmark contract replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Replay evaluation and benchmark evidence contracts
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache --stacktrace \
+            :evaluation:contracts:testDebugUnitTest \
+            :evaluation:datasets:testDebugUnitTest \
+            :evaluation:evaluators:testDebugUnitTest \
+            :evaluation:engine:testDebugUnitTest \
+            :evaluation:runtime-adapter:testDebugUnitTest \
+            :evaluation:comparison:testDebugUnitTest \
+            :evaluation:persistence:testDebugUnitTest \
+            :observability:contracts:testDebugUnitTest \
+            :observability:benchmark-engine:testDebugUnitTest
+
   qwen35-reference:
     name: Exact Qwen3.5 host compatibility replay
     runs-on: ubuntu-latest
@@ -260,11 +301,13 @@ jobs:
       - provenance
       - native-host
       - jvm-contracts
+      - evaluation-evidence
       - qwen35-reference
     env:
       PROVENANCE_RESULT: ${{ needs.provenance.result }}
       NATIVE_HOST_RESULT: ${{ needs.native-host.result }}
       JVM_CONTRACTS_RESULT: ${{ needs.jvm-contracts.result }}
+      EVALUATION_EVIDENCE_RESULT: ${{ needs.evaluation-evidence.result }}
       QWEN35_RESULT: ${{ needs.qwen35-reference.result }}
     steps:
       - name: Write replay manifest
@@ -281,6 +324,7 @@ jobs:
               "provenance": os.environ["PROVENANCE_RESULT"],
               "nativeHost": os.environ["NATIVE_HOST_RESULT"],
               "jvmContracts": os.environ["JVM_CONTRACTS_RESULT"],
+              "evaluationAndBenchmarkContracts": os.environ["EVALUATION_EVIDENCE_RESULT"],
               "qwen35ExactHostCompatibility": os.environ["QWEN35_RESULT"],
           }
           payload = {
