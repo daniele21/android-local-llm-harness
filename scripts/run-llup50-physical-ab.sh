@@ -175,7 +175,9 @@ cleanup_device() {
   "${ADB_CMD[@]}" uninstall "$TEST_PACKAGE_ID" >/dev/null 2>&1 || true
   "${ADB_CMD[@]}" uninstall "$APP_ID" >/dev/null 2>&1 || true
 }
-trap cleanup_device EXIT INT TERM
+trap cleanup_device EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 write_result() {
   local verdict="$1" reason="$2" exit_code="$3"
@@ -445,8 +447,12 @@ if (( candidate_rc != 0 )); then
 fi
 record_stage "candidate" "PASS" 0 "v0.3.0 candidate evidence captured"
 
-CONTROL_DIR="$(find "$SIDE_OUTPUT" -type f -path "*/control/$CONTROL_EVIDENCE_SHA/manifest.json" -print | head -n 1 | xargs -I{} dirname "{}")"
-CANDIDATE_DIR="$(find "$SIDE_OUTPUT" -type f -path "*/candidate/$CANDIDATE_EVIDENCE_SHA/manifest.json" -print | head -n 1 | xargs -I{} dirname "{}")"
+CONTROL_MANIFEST_PATH="$(find "$SIDE_OUTPUT" -type f -path "*/control/$CONTROL_EVIDENCE_SHA/manifest.json" -print | head -n 1)"
+CANDIDATE_MANIFEST_PATH="$(find "$SIDE_OUTPUT" -type f -path "*/candidate/$CANDIDATE_EVIDENCE_SHA/manifest.json" -print | head -n 1)"
+CONTROL_DIR=""
+CANDIDATE_DIR=""
+[[ -n "$CONTROL_MANIFEST_PATH" ]] && CONTROL_DIR="$(dirname "$CONTROL_MANIFEST_PATH")"
+[[ -n "$CANDIDATE_MANIFEST_PATH" ]] && CANDIDATE_DIR="$(dirname "$CANDIDATE_MANIFEST_PATH")"
 if [[ -z "$CONTROL_DIR" || -z "$CANDIDATE_DIR" ]]; then
   record_stage "comparison" "INCONCLUSIVE" 2 "side manifests were not found at the expected frozen identities"
   write_result "INCONCLUSIVE" "Physical runs completed but their exact-identity manifests could not be located." 2
