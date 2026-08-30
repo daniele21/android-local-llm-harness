@@ -13,32 +13,15 @@ permissions:
 
 jobs:
   dispatch:
-    name: Dispatch exact-source control and candidate packages
+    name: Dispatch exact-source corrected candidate package
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Dispatch frozen LLUP control package
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: ab5b35519d51ee903e1127b2973ab8cf30407704
-        shell: bash
-        run: |
-          set -euo pipefail
-          payload="$(printf '{\"ref\":\"dev\",\"inputs\":{\"candidate_ref\":\"%s\",\"profile\":\"false\"}}' "$TARGET_SHA")"
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$REPOSITORY/actions/workflows/package.yml/dispatches" \
-            --data "$payload"
-
       - name: Dispatch frozen LLUP v0.3.0 candidate package
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: 6cfa8b8bf7dd264949da797115b216c130d546df
+          TARGET_SHA: f796235f47899314b65a5abc95c998b396883c4b
         shell: bash
         run: |
           set -euo pipefail
