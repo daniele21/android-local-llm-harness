@@ -7,6 +7,8 @@ Canonical scope: workstream.llup-v0-3-automated-replay
 Read when: refreshing LLUP-60 evidence, preparing LLUP-50 device qualification, or evaluating LLUP-70 promotion readiness
 Last reviewed: 2026-08-30
 
+Repository integrated state and blockers remain owned by [`../current-state.md`](../current-state.md); this file owns only the bounded LLUP qualification/replay sequence.
+
 ## Frozen qualification identities
 
 - Control: `dev@80164329bbc41a00b75721e3d0524294c03fdb56`, llama.cpp `b9637` / `aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3`.
