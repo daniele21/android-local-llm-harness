@@ -533,8 +533,17 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaApi_loadModel(
 
     llama_model_params params = llama_model_default_params();
     params.n_gpu_layers = n_gpu_layers;
-    params.use_mmap = use_mmap == JNI_TRUE;
-    params.use_mlock = use_mlock == JNI_TRUE;
+    const bool mmap_enabled = use_mmap == JNI_TRUE;
+    const bool mlock_enabled = use_mlock == JNI_TRUE;
+    if (mmap_enabled && mlock_enabled) {
+        params.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK;
+    } else if (mmap_enabled) {
+        params.load_mode = LLAMA_LOAD_MODE_MMAP;
+    } else if (mlock_enabled) {
+        params.load_mode = LLAMA_LOAD_MODE_MLOCK;
+    } else {
+        params.load_mode = LLAMA_LOAD_MODE_NONE;
+    }
 
     const auto started_at = std::chrono::steady_clock::now();
     llama_model* raw_model = llama_model_load_from_file(path.get(), params);
@@ -950,10 +959,10 @@ std::string grammar_for_constraint(const std::string& type, const std::string& s
     }
     if (type == "JSON") {
         static const std::string json_schema = R"({"$schema":"http://json-schema.org/draft-07/schema#"})";
-        return json_schema_to_grammar(nlohmann::ordered_json::parse(json_schema), true);
+        return json_schema_to_grammar(common_json::parse(json_schema), true);
     }
     if (type == "JSON_SCHEMA") {
-        return json_schema_to_grammar(nlohmann::ordered_json::parse(schema), true);
+        return json_schema_to_grammar(common_json::parse(schema), true);
     }
     throw std::invalid_argument("Unsupported output constraint type");
 }
