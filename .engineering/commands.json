@@ -10,7 +10,7 @@
     "e2e": {"status": "recommended", "run": "bash scripts/capture-device-e2e-evidence.sh --model \"$MODEL_GGUF\" --architecture \"$MODEL_ARCHITECTURE\" --quantization \"$MODEL_QUANTIZATION\" --memory-repeat 5"},
     "build": {"status": "required", "run": "./gradlew assembleDebug"},
     "smoke": {"status": "n/a", "run": "n/a"},
-    "package": {"status": "optional", "run": "LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true ./gradlew :apps:local-llm-phone-test:bundleRelease"},
+    "package": {"status": "optional", "run": "bash scripts/build-android-aab.sh build"},
     "stop": {"status": "n/a", "run": "n/a"},
     "clean": {"status": "required", "run": "./gradlew clean && rm -rf build/native-tests build/llrt-suite"}
   },
