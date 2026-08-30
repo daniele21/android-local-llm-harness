@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: runtime-memory
 Canonical scope: memory-management.routing
 Read when: locating the memory-management target, current state, roadmap or owning workstream
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-30
 
 This is the entry point for repository-wide memory-management work. It covers runtime residency, native lifecycle, proactive admission, Android memory pressure, bounded queueing, resource observability and physical memory evidence without creating a second runtime or duplicating Qwen3.5 tuning policy.
 
@@ -75,6 +75,7 @@ A repository or emulator test may validate policy semantics and Android wiring, 
 | Native/runtime shutdown correctness | [`workstreams/lifecycle.md`](workstreams/lifecycle.md) |
 | Memory budgets and admission | [`workstreams/admission-and-budgeting.md`](workstreams/admission-and-budgeting.md) |
 | Shared-runtime residency and TTL | [`workstreams/shared-runtime-residency.md`](workstreams/shared-runtime-residency.md) |
+| Bounded multi-model residency contract | [`workstreams/bounded-multi-model-residency.md`](workstreams/bounded-multi-model-residency.md) |
 | Resource metrics, regressions and soak evidence | [`workstreams/observability-and-validation.md`](workstreams/observability-and-validation.md) |
 
 ## Ownership boundaries
