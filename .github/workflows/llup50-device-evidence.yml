@@ -20,16 +20,16 @@ jobs:
       matrix:
         include:
           - label: control
-            evidence_sha: 1e3061f10e091d63d7772e2d23903d46cc239b36
-            runtime_sha: ab5b35519d51ee903e1127b2973ab8cf30407704
+            evidence_sha: fcbefc7cd9af84de570da96d039582175dd1700b
+            runtime_sha: 80164329bbc41a00b75721e3d0524294c03fdb56
             backend_revision: aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3
           - label: candidate
-            evidence_sha: b1f661edc303089dd0ee5d3565bca43450838ab3
-            runtime_sha: f796235f47899314b65a5abc95c998b396883c4b
+            evidence_sha: a2a050d9551db541bb4c6b152cba8623c782164d
+            runtime_sha: 59af48313b450d9cff13c7f43458c2e5e6560374
             backend_revision: c1d0e7a004015f23bc0233470b747b596f29b264
           - label: candidate-runtime
-            evidence_sha: f796235f47899314b65a5abc95c998b396883c4b
-            runtime_sha: f796235f47899314b65a5abc95c998b396883c4b
+            evidence_sha: 59af48313b450d9cff13c7f43458c2e5e6560374
+            runtime_sha: 59af48313b450d9cff13c7f43458c2e5e6560374
             backend_revision: c1d0e7a004015f23bc0233470b747b596f29b264
 
     steps:
