@@ -1,6 +1,6 @@
 # LLUP v0.3.0 automated replay checkpoint
 
-Status: active — refreshed after candidate/base movement; `REAL_ENVIRONMENT` intentionally deferred
+Status: active
 Document type: execution checkpoint / promotion-readiness ledger
 Owner: llama-cpp-runtime / runtime-memory
 
@@ -12,7 +12,7 @@ Owner: llama-cpp-runtime / runtime-memory
 - Candidate LLUP-50 evidence ref: `evidence/llup50-candidate@a2a050d9551db541bb4c6b152cba8623c782164d`.
 - LLUP-50 runner branch: `agent/llup50-physical-runner@cefb893ae95cfd95339de4a24a955a652f0011e6`.
 
-The previous candidate `f796235f47899314b65a5abc95c998b396883c4b` was refreshed only because `dev` gained the canonical Android AAB packaging command. The llama.cpp runtime behavior did not change, but packaging identity is part of qualification, so relevant exact-head evidence is refreshed rather than reused.
+The previous candidate `f796235f47899314b65a5abc95c998b396883c4b` was refreshed only because `dev` gained the canonical Android AAB packaging command. The llama.cpp runtime behavior did not change, but packaging identity is part of qualification, so relevant exact-head evidence is refreshed rather than reused. The automated work is refreshed for this candidate/base pair while `REAL_ENVIRONMENT` evidence remains intentionally deferred.
 
 ## Current automated state
 
