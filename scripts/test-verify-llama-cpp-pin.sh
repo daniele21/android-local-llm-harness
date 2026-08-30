@@ -20,6 +20,21 @@ object Qwen35RuntimeTuningProfiles {
 EOF
 }
 
+write_backend_revision() {
+  local repository_path="$1"
+  local commit="$2"
+  local backend_path="$repository_path/backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/runtime/LlamaCppInferenceBackend.kt"
+  mkdir -p "$(dirname "$backend_path")"
+  cat > "$backend_path" <<EOF
+package io.github.daniele21.localllm.runtime
+
+class LlamaCppInferenceBackend {
+    val id: String = "llama.cpp"
+    override val revision: String = "$commit"
+}
+EOF
+}
+
 write_pin() {
   local repository_path="$1"
   local commit="$2"
@@ -32,6 +47,7 @@ write_pin() {
   "commit": "$commit"
 }
 EOF
+  write_backend_revision "$repository_path" "$commit"
   write_runtime_revision "$repository_path" "$commit"
 }
 
@@ -39,6 +55,7 @@ run_verifier() {
   local repository_path="$1"
   LLAMA_CPP_PIN_FILE="$repository_path/backends/llama-cpp/llama-cpp-pin.json" \
   LLAMA_CPP_SUBMODULE_PATH="$repository_path/third_party/llama.cpp" \
+  LLAMA_CPP_BACKEND_RUNTIME_FILE="$repository_path/backends/llama-cpp/src/main/kotlin/io/github/daniele21/localllm/runtime/LlamaCppInferenceBackend.kt" \
   QWEN35_RUNTIME_TUNING_FILE="$repository_path/models/model-profile/src/main/kotlin/io/github/daniele21/localllm/models/Qwen35RuntimeTuning.kt" \
     bash "$verifier"
 }
@@ -96,6 +113,22 @@ matching_output="$(run_verifier "$matching_repository")"
 if ! grep -Fq "fixture-tag ($matching_commit)" <<<"$matching_output"; then
   echo "matching pin did not report canonical tag and commit" >&2
   echo "$matching_output" >&2
+  exit 1
+fi
+
+backend_revision_mismatch_repository="$temporary_root/backend-revision-mismatch"
+create_initialized_submodule "$backend_revision_mismatch_repository"
+backend_revision_commit="$(git -C "$backend_revision_mismatch_repository/third_party/llama.cpp" rev-parse HEAD)"
+write_pin "$backend_revision_mismatch_repository" "$backend_revision_commit" "backend-revision-pin"
+write_backend_revision "$backend_revision_mismatch_repository" "0000000000000000000000000000000000000000"
+backend_revision_stderr="$temporary_root/backend-revision-mismatch.stderr"
+if run_verifier "$backend_revision_mismatch_repository" > /dev/null 2>"$backend_revision_stderr"; then
+  echo "backend revision mismatch unexpectedly passed" >&2
+  exit 1
+fi
+if ! grep -Fq "llama.cpp backend runtime revision mismatch" "$backend_revision_stderr"; then
+  echo "backend revision mismatch did not fail closed on execution identity drift" >&2
+  cat "$backend_revision_stderr" >&2
   exit 1
 fi
 
