@@ -98,18 +98,14 @@ Hardware sessions may also combine phone UX, Q35-6, SR-6 and OMB-8 execution whe
 
 ### 5. Follow-on validation and product hardening
 
-Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work includes device/restoration evidence plus the separately scoped RAM warm-idle policy. After Q35-6, Q35-7 covers semantic/golden, context-boundary, cancellation, lifecycle, memory and thermal validation.
-
-### 6. llama.cpp v0.3.0 upgrade and bounded residency qualification
-
-A new parallel workstream is ready to qualify the stable upstream `llama.cpp v0.3.0` baseline against the current `b9637` control and then decide, from exact automated plus representative-device evidence, whether bounded multi-model residency can be enabled for qualified policies. The existing single-decode and resident-capacity-1 production defaults remain unchanged until those gates pass. See [`workstreams/llama-cpp-v0-3-residency-qualification.md`](workstreams/llama-cpp-v0-3-residency-qualification.md).
+Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work is device/restoration evidence, RAM warm-idle policy and Q35-7 semantic/lifecycle/memory/thermal validation. Parallel upgrade plan: [`LLUP`](workstreams/llama-cpp-v0-3-residency-qualification.md).
 
 ## Immediate next block
 
 1. build same-signer release APKs from the frozen Harness v31 and RedactGuard v11 source revisions using their repository release helpers;
 2. execute CRV-110 / RG-HCP-8 on a representative ARM64 Android device with a real GGUF, recording the exact candidate identity and privacy-safe evidence;
 3. in the same hardware window where appropriate, execute CPREC-80 upgrade-repair first and then the clean CPREC-90/ACUX-90 path without collapsing their independent acceptance criteria;
-4. keep OMB-6B review, OMB-8 quality execution, Q35-6, SR-6, broader phone UX evidence and LLUP-00/LLUP-10/MRES-00 planning/preparation parallel where their ownership does not conflict;
+4. keep OMB-6B review, OMB-8 quality execution, Q35-6, SR-6 and broader phone UX evidence parallel where their ownership does not conflict;
 5. after CRV-110 passes, perform CRV-120 durable handoff/cleanup and close the temporary CRV coordinator rather than merging its stale planning branch;
 6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact promoted build when a release promotion is intentionally requested.
 
@@ -122,5 +118,4 @@ A new parallel workstream is ready to qualify the stable upstream `llama.cpp v0.
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
-- llama.cpp v0.3/residency qualification: [`workstreams/llama-cpp-v0-3-residency-qualification.md`](workstreams/llama-cpp-v0-3-residency-qualification.md)
 - Harness 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
