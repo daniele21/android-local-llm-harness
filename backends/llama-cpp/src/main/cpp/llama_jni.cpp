@@ -5,6 +5,7 @@
 #include "gguf_metadata.h"
 #include "kv_cache_type_params.h"
 #include "llama.h"
+#include "model_load_params_compat.h"
 #include "native_handle_registry.h"
 #include "prepared_prompt_cache.h"
 #include "json-schema-to-grammar.h"
@@ -533,17 +534,11 @@ Java_io_github_daniele21_localllm_llamacpp_JniLlamaApi_loadModel(
 
     llama_model_params params = llama_model_default_params();
     params.n_gpu_layers = n_gpu_layers;
-    const bool mmap_enabled = use_mmap == JNI_TRUE;
-    const bool mlock_enabled = use_mlock == JNI_TRUE;
-    if (mmap_enabled && mlock_enabled) {
-        params.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK;
-    } else if (mmap_enabled) {
-        params.load_mode = LLAMA_LOAD_MODE_MMAP;
-    } else if (mlock_enabled) {
-        params.load_mode = LLAMA_LOAD_MODE_MLOCK;
-    } else {
-        params.load_mode = LLAMA_LOAD_MODE_NONE;
-    }
+    local_llm::apply_legacy_model_load_policy(
+        params,
+        use_mmap == JNI_TRUE,
+        use_mlock == JNI_TRUE
+    );
 
     const auto started_at = std::chrono::steady_clock::now();
     llama_model* raw_model = llama_model_load_from_file(path.get(), params);
