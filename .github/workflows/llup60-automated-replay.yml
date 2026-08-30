@@ -1,0 +1,318 @@
+name: LLUP-60 automated evidence replay
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/llup60-automated-replay
+    paths:
+      - ".github/workflows/llup60-automated-replay.yml"
+      - "docs/workstreams/llup-v0-3-automated-replay.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llup60-automated-replay-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUNTIME_SOURCE_COMMIT: f796235f47899314b65a5abc95c998b396883c4b
+  EXPECTED_LLAMA_CPP_TAG: v0.3.0
+  EXPECTED_LLAMA_CPP_REVISION: c1d0e7a004015f23bc0233470b747b596f29b264
+  QWEN35_08B_SHA256: bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517
+  QWEN35_08B_BYTES: "532517120"
+  QWEN35_2B_SHA256: aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223
+  QWEN35_2B_BYTES: "1280835840"
+
+jobs:
+  provenance:
+    name: Exact-source and identity provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Verify stacked evidence scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$RUNTIME_SOURCE_COMMIT" HEAD
+          changed="$(git diff --name-only "$RUNTIME_SOURCE_COMMIT"...HEAD)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(\.github/workflows/llup60-automated-replay\.yml|docs/workstreams/llup-v0-3-automated-replay\.md)$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo "LLUP-60 evidence branch changes runtime/product files:" >&2
+            printf '%s\n' "$unexpected" >&2
+            exit 1
+          fi
+
+      - name: Verify authoritative backend identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/verify-llama-cpp-pin.sh
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          pin = json.loads(Path("backends/llama-cpp/llama-cpp-pin.json").read_text())
+          expected_tag = os.environ["EXPECTED_LLAMA_CPP_TAG"]
+          expected_revision = os.environ["EXPECTED_LLAMA_CPP_REVISION"]
+          actual_submodule = subprocess.check_output(
+              ["git", "-C", "third_party/llama.cpp", "rev-parse", "HEAD"], text=True
+          ).strip()
+          if pin.get("tag") != expected_tag:
+              raise SystemExit(f"pin tag mismatch: {pin.get('tag')} != {expected_tag}")
+          if pin.get("commit") != expected_revision:
+              raise SystemExit(f"pin revision mismatch: {pin.get('commit')} != {expected_revision}")
+          if actual_submodule != expected_revision:
+              raise SystemExit(f"submodule mismatch: {actual_submodule} != {expected_revision}")
+          PY
+          bash scripts/test-verify-llama-cpp-pin.sh
+
+      - name: Record provenance evidence
+        shell: bash
+        run: |
+          mkdir -p build/llup60
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "schemaVersion": 1,
+              "workstream": "LLUP-60A",
+              "runtimeSourceCommit": os.environ["RUNTIME_SOURCE_COMMIT"],
+              "evidenceHarnessCommit": os.environ["GITHUB_SHA"],
+              "llamaCppTag": os.environ["EXPECTED_LLAMA_CPP_TAG"],
+              "llamaCppRevision": os.environ["EXPECTED_LLAMA_CPP_REVISION"],
+              "identityGuard": "pass",
+              "realEnvironmentDeferred": True,
+          }
+          Path("build/llup60/provenance.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: llup60-provenance
+          path: build/llup60/provenance.json
+          if-no-files-found: error
+          retention-days: 14
+
+  native-host:
+    name: Native API and ownership replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Verify candidate pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Build and run host-native suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S backends/llama-cpp/src/test-native -B build/llup60-native -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/llup60-native --parallel 2
+          ctest --test-dir build/llup60-native --output-on-failure
+
+  jvm-contracts:
+    name: Q35 and runtime contract replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Replay Q35 capability and runtime contracts
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew --stacktrace :models:model-profile:test :core:runtime-core:test
+
+  qwen35-reference:
+    name: Exact Qwen3.5 host compatibility replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Verify candidate pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Build candidate llama.cpp smoke runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S third_party/llama.cpp -B build/llup60-qwen35 \
+            -DLLAMA_CURL=OFF \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=OFF \
+            -DLLAMA_BUILD_TOOLS=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_EXAMPLES=ON
+          cmake --build build/llup60-qwen35 --target llama-simple -j2
+
+      - name: Download exact Qwen3.5 reference artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/llup60-models
+          curl --fail --location --retry 3 --output build/llup60-models/qwen35-08b-q4-k-m.gguf \
+            "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/5aea8824cba95d22990acc6ea66c2c1909530650/Qwen3.5-0.8B-Q4_K_M.gguf?download=true"
+          curl --fail --location --retry 3 --output build/llup60-models/qwen35-2b-q4-k-m.gguf \
+            "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/802854bfd388ed92748de119df31327962811548/Qwen3.5-2B-Q4_K_M.gguf?download=true"
+
+      - name: Verify exact Qwen3.5 artifact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$QWEN35_08B_SHA256  build/llup60-models/qwen35-08b-q4-k-m.gguf" | sha256sum --check
+          echo "$QWEN35_2B_SHA256  build/llup60-models/qwen35-2b-q4-k-m.gguf" | sha256sum --check
+          test "$(stat -c%s build/llup60-models/qwen35-08b-q4-k-m.gguf)" = "$QWEN35_08B_BYTES"
+          test "$(stat -c%s build/llup60-models/qwen35-2b-q4-k-m.gguf)" = "$QWEN35_2B_BYTES"
+
+      - name: Smoke load tokenize generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli=build/llup60-qwen35/bin/llama-simple
+          for model in build/llup60-models/qwen35-08b-q4-k-m.gguf build/llup60-models/qwen35-2b-q4-k-m.gguf; do
+            timeout 120 "$cli" -m "$model" -ngl 0 -n 1 "Reply OK." >/dev/null
+          done
+
+      - name: Record Qwen3.5 compatibility evidence
+        shell: bash
+        run: |
+          mkdir -p build/llup60
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "schemaVersion": 1,
+              "workstream": "LLUP-60A",
+              "runtimeSourceCommit": os.environ["RUNTIME_SOURCE_COMMIT"],
+              "evidenceHarnessCommit": os.environ["GITHUB_SHA"],
+              "llamaCppRevision": os.environ["EXPECTED_LLAMA_CPP_REVISION"],
+              "artifacts": {
+                  "qwen35-08b-q4-k-m": {
+                      "sha256": os.environ["QWEN35_08B_SHA256"],
+                      "bytes": int(os.environ["QWEN35_08B_BYTES"]),
+                      "hostSmoke": "pass",
+                  },
+                  "qwen35-2b-q4-k-m": {
+                      "sha256": os.environ["QWEN35_2B_SHA256"],
+                      "bytes": int(os.environ["QWEN35_2B_BYTES"]),
+                      "hostSmoke": "pass",
+                  },
+              },
+          }
+          Path("build/llup60/qwen35-host-compatibility.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: llup60-qwen35-host-compatibility
+          path: build/llup60/qwen35-host-compatibility.json
+          if-no-files-found: error
+          retention-days: 14
+
+  summary:
+    name: Automated replay evidence summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - provenance
+      - native-host
+      - jvm-contracts
+      - qwen35-reference
+    env:
+      PROVENANCE_RESULT: ${{ needs.provenance.result }}
+      NATIVE_HOST_RESULT: ${{ needs.native-host.result }}
+      JVM_CONTRACTS_RESULT: ${{ needs.jvm-contracts.result }}
+      QWEN35_RESULT: ${{ needs.qwen35-reference.result }}
+    steps:
+      - name: Write replay manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/llup60
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          checks = {
+              "provenance": os.environ["PROVENANCE_RESULT"],
+              "nativeHost": os.environ["NATIVE_HOST_RESULT"],
+              "jvmContracts": os.environ["JVM_CONTRACTS_RESULT"],
+              "qwen35ExactHostCompatibility": os.environ["QWEN35_RESULT"],
+          }
+          payload = {
+              "schemaVersion": 1,
+              "workstream": "LLUP-60A",
+              "runtimeSourceCommit": os.environ["RUNTIME_SOURCE_COMMIT"],
+              "evidenceHarnessCommit": os.environ["GITHUB_SHA"],
+              "llamaCppTag": os.environ["EXPECTED_LLAMA_CPP_TAG"],
+              "llamaCppRevision": os.environ["EXPECTED_LLAMA_CPP_REVISION"],
+              "checks": checks,
+              "automatedReplayComplete": all(value == "success" for value in checks.values()),
+              "realEnvironmentDeferred": True,
+              "deferred": [
+                  "LLUP-50 same-device physical A/B",
+                  "LLRT KV-cache physical evidence",
+                  "LLRT evaluation-batch physical evidence",
+                  "device-only Q35 performance/memory/lifecycle evidence",
+                  "output-quality replay whose canonical owner requires representative-device execution",
+              ],
+              "promotionDecisionAllowed": False,
+          }
+          Path("build/llup60/automated-replay-manifest.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          if not payload["automatedReplayComplete"]:
+              raise SystemExit("one or more automated replay lanes failed")
+          PY
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: llup60-automated-replay-manifest
+          path: build/llup60/automated-replay-manifest.json
+          if-no-files-found: error
+          retention-days: 14
