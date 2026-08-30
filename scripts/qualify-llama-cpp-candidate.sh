@@ -141,6 +141,7 @@ if [[ "$run_android" == "1" ]]; then
   ./gradlew \
     --no-configuration-cache \
     --stacktrace \
+    -PlocalLlm.llamaCppQualificationCommit="$candidate_sha" \
     :backends:llama-cpp:assembleDebug \
     :backends:llama-cpp:testDebugUnitTest \
     :apps:device-test-runner:assembleDebug

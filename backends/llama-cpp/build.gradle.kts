@@ -8,9 +8,16 @@ val experimentalOpenCl = providers.gradleProperty("localLlm.experimentalOpenCl")
     ?: false
 val openClIncludeDirProperty = providers.gradleProperty("localLlm.openClIncludeDir").orNull
 val openClLibraryProperty = providers.gradleProperty("localLlm.openClLibrary").orNull
+val llamaCppQualificationCommit = providers.gradleProperty("localLlm.llamaCppQualificationCommit").orNull
 
 val openClIncludeDir = openClIncludeDirProperty?.let { rootProject.file(it) }
 val openClLibrary = openClLibraryProperty?.let { rootProject.file(it) }
+
+llamaCppQualificationCommit?.let { commit ->
+    require(Regex("^[0-9a-f]{40}$").matches(commit)) {
+        "-PlocalLlm.llamaCppQualificationCommit must be an exact lowercase 40-character SHA"
+    }
+}
 
 if (experimentalOpenCl) {
     val includeDir = requireNotNull(openClIncludeDir) {
@@ -47,6 +54,9 @@ android {
             cmake {
                 arguments += "-DANDROID_STL=c++_shared"
                 arguments += "-DLOCAL_LLM_EXPERIMENTAL_OPENCL=${if (experimentalOpenCl) "ON" else "OFF"}"
+                llamaCppQualificationCommit?.let { commit ->
+                    arguments += "-DLOCAL_LLM_LLAMA_CPP_QUALIFICATION_COMMIT=$commit"
+                }
                 if (experimentalOpenCl) {
                     arguments += "-DOpenCL_INCLUDE_DIR=${openClIncludeDir!!.absolutePath}"
                     arguments += "-DOpenCL_LIBRARY=${openClLibrary!!.absolutePath}"

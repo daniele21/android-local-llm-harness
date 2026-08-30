@@ -1,13 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-expected_commit="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
-submodule_path="${LLAMA_CPP_SUBMODULE_PATH:-third_party/llama.cpp}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd "$script_dir/.." && pwd -P)"
+pin_file="${LLAMA_CPP_PIN_FILE:-$repo_root/backends/llama-cpp/llama-cpp-pin.json}"
+submodule_path="${LLAMA_CPP_SUBMODULE_PATH:-$repo_root/third_party/llama.cpp}"
 
 print_initialization_help() {
   echo "llama.cpp submodule is not initialized at $submodule_path" >&2
-  echo "Run: git submodule update --init --recursive $submodule_path" >&2
+  echo "Run: git submodule update --init --recursive third_party/llama.cpp" >&2
 }
+
+if [[ ! -f "$pin_file" ]]; then
+  echo "llama.cpp pin manifest is missing at $pin_file" >&2
+  exit 1
+fi
+
+mapfile -t pin_values < <(python3 - "$pin_file" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit(f"invalid llama.cpp pin manifest: {exc}")
+
+if payload.get("schema_version") != 1:
+    raise SystemExit("invalid llama.cpp pin manifest: schema_version must be 1")
+
+tag = payload.get("tag")
+commit = payload.get("commit")
+if not isinstance(tag, str) or not tag or any(ch.isspace() for ch in tag):
+    raise SystemExit("invalid llama.cpp pin manifest: tag must be a non-empty token")
+if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+    raise SystemExit("invalid llama.cpp pin manifest: commit must be an exact lowercase 40-character SHA")
+print(tag)
+print(commit)
+PY
+)
+
+if [[ "${#pin_values[@]}" -ne 2 ]]; then
+  echo "invalid llama.cpp pin manifest: expected tag and commit" >&2
+  exit 1
+fi
+expected_tag="${pin_values[0]}"
+expected_commit="${pin_values[1]}"
 
 if [[ ! -d "$submodule_path" || ! -e "$submodule_path/.git" ]]; then
   print_initialization_help
@@ -25,7 +65,7 @@ fi
 actual_commit="$(git -C "$submodule_path" rev-parse HEAD)"
 
 if [[ "$actual_commit" != "$expected_commit" ]]; then
-  echo "llama.cpp pin mismatch: expected $expected_commit, found $actual_commit" >&2
+  echo "llama.cpp pin mismatch: expected $expected_commit ($expected_tag), found $actual_commit" >&2
   exit 1
 fi
 
@@ -34,4 +74,4 @@ if [[ -n "$(git -C "$submodule_path" status --porcelain)" ]]; then
   exit 1
 fi
 
-echo "llama.cpp pin verified: $actual_commit"
+echo "llama.cpp pin verified: $expected_tag ($actual_commit)"
