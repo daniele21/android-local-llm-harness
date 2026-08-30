@@ -1,0 +1,156 @@
+name: LLUP-50 device evidence packages
+
+on:
+  push:
+    branches:
+      - ci/llup-package-evidence
+    paths:
+      - .github/workflows/llup50-device-evidence.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package LLUP-50 ${{ matrix.label }} device evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: control
+            evidence_sha: 1e3061f10e091d63d7772e2d23903d46cc239b36
+            runtime_sha: ab5b35519d51ee903e1127b2973ab8cf30407704
+            backend_revision: aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3
+          - label: candidate
+            evidence_sha: b1f661edc303089dd0ee5d3565bca43450838ab3
+            runtime_sha: f796235f47899314b65a5abc95c998b396883c4b
+            backend_revision: c1d0e7a004015f23bc0233470b747b596f29b264
+
+    steps:
+      - name: Checkout exact evidence source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+          ref: ${{ matrix.evidence_sha }}
+
+      - name: Verify exact evidence source
+        env:
+          EXPECTED_SHA: ${{ matrix.evidence_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          [[ "$actual" == "$EXPECTED_SHA" ]] || {
+            echo "Expected evidence source $EXPECTED_SHA but checkout resolved $actual" >&2
+            exit 1
+          }
+
+      - name: Verify llama.cpp identity
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build paired device-test APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --stacktrace \
+            :apps:device-test-runner:assembleDebug \
+            :apps:device-test-runner:assembleDebugAndroidTest
+
+      - name: Generate exact evidence manifest
+        env:
+          LABEL: ${{ matrix.label }}
+          EVIDENCE_SHA: ${{ matrix.evidence_sha }}
+          RUNTIME_SHA: ${{ matrix.runtime_sha }}
+          BACKEND_REVISION: ${{ matrix.backend_revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/llup50-device-evidence
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path.cwd()
+          app = root / "apps/device-test-runner/build/outputs/apk/debug/device-test-runner-debug.apk"
+          test = root / "apps/device-test-runner/build/outputs/apk/androidTest/debug/device-test-runner-debug-androidTest.apk"
+          for path in (app, test):
+              if not path.is_file():
+                  raise SystemExit(f"Missing expected APK: {path}")
+
+          def digest(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          payload = {
+              "schemaVersion": 1,
+              "evidenceType": "LLUP50_DEVICE_APK_PAIR",
+              "label": os.environ["LABEL"],
+              "sourceRevision": os.environ["EVIDENCE_SHA"],
+              "runtimeSourceCommit": os.environ["RUNTIME_SHA"],
+              "backendRevision": os.environ["BACKEND_REVISION"],
+              "artifacts": [
+                  {
+                      "product": "device-test-runner",
+                      "variant": "debug",
+                      "fileName": app.name,
+                      "sourceRevision": os.environ["EVIDENCE_SHA"],
+                      "sha256": digest(app),
+                      "sizeBytes": app.stat().st_size,
+                  },
+                  {
+                      "product": "device-test-runner",
+                      "variant": "androidTest",
+                      "fileName": test.name,
+                      "sourceRevision": os.environ["EVIDENCE_SHA"],
+                      "sha256": digest(test),
+                      "sizeBytes": test.stat().st_size,
+                  },
+              ],
+          }
+          out = root / "build/llup50-device-evidence/build-manifest.json"
+          out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(out)
+          PY
+
+      - name: Upload paired LLUP-50 APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: llup50-${{ matrix.label }}-device-apks
+          path: |
+            apps/device-test-runner/build/outputs/apk/debug/device-test-runner-debug.apk
+            apps/device-test-runner/build/outputs/apk/androidTest/debug/device-test-runner-debug-androidTest.apk
+            build/llup50-device-evidence/build-manifest.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
