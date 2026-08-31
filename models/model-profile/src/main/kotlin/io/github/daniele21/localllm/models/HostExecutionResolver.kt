@@ -92,6 +92,7 @@ data class ResolvedHostExecution(
     val inferencePreset: InferencePresetRef,
     val contextTokens: Int,
     val cachePolicy: UseCaseCachePolicy,
+    val generationOverrides: PresetGenerationOverrides?,
     val evidence: HostExecutionResolutionEvidence,
 ) {
     init {
@@ -114,11 +115,13 @@ sealed interface HostExecutionResolution {
         val applicationId: ApplicationId,
         val useCaseId: UseCaseId,
         val evidence: HostExecutionResolutionEvidence,
-    ) : HostExecutionResolution {
+    ) : HostExecutionResolution.FailureMarker {
         init {
             require(detail.isNotBlank()) { "Resolution failure detail must not be blank" }
         }
     }
+
+    private interface FailureMarker : HostExecutionResolution
 }
 
 class HostExecutionResolver(private val store: HostControlPlaneStore) {
@@ -186,9 +189,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
                 request,
                 HostExecutionFailureCode.PRESET_UNAVAILABLE,
                 "Exposed preset revision is unavailable",
-                useCaseEvidence.copy(
-                    exposedPresetRevision = exposure.presetRevision,
-                ),
+                useCaseEvidence.copy(exposedPresetRevision = exposure.presetRevision),
             )
         val presetEvidence = useCaseEvidence.copy(
             exposedPresetRevision = exposure.presetRevision,
@@ -220,6 +221,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
                 inferencePreset = preset.execution.inferencePreset,
                 contextTokens = effectiveContextTokens(useCase, preset),
                 cachePolicy = preset.execution.cachePolicy,
+                generationOverrides = preset.execution.generationOverrides,
                 evidence = presetEvidence.copy(candidateRejections = modelResolution.rejections),
             ),
         )
@@ -253,9 +255,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
                 evidence,
             )
         }
-        if (request.presetRevision == null) {
-            return matchingId.maxBy(StoredPresetExposure::presetRevision)
-        }
+        if (request.presetRevision == null) return matchingId.maxBy(StoredPresetExposure::presetRevision)
         return matchingId.firstOrNull { it.presetRevision == request.presetRevision }
             ?: failure(
                 request,
@@ -315,30 +315,18 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
     ): ModelCandidateRejection? {
         val requiredContext = effectiveContextTokens(useCase, preset)
         val reasons = buildSet {
-            if (profile.artifact.digest !in environment.installedModelDigests) {
-                add(ModelCandidateRejectionReason.NOT_INSTALLED)
-            }
-            if (profile.contextSize < requiredContext) {
-                add(ModelCandidateRejectionReason.INSUFFICIENT_CONTEXT)
-            }
+            if (profile.artifact.digest !in environment.installedModelDigests) add(ModelCandidateRejectionReason.NOT_INSTALLED)
+            if (profile.contextSize < requiredContext) add(ModelCandidateRejectionReason.INSUFFICIENT_CONTEXT)
             profile.runtimeCapabilities.requiredBackendId?.let { required ->
                 if (required != environment.backendId) add(ModelCandidateRejectionReason.REQUIRED_BACKEND_MISMATCH)
             }
             profile.runtimeCapabilities.requiredBackendRevision?.let { required ->
-                if (required != environment.backendRevision) {
-                    add(ModelCandidateRejectionReason.REQUIRED_BACKEND_REVISION_MISMATCH)
-                }
+                if (required != environment.backendRevision) add(ModelCandidateRejectionReason.REQUIRED_BACKEND_REVISION_MISMATCH)
             }
-            if (
-                preset.execution.cachePolicy.reuseStatelessContext &&
-                !profile.runtimeCapabilities.supportsStatelessContextReuse
-            ) {
+            if (preset.execution.cachePolicy.reuseStatelessContext && !profile.runtimeCapabilities.supportsStatelessContextReuse) {
                 add(ModelCandidateRejectionReason.STATELESS_REUSE_UNSUPPORTED)
             }
-            if (
-                preset.execution.cachePolicy.enablePrefixSnapshot &&
-                !profile.runtimeCapabilities.supportsPrefixSnapshot
-            ) {
+            if (preset.execution.cachePolicy.enablePrefixSnapshot && !profile.runtimeCapabilities.supportsPrefixSnapshot) {
                 add(ModelCandidateRejectionReason.PREFIX_SNAPSHOT_UNSUPPORTED)
             }
         }
@@ -367,10 +355,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
     )
 
     private sealed interface ModelResolution
-
-    private data class ModelResolutionSuccess(val profile: GgufModelProfile, val rejections: List<ModelCandidateRejection>) :
-        ModelResolution
-
+    private data class ModelResolutionSuccess(val profile: GgufModelProfile, val rejections: List<ModelCandidateRejection>) : ModelResolution
     private data class ModelResolutionFailure(
         val code: HostExecutionFailureCode,
         val detail: String,
