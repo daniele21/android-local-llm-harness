@@ -9,6 +9,32 @@ import java.nio.file.Files
 
 class LlamaCppGgufArtifactInspectorTest {
     @Test
+    fun constructionDefersBridgeCreationUntilInspection() {
+        val file = Files.createTempFile("gguf-inspection-lazy", ".gguf").toFile()
+        var bridgeCreations = 0
+        val inspector =
+            LlamaCppGgufArtifactInspector {
+                bridgeCreations += 1
+                LlamaCppBridge(
+                    FakeNativeApi(
+                        arrayOf(
+                            "error",
+                            "PARSE_FAILED",
+                            "test parse failure",
+                        ),
+                    ),
+                )
+            }
+
+        assertEquals(0, bridgeCreations)
+
+        inspector.inspect(file)
+        inspector.inspect(file)
+
+        assertEquals(1, bridgeCreations)
+    }
+
+    @Test
     fun mapsSuccessfulMetadataWithoutBackendDetails() {
         val file = Files.createTempFile("gguf-inspection", ".gguf").toFile()
         val inspector =
