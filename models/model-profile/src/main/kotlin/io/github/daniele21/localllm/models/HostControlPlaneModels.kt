@@ -2,7 +2,10 @@ package io.github.daniele21.localllm.models
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.MAX_NATIVE_SEED
+import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.SessionKind
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 enum class ApplicationRegistrationState {
@@ -95,11 +98,90 @@ data class PresetConsumerMetadata(val presetId: String, val revision: Int, val d
     }
 }
 
+enum class PresetSeedMode {
+    INHERIT,
+    RANDOM,
+    FIXED,
+}
+
+/**
+ * Optional user-owned overrides layered on top of the immutable published inference profile.
+ * Null values inherit the selected profile so model-tier-specific defaults remain intact.
+ */
+data class PresetGenerationOverrides(
+    val maxOutputTokens: Int? = null,
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val topK: Int? = null,
+    val minP: Float? = null,
+    val presencePenalty: Float? = null,
+    val repeatPenalty: Float? = null,
+    val repeatLastN: Int? = null,
+    val thinkingMode: ThinkingMode? = null,
+    val seedMode: PresetSeedMode = PresetSeedMode.INHERIT,
+    val fixedSeed: Long? = null,
+) {
+    init {
+        require(maxOutputTokens == null || maxOutputTokens > 0) { "Maximum output tokens override must be positive" }
+        require(temperature == null || temperature.isFinite() && temperature in 0f..2f) {
+            "Temperature override must be in [0, 2]"
+        }
+        require(topP == null || topP.isFinite() && topP > 0f && topP <= 1f) { "Top-p override must be in (0, 1]" }
+        require(topK == null || topK in 0..1_000) { "Top-k override must be in [0, 1000]" }
+        require(minP == null || minP.isFinite() && minP in 0f..1f) { "Min-p override must be in [0, 1]" }
+        require(presencePenalty == null || presencePenalty.isFinite() && presencePenalty in 0f..2f) {
+            "Presence penalty override must be in [0, 2]"
+        }
+        require(repeatPenalty == null || repeatPenalty.isFinite() && repeatPenalty in 1f..2f) {
+            "Repeat penalty override must be in [1, 2]"
+        }
+        require(repeatLastN == null || repeatLastN in 0..4_096) { "Repeat window override must be in [0, 4096]" }
+        require(fixedSeed == null || fixedSeed in 0..MAX_NATIVE_SEED) { "Fixed seed override is out of range" }
+        require(seedMode == PresetSeedMode.FIXED || fixedSeed == null) { "Fixed seed requires FIXED seed mode" }
+        require(seedMode != PresetSeedMode.FIXED || fixedSeed != null) { "FIXED seed mode requires a seed" }
+    }
+
+    val isEmpty: Boolean
+        get() = maxOutputTokens == null &&
+            temperature == null &&
+            topP == null &&
+            topK == null &&
+            minP == null &&
+            presencePenalty == null &&
+            repeatPenalty == null &&
+            repeatLastN == null &&
+            thinkingMode == null &&
+            seedMode == PresetSeedMode.INHERIT
+}
+
+fun GenerationDefaults.withPresetOverrides(overrides: PresetGenerationOverrides?): GenerationDefaults {
+    if (overrides == null || overrides.isEmpty) return this
+    val seedValues = when (overrides.seedMode) {
+        PresetSeedMode.INHERIT -> seed to seedPolicy
+        PresetSeedMode.RANDOM -> null to SeedPolicy.Random
+        PresetSeedMode.FIXED -> requireNotNull(overrides.fixedSeed).let { it to SeedPolicy.Fixed(it) }
+    }
+    return copy(
+        maxOutputTokens = overrides.maxOutputTokens ?: maxOutputTokens,
+        temperature = overrides.temperature ?: temperature,
+        topP = overrides.topP ?: topP,
+        topK = overrides.topK ?: topK,
+        minP = overrides.minP ?: minP,
+        presencePenalty = overrides.presencePenalty ?: presencePenalty,
+        repeatPenalty = overrides.repeatPenalty ?: repeatPenalty,
+        repeatLastN = overrides.repeatLastN ?: repeatLastN,
+        thinkingMode = overrides.thinkingMode ?: thinkingMode,
+        seed = seedValues.first,
+        seedPolicy = seedValues.second,
+    )
+}
+
 data class PresetExecutionPolicy(
     val modelProfileId: String?,
     val inferencePreset: InferencePresetRef,
     val contextTokens: Int?,
     val cachePolicy: UseCaseCachePolicy,
+    val generationOverrides: PresetGenerationOverrides? = null,
 ) {
     init {
         require(modelProfileId == null || modelProfileId.isNotBlank()) { "Model profile ID must not be blank" }
