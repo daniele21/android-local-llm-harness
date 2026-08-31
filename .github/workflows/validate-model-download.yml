@@ -59,10 +59,8 @@ jobs:
             echo "No formatter changes to publish"
             exit 0
           fi
-          git diff --binary > /tmp/spotless.patch
           git fetch origin "${{ github.head_ref }}" --depth=1
           git checkout -B formatter-publish "origin/${{ github.head_ref }}"
-          git apply /tmp/spotless.patch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
