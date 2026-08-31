@@ -181,7 +181,13 @@ interface ConsumerControlPlaneClient {
     fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult
 
     /** Read-only setup projection; never creates activation/runtime residency. */
-    fun resolveSetup(request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult
+    fun resolveSetup(request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult =
+        ConsumerSetupResolutionResult.Rejected(
+            ConsumerControlPlaneFailure(
+                ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
+                "Consumer setup resolution is unavailable",
+            ),
+        )
 
     fun activate(request: ConsumerActivationRequest): ConsumerActivationResult
 
