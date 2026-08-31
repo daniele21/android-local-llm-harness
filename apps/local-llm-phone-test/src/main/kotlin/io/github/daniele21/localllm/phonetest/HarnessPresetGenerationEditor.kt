@@ -23,6 +23,7 @@ import io.github.daniele21.localllm.models.PresetSeedMode
 import io.github.daniele21.localllm.models.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberFieldValidation
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberInputMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
@@ -127,7 +128,6 @@ internal fun HarnessPresetGenerationEditor(
     onDraftChanged: (HarnessPresetGenerationDraft) -> Unit,
 ) {
     var advancedVisible by rememberSaveable { mutableStateOf(false) }
-    val spacing = LocalHarnessSpacing.current
     val validation = draft.overridesResult()
 
     HarnessCard(modifier = Modifier.testTag("custom-preset-generation-editor")) {
@@ -137,14 +137,15 @@ internal fun HarnessPresetGenerationEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
         HarnessNumberField(
             value = draft.maxOutputTokens,
             onValueChange = { onDraftChanged(draft.copy(maxOutputTokens = it)) },
             label = "Max output tokens",
             enabled = enabled,
-            isError = !draft.maxOutputTokens.validInt { it > 0 },
-            supportingText = "Positive whole number · blank uses base",
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.maxOutputTokens.validInt { it > 0 },
+                supportingText = "Positive whole number · blank uses base",
+            ),
             modifier = Modifier.fillMaxWidth().testTag("custom-preset-max-output-tokens"),
         )
         HarnessThinkingOverride(draft, enabled, onDraftChanged)
@@ -154,8 +155,10 @@ internal fun HarnessPresetGenerationEditor(
             label = "Temperature",
             mode = HarnessNumberInputMode.DECIMAL,
             enabled = enabled,
-            isError = !draft.temperature.validFloat { it in 0f..2f },
-            supportingText = "0–2 · blank uses base",
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.temperature.validFloat { it in 0f..2f },
+                supportingText = "0–2 · blank uses base",
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
         HarnessNumberField(
@@ -164,70 +167,20 @@ internal fun HarnessPresetGenerationEditor(
             label = "Top-p",
             mode = HarnessNumberInputMode.DECIMAL,
             enabled = enabled,
-            isError = !draft.topP.validFloat { it > 0f && it <= 1f },
-            supportingText = ">0–1 · blank uses base",
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.topP.validFloat { it > 0f && it <= 1f },
+                supportingText = ">0–1 · blank uses base",
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
-
         HarnessSecondaryButton(
             text = if (advancedVisible) "Advanced settings · Hide" else "Advanced settings · Show",
             enabled = enabled,
             onClick = { advancedVisible = !advancedVisible },
         )
         if (advancedVisible) {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-                HarnessNumberField(
-                    value = draft.topK,
-                    onValueChange = { onDraftChanged(draft.copy(topK = it)) },
-                    label = "Top-k",
-                    enabled = enabled,
-                    isError = !draft.topK.validInt { it in 0..1_000 },
-                    supportingText = "0–1000 · blank uses base",
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                HarnessNumberField(
-                    value = draft.minP,
-                    onValueChange = { onDraftChanged(draft.copy(minP = it)) },
-                    label = "Min-p",
-                    mode = HarnessNumberInputMode.DECIMAL,
-                    enabled = enabled,
-                    isError = !draft.minP.validFloat { it in 0f..1f },
-                    supportingText = "0–1 · blank uses base",
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                HarnessNumberField(
-                    value = draft.presencePenalty,
-                    onValueChange = { onDraftChanged(draft.copy(presencePenalty = it)) },
-                    label = "Presence penalty",
-                    mode = HarnessNumberInputMode.DECIMAL,
-                    enabled = enabled,
-                    isError = !draft.presencePenalty.validFloat { it in 0f..2f },
-                    supportingText = "0–2 · blank uses base",
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                HarnessNumberField(
-                    value = draft.repeatPenalty,
-                    onValueChange = { onDraftChanged(draft.copy(repeatPenalty = it)) },
-                    label = "Repeat penalty",
-                    mode = HarnessNumberInputMode.DECIMAL,
-                    enabled = enabled,
-                    isError = !draft.repeatPenalty.validFloat { it in 1f..2f },
-                    supportingText = "1–2 · blank uses base",
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                HarnessNumberField(
-                    value = draft.repeatLastN,
-                    onValueChange = { onDraftChanged(draft.copy(repeatLastN = it)) },
-                    label = "Repeat last N",
-                    enabled = enabled,
-                    isError = !draft.repeatLastN.validInt { it in 0..4_096 },
-                    supportingText = "0–4096 · blank uses base",
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                HarnessSeedOverride(draft, enabled, onDraftChanged)
-            }
+            HarnessAdvancedGenerationFields(draft, enabled, onDraftChanged)
         }
-
         if (validation.isFailure) {
             Text(
                 validation.exceptionOrNull()?.message ?: "Review generation parameters.",
@@ -243,6 +196,75 @@ internal fun HarnessPresetGenerationEditor(
                 onClick = { onDraftChanged(HarnessPresetGenerationDraft()) },
             )
         }
+    }
+}
+
+@Composable
+private fun HarnessAdvancedGenerationFields(
+    draft: HarnessPresetGenerationDraft,
+    enabled: Boolean,
+    onDraftChanged: (HarnessPresetGenerationDraft) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+        HarnessNumberField(
+            value = draft.topK,
+            onValueChange = { onDraftChanged(draft.copy(topK = it)) },
+            label = "Top-k",
+            enabled = enabled,
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.topK.validInt { it in 0..1_000 },
+                supportingText = "0–1000 · blank uses base",
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        HarnessNumberField(
+            value = draft.minP,
+            onValueChange = { onDraftChanged(draft.copy(minP = it)) },
+            label = "Min-p",
+            mode = HarnessNumberInputMode.DECIMAL,
+            enabled = enabled,
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.minP.validFloat { it in 0f..1f },
+                supportingText = "0–1 · blank uses base",
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        HarnessNumberField(
+            value = draft.presencePenalty,
+            onValueChange = { onDraftChanged(draft.copy(presencePenalty = it)) },
+            label = "Presence penalty",
+            mode = HarnessNumberInputMode.DECIMAL,
+            enabled = enabled,
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.presencePenalty.validFloat { it in 0f..2f },
+                supportingText = "0–2 · blank uses base",
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        HarnessNumberField(
+            value = draft.repeatPenalty,
+            onValueChange = { onDraftChanged(draft.copy(repeatPenalty = it)) },
+            label = "Repeat penalty",
+            mode = HarnessNumberInputMode.DECIMAL,
+            enabled = enabled,
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.repeatPenalty.validFloat { it in 1f..2f },
+                supportingText = "1–2 · blank uses base",
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        HarnessNumberField(
+            value = draft.repeatLastN,
+            onValueChange = { onDraftChanged(draft.copy(repeatLastN = it)) },
+            label = "Repeat last N",
+            enabled = enabled,
+            validation = HarnessNumberFieldValidation(
+                isError = !draft.repeatLastN.validInt { it in 0..4_096 },
+                supportingText = "0–4096 · blank uses base",
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        HarnessSeedOverride(draft, enabled, onDraftChanged)
     }
 }
 
@@ -308,8 +330,10 @@ private fun HarnessSeedOverride(
             onValueChange = { onDraftChanged(draft.copy(fixedSeed = it)) },
             label = "Fixed seed",
             enabled = enabled,
-            isError = draft.fixedSeed.isBlank() || draft.fixedSeed.toLongOrNull() == null,
-            supportingText = "Required for Fixed seed policy",
+            validation = HarnessNumberFieldValidation(
+                isError = draft.fixedSeed.isBlank() || draft.fixedSeed.toLongOrNull() == null,
+                supportingText = "Required for Fixed seed policy",
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
     }
