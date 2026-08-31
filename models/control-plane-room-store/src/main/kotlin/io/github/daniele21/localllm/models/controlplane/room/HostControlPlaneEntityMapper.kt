@@ -4,7 +4,6 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.SessionKind
-import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.ApplicationUseCaseBinding
@@ -13,9 +12,7 @@ import io.github.daniele21.localllm.models.OutputMode
 import io.github.daniele21.localllm.models.PresetConsumerMetadata
 import io.github.daniele21.localllm.models.PresetCreationSource
 import io.github.daniele21.localllm.models.PresetExecutionPolicy
-import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetLifecycleState
-import io.github.daniele21.localllm.models.PresetSeedMode
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
@@ -154,34 +151,6 @@ private fun fromEntity(value: HostControlPlaneEntities.PresetEntity) = UseCasePr
         generationOverrides = value.toGenerationOverrides(),
     ),
 )
-
-private fun HostControlPlaneEntities.PresetEntity.toGenerationOverrides(): PresetGenerationOverrides? {
-    val hasOverrides = generationMaxOutputTokens != null ||
-        generationTemperature != null ||
-        generationTopP != null ||
-        generationTopK != null ||
-        generationMinP != null ||
-        generationPresencePenalty != null ||
-        generationRepeatPenalty != null ||
-        generationRepeatLastN != null ||
-        generationThinkingMode != null ||
-        generationSeedMode != null ||
-        generationFixedSeed != null
-    if (!hasOverrides) return null
-    return PresetGenerationOverrides(
-        maxOutputTokens = generationMaxOutputTokens,
-        temperature = generationTemperature,
-        topP = generationTopP,
-        topK = generationTopK,
-        minP = generationMinP,
-        presencePenalty = generationPresencePenalty,
-        repeatPenalty = generationRepeatPenalty,
-        repeatLastN = generationRepeatLastN,
-        thinkingMode = generationThinkingMode?.let { enumValueOf<ThinkingMode>(it) },
-        seedMode = generationSeedMode?.let { enumValueOf<PresetSeedMode>(it) } ?: PresetSeedMode.INHERIT,
-        fixedSeed = generationFixedSeed,
-    )
-}
 
 private fun toEntity(value: ApplicationUseCaseBinding) = HostControlPlaneEntities.BindingEntity(
     value.bindingId,
