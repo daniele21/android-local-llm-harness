@@ -11,10 +11,16 @@ import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
+import io.github.daniele21.localllm.contracts.ConsumerGenerationConfiguration
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPreset
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.ConsumerResolvedSetup
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.SeedPolicyType
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 fun ConsumerAssignedUseCasesResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
@@ -54,6 +60,22 @@ fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPub
     bindingRevision = requireNotNull(bindingRevision),
     presets = presets.map(ConsumerPublishedPresetMetadataParcel::toCore),
 )
+
+fun ConsumerSetupResolutionResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
+    is ConsumerSetupResolutionResult.Resolved -> ConsumerControlPlaneResultParcel(
+        operationId = operationId,
+        resolvedSetup = setup.toWire(),
+    )
+
+    is ConsumerSetupResolutionResult.Rejected -> ConsumerControlPlaneResultParcel(
+        operationId = operationId,
+        error = failure.toWireError(),
+    )
+}
+
+fun ConsumerControlPlaneResultParcel.toCoreSetupResolutionResult(): ConsumerSetupResolutionResult = error?.let {
+    ConsumerSetupResolutionResult.Rejected(it.toConsumerControlPlaneFailure())
+} ?: ConsumerSetupResolutionResult.Resolved(requireNotNull(resolvedSetup).toCore())
 
 fun ConsumerActivationResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerActivationResult.Activated -> ConsumerControlPlaneResultParcel(
@@ -112,6 +134,18 @@ fun ConsumerActivationRequest.toConsumerControlPlaneWire(
     preset = ConsumerPresetParcel(preset.id.value, preset.version),
 )
 
+fun ConsumerSetupResolutionRequest.toConsumerControlPlaneWire(
+    clientToken: ClientTokenParcel,
+    operationId: String,
+): ConsumerControlPlaneRequestParcel = ConsumerControlPlaneRequestParcel(
+    clientToken = clientToken,
+    operationId = operationId,
+    useCaseId = useCaseId.value,
+    useCaseRevision = useCaseRevision,
+    bindingRevision = bindingRevision,
+    preset = ConsumerPresetParcel(preset.id.value, preset.version),
+)
+
 private fun ConsumerAssignedUseCase.toWire() = ConsumerAssignedUseCaseParcel(
     useCaseId = useCaseId.value,
     useCaseRevision = useCaseRevision,
@@ -142,6 +176,52 @@ private fun ConsumerPublishedPresetMetadataParcel.toCore() = ConsumerPublishedPr
     displayName = displayName,
     description = description,
     isDefault = isDefault,
+)
+
+private fun ConsumerResolvedSetup.toWire() = ConsumerResolvedSetupParcel(
+    useCaseId = useCaseId.value,
+    useCaseRevision = useCaseRevision,
+    bindingRevision = bindingRevision,
+    preset = ConsumerPresetParcel(preset.id.value, preset.version),
+    modelProfileId = modelProfileId,
+    contextTokens = contextTokens,
+    generation = generation.toWire(),
+)
+
+private fun ConsumerResolvedSetupParcel.toCore() = ConsumerResolvedSetup(
+    useCaseId = UseCaseId(useCaseId),
+    useCaseRevision = useCaseRevision,
+    bindingRevision = bindingRevision,
+    preset = InferencePresetRef(InferencePresetId(preset.id), preset.version),
+    modelProfileId = modelProfileId,
+    contextTokens = contextTokens,
+    generation = generation.toCore(),
+)
+
+private fun ConsumerGenerationConfiguration.toWire() = ConsumerGenerationConfigurationParcel(
+    maxOutputTokens = maxOutputTokens,
+    temperature = temperature,
+    topP = topP,
+    topK = topK,
+    minP = minP,
+    presencePenalty = presencePenalty,
+    repeatPenalty = repeatPenalty,
+    repeatLastN = repeatLastN,
+    thinkingModeTag = thinkingMode.name,
+    seedPolicyTag = seedPolicy.name,
+)
+
+private fun ConsumerGenerationConfigurationParcel.toCore() = ConsumerGenerationConfiguration(
+    maxOutputTokens = maxOutputTokens,
+    temperature = temperature,
+    topP = topP,
+    topK = topK,
+    minP = minP,
+    presencePenalty = presencePenalty,
+    repeatPenalty = repeatPenalty,
+    repeatLastN = repeatLastN,
+    thinkingMode = enumTagOrNull<ThinkingMode>(thinkingModeTag) ?: error("Invalid thinking-mode tag"),
+    seedPolicy = enumTagOrNull<SeedPolicyType>(seedPolicyTag) ?: error("Invalid seed-policy tag"),
 )
 
 private fun ConsumerActivation.toWire() = ConsumerActivationParcel(
