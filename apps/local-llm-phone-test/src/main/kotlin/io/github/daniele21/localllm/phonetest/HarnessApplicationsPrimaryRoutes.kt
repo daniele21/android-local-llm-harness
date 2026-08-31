@@ -15,7 +15,12 @@ internal fun NavGraphBuilder.installApplicationsListRoute(
         HarnessApplicationsScreen(
             state = state,
             onRefresh = callbacks.onRefresh,
+            onCreateConnection = {
+                callbacks.onClearMutationFeedback()
+                navController.navigate(HarnessApplicationRoutes.newApplication())
+            },
             onOpenApplication = { applicationId ->
+                callbacks.onClearMutationFeedback()
                 navController.navigate(HarnessApplicationRoutes.application(applicationId))
             },
         )
@@ -25,6 +30,7 @@ internal fun NavGraphBuilder.installApplicationsListRoute(
 internal fun NavGraphBuilder.installApplicationDetailRoute(
     navController: NavHostController,
     state: HarnessApplicationsReadState,
+    mutationState: HarnessApplicationsMutationState,
     callbacks: HarnessApplicationsGraphCallbacks,
 ) {
     composable(
@@ -39,14 +45,28 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
         HarnessApplicationsRouteContent(state = state, onRefresh = callbacks.onRefresh) { snapshot ->
             val selectedApplication = snapshot.application(applicationId)
             val onOpenAssignment: (String, String) -> Unit = { appId, useCaseId ->
+                callbacks.onClearMutationFeedback()
                 navController.navigate(HarnessApplicationRoutes.assignment(appId, useCaseId))
+            }
+            val onConnectionEnabledChanged: (Boolean) -> Unit = { enabled ->
+                selectedApplication?.let { application ->
+                    callbacks.onSetApplicationConnectionEnabled(application.applicationId, enabled)
+                }
             }
             if (useHarnessApplicationsMasterDetail(currentHarnessAdaptivePolicy())) {
                 HarnessApplicationsMasterDetailScreen(
                     snapshot = snapshot,
                     selectedApplication = selectedApplication,
+                    mutationState = mutationState,
                     onRefresh = callbacks.onRefresh,
+                    onCreateConnection = {
+                        callbacks.onClearMutationFeedback()
+                        navController.navigate(HarnessApplicationRoutes.newApplication())
+                    },
+                    onConnectionEnabledChanged = onConnectionEnabledChanged,
+                    onDismissFeedback = callbacks.onClearMutationFeedback,
                     onOpenApplication = { selectedApplicationId ->
+                        callbacks.onClearMutationFeedback()
                         navController.navigate(HarnessApplicationRoutes.application(selectedApplicationId)) {
                             popUpTo(HarnessDestination.APPS.route)
                             launchSingleTop = true
@@ -57,6 +77,10 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
             } else {
                 HarnessApplicationDetailScreen(
                     application = selectedApplication,
+                    mutationState = mutationState,
+                    onConnectionEnabledChanged = onConnectionEnabledChanged,
+                    onReload = callbacks.onRefresh,
+                    onDismissFeedback = callbacks.onClearMutationFeedback,
                     onOpenAssignment = onOpenAssignment,
                 )
             }
