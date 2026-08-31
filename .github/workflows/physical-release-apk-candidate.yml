@@ -1,0 +1,103 @@
+name: Physical release APK candidate
+
+on:
+  push:
+    branches: [ci/physical-candidate-9130cdf]
+    paths:
+      - ".github/workflows/physical-release-apk-candidate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build exact signed Harness release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact validated candidate
+        uses: actions/checkout@v7
+        with:
+          ref: 9130cdf1939080f6341c47c4cd923b63e53f983f
+          fetch-depth: 1
+          submodules: recursive
+          path: candidate
+
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "9130cdf1939080f6341c47c4cd923b63e53f983f"
+          test -z "$(git -C candidate status --porcelain --untracked-files=normal)"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Restore protected upload keystore
+        env:
+          ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_UPLOAD_KEYSTORE_B64"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/physical-upload.p12"
+          chmod 600 "$RUNNER_TEMP/physical-upload.p12"
+
+      - name: Build signed exact-candidate APK
+        working-directory: candidate
+        env:
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE: ${{ runner.temp }}/physical-upload.p12
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS: ${{ vars.ANDROID_UPLOAD_KEY_ALIAS || 'local-llm-phone-test-upload' }}
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD || secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          bash scripts/build-phone-test-release.sh build-apk
+
+      - name: Record bounded identity and signer evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="candidate/apps/local-llm-phone-test/build/outputs/apk/release/local-llm-phone-test-release.apk"
+          test -f "$apk"
+          out="$RUNNER_TEMP/physical-candidate"
+          mkdir -p "$out"
+          cp "$apk" "$out/harness-release-9130cdf.apk"
+          sha256sum "$apk" | tee "$out/apk-sha256.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" | tee "$out/apk-signer.txt"
+          printf '%s\n' "sourceRevision=9130cdf1939080f6341c47c4cd923b63e53f983f" > "$out/source-identity.txt"
+          printf '%s\n' "checkoutRevision=$(git -C candidate rev-parse HEAD)" >> "$out/source-identity.txt"
+
+      - name: Remove protected keystore
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/physical-upload.p12"
+
+      - name: Upload signed physical candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: harness-physical-release-9130cdf
+          path: ${{ runner.temp }}/physical-candidate/**
+          if-no-files-found: error
+          retention-days: 7
