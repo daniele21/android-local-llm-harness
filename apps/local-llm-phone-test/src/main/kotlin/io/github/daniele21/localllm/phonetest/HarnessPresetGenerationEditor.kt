@@ -18,9 +18,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetSeedMode
-import io.github.daniele21.localllm.models.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberFieldValidation
