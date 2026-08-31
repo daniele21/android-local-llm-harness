@@ -9,6 +9,8 @@ import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -22,6 +24,14 @@ interface ConsumerControlPlaneHost {
     fun assignedUseCases(applicationId: ApplicationId): ConsumerAssignedUseCasesResult
 
     fun publishedPresets(applicationId: ApplicationId, useCaseId: UseCaseId): ConsumerPublishedPresetsResult
+
+    fun resolveSetup(applicationId: ApplicationId, request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult =
+        ConsumerSetupResolutionResult.Rejected(
+            ConsumerControlPlaneFailure(
+                ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
+                "Consumer setup resolution is unavailable",
+            ),
+        )
 
     fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult
 
@@ -65,6 +75,20 @@ internal class ConsumerControlPlaneHostOperations(
         requireHost(host, request).publishedPresets(caller.applicationId, useCaseId).toConsumerControlPlaneWire(request.operationId)
     }
 
+    fun resolveSetup(
+        caller: AuthorizedCaller,
+        request: ConsumerControlPlaneRequestParcel,
+        callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
+    ) = submit(caller, request, callback, BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1) {
+        val setupRequest = request.toCoreSetupResolutionRequestOrNull() ?: return@submit invalidRequest(request)
+        if (!caller.allows(setupRequest.useCaseId)) {
+            return@submit unauthorizedSetupResolution(request)
+        }
+        requireHost(host, request)
+            .resolveSetup(caller.applicationId, setupRequest)
+            .toConsumerControlPlaneWire(request.operationId)
+    }
+
     fun activate(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
@@ -95,6 +119,7 @@ internal class ConsumerControlPlaneHostOperations(
         caller: AuthorizedCaller,
         request: ConsumerControlPlaneRequestParcel,
         callback: HostResultCallback<ConsumerControlPlaneResultParcel>,
+        requiredFeature: String = BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
         block: (HostClientToken) -> ConsumerControlPlaneResultParcel,
     ) {
         val token = runCatching { HostClientToken(request.clientToken.value) }.getOrNull()
@@ -105,13 +130,7 @@ internal class ConsumerControlPlaneHostOperations(
         controlExecutor.submitOrReject(
             onRejected = { callback.onResult(failure(request, WireErrorCodes.TRANSPORT_FAILURE)) },
         ) {
-            when (
-                val support = ledger.supportsFeature(
-                    token,
-                    caller,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                )
-            ) {
+            when (val support = ledger.supportsFeature(token, caller, requiredFeature)) {
                 is LedgerResult.Failure -> callback.onResult(failure(request, WireErrorCodes.CLIENT_TOKEN_INVALID))
 
                 is LedgerResult.Success -> {
@@ -131,7 +150,17 @@ internal class ConsumerControlPlaneHostOperations(
 private fun requireHost(host: ConsumerControlPlaneHost?, request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneHost =
     host ?: error("Consumer control plane is unavailable for ${request.operationId}")
 
-private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): ConsumerActivationRequest? {
+private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): ConsumerActivationRequest? =
+    toCoreSetupResolutionRequestOrNull()?.let { setup ->
+        ConsumerActivationRequest(
+            useCaseId = setup.useCaseId,
+            useCaseRevision = setup.useCaseRevision,
+            bindingRevision = setup.bindingRevision,
+            preset = setup.preset,
+        )
+    }
+
+private fun ConsumerControlPlaneRequestParcel.toCoreSetupResolutionRequestOrNull(): ConsumerSetupResolutionRequest? {
     val useCase = useCaseId?.takeIf(String::isNotBlank)
     val useCaseRevisionValue = useCaseRevision?.takeIf { it > 0 }
     val bindingRevisionValue = bindingRevision?.takeIf { it > 0 }
@@ -139,7 +168,7 @@ private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): C
     val hasIdentity = useCase != null && presetValue != null
     val hasRevisions = useCaseRevisionValue != null && bindingRevisionValue != null
     if (!hasIdentity || !hasRevisions) return null
-    return ConsumerActivationRequest(
+    return ConsumerSetupResolutionRequest(
         useCaseId = UseCaseId(requireNotNull(useCase)),
         useCaseRevision = requireNotNull(useCaseRevisionValue),
         bindingRevision = requireNotNull(bindingRevisionValue),
@@ -149,6 +178,10 @@ private fun ConsumerControlPlaneRequestParcel.toCoreActivationRequestOrNull(): C
 
 private fun unauthorizedPresetDiscovery(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
     ConsumerPublishedPresetsResult.Rejected(unauthorizedUseCaseFailure())
+        .toConsumerControlPlaneWire(request.operationId)
+
+private fun unauthorizedSetupResolution(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
+    ConsumerSetupResolutionResult.Rejected(unauthorizedUseCaseFailure())
         .toConsumerControlPlaneWire(request.operationId)
 
 private fun unauthorizedActivation(request: ConsumerControlPlaneRequestParcel): ConsumerControlPlaneResultParcel =
