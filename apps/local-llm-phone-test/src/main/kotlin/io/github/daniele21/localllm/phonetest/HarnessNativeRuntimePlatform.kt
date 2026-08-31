@@ -11,13 +11,9 @@ import java.io.File
 
 /** Production runtime factory shared by the ordinary debug and release phone variants. */
 internal object HarnessNativeRuntimePlatform {
-    fun modelStore(context: Context): ModelStore =
-        FileSystemModelStore(File(context.noBackupFilesDir, MODEL_STORE_DIRECTORY))
+    fun modelStore(context: Context): ModelStore = FileSystemModelStore(File(context.noBackupFilesDir, MODEL_STORE_DIRECTORY))
 
-    fun backend(
-        context: Context,
-        activationResidency: ActivationResidencyCoordinator,
-    ): InferenceBackend {
+    fun backend(context: Context, activationResidency: ActivationResidencyCoordinator): InferenceBackend {
         val nativeLibraryDirectory = File(context.applicationInfo.nativeLibraryDir)
         require(nativeLibraryDirectory.isDirectory) { "Native library directory is unavailable" }
         return ActivationResidencyInferenceBackend(
