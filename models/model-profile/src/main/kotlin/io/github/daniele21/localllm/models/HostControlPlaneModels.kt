@@ -123,16 +123,18 @@ data class PresetGenerationOverrides(
 ) {
     init {
         require(maxOutputTokens == null || maxOutputTokens > 0) { "Maximum output tokens override must be positive" }
-        require(temperature == null || temperature.isFinite() && temperature in 0f..2f) {
+        require(temperature == null || (temperature.isFinite() && temperature in 0f..2f)) {
             "Temperature override must be in [0, 2]"
         }
-        require(topP == null || topP.isFinite() && topP > 0f && topP <= 1f) { "Top-p override must be in (0, 1]" }
+        require(topP == null || (topP.isFinite() && topP > 0f && topP <= 1f)) {
+            "Top-p override must be in (0, 1]"
+        }
         require(topK == null || topK in 0..1_000) { "Top-k override must be in [0, 1000]" }
-        require(minP == null || minP.isFinite() && minP in 0f..1f) { "Min-p override must be in [0, 1]" }
-        require(presencePenalty == null || presencePenalty.isFinite() && presencePenalty in 0f..2f) {
+        require(minP == null || (minP.isFinite() && minP in 0f..1f)) { "Min-p override must be in [0, 1]" }
+        require(presencePenalty == null || (presencePenalty.isFinite() && presencePenalty in 0f..2f)) {
             "Presence penalty override must be in [0, 2]"
         }
-        require(repeatPenalty == null || repeatPenalty.isFinite() && repeatPenalty in 1f..2f) {
+        require(repeatPenalty == null || (repeatPenalty.isFinite() && repeatPenalty in 1f..2f)) {
             "Repeat penalty override must be in [1, 2]"
         }
         require(repeatLastN == null || repeatLastN in 0..4_096) { "Repeat window override must be in [0, 4096]" }
