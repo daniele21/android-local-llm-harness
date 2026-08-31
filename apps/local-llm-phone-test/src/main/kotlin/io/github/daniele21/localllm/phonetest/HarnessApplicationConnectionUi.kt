@@ -3,6 +3,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
@@ -57,7 +57,7 @@ internal fun NavGraphBuilder.installNewApplicationConnectionRoute(
 
 @Composable
 internal fun activityApplicationsViewModel(): HarnessApplicationsReadViewModel {
-    val owner = LocalContext.current as? ComponentActivity
+    val owner = LocalActivity.current as? ComponentActivity
         ?: error("Application control-plane routes require a ComponentActivity owner")
     return viewModel(viewModelStoreOwner = owner)
 }
