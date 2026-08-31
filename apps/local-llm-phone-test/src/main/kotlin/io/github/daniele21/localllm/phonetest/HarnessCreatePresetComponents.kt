@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessKeyValueRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessRecoveryCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
@@ -177,22 +178,17 @@ private fun HarnessModelOptionCard(
 
 @Composable
 internal fun HarnessContextTokensField(value: String, valid: Boolean, enabled: Boolean, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
+    HarnessNumberField(
         value = value,
         onValueChange = onValueChange,
+        label = "Context tokens",
         modifier = Modifier.fillMaxWidth().testTag("custom-preset-context"),
         enabled = enabled,
-        singleLine = true,
         isError = !valid,
-        label = { Text("Context tokens") },
-        supportingText = {
-            Text(
-                if (valid) {
-                    "Blank uses the use-case default. The canonical minimum is enforced when saved."
-                } else {
-                    "Enter a positive whole number or leave the field blank."
-                },
-            )
+        supportingText = if (valid) {
+            "Blank uses the use-case default. The canonical minimum is enforced when saved."
+        } else {
+            "Enter a positive whole number or leave the field blank."
         },
     )
 }
@@ -202,7 +198,7 @@ internal fun HarnessEffectivePresetConfigurationCard(summary: HarnessPresetConfi
     HarnessCard(modifier = Modifier.testTag("custom-preset-effective-configuration")) {
         Text("Effective generation configuration", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Projected from the selected canonical inference profile and runtime model tier. These values are not duplicated as editable UI state.",
+            "Preview of the selected base profile after applying your model, context and generation overrides.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
