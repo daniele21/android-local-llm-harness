@@ -18,6 +18,11 @@ class HarnessApplicationNavigationTest {
     }
 
     @Test
+    fun `new application connection route is static and serializes no identity`() {
+        assertEquals("applications/new", HarnessApplicationRoutes.newApplication())
+    }
+
+    @Test
     fun `assignment and preset routes preserve independent opaque identities`() {
         val applicationId = "redactguard"
         val useCaseId = "document/pii detection"
