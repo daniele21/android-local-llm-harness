@@ -44,7 +44,9 @@ fun HarnessNumberField(
         singleLine = true,
         isError = isError,
         label = { Text(label) },
-        supportingText = supportingText?.let { detail -> { Text(detail) } },
+        supportingText = supportingText?.let { detail ->
+            { Text(detail) }
+        },
         keyboardOptions = KeyboardOptions(
             keyboardType = when (mode) {
                 HarnessNumberInputMode.INTEGER -> KeyboardType.Number
@@ -58,6 +60,7 @@ fun normalizeHarnessNumberInput(candidate: String, mode: HarnessNumberInputMode)
     if (candidate.isEmpty()) return ""
     return when (mode) {
         HarnessNumberInputMode.INTEGER -> candidate.takeIf { value -> value.all(Char::isDigit) }
+
         HarnessNumberInputMode.DECIMAL -> {
             val normalized = candidate.replace(',', '.')
             normalized.takeIf { value ->
