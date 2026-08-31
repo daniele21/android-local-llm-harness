@@ -1,10 +1,13 @@
 # Background/process lifecycle hardening
 
 Status: active
-Document type: workstream
+Document type: workstream-state
 Owner: shared-runtime/runtime lifecycle
 Canonical scope: workstream.background-process-lifecycle
-Started: 2026-08-31
+Read when: coordinating detached inference-job, Binder reconnect, host background execution or process-recovery implementation
+Last reviewed: 2026-08-31
+
+Repository priority and integrated/blocker truth remain owned by [`../current-state.md`](../current-state.md). This workstream coordinates only the bounded implementation sequence.
 
 ## Outcome
 
@@ -23,6 +26,17 @@ Canonical architectural decision: [ADR 0016](../adr/0016-detached-shared-runtime
 - Persistent metadata is privacy-safe only; prompt/document/generated content is not added to durable storage or normal evidence.
 - Real device behavior is not inferred from emulator/CI evidence.
 
+## Resource ownership target
+
+| Resource | Semantic owner | Transport loss | Terminal/cleanup owner |
+| --- | --- | --- | --- |
+| Binder registration/death link/callback dispatcher | connection | removed | connection cleanup |
+| logical inference job | host job registry | survives | explicit terminal/job policy |
+| active generation handle | logical job | survives observer loss | job terminal/cancel/runtime policy |
+| session retained by active job | logical job/runtime | survives | job terminal/session policy |
+| idle client session | authenticated client/session policy | bounded cleanup allowed | session policy |
+| loaded model | runtime residency policy | unaffected | explicit unload/idle/pressure/shutdown |
+
 ## Parallel lanes
 
 ### Lane A — architecture and ownership
@@ -30,17 +44,19 @@ Canonical architectural decision: [ADR 0016](../adr/0016-detached-shared-runtime
 | ID | State | Task |
 | --- | --- | --- |
 | HBG-00 | DONE | Accept successor ADR separating Binder/client lifetime from logical jobs/runtime lifetime. |
-| HBG-01 | IN_PROGRESS | Align ADR index, implementation plan, shared-runtime host specification and current state with active shared service + detached-job target. |
-| HBG-10 | IN_PROGRESS | Document/test resource ownership matrix for connection, logical job, session, request handle and model residency. |
+| HBG-01 | IN_PROGRESS | Align ADR index, implementation plan, shared-runtime host specification/architecture/target and current state with active shared service + detached-job target. |
+| HBG-10 | DONE | Freeze resource ownership matrix for connection, logical job, session, request handle and model residency. |
 
 ### Lane B — logical job foundation
 
 | ID | State | Task |
 | --- | --- | --- |
-| HBG-20 | IN_PROGRESS | Add backend-neutral host logical job identity/state/revision/attempt primitives. |
-| HBG-21 | IN_PROGRESS | Add deterministic transition/idempotency tests including stale-revision rejection. |
-| HBG-22 | TODO | Introduce bounded process-local job registry independent from Binder callbacks. |
-| HBG-23 | TODO | Add authenticated caller-scoped idempotency key lookup and duplicate-submit convergence. |
+| HBG-20 | DONE | Add host logical job identity/state/revision/attempt/runtime-session primitives. |
+| HBG-21 | DONE | Add deterministic transition/idempotency tests including stale-revision rejection. |
+| HBG-22 | DONE | Introduce bounded process-local job registry independent from Binder callbacks. |
+| HBG-23 | DONE | Add authenticated application/use-case-scoped idempotency lookup and duplicate-submit convergence. |
+
+The foundation is deliberately not wired into AIDL yet: connection-owned request/session cleanup remains unchanged until the logical-job protocol can query/reattach/cancel safely, preventing orphaned native work.
 
 ### Lane C — transport/session decoupling
 
@@ -95,7 +111,7 @@ Canonical architectural decision: [ADR 0016](../adr/0016-detached-shared-runtime
 
 ## Documentation impact
 
-Expected durable owners: ADR index, shared-runtime host specification/architecture, implementation plan, Consumer SDK/API docs, `.engineering/e2e.json`, current state and affected README usage only if public setup/behavior changes. Stable repository mission/positioning remains unchanged.
+Expected durable owners: ADR index, shared-runtime host specification/architecture/target, implementation plan, Consumer SDK/API docs, `.engineering/e2e.json`, current state and affected README usage only if public setup/behavior changes. Stable repository mission/positioning remains unchanged.
 
 ## Validation
 
