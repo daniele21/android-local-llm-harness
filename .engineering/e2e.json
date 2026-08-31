@@ -54,6 +54,22 @@
       ]
     },
     {
+      "id": "shared-runtime-two-apk-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "real Harness app/Service/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend and pre-provisioned ModelStore, consumed by a separately installed same-signer Consumer APK",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "known_gaps": [
+        "x86_64 emulator does not execute the production arm64-v8a llama.cpp/JNI backend",
+        "GGUF bytes and native generation are replaced by a deterministic emulator backend",
+        "physical memory, thermal and OEM behavior remain unrepresented",
+        "the emulator ModelStore deliberately mirrors production find/snapshot semantics by exposing present models with verified=false and leaving integrity verification to RuntimeOrchestrator prepare"
+      ]
+    },
+    {
       "id": "phone-cold-start-api35-emulator",
       "fidelity_class": "simulated_or_emulated",
       "automation": "automated",
@@ -95,9 +111,26 @@
       ],
       "minimum_automated_fidelity": "simulated_or_emulated",
       "residual_gaps": [
-        "full cross-process/two-application service lifecycle remains a stronger journey than Parcelable contract evidence"
+        "full two-application behavior is owned by the separate shared-runtime-consumer-roundtrip journey"
       ],
       "real_environment_confirmation": "conditional",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "shared-runtime-consumer-roundtrip",
+      "claim": "A separately installed same-signer Consumer can discover the real Harness Service, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, release and recover across Host restart without a fake Consumer runtime.",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "automated_environment_refs": [
+        "shared-runtime-two-apk-api35-emulator"
+      ],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": [
+        "production ARM64 JNI/llama.cpp execution and real GGUF byte loading remain physical",
+        "physical memory, thermal and OEM lifecycle fidelity remain physical"
+      ],
+      "real_environment_confirmation": "required",
       "automation_gap_reason": null
     },
     {
