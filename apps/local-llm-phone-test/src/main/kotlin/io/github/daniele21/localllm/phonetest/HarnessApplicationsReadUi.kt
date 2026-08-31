@@ -197,8 +197,9 @@ private fun HarnessConnectionControlCard(
     saving: Boolean,
     onConnectionEnabledChanged: (Boolean) -> Unit,
 ) {
-    val toggleSupported = application.status == HarnessApplicationStatus.AUTHORIZED ||
-        application.status == HarnessApplicationStatus.DISABLED
+    val toggleSupported =
+        application.status == HarnessApplicationStatus.AUTHORIZED ||
+            application.status == HarnessApplicationStatus.DISABLED
     val enabled = application.status == HarnessApplicationStatus.AUTHORIZED
     HarnessCard(modifier = Modifier.testTag("application-connection-control")) {
         Row(
@@ -246,15 +247,18 @@ private fun HarnessApplicationMutationFeedback(
 ) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
+
         HarnessApplicationsMutationState.Saving -> HarnessCard {
             HarnessStatusBadge("Updating", HarnessStatusTone.INFO)
             Text("Saving the connection state and re-reading the control plane.")
         }
+
         is HarnessApplicationsMutationState.Saved -> HarnessCard(emphasized = true) {
             HarnessStatusBadge("Saved", HarnessStatusTone.SUCCESS)
             Text(state.message)
             HarnessSecondaryButton("Dismiss", onClick = onDismiss)
         }
+
         is HarnessApplicationsMutationState.Conflict -> HarnessRecoveryCard(
             title = "Configuration changed",
             detail = state.message,
@@ -262,6 +266,7 @@ private fun HarnessApplicationMutationFeedback(
             onAction = onReload,
             tone = HarnessStatusTone.WARNING,
         )
+
         is HarnessApplicationsMutationState.Failed -> HarnessRecoveryCard(
             title = "Connection not updated",
             detail = state.message,
