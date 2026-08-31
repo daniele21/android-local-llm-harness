@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.SessionKind
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.ApplicationUseCaseBinding
@@ -18,7 +19,6 @@ import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.PresetSeedMode
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.StoredPresetExposure
-import io.github.daniele21.localllm.models.ThinkingMode
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseDefinition
 import io.github.daniele21.localllm.models.UseCaseDefinitionState
