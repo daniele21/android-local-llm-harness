@@ -84,10 +84,12 @@ internal class StoreHarnessCustomPresetGateway(
 
 private sealed interface CustomPresetIdentity {
     data class Valid(val applicationId: ApplicationId, val useCaseId: UseCaseId) : CustomPresetIdentity
+
     data class Rejected(val message: String) : CustomPresetIdentity
 }
 
 private data class CustomPresetAssignment(val binding: ApplicationUseCaseBinding, val useCase: UseCaseDefinition)
+
 private data class CustomPresetFields(val presetId: String, val displayName: String, val modelProfileId: String?)
 
 private fun HarnessCreateCustomPresetCommand.identity(): CustomPresetIdentity {
@@ -157,7 +159,9 @@ private fun HostControlPlaneState.resolveCustomPresetFields(
 
 private fun HostControlPlaneState.validatePresetId(rawPresetId: String, useCaseId: UseCaseId): String {
     val presetId = rawPresetId.trim()
-    if (presetId.isBlank()) throw CustomPresetRejected("Preset identity is invalid")
+    if (presetId.isBlank()) {
+        throw CustomPresetRejected("Preset identity is invalid")
+    }
     if (presets.any { it.useCaseId == useCaseId && it.metadata.presetId == presetId }) {
         throw CustomPresetRejected("Preset identity is already in use")
     }
@@ -205,22 +209,30 @@ private object CustomPresetValidation {
         if (binding.revision != expectedRevision) {
             throw CustomPresetStaleBindingRevision(expectedRevision, binding.revision)
         }
-        if (!binding.enabled) throw CustomPresetRejected("Assignment is disabled")
+        if (!binding.enabled) {
+            throw CustomPresetRejected("Assignment is disabled")
+        }
     }
 
     fun useCase(useCase: UseCaseDefinition) {
-        if (useCase.state != UseCaseDefinitionState.ACTIVE) throw CustomPresetRejected("Use case is not active")
+        if (useCase.state != UseCaseDefinitionState.ACTIVE) {
+            throw CustomPresetRejected("Use case is not active")
+        }
     }
 
     fun displayName(rawDisplayName: String): String {
         val displayName = rawDisplayName.trim()
-        if (displayName.isBlank()) throw CustomPresetRejected("Preset name is required")
+        if (displayName.isBlank()) {
+            throw CustomPresetRejected("Preset name is required")
+        }
         return displayName
     }
 
     fun modelProfileId(rawModelProfileId: String?): String? {
         val modelProfileId = rawModelProfileId?.trim()
-        if (modelProfileId != null && modelProfileId.isBlank()) throw CustomPresetRejected("Model profile identity is invalid")
+        if (modelProfileId != null && modelProfileId.isBlank()) {
+            throw CustomPresetRejected("Model profile identity is invalid")
+        }
         return modelProfileId
     }
 
@@ -234,5 +246,7 @@ private object CustomPresetValidation {
 }
 
 private class CustomPresetStaleBindingRevision(val expectedRevision: Int, val actualRevision: Int) : RuntimeException()
+
 private class CustomPresetRejected(message: String) : RuntimeException(message)
+
 private const val FIRST_CUSTOM_PRESET_REVISION = 1
