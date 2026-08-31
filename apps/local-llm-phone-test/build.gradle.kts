@@ -66,10 +66,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
         buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
     }
 
     signingConfigs {
@@ -90,14 +86,29 @@ android {
             versionNameSuffix = "-debug"
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeDebugPermission
             buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeDebugPermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
         release {
             isDebuggable = false
             isMinifyEnabled = false
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
             buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
             if (phoneTestUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
+            }
+        }
+        create("emulatorE2e") {
+            initWith(getByName("debug"))
+            versionNameSuffix = "-emulator-e2e"
+            matchingFallbacks += listOf("debug")
+            ndk {
+                abiFilters.clear()
+                abiFilters += "x86_64"
             }
         }
     }
