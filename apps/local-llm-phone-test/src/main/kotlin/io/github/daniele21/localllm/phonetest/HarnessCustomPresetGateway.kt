@@ -88,9 +88,16 @@ private sealed interface CustomPresetIdentity {
     data class Rejected(val message: String) : CustomPresetIdentity
 }
 
-private data class CustomPresetAssignment(val binding: ApplicationUseCaseBinding, val useCase: UseCaseDefinition)
+private data class CustomPresetAssignment(
+    val binding: ApplicationUseCaseBinding,
+    val useCase: UseCaseDefinition,
+)
 
-private data class CustomPresetFields(val presetId: String, val displayName: String, val modelProfileId: String?)
+private data class CustomPresetFields(
+    val presetId: String,
+    val displayName: String,
+    val modelProfileId: String?,
+)
 
 private fun HarnessCreateCustomPresetCommand.identity(): CustomPresetIdentity {
     val parsedApplicationId = runCatching { ApplicationId(applicationId) }.getOrElse {
@@ -151,11 +158,12 @@ private fun HostControlPlaneState.resolveBasePreset(
 private fun HostControlPlaneState.resolveCustomPresetFields(
     command: HarnessCreateCustomPresetCommand,
     useCaseId: UseCaseId,
-): CustomPresetFields = CustomPresetFields(
-    presetId = validatePresetId(command.presetId, useCaseId),
-    displayName = CustomPresetValidation.displayName(command.displayName),
-    modelProfileId = CustomPresetValidation.modelProfileId(command.modelProfileId),
-)
+): CustomPresetFields =
+    CustomPresetFields(
+        presetId = validatePresetId(command.presetId, useCaseId),
+        displayName = CustomPresetValidation.displayName(command.displayName),
+        modelProfileId = CustomPresetValidation.modelProfileId(command.modelProfileId),
+    )
 
 private fun HostControlPlaneState.validatePresetId(rawPresetId: String, useCaseId: UseCaseId): String {
     val presetId = rawPresetId.trim()
@@ -173,36 +181,38 @@ private fun buildCustomPreset(
     useCaseId: UseCaseId,
     basePreset: UseCasePresetDefinition,
     fields: CustomPresetFields,
-): UseCasePresetDefinition = UseCasePresetDefinition(
-    useCaseId = useCaseId,
-    metadata = PresetConsumerMetadata(
-        presetId = fields.presetId,
-        revision = FIRST_CUSTOM_PRESET_REVISION,
-        displayName = fields.displayName,
-        description = "Custom configuration based on ${basePreset.metadata.displayName}",
-    ),
-    creationSource = PresetCreationSource.CUSTOM,
-    state = PresetLifecycleState.PUBLISHED,
-    execution = basePreset.execution.copy(
-        modelProfileId = fields.modelProfileId,
-        contextTokens = command.contextTokens,
-        generationOverrides = command.generationOverrides?.takeUnless(PresetGenerationOverrides::isEmpty),
-    ),
-)
+): UseCasePresetDefinition =
+    UseCasePresetDefinition(
+        useCaseId = useCaseId,
+        metadata = PresetConsumerMetadata(
+            presetId = fields.presetId,
+            revision = FIRST_CUSTOM_PRESET_REVISION,
+            displayName = fields.displayName,
+            description = "Custom configuration based on ${basePreset.metadata.displayName}",
+        ),
+        creationSource = PresetCreationSource.CUSTOM,
+        state = PresetLifecycleState.PUBLISHED,
+        execution = basePreset.execution.copy(
+            modelProfileId = fields.modelProfileId,
+            contextTokens = command.contextTokens,
+            generationOverrides = command.generationOverrides?.takeUnless { it.isEmpty },
+        ),
+    )
 
 private fun HostControlPlaneState.addCustomPreset(
     binding: ApplicationUseCaseBinding,
     customPreset: UseCasePresetDefinition,
-): HostControlPlaneState = copy(
-    presets = presets + customPreset,
-    exposures = exposures + StoredPresetExposure(
-        bindingId = binding.bindingId,
-        bindingRevision = binding.revision,
-        presetId = customPreset.metadata.presetId,
-        presetRevision = customPreset.metadata.revision,
-        isDefault = false,
-    ),
-)
+): HostControlPlaneState =
+    copy(
+        presets = presets + customPreset,
+        exposures = exposures + StoredPresetExposure(
+            bindingId = binding.bindingId,
+            bindingRevision = binding.revision,
+            presetId = customPreset.metadata.presetId,
+            presetRevision = customPreset.metadata.revision,
+            isDefault = false,
+        ),
+    )
 
 private object CustomPresetValidation {
     fun binding(expectedRevision: Int, binding: ApplicationUseCaseBinding) {
