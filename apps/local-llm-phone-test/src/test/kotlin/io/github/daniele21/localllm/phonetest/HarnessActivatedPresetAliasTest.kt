@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
 import io.github.daniele21.localllm.contracts.ConsumerActivationResult
+import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
@@ -102,12 +103,12 @@ class HarnessActivatedPresetAliasTest {
     }
 
     @Test
-    fun `host activation installs public preset alias over canonical profile`() {
+    fun `host activation accepts present unverified inventory and leaves integrity verification to runtime prepare`() {
         val fixture = controlPlaneFixture()
         val runtimeControl = RecordingRuntimeControl()
         val host = HarnessConsumerControlPlaneHost(
             store = InMemoryHostControlPlaneStore(fixture.state),
-            modelStore = ReadOnlyVerifiedModelStore(fixture.storedModel),
+            modelStore = ReadOnlyPresentModelStore(fixture.storedModel),
             runtimeControl = runtimeControl,
             epochClock = { 100L },
         )
@@ -115,12 +116,7 @@ class HarnessActivatedPresetAliasTest {
         val result = host.activate(
             ownerId = "redactguard-connection",
             applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-            request = ConsumerActivationRequest(
-                useCaseId = fixture.spec.useCase.useCaseId,
-                useCaseRevision = fixture.spec.useCase.revision,
-                bindingRevision = fixture.bindingRevision,
-                preset = fixture.publicPreset,
-            ),
+            request = activationRequest(fixture),
         )
 
         assertTrue(result is ConsumerActivationResult.Activated)
@@ -129,6 +125,36 @@ class HarnessActivatedPresetAliasTest {
         assertEquals(fixture.publicPreset, installed.useCase.presets.single().ref)
         assertEquals(fixture.storedModel.digest, installed.model.artifact.digest)
     }
+
+    @Test
+    fun `host activation still rejects genuinely missing model inventory`() {
+        val fixture = controlPlaneFixture()
+        val host = HarnessConsumerControlPlaneHost(
+            store = InMemoryHostControlPlaneStore(fixture.state),
+            modelStore = EmptyModelStore,
+            runtimeControl = RecordingRuntimeControl(),
+            epochClock = { 100L },
+        )
+
+        val result = host.activate(
+            ownerId = "redactguard-connection",
+            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            request = activationRequest(fixture),
+        )
+
+        assertTrue(result is ConsumerActivationResult.Rejected)
+        assertEquals(
+            ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+            (result as ConsumerActivationResult.Rejected).failure.code,
+        )
+    }
+
+    private fun activationRequest(fixture: ControlPlaneFixture) = ConsumerActivationRequest(
+        useCaseId = fixture.spec.useCase.useCaseId,
+        useCaseRevision = fixture.spec.useCase.revision,
+        bindingRevision = fixture.bindingRevision,
+        preset = fixture.publicPreset,
+    )
 
     private fun resolvedOmbra(): ResolvedUseCase = HarnessSharedRuntimeBindings.resolveOmbra(
         importedModel(),
@@ -166,7 +192,7 @@ class HarnessActivatedPresetAliasTest {
             digest = artifact.digest,
             file = File("unused-test-model.gguf"),
             sizeBytes = artifact.sizeBytes,
-            verified = true,
+            verified = false,
         )
         val state = HostControlPlaneState(
             applications = listOf(requirement.newRegistration(0L)),
@@ -240,7 +266,7 @@ private class RecordingRuntimeControl : HarnessConsumerRuntimeControl {
     }
 }
 
-private class ReadOnlyVerifiedModelStore(private val storedModel: StoredModel) : ModelStore {
+private class ReadOnlyPresentModelStore(private val storedModel: StoredModel) : ModelStore {
     override fun find(digest: ModelDigest): StoredModel? = storedModel.takeIf { it.digest == digest }
 
     override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(
@@ -252,7 +278,25 @@ private class ReadOnlyVerifiedModelStore(private val storedModel: StoredModel) :
     override fun import(source: File, artifact: io.github.daniele21.localllm.models.GgufArtifact): StoredModel =
         error("Activation must not import model bytes")
 
-    override fun verify(digest: ModelDigest): VerificationResult = error("Activation must not re-verify model bytes")
+    override fun verify(digest: ModelDigest): VerificationResult =
+        error("Control Plane activation must not hash model bytes; RuntimeOrchestrator prepare owns integrity verification")
+
+    override fun remove(digest: ModelDigest): Boolean = error("Activation must not remove model bytes")
+}
+
+private object EmptyModelStore : ModelStore {
+    override fun find(digest: ModelDigest): StoredModel? = null
+
+    override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(
+        modelCount = 0,
+        totalBytes = 0,
+        entries = emptyList(),
+    )
+
+    override fun import(source: File, artifact: io.github.daniele21.localllm.models.GgufArtifact): StoredModel =
+        error("Activation must not import model bytes")
+
+    override fun verify(digest: ModelDigest): VerificationResult = error("Missing inventory must not be verified during activation")
 
     override fun remove(digest: ModelDigest): Boolean = error("Activation must not remove model bytes")
 }
