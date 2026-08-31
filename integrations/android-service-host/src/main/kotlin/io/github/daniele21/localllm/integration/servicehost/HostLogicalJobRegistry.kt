@@ -87,10 +87,7 @@ internal data class HostLogicalJobTransition(
 )
 
 internal object HostLogicalJobLifecycle {
-    fun apply(
-        current: HostLogicalJobSnapshot,
-        transition: HostLogicalJobTransition,
-    ): HostLogicalJobSnapshot {
+    fun apply(current: HostLogicalJobSnapshot, transition: HostLogicalJobTransition): HostLogicalJobSnapshot {
         if (transition.revision <= current.revision) return current
         require(transition.attempt >= current.attempt) { "Logical job attempt cannot move backwards" }
 
@@ -124,10 +121,7 @@ internal object HostLogicalJobLifecycle {
         )
     }
 
-    fun interruptStaleRuntime(
-        current: HostLogicalJobSnapshot,
-        activeRuntimeSessionId: HostRuntimeSessionId,
-    ): HostLogicalJobSnapshot {
+    fun interruptStaleRuntime(current: HostLogicalJobSnapshot, activeRuntimeSessionId: HostRuntimeSessionId): HostLogicalJobSnapshot {
         if (current.isTerminal || current.runtimeSessionId == activeRuntimeSessionId) return current
         return current.copy(
             state = HostLogicalJobState.INTERRUPTED,
@@ -135,53 +129,56 @@ internal object HostLogicalJobLifecycle {
         )
     }
 
-    private fun allowedNextStates(state: HostLogicalJobState): Set<HostLogicalJobState> =
-        when (state) {
-            HostLogicalJobState.QUEUED -> {
-                setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
-            }
-
-            HostLogicalJobState.PREPARING -> {
-                setOf(
-                    HostLogicalJobState.RUNNING,
-                    HostLogicalJobState.CANCEL_REQUESTED,
-                    HostLogicalJobState.FAILED_RETRYABLE,
-                    HostLogicalJobState.INTERRUPTED,
-                    HostLogicalJobState.FAILED_FINAL,
-                )
-            }
-
-            HostLogicalJobState.RUNNING -> {
-                setOf(
-                    HostLogicalJobState.SUCCEEDED,
-                    HostLogicalJobState.CANCEL_REQUESTED,
-                    HostLogicalJobState.FAILED_RETRYABLE,
-                    HostLogicalJobState.INTERRUPTED,
-                    HostLogicalJobState.FAILED_FINAL,
-                )
-            }
-
-            HostLogicalJobState.CANCEL_REQUESTED -> {
-                setOf(HostLogicalJobState.CANCELLED, HostLogicalJobState.SUCCEEDED, HostLogicalJobState.FAILED_FINAL)
-            }
-
-            HostLogicalJobState.FAILED_RETRYABLE,
-            HostLogicalJobState.INTERRUPTED,
-            -> {
-                setOf(HostLogicalJobState.RECOVERING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
-            }
-
-            HostLogicalJobState.RECOVERING -> {
-                setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
-            }
-
-            HostLogicalJobState.SUCCEEDED,
-            HostLogicalJobState.CANCELLED,
-            HostLogicalJobState.FAILED_FINAL,
-            -> {
-                emptySet()
-            }
+    private fun allowedNextStates(state: HostLogicalJobState): Set<HostLogicalJobState> = when (state) {
+        HostLogicalJobState.QUEUED -> {
+            setOf(
+                HostLogicalJobState.PREPARING,
+                HostLogicalJobState.CANCEL_REQUESTED,
+                HostLogicalJobState.FAILED_FINAL,
+            )
         }
+
+        HostLogicalJobState.PREPARING -> {
+            setOf(
+                HostLogicalJobState.RUNNING,
+                HostLogicalJobState.CANCEL_REQUESTED,
+                HostLogicalJobState.FAILED_RETRYABLE,
+                HostLogicalJobState.INTERRUPTED,
+                HostLogicalJobState.FAILED_FINAL,
+            )
+        }
+
+        HostLogicalJobState.RUNNING -> {
+            setOf(
+                HostLogicalJobState.SUCCEEDED,
+                HostLogicalJobState.CANCEL_REQUESTED,
+                HostLogicalJobState.FAILED_RETRYABLE,
+                HostLogicalJobState.INTERRUPTED,
+                HostLogicalJobState.FAILED_FINAL,
+            )
+        }
+
+        HostLogicalJobState.CANCEL_REQUESTED -> {
+            setOf(HostLogicalJobState.CANCELLED, HostLogicalJobState.SUCCEEDED, HostLogicalJobState.FAILED_FINAL)
+        }
+
+        HostLogicalJobState.FAILED_RETRYABLE,
+        HostLogicalJobState.INTERRUPTED,
+        -> {
+            setOf(HostLogicalJobState.RECOVERING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+        }
+
+        HostLogicalJobState.RECOVERING -> {
+            setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+        }
+
+        HostLogicalJobState.SUCCEEDED,
+        HostLogicalJobState.CANCELLED,
+        HostLogicalJobState.FAILED_FINAL,
+        -> {
+            emptySet()
+        }
+    }
 }
 
 internal data class HostLogicalJobSubmission(
