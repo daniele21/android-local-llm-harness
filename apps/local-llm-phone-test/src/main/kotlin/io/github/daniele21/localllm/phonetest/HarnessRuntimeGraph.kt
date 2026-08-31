@@ -242,8 +242,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 internal fun HarnessRuntimeGraph.recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> =
     telemetryRepository.recentRuns(limit)
 
-internal fun HarnessRuntimeGraph.recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> =
-    telemetryRepository.recentLogs(limit)
+internal fun HarnessRuntimeGraph.recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> = telemetryRepository.recentLogs(limit)
 
 internal enum class HarnessRuntimePurpose(val useCaseId: UseCaseId) {
     PLAYGROUND(UseCaseId("manual-inference-playground")),
