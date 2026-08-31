@@ -55,21 +55,24 @@ class HostLogicalJobRegistryTest {
     fun `stale revision cannot overwrite newer job state`() {
         val registry = registry()
         val job = registry.submit(scope, HostClientRequestId("request-1")).snapshot
-        val preparing = registry.transition(
-            scope,
-            job.jobId,
-            HostLogicalJobTransition(HostLogicalJobState.PREPARING, 1, 1, runtimeA),
-        )!!
-        val running = registry.transition(
-            scope,
-            job.jobId,
-            HostLogicalJobTransition(HostLogicalJobState.RUNNING, 2, 1, runtimeA),
-        )!!
-        val stale = registry.transition(
-            scope,
-            job.jobId,
-            HostLogicalJobTransition(HostLogicalJobState.FAILED_FINAL, 1, 1, runtimeA),
-        )!!
+        val preparing =
+            registry.transition(
+                scope,
+                job.jobId,
+                HostLogicalJobTransition(HostLogicalJobState.PREPARING, 1, 1, runtimeA),
+            )!!
+        val running =
+            registry.transition(
+                scope,
+                job.jobId,
+                HostLogicalJobTransition(HostLogicalJobState.RUNNING, 2, 1, runtimeA),
+            )!!
+        val stale =
+            registry.transition(
+                scope,
+                job.jobId,
+                HostLogicalJobTransition(HostLogicalJobState.FAILED_FINAL, 1, 1, runtimeA),
+            )!!
 
         assertEquals(HostLogicalJobState.PREPARING, preparing.state)
         assertEquals(HostLogicalJobState.RUNNING, running.state)
@@ -78,10 +81,11 @@ class HostLogicalJobRegistryTest {
 
     @Test
     fun `runtime session mismatch interrupts non terminal job`() {
-        val job = registry().submit(scope, HostClientRequestId("request-1")).snapshot.copy(
-            state = HostLogicalJobState.RUNNING,
-            revision = 4,
-        )
+        val job =
+            registry().submit(scope, HostClientRequestId("request-1")).snapshot.copy(
+                state = HostLogicalJobState.RUNNING,
+                revision = 4,
+            )
 
         val reconciled = HostLogicalJobLifecycle.interruptStaleRuntime(job, HostRuntimeSessionId("runtime-B"))
 
@@ -92,20 +96,22 @@ class HostLogicalJobRegistryTest {
 
     @Test
     fun `interrupted job starts recovery in new runtime session and increments attempt`() {
-        val interrupted = registry().submit(scope, HostClientRequestId("request-1")).snapshot.copy(
-            state = HostLogicalJobState.INTERRUPTED,
-            revision = 3,
-        )
+        val interrupted =
+            registry().submit(scope, HostClientRequestId("request-1")).snapshot.copy(
+                state = HostLogicalJobState.INTERRUPTED,
+                revision = 3,
+            )
 
-        val recovering = HostLogicalJobLifecycle.apply(
-            interrupted,
-            HostLogicalJobTransition(
-                state = HostLogicalJobState.RECOVERING,
-                revision = 4,
-                attempt = 2,
-                runtimeSessionId = HostRuntimeSessionId("runtime-B"),
-            ),
-        )
+        val recovering =
+            HostLogicalJobLifecycle.apply(
+                interrupted,
+                HostLogicalJobTransition(
+                    state = HostLogicalJobState.RECOVERING,
+                    revision = 4,
+                    attempt = 2,
+                    runtimeSessionId = HostRuntimeSessionId("runtime-B"),
+                ),
+            )
 
         assertEquals(HostLogicalJobState.RECOVERING, recovering.state)
         assertEquals(2, recovering.attempt)
@@ -116,9 +122,21 @@ class HostLogicalJobRegistryTest {
     fun `capacity evicts terminal job but never active job`() {
         val registry = registry(maxJobs = 1)
         val first = registry.submit(scope, HostClientRequestId("first")).snapshot
-        registry.transition(scope, first.jobId, HostLogicalJobTransition(HostLogicalJobState.PREPARING, 1, 1, runtimeA))
-        registry.transition(scope, first.jobId, HostLogicalJobTransition(HostLogicalJobState.RUNNING, 2, 1, runtimeA))
-        registry.transition(scope, first.jobId, HostLogicalJobTransition(HostLogicalJobState.SUCCEEDED, 3, 1, runtimeA))
+        registry.transition(
+            scope,
+            first.jobId,
+            HostLogicalJobTransition(HostLogicalJobState.PREPARING, 1, 1, runtimeA),
+        )
+        registry.transition(
+            scope,
+            first.jobId,
+            HostLogicalJobTransition(HostLogicalJobState.RUNNING, 2, 1, runtimeA),
+        )
+        registry.transition(
+            scope,
+            first.jobId,
+            HostLogicalJobTransition(HostLogicalJobState.SUCCEEDED, 3, 1, runtimeA),
+        )
 
         val second = registry.submit(scope, HostClientRequestId("second"))
 
