@@ -12,9 +12,12 @@ import io.github.daniele21.localllm.models.OutputMode
 import io.github.daniele21.localllm.models.PresetConsumerMetadata
 import io.github.daniele21.localllm.models.PresetCreationSource
 import io.github.daniele21.localllm.models.PresetExecutionPolicy
+import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetLifecycleState
+import io.github.daniele21.localllm.models.PresetSeedMode
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.StoredPresetExposure
+import io.github.daniele21.localllm.models.ThinkingMode
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseDefinition
 import io.github.daniele21.localllm.models.UseCaseDefinitionState
@@ -26,7 +29,7 @@ import org.junit.Test
 
 class HostControlPlaneEntityMapperTest {
     @Test
-    fun `round trip preserves exact revision residency and binding configuration`() {
+    fun `round trip preserves exact revision residency binding and generation configuration`() {
         val expected = state()
 
         val actual = HostControlPlaneEntityMapper.fromEntities(
@@ -35,6 +38,22 @@ class HostControlPlaneEntityMapperTest {
 
         assertEquals(expected.canonical(), actual)
         assertEquals(90_000L, actual.presets.single().execution.cachePolicy.retainModelWarmMs)
+        assertEquals(
+            PresetGenerationOverrides(
+                maxOutputTokens = 768,
+                temperature = 0.45f,
+                topP = 0.82f,
+                topK = 32,
+                minP = 0.04f,
+                presencePenalty = 0.2f,
+                repeatPenalty = 1.1f,
+                repeatLastN = 128,
+                thinkingMode = ThinkingMode.ENABLED,
+                seedMode = PresetSeedMode.FIXED,
+                fixedSeed = 84L,
+            ),
+            actual.presets.single().execution.generationOverrides,
+        )
         assertEquals(7, actual.exposures.single().bindingRevision)
         assertTrue(actual.bindings.single().isDefault)
     }
@@ -83,6 +102,19 @@ class HostControlPlaneEntityMapperTest {
                         reuseStatelessContext = true,
                         enablePrefixSnapshot = false,
                         enableDeterministicResultCache = false,
+                    ),
+                    generationOverrides = PresetGenerationOverrides(
+                        maxOutputTokens = 768,
+                        temperature = 0.45f,
+                        topP = 0.82f,
+                        topK = 32,
+                        minP = 0.04f,
+                        presencePenalty = 0.2f,
+                        repeatPenalty = 1.1f,
+                        repeatLastN = 128,
+                        thinkingMode = ThinkingMode.ENABLED,
+                        seedMode = PresetSeedMode.FIXED,
+                        fixedSeed = 84L,
                     ),
                 ),
             ),
