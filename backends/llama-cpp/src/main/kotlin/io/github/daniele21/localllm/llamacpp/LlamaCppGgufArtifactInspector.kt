@@ -13,9 +13,7 @@ import java.io.File
  * during the phone app cold start, while GGUF inspection is only needed when an artifact is actually installed.
  * Keep the bridge lazy so opening or navigating the Harness never depends on loading the native runtime.
  */
-class LlamaCppGgufArtifactInspector internal constructor(
-    private val bridgeProvider: () -> LlamaCppBridge,
-) : GgufArtifactInspector {
+class LlamaCppGgufArtifactInspector internal constructor(private val bridgeProvider: () -> LlamaCppBridge) : GgufArtifactInspector {
     constructor() : this({ LlamaCppBridge() })
 
     constructor(bridge: LlamaCppBridge) : this({ bridge })
