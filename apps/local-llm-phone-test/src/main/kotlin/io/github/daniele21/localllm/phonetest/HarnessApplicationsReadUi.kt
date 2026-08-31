@@ -240,11 +240,7 @@ private fun HarnessConnectionControlCard(
 }
 
 @Composable
-private fun HarnessApplicationMutationFeedback(
-    state: HarnessApplicationsMutationState,
-    onReload: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun HarnessApplicationMutationFeedback(state: HarnessApplicationsMutationState, onReload: () -> Unit, onDismiss: () -> Unit) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
 
