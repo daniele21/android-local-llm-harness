@@ -6,6 +6,9 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPla
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobQueryParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobSubmitParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
@@ -13,6 +16,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerWireTags
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLogicalJobResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
@@ -129,6 +133,45 @@ internal class ConsumerRuntimeBinderStub(
                 remoteConsumerRuntimeReadinessResultCallback(delegate, caller, request.clientToken, callback),
             )
         }
+
+    override fun submitLogicalGeneration(
+        request: ConsumerLogicalJobSubmitParcel,
+        callback: IConsumerLogicalJobResultCallback,
+    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+        delegate.logicalJobOperations.submit(
+            caller,
+            request,
+            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+        )
+    }
+
+    override fun getLogicalJob(
+        request: ConsumerLogicalJobQueryParcel,
+        callback: IConsumerLogicalJobResultCallback,
+    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+        delegate.logicalJobOperations.query(
+            caller,
+            request,
+            includeResult = false,
+            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+        )
+    }
+
+    override fun getLogicalJobResult(
+        request: ConsumerLogicalJobQueryParcel,
+        callback: IConsumerLogicalJobResultCallback,
+    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+        delegate.logicalJobOperations.query(
+            caller,
+            request,
+            includeResult = true,
+            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+        )
+    }
+
+    override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) {
+        authorizedCallerOrNull(authorizer, callingProcessSource)?.let { delegate.logicalJobOperations.cancel(it, request) }
+    }
 }
 
 private fun deliverConsumerUnauthorized(externalRequestId: String?, callback: IConsumerGenerationCallback) {
@@ -201,6 +244,28 @@ private inline fun withRuntimeReadinessCaller(
             callback.onResult(
                 ConsumerRuntimeReadinessResultParcel(
                     operationId = request.operationId,
+                    error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
+                ),
+            )
+        }
+    } else {
+        block(caller)
+    }
+}
+
+private inline fun withLogicalJobCaller(
+    authorizer: CallerAuthorizer,
+    callingProcessSource: CallingProcessSource,
+    operationId: String,
+    callback: IConsumerLogicalJobResultCallback,
+    block: (AuthorizedCaller) -> Unit,
+) {
+    val caller = authorizedCallerOrNull(authorizer, callingProcessSource)
+    if (caller == null) {
+        deliverRemote {
+            callback.onResult(
+                ConsumerLogicalJobResultParcel(
+                    operationId = operationId,
                     error = wireError(WireErrorCodes.CLIENT_NOT_REGISTERED),
                 ),
             )
