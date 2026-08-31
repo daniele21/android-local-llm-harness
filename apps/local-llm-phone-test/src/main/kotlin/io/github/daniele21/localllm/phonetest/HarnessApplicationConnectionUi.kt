@@ -2,6 +2,7 @@
 
 package io.github.daniele21.localllm.phonetest
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
@@ -28,7 +31,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessEmptyState
 import io.github.daniele21.localllm.ui.designsystem.HarnessKeyValueRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessRecoveryCard
-import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
@@ -40,18 +42,26 @@ internal fun NavGraphBuilder.installNewApplicationConnectionRoute(
     callbacks: HarnessApplicationsGraphCallbacks,
 ) {
     composable(HarnessApplicationRoutes.NEW_APPLICATION_ROUTE) {
+        val applicationsViewModel = activityApplicationsViewModel()
         LaunchedEffect(Unit) { callbacks.onClearMutationFeedback() }
         HarnessApplicationsRouteContent(state = state, onRefresh = callbacks.onRefresh) { snapshot ->
             HarnessCreateApplicationConnectionScreen(
                 options = snapshot.connectionOptions,
                 mutationState = mutationState,
-                onCreate = callbacks.onCreateApplicationConnection,
+                onCreate = applicationsViewModel::createApplicationConnection,
                 onReload = callbacks.onRefresh,
                 onClearFeedback = callbacks.onClearMutationFeedback,
                 onDone = { navController.popBackStack() },
             )
         }
     }
+}
+
+@Composable
+internal fun activityApplicationsViewModel(): HarnessApplicationsReadViewModel {
+    val owner = LocalContext.current as? ComponentActivity
+        ?: error("Application control-plane routes require a ComponentActivity owner")
+    return viewModel(viewModelStoreOwner = owner)
 }
 
 @Composable
