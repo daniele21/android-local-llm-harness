@@ -158,25 +158,35 @@ data class PresetGenerationOverrides(
 
 fun GenerationDefaults.withPresetOverrides(overrides: PresetGenerationOverrides?): GenerationDefaults {
     if (overrides == null || overrides.isEmpty) return this
-    val seedValues = when (overrides.seedMode) {
-        PresetSeedMode.INHERIT -> seed to seedPolicy
-        PresetSeedMode.RANDOM -> null to SeedPolicy.Random
-        PresetSeedMode.FIXED -> requireNotNull(overrides.fixedSeed).let { it to SeedPolicy.Fixed(it) }
-    }
+    val seedValues = overrides.resolveSeedValues(seed, seedPolicy)
     return copy(
-        maxOutputTokens = overrides.maxOutputTokens ?: maxOutputTokens,
-        temperature = overrides.temperature ?: temperature,
-        topP = overrides.topP ?: topP,
-        topK = overrides.topK ?: topK,
-        minP = overrides.minP ?: minP,
-        presencePenalty = overrides.presencePenalty ?: presencePenalty,
-        repeatPenalty = overrides.repeatPenalty ?: repeatPenalty,
-        repeatLastN = overrides.repeatLastN ?: repeatLastN,
-        thinkingMode = overrides.thinkingMode ?: thinkingMode,
+        maxOutputTokens = overrides.valueOr(maxOutputTokens, PresetGenerationOverrides::maxOutputTokens),
+        temperature = overrides.valueOr(temperature, PresetGenerationOverrides::temperature),
+        topP = overrides.valueOr(topP, PresetGenerationOverrides::topP),
+        topK = overrides.valueOr(topK, PresetGenerationOverrides::topK),
+        minP = overrides.valueOr(minP, PresetGenerationOverrides::minP),
+        presencePenalty = overrides.valueOr(presencePenalty, PresetGenerationOverrides::presencePenalty),
+        repeatPenalty = overrides.valueOr(repeatPenalty, PresetGenerationOverrides::repeatPenalty),
+        repeatLastN = overrides.valueOr(repeatLastN, PresetGenerationOverrides::repeatLastN),
+        thinkingMode = overrides.valueOr(thinkingMode, PresetGenerationOverrides::thinkingMode),
         seed = seedValues.first,
         seedPolicy = seedValues.second,
     )
 }
+
+private fun PresetGenerationOverrides.resolveSeedValues(
+    inheritedSeed: Long?,
+    inheritedPolicy: SeedPolicy,
+): Pair<Long?, SeedPolicy> = when (seedMode) {
+    PresetSeedMode.INHERIT -> inheritedSeed to inheritedPolicy
+    PresetSeedMode.RANDOM -> null to SeedPolicy.Random
+    PresetSeedMode.FIXED -> requireNotNull(fixedSeed).let { it to SeedPolicy.Fixed(it) }
+}
+
+private inline fun <T : Any> PresetGenerationOverrides.valueOr(
+    inherited: T,
+    selector: (PresetGenerationOverrides) -> T?,
+): T = selector(this) ?: inherited
 
 data class PresetExecutionPolicy(
     val modelProfileId: String?,
