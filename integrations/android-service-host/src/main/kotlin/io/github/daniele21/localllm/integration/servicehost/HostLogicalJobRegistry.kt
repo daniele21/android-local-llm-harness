@@ -181,10 +181,7 @@ internal object HostLogicalJobLifecycle {
     }
 }
 
-internal data class HostLogicalJobSubmission(
-    val snapshot: HostLogicalJobSnapshot,
-    val created: Boolean,
-)
+internal data class HostLogicalJobSubmission(val snapshot: HostLogicalJobSnapshot, val created: Boolean)
 
 /**
  * Bounded process-local identity/state registry. It stores no prompt or generated content. Binder
@@ -195,10 +192,7 @@ internal class HostLogicalJobRegistry(
     private val runtimeSessionId: HostRuntimeSessionId,
     private val idFactory: () -> HostLogicalJobId,
 ) {
-    private data class RequestKey(
-        val scope: HostLogicalJobScope,
-        val clientRequestId: HostClientRequestId,
-    )
+    private data class RequestKey(val scope: HostLogicalJobScope, val clientRequestId: HostClientRequestId)
 
     private val jobsById = LinkedHashMap<HostLogicalJobId, HostLogicalJobSnapshot>()
     private val jobsByRequest = LinkedHashMap<RequestKey, HostLogicalJobId>()
@@ -208,10 +202,7 @@ internal class HostLogicalJobRegistry(
     }
 
     @Synchronized
-    fun submit(
-        scope: HostLogicalJobScope,
-        clientRequestId: HostClientRequestId,
-    ): HostLogicalJobSubmission {
+    fun submit(scope: HostLogicalJobScope, clientRequestId: HostClientRequestId): HostLogicalJobSubmission {
         val requestKey = RequestKey(scope, clientRequestId)
         jobsByRequest[requestKey]?.let { existingId ->
             return HostLogicalJobSubmission(checkNotNull(jobsById[existingId]), created = false)
@@ -236,17 +227,11 @@ internal class HostLogicalJobRegistry(
     }
 
     @Synchronized
-    fun snapshot(
-        scope: HostLogicalJobScope,
-        jobId: HostLogicalJobId,
-    ): HostLogicalJobSnapshot? = jobsById[jobId]?.takeIf { it.scope == scope }
+    fun snapshot(scope: HostLogicalJobScope, jobId: HostLogicalJobId): HostLogicalJobSnapshot? =
+        jobsById[jobId]?.takeIf { it.scope == scope }
 
     @Synchronized
-    fun transition(
-        scope: HostLogicalJobScope,
-        jobId: HostLogicalJobId,
-        transition: HostLogicalJobTransition,
-    ): HostLogicalJobSnapshot? {
+    fun transition(scope: HostLogicalJobScope, jobId: HostLogicalJobId, transition: HostLogicalJobTransition): HostLogicalJobSnapshot? {
         val current = snapshot(scope, jobId) ?: return null
         val next = HostLogicalJobLifecycle.apply(current, transition)
         jobsById[jobId] = next
