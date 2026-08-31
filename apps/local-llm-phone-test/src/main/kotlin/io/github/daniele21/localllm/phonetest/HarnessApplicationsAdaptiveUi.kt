@@ -16,17 +16,21 @@ import androidx.compose.ui.unit.dp
 internal fun useHarnessApplicationsMasterDetail(policy: HarnessAdaptivePolicy): Boolean =
     policy.useNavigationRail && !policy.stackDenseContent
 
+internal data class HarnessApplicationsMasterDetailActions(
+    val onRefresh: () -> Unit,
+    val onCreateConnection: () -> Unit,
+    val onConnectionEnabledChanged: (Boolean) -> Unit,
+    val onDismissFeedback: () -> Unit,
+    val onOpenApplication: (String) -> Unit,
+    val onOpenAssignment: (String, String) -> Unit,
+)
+
 @Composable
 internal fun HarnessApplicationsMasterDetailScreen(
     snapshot: HarnessApplicationsSnapshot,
     selectedApplication: HarnessApplicationSummary?,
     mutationState: HarnessApplicationsMutationState,
-    onRefresh: () -> Unit,
-    onCreateConnection: () -> Unit,
-    onConnectionEnabledChanged: (Boolean) -> Unit,
-    onDismissFeedback: () -> Unit,
-    onOpenApplication: (String) -> Unit,
-    onOpenAssignment: (String, String) -> Unit,
+    actions: HarnessApplicationsMasterDetailActions,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxSize().testTag("applications-master-detail")) {
@@ -37,9 +41,9 @@ internal fun HarnessApplicationsMasterDetailScreen(
         ) {
             HarnessApplicationsScreen(
                 state = HarnessApplicationsReadState.Loaded(snapshot),
-                onRefresh = onRefresh,
-                onCreateConnection = onCreateConnection,
-                onOpenApplication = onOpenApplication,
+                onRefresh = actions.onRefresh,
+                onCreateConnection = actions.onCreateConnection,
+                onOpenApplication = actions.onOpenApplication,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -48,10 +52,10 @@ internal fun HarnessApplicationsMasterDetailScreen(
             HarnessApplicationDetailScreen(
                 application = selectedApplication,
                 mutationState = mutationState,
-                onConnectionEnabledChanged = onConnectionEnabledChanged,
-                onReload = onRefresh,
-                onDismissFeedback = onDismissFeedback,
-                onOpenAssignment = onOpenAssignment,
+                onConnectionEnabledChanged = actions.onConnectionEnabledChanged,
+                onReload = actions.onRefresh,
+                onDismissFeedback = actions.onDismissFeedback,
+                onOpenAssignment = actions.onOpenAssignment,
                 modifier = Modifier.fillMaxSize(),
             )
         }
