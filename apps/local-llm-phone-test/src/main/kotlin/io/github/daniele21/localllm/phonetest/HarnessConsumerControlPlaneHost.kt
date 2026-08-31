@@ -117,10 +117,7 @@ internal class HarnessConsumerControlPlaneHost(
             )
         }
 
-    override fun resolveSetup(
-        applicationId: ApplicationId,
-        request: ConsumerSetupResolutionRequest,
-    ): ConsumerSetupResolutionResult {
+    override fun resolveSetup(applicationId: ApplicationId, request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult {
         val resolution = resolver.resolve(
             HostExecutionRequest(
                 applicationId = applicationId,
