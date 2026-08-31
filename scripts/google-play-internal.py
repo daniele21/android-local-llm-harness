@@ -117,7 +117,7 @@ def publish(package_name: str, aab_path: Path, track: str, release_name: str, ex
                 ],
             },
         )
-        request_json("POST", f"{edit_base(package_name)}/{encoded_edit}:commit", body={})
+        request_json("POST", f"{edit_base(package_name)}/{encoded_edit}:commit")
         committed = True
         return uploaded_version_code
     finally:
