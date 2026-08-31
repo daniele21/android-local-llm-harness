@@ -118,7 +118,10 @@ internal data class HarnessCreateApplicationConnectionCommand(
 internal sealed interface HarnessControlPlaneMutationResult {
     data class Success(val snapshot: HarnessApplicationsSnapshot) : HarnessControlPlaneMutationResult
 
-    data class StaleRevision(val expectedRevision: Int, val actualRevision: Int) : HarnessControlPlaneMutationResult
+    data class StaleRevision(
+        val expectedRevision: Int,
+        val actualRevision: Int,
+    ) : HarnessControlPlaneMutationResult
 
     data class Rejected(val message: String) : HarnessControlPlaneMutationResult
 }
@@ -128,9 +131,13 @@ internal interface HarnessApplicationsGateway {
 
     fun setDefaultPreset(command: HarnessSetDefaultPresetCommand): HarnessControlPlaneMutationResult
 
-    fun setApplicationConnectionEnabled(command: HarnessSetApplicationConnectionEnabledCommand): HarnessControlPlaneMutationResult
+    fun setApplicationConnectionEnabled(
+        command: HarnessSetApplicationConnectionEnabledCommand,
+    ): HarnessControlPlaneMutationResult
 
-    fun createApplicationConnection(command: HarnessCreateApplicationConnectionCommand): HarnessControlPlaneMutationResult
+    fun createApplicationConnection(
+        command: HarnessCreateApplicationConnectionCommand,
+    ): HarnessControlPlaneMutationResult
 }
 
 internal class StoreHarnessApplicationsGateway(
@@ -152,13 +159,22 @@ internal class StoreHarnessApplicationsGateway(
         val applicationId = parseApplicationId(command.applicationId)
         val existing = applications.singleOrNull { it.applicationId == applicationId }
             ?: throw ControlPlaneMutationRejected("Application connection is no longer available")
-        val target = if (command.enabled) ApplicationRegistrationState.AUTHORIZED else ApplicationRegistrationState.DISABLED
+        val target =
+            if (command.enabled) {
+                ApplicationRegistrationState.AUTHORIZED
+            } else {
+                ApplicationRegistrationState.DISABLED
+            }
         if (existing.state !in setOf(ApplicationRegistrationState.AUTHORIZED, ApplicationRegistrationState.DISABLED)) {
             throw ControlPlaneMutationRejected("This application identity must be resolved before access can be changed")
         }
         copy(
             applications = applications.map { application ->
-                if (application.applicationId == applicationId) application.copy(state = target) else application
+                if (application.applicationId == applicationId) {
+                    application.copy(state = target)
+                } else {
+                    application
+                }
             },
         )
     }
@@ -197,7 +213,9 @@ internal class StoreHarnessApplicationsGateway(
                 firstSeenAtEpochMs = now,
                 lastSeenAtEpochMs = now,
             )
-        }.getOrElse { throw ControlPlaneMutationRejected("Signing certificate must be a SHA-256 fingerprint") }
+        }.getOrElse {
+            throw ControlPlaneMutationRejected("Signing certificate must be a SHA-256 fingerprint")
+        }
         val binding = ApplicationUseCaseBinding(
             bindingId = "connection:${applicationId.value}:${useCase.useCaseId.value}",
             applicationId = applicationId,
@@ -220,7 +238,9 @@ internal class StoreHarnessApplicationsGateway(
         )
     }
 
-    private fun mutate(transform: HostControlPlaneState.() -> HostControlPlaneState): HarnessControlPlaneMutationResult = try {
+    private fun mutate(
+        transform: HostControlPlaneState.() -> HostControlPlaneState,
+    ): HarnessControlPlaneMutationResult = try {
         val updated = store.transact(transform)
         HarnessControlPlaneMutationResult.Success(updated.toApplicationsSnapshot(runtimeSource))
     } catch (rejected: ControlPlaneMutationRejected) {
@@ -245,7 +265,11 @@ internal class StoreHarnessApplicationsGateway(
 }
 
 private sealed interface ParsedCommandIdentity {
-    data class Valid(val applicationId: ApplicationId, val useCaseId: UseCaseId) : ParsedCommandIdentity
+    data class Valid(
+        val applicationId: ApplicationId,
+        val useCaseId: UseCaseId,
+    ) : ParsedCommandIdentity
+
     data class Rejected(val message: String) : ParsedCommandIdentity
 }
 
@@ -259,11 +283,13 @@ private fun HarnessSetDefaultPresetCommand.identity(): ParsedCommandIdentity {
     return ParsedCommandIdentity.Valid(parsedApplicationId, parsedUseCaseId)
 }
 
-private fun parseApplicationId(value: String): ApplicationId = runCatching { ApplicationId(value.trim()) }
-    .getOrElse { throw ControlPlaneMutationRejected("Application ID is invalid") }
+private fun parseApplicationId(value: String): ApplicationId =
+    runCatching { ApplicationId(value.trim()) }
+        .getOrElse { throw ControlPlaneMutationRejected("Application ID is invalid") }
 
-private fun parseUseCaseId(value: String): UseCaseId = runCatching { UseCaseId(value.trim()) }
-    .getOrElse { throw ControlPlaneMutationRejected("Use-case identity is invalid") }
+private fun parseUseCaseId(value: String): UseCaseId =
+    runCatching { UseCaseId(value.trim()) }
+        .getOrElse { throw ControlPlaneMutationRejected("Use-case identity is invalid") }
 
 private fun HostControlPlaneState.withDefaultPreset(
     command: HarnessSetDefaultPresetCommand,
@@ -278,7 +304,9 @@ private fun HostControlPlaneState.withDefaultPreset(
             exposure.presetRevision == command.presetRevision
     } ?: throw ControlPlaneMutationRejected("Preset is no longer available for this assignment")
     val targetPreset = preset(identity.useCaseId, targetExposure.presetId, targetExposure.presetRevision)
-    if (targetPreset?.isConsumerVisible != true) throw ControlPlaneMutationRejected("Preset is not published for consumer use")
+    if (targetPreset?.isConsumerVisible != true) {
+        throw ControlPlaneMutationRejected("Preset is not published for consumer use")
+    }
     return copy(
         exposures = exposures.map { exposure ->
             if (exposure.bindingId == binding.bindingId && exposure.bindingRevision == binding.revision) {
@@ -293,15 +321,21 @@ private fun HostControlPlaneState.withDefaultPreset(
     )
 }
 
-private fun HostControlPlaneState.requireLatestBinding(applicationId: ApplicationId, useCaseId: UseCaseId): ApplicationUseCaseBinding =
-    latestBinding(applicationId, useCaseId) ?: throw ControlPlaneMutationRejected("Assignment is no longer available")
+private fun HostControlPlaneState.requireLatestBinding(
+    applicationId: ApplicationId,
+    useCaseId: UseCaseId,
+): ApplicationUseCaseBinding =
+    latestBinding(applicationId, useCaseId)
+        ?: throw ControlPlaneMutationRejected("Assignment is no longer available")
 
 private fun requireBindingRevision(binding: ApplicationUseCaseBinding, expectedRevision: Int) {
     if (binding.revision != expectedRevision) throw StaleBindingRevision(expectedRevision, binding.revision)
     if (!binding.enabled) throw ControlPlaneMutationRejected("Assignment is disabled")
 }
 
-private fun HostControlPlaneState.toApplicationsSnapshot(runtimeSource: HarnessApplicationsRuntimeSource): HarnessApplicationsSnapshot {
+private fun HostControlPlaneState.toApplicationsSnapshot(
+    runtimeSource: HarnessApplicationsRuntimeSource,
+): HarnessApplicationsSnapshot {
     val latestBindings = bindings
         .groupBy { it.applicationId to it.useCaseId }
         .values
@@ -367,28 +401,32 @@ private fun HostControlPlaneState.assignmentSummary(
     val exposed = exposures.filter { exposure ->
         exposure.bindingId == binding.bindingId && exposure.bindingRevision == binding.revision
     }
-    val summaries = exposed.mapNotNull { exposure ->
-        preset(binding.useCaseId, exposure.presetId, exposure.presetRevision)?.let { preset ->
-            HarnessPresetSummary(
-                presetId = preset.metadata.presetId,
-                revision = preset.metadata.revision,
-                displayName = preset.metadata.displayName,
-                description = preset.metadata.description,
-                source = preset.creationSource,
-                lifecycleState = preset.state,
-                modelProfileId = preset.execution.modelProfileId,
-                contextTokens = preset.execution.contextTokens,
-                isDefault = exposure.isDefault,
-                inferencePresetId = preset.execution.inferencePreset.id.value,
-                inferencePresetRevision = preset.execution.inferencePreset.version,
-                retainModelWarmMs = preset.execution.cachePolicy.retainModelWarmMs,
-                reuseStatelessContext = preset.execution.cachePolicy.reuseStatelessContext,
-                enablePrefixSnapshot = preset.execution.cachePolicy.enablePrefixSnapshot,
-                enableDeterministicResultCache = preset.execution.cachePolicy.enableDeterministicResultCache,
-                generationOverrides = preset.execution.generationOverrides,
-            )
-        }
-    }.sortedWith(compareByDescending<HarnessPresetSummary> { it.isDefault }.thenBy { it.displayName.lowercase() })
+    val summaries = exposed
+        .mapNotNull { exposure ->
+            preset(binding.useCaseId, exposure.presetId, exposure.presetRevision)?.let { preset ->
+                HarnessPresetSummary(
+                    presetId = preset.metadata.presetId,
+                    revision = preset.metadata.revision,
+                    displayName = preset.metadata.displayName,
+                    description = preset.metadata.description,
+                    source = preset.creationSource,
+                    lifecycleState = preset.state,
+                    modelProfileId = preset.execution.modelProfileId,
+                    contextTokens = preset.execution.contextTokens,
+                    isDefault = exposure.isDefault,
+                    inferencePresetId = preset.execution.inferencePreset.id.value,
+                    inferencePresetRevision = preset.execution.inferencePreset.version,
+                    retainModelWarmMs = preset.execution.cachePolicy.retainModelWarmMs,
+                    reuseStatelessContext = preset.execution.cachePolicy.reuseStatelessContext,
+                    enablePrefixSnapshot = preset.execution.cachePolicy.enablePrefixSnapshot,
+                    enableDeterministicResultCache = preset.execution.cachePolicy.enableDeterministicResultCache,
+                    generationOverrides = preset.execution.generationOverrides,
+                )
+            }
+        }.sortedWith(
+            compareByDescending<HarnessPresetSummary> { it.isDefault }
+                .thenBy { it.displayName.lowercase() },
+        )
 
     return HarnessAssignmentSummary(
         bindingId = binding.bindingId,
@@ -419,4 +457,5 @@ private fun ApplicationRegistrationState.toHarnessStatus(): HarnessApplicationSt
 }
 
 private class StaleBindingRevision(val expectedRevision: Int, val actualRevision: Int) : RuntimeException()
+
 private class ControlPlaneMutationRejected(message: String) : RuntimeException(message)
