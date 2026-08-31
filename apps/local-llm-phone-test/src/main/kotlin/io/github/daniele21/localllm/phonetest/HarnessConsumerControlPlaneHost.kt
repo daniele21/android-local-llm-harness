@@ -170,7 +170,7 @@ internal class HarnessConsumerControlPlaneHost(
         resolution: HostExecutionResolution.Success,
     ): ConsumerActivationResult {
         val execution = resolution.execution
-        val installed = modelStore.find(execution.modelDigest)?.takeIf { it.verified }
+        val installed = modelStore.find(execution.modelDigest)
         val imported = installed?.let { importedModel(it.digest, it.sizeBytes) }
         val baseRuntimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
         val preparationFailure = activationPreparationFailure(
@@ -249,7 +249,7 @@ internal class HarnessConsumerControlPlaneHost(
     }
 
     private fun executionEnvironment(applicationId: ApplicationId): HostExecutionEnvironment {
-        val installed = modelStore.snapshot().entries.filter { it.verified }
+        val installed = modelStore.snapshot().entries
         val profiles = installed.mapNotNull { stored ->
             importedModel(stored.digest, stored.sizeBytes)?.let { model ->
                 runCatching { HarnessSharedRuntimeBindings.resolveOmbra(model, applicationId).model }.getOrNull()
