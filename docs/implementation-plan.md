@@ -5,13 +5,13 @@ Document type: target-specification
 Owner: repository
 Canonical scope: target.repository
 Read when: a change affects repository-wide product behavior, phase boundaries or acceptance criteria
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-31
 
 This document defines the repository-level target and routes work to the focused specification that owns each behavior. It intentionally avoids repeating module contracts, implementation status or release evidence.
 
 ## Product target
 
-The harness provides a local-first Android runtime intentionally supported, tuned and certified for Qwen3.5 dense 0.8B and 2B GGUF models through `llama.cpp`. Applications embed the runtime through model-family-neutral public contracts; neutral contracts preserve dependency boundaries but do not imply support for other model families.
+The harness provides a local-first Android runtime intentionally supported, tuned and certified for Qwen3.5 dense 0.8B and 2B GGUF models through `llama.cpp`. Applications embed or consume the runtime through model-family-neutral public contracts; neutral contracts preserve dependency boundaries but do not imply support for other model families.
 
 The product must:
 
@@ -20,6 +20,7 @@ The product must:
 - keep catalog selection, verified transfer, installation, binding, runtime loading and inference as separate operations;
 - keep public contracts independent from Android UI, persistence and backend-owned native types;
 - treat cancellation, shutdown, partial failure and cleanup as normal lifecycle paths;
+- keep UI/client transport lifetime separate from accepted logical inference-job and model-residency lifetime;
 - exclude prompts and generated content from normal telemetry and shared evidence;
 - use measurements from representative hardware before changing residency, concurrency or cache policy;
 - support explicit dataset-based model evaluation without conflating semantic quality with runtime regression baselines;
@@ -39,7 +40,16 @@ applicationId + useCaseId
   -> session close and eventual model release
 ```
 
-Remote distribution precedes this lifecycle but never bypasses it:
+For shared-runtime consumers, an accepted logical job is additionally independent from a transient Binder observer:
+
+```text
+authenticated consumer + use case + clientRequestId
+  -> host logical job
+  -> prepare / run / terminal state
+  -> query or observe from an authenticated connection
+```
+
+Remote distribution precedes these lifecycles but never bypasses them:
 
 ```text
 catalog release
@@ -58,6 +68,8 @@ catalog release
 | Reference-grade architecture hardening target and sequencing | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md) |
 | Qwen3.5 product envelope and specialization sequence | [`qwen35/README.md`](qwen35/README.md) and [ADR 0011](adr/0011-qwen35-only-product-support.md) |
 | Public embedded assembly and lifecycle | [`api-usage.md`](api-usage.md) |
+| Shared Android runtime and Consumer boundary | [`shared-runtime/README.md`](shared-runtime/README.md), [`shared-runtime/workstreams/host-service.md`](shared-runtime/workstreams/host-service.md) and [ADR 0012](adr/0012-shared-runtime-same-signer-binder-boundary.md) |
+| Background/process lifecycle hardening | [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md) and [ADR 0016](adr/0016-detached-shared-runtime-jobs.md) |
 | Model distribution and installation routing | [`model-catalog-download-plan.md`](model-catalog-download-plan.md) |
 | Curated catalog behavior | [`curated-model-catalog.md`](curated-model-catalog.md) |
 | Secure verified transfer | [`secure-model-download.md`](secure-model-download.md) |
@@ -95,6 +107,7 @@ Every coherent implementation slice must satisfy the applicable criteria below.
 ### Runtime lifecycle
 
 - Load, session, generation, cancellation, close and unload ownership are explicit and idempotent where required.
+- Accepted shared-runtime jobs are not cancelled merely because UI or Binder observation disappears.
 - One model residency and one decode remain the default until representative measurements justify broader concurrency.
 - Memory pressure, background transitions and partial native failures leave the runtime recoverable.
 
@@ -109,11 +122,15 @@ Every coherent implementation slice must satisfy the applicable criteria below.
 - The narrowest deterministic unit, integration and packaging checks cover the changed owner and direct consumers.
 - Shared contracts or multi-domain changes pass the repository-wide gate.
 - Emulator evidence is labelled as emulator evidence.
-- Production-readiness, compatibility and performance claims require representative physical-device GGUF evidence.
+- Production-readiness, compatibility, background execution, memory and performance claims require representative physical-device GGUF evidence when environment fidelity is material.
 
 ## Delivery direction
 
-The current embedded Android boundary is the only active runtime path. Native Android SDK and Capacitor adapters may build on it after the embedded API and release gates are stable. A shared Android service remains deferred until measurements demonstrate that cross-application artifact or RAM deduplication justifies Binder lifecycle complexity. Its progressive-disclosure execution plan is [`shared-runtime/README.md`](shared-runtime/README.md); that plan does not make the deployment active or release-ready.
+The embedded Android path and the same-signer shared Android service are both active deployment shapes. The shared service reuses the process-scoped runtime graph and host-owned model/control-plane policy rather than creating a second runtime. Current production-readiness gaps are evidence and lifecycle-hardening work, not absence of the shared-runtime implementation.
+
+ADR 0016 evolves the original bound-only lifecycle from ADR 0012 toward detached logical jobs, authenticated reconnect/reconciliation and explicit Android background execution. This evolution must preserve the existing security/model-authority boundary and must not persist sensitive inference content merely to make recovery appear transparent.
+
+Native Android SDK and Capacitor adapters may build on the stable public boundary after their own contract and release gates are satisfied; they do not replace the current embedded/shared-runtime ownership model.
 
 Cross-cutting hardening toward a reference-grade local-AI architecture is owned by [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md); its tracker does not replace capability-specific plans or the repository operational ledger.
 
