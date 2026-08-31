@@ -17,6 +17,7 @@ class SharedRuntimeHostComposition(
     consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
+    policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
 ) : AutoCloseable {
     private val delegate = SharedRuntimeHostDelegate(
         client = client,
@@ -35,6 +36,7 @@ class SharedRuntimeHostComposition(
             permissionName = permissionName,
             policies = policies,
             environment = AndroidCallerEnvironment(context.applicationContext),
+            policySource = policySource,
         ),
         delegate = delegate,
     )
@@ -64,15 +66,9 @@ internal fun hostProtocolInfo(
         "Consumer runtime readiness requires the consumer control plane"
     }
     val features = BinderProtocolV1.KNOWN_FEATURES
-        .let { known ->
-            if (consumerApiEnabled) known else known - BinderProtocolV1.FEATURE_CONSUMER_API_V1
-        }
+        .let { known -> if (consumerApiEnabled) known else known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 }
         .let { consumerFeatures ->
-            if (consumerControlPlaneEnabled) {
-                consumerFeatures
-            } else {
-                consumerFeatures - BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1
-            }
+            if (consumerControlPlaneEnabled) consumerFeatures else consumerFeatures - BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1
         }
         .let { controlPlaneFeatures ->
             if (consumerRuntimeReadinessEnabled) {
