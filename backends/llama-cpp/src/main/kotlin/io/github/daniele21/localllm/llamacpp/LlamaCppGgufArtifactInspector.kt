@@ -6,7 +6,22 @@ import io.github.daniele21.localllm.install.GgufArtifactInspector
 import io.github.daniele21.localllm.install.GgufArtifactMetadata
 import java.io.File
 
-class LlamaCppGgufArtifactInspector(private val bridge: LlamaCppBridge = LlamaCppBridge()) : GgufArtifactInspector {
+/**
+ * GGUF metadata adapter that keeps JNI completely out of composition/startup.
+ *
+ * The default bridge owns [JniLlamaApi], whose construction loads local_llm_jni. Model distribution is created
+ * during the phone app cold start, while GGUF inspection is only needed when an artifact is actually installed.
+ * Keep the bridge lazy so opening or navigating the Harness never depends on loading the native runtime.
+ */
+class LlamaCppGgufArtifactInspector internal constructor(
+    private val bridgeProvider: () -> LlamaCppBridge,
+) : GgufArtifactInspector {
+    constructor() : this({ LlamaCppBridge() })
+
+    constructor(bridge: LlamaCppBridge) : this({ bridge })
+
+    private val bridge: LlamaCppBridge by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { bridgeProvider() }
+
     override fun inspect(file: File): GgufArtifactInspectionResult = when (val result = bridge.inspectGguf(file)) {
         is GgufInspectionResult.Success ->
             GgufArtifactInspectionResult.Success(
