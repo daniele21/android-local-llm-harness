@@ -59,6 +59,11 @@ internal interface ConsumerSharedRuntimeRemoteService {
     }
 
     @Throws(RemoteException::class)
+    fun resolveSetup(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        callback(controlPlaneUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
     fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         callback(controlPlaneUnavailable(request.operationId))
     }
