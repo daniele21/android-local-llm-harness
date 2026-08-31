@@ -50,6 +50,15 @@ val versionProperties = Properties().apply {
 }
 val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
 val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+val playVersionCodeOverride =
+    System.getenv("PLAY_VERSION_CODE")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { raw ->
+            raw.toIntOrNull()?.takeIf { it > 0 }
+                ?: throw GradleException("PLAY_VERSION_CODE must be a positive integer")
+        }
+val effectiveVersionCode = playVersionCodeOverride ?: currentVersionCode
 
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
@@ -61,15 +70,11 @@ android {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = currentVersionCode
+        versionCode = effectiveVersionCode
         versionName = currentVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
         buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
     }
 
     signingConfigs {
@@ -90,14 +95,29 @@ android {
             versionNameSuffix = "-debug"
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeDebugPermission
             buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeDebugPermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
         release {
             isDebuggable = false
             isMinifyEnabled = false
             manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
             buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
             if (phoneTestUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
+            }
+        }
+        create("emulatorE2e") {
+            initWith(getByName("debug"))
+            versionNameSuffix = "-emulator-e2e"
+            matchingFallbacks += listOf("debug")
+            ndk {
+                abiFilters.clear()
+                abiFilters += "x86_64"
             }
         }
     }

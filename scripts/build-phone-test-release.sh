@@ -21,8 +21,10 @@ Usage:
 The setup command stores the existing PKCS12 upload-keystore password in the
 user's default macOS Keychain. It does not create the upload keystore.
 
-The build command retrieves the password without printing it, increments the
-phone-test versionCode and creates a signed release bundle through Gradle.
+The build command creates a signed release bundle. Locally it reads the password
+from macOS Keychain and increments version.properties. In CI, explicit secure
+environment variables are accepted and PLAY_VERSION_CODE can provide the exact
+Play-resolved versionCode without modifying version.properties.
 
 The build-apk command is for exact-candidate physical E2E. It requires a clean
 Git checkout, keeps the current version.properties identity unchanged, builds a
@@ -34,34 +36,40 @@ resulting JAR signature.
 Optional non-secret overrides:
   LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE  Upload keystore path
   LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS   Upload key alias
+  PLAY_VERSION_CODE                               Positive CI release versionCode
   ANDROID_HOME                                    Android SDK path
+
+Optional secret overrides for non-Keychain environments:
+  LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD
+  LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
 EOF
 }
 
 require_macos_keychain() {
     if [[ "$(uname -s)" != "Darwin" ]] || ! command -v security >/dev/null 2>&1; then
-        echo "This helper requires the macOS Keychain 'security' command." >&2
-        exit 1
+        echo "macOS Keychain is unavailable." >&2
+        echo "Set both LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_*_PASSWORD variables in a secure environment." >&2
+        return 1
     fi
 }
 
 setup_keychain_password() {
     require_macos_keychain
     echo "Store the Local LLM Phone Test upload-keystore password in macOS Keychain."
-    echo "The keystore and key must use the same password."
+    echo "The keystore and key normally use the same password."
     echo "Input is handled by Keychain and is not shown or added to shell history."
     security add-generic-password \
         -U \
         -a "${KEYCHAIN_ACCOUNT}" \
         -s "${KEYCHAIN_SERVICE}" \
         -l "Local LLM Phone Test Android upload keystore" \
-        -j "Password for the Play upload keystore; store and key password are identical." \
+        -j "Password for the Play upload keystore." \
         -w
     echo "Phone-test Android signing password saved in macOS Keychain."
 }
 
 read_keychain_password() {
-    require_macos_keychain
+    require_macos_keychain >/dev/null
     security find-generic-password \
         -a "${KEYCHAIN_ACCOUNT}" \
         -s "${KEYCHAIN_SERVICE}" \
@@ -115,26 +123,35 @@ load_signing_configuration() {
         exit 1
     fi
 
-    if ! SIGNING_PASSWORD="$(read_keychain_password)" || [[ -z "${SIGNING_PASSWORD}" ]]; then
-        echo "Phone-test signing password is not available in macOS Keychain." >&2
-        echo "Run: bash scripts/build-phone-test-release.sh setup" >&2
-        exit 1
+    STORE_PASSWORD="${LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD:-}"
+    KEY_PASSWORD="${LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD:-}"
+
+    if [[ -z "${STORE_PASSWORD}" ]]; then
+        if ! STORE_PASSWORD="$(read_keychain_password)" || [[ -z "${STORE_PASSWORD}" ]]; then
+            echo "Phone-test signing password is not available in macOS Keychain." >&2
+            echo "Run: bash scripts/build-phone-test-release.sh setup" >&2
+            echo "or inject the signing password variables securely in CI." >&2
+            exit 1
+        fi
+    fi
+    if [[ -z "${KEY_PASSWORD}" ]]; then
+        KEY_PASSWORD="${STORE_PASSWORD}"
     fi
 
     export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE="${STORE_FILE}"
-    export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD="${SIGNING_PASSWORD}"
+    export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD="${STORE_PASSWORD}"
     export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS="${KEY_ALIAS}"
-    export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD="${SIGNING_PASSWORD}"
+    export LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD="${KEY_PASSWORD}"
     trap clear_signing_configuration EXIT
 }
 
 clear_signing_configuration() {
-    unset SIGNING_PASSWORD
+    unset STORE_FILE KEY_ALIAS STORE_PASSWORD KEY_PASSWORD
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS
     unset LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
-    unset PHONE_TEST_JARSIGNER_PASSWORD
+    unset PHONE_TEST_JARSIGNER_STORE_PASSWORD PHONE_TEST_JARSIGNER_KEY_PASSWORD
 }
 
 require_clean_source() {
@@ -155,13 +172,25 @@ require_clean_source() {
 }
 
 increment_version_code() {
+    if [[ -n "${PLAY_VERSION_CODE:-}" ]]; then
+        if [[ ! "${PLAY_VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PLAY_VERSION_CODE must be a positive integer." >&2
+            exit 2
+        fi
+        return
+    fi
+
     local prop_file="${ROOT_DIR}/apps/local-llm-phone-test/version.properties"
     if [[ -f "${prop_file}" ]]; then
         local current_code
         current_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
         if [[ -n "${current_code}" ]]; then
             local next_code=$((current_code + 1))
-            sed -i '' "s/^versionCode=.*/versionCode=${next_code}/" "${prop_file}"
+            if sed --version >/dev/null 2>&1; then
+                sed -i "s/^versionCode=.*/versionCode=${next_code}/" "${prop_file}"
+            else
+                sed -i '' "s/^versionCode=.*/versionCode=${next_code}/" "${prop_file}"
+            fi
         fi
     fi
 }
@@ -174,10 +203,12 @@ build_release() {
     ./gradlew :apps:local-llm-phone-test:bundleRelease
 
     local prop_file="${ROOT_DIR}/apps/local-llm-phone-test/version.properties"
-    local v_code=""
+    local v_code="${PLAY_VERSION_CODE:-}"
     local v_name=""
     if [[ -f "${prop_file}" ]]; then
-        v_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
+        if [[ -z "${v_code}" ]]; then
+            v_code="$(sed -n 's/^versionCode=//p' "${prop_file}")"
+        fi
         v_name="$(sed -n 's/^versionName=//p' "${prop_file}")"
     fi
 
@@ -236,12 +267,13 @@ sign_ci_aab() {
     fi
 
     load_signing_configuration
-    export PHONE_TEST_JARSIGNER_PASSWORD="${SIGNING_PASSWORD}"
+    export PHONE_TEST_JARSIGNER_STORE_PASSWORD="${STORE_PASSWORD}"
+    export PHONE_TEST_JARSIGNER_KEY_PASSWORD="${KEY_PASSWORD}"
     jarsigner \
         -keystore "${STORE_FILE}" \
         -storetype PKCS12 \
-        -storepass:env PHONE_TEST_JARSIGNER_PASSWORD \
-        -keypass:env PHONE_TEST_JARSIGNER_PASSWORD \
+        -storepass:env PHONE_TEST_JARSIGNER_STORE_PASSWORD \
+        -keypass:env PHONE_TEST_JARSIGNER_KEY_PASSWORD \
         -signedjar "${output_aab}" \
         "${input_aab}" \
         "${KEY_ALIAS}"
