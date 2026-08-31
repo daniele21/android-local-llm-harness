@@ -16,10 +16,7 @@ enum class HarnessNumberInputMode {
 }
 
 /** Optional validation and supporting copy shown by [HarnessNumberField]. */
-data class HarnessNumberFieldValidation(
-    val isError: Boolean = false,
-    val supportingText: String? = null,
-)
+data class HarnessNumberFieldValidation(val isError: Boolean = false, val supportingText: String? = null)
 
 /**
  * Shared numeric editor for Harness forms.
