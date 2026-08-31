@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-31
+Last reviewed: 2026-08-30
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -30,8 +30,6 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 ### Android application and observability
 
 `apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
-
-The phone cold-start boundary now has automated API 35 emulator evidence. CI builds the production-shaped ARM64 debug APK, derives a no-native canary by removing only packaged native libraries and re-signing it for test use, installs it into a clean emulator process, launches the real `MainActivity` with `am start`, and requires both a live process and rendered Harness shell. This proves application startup remains independent of JNI/native loading; it does not replace ARM64 native-linker, real-GGUF, release-signing or physical-device evidence.
 
 Applications control-plane implementation is complete through ACUX-80. The subsequent control-plane persistence regression has also been repaired repository-side: CPREC-10 through CPREC-70 are integrated through PRs #455, #459, #457, #458, #460, #461 and #464. Startup now reconciles mandatory built-ins atomically before UI/Binder readers are exposed, preserves valid custom/default/disabled state, remains off the Android main thread and keeps Binder discovery/activation free of bootstrap mutation. CPREC-80/90 remain physical evidence gates; see [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
 
