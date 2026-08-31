@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: validate-model-distribution-${{ github.ref }}
@@ -52,16 +52,22 @@ jobs:
         run: ./gradlew --no-configuration-cache --stacktrace spotlessApply
       - name: Verify formatter convergence
         run: ./gradlew --no-configuration-cache --stacktrace spotlessCheck
-      - name: Capture formatted sources
-        uses: actions/upload-artifact@v6
-        with:
-          name: spotless-formatted-sources
-          retention-days: 1
-          path: |
-            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsGateway.kt
-            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsReadUi.kt
-            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsReadViewModel.kt
+      - name: Publish canonical formatting to feature branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if git diff --quiet; then
+            echo "No formatter changes to publish"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsGateway.kt \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsReadUi.kt \
+            apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessApplicationsReadViewModel.kt \
             apps/local-llm-phone-test/src/main/kotlin/io/github/daniele21/localllm/phonetest/HarnessCustomPresetGateway.kt
+          git commit -m "style: apply canonical Kotlin formatting"
+          git push origin HEAD:${{ github.head_ref }}
       - name: Run static analysis
         run: ./gradlew --no-configuration-cache --stacktrace detekt
       - name: Verify repository contains no model artifacts
