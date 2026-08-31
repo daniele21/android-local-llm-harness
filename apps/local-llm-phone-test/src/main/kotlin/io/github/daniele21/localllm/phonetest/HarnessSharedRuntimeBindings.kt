@@ -82,10 +82,11 @@ internal object HarnessSharedRuntimeBindings {
         )
     }
 
+    /**
+     * Resolves the document-PII runtime for any application identity already authorized and assigned by the
+     * control plane. Built-in and user-created applications share the same host-owned runtime contract.
+     */
     fun resolveOmbra(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
-        require(applicationId in piiConsumerApplicationIds) {
-            "document-pii-detection is not configured for applicationId ${applicationId.value}"
-        }
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
