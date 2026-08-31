@@ -49,9 +49,7 @@ fun HarnessNumberField(
         singleLine = true,
         isError = validation.isError,
         label = { Text(label) },
-        supportingText = validation.supportingText?.let { detail ->
-            { Text(detail) }
-        },
+        supportingText = validation.supportingText?.let { detail -> { Text(detail) } },
         keyboardOptions = KeyboardOptions(
             keyboardType = when (mode) {
                 HarnessNumberInputMode.INTEGER -> KeyboardType.Number
