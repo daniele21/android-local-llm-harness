@@ -5,7 +5,7 @@ Document type: runbook
 Owner: apps/local-llm-phone-test
 Canonical scope: release.play-internal
 Read when: preparing, uploading or validating the phone application through Google Play Internal Testing
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-31
 
 `apps/local-llm-phone-test` is a standalone Android application for validating the real local-LLM runtime on a physical device when developer mode, USB debugging or ADB is unavailable.
 
@@ -76,20 +76,7 @@ keystore: ~/.keystore/local-llm-phone-test-upload.jks
 alias: local-llm-phone-test-upload
 ```
 
-The `.jks` suffix is only a filename convention; the store format must be `PKCS12`. The keystore and key use the same password. Create the keystore manually outside the repository before the first release:
-
-```bash
-mkdir -p ~/.keystore
-keytool -genkeypair -v \
-  -storetype PKCS12 \
-  -keystore ~/.keystore/local-llm-phone-test-upload.jks \
-  -alias local-llm-phone-test-upload \
-  -keyalg RSA \
-  -keysize 4096 \
-  -validity 10000
-```
-
-`keytool` prompts for the password and certificate fields. Do not put passwords in command arguments, shell history, environment files or repository files. Keep an encrypted backup of the keystore outside the development machine and record who owns recovery and Play Console upload-key reset operations.
+The `.jks` suffix is only a filename convention; the store format must be `PKCS12`. Keep an encrypted backup of the keystore outside the development machine and record who owns recovery and Play Console upload-key reset operations.
 
 On macOS, save the existing keystore password in the user's default Keychain:
 
@@ -97,25 +84,21 @@ On macOS, save the existing keystore password in the user's default Keychain:
 bash scripts/build-phone-test-release.sh setup
 ```
 
-The setup command does not create or modify the keystore. It only calls `security add-generic-password` and lets Keychain prompt for the password without printing it.
+The setup command does not create or modify the keystore. It only stores the password in Keychain without printing it.
 
-## Build a signed Android App Bundle
+## Build a signed Android App Bundle locally
 
 Create a signed bundle from the current source with:
 
 ```bash
-bash scripts/build-phone-test-release.sh build
+bash scripts/build-android-aab.sh build
 ```
 
-The helper resolves the Android SDK from `ANDROID_HOME`, `ANDROID_SDK_ROOT`, root `local.properties` or the standard macOS/Homebrew SDK locations. Set `ANDROID_HOME` explicitly when using a different location.
+This routes to `scripts/build-phone-test-release.sh build`. The helper resolves the Android SDK, checks the external upload keystore, supplies the signing environment only to the build and runs:
 
-The helper:
-
-1. verifies that the external keystore exists;
-2. reads its password from macOS Keychain;
-3. supplies the four signing variables only to the Gradle process;
-4. runs `:apps:local-llm-phone-test:bundleRelease`;
-5. clears its signing variables when the process exits.
+```text
+:apps:local-llm-phone-test:bundleRelease
+```
 
 Gradle accepts release signing only through:
 
@@ -126,7 +109,9 @@ LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS
 LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
 ```
 
-All four values are required. A partial configuration fails explicitly. Packaging a release without signing also fails unless `LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true` is set explicitly; this exception is reserved for the CI job that publishes the reviewable unsigned artifact.
+All four values are required by Gradle. A partial configuration fails explicitly. Locally, the helper can source the password from macOS Keychain and use it for both store and key; CI can inject separate store/key passwords when required.
+
+Packaging a release without signing fails unless `LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true` is set explicitly; that exception remains reserved for intentional non-distributable CI evidence.
 
 The default signed output is:
 
@@ -134,11 +119,11 @@ The default signed output is:
 apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
 ```
 
-Non-secret path and alias overrides may be supplied through `LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE` and `LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS`. Do not export either password manually for the normal macOS workflow.
+For ordinary local builds, the helper increments the repository-local `apps/local-llm-phone-test/version.properties` value. Protected Play CI instead provides a positive `PLAY_VERSION_CODE` override, which prevents local-file mutation and makes Gradle embed the exact version code resolved from Play.
 
-## Sign the unsigned CI bundle
+## Sign the unsigned CI bundle manually
 
-To preserve and sign the CI bundle already downloaded at the repository root:
+To preserve and sign an unsigned CI bundle already downloaded at the repository root:
 
 ```bash
 bash scripts/build-phone-test-release.sh sign-ci-aab
@@ -151,48 +136,104 @@ input:  local-llm-phone-test-release-unsigned.aab
 output: local-llm-phone-test-release-signed.aab
 ```
 
-The command signs a separate copy with `jarsigner`, then runs `jarsigner -verify -verbose -certs`. Input and output can be passed as the second and third arguments. Verify any published CI checksum before signing; signing necessarily changes the bundle digest.
+The command signs a separate copy with `jarsigner` and verifies the result. This remains useful for inspection/recovery, but normal Internal Testing publication should use the automated release workflow below.
 
-The bundle uploaded to Google Play must be signed with the registered upload key. New Google Play applications use Play App Signing, which keeps the distribution app-signing key separate from the developer-held upload key.
+## Automated GitHub -> Play Internal Testing
 
-Official references:
+`.github/workflows/play-internal.yml` is the canonical automatic publishing path for the phone-test application.
 
-- <https://developer.android.com/studio/publish/app-signing>
-- <https://developer.android.com/studio/publish/upload-bundle>
+Automatic publication is disabled until repository variable `PLAY_INTERNAL_ENABLED=true` is configured. After activation, an app/runtime-relevant push to `dev` starts the workflow. Before accessing signing material or Google Play, the job checks out the exact candidate SHA and waits for the existing `Validate` workflow for that same SHA and `push` event to complete successfully. Failed or cancelled validation blocks publication.
 
-## Publish to the internal testing track
+The workflow then:
 
-In Play Console:
+1. authenticates to Google through GitHub OIDC and Workload Identity Federation;
+2. creates a temporary Android Publisher edit and lists all current APK/AAB version codes;
+3. selects `max(versionCode) + 1`, or `1` for an app with no uploaded artifacts;
+4. reconstructs the PKCS12 upload keystore only inside the GitHub runner;
+5. invokes the same canonical `bash scripts/build-android-aab.sh build` entrypoint with `PLAY_VERSION_CODE` and the protected signing variables;
+6. verifies the signed AAB with `jarsigner`;
+7. refreshes the short-lived Google access token after the potentially long native build;
+8. uploads the AAB, updates the `internal` track to a completed release and commits the Play edit;
+9. stores the exact released AAB as a seven-day GitHub Actions evidence artifact.
 
-1. Create an application using the stable package name above.
-2. Complete the minimum app setup requested by Play Console.
-3. Enroll the application in Play App Signing when prompted.
-4. Open **Test and release → Testing → Internal testing**.
-5. Create a release and upload the signed `.aab`.
-6. Add the Google account used by the Play Store on the target phone to the tester list.
-7. Start the internal rollout.
-8. Open the generated opt-in URL on the phone with the same Google account.
-9. Join the test and install the application from Google Play.
+Publishing is serialized for the application, preventing concurrent release jobs from selecting the same next Play version code. If upload/track update fails before commit, the helper attempts to delete the uncommitted Play edit.
 
-Internal testing is intended for a small trusted group and currently supports up to 100 testers. Internal-test applications are installed through Google Play and are not normally discoverable through store search before broader publication.
+`workflow_dispatch` is also available, but the selected candidate must already have a successful `Validate` **push** run for the exact commit. Manual dispatch cannot bypass the validation gate.
 
-Official references:
+### GitHub configuration
 
-- <https://support.google.com/googleplay/android-developer/answer/9845334>
-- <https://support.google.com/googleplay/android-developer/answer/9859348>
+Create a GitHub Environment named:
+
+```text
+play-internal
+```
+
+Store these Environment secrets:
+
+```text
+ANDROID_UPLOAD_KEYSTORE_B64
+ANDROID_UPLOAD_STORE_PASSWORD
+ANDROID_UPLOAD_KEY_PASSWORD
+```
+
+If the PKCS12 key password is the same as the store password, store the same value in both password secrets.
+
+Store these non-secret variables in the `play-internal` Environment:
+
+```text
+GCP_WORKLOAD_IDENTITY_PROVIDER
+GCP_PLAY_SERVICE_ACCOUNT
+ANDROID_UPLOAD_KEY_ALIAS
+```
+
+`ANDROID_UPLOAD_KEY_ALIAS` may be omitted when the existing default remains valid:
+
+```text
+local-llm-phone-test-upload
+```
+
+Only after Google Cloud and Play Console are configured, create this **repository variable**:
+
+```text
+PLAY_INTERNAL_ENABLED=true
+```
+
+The enable flag is repository-scoped because GitHub evaluates whether an automatic push job should start before Environment values are loaded.
+
+## Google identity and Play permissions
+
+The workflow deliberately stores no service-account JSON key. GitHub requests a short-lived OIDC identity, the configured Google Workload Identity Provider validates the repository identity, and the workflow impersonates the service account configured by `GCP_PLAY_SERVICE_ACCOUNT`.
+
+The Google Cloud project must have the Google Play Android Developer API enabled. The Workload Identity provider must trust this repository and grant it permission to impersonate the service account. The same service-account email must be invited in Play Console with permission to release this application to testing tracks. Production-release permission is not required.
+
+The Python helper `scripts/google-play-internal.py` talks directly to Android Publisher REST v3; it creates/deletes/commits edits, lists current bundles/APKs, uploads the signed AAB and updates the `internal` track. No third-party publishing action owns release semantics.
+
+## Play Console bootstrap
+
+For the first setup:
+
+1. Create the Play application for package `io.github.daniele21.localllm.phonetest`.
+2. Complete the minimum application/setup requirements requested by Play Console.
+3. Enroll in Play App Signing and verify the expected upload certificate.
+4. Configure **Testing -> Internal testing** and its tester list.
+5. Invite the CI service account with testing-track release permission.
+6. Verify the package has at least one valid Internal Testing configuration; the automated workflow can then own subsequent releases.
+
+Google Play installs the app-signing-key-signed APK generated from the uploaded AAB. The developer-held upload key only authenticates the bundle upload.
 
 ## Run the physical-device validation
 
-1. Download the configured legacy preflight GGUF to the phone or make it available through a Storage Access Framework provider such as Google Drive.
-2. Open **Local LLM Phone Test**.
-3. Confirm `qwen3` and `Q4_K_M` for the current pre-migration Qwen3 0.6B test model.
-4. Tap **Select and import GGUF**.
-5. Keep the application open while the model is copied, hashed and imported.
-6. Tap **Run full validation**.
-7. Keep the screen on and the application in the foreground until a PASS or FAIL report appears.
-8. Tap **Copy report** or **Share report** and attach the exact text to the physical-device evidence PR.
+1. Install or update the app through the normal Internal Testing opt-in flow.
+2. Download the configured legacy preflight GGUF to the phone or expose it through a Storage Access Framework provider.
+3. Open **Local LLM Phone Test**.
+4. Confirm the intended architecture/quantization for the model under test.
+5. Tap **Select and import GGUF**.
+6. Keep the application open while the model is copied, hashed and imported.
+7. Tap **Run full validation**.
+8. Keep the screen on and the application in the foreground until a PASS or FAIL report appears.
+9. Copy/share the privacy-safe report into the evidence PR.
 
-A PASS report confirms the tested application build, model digest and physical device completed the configured lifecycle. It does not establish compatibility or performance for other models, Android versions, SoCs or OEMs.
+A PASS report confirms only the tested build, model digest and physical device completed the configured lifecycle. It does not establish compatibility or performance for other models, Android versions, SoCs or OEMs.
 
 ## Managed-device limitation
 
@@ -200,9 +241,9 @@ Google Play installation does not require developer mode or ADB. A company-manag
 
 ## Release and evidence discipline
 
-- Increment `versionCode` for every uploaded Play build.
+- Every Play upload uses a strictly increasing version code; CI resolves it from current Play state rather than GitHub run numbers.
 - Keep the package name stable after the Play Console application is created.
-- Do not commit the GGUF, keystore, service-account JSON or passwords.
+- Do not commit GGUFs, keystores, passwords, Google private keys or generated credentials.
 - Restrict upload-keystore access, keep an encrypted external backup and test recovery before it is needed.
-- Record the app version, commit SHA, model SHA-256 and exact privacy-safe report in the evidence PR.
+- Record app version, commit SHA, model SHA-256 and exact privacy-safe report in the evidence PR.
 - Do not mark the runtime production-ready from emulator evidence or from a single physical device.
