@@ -59,21 +59,23 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
                     snapshot = snapshot,
                     selectedApplication = selectedApplication,
                     mutationState = mutationState,
-                    onRefresh = callbacks.onRefresh,
-                    onCreateConnection = {
-                        callbacks.onClearMutationFeedback()
-                        navController.navigate(HarnessApplicationRoutes.newApplication())
-                    },
-                    onConnectionEnabledChanged = onConnectionEnabledChanged,
-                    onDismissFeedback = callbacks.onClearMutationFeedback,
-                    onOpenApplication = { selectedApplicationId ->
-                        callbacks.onClearMutationFeedback()
-                        navController.navigate(HarnessApplicationRoutes.application(selectedApplicationId)) {
-                            popUpTo(HarnessDestination.APPS.route)
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenAssignment = onOpenAssignment,
+                    actions = HarnessApplicationsMasterDetailActions(
+                        onRefresh = callbacks.onRefresh,
+                        onCreateConnection = {
+                            callbacks.onClearMutationFeedback()
+                            navController.navigate(HarnessApplicationRoutes.newApplication())
+                        },
+                        onConnectionEnabledChanged = onConnectionEnabledChanged,
+                        onDismissFeedback = callbacks.onClearMutationFeedback,
+                        onOpenApplication = { selectedApplicationId ->
+                            callbacks.onClearMutationFeedback()
+                            navController.navigate(HarnessApplicationRoutes.application(selectedApplicationId)) {
+                                popUpTo(HarnessDestination.APPS.route)
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenAssignment = onOpenAssignment,
+                    ),
                 )
             } else {
                 HarnessApplicationDetailScreen(
