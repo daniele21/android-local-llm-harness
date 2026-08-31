@@ -183,8 +183,7 @@ private class SetupReadOnlyModelStore(private val storedModel: StoredModel) : Mo
     override fun import(source: File, artifact: io.github.daniele21.localllm.models.GgufArtifact): StoredModel =
         error("Setup inspection must not import model bytes")
 
-    override fun verify(digest: ModelDigest): VerificationResult =
-        error("Setup inspection must not verify or hash model bytes")
+    override fun verify(digest: ModelDigest): VerificationResult = error("Setup inspection must not verify or hash model bytes")
 
     override fun remove(digest: ModelDigest): Boolean = error("Setup inspection must not remove model bytes")
 }
