@@ -13,9 +13,12 @@ import io.github.daniele21.localllm.models.OutputMode
 import io.github.daniele21.localllm.models.PresetConsumerMetadata
 import io.github.daniele21.localllm.models.PresetCreationSource
 import io.github.daniele21.localllm.models.PresetExecutionPolicy
+import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetLifecycleState
+import io.github.daniele21.localllm.models.PresetSeedMode
 import io.github.daniele21.localllm.models.RegisteredApplication
 import io.github.daniele21.localllm.models.StoredPresetExposure
+import io.github.daniele21.localllm.models.ThinkingMode
 import io.github.daniele21.localllm.models.UseCaseCachePolicy
 import io.github.daniele21.localllm.models.UseCaseDefinition
 import io.github.daniele21.localllm.models.UseCaseDefinitionState
@@ -28,15 +31,25 @@ import org.junit.Test
 
 class HarnessCustomPresetGatewayTest {
     @Test
-    fun `create custom preset clones owned base policy and exposes new preset without changing default`() {
+    fun `create custom preset clones owned base policy and persists generation overrides`() {
         val store = InMemoryHostControlPlaneStore(state())
         val gateway = StoreHarnessCustomPresetGateway(store)
+        val overrides = PresetGenerationOverrides(
+            maxOutputTokens = 512,
+            temperature = 0.35f,
+            topP = 0.8f,
+            topK = 24,
+            thinkingMode = ThinkingMode.ENABLED,
+            seedMode = PresetSeedMode.FIXED,
+            fixedSeed = 42,
+        )
 
         val result = gateway.createCustomPreset(
             command(
                 presetId = "custom-high-accuracy",
                 modelProfileId = "qwen35-4b-q4",
                 contextTokens = 8_192,
+                generationOverrides = overrides,
             ),
         )
 
@@ -51,6 +64,7 @@ class HarnessCustomPresetGatewayTest {
         assertEquals(8_192, custom.execution.contextTokens)
         assertEquals(base.execution.inferencePreset, custom.execution.inferencePreset)
         assertEquals(base.execution.cachePolicy, custom.execution.cachePolicy)
+        assertEquals(overrides, custom.execution.generationOverrides)
         assertTrue(
             persisted.exposures.any {
                 it.bindingId == BINDING_ID &&
@@ -61,6 +75,18 @@ class HarnessCustomPresetGatewayTest {
             },
         )
         assertEquals("balanced", persisted.exposures.single { it.isDefault }.presetId)
+    }
+
+    @Test
+    fun `empty generation overrides are normalized to inherited base behavior`() {
+        val store = InMemoryHostControlPlaneStore(state())
+        val gateway = StoreHarnessCustomPresetGateway(store)
+
+        val result = gateway.createCustomPreset(command(generationOverrides = PresetGenerationOverrides()))
+
+        assertTrue(result is HarnessCustomPresetMutationResult.Success)
+        val custom = store.snapshot().preset(USE_CASE_ID, "custom-pii", 1)!!
+        assertEquals(null, custom.execution.generationOverrides)
     }
 
     @Test
@@ -109,6 +135,7 @@ class HarnessCustomPresetGatewayTest {
         expectedBindingRevision: Int = 3,
         modelProfileId: String? = null,
         contextTokens: Int? = 4_096,
+        generationOverrides: PresetGenerationOverrides? = null,
     ): HarnessCreateCustomPresetCommand = HarnessCreateCustomPresetCommand(
         applicationId = APPLICATION_ID.value,
         useCaseId = USE_CASE_ID.value,
@@ -119,6 +146,7 @@ class HarnessCustomPresetGatewayTest {
         displayName = "High accuracy PII",
         modelProfileId = modelProfileId,
         contextTokens = contextTokens,
+        generationOverrides = generationOverrides,
     )
 
     private fun state(): HostControlPlaneState = HostControlPlaneState(
