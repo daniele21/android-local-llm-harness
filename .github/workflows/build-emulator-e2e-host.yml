@@ -1,0 +1,96 @@
+name: Build shared-runtime emulator host
+
+on:
+  workflow_call:
+    inputs:
+      harness_ref:
+        description: Exact Harness commit to package
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      harness_ref:
+        description: Exact Harness commit to package
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-emulator-host:
+    name: Build exact emulator host APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact Harness source
+        uses: actions/checkout@v7
+        with:
+          repository: daniele21/android-local-llm-harness
+          ref: ${{ inputs.harness_ref }}
+          fetch-depth: 1
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify exact source identity
+        shell: bash
+        env:
+          EXPECTED_REF: ${{ inputs.harness_ref }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          expected_sha="$(git rev-parse "$EXPECTED_REF^{commit}")"
+          test "$actual_sha" = "$expected_sha"
+          printf '%s\n' "$actual_sha" > "$RUNNER_TEMP/harness-source-revision.txt"
+
+      - name: Verify llama.cpp pin
+        run: ./scripts/verify-llama-cpp-pin.sh
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build emulator host
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache :apps:local-llm-phone-test:assembleEmulatorE2e
+
+      - name: Stage bounded emulator host artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          host_apk="$(find apps/local-llm-phone-test/build/outputs/apk -type f -name '*.apk' -path '*emulatorE2e*' | head -n 1)"
+          test -f "$host_apk"
+          mkdir -p "$RUNNER_TEMP/harness-emulator-host"
+          cp "$host_apk" "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk"
+          cp "$RUNNER_TEMP/harness-source-revision.txt" "$RUNNER_TEMP/harness-emulator-host/source-revision.txt"
+          sha256sum "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk" \
+            > "$RUNNER_TEMP/harness-emulator-host/apk-sha256.txt"
+
+      - name: Upload emulator host APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: shared-runtime-emulator-host
+          path: ${{ runner.temp }}/harness-emulator-host/**
+          if-no-files-found: error
+          retention-days: 7
