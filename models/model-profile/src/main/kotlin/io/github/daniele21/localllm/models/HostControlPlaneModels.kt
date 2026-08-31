@@ -174,19 +174,15 @@ fun GenerationDefaults.withPresetOverrides(overrides: PresetGenerationOverrides?
     )
 }
 
-private fun PresetGenerationOverrides.resolveSeedValues(
-    inheritedSeed: Long?,
-    inheritedPolicy: SeedPolicy,
-): Pair<Long?, SeedPolicy> = when (seedMode) {
-    PresetSeedMode.INHERIT -> inheritedSeed to inheritedPolicy
-    PresetSeedMode.RANDOM -> null to SeedPolicy.Random
-    PresetSeedMode.FIXED -> requireNotNull(fixedSeed).let { it to SeedPolicy.Fixed(it) }
-}
+private fun PresetGenerationOverrides.resolveSeedValues(inheritedSeed: Long?, inheritedPolicy: SeedPolicy): Pair<Long?, SeedPolicy> =
+    when (seedMode) {
+        PresetSeedMode.INHERIT -> inheritedSeed to inheritedPolicy
+        PresetSeedMode.RANDOM -> null to SeedPolicy.Random
+        PresetSeedMode.FIXED -> requireNotNull(fixedSeed).let { it to SeedPolicy.Fixed(it) }
+    }
 
-private inline fun <T : Any> PresetGenerationOverrides.valueOr(
-    inherited: T,
-    selector: (PresetGenerationOverrides) -> T?,
-): T = selector(this) ?: inherited
+private inline fun <T : Any> PresetGenerationOverrides.valueOr(inherited: T, selector: (PresetGenerationOverrides) -> T?): T =
+    selector(this) ?: inherited
 
 data class PresetExecutionPolicy(
     val modelProfileId: String?,
