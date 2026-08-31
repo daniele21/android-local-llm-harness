@@ -19,6 +19,7 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessKeyValueRow
 import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberFieldValidation
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessRecoveryCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
@@ -184,12 +185,14 @@ internal fun HarnessContextTokensField(value: String, valid: Boolean, enabled: B
         label = "Context tokens",
         modifier = Modifier.fillMaxWidth().testTag("custom-preset-context"),
         enabled = enabled,
-        isError = !valid,
-        supportingText = if (valid) {
-            "Blank uses the use-case default. The canonical minimum is enforced when saved."
-        } else {
-            "Enter a positive whole number or leave the field blank."
-        },
+        validation = HarnessNumberFieldValidation(
+            isError = !valid,
+            supportingText = if (valid) {
+                "Blank uses the use-case default. The canonical minimum is enforced when saved."
+            } else {
+                "Enter a positive whole number or leave the field blank."
+            },
+        ),
     )
 }
 
