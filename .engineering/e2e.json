@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.1.0",
+  "applicability": {
+    "status": "recommended",
+    "reason": "Harness has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
+  },
+  "principles": {
+    "final_environment_should_confirm_not_discover": true,
+    "execution_capability_separate_from_environment_fidelity": true,
+    "lowest_sufficient_test_level": true,
+    "critical_journeys_only": true,
+    "built_artifact_when_material": true,
+    "residual_fidelity_gaps_explicit": true
+  },
+  "fidelity_order": [
+    "host_or_fake",
+    "simulated_or_emulated",
+    "representative_virtual",
+    "representative_physical",
+    "target_environment"
+  ],
+  "target_environments": [
+    {
+      "id": "android-arm64-device",
+      "platform": "Android ARM64 (API 26+ supported class)",
+      "description": "Representative physical Android ARM64 device running the Harness app, native llama.cpp backend and real GGUF model artifacts.",
+      "material_dimensions": [
+        "Android framework and process lifecycle",
+        "arm64-v8a ABI and JNI/native llama.cpp backend",
+        "real GGUF storage and model lifecycle",
+        "Binder/process behavior where shared-runtime surfaces are exercised",
+        "physical memory pressure and reclamation",
+        "thermal and sustained-decode behavior",
+        "device/OEM resource behavior"
+      ]
+    }
+  ],
+  "execution_environments": [
+    {
+      "id": "binder-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "instrumented tests for transports/android-binder-contract",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "known_gaps": [
+        "x86_64 emulator does not represent arm64-v8a native inference",
+        "does not load a production GGUF through the llama.cpp backend",
+        "does not establish physical memory, thermal or OEM behavior",
+        "Binder Parcelable evidence is narrower than a full two-application host/client round trip"
+      ]
+    },
+    {
+      "id": "physical-arm64-device",
+      "fidelity_class": "representative_physical",
+      "automation": "real_environment",
+      "platform": "Physical Android ARM64 device",
+      "artifact_surface": "installed Harness debug/release-candidate app plus identity-bearing device evidence scripts",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "known_gaps": [
+        "one representative device does not establish every supported OEM/device configuration"
+      ]
+    }
+  ],
+  "critical_journeys": [
+    {
+      "id": "binder-contract-serialization",
+      "claim": "The public Android Binder contract types survive Android framework parceling/unparceling with the expected contract semantics.",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "automated_environment_refs": [
+        "binder-api35-emulator"
+      ],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": [
+        "full cross-process/two-application service lifecycle remains a stronger journey than Parcelable contract evidence"
+      ],
+      "real_environment_confirmation": "conditional",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "local-inference-device-lifecycle",
+      "claim": "A verified compatible GGUF can be selected, prepared, streamed/cancelled through the production native backend, and cleaned up with truthful lifecycle/resource evidence on Android ARM64.",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "automated_environment_refs": [],
+      "minimum_automated_fidelity": "host_or_fake",
+      "residual_gaps": [
+        "production arm64-v8a JNI/llama.cpp execution",
+        "real model loading and memory reclamation",
+        "physical thermal/resource behavior",
+        "OEM/device-specific lifecycle behavior"
+      ],
+      "real_environment_confirmation": "required",
+      "automation_gap_reason": "Current hosted CI has no representative Android ARM64 device/model environment for the production llama.cpp backend. Lower-level deterministic tests cover orchestration and contracts, while identity-bearing physical-device evidence owns the remaining native/model/resource claim."
+    }
+  ]
+}
