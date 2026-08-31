@@ -125,7 +125,10 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 )
                 ConnectionTextField(
                     value = displayName,
-                    onValueChange = { displayName = it; onClearFeedback() },
+                    onValueChange = {
+                        displayName = it
+                        onClearFeedback()
+                    },
                     label = "App name",
                     supportingText = "Human-readable name shown in Harness",
                     enabled = !saving && !saved,
@@ -133,7 +136,10 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 )
                 ConnectionTextField(
                     value = applicationId,
-                    onValueChange = { applicationId = it; onClearFeedback() },
+                    onValueChange = {
+                        applicationId = it
+                        onClearFeedback()
+                    },
                     label = "Application ID",
                     supportingText = "Stable Harness identity for this consumer app",
                     enabled = !saving && !saved,
@@ -141,7 +147,10 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 )
                 ConnectionTextField(
                     value = packageName,
-                    onValueChange = { packageName = it.trim(); onClearFeedback() },
+                    onValueChange = {
+                        packageName = it.trim()
+                        onClearFeedback()
+                    },
                     label = "Android package",
                     supportingText = "Example: com.example.myapp",
                     enabled = !saving && !saved,
@@ -280,15 +289,18 @@ private fun ConnectionMutationFeedback(
 ) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
+
         HarnessApplicationsMutationState.Saving -> HarnessCard {
             HarnessStatusBadge("Saving", HarnessStatusTone.INFO)
             Text("Persisting the application identity, assignment and default preset.")
         }
+
         is HarnessApplicationsMutationState.Saved -> HarnessCard(emphasized = true) {
             HarnessStatusBadge("Connection ready", HarnessStatusTone.SUCCESS)
             Text(state.message)
             HarnessPrimaryButton("Done", onClick = onDone)
         }
+
         is HarnessApplicationsMutationState.Conflict -> HarnessRecoveryCard(
             title = "Configuration changed",
             detail = state.message,
@@ -296,6 +308,7 @@ private fun ConnectionMutationFeedback(
             onAction = onReload,
             tone = HarnessStatusTone.WARNING,
         )
+
         is HarnessApplicationsMutationState.Failed -> HarnessRecoveryCard(
             title = "Connection not created",
             detail = state.message,
