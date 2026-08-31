@@ -3,9 +3,9 @@ package io.github.daniele21.localllm.phonetest
 import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetSeedMode
-import io.github.daniele21.localllm.models.ThinkingMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
