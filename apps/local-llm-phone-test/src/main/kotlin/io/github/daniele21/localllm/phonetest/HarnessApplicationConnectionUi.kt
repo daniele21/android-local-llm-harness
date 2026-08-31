@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -88,10 +87,7 @@ internal fun HarnessCreateApplicationConnectionScreen(
     var packageName by rememberSaveable { mutableStateOf("") }
     var signerSha256 by rememberSaveable { mutableStateOf("") }
     var selectedUseCaseId by rememberSaveable { mutableStateOf(options.first().useCaseId) }
-    var selectedPresetKey by rememberSaveable {
-        mutableStateOf(options.first().presets.first().identityKey())
-    }
-
+    var selectedPresetKey by rememberSaveable { mutableStateOf(options.first().presets.first().identityKey()) }
     val selectedUseCase = options.firstOrNull { it.useCaseId == selectedUseCaseId } ?: options.first()
     val selectedPreset = selectedUseCase.presets.firstOrNull { it.identityKey() == selectedPresetKey }
         ?: selectedUseCase.presets.first()
@@ -116,102 +112,30 @@ internal fun HarnessCreateApplicationConnectionScreen(
             }
         }
         item {
-            HarnessCard {
-                Text("Application identity", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Package and signer are checked at the Binder security boundary. They must match the installed consumer app exactly.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ConnectionTextField(
-                    value = displayName,
-                    onValueChange = {
-                        displayName = it
-                        onClearFeedback()
-                    },
-                    label = "App name",
-                    supportingText = "Human-readable name shown in Harness",
-                    enabled = !saving && !saved,
-                    testTag = "connection-display-name",
-                )
-                ConnectionTextField(
-                    value = applicationId,
-                    onValueChange = {
-                        applicationId = it
-                        onClearFeedback()
-                    },
-                    label = "Application ID",
-                    supportingText = "Stable Harness identity for this consumer app",
-                    enabled = !saving && !saved,
-                    testTag = "connection-application-id",
-                )
-                ConnectionTextField(
-                    value = packageName,
-                    onValueChange = {
-                        packageName = it.trim()
-                        onClearFeedback()
-                    },
-                    label = "Android package",
-                    supportingText = "Example: com.example.myapp",
-                    enabled = !saving && !saved,
-                    testTag = "connection-package-name",
-                )
-                ConnectionTextField(
-                    value = signerSha256,
-                    onValueChange = { candidate ->
-                        normalizeSignerFingerprint(candidate)?.let { signerSha256 = it }
-                        onClearFeedback()
-                    },
-                    label = "Signing certificate SHA-256",
-                    supportingText = if (signerValid || signerSha256.isBlank()) {
-                        "64 hexadecimal characters. Spaces and ':' are removed when pasted."
-                    } else {
-                        "Enter the complete 64-character SHA-256 fingerprint."
-                    },
-                    enabled = !saving && !saved,
-                    testTag = "connection-signer-sha256",
-                    isError = signerSha256.isNotBlank() && !signerValid,
-                )
-            }
+            ConnectionIdentitySection(
+                model = ConnectionIdentityModel(displayName, applicationId, packageName, signerSha256, signerValid, !saving && !saved),
+                onDisplayNameChanged = { displayName = it; onClearFeedback() },
+                onApplicationIdChanged = { applicationId = it; onClearFeedback() },
+                onPackageNameChanged = { packageName = it.trim(); onClearFeedback() },
+                onSignerChanged = { candidate ->
+                    normalizeSignerFingerprint(candidate)?.let { signerSha256 = it }
+                    onClearFeedback()
+                },
+            )
         }
-        item { Text("Use case", style = MaterialTheme.typography.titleMedium) }
-        items(options, key = HarnessConnectionUseCaseOption::useCaseId) { option ->
-            HarnessCard(
-                emphasized = option.useCaseId == selectedUseCase.useCaseId,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("connection-use-case-${option.useCaseId}")
-                    .clickable(enabled = !saving && !saved) {
-                        selectedUseCaseId = option.useCaseId
-                        selectedPresetKey = option.presets.first().identityKey()
-                        onClearFeedback()
-                    },
-            ) {
-                Text(option.displayName, style = MaterialTheme.typography.titleMedium)
-                Text(option.description, style = MaterialTheme.typography.bodySmall)
-                if (option.useCaseId == selectedUseCase.useCaseId) {
-                    HarnessStatusBadge("Selected", HarnessStatusTone.SUCCESS)
-                }
-            }
-        }
-        item { Text("Initial preset", style = MaterialTheme.typography.titleMedium) }
-        items(selectedUseCase.presets, key = HarnessConnectionPresetOption::identityKey) { preset ->
-            HarnessCard(
-                emphasized = preset.identityKey() == selectedPreset.identityKey(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("connection-preset-${preset.presetId}")
-                    .clickable(enabled = !saving && !saved) {
-                        selectedPresetKey = preset.identityKey()
-                        onClearFeedback()
-                    },
-            ) {
-                Text(preset.displayName, style = MaterialTheme.typography.titleMedium)
-                Text(preset.description, style = MaterialTheme.typography.bodySmall)
-                if (preset.identityKey() == selectedPreset.identityKey()) {
-                    HarnessStatusBadge("Default on connection", HarnessStatusTone.SUCCESS)
-                }
-            }
+        item {
+            ConnectionAccessSelection(
+                options = options,
+                selectedUseCase = selectedUseCase,
+                selectedPreset = selectedPreset,
+                enabled = !saving && !saved,
+                onUseCaseSelected = { option ->
+                    selectedUseCaseId = option.useCaseId
+                    selectedPresetKey = option.presets.first().identityKey()
+                    onClearFeedback()
+                },
+                onPresetSelected = { preset -> selectedPresetKey = preset.identityKey(); onClearFeedback() },
+            )
         }
         item {
             HarnessCard(emphasized = true) {
@@ -227,14 +151,7 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 )
             }
         }
-        item {
-            ConnectionMutationFeedback(
-                state = mutationState,
-                onReload = onReload,
-                onClearFeedback = onClearFeedback,
-                onDone = onDone,
-            )
-        }
+        item { ConnectionMutationFeedback(mutationState, onReload, onClearFeedback, onDone) }
         if (!saved) {
             item {
                 HarnessPrimaryButton(
@@ -243,16 +160,93 @@ internal fun HarnessCreateApplicationConnectionScreen(
                     modifier = Modifier.fillMaxWidth().testTag("connection-create"),
                     onClick = {
                         onCreate(
-                            applicationId.trim(),
-                            displayName.trim(),
-                            packageName.trim(),
-                            signerSha256,
-                            selectedUseCase.useCaseId,
-                            selectedPreset.presetId,
-                            selectedPreset.revision,
+                            applicationId.trim(), displayName.trim(), packageName.trim(), signerSha256,
+                            selectedUseCase.useCaseId, selectedPreset.presetId, selectedPreset.revision,
                         )
                     },
                 )
+            }
+        }
+    }
+}
+
+private data class ConnectionIdentityModel(
+    val displayName: String,
+    val applicationId: String,
+    val packageName: String,
+    val signerSha256: String,
+    val signerValid: Boolean,
+    val enabled: Boolean,
+)
+
+@Composable
+private fun ConnectionIdentitySection(
+    model: ConnectionIdentityModel,
+    onDisplayNameChanged: (String) -> Unit,
+    onApplicationIdChanged: (String) -> Unit,
+    onPackageNameChanged: (String) -> Unit,
+    onSignerChanged: (String) -> Unit,
+) {
+    HarnessCard {
+        Text("Application identity", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Package and signer are checked at the Binder security boundary. They must match the installed consumer app exactly.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ConnectionTextField(model.displayName, onDisplayNameChanged, "App name", "Human-readable name shown in Harness", model.enabled, "connection-display-name")
+        ConnectionTextField(model.applicationId, onApplicationIdChanged, "Application ID", "Stable Harness identity for this consumer app", model.enabled, "connection-application-id")
+        ConnectionTextField(model.packageName, onPackageNameChanged, "Android package", "Example: com.example.myapp", model.enabled, "connection-package-name")
+        ConnectionTextField(
+            value = model.signerSha256,
+            onValueChange = onSignerChanged,
+            label = "Signing certificate SHA-256",
+            supportingText = if (model.signerValid || model.signerSha256.isBlank()) {
+                "64 hexadecimal characters. Spaces and ':' are removed when pasted."
+            } else {
+                "Enter the complete 64-character SHA-256 fingerprint."
+            },
+            enabled = model.enabled,
+            testTag = "connection-signer-sha256",
+            isError = model.signerSha256.isNotBlank() && !model.signerValid,
+        )
+    }
+}
+
+@Composable
+private fun ConnectionAccessSelection(
+    options: List<HarnessConnectionUseCaseOption>,
+    selectedUseCase: HarnessConnectionUseCaseOption,
+    selectedPreset: HarnessConnectionPresetOption,
+    enabled: Boolean,
+    onUseCaseSelected: (HarnessConnectionUseCaseOption) -> Unit,
+    onPresetSelected: (HarnessConnectionPresetOption) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium)) {
+        Text("Use case", style = MaterialTheme.typography.titleMedium)
+        options.forEach { option ->
+            HarnessCard(
+                emphasized = option.useCaseId == selectedUseCase.useCaseId,
+                modifier = Modifier.fillMaxWidth().testTag("connection-use-case-${option.useCaseId}")
+                    .clickable(enabled = enabled) { onUseCaseSelected(option) },
+            ) {
+                Text(option.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(option.description, style = MaterialTheme.typography.bodySmall)
+                if (option.useCaseId == selectedUseCase.useCaseId) HarnessStatusBadge("Selected", HarnessStatusTone.SUCCESS)
+            }
+        }
+        Text("Initial preset", style = MaterialTheme.typography.titleMedium)
+        selectedUseCase.presets.forEach { preset ->
+            HarnessCard(
+                emphasized = preset.identityKey() == selectedPreset.identityKey(),
+                modifier = Modifier.fillMaxWidth().testTag("connection-preset-${preset.presetId}")
+                    .clickable(enabled = enabled) { onPresetSelected(preset) },
+            ) {
+                Text(preset.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(preset.description, style = MaterialTheme.typography.bodySmall)
+                if (preset.identityKey() == selectedPreset.identityKey()) {
+                    HarnessStatusBadge("Default on connection", HarnessStatusTone.SUCCESS)
+                }
             }
         }
     }
@@ -289,32 +283,22 @@ private fun ConnectionMutationFeedback(
 ) {
     when (state) {
         HarnessApplicationsMutationState.Idle -> Unit
-
         HarnessApplicationsMutationState.Saving -> HarnessCard {
             HarnessStatusBadge("Saving", HarnessStatusTone.INFO)
             Text("Persisting the application identity, assignment and default preset.")
         }
-
         is HarnessApplicationsMutationState.Saved -> HarnessCard(emphasized = true) {
             HarnessStatusBadge("Connection ready", HarnessStatusTone.SUCCESS)
             Text(state.message)
             HarnessPrimaryButton("Done", onClick = onDone)
         }
-
         is HarnessApplicationsMutationState.Conflict -> HarnessRecoveryCard(
-            title = "Configuration changed",
-            detail = state.message,
-            actionLabel = "Reload changes",
-            onAction = onReload,
-            tone = HarnessStatusTone.WARNING,
+            title = "Configuration changed", detail = state.message, actionLabel = "Reload changes",
+            onAction = onReload, tone = HarnessStatusTone.WARNING,
         )
-
         is HarnessApplicationsMutationState.Failed -> HarnessRecoveryCard(
-            title = "Connection not created",
-            detail = state.message,
-            actionLabel = "Review fields",
-            onAction = onClearFeedback,
-            tone = HarnessStatusTone.ERROR,
+            title = "Connection not created", detail = state.message, actionLabel = "Review fields",
+            onAction = onClearFeedback, tone = HarnessStatusTone.ERROR,
         )
     }
 }
