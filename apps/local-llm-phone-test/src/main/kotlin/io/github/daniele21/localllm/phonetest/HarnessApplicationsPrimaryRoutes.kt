@@ -39,6 +39,7 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
             navArgument(HarnessApplicationRoutes.APPLICATION_ID_ARGUMENT) { type = NavType.StringType },
         ),
     ) { entry ->
+        val applicationsViewModel = activityApplicationsViewModel()
         val applicationId = HarnessApplicationRoutes.decodeApplicationId(
             entry.arguments?.getString(HarnessApplicationRoutes.APPLICATION_ID_ARGUMENT),
         )
@@ -50,7 +51,7 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
             }
             val onConnectionEnabledChanged: (Boolean) -> Unit = { enabled ->
                 selectedApplication?.let { application ->
-                    callbacks.onSetApplicationConnectionEnabled(application.applicationId, enabled)
+                    applicationsViewModel.setApplicationConnectionEnabled(application.applicationId, enabled)
                 }
             }
             if (useHarnessApplicationsMasterDetail(currentHarnessAdaptivePolicy())) {
