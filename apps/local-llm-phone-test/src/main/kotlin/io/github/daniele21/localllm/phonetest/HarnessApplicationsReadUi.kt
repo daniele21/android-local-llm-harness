@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -187,54 +186,6 @@ internal fun HarnessApplicationDetailScreen(
                     onClick = { onOpenAssignment(application.applicationId, assignment.useCaseId) },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun HarnessConnectionControlCard(
-    application: HarnessApplicationSummary,
-    saving: Boolean,
-    onConnectionEnabledChanged: (Boolean) -> Unit,
-) {
-    val toggleSupported =
-        application.status == HarnessApplicationStatus.AUTHORIZED ||
-            application.status == HarnessApplicationStatus.DISABLED
-    val enabled = application.status == HarnessApplicationStatus.AUTHORIZED
-    HarnessCard(modifier = Modifier.testTag("application-connection-control")) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = HarnessMinimumTouchTarget),
-            horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall),
-            ) {
-                Text("Allow app connection", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (enabled) {
-                        "This app can authenticate to the shared runtime for its assigned use cases."
-                    } else {
-                        "Access is blocked at the Binder authorization boundary. Configuration is retained."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!toggleSupported) {
-                    Text(
-                        "Resolve the application identity state before changing access.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onConnectionEnabledChanged,
-                enabled = toggleSupported && !saving,
-                modifier = Modifier.testTag("application-connection-enabled"),
-            )
         }
     }
 }
