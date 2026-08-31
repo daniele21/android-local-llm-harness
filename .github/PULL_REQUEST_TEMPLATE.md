@@ -32,6 +32,23 @@ If user-facing behavior changes, classify it as structural UX, interaction or vi
 
 State affected `.engineering/commands.json` intents and any build identity, manifest/checksum/build-delta/retention or cleanup implications. Otherwise `N/A`.
 
+## Documentation impact
+
+Classify each owner as `UPDATED` or `N/A`; give a short reason when impact was plausible but `N/A`. README identity means purpose/audience/outcome/mission/positioning. README usage means prerequisites/setup/run/configuration/public API/UI/examples.
+
+- README_IDENTITY: `UPDATED|N/A`
+- README_USAGE: `UPDATED|N/A`
+- FEATURE_DOCS: `UPDATED|N/A`
+- ARCHITECTURE: `UPDATED|N/A`
+- ADR: `UPDATED|N/A`
+- SECURITY_DATA: `UPDATED|N/A`
+- OPERATIONS: `UPDATED|N/A`
+- PRODUCT_EXPERIENCE: `UPDATED|N/A`
+- CURRENT_STATE: `UPDATED|N/A`
+- DOCS_CURRENT_WITH_IMPLEMENTATION: `PASS|FAIL`
+
+A usage-only change must not trigger an opportunistic mission rewrite. Existing feature docs update in the same change as the durable behavior they describe.
+
 ## Pre-publication readiness
 
 Record exact publication state:
@@ -60,11 +77,24 @@ List deterministic selected-profile gates the current coding agent executed dire
 
 ## Remote automated validation
 
-List deterministic selected-profile gates unavailable agent-local as `PASS|FAIL|PENDING|N/A`, including `/preflight` trigger/run identity. Do not delegate Gradle/R8/Lint/build work to the user merely because the agent lacks Android tooling.
+List deterministic selected-profile gates unavailable agent-local as `PASS|FAIL|PENDING|N/A`, including `/preflight` trigger/run identity. Do not delegate Gradle/R8/Lint/build/emulator work to the user merely because the agent lacks Android tooling.
+
+## E2E environment / fidelity evidence
+
+For every affected complete journey, use `.engineering/e2e.json` and report:
+
+- critical journey ID;
+- execution environment ID;
+- fidelity class;
+- artifact surface;
+- `PASS|FAIL|PENDING|N/A`;
+- residual target/physical gaps.
+
+The API35 x86_64 Binder emulator is `simulated_or_emulated`; it is not ARM64 `llama.cpp`, real-model, memory-reclamation, thermal or OEM evidence. A built APK on an emulator can prove package/install behavior without upgrading hardware fidelity.
 
 ## Real-environment evidence
 
-Declare physical-device, hardware, thermal/performance, packaged cross-app or representative usability evidence as `PASS|PENDING|N/A`. Pending evidence still blocks any stronger claim that depends on it.
+Declare physical-device, native ARM64/model, memory, hardware, thermal/performance, packaged cross-app or representative usability evidence as `PASS|PENDING|N/A`. Pending evidence still blocks any stronger claim that depends on it.
 
 ## E2E / experience evidence
 
@@ -72,7 +102,7 @@ For a complete critical workflow or stable high-risk UI surface, describe journe
 
 ## Documentation / design lifecycle
 
-- [ ] I updated the canonical durable owner rather than creating a duplicate source.
+- [ ] Documentation impact was assessed from observable behavior and every affected canonical owner is current.
 - [ ] New active docs have supported metadata, bounded reading cost and one navigation owner.
 - [ ] Active multi-PR coordination lives in `docs/workstreams/`, not separate plan/progress/status files.
 - [ ] Completed workstreams are deleted by default after durable knowledge is transferred; archive is exception-only.

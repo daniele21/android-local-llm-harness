@@ -5,14 +5,25 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating documentation ownership or changing documentation governance
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-31
 
 Use progressive disclosure: root guide -> closest scoped guide -> focused owner. One fact has one canonical owner. Machine policy: [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
+
+## README ownership
+
+Treat the root README as two semantic owners rather than one document that must be rewritten as a unit.
+
+- **README identity** — project title/summary, `Why this exists`, primary audience/outcome, mission/vision and stable positioning. Update only when those claims materially change. A feature, implementation, command, configuration or runtime change does not by itself justify rewriting them.
+- **README usage** — prerequisites, setup/run, public configuration, public API/UI integration and copy-paste examples. Update in the same change whenever the current instructions would otherwise become incomplete, wrong, removed, newly mandatory or misleading.
+
+A normal feature/operational change may therefore report `README_IDENTITY: N/A` and `README_USAGE: UPDATED`.
 
 ## Canonical sources
 
 | Question | Canonical source |
 | --- | --- |
+| What is Harness and why does it exist? | root README identity sections |
+| How does a person set up/run/configure/use Harness now? | root README usage sections plus focused runbooks/API docs |
 | Integrated state/blockers | [`current-state.md`](current-state.md) |
 | Capability milestones | [`roadmap.md`](roadmap.md) |
 | Repository target | [`implementation-plan.md`](implementation-plan.md) |
@@ -24,8 +35,31 @@ Use progressive disclosure: root guide -> closest scoped guide -> focused owner.
 | Qwen3.5 | [`qwen35/README.md`](qwen35/README.md) |
 | Model evaluation | [`model-evaluation/README.md`](model-evaluation/README.md) |
 | Architecture/decisions | [`architecture.md`](architecture.md), [`adr/`](adr/) |
+| E2E target/execution environments, fidelity and residual gaps | [`.engineering/e2e.json`](../.engineering/e2e.json) |
 | Merge/release completion | [`definition-of-done.md`](definition-of-done.md), [`releases/harness-0.5.md`](releases/harness-0.5.md) |
 | Historical exception material | [`archive/`](archive/) |
+
+## Documentation impact contract
+
+Code and durable documentation ship together. A meaningful change is not complete until every affected canonical owner describes the exact behavior being published.
+
+During `preflight-change`, assess impact from observable behavior rather than filenames and classify at least:
+
+- `README_IDENTITY`;
+- `README_USAGE`;
+- `FEATURE_DOCS`;
+- `ARCHITECTURE`;
+- `ADR`;
+- `SECURITY_DATA`;
+- `OPERATIONS`;
+- `PRODUCT_EXPERIENCE`;
+- `CURRENT_STATE`.
+
+Use `UPDATED` or `N/A`; give a short reason when impact was plausible but `N/A`. Publication readiness requires `DOCS_CURRENT_WITH_IMPLEMENTATION: PASS`.
+
+Existing feature documentation must update in the same change when the durable behavior it describes changes. Create a new feature document only when durable non-obvious behavior is not sufficiently discoverable from public contracts, tests, code, architecture or an existing focused owner. Do not create documentation merely because a PR or task completed.
+
+E2E target/environment/fidelity changes are durable contract changes and update `.engineering/e2e.json`; evidence artifacts such as logs/screenshots/reports remain bounded evidence, not durable documentation.
 
 ## Active source index
 
@@ -85,6 +119,7 @@ Use progressive disclosure: root guide -> closest scoped guide -> focused owner.
 - [`android-brand-assets.md`](android-brand-assets.md)
 - [`assets/brand/README.md`](assets/brand/README.md)
 - [`assets/brand/master/README.md`](assets/brand/master/README.md)
+- [`assets/brand/reference/hbridge-core/README.md`](assets/brand/reference/hbridge-core/README.md)
 - [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md)
 
 ### Build, distribution and evidence
@@ -104,14 +139,15 @@ Durable types: `roadmap`, `target-specification`, `feature-index`, `feature-spec
 
 Completed workstreams are **deleted by default** after durable transfer. `archive/` is exception-only for independent audit, regulatory, release-evidence or historical value. Git history owns normal implementation history.
 
-## Before creating a document
+## Before creating or updating documentation
 
-1. Search `Canonical scope` and this index.
-2. Update an existing owner when possible.
-3. Create only a durable independent owner or a genuinely necessary bounded workstream.
-4. Set supported type, owner, unique canonical scope and precise `Read when`.
-5. Link it from this or the closest domain index.
-6. Finalize temporary work by transferring durable knowledge and deleting it; archive only under the exception rule.
+1. Assess documentation impact from observable behavior.
+2. Search `Canonical scope` and this index.
+3. Update an existing owner when possible; for README changes touch only the affected identity/usage sections.
+4. Create only a durable independent owner or a genuinely necessary bounded workstream.
+5. Set supported type, owner, unique canonical scope and precise `Read when`.
+6. Link it from this or the closest domain index.
+7. Finalize temporary work by transferring durable knowledge and deleting it; archive only under the exception rule.
 
 Do not create documentation merely to record a branch, PR or isolated implementation completion.
 
@@ -142,6 +178,7 @@ Executable contracts/tests -> accepted ADRs -> architecture -> focused specifica
 
 ```bash
 python3 scripts/verify-docs.py --base <target-branch-commit>
+python3 scripts/verify_e2e.py
 python3 scripts/verify-agent-navigation.py
 python3 -m py_compile scripts/*.py
 git diff --check

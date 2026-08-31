@@ -5,11 +5,13 @@ Document type: feature-index
 Owner: repository
 Canonical scope: documentation.features
 Read when: locating or creating durable cross-module feature behavior documentation
-Last reviewed: 2026-08-25
+Last reviewed: 2026-08-30
 
 Feature documents describe durable current or accepted target behavior, constraints, ownership and verification when those facts are not sufficiently discoverable from public contracts, tests and architecture documentation.
 
 Do not create one file per small feature. Prefer code/tests for obvious behavior and a bounded document for cross-module or operationally important capabilities. Feature documents must not contain implementation progress, PR history or completed task diaries.
+
+When a change alters durable behavior already described by a feature document, update that canonical owner in the same change. Create a new feature document only when durable non-obvious behavior is not sufficiently discoverable from public contracts, tests, code, architecture or an existing focused owner. Delete or consolidate a feature document when it no longer has an independent durable purpose.
 
 ## Current feature owners
 
