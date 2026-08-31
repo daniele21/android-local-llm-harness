@@ -15,6 +15,12 @@ enum class HarnessNumberInputMode {
     DECIMAL,
 }
 
+/** Optional validation and supporting copy shown by [HarnessNumberField]. */
+data class HarnessNumberFieldValidation(
+    val isError: Boolean = false,
+    val supportingText: String? = null,
+)
+
 /**
  * Shared numeric editor for Harness forms.
  *
@@ -31,8 +37,7 @@ fun HarnessNumberField(
     modifier: Modifier = Modifier,
     mode: HarnessNumberInputMode = HarnessNumberInputMode.INTEGER,
     enabled: Boolean = true,
-    isError: Boolean = false,
-    supportingText: String? = null,
+    validation: HarnessNumberFieldValidation = HarnessNumberFieldValidation(),
 ) {
     OutlinedTextField(
         value = value,
@@ -42,9 +47,9 @@ fun HarnessNumberField(
         modifier = modifier,
         enabled = enabled,
         singleLine = true,
-        isError = isError,
+        isError = validation.isError,
         label = { Text(label) },
-        supportingText = supportingText?.let { detail ->
+        supportingText = validation.supportingText?.let { detail ->
             { Text(detail) }
         },
         keyboardOptions = KeyboardOptions(
