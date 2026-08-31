@@ -9,8 +9,6 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     state: HarnessApplicationsReadState,
     mutationState: HarnessApplicationsMutationState,
     onRefresh: () -> Unit,
-    onSetApplicationConnectionEnabled: (String, Boolean) -> Unit,
-    onCreateApplicationConnection: (String, String, String, String, String, String, Int) -> Unit,
     onSetDefaultPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary) -> Unit,
     onCreateCustomPreset: (
         String,
@@ -25,8 +23,6 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
 ) {
     val callbacks = HarnessApplicationsGraphCallbacks(
         onRefresh = onRefresh,
-        onSetApplicationConnectionEnabled = onSetApplicationConnectionEnabled,
-        onCreateApplicationConnection = onCreateApplicationConnection,
         onSetDefaultPreset = onSetDefaultPreset,
         onCreateCustomPreset = onCreateCustomPreset,
         onClearMutationFeedback = onClearMutationFeedback,
