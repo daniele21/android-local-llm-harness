@@ -49,11 +49,11 @@ class RoomHostControlPlaneStoreTest {
     @Test
     fun persistedControlPlaneSurvivesDatabaseRestart() {
         val expected = state()
-        openDatabase().use { first ->
+        withDatabase { first ->
             RoomHostControlPlaneStore(first).replace(expected)
         }
 
-        openDatabase().use { second ->
+        withDatabase { second ->
             val actual = RoomHostControlPlaneStore(second).snapshot()
             assertEquals(expected.canonical(), actual)
             assertTrue(actual.bindings.single().isDefault)
@@ -63,7 +63,7 @@ class RoomHostControlPlaneStoreTest {
     @Test
     fun invalidTransactionRollsBackWithoutDestroyingPreviousConfiguration() {
         val expected = state()
-        openDatabase().use { database ->
+        withDatabase { database ->
             val store = RoomHostControlPlaneStore(database)
             store.replace(expected)
 
@@ -81,6 +81,15 @@ class RoomHostControlPlaneStoreTest {
 
             assertTrue(result.exceptionOrNull() is IllegalArgumentException)
             assertEquals(expected.canonical(), store.snapshot())
+        }
+    }
+
+    private inline fun <T> withDatabase(block: (HostControlPlaneDatabase) -> T): T {
+        val database = openDatabase()
+        return try {
+            block(database)
+        } finally {
+            database.close()
         }
     }
 
