@@ -34,7 +34,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: play-internal-${{ github.event_name == 'push' && github.sha || inputs.candidate_ref }}
+  group: play-internal-phone-test
   cancel-in-progress: false
 
 jobs:
@@ -69,7 +69,7 @@ jobs:
               -f head_sha="$candidate_sha" \
               -f event=push \
               -f per_page=20)"
-            state="$(printf '%s' "$response" | python3 -c 'import json,sys; runs=json.load(sys.stdin).get("workflow_runs", []); r=runs[0] if runs else {}; print(f"{r.get(chr(105)+chr(100), chr(45))}|{r.get(chr(115)+chr(116)+chr(97)+chr(116)+chr(117)+chr(115), chr(45))}|{r.get(chr(99)+chr(111)+chr(110)+chr(99)+chr(108)+chr(117)+chr(115)+chr(105)+chr(111)+chr(110), chr(45))}")')"
+            state="$(printf '%s' "$response" | python3 -c 'import json,sys; runs=json.load(sys.stdin).get("workflow_runs", []); r=runs[0] if runs else {}; print("{}|{}|{}".format(r.get("id", "-"), r.get("status", "-"), r.get("conclusion", "-")))')"
             IFS='|' read -r run_id status conclusion <<< "$state"
             if [[ "$run_id" == "-" ]]; then
               sleep 10
@@ -122,6 +122,7 @@ jobs:
           service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
 
       - name: Resolve next Play versionCode
         id: play-version
@@ -164,6 +165,7 @@ jobs:
           service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
 
       - name: Publish to Internal Testing
         env:
