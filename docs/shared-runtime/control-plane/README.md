@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: shared-runtime-control-plane
 Canonical scope: shared-runtime.control-plane.routing
 Read when: designing or implementing dynamic application/use-case bindings, presets, residency ownership, Harness decisions/notifications, or unified cross-app inference observability
-Last reviewed: 2026-08-18
+Last reviewed: 2026-08-31
 
 Harness is the owner of local-AI execution policy for both its own UI and authorized consumer applications. Consumers declare intent through host-advertised use cases and presets; they never own exact GGUF/model selection, residency, backend tuning or host diagnostics.
 
@@ -75,6 +75,7 @@ Harness runtime + observability
 | Session/run telemetry, Room history, runtime instrumentation and Sessions UI | [`workstreams/observability.md`](workstreams/observability.md) |
 | Activation/residency, consumer discovery/Binder evolution and final cutover | [`workstreams/activation-consumer.md`](workstreams/activation-consumer.md) |
 | Durable ownership decision | [`../../adr/0015-harness-managed-control-plane.md`](../../adr/0015-harness-managed-control-plane.md) |
+| Durable consumer inference lifetime and app-switch semantics | [`../../adr/0016-durable-consumer-inference-jobs.md`](../../adr/0016-durable-consumer-inference-jobs.md) |
 | Existing public consumer boundary | [`../consumer-api/README.md`](../consumer-api/README.md) |
 | Shared-runtime release/evidence gates | [`../roadmap.md`](../roadmap.md) |
 
