@@ -55,23 +55,32 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     }
 
     override fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit) {
-        delegate.prepare(request, object : IPrepareCallback.Stub() {
-            override fun onResult(result: PrepareResultParcel) = callback(result)
-        })
+        delegate.prepare(
+            request,
+            object : IPrepareCallback.Stub() {
+                override fun onResult(result: PrepareResultParcel) = callback(result)
+            },
+        )
     }
 
     override fun openSession(request: OpenSessionRequestParcel, callback: (SessionResultParcel) -> Unit) {
-        delegate.openSession(request, object : ISessionCallback.Stub() {
-            override fun onResult(result: SessionResultParcel) = callback(result)
-        })
+        delegate.openSession(
+            request,
+            object : ISessionCallback.Stub() {
+                override fun onResult(result: SessionResultParcel) = callback(result)
+            },
+        )
     }
 
     override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
 
     override fun generate(request: GenerationRequestParcel, callback: (GenerationEventParcel) -> Unit) {
-        delegate.generate(request, object : IGenerationCallback.Stub() {
-            override fun onEvent(event: GenerationEventParcel) = callback(event)
-        })
+        delegate.generate(
+            request,
+            object : IGenerationCallback.Stub() {
+                override fun onEvent(event: GenerationEventParcel) = callback(event)
+            },
+        )
     }
 
     override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
