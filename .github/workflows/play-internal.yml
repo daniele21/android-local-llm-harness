@@ -1,45 +1,92 @@
 name: Publish Play Internal
 
 on:
-  workflow_run:
-    workflows: ["Validate"]
-    types: [completed]
+  push:
     branches: [dev]
+    paths:
+      - "apps/local-llm-phone-test/**"
+      - "backends/**"
+      - "core/**"
+      - "models/**"
+      - "observability/**"
+      - "transports/**"
+      - "integrations/**"
+      - "ui/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "third_party/llama.cpp"
+      - "scripts/build-android-aab.sh"
+      - "scripts/build-phone-test-release.sh"
+      - "scripts/google-play-internal.py"
+      - ".github/workflows/play-internal.yml"
   workflow_dispatch:
     inputs:
       candidate_ref:
-        description: Branch, tag, or commit to publish
+        description: Branch, tag, or commit to publish; it must already have a successful push Validate run
         type: string
         default: dev
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
 concurrency:
-  group: play-internal-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.candidate_ref }}
+  group: play-internal-${{ github.event_name == 'push' && github.sha || inputs.candidate_ref }}
   cancel-in-progress: false
 
 jobs:
   publish:
     name: Sign and publish phone test to Play Internal Testing
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch' || vars.PLAY_INTERNAL_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: play-internal
     env:
       PLAY_PACKAGE_NAME: io.github.daniele21.localllm.phonetest
       PLAY_TRACK: internal
 
     steps:
-      - name: Checkout exact validated candidate
+      - name: Checkout exact candidate
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: recursive
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.candidate_ref }}
+          ref: ${{ github.event_name == 'push' && github.sha || inputs.candidate_ref }}
+
+      - name: Require successful Validate for exact candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_sha="$(git rev-parse HEAD)"
+          for attempt in $(seq 1 180); do
+            response="$(gh api -X GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/validate.yml/runs" \
+              -f head_sha="$candidate_sha" \
+              -f event=push \
+              -f per_page=20)"
+            state="$(printf '%s' "$response" | python3 -c 'import json,sys; runs=json.load(sys.stdin).get("workflow_runs", []); r=runs[0] if runs else {}; print(f"{r.get(chr(105)+chr(100), chr(45))}|{r.get(chr(115)+chr(116)+chr(97)+chr(116)+chr(117)+chr(115), chr(45))}|{r.get(chr(99)+chr(111)+chr(110)+chr(99)+chr(108)+chr(117)+chr(115)+chr(105)+chr(111)+chr(110), chr(45))}")')"
+            IFS='|' read -r run_id status conclusion <<< "$state"
+            if [[ "$run_id" == "-" ]]; then
+              sleep 10
+              continue
+            fi
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "Validate run $run_id passed for $candidate_sha"
+                exit 0
+              fi
+              echo "Validate run $run_id completed with conclusion: $conclusion" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "No completed Validate run found for $candidate_sha within the release gate window." >&2
+          exit 1
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
