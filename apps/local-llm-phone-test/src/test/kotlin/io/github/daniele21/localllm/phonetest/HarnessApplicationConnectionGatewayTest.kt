@@ -79,7 +79,7 @@ class HarnessApplicationConnectionGatewayTest {
             createCommand().copy(applicationId = "other-app"),
         )
 
-        assertEquals(HarnessControlPlaneMutationResult.Rejected("Android package is already connected"), result)
+        assertEquals(HarnessControlPlaneMutationResult.Rejected("Package name is already connected"), result)
         assertEquals(before, store.snapshot())
     }
 
