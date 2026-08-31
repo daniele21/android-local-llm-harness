@@ -89,7 +89,7 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
-                        painter = painterResource(R.drawable.harness_launcher_foreground),
+                        painter = painterResource(R.drawable.harness_launcher_symbol),
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
                     )

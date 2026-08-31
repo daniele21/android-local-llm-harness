@@ -67,6 +67,7 @@ When the profile/claim requires E2E, read `.engineering/e2e.json` and choose the
 Harness mappings:
 
 - `binder-contract-serialization` -> `binder-api35-emulator` / `simulated_or_emulated`; proves Android Binder Parcelable contract behavior only.
+- `phone-cold-start` -> `phone-cold-start-api35-emulator` / `simulated_or_emulated`; installs a no-native canary derived from the production-shaped phone debug APK, launches the real `MainActivity`, and proves clean startup/rendering remains independent of JNI/native loading. It does not establish ARM64 linker, release-signing, model or inference behavior.
 - `local-inference-device-lifecycle` -> current automated environment gap; production ARM64 JNI/llama.cpp, real GGUF loading, memory reclamation and physical thermal/OEM behavior remain `REAL_ENVIRONMENT` evidence on `physical-arm64-device`.
 
 Do not promote API35 x86_64 emulator evidence into ARM64/native/model/resource claims. Built/installable artifact evidence may prove package/install behavior while still remaining emulator fidelity for hardware-dependent claims.
