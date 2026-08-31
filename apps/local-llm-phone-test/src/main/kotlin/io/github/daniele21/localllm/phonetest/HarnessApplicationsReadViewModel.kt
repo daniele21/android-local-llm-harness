@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 internal sealed interface HarnessApplicationsReadState {
     data object Loading : HarnessApplicationsReadState
@@ -33,7 +34,7 @@ internal sealed interface HarnessApplicationsMutationState {
 internal class HarnessApplicationsReadViewModel : ViewModel() {
     private val mutableState = MutableStateFlow<HarnessApplicationsReadState>(HarnessApplicationsReadState.Loading)
     private val mutableMutationState = MutableStateFlow<HarnessApplicationsMutationState>(HarnessApplicationsMutationState.Idle)
-    private val generation = java.util.concurrent.atomic.AtomicLong(0)
+    private val generation = AtomicLong(0)
     private var gateway: HarnessApplicationsGateway? = null
 
     val state: StateFlow<HarnessApplicationsReadState> = mutableState.asStateFlow()
@@ -63,7 +64,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         mutableState.value = HarnessApplicationsReadState.Loading
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching(attached::snapshot)
-            if (!isCurrent(token, attached)) return@launch
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
             mutableState.value = result.fold(
                 onSuccess = HarnessApplicationsReadState::Loaded,
                 onFailure = { HarnessApplicationsReadState.Failed("Applications could not be loaded") },
@@ -155,7 +156,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                     ),
                 )
             }.getOrElse {
-                if (isCurrent(token, attached)) {
+                if (isCurrentGeneration(generation, token, gateway, attached)) {
                     mutableMutationState.value = HarnessApplicationsMutationState.Failed(
                         "Custom preset could not be saved. Nothing was retried automatically.",
                     )
@@ -163,7 +164,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                 return@launch
             }
             val canonical = runCatching(attached::snapshot).getOrNull()
-            if (!isCurrent(token, attached)) return@launch
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
             canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
             mutableMutationState.value = result.toMutationState(canonical != null)
         }
@@ -185,7 +186,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         mutableMutationState.value = HarnessApplicationsMutationState.Saving
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching { operation(attached) }.getOrElse {
-                if (isCurrent(token, attached)) {
+                if (isCurrentGeneration(generation, token, gateway, attached)) {
                     mutableMutationState.value = HarnessApplicationsMutationState.Failed(
                         "Configuration could not be updated. Nothing was retried automatically.",
                     )
@@ -193,13 +194,11 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                 return@launch
             }
             val canonical = runCatching(attached::snapshot).getOrNull()
-            if (!isCurrent(token, attached)) return@launch
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
             canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
             mutableMutationState.value = result.toMutationState(canonical != null, successMessage)
         }
     }
-
-    private fun isCurrent(token: Long, attached: HarnessApplicationsGateway): Boolean = generation.get() == token && gateway === attached
 
     override fun onCleared() {
         generation.incrementAndGet()
@@ -208,6 +207,13 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         super.onCleared()
     }
 }
+
+private fun isCurrentGeneration(
+    generation: AtomicLong,
+    token: Long,
+    currentGateway: HarnessApplicationsGateway?,
+    attached: HarnessApplicationsGateway,
+): Boolean = generation.get() == token && currentGateway === attached
 
 private fun HarnessControlPlaneMutationResult.toMutationState(
     canonicalReloaded: Boolean,
