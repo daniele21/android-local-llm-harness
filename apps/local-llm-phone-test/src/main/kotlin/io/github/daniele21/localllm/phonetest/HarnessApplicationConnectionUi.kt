@@ -96,26 +96,14 @@ internal fun HarnessCreateApplicationConnectionScreen(
     val saving = mutationState == HarnessApplicationsMutationState.Saving
     val saved = mutationState is HarnessApplicationsMutationState.Saved
     val signerValid = signerSha256.length == SHA256_FINGERPRINT_LENGTH && signerSha256.all(Char::isHexDigit)
-    val formValid = displayName.isNotBlank() &&
-        applicationId.isNotBlank() &&
-        packageName.isNotBlank() &&
-        signerValid
+    val formValid = displayName.isNotBlank() && applicationId.isNotBlank() && packageName.isNotBlank() && signerValid
 
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("create-application-connection"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(LocalHarnessSpacing.current.large),
         verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall)) {
-                Text("New app connection", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    "Authorize one exact Android package and signing identity to use a selected Harness use case.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        item { ConnectionScreenHeader() }
         item {
             ConnectionIdentitySection(
                 model = ConnectionIdentityModel(
@@ -126,16 +114,16 @@ internal fun HarnessCreateApplicationConnectionScreen(
                     signerValid,
                     !saving && !saved,
                 ),
-                onDisplayNameChanged = {
-                    displayName = it
+                onDisplayNameChanged = { value ->
+                    displayName = value
                     onClearFeedback()
                 },
-                onApplicationIdChanged = {
-                    applicationId = it
+                onApplicationIdChanged = { value ->
+                    applicationId = value
                     onClearFeedback()
                 },
-                onPackageNameChanged = {
-                    packageName = it.trim()
+                onPackageNameChanged = { value ->
+                    packageName = value.trim()
                     onClearFeedback()
                 },
                 onSignerChanged = { candidate ->
@@ -161,42 +149,95 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 },
             )
         }
-        item {
-            HarnessCard(emphasized = true) {
-                Text("Review connection", style = MaterialTheme.typography.titleMedium)
-                HarnessKeyValueRow("Application", displayName.ifBlank { "Not set" })
-                HarnessKeyValueRow("Package", packageName.ifBlank { "Not set" })
-                HarnessKeyValueRow("Use case", selectedUseCase.displayName)
-                HarnessKeyValueRow("Default preset", selectedPreset.displayName)
-                Text(
-                    "Creating this connection enables access immediately. You can disable it later without deleting its configuration.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        item { ConnectionReviewCard(displayName, packageName, selectedUseCase, selectedPreset) }
         item { ConnectionMutationFeedback(mutationState, onReload, onClearFeedback, onDone) }
         if (!saved) {
             item {
-                HarnessPrimaryButton(
-                    text = if (saving) "Creating connection…" else "Create & enable connection",
+                ConnectionCreateAction(
+                    saving = saving,
                     enabled = formValid && !saving,
-                    modifier = Modifier.fillMaxWidth().testTag("connection-create"),
-                    onClick = {
-                        onCreate(
-                            applicationId.trim(),
-                            displayName.trim(),
-                            packageName.trim(),
-                            signerSha256,
-                            selectedUseCase.useCaseId,
-                            selectedPreset.presetId,
-                            selectedPreset.revision,
-                        )
-                    },
+                    submission = ConnectionSubmission(
+                        applicationId.trim(),
+                        displayName.trim(),
+                        packageName.trim(),
+                        signerSha256,
+                        selectedUseCase.useCaseId,
+                        selectedPreset.presetId,
+                        selectedPreset.revision,
+                    ),
+                    onCreate = onCreate,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun ConnectionScreenHeader() {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.xSmall)) {
+        Text("New app connection", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Authorize one exact Android package and signing identity to use a selected Harness use case.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ConnectionReviewCard(
+    displayName: String,
+    packageName: String,
+    selectedUseCase: HarnessConnectionUseCaseOption,
+    selectedPreset: HarnessConnectionPresetOption,
+) {
+    HarnessCard(emphasized = true) {
+        Text("Review connection", style = MaterialTheme.typography.titleMedium)
+        HarnessKeyValueRow("Application", displayName.ifBlank { "Not set" })
+        HarnessKeyValueRow("Package", packageName.ifBlank { "Not set" })
+        HarnessKeyValueRow("Use case", selectedUseCase.displayName)
+        HarnessKeyValueRow("Default preset", selectedPreset.displayName)
+        Text(
+            "Creating this connection enables access immediately. You can disable it later without deleting its configuration.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private data class ConnectionSubmission(
+    val applicationId: String,
+    val displayName: String,
+    val packageName: String,
+    val signerSha256: String,
+    val useCaseId: String,
+    val presetId: String,
+    val presetRevision: Int,
+)
+
+@Composable
+private fun ConnectionCreateAction(
+    saving: Boolean,
+    enabled: Boolean,
+    submission: ConnectionSubmission,
+    onCreate: (String, String, String, String, String, String, Int) -> Unit,
+) {
+    HarnessPrimaryButton(
+        text = if (saving) "Creating connection…" else "Create & enable connection",
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().testTag("connection-create"),
+        onClick = {
+            onCreate(
+                submission.applicationId,
+                submission.displayName,
+                submission.packageName,
+                submission.signerSha256,
+                submission.useCaseId,
+                submission.presetId,
+                submission.presetRevision,
+            )
+        },
+    )
 }
 
 private data class ConnectionIdentityModel(
