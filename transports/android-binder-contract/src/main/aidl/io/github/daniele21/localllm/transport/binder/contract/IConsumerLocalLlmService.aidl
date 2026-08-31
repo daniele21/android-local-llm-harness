@@ -4,9 +4,12 @@ import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParce
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel;
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel;
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel;
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobQueryParcel;
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobSubmitParcel;
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback;
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLogicalJobResultCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback;
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback;
 
@@ -28,4 +31,10 @@ interface IConsumerLocalLlmService {
 
     // Appended in protocol minor 4; the request reuses control-plane activation identity only.
     void runtimeReadiness(in ConsumerControlPlaneRequestParcel request, IConsumerRuntimeReadinessResultCallback callback);
+
+    // Appended in protocol minor 5. Detached jobs are owned by authenticated caller scope, not Binder connection lifetime.
+    void submitLogicalGeneration(in ConsumerLogicalJobSubmitParcel request, IConsumerLogicalJobResultCallback callback);
+    void getLogicalJob(in ConsumerLogicalJobQueryParcel request, IConsumerLogicalJobResultCallback callback);
+    void getLogicalJobResult(in ConsumerLogicalJobQueryParcel request, IConsumerLogicalJobResultCallback callback);
+    oneway void cancelLogicalJob(in ConsumerLogicalJobQueryParcel request);
 }
