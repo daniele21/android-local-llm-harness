@@ -3,12 +3,12 @@ package io.github.daniele21.localllm.phonetest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.daniele21.localllm.models.PresetGenerationOverrides
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 internal sealed interface HarnessApplicationsReadState {
     data object Loading : HarnessApplicationsReadState
@@ -202,7 +202,8 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         }
     }
 
-    private fun isCurrent(token: Long, attached: HarnessApplicationsGateway): Boolean = generation.get() == token && gateway === attached
+    private fun isCurrent(token: Long, attached: HarnessApplicationsGateway): Boolean =
+        generation.get() == token && gateway === attached
 
     override fun onCleared() {
         generation.incrementAndGet()
@@ -233,7 +234,9 @@ private fun HarnessControlPlaneMutationResult.toMutationState(
     )
 }
 
-private fun HarnessCustomPresetMutationResult.toMutationState(canonicalReloaded: Boolean): HarnessApplicationsMutationState = when (this) {
+private fun HarnessCustomPresetMutationResult.toMutationState(
+    canonicalReloaded: Boolean,
+): HarnessApplicationsMutationState = when (this) {
     is HarnessCustomPresetMutationResult.Success -> if (canonicalReloaded) {
         HarnessApplicationsMutationState.Saved(
             message = "Preset saved and reloaded from the control plane.",
