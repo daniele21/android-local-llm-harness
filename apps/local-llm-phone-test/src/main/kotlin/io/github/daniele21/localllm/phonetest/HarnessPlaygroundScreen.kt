@@ -31,6 +31,7 @@ import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessColors
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberFieldValidation
 import io.github.daniele21.localllm.ui.designsystem.HarnessNumberInputMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
@@ -230,7 +231,7 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
         mode = HarnessNumberInputMode.DECIMAL,
         enabled = presentation.inputsEnabled,
         modifier = Modifier.fillMaxWidth().testTag("playground-temperature-field"),
-        supportingText = "0–2. Slider and field stay synchronized.",
+        validation = HarnessNumberFieldValidation(supportingText = "0–2. Slider and field stay synchronized."),
     )
     Slider(
         value = temperature,
@@ -248,7 +249,7 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
         mode = HarnessNumberInputMode.DECIMAL,
         enabled = presentation.inputsEnabled && temperature != 0f,
         modifier = Modifier.fillMaxWidth().testTag("playground-top-p-field"),
-        supportingText = "0.01–1. Slider and field stay synchronized.",
+        validation = HarnessNumberFieldValidation(supportingText = "0.01–1. Slider and field stay synchronized."),
     )
     Slider(
         value = topP,
@@ -315,7 +316,7 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         onValueChange = actions.updateRepeatPenalty,
         label = "Repeat penalty",
         mode = HarnessNumberInputMode.DECIMAL,
-        supportingText = "1 = off",
+        validation = HarnessNumberFieldValidation(supportingText = "1 = off"),
         enabled = presentation.inputsEnabled,
         modifier = Modifier.fillMaxWidth().testTag("playground-repeat-penalty"),
     )
@@ -323,7 +324,7 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         value = state.playgroundRepeatLastN,
         onValueChange = actions.updateRepeatLastN,
         label = "Repeat last N",
-        supportingText = "0 = off",
+        validation = HarnessNumberFieldValidation(supportingText = "0 = off"),
         enabled = presentation.inputsEnabled,
         modifier = Modifier.fillMaxWidth().testTag("playground-repeat-last-n"),
     )
@@ -364,7 +365,9 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         value = state.playgroundContext,
         onValueChange = actions.updateContext,
         label = "Context size · blank = Auto",
-        supportingText = "Manual values are exact; insufficient context fails without truncation.",
+        validation = HarnessNumberFieldValidation(
+            supportingText = "Manual values are exact; insufficient context fails without truncation.",
+        ),
         enabled = presentation.inputsEnabled,
         modifier = Modifier.fillMaxWidth(),
     )
