@@ -4,8 +4,6 @@ import io.github.daniele21.localllm.models.PresetGenerationOverrides
 
 internal data class HarnessApplicationsGraphCallbacks(
     val onRefresh: () -> Unit,
-    val onSetApplicationConnectionEnabled: (String, Boolean) -> Unit,
-    val onCreateApplicationConnection: (String, String, String, String, String, String, Int) -> Unit,
     val onSetDefaultPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary) -> Unit,
     val onCreateCustomPreset: (
         String,
