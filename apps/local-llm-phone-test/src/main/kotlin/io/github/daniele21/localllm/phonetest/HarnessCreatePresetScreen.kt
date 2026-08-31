@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.ui.designsystem.HarnessEmptyState
 import io.github.daniele21.localllm.ui.designsystem.HarnessErrorState
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
@@ -28,6 +29,9 @@ private data class HarnessCreatePresetDraft(
     val modelSelectionValid: Boolean,
     val parsedContext: Int?,
     val contextValid: Boolean,
+    val generationDraft: HarnessPresetGenerationDraft,
+    val generationOverrides: PresetGenerationOverrides?,
+    val generationValid: Boolean,
     val effectiveConfiguration: HarnessPresetConfigurationSummary,
 )
 
@@ -38,6 +42,7 @@ private data class HarnessCreatePresetDraftActions(
     val onBaseSelected: (HarnessPresetSummary) -> Unit,
     val onModelSelected: (String?) -> Unit,
     val onContextChanged: (String) -> Unit,
+    val onGenerationChanged: (HarnessPresetGenerationDraft) -> Unit,
 )
 
 @Composable
@@ -94,6 +99,7 @@ private fun HarnessCreatePresetReadyContent(
     var selectedModelProfileId by rememberSaveable(application.applicationId, assignment.useCaseId) {
         mutableStateOf(initialBase.modelProfileId)
     }
+    val generationState = rememberHarnessPresetGenerationDraft(application.applicationId, assignment.useCaseId)
 
     val selectedBase = assignment.availablePresets.firstOrNull { it.identityKey() == selectedBaseKey } ?: initialBase
     LaunchedEffect(assignment.bindingRevision, selectedBaseKey) {
@@ -101,15 +107,22 @@ private fun HarnessCreatePresetReadyContent(
             selectedBaseKey = initialBase.identityKey()
             contextText = initialBase.contextTokens?.toString().orEmpty()
             selectedModelProfileId = initialBase.modelProfileId
+            generationState.update(HarnessPresetGenerationDraft())
         }
     }
 
     val parsedContext = contextText.toIntOrNull()
     val contextValid = contextText.isBlank() || (parsedContext != null && parsedContext > 0)
     val modelSelectionValid = isHarnessPresetModelSelectionValid(assignment.useCaseId, selectedModelProfileId)
+    val generationResult = generationState.draft.overridesResult()
+    val generationOverrides = generationResult.getOrNull()
+    val generationValid = generationResult.isSuccess
     val effectiveConfiguration = harnessPresetConfigurationSummary(
         useCaseId = assignment.useCaseId,
-        preset = selectedBase.copy(contextTokens = parsedContext),
+        preset = selectedBase.copy(
+            contextTokens = parsedContext,
+            generationOverrides = generationOverrides,
+        ),
         selectedModelProfileId = selectedModelProfileId,
     )
     val saved = mutationState as? HarnessApplicationsMutationState.Saved
@@ -121,6 +134,9 @@ private fun HarnessCreatePresetReadyContent(
         modelSelectionValid = modelSelectionValid,
         parsedContext = parsedContext,
         contextValid = contextValid,
+        generationDraft = generationState.draft,
+        generationOverrides = generationOverrides,
+        generationValid = generationValid,
         effectiveConfiguration = effectiveConfiguration,
     )
     val status = HarnessCreatePresetStatus(
@@ -133,6 +149,7 @@ private fun HarnessCreatePresetReadyContent(
             selectedBaseKey = preset.identityKey()
             contextText = preset.contextTokens?.toString().orEmpty()
             selectedModelProfileId = preset.modelProfileId
+            generationState.update(HarnessPresetGenerationDraft())
             actions.onClearFeedback()
         },
         onModelSelected = { modelProfileId ->
@@ -140,10 +157,12 @@ private fun HarnessCreatePresetReadyContent(
             actions.onClearFeedback()
         },
         onContextChanged = { value ->
-            if (value.isEmpty() || value.all(Char::isDigit)) {
-                contextText = value
-                actions.onClearFeedback()
-            }
+            contextText = value
+            actions.onClearFeedback()
+        },
+        onGenerationChanged = { value ->
+            generationState.update(value)
+            actions.onClearFeedback()
         },
     )
     HarnessCreatePresetForm(
@@ -207,6 +226,13 @@ private fun HarnessCreatePresetForm(
                 onValueChange = draftActions.onContextChanged,
             )
         }
+        item {
+            HarnessPresetGenerationEditor(
+                draft = draft.generationDraft,
+                enabled = !status.saving && status.customSaved == null,
+                onDraftChanged = draftActions.onGenerationChanged,
+            )
+        }
         item { HarnessEffectivePresetConfigurationCard(draft.effectiveConfiguration) }
         item { HarnessCustomPresetFeedback(state = mutationState, actions = actions) }
         if (status.customSaved == null) {
@@ -217,6 +243,7 @@ private fun HarnessCreatePresetForm(
                         draft.displayName.isNotBlank() &&
                         draft.contextValid &&
                         draft.modelSelectionValid &&
+                        draft.generationValid &&
                         draft.effectiveConfiguration.available,
                     onSave = {
                         actions.onSave(
@@ -224,6 +251,7 @@ private fun HarnessCreatePresetForm(
                             draft.displayName.trim(),
                             draft.selectedModelProfileId,
                             draft.parsedContext,
+                            draft.generationOverrides,
                         )
                     },
                 )

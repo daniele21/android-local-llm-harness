@@ -2,12 +2,14 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 internal sealed interface HarnessApplicationsReadState {
     data object Loading : HarnessApplicationsReadState
@@ -32,7 +34,7 @@ internal sealed interface HarnessApplicationsMutationState {
 internal class HarnessApplicationsReadViewModel : ViewModel() {
     private val mutableState = MutableStateFlow<HarnessApplicationsReadState>(HarnessApplicationsReadState.Loading)
     private val mutableMutationState = MutableStateFlow<HarnessApplicationsMutationState>(HarnessApplicationsMutationState.Idle)
-    private val generation = java.util.concurrent.atomic.AtomicLong(0)
+    private val generation = AtomicLong(0)
     private var gateway: HarnessApplicationsGateway? = null
 
     val state: StateFlow<HarnessApplicationsReadState> = mutableState.asStateFlow()
@@ -62,7 +64,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         mutableState.value = HarnessApplicationsReadState.Loading
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching(attached::snapshot)
-            if (!isCurrent(token, attached)) return@launch
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
             mutableState.value = result.fold(
                 onSuccess = HarnessApplicationsReadState::Loaded,
                 onFailure = { HarnessApplicationsReadState.Failed("Applications could not be loaded") },
@@ -70,37 +72,51 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         }
     }
 
-    fun setDefaultPreset(applicationId: String, assignment: HarnessAssignmentSummary, preset: HarnessPresetSummary) {
-        val attached = gateway
-        if (attached == null) {
-            mutableMutationState.value = HarnessApplicationsMutationState.Failed("Applications source is unavailable")
-            return
+    fun setApplicationConnectionEnabled(applicationId: String, enabled: Boolean) {
+        mutateControlPlane(
+            successMessage = if (enabled) "Application connection enabled." else "Application connection disabled.",
+        ) { attached ->
+            attached.setApplicationConnectionEnabled(
+                HarnessSetApplicationConnectionEnabledCommand(applicationId = applicationId, enabled = enabled),
+            )
         }
-        val token = generation.incrementAndGet()
-        mutableMutationState.value = HarnessApplicationsMutationState.Saving
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = runCatching {
-                attached.setDefaultPreset(
-                    HarnessSetDefaultPresetCommand(
-                        applicationId = applicationId,
-                        useCaseId = assignment.useCaseId,
-                        expectedBindingRevision = assignment.bindingRevision,
-                        presetId = preset.presetId,
-                        presetRevision = preset.revision,
-                    ),
-                )
-            }.getOrElse {
-                if (isCurrent(token, attached)) {
-                    mutableMutationState.value = HarnessApplicationsMutationState.Failed(
-                        "Configuration could not be updated. Nothing was retried automatically.",
-                    )
-                }
-                return@launch
-            }
-            val canonical = runCatching(attached::snapshot).getOrNull()
-            if (!isCurrent(token, attached)) return@launch
-            canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
-            mutableMutationState.value = result.toMutationState(canonical != null)
+    }
+
+    fun createApplicationConnection(
+        applicationId: String,
+        displayName: String,
+        packageName: String,
+        signerSha256: String,
+        useCaseId: String,
+        presetId: String,
+        presetRevision: Int,
+    ) {
+        mutateControlPlane(successMessage = "Application connection created and enabled.") { attached ->
+            attached.createApplicationConnection(
+                HarnessCreateApplicationConnectionCommand(
+                    applicationId = applicationId,
+                    displayName = displayName,
+                    packageName = packageName,
+                    signerSha256 = signerSha256,
+                    useCaseId = useCaseId,
+                    presetId = presetId,
+                    presetRevision = presetRevision,
+                ),
+            )
+        }
+    }
+
+    fun setDefaultPreset(applicationId: String, assignment: HarnessAssignmentSummary, preset: HarnessPresetSummary) {
+        mutateControlPlane(successMessage = "Default preset updated and reloaded from the control plane.") { attached ->
+            attached.setDefaultPreset(
+                HarnessSetDefaultPresetCommand(
+                    applicationId = applicationId,
+                    useCaseId = assignment.useCaseId,
+                    expectedBindingRevision = assignment.bindingRevision,
+                    presetId = preset.presetId,
+                    presetRevision = preset.revision,
+                ),
+            )
         }
     }
 
@@ -111,6 +127,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         displayName: String,
         modelProfileId: String?,
         contextTokens: Int?,
+        generationOverrides: PresetGenerationOverrides?,
     ) {
         val attached = gateway as? HarnessCustomPresetGateway
         if (attached == null) {
@@ -135,10 +152,11 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                         displayName = displayName,
                         modelProfileId = modelProfileId,
                         contextTokens = contextTokens,
+                        generationOverrides = generationOverrides,
                     ),
                 )
             }.getOrElse {
-                if (isCurrent(token, attached)) {
+                if (isCurrentGeneration(generation, token, gateway, attached)) {
                     mutableMutationState.value = HarnessApplicationsMutationState.Failed(
                         "Custom preset could not be saved. Nothing was retried automatically.",
                     )
@@ -146,7 +164,7 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
                 return@launch
             }
             val canonical = runCatching(attached::snapshot).getOrNull()
-            if (!isCurrent(token, attached)) return@launch
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
             canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
             mutableMutationState.value = result.toMutationState(canonical != null)
         }
@@ -158,7 +176,29 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         }
     }
 
-    private fun isCurrent(token: Long, attached: HarnessApplicationsGateway): Boolean = generation.get() == token && gateway === attached
+    private fun mutateControlPlane(successMessage: String, operation: (HarnessApplicationsGateway) -> HarnessControlPlaneMutationResult) {
+        val attached = gateway
+        if (attached == null) {
+            mutableMutationState.value = HarnessApplicationsMutationState.Failed("Applications source is unavailable")
+            return
+        }
+        val token = generation.incrementAndGet()
+        mutableMutationState.value = HarnessApplicationsMutationState.Saving
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching { operation(attached) }.getOrElse {
+                if (isCurrentGeneration(generation, token, gateway, attached)) {
+                    mutableMutationState.value = HarnessApplicationsMutationState.Failed(
+                        "Configuration could not be updated. Nothing was retried automatically.",
+                    )
+                }
+                return@launch
+            }
+            val canonical = runCatching(attached::snapshot).getOrNull()
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
+            canonical?.let { mutableState.value = HarnessApplicationsReadState.Loaded(it) }
+            mutableMutationState.value = result.toMutationState(canonical != null, successMessage)
+        }
+    }
 
     override fun onCleared() {
         generation.incrementAndGet()
@@ -168,12 +208,22 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
     }
 }
 
-private fun HarnessControlPlaneMutationResult.toMutationState(canonicalReloaded: Boolean): HarnessApplicationsMutationState = when (this) {
+private fun isCurrentGeneration(
+    generation: AtomicLong,
+    token: Long,
+    currentGateway: HarnessApplicationsGateway?,
+    attached: HarnessApplicationsGateway,
+): Boolean = generation.get() == token && currentGateway === attached
+
+private fun HarnessControlPlaneMutationResult.toMutationState(
+    canonicalReloaded: Boolean,
+    successMessage: String,
+): HarnessApplicationsMutationState = when (this) {
     is HarnessControlPlaneMutationResult.Success -> if (canonicalReloaded) {
-        HarnessApplicationsMutationState.Saved("Default preset updated and reloaded from the control plane.")
+        HarnessApplicationsMutationState.Saved(successMessage)
     } else {
         HarnessApplicationsMutationState.Failed(
-            "The default preset was updated, but the canonical state could not be reloaded. Reload Applications before continuing.",
+            "The configuration changed, but the canonical state could not be reloaded. Reload Applications before continuing.",
         )
     }
 

@@ -49,11 +49,11 @@ class RoomHostControlPlanePartialStateTest {
     @Test
     fun partialCurrentSchemaStateCanBeReopenedThenCompletedAtomicallyAndPersists() {
         val partial = partialState()
-        openDatabase().use { database ->
+        withDatabase { database ->
             RoomHostControlPlaneStore(database).replace(partial)
         }
 
-        openDatabase().use { database ->
+        withDatabase { database ->
             val store = RoomHostControlPlaneStore(database)
             assertEquals(partial.canonical(), store.snapshot())
 
@@ -61,7 +61,7 @@ class RoomHostControlPlanePartialStateTest {
             assertEquals(complete(partial).canonical(), completed)
         }
 
-        openDatabase().use { database ->
+        withDatabase { database ->
             assertEquals(complete(partial).canonical(), RoomHostControlPlaneStore(database).snapshot())
         }
     }
@@ -69,7 +69,7 @@ class RoomHostControlPlanePartialStateTest {
     @Test
     fun failedRepairTransactionDoesNotExposePartialMutationAcrossReopen() {
         val partial = partialState()
-        openDatabase().use { database ->
+        withDatabase { database ->
             val store = RoomHostControlPlaneStore(database)
             store.replace(partial)
 
@@ -83,8 +83,17 @@ class RoomHostControlPlanePartialStateTest {
             assertEquals(partial.canonical(), store.snapshot())
         }
 
-        openDatabase().use { database ->
+        withDatabase { database ->
             assertEquals(partial.canonical(), RoomHostControlPlaneStore(database).snapshot())
+        }
+    }
+
+    private inline fun <T> withDatabase(block: (HostControlPlaneDatabase) -> T): T {
+        val database = openDatabase()
+        return try {
+            block(database)
+        } finally {
+            database.close()
         }
     }
 

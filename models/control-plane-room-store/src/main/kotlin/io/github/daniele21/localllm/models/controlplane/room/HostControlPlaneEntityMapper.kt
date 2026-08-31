@@ -94,6 +94,7 @@ private fun fromEntity(value: HostControlPlaneEntities.UseCaseEntity) = UseCaseD
 
 private fun toEntity(value: UseCasePresetDefinition): HostControlPlaneEntities.PresetEntity {
     val cache = value.execution.cachePolicy
+    val generation = value.execution.generationOverrides
     return HostControlPlaneEntities.PresetEntity(
         value.useCaseId.value,
         value.metadata.presetId,
@@ -110,6 +111,17 @@ private fun toEntity(value: UseCasePresetDefinition): HostControlPlaneEntities.P
         cache.reuseStatelessContext,
         cache.enablePrefixSnapshot,
         cache.enableDeterministicResultCache,
+        generation?.maxOutputTokens,
+        generation?.temperature,
+        generation?.topP,
+        generation?.topK,
+        generation?.minP,
+        generation?.presencePenalty,
+        generation?.repeatPenalty,
+        generation?.repeatLastN,
+        generation?.thinkingMode?.name,
+        generation?.seedMode?.name,
+        generation?.fixedSeed,
     )
 }
 
@@ -136,6 +148,7 @@ private fun fromEntity(value: HostControlPlaneEntities.PresetEntity) = UseCasePr
             enablePrefixSnapshot = value.enablePrefixSnapshot,
             enableDeterministicResultCache = value.enableDeterministicResultCache,
         ),
+        generationOverrides = value.toGenerationOverrides(),
     ),
 )
 

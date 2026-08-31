@@ -131,9 +131,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 HarnessSharedRuntimeBindings.redactGuardApplicationId ->
                     listOf(HarnessOmbraConsumerPolicy.create(applicationId))
 
-                else -> throw IllegalArgumentException(
-                    "Consumer API is not configured for applicationId ${applicationId.value}",
-                )
+                else -> {
+                    val state = controlPlaneStore.snapshot()
+                    require(state.isAuthorizedOmbraConsumer(applicationId)) {
+                        "Consumer API is not configured for applicationId ${applicationId.value}"
+                    }
+                    listOf(HarnessOmbraConsumerPolicy.create(applicationId))
+                }
             }
         val fallbackPolicyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies)
         val capabilityPolicy =

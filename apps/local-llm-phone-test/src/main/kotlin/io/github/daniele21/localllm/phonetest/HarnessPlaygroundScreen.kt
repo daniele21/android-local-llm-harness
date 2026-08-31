@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessColors
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberField
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberFieldValidation
+import io.github.daniele21.localllm.ui.designsystem.HarnessNumberInputMode
 import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 
@@ -221,7 +224,15 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
     }
 
     val temperature = playgroundTemperature(state)
-    Text("Temperature · ${state.playgroundTemperature}", style = MaterialTheme.typography.labelLarge)
+    HarnessNumberField(
+        value = state.playgroundTemperature,
+        onValueChange = actions.updateTemperature,
+        label = "Temperature",
+        mode = HarnessNumberInputMode.DECIMAL,
+        enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth().testTag("playground-temperature-field"),
+        validation = HarnessNumberFieldValidation(supportingText = "0–2. Slider and field stay synchronized."),
+    )
     Slider(
         value = temperature,
         onValueChange = { actions.updateTemperature(formatPlaygroundControlValue(it)) },
@@ -231,7 +242,15 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
     )
 
     val topP = state.playgroundTopP.toFloatOrNull()?.coerceIn(0.01f, 1f) ?: 0.9f
-    Text("Top-p · ${state.playgroundTopP}", style = MaterialTheme.typography.labelLarge)
+    HarnessNumberField(
+        value = state.playgroundTopP,
+        onValueChange = actions.updateTopP,
+        label = "Top-p",
+        mode = HarnessNumberInputMode.DECIMAL,
+        enabled = presentation.inputsEnabled && temperature != 0f,
+        modifier = Modifier.fillMaxWidth().testTag("playground-top-p-field"),
+        validation = HarnessNumberFieldValidation(supportingText = "0.01–1. Slider and field stay synchronized."),
+    )
     Slider(
         value = topP,
         onValueChange = { actions.updateTopP(formatPlaygroundControlValue(it)) },
@@ -248,12 +267,12 @@ private fun PlaygroundAdvancedControls(state: HarnessUiState, presentation: Play
         )
     }
 
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundMaxTokens,
         onValueChange = actions.updateMaxTokens,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Max output tokens") },
+        label = "Max output tokens",
         enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -269,42 +288,45 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundTopK,
         onValueChange = actions.updateTopK,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Top-k") },
+        label = "Top-k",
         enabled = samplingEnabled,
+        modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundMinP,
         onValueChange = actions.updateMinP,
-        modifier = Modifier.fillMaxWidth().testTag("playground-min-p"),
-        label = { Text("Min-p") },
+        label = "Min-p",
+        mode = HarnessNumberInputMode.DECIMAL,
         enabled = samplingEnabled,
+        modifier = Modifier.fillMaxWidth().testTag("playground-min-p"),
     )
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundPresencePenalty,
         onValueChange = actions.updatePresencePenalty,
-        modifier = Modifier.fillMaxWidth().testTag("playground-presence-penalty"),
-        label = { Text("Presence penalty") },
+        label = "Presence penalty",
+        mode = HarnessNumberInputMode.DECIMAL,
         enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth().testTag("playground-presence-penalty"),
     )
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundRepeatPenalty,
         onValueChange = actions.updateRepeatPenalty,
-        modifier = Modifier.fillMaxWidth().testTag("playground-repeat-penalty"),
-        label = { Text("Repeat penalty") },
-        supportingText = { Text("1 = off") },
+        label = "Repeat penalty",
+        mode = HarnessNumberInputMode.DECIMAL,
+        validation = HarnessNumberFieldValidation(supportingText = "1 = off"),
         enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth().testTag("playground-repeat-penalty"),
     )
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundRepeatLastN,
         onValueChange = actions.updateRepeatLastN,
-        modifier = Modifier.fillMaxWidth().testTag("playground-repeat-last-n"),
-        label = { Text("Repeat last N") },
-        supportingText = { Text("0 = off") },
+        label = "Repeat last N",
+        validation = HarnessNumberFieldValidation(supportingText = "0 = off"),
         enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth().testTag("playground-repeat-last-n"),
     )
 
     Text("Seed policy", style = MaterialTheme.typography.labelLarge)
@@ -323,12 +345,12 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         )
     }
     if (state.playgroundSeed.isNotBlank()) {
-        OutlinedTextField(
+        HarnessNumberField(
             value = state.playgroundSeed,
             onValueChange = actions.updateSeed,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Seed") },
+            label = "Seed",
             enabled = samplingEnabled,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 
@@ -339,13 +361,15 @@ private fun PlaygroundExpertControls(state: HarnessUiState, presentation: Playgr
         label = { Text("Auto") },
         enabled = presentation.inputsEnabled,
     )
-    OutlinedTextField(
+    HarnessNumberField(
         value = state.playgroundContext,
         onValueChange = actions.updateContext,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Context size · blank = Auto") },
-        supportingText = { Text("Manual values are exact; insufficient context fails without truncation.") },
+        label = "Context size · blank = Auto",
+        validation = HarnessNumberFieldValidation(
+            supportingText = "Manual values are exact; insufficient context fails without truncation.",
+        ),
         enabled = presentation.inputsEnabled,
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 

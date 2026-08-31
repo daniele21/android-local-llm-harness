@@ -79,14 +79,13 @@ class CallerAuthorizer(
     private val permissionName: String,
     policies: Collection<AuthorizedClientPolicy>,
     private val environment: CallerEnvironment,
+    private val policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
 ) {
-    private val policiesByPackage: Map<String, AuthorizedClientPolicy>
+    private val staticPolicies: List<AuthorizedClientPolicy> = policies.toList()
 
     init {
         require(permissionName.isNotBlank()) { "Permission name must not be blank" }
-        val grouped = policies.groupBy(AuthorizedClientPolicy::packageName)
-        require(grouped.values.none { it.size > 1 }) { "Authorized package policies must be unique" }
-        policiesByPackage = grouped.mapValues { (_, values) -> values.single() }
+        validatedPoliciesByPackage(staticPolicies)
     }
 
     fun authorize(callingProcess: CallingProcess): AuthorizationResult = if (environment.hasPermission(permissionName, callingProcess)) {
@@ -118,6 +117,8 @@ class CallerAuthorizer(
     }
 
     private fun authorizePackage(uid: Int, packageName: String): AuthorizationResult {
+        val policiesByPackage = policySource?.invoke()?.let(::validatedPoliciesByPackage)
+            ?: validatedPoliciesByPackage(staticPolicies)
         val policy = policiesByPackage[packageName]
             ?: return AuthorizationResult.Denied(AuthorizationFailure.PACKAGE_NOT_AUTHORIZED)
         val signerMatches = policy.acceptedSigningCertificates.any { certificate ->
@@ -135,5 +136,11 @@ class CallerAuthorizer(
         } else {
             AuthorizationResult.Denied(AuthorizationFailure.SIGNATURE_MISMATCH)
         }
+    }
+
+    private fun validatedPoliciesByPackage(policies: Collection<AuthorizedClientPolicy>): Map<String, AuthorizedClientPolicy> {
+        val grouped = policies.groupBy(AuthorizedClientPolicy::packageName)
+        require(grouped.values.none { it.size > 1 }) { "Authorized package policies must be unique" }
+        return grouped.mapValues { (_, values) -> values.single() }
     }
 }

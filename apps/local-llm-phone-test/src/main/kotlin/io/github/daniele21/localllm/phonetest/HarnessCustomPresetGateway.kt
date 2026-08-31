@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.PresetConsumerMetadata
 import io.github.daniele21.localllm.models.PresetCreationSource
+import io.github.daniele21.localllm.models.PresetGenerationOverrides
 import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCaseDefinition
@@ -23,6 +24,7 @@ internal data class HarnessCreateCustomPresetCommand(
     val displayName: String,
     val modelProfileId: String?,
     val contextTokens: Int?,
+    val generationOverrides: PresetGenerationOverrides? = null,
 )
 
 internal sealed interface HarnessCustomPresetMutationResult {
@@ -52,6 +54,13 @@ internal class StoreHarnessCustomPresetGateway(
 
     override fun setDefaultPreset(command: HarnessSetDefaultPresetCommand): HarnessControlPlaneMutationResult =
         delegate.setDefaultPreset(command)
+
+    override fun setApplicationConnectionEnabled(
+        command: HarnessSetApplicationConnectionEnabledCommand,
+    ): HarnessControlPlaneMutationResult = delegate.setApplicationConnectionEnabled(command)
+
+    override fun createApplicationConnection(command: HarnessCreateApplicationConnectionCommand): HarnessControlPlaneMutationResult =
+        delegate.createApplicationConnection(command)
 
     override fun createCustomPreset(command: HarnessCreateCustomPresetCommand): HarnessCustomPresetMutationResult {
         val identity = command.identity()
@@ -176,6 +185,7 @@ private fun buildCustomPreset(
     execution = basePreset.execution.copy(
         modelProfileId = fields.modelProfileId,
         contextTokens = command.contextTokens,
+        generationOverrides = command.generationOverrides?.takeUnless { it.isEmpty },
     ),
 )
 

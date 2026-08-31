@@ -19,7 +19,10 @@ class RoomHostControlPlaneStoreOwner private constructor(
                 context.applicationContext,
                 HostControlPlaneDatabase::class.java,
                 databaseName,
-            ).addMigrations(HostControlPlaneDatabase.MIGRATION_1_2).build()
+            ).addMigrations(
+                HostControlPlaneDatabase.MIGRATION_1_2,
+                HostControlPlaneDatabase.MIGRATION_2_3,
+            ).build()
             return RoomHostControlPlaneStoreOwner(
                 store = RoomHostControlPlaneStore(database),
                 database = database,

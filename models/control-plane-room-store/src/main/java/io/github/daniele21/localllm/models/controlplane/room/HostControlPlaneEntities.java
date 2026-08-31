@@ -165,6 +165,50 @@ public final class HostControlPlaneEntities {
         @ColumnInfo(name = "enable_deterministic_result_cache")
         public final boolean enableDeterministicResultCache;
 
+        @Nullable
+        @ColumnInfo(name = "generation_max_output_tokens")
+        public final Integer generationMaxOutputTokens;
+
+        @Nullable
+        @ColumnInfo(name = "generation_temperature")
+        public final Float generationTemperature;
+
+        @Nullable
+        @ColumnInfo(name = "generation_top_p")
+        public final Float generationTopP;
+
+        @Nullable
+        @ColumnInfo(name = "generation_top_k")
+        public final Integer generationTopK;
+
+        @Nullable
+        @ColumnInfo(name = "generation_min_p")
+        public final Float generationMinP;
+
+        @Nullable
+        @ColumnInfo(name = "generation_presence_penalty")
+        public final Float generationPresencePenalty;
+
+        @Nullable
+        @ColumnInfo(name = "generation_repeat_penalty")
+        public final Float generationRepeatPenalty;
+
+        @Nullable
+        @ColumnInfo(name = "generation_repeat_last_n")
+        public final Integer generationRepeatLastN;
+
+        @Nullable
+        @ColumnInfo(name = "generation_thinking_mode")
+        public final String generationThinkingMode;
+
+        @Nullable
+        @ColumnInfo(name = "generation_seed_mode")
+        public final String generationSeedMode;
+
+        @Nullable
+        @ColumnInfo(name = "generation_fixed_seed")
+        public final Long generationFixedSeed;
+
         public PresetEntity(
                 @NonNull String useCaseId,
                 @NonNull String presetId,
@@ -180,7 +224,18 @@ public final class HostControlPlaneEntities {
                 long retainModelWarmMs,
                 boolean reuseStatelessContext,
                 boolean enablePrefixSnapshot,
-                boolean enableDeterministicResultCache) {
+                boolean enableDeterministicResultCache,
+                @Nullable Integer generationMaxOutputTokens,
+                @Nullable Float generationTemperature,
+                @Nullable Float generationTopP,
+                @Nullable Integer generationTopK,
+                @Nullable Float generationMinP,
+                @Nullable Float generationPresencePenalty,
+                @Nullable Float generationRepeatPenalty,
+                @Nullable Integer generationRepeatLastN,
+                @Nullable String generationThinkingMode,
+                @Nullable String generationSeedMode,
+                @Nullable Long generationFixedSeed) {
             this.useCaseId = useCaseId;
             this.presetId = presetId;
             this.revision = revision;
@@ -196,6 +251,17 @@ public final class HostControlPlaneEntities {
             this.reuseStatelessContext = reuseStatelessContext;
             this.enablePrefixSnapshot = enablePrefixSnapshot;
             this.enableDeterministicResultCache = enableDeterministicResultCache;
+            this.generationMaxOutputTokens = generationMaxOutputTokens;
+            this.generationTemperature = generationTemperature;
+            this.generationTopP = generationTopP;
+            this.generationTopK = generationTopK;
+            this.generationMinP = generationMinP;
+            this.generationPresencePenalty = generationPresencePenalty;
+            this.generationRepeatPenalty = generationRepeatPenalty;
+            this.generationRepeatLastN = generationRepeatLastN;
+            this.generationThinkingMode = generationThinkingMode;
+            this.generationSeedMode = generationSeedMode;
+            this.generationFixedSeed = generationFixedSeed;
         }
     }
 

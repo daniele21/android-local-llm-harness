@@ -7,8 +7,12 @@ import org.junit.Test
 class HarnessApplicationsReadPresentationTest {
     @Test
     fun `application statuses map to non-color-only labels and semantic tones`() {
-        assertEquals("Authorized", HarnessApplicationStatus.AUTHORIZED.label())
+        assertEquals("Enabled", HarnessApplicationStatus.AUTHORIZED.label())
         assertEquals(HarnessStatusTone.SUCCESS, HarnessApplicationStatus.AUTHORIZED.tone())
+        assertEquals("Pending", HarnessApplicationStatus.PENDING.label())
+        assertEquals(HarnessStatusTone.INFO, HarnessApplicationStatus.PENDING.tone())
+        assertEquals("Disabled", HarnessApplicationStatus.DISABLED.label())
+        assertEquals(HarnessStatusTone.NEUTRAL, HarnessApplicationStatus.DISABLED.tone())
         assertEquals("Identity changed", HarnessApplicationStatus.IDENTITY_CHANGED.label())
         assertEquals(HarnessStatusTone.WARNING, HarnessApplicationStatus.IDENTITY_CHANGED.tone())
         assertEquals("Unavailable", HarnessApplicationStatus.UNAVAILABLE.label())

@@ -242,6 +242,9 @@ jobs:
             else
               tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
             fi
+            if [[ "$module" == "models:control-plane-room-store" ]]; then
+              tasks+=(":${module}:assembleDebugAndroidTest")
+            fi
             if [[ "$module" == "apps:local-llm-console" ]]; then tasks+=(":apps:local-llm-console:lintInternal"); fi
           done
 

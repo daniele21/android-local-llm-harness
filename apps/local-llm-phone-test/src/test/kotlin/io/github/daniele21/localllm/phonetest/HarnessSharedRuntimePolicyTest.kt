@@ -1,8 +1,18 @@
 package io.github.daniele21.localllm.phonetest
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.SessionKind
+import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSha256
+import io.github.daniele21.localllm.models.ApplicationRegistrationState
+import io.github.daniele21.localllm.models.ApplicationUseCaseBinding
+import io.github.daniele21.localllm.models.HostControlPlaneState
+import io.github.daniele21.localllm.models.OutputMode
+import io.github.daniele21.localllm.models.RegisteredApplication
+import io.github.daniele21.localllm.models.UseCaseDefinition
+import io.github.daniele21.localllm.models.UseCaseDefinitionState
+import io.github.daniele21.localllm.models.UseCaseRequirements
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,20 +22,11 @@ class HarnessSharedRuntimePolicyTest {
     fun ombraSpecCollapsesPackageAliasesIntoSingleApplicationRequirement() {
         val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
         val policies = listOf(
-            policy(
-                packageName = "io.github.daniele21.redactguard",
-                applicationId = applicationId,
-                signer = SIGNER_A,
-            ),
-            policy(
-                packageName = "io.github.daniele21.redactguard.debug",
-                applicationId = applicationId,
-                signer = SIGNER_B,
-            ),
+            policy("io.github.daniele21.redactguard", applicationId, SIGNER_A),
+            policy("io.github.daniele21.redactguard.debug", applicationId, SIGNER_B),
         )
 
-        val spec = HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(policies)
-        val requirement = spec.applications.single()
+        val requirement = HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(policies).applications.single()
 
         assertEquals(applicationId, requirement.applicationId)
         assertEquals(
@@ -39,9 +40,9 @@ class HarnessSharedRuntimePolicyTest {
     @Test
     fun ombraSpecExcludesPoliciesThatDoNotAuthorizeOmbra() {
         val ombra = policy(
-            packageName = "io.github.daniele21.redactguard",
-            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-            signer = SIGNER_A,
+            "io.github.daniele21.redactguard",
+            HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            SIGNER_A,
         )
         val unrelated = AuthorizedClientPolicy(
             packageName = "io.github.example.internal",
@@ -54,6 +55,45 @@ class HarnessSharedRuntimePolicyTest {
 
         assertEquals(listOf(HarnessSharedRuntimeBindings.redactGuardApplicationId), spec.applications.map { it.applicationId })
         assertTrue(spec.applications.none { it.applicationId == unrelated.applicationId })
+    }
+
+    @Test
+    fun `live policy exposes manual authorized connection and removes it when disabled`() {
+        val applicationId = ApplicationId("manual-consumer")
+        val useCaseId = UseCaseId("manual-use-case")
+        val application = RegisteredApplication(
+            applicationId = applicationId,
+            packageName = "com.example.manual",
+            signerSha256 = SIGNER_A,
+            displayName = "Manual consumer",
+            state = ApplicationRegistrationState.AUTHORIZED,
+            firstSeenAtEpochMs = 1,
+            lastSeenAtEpochMs = 1,
+        )
+        val useCase = UseCaseDefinition(
+            useCaseId = useCaseId,
+            displayName = "Manual use case",
+            description = "Test use case",
+            requirements = UseCaseRequirements(OutputMode.TEXT, SessionKind.STATELESS, false, 1),
+            state = UseCaseDefinitionState.ACTIVE,
+            revision = 1,
+        )
+        val binding = ApplicationUseCaseBinding("manual-binding", applicationId, useCaseId, 1, enabled = true)
+        val enabledState = HostControlPlaneState(
+            applications = listOf(application),
+            useCases = listOf(useCase),
+            bindings = listOf(binding),
+        )
+
+        val live = HarnessSharedRuntimePolicy.liveAuthorizedClients(emptyList(), enabledState).single()
+        assertEquals("com.example.manual", live.packageName)
+        assertEquals(setOf(useCaseId), live.allowedUseCases)
+        assertEquals(setOf(SIGNER_A), live.acceptedSigningCertificates.map { it.hex }.toSet())
+
+        val disabledState = enabledState.copy(
+            applications = listOf(application.copy(state = ApplicationRegistrationState.DISABLED)),
+        )
+        assertTrue(HarnessSharedRuntimePolicy.liveAuthorizedClients(emptyList(), disabledState).isEmpty())
     }
 
     private fun policy(packageName: String, applicationId: ApplicationId, signer: String) = AuthorizedClientPolicy(

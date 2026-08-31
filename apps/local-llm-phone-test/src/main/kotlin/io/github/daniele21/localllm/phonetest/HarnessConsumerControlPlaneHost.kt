@@ -187,6 +187,7 @@ internal class HarnessConsumerControlPlaneHost(
             requireNotNull(baseRuntimeResolved).withActivatedPresetAlias(
                 publicPreset = request.preset,
                 canonicalInferencePreset = execution.inferencePreset,
+                generationOverrides = execution.generationOverrides,
             )
         }.getOrElse {
             return ConsumerActivationResult.Rejected(

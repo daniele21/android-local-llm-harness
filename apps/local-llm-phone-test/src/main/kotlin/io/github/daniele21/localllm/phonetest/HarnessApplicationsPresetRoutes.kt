@@ -104,7 +104,7 @@ private fun createPresetActions(
     assignment: HarnessAssignmentSummary?,
     callbacks: HarnessApplicationsGraphCallbacks,
 ) = HarnessCreatePresetActions(
-    onSave = { basePreset, displayName, modelProfileId, contextTokens ->
+    onSave = { basePreset, displayName, modelProfileId, contextTokens, generationOverrides ->
         if (application != null && assignment != null) {
             callbacks.onCreateCustomPreset(
                 application.applicationId,
@@ -113,6 +113,7 @@ private fun createPresetActions(
                 displayName,
                 modelProfileId,
                 contextTokens,
+                generationOverrides,
             )
         }
     },

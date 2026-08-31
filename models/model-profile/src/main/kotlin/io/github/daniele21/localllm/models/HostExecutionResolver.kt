@@ -92,6 +92,7 @@ data class ResolvedHostExecution(
     val inferencePreset: InferencePresetRef,
     val contextTokens: Int,
     val cachePolicy: UseCaseCachePolicy,
+    val generationOverrides: PresetGenerationOverrides?,
     val evidence: HostExecutionResolutionEvidence,
 ) {
     init {
@@ -220,6 +221,7 @@ class HostExecutionResolver(private val store: HostControlPlaneStore) {
                 inferencePreset = preset.execution.inferencePreset,
                 contextTokens = effectiveContextTokens(useCase, preset),
                 cachePolicy = preset.execution.cachePolicy,
+                generationOverrides = preset.execution.generationOverrides,
                 evidence = presetEvidence.copy(candidateRejections = modelResolution.rejections),
             ),
         )

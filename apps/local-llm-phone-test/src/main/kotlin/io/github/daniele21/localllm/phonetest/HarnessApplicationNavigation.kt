@@ -16,6 +16,7 @@ internal object HarnessApplicationRoutes {
     const val PRESET_ID_ARGUMENT = "presetId"
     const val PRESET_REVISION_ARGUMENT = "presetRevision"
 
+    const val NEW_APPLICATION_ROUTE = "applications/new"
     const val APPLICATION_PATTERN = "applications/{$APPLICATION_ID_ARGUMENT}"
     const val ASSIGNMENT_PATTERN =
         "applications/{$APPLICATION_ID_ARGUMENT}/use-cases/{$USE_CASE_ID_ARGUMENT}"
@@ -29,6 +30,8 @@ internal object HarnessApplicationRoutes {
     private const val APPLICATION_PREFIX = "applications/"
     private const val USE_CASE_SEGMENT = "/use-cases/"
     private const val PRESET_SEGMENT = "/presets/"
+
+    fun newApplication(): String = NEW_APPLICATION_ROUTE
 
     fun application(applicationId: String): String = APPLICATION_PREFIX + encode(applicationId, "applicationId")
 
