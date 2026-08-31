@@ -20,7 +20,11 @@ internal fun useHarnessApplicationsMasterDetail(policy: HarnessAdaptivePolicy): 
 internal fun HarnessApplicationsMasterDetailScreen(
     snapshot: HarnessApplicationsSnapshot,
     selectedApplication: HarnessApplicationSummary?,
+    mutationState: HarnessApplicationsMutationState,
     onRefresh: () -> Unit,
+    onCreateConnection: () -> Unit,
+    onConnectionEnabledChanged: (Boolean) -> Unit,
+    onDismissFeedback: () -> Unit,
     onOpenApplication: (String) -> Unit,
     onOpenAssignment: (String, String) -> Unit,
     modifier: Modifier = Modifier,
@@ -34,6 +38,7 @@ internal fun HarnessApplicationsMasterDetailScreen(
             HarnessApplicationsScreen(
                 state = HarnessApplicationsReadState.Loaded(snapshot),
                 onRefresh = onRefresh,
+                onCreateConnection = onCreateConnection,
                 onOpenApplication = onOpenApplication,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -42,6 +47,10 @@ internal fun HarnessApplicationsMasterDetailScreen(
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             HarnessApplicationDetailScreen(
                 application = selectedApplication,
+                mutationState = mutationState,
+                onConnectionEnabledChanged = onConnectionEnabledChanged,
+                onReload = onRefresh,
+                onDismissFeedback = onDismissFeedback,
                 onOpenAssignment = onOpenAssignment,
                 modifier = Modifier.fillMaxSize(),
             )
