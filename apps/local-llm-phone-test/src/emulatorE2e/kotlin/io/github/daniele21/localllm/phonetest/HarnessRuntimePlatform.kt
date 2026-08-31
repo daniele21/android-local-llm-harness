@@ -42,10 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal object HarnessRuntimePlatform {
     fun modelStore(context: Context): ModelStore = EmulatorE2eModelStore(context)
 
-    fun backend(
-        context: Context,
-        activationResidency: ActivationResidencyCoordinator,
-    ): InferenceBackend {
+    fun backend(context: Context, activationResidency: ActivationResidencyCoordinator): InferenceBackend {
         @Suppress("UNUSED_VARIABLE")
         val unusedContext = context
         return ActivationResidencyInferenceBackend(
@@ -92,10 +89,7 @@ private data class EmulatorE2eModelHandle(
     override val loadDurationMs: Long = 5,
 ) : BackendModelHandle
 
-private data class EmulatorE2eContext(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class EmulatorE2eContext(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     override val id: String = "llama.cpp"
