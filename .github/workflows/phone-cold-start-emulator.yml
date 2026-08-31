@@ -112,8 +112,9 @@ jobs:
           }
 
           original_apk="${candidates[0]}"
-          canary_unaligned="$evidence/harness-no-native-unaligned.apk"
+          canary_unaligned="$RUNNER_TEMP/harness-no-native-unaligned.apk"
           canary_apk="$evidence/harness-no-native.apk"
+          canary_keystore="$RUNNER_TEMP/phone-cold-start-canary.p12"
           cp "$original_apk" "$canary_unaligned"
 
           mapfile -t native_entries < <(zipinfo -1 "$canary_unaligned" | grep '^lib/' || true)
@@ -124,23 +125,37 @@ jobs:
           printf '%s\n' "${native_entries[@]}" > "$evidence/original-native-entries.txt"
           zip -dq "$canary_unaligned" "${native_entries[@]}"
           if zipinfo -1 "$canary_unaligned" | grep -q '^lib/'; then
-            echo "No-native canary still contains native library entries." >&2
+            echo "No-native canary still contains native library entries before signing." >&2
             exit 1
           fi
 
-          debug_keystore="$HOME/.android/debug.keystore"
-          [[ -f "$debug_keystore" ]] || {
-            echo "Gradle debug keystore is unavailable after assembleDebug." >&2
-            exit 1
-          }
+          rm -f "$canary_keystore"
+          keytool -genkeypair \
+            -keystore "$canary_keystore" \
+            -storetype PKCS12 \
+            -storepass android \
+            -keypass android \
+            -alias coldstart \
+            -dname "CN=Harness Cold Start CI, OU=CI, O=Local LLM Harness, C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -noprompt
+
           "$build_tools/zipalign" -f -p 4 "$canary_unaligned" "$canary_apk"
           "$build_tools/apksigner" sign \
-            --ks "$debug_keystore" \
-            --ks-key-alias androiddebugkey \
+            --ks "$canary_keystore" \
+            --ks-key-alias coldstart \
             --ks-pass pass:android \
             --key-pass pass:android \
             "$canary_apk"
+          rm -f "$canary_keystore" "$canary_unaligned"
+
           "$build_tools/apksigner" verify --verbose "$canary_apk" | tee "$evidence/apksigner-verify.txt"
+          if zipinfo -1 "$canary_apk" | grep -q '^lib/'; then
+            echo "Signed no-native canary unexpectedly contains native library entries." >&2
+            exit 1
+          fi
 
           package_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/package: name='\([^']*\)'.*/\1/p" | head -n 1)
           activity_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/launchable-activity: name='\([^']*\)'.*/\1/p" | head -n 1)
@@ -258,6 +273,7 @@ jobs:
         run: |
           adb -s emulator-5554 uninstall io.github.daniele21.localllm.phonetest.debug || true
           adb -s emulator-5554 emu kill || true
+          rm -f "$RUNNER_TEMP/phone-cold-start-canary.p12" "$RUNNER_TEMP/harness-no-native-unaligned.apk"
 
       - name: Upload cold-start evidence
         if: always()
