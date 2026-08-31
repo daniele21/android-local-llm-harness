@@ -103,6 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/phone-cold-start"
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
           mapfile -t candidates < <(find apps/local-llm-phone-test/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' | sort)
           [[ "${#candidates[@]}" -eq 1 ]] || {
             printf 'Expected exactly one phone debug APK, found %s\n' "${#candidates[@]}" >&2
@@ -132,17 +133,17 @@ jobs:
             echo "Gradle debug keystore is unavailable after assembleDebug." >&2
             exit 1
           }
-          zipalign -f -p 4 "$canary_unaligned" "$canary_apk"
-          apksigner sign \
+          "$build_tools/zipalign" -f -p 4 "$canary_unaligned" "$canary_apk"
+          "$build_tools/apksigner" sign \
             --ks "$debug_keystore" \
             --ks-key-alias androiddebugkey \
             --ks-pass pass:android \
             --key-pass pass:android \
             "$canary_apk"
-          apksigner verify --verbose "$canary_apk" | tee "$evidence/apksigner-verify.txt"
+          "$build_tools/apksigner" verify --verbose "$canary_apk" | tee "$evidence/apksigner-verify.txt"
 
-          package_name=$(aapt dump badging "$canary_apk" | sed -n "s/package: name='\([^']*\)'.*/\1/p" | head -n 1)
-          activity_name=$(aapt dump badging "$canary_apk" | sed -n "s/launchable-activity: name='\([^']*\)'.*/\1/p" | head -n 1)
+          package_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/package: name='\([^']*\)'.*/\1/p" | head -n 1)
+          activity_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/launchable-activity: name='\([^']*\)'.*/\1/p" | head -n 1)
           [[ -n "$package_name" && -n "$activity_name" ]] || {
             echo "Unable to resolve package or launchable activity from canary APK." >&2
             exit 1
@@ -199,7 +200,7 @@ jobs:
             sleep 2
           done
 
-          adb -s emulator-5554 devices -l >&2 || true
+          adb devices -l >&2 || true
           cat "$evidence/emulator.log" >&2 || true
           echo "Error: phone cold-start emulator did not finish booting." >&2
           exit 1
@@ -223,10 +224,10 @@ jobs:
 
           adb shell am start -W -n "$component" | tee "$evidence/am-start.txt"
           sleep 3
+          adb logcat -d -v threadtime > "$evidence/logcat.txt"
 
           pid=$(adb shell pidof "$PACKAGE_NAME" | tr -d '\r')
           [[ -n "$pid" ]] || {
-            adb logcat -d -v threadtime > "$evidence/logcat.txt" || true
             echo "Harness process is not alive after cold start." >&2
             exit 1
           }
@@ -246,8 +247,7 @@ jobs:
             exit 1
           fi
 
-          adb logcat -d -v threadtime > "$evidence/logcat.txt"
-          if grep -F "Process: $PACKAGE_NAME" "$evidence/logcat.txt" | grep -F "FATAL EXCEPTION" >/dev/null; then
+          if grep -A 12 -F "FATAL EXCEPTION" "$evidence/logcat.txt" | grep -F "Process: $PACKAGE_NAME" >/dev/null; then
             echo "Fatal exception detected for Harness during cold start." >&2
             exit 1
           fi
