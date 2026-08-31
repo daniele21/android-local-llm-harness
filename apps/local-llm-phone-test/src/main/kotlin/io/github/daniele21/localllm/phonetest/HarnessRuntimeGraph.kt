@@ -21,19 +21,16 @@ import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
 import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
 import io.github.daniele21.localllm.runtime.ActivationIdFactory
 import io.github.daniele21.localllm.runtime.ActivationResidencyCoordinator
-import io.github.daniele21.localllm.runtime.ActivationResidencyInferenceBackend
 import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
 import io.github.daniele21.localllm.runtime.ConsumerLocalLlmFacade
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistry
-import io.github.daniele21.localllm.runtime.LlamaCppInferenceBackend
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import io.github.daniele21.localllm.runtime.UseCaseActivationLeaseRegistry
-import io.github.daniele21.localllm.store.FileSystemModelStore
+import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.transport.InProcessLocalLlmClient
-import java.io.File
 import java.util.UUID
 
 private const val DEFAULT_RUN_LIMIT = 50
@@ -64,7 +61,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     }
 
     val activationResidency = ActivationResidencyCoordinator(activationLeases)
-    val modelStore = FileSystemModelStore(File(appContext.noBackupFilesDir, MODEL_STORE_DIRECTORY))
+    val modelStore: ModelStore = HarnessRuntimePlatform.modelStore(appContext)
     val controlPlaneStore = HarnessPhoneControlPlaneAccess(
         store = controlPlaneStoreOwner.store,
         applicationsRuntimeSource = RuntimeGraphHarnessApplicationsRuntimeSource(
@@ -209,12 +206,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     private fun ensureRuntime() {
         if (runtime != null) return
 
-        val nativeLibraryDirectory = File(appContext.applicationInfo.nativeLibraryDir)
-        require(nativeLibraryDirectory.isDirectory) { "Native library directory is unavailable" }
-        val backend = ActivationResidencyInferenceBackend(
-            delegate = LlamaCppInferenceBackend(nativeLibraryDirectory),
-            activationResidency = activationResidency,
-        )
+        val backend = HarnessRuntimePlatform.backend(appContext, activationResidency)
         val orchestrator = RuntimeOrchestrator(
             registry = registry,
             modelStore = modelStore,
@@ -232,7 +224,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     }
 
     companion object {
-        private const val MODEL_STORE_DIRECTORY = "local-llm-phone-test"
         private const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
@@ -251,7 +242,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 internal fun HarnessRuntimeGraph.recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> =
     telemetryRepository.recentRuns(limit)
 
-internal fun HarnessRuntimeGraph.recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> = telemetryRepository.recentLogs(limit)
+internal fun HarnessRuntimeGraph.recentLogs(limit: Int = DEFAULT_LOG_LIMIT): List<StructuredLog> =
+    telemetryRepository.recentLogs(limit)
 
 internal enum class HarnessRuntimePurpose(val useCaseId: UseCaseId) {
     PLAYGROUND(UseCaseId("manual-inference-playground")),
