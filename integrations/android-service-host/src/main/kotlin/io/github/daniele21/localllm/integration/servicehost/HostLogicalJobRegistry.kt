@@ -4,9 +4,7 @@ import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 @JvmInline
-internal value class HostLogicalJobId(
-    val value: String,
-) {
+internal value class HostLogicalJobId(val value: String) {
     init {
         require(SAFE_ID.matches(value)) { "Logical job ID must be a privacy-safe identifier" }
     }
@@ -17,9 +15,7 @@ internal value class HostLogicalJobId(
 }
 
 @JvmInline
-internal value class HostClientRequestId(
-    val value: String,
-) {
+internal value class HostClientRequestId(val value: String) {
     init {
         require(SAFE_ID.matches(value)) { "Client request ID must be a privacy-safe identifier" }
     }
@@ -30,9 +26,7 @@ internal value class HostClientRequestId(
 }
 
 @JvmInline
-internal value class HostRuntimeSessionId(
-    val value: String,
-) {
+internal value class HostRuntimeSessionId(val value: String) {
     init {
         require(SAFE_ID.matches(value)) { "Runtime session ID must be a privacy-safe identifier" }
     }
@@ -42,10 +36,7 @@ internal value class HostRuntimeSessionId(
     }
 }
 
-internal data class HostLogicalJobScope(
-    val applicationId: ApplicationId,
-    val useCaseId: UseCaseId,
-)
+internal data class HostLogicalJobScope(val applicationId: ApplicationId, val useCaseId: UseCaseId)
 
 internal enum class HostLogicalJobState {
     QUEUED,
@@ -79,11 +70,12 @@ internal data class HostLogicalJobSnapshot(
         get() = state in TERMINAL_STATES
 
     private companion object {
-        val TERMINAL_STATES = setOf(
-            HostLogicalJobState.SUCCEEDED,
-            HostLogicalJobState.CANCELLED,
-            HostLogicalJobState.FAILED_FINAL,
-        )
+        val TERMINAL_STATES =
+            setOf(
+                HostLogicalJobState.SUCCEEDED,
+                HostLogicalJobState.CANCELLED,
+                HostLogicalJobState.FAILED_FINAL,
+            )
     }
 }
 
@@ -110,7 +102,9 @@ internal object HostLogicalJobLifecycle {
                 "Illegal logical job transition ${current.state} -> ${transition.state}"
             }
         } else {
-            require(transition.attempt == current.attempt + 1) { "Logical job attempt must advance one step at a time" }
+            require(transition.attempt == current.attempt + 1) {
+                "Logical job attempt must advance one step at a time"
+            }
             require(current.state in setOf(HostLogicalJobState.INTERRUPTED, HostLogicalJobState.FAILED_RETRYABLE)) {
                 "Only interrupted or retryable jobs can start another attempt"
             }
@@ -143,30 +137,50 @@ internal object HostLogicalJobLifecycle {
 
     private fun allowedNextStates(state: HostLogicalJobState): Set<HostLogicalJobState> =
         when (state) {
-            HostLogicalJobState.QUEUED -> setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
-            HostLogicalJobState.PREPARING -> setOf(
-                HostLogicalJobState.RUNNING,
-                HostLogicalJobState.CANCEL_REQUESTED,
-                HostLogicalJobState.FAILED_RETRYABLE,
-                HostLogicalJobState.INTERRUPTED,
-                HostLogicalJobState.FAILED_FINAL,
-            )
-            HostLogicalJobState.RUNNING -> setOf(
-                HostLogicalJobState.SUCCEEDED,
-                HostLogicalJobState.CANCEL_REQUESTED,
-                HostLogicalJobState.FAILED_RETRYABLE,
-                HostLogicalJobState.INTERRUPTED,
-                HostLogicalJobState.FAILED_FINAL,
-            )
-            HostLogicalJobState.CANCEL_REQUESTED -> setOf(HostLogicalJobState.CANCELLED, HostLogicalJobState.SUCCEEDED, HostLogicalJobState.FAILED_FINAL)
+            HostLogicalJobState.QUEUED -> {
+                setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+            }
+
+            HostLogicalJobState.PREPARING -> {
+                setOf(
+                    HostLogicalJobState.RUNNING,
+                    HostLogicalJobState.CANCEL_REQUESTED,
+                    HostLogicalJobState.FAILED_RETRYABLE,
+                    HostLogicalJobState.INTERRUPTED,
+                    HostLogicalJobState.FAILED_FINAL,
+                )
+            }
+
+            HostLogicalJobState.RUNNING -> {
+                setOf(
+                    HostLogicalJobState.SUCCEEDED,
+                    HostLogicalJobState.CANCEL_REQUESTED,
+                    HostLogicalJobState.FAILED_RETRYABLE,
+                    HostLogicalJobState.INTERRUPTED,
+                    HostLogicalJobState.FAILED_FINAL,
+                )
+            }
+
+            HostLogicalJobState.CANCEL_REQUESTED -> {
+                setOf(HostLogicalJobState.CANCELLED, HostLogicalJobState.SUCCEEDED, HostLogicalJobState.FAILED_FINAL)
+            }
+
             HostLogicalJobState.FAILED_RETRYABLE,
             HostLogicalJobState.INTERRUPTED,
-            -> setOf(HostLogicalJobState.RECOVERING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
-            HostLogicalJobState.RECOVERING -> setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+            -> {
+                setOf(HostLogicalJobState.RECOVERING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+            }
+
+            HostLogicalJobState.RECOVERING -> {
+                setOf(HostLogicalJobState.PREPARING, HostLogicalJobState.CANCEL_REQUESTED, HostLogicalJobState.FAILED_FINAL)
+            }
+
             HostLogicalJobState.SUCCEEDED,
             HostLogicalJobState.CANCELLED,
             HostLogicalJobState.FAILED_FINAL,
-            -> emptySet()
+            -> {
+                emptySet()
+            }
         }
 }
 
@@ -209,15 +223,16 @@ internal class HostLogicalJobRegistry(
         ensureCapacity()
         val jobId = idFactory()
         require(jobId !in jobsById) { "Logical job ID factory returned a duplicate ID" }
-        val snapshot = HostLogicalJobSnapshot(
-            jobId = jobId,
-            clientRequestId = clientRequestId,
-            scope = scope,
-            state = HostLogicalJobState.QUEUED,
-            revision = 0,
-            attempt = 1,
-            runtimeSessionId = runtimeSessionId,
-        )
+        val snapshot =
+            HostLogicalJobSnapshot(
+                jobId = jobId,
+                clientRequestId = clientRequestId,
+                scope = scope,
+                state = HostLogicalJobState.QUEUED,
+                revision = 0,
+                attempt = 1,
+                runtimeSessionId = runtimeSessionId,
+            )
         jobsById[jobId] = snapshot
         jobsByRequest[requestKey] = jobId
         return HostLogicalJobSubmission(snapshot, created = true)
@@ -246,8 +261,9 @@ internal class HostLogicalJobRegistry(
 
     private fun ensureCapacity() {
         if (jobsById.size < maxJobs) return
-        val evictable = jobsById.values.firstOrNull(HostLogicalJobSnapshot::isTerminal)
-            ?: throw HostLogicalJobCapacityException()
+        val evictable =
+            jobsById.values.firstOrNull(HostLogicalJobSnapshot::isTerminal)
+                ?: throw HostLogicalJobCapacityException()
         jobsById.remove(evictable.jobId)
         jobsByRequest.remove(RequestKey(evictable.scope, evictable.clientRequestId))
     }
