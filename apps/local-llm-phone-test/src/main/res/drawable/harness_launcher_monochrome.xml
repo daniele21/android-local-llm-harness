@@ -1,38 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <group
-        android:name="harness_symbol"
-        android:scaleX="0.72"
-        android:scaleY="0.72"
-        android:translateX="18.0"
-        android:translateY="18.0">
-        <path
-            android:name="left_bracket"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M8,8 L33,20 L33,42 L16,50 L33,58 L33,80 L8,92 Z" />
-        <path
-            android:name="right_bracket"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M92,8 L67,20 L67,42 L84,50 L67,58 L67,80 L92,92 Z" />
-        <path
-            android:name="bridge_primary"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M41.964,48.724 H44.643 V51.276 H41.964 Z" />
-        <path
-            android:name="bridge_indigo"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M46.429,48.724 H49.107 V51.276 H46.429 Z" />
-        <path
-            android:name="bridge_blue"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M50.893,48.724 H53.571 V51.276 H50.893 Z" />
-        <path
-            android:name="bridge_secondary"
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M55.357,48.724 H58.036 V51.276 H55.357 Z" />
-    </group>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="66dp"
+        android:height="66dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/harness_launcher_symbol"
+            android:gravity="fill" android:tint="#FFFFFFFF" />
+    </item>
+</layer-list>
