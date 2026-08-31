@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.1.0",
+  "contract_version": "0.2.0",
   "applicability": {
     "status": "recommended",
     "reason": "Harness has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
@@ -54,6 +54,22 @@
       ]
     },
     {
+      "id": "phone-cold-start-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "installed phone debug APK derived from the production-shaped ARM64 debug APK by removing native library entries and re-signing only for the no-native cold-start canary",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "known_gaps": [
+        "the canary intentionally removes the ARM64 native payload and therefore does not prove native loading or inference",
+        "the re-signed canary is not the release/promoted artifact and does not establish production signing identity",
+        "x86_64 emulator does not represent ARM64 package installation, physical memory, thermal or OEM behavior",
+        "the journey proves clean startup remains independent of JNI; native packaging/linkability remains covered separately"
+      ]
+    },
+    {
       "id": "physical-arm64-device",
       "fidelity_class": "representative_physical",
       "automation": "real_environment",
@@ -80,6 +96,23 @@
       "minimum_automated_fidelity": "simulated_or_emulated",
       "residual_gaps": [
         "full cross-process/two-application service lifecycle remains a stronger journey than Parcelable contract evidence"
+      ],
+      "real_environment_confirmation": "conditional",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "phone-cold-start",
+      "claim": "A clean Harness process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
+      "target_environment_refs": [
+        "android-arm64-device"
+      ],
+      "automated_environment_refs": [
+        "phone-cold-start-api35-emulator"
+      ],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": [
+        "the no-native canary does not prove ARM64 native linker compatibility, model loading or inference",
+        "release signing and exact promoted-artifact launch remain separate packaging/physical evidence"
       ],
       "real_environment_confirmation": "conditional",
       "automation_gap_reason": null
