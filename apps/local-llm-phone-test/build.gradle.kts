@@ -50,6 +50,15 @@ val versionProperties = Properties().apply {
 }
 val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
 val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+val playVersionCodeOverride =
+    System.getenv("PLAY_VERSION_CODE")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { raw ->
+            raw.toIntOrNull()?.takeIf { it > 0 }
+                ?: throw GradleException("PLAY_VERSION_CODE must be a positive integer")
+        }
+val effectiveVersionCode = playVersionCodeOverride ?: currentVersionCode
 
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
@@ -61,7 +70,7 @@ android {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = currentVersionCode
+        versionCode = effectiveVersionCode
         versionName = currentVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
