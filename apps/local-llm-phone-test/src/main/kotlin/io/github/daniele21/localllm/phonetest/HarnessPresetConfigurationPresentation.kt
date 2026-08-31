@@ -4,6 +4,7 @@ import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.models.GenerationDefaults
 import io.github.daniele21.localllm.models.Qwen35GenerationProfiles
 import io.github.daniele21.localllm.models.Qwen35ModelTier
+import io.github.daniele21.localllm.models.withPresetOverrides
 
 internal data class HarnessPresetModelOption(
     val modelId: String,
@@ -71,7 +72,10 @@ internal fun harnessPresetConfigurationSummary(
         listOf(selected.tier)
     }
     val defaults = tiers.map { tier ->
-        tier to Qwen35GenerationProfiles.forTier(tier).single { it.id == option.profileId }.defaults
+        tier to Qwen35GenerationProfiles.forTier(tier)
+            .single { it.id == option.profileId }
+            .defaults
+            .withPresetOverrides(preset.generationOverrides)
     }
     val modelTarget = selectedModelProfileId?.let { selected ->
         modelOptions.singleOrNull { it.modelProfileId == selected }?.displayName ?: selected
