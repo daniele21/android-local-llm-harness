@@ -47,6 +47,63 @@ data class ConsumerActivationRequest(
     }
 }
 
+/**
+ * Exact published setup identity a consumer wants to inspect before activation.
+ * Resolution is observational: it must not activate, prepare, load, open a session or acquire residency.
+ */
+data class ConsumerSetupResolutionRequest(
+    val useCaseId: UseCaseId,
+    val useCaseRevision: Int,
+    val bindingRevision: Int,
+    val preset: InferencePresetRef,
+) {
+    init {
+        require(useCaseRevision > 0) { "Use-case revision must be positive" }
+        require(bindingRevision > 0) { "Binding revision must be positive" }
+    }
+}
+
+data class ConsumerGenerationConfiguration(
+    val maxOutputTokens: Int,
+    val temperature: Float,
+    val topP: Float,
+    val topK: Int,
+    val minP: Float,
+    val presencePenalty: Float,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
+    val thinkingMode: ThinkingMode,
+    val seedPolicy: SeedPolicyType,
+) {
+    init {
+        require(maxOutputTokens > 0) { "Maximum output tokens must be positive" }
+        require(temperature.isFinite() && temperature in 0f..2f) { "Temperature must be in [0, 2]" }
+        require(topP.isFinite() && topP > 0f && topP <= 1f) { "Top-p must be in (0, 1]" }
+        require(topK in 0..1_000) { "Top-k must be in [0, 1000]" }
+        require(minP.isFinite() && minP in 0f..1f) { "Min-p must be in [0, 1]" }
+        require(presencePenalty.isFinite() && presencePenalty in 0f..2f) { "Presence penalty must be in [0, 2]" }
+        require(repeatPenalty.isFinite() && repeatPenalty in 1f..2f) { "Repeat penalty must be in [1, 2]" }
+        require(repeatLastN in 0..4_096) { "Repeat window must be in [0, 4096]" }
+    }
+}
+
+data class ConsumerResolvedSetup(
+    val useCaseId: UseCaseId,
+    val useCaseRevision: Int,
+    val bindingRevision: Int,
+    val preset: InferencePresetRef,
+    val modelProfileId: String,
+    val contextTokens: Int,
+    val generation: ConsumerGenerationConfiguration,
+) {
+    init {
+        require(useCaseRevision > 0) { "Use-case revision must be positive" }
+        require(bindingRevision > 0) { "Binding revision must be positive" }
+        require(modelProfileId.isNotBlank()) { "Model profile ID must not be blank" }
+        require(contextTokens > 0) { "Context tokens must be positive" }
+    }
+}
+
 data class ConsumerActivation(
     val activationId: ConsumerActivationId,
     val useCaseId: UseCaseId,
@@ -99,6 +156,12 @@ sealed interface ConsumerPublishedPresetsResult {
     data class Rejected(val failure: ConsumerControlPlaneFailure) : ConsumerPublishedPresetsResult
 }
 
+sealed interface ConsumerSetupResolutionResult {
+    data class Resolved(val setup: ConsumerResolvedSetup) : ConsumerSetupResolutionResult
+
+    data class Rejected(val failure: ConsumerControlPlaneFailure) : ConsumerSetupResolutionResult
+}
+
 sealed interface ConsumerActivationResult {
     data class Activated(val activation: ConsumerActivation) : ConsumerActivationResult
 
@@ -116,6 +179,9 @@ interface ConsumerControlPlaneClient {
     fun assignedUseCases(): ConsumerAssignedUseCasesResult
 
     fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult
+
+    /** Read-only setup projection; never creates activation/runtime residency. */
+    fun resolveSetup(request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult
 
     fun activate(request: ConsumerActivationRequest): ConsumerActivationResult
 
