@@ -150,10 +150,9 @@ class HostLogicalJobRegistryTest {
         assertEquals(1, registry.size())
     }
 
-    private fun registry(maxJobs: Int = 8): HostLogicalJobRegistry =
-        HostLogicalJobRegistry(
-            maxJobs = maxJobs,
-            runtimeSessionId = runtimeA,
-            idFactory = { HostLogicalJobId("job-${nextId++}") },
-        )
+    private fun registry(maxJobs: Int = 8): HostLogicalJobRegistry = HostLogicalJobRegistry(
+        maxJobs = maxJobs,
+        runtimeSessionId = runtimeA,
+        idFactory = { HostLogicalJobId("job-${nextId++}") },
+    )
 }
