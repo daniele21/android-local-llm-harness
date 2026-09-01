@@ -35,12 +35,12 @@ class HarnessSharedRuntimeService : Service() {
         val controlPlaneHost =
             HarnessWarmRetentionAwareControlPlaneHost(
                 delegate =
-                    HarnessConsumerControlPlaneHost(
-                        store = runtimeGraph.controlPlaneStore,
-                        modelStore = runtimeGraph.modelStore,
-                        runtimeGraph = runtimeGraph,
-                        onWarmRetention = resolvedWarmRetention::schedule,
-                    ),
+                HarnessConsumerControlPlaneHost(
+                    store = runtimeGraph.controlPlaneStore,
+                    modelStore = runtimeGraph.modelStore,
+                    runtimeGraph = runtimeGraph,
+                    onWarmRetention = resolvedWarmRetention::schedule,
+                ),
                 warmRetention = resolvedWarmRetention,
             )
         val runtimeReadinessHost =
