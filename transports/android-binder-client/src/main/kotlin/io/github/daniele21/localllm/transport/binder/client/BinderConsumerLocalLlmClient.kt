@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationListener
 import io.github.daniele21.localllm.contracts.ConsumerGenerationRequest
 import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
+import io.github.daniele21.localllm.contracts.ConsumerLogicalJobClient
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
@@ -25,9 +26,11 @@ private constructor(
     private val generation: BinderConsumerGenerationAdapter,
     private val controlPlane: BinderConsumerControlPlaneAdapter,
     private val runtimeReadiness: BinderConsumerRuntimeReadinessAdapter,
+    private val logicalJobs: BinderConsumerLogicalJobAdapter,
 ) : ConsumerLocalLlmClient,
     ConsumerControlPlaneClient by controlPlane,
     ConsumerRuntimeReadinessClient by runtimeReadiness,
+    ConsumerLogicalJobClient by logicalJobs,
     AutoCloseable {
     private val closed = AtomicBoolean(false)
 
@@ -111,6 +114,12 @@ private constructor(
                 ),
                 runtimeReadiness =
                 BinderConsumerRuntimeReadinessAdapter(
+                    endpointProvider = { connection.endpoint },
+                    enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
+                    endpointInvalidations = connection.endpointInvalidations,
+                ),
+                logicalJobs =
+                BinderConsumerLogicalJobAdapter(
                     endpointProvider = { connection.endpoint },
                     enabledFeaturesProvider = { connection.snapshot.enabledFeatures },
                     endpointInvalidations = connection.endpointInvalidations,

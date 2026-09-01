@@ -8,6 +8,9 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPla
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobQueryParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobSubmitParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
@@ -17,6 +20,7 @@ import io.github.daniele21.localllm.transport.binder.contract.IClientLifecycle
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLogicalJobResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
@@ -138,6 +142,20 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
     override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
         delegate.runtimeReadiness(request, runtimeReadinessResultCallback(callback))
     }
+
+    override fun submitLogicalGeneration(request: ConsumerLogicalJobSubmitParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        delegate.submitLogicalGeneration(request, logicalJobResultCallback(callback))
+    }
+
+    override fun logicalJobStatus(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        delegate.getLogicalJob(request, logicalJobResultCallback(callback))
+    }
+
+    override fun logicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        delegate.getLogicalJobResult(request, logicalJobResultCallback(callback))
+    }
+
+    override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) = delegate.cancelLogicalJob(request)
 }
 
 private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback = object : IConsumerResultCallback.Stub() {
@@ -159,3 +177,8 @@ private fun runtimeReadinessResultCallback(
 ): IConsumerRuntimeReadinessResultCallback = object : IConsumerRuntimeReadinessResultCallback.Stub() {
     override fun onResult(result: ConsumerRuntimeReadinessResultParcel) = callback(result)
 }
+
+private fun logicalJobResultCallback(callback: (ConsumerLogicalJobResultParcel) -> Unit): IConsumerLogicalJobResultCallback =
+    object : IConsumerLogicalJobResultCallback.Stub() {
+        override fun onResult(result: ConsumerLogicalJobResultParcel) = callback(result)
+    }

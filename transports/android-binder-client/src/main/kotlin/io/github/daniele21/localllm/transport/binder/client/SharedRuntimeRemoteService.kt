@@ -9,6 +9,9 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPla
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationRequestV2Parcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobQueryParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobSubmitParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
@@ -77,6 +80,24 @@ internal interface ConsumerSharedRuntimeRemoteService {
     fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
         callback(runtimeReadinessUnavailable(request.operationId))
     }
+
+    @Throws(RemoteException::class)
+    fun submitLogicalGeneration(request: ConsumerLogicalJobSubmitParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        callback(logicalJobUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun logicalJobStatus(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        callback(logicalJobUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun logicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        callback(logicalJobUnavailable(request.operationId))
+    }
+
+    @Throws(RemoteException::class)
+    fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) = Unit
 }
 
 internal interface SharedRuntimeRemoteService {
@@ -154,6 +175,15 @@ private fun runtimeReadinessUnavailable(operationId: String) = ConsumerRuntimeRe
     error = WireErrorParcel(
         code = WireErrorCodes.FEATURE_UNAVAILABLE,
         safeMessage = "Consumer runtime readiness is unavailable",
+        retryable = false,
+    ),
+)
+
+private fun logicalJobUnavailable(operationId: String) = ConsumerLogicalJobResultParcel(
+    operationId = operationId,
+    error = WireErrorParcel(
+        code = WireErrorCodes.FEATURE_UNAVAILABLE,
+        safeMessage = "Consumer logical jobs are unavailable",
         retryable = false,
     ),
 )

@@ -8,6 +8,9 @@ import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.CloseSessionRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerGenerationEventParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobQueryParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobSubmitParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
@@ -34,11 +37,17 @@ internal class FakeSharedRuntimeRemoteService(
     var consumerCloseSessionCalls = 0
     var consumerGenerateCalls = 0
     var consumerCancelCalls = 0
+    var consumerLogicalJobSubmitCalls = 0
+    var consumerLogicalJobStatusCalls = 0
+    var consumerLogicalJobResultCalls = 0
+    var consumerLogicalJobCancelCalls = 0
     var lastGenerationRequest: GenerationRequestParcel? = null
     var lastCancelRequest: CancelRequestParcel? = null
     var lastConsumerRequest: ConsumerRequestParcel? = null
     var lastConsumerCloseSessionRequest: CloseSessionRequestParcel? = null
     var lastRuntimeReadinessRequest: ConsumerControlPlaneRequestParcel? = null
+    var lastLogicalJobSubmitRequest: ConsumerLogicalJobSubmitParcel? = null
+    var lastLogicalJobQueryRequest: ConsumerLogicalJobQueryParcel? = null
     var cancelFailure: RemoteException? = null
     var registrationHandler: ((ClientHelloParcel, (RegistrationResultParcel) -> Unit) -> Unit)? = null
     var prepareHandler: ((PrepareRequestParcel, (PrepareResultParcel) -> Unit) -> Unit)? = null
@@ -50,6 +59,12 @@ internal class FakeSharedRuntimeRemoteService(
     var consumerGenerationHandler: ((ConsumerRequestParcel, (ConsumerGenerationEventParcel) -> Unit) -> Unit)? = null
     var consumerRuntimeReadinessHandler:
         ((ConsumerControlPlaneRequestParcel, (ConsumerRuntimeReadinessResultParcel) -> Unit) -> Unit)? = null
+    var consumerLogicalJobSubmitHandler:
+        ((ConsumerLogicalJobSubmitParcel, (ConsumerLogicalJobResultParcel) -> Unit) -> Unit)? = null
+    var consumerLogicalJobStatusHandler:
+        ((ConsumerLogicalJobQueryParcel, (ConsumerLogicalJobResultParcel) -> Unit) -> Unit)? = null
+    var consumerLogicalJobResultHandler:
+        ((ConsumerLogicalJobQueryParcel, (ConsumerLogicalJobResultParcel) -> Unit) -> Unit)? = null
     private var hostDisconnecting: (() -> Unit)? = null
 
     override fun protocolInfo(): ProtocolInfoParcel = protocol
@@ -115,6 +130,29 @@ internal class FakeSharedRuntimeRemoteService(
         requireNotNull(consumerRuntimeReadinessHandler) { "Consumer runtime-readiness handler not configured" }(request, callback)
     }
 
+    fun consumerLogicalJobSubmit(request: ConsumerLogicalJobSubmitParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        consumerLogicalJobSubmitCalls += 1
+        lastLogicalJobSubmitRequest = request
+        requireNotNull(consumerLogicalJobSubmitHandler) { "Consumer logical-job submit handler not configured" }(request, callback)
+    }
+
+    fun consumerLogicalJobStatus(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        consumerLogicalJobStatusCalls += 1
+        lastLogicalJobQueryRequest = request
+        requireNotNull(consumerLogicalJobStatusHandler) { "Consumer logical-job status handler not configured" }(request, callback)
+    }
+
+    fun consumerLogicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
+        consumerLogicalJobResultCalls += 1
+        lastLogicalJobQueryRequest = request
+        requireNotNull(consumerLogicalJobResultHandler) { "Consumer logical-job result handler not configured" }(request, callback)
+    }
+
+    fun consumerLogicalJobCancel(request: ConsumerLogicalJobQueryParcel) {
+        consumerLogicalJobCancelCalls += 1
+        lastLogicalJobQueryRequest = request
+    }
+
     fun consumerCancel(request: CancelRequestParcel) {
         consumerCancelCalls += 1
         lastCancelRequest = request
@@ -148,6 +186,13 @@ private class FakeConsumerRemoteService(private val parent: FakeSharedRuntimeRem
     override fun closeSession(request: CloseSessionRequestParcel) = parent.consumerCloseSession(request)
     override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) =
         parent.consumerRuntimeReadiness(request, callback)
+    override fun submitLogicalGeneration(request: ConsumerLogicalJobSubmitParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) =
+        parent.consumerLogicalJobSubmit(request, callback)
+    override fun logicalJobStatus(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) =
+        parent.consumerLogicalJobStatus(request, callback)
+    override fun logicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) =
+        parent.consumerLogicalJobResult(request, callback)
+    override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) = parent.consumerLogicalJobCancel(request)
 }
 
 internal class FakeEndpointInvalidations : SharedRuntimeEndpointInvalidationSource {
