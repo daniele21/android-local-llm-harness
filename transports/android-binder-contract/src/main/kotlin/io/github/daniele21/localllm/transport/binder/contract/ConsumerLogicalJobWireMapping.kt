@@ -13,30 +13,28 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 fun ConsumerLogicalJobSubmitRequest.toConsumerLogicalJobWire(
     clientToken: ClientTokenParcel,
     operationId: String,
-): ConsumerLogicalJobSubmitParcel =
-    ConsumerLogicalJobSubmitParcel(
-        clientToken = clientToken,
-        operationId = operationId,
-        clientRequestId = clientRequestId.value,
-        useCaseId = useCaseId.value,
-        preparedId = preparedId.value,
-        input = input.toConsumerWire(),
-        outputConstraint = outputConstraint.toConsumerWire(),
-        taskDefinitions = taskDefinitions.map { it.toConsumerWire() },
-    )
+): ConsumerLogicalJobSubmitParcel = ConsumerLogicalJobSubmitParcel(
+    clientToken = clientToken,
+    operationId = operationId,
+    clientRequestId = clientRequestId.value,
+    useCaseId = useCaseId.value,
+    preparedId = preparedId.value,
+    input = input.toConsumerWire(),
+    outputConstraint = outputConstraint.toConsumerWire(),
+    taskDefinitions = taskDefinitions.map { it.toConsumerWire() },
+)
 
 fun consumerLogicalJobQueryWire(
     clientToken: ClientTokenParcel,
     operationId: String,
     jobId: ConsumerInferenceJobId,
     useCaseId: UseCaseId,
-): ConsumerLogicalJobQueryParcel =
-    ConsumerLogicalJobQueryParcel(
-        clientToken = clientToken,
-        operationId = operationId,
-        jobId = jobId.value,
-        useCaseId = useCaseId.value,
-    )
+): ConsumerLogicalJobQueryParcel = ConsumerLogicalJobQueryParcel(
+    clientToken = clientToken,
+    operationId = operationId,
+    jobId = jobId.value,
+    useCaseId = useCaseId.value,
+)
 
 fun ConsumerLogicalJobResultParcel.toCoreLogicalJobResponse(): ConsumerInferenceJobResponse {
     error?.let { return ConsumerInferenceJobResponse.Rejected(it.toConsumerFailure()) }
@@ -64,7 +62,8 @@ private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() =
         attempt = attempt,
         runtimeSessionId = ConsumerRuntimeSessionId(runtimeSessionId),
         resultAvailable = resultAvailable,
-        errorCode = errorCode?.let {
+        errorCode =
+        errorCode?.let {
             WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
         },
     )
