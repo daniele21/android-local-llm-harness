@@ -19,9 +19,7 @@ import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.withPresetOverrides
 import io.github.daniele21.localllm.store.ModelStore
 
-internal class HarnessConsumerSetupResolver(
-    private val modelStore: ModelStore,
-) {
+internal class HarnessConsumerSetupResolver(private val modelStore: ModelStore) {
     fun resolve(
         applicationId: ApplicationId,
         request: ConsumerSetupResolutionRequest,
@@ -46,13 +44,12 @@ internal class HarnessConsumerSetupResolver(
         execution: ResolvedHostExecution,
         digest: ModelDigest,
         sizeBytes: Long,
-    ): ConsumerSetupResolutionResult =
-        importedPhoneModel(digest, sizeBytes)?.let { model ->
-            resolveRuntime(applicationId, execution, model)
-        } ?: rejected(
-            ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
-            "Required local model is unsupported",
-        )
+    ): ConsumerSetupResolutionResult = importedPhoneModel(digest, sizeBytes)?.let { model ->
+        resolveRuntime(applicationId, execution, model)
+    } ?: rejected(
+        ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+        "Required local model is unsupported",
+    )
 
     private fun resolveRuntime(
         applicationId: ApplicationId,
