@@ -68,7 +68,15 @@ internal fun hostProtocolInfo(
     val features = BinderProtocolV1.KNOWN_FEATURES
         .let { known -> if (consumerApiEnabled) known else known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 }
         .let { consumerFeatures ->
-            if (consumerControlPlaneEnabled) consumerFeatures else consumerFeatures - BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1
+            if (consumerControlPlaneEnabled) {
+                consumerFeatures
+            } else {
+                consumerFeatures -
+                    setOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+                    )
+            }
         }
         .let { controlPlaneFeatures ->
             if (consumerRuntimeReadinessEnabled) {

@@ -11,16 +11,23 @@ import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
+import io.github.daniele21.localllm.contracts.ConsumerGenerationConfiguration
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPreset
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.ConsumerResolvedSetup
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.contracts.SeedPolicy
+import io.github.daniele21.localllm.contracts.SeedPolicyType
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.ConsumerControlPlaneHost
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscovery
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscoveryFailure
 import io.github.daniele21.localllm.models.AssignedUseCaseDiscoveryResult
+import io.github.daniele21.localllm.models.GenerationDefaults
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 import io.github.daniele21.localllm.models.HostExecutionEnvironment
 import io.github.daniele21.localllm.models.HostExecutionFailureCode
@@ -31,7 +38,9 @@ import io.github.daniele21.localllm.models.PublishedPresetDiscovery
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryFailure
 import io.github.daniele21.localllm.models.PublishedPresetDiscoveryResult
 import io.github.daniele21.localllm.models.Qwen35RuntimeTuningProfiles
+import io.github.daniele21.localllm.models.ResolvedHostExecution
 import io.github.daniele21.localllm.models.ResolvedUseCase
+import io.github.daniele21.localllm.models.withPresetOverrides
 import io.github.daniele21.localllm.runtime.ActivationLeaseFailure
 import io.github.daniele21.localllm.runtime.ActivationOwnerId
 import io.github.daniele21.localllm.runtime.ActivationResidencyFailure
@@ -108,6 +117,22 @@ internal class HarnessConsumerControlPlaneHost(
             )
         }
 
+    override fun resolveSetup(applicationId: ApplicationId, request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult {
+        val resolution = resolver.resolve(
+            HostExecutionRequest(
+                applicationId = applicationId,
+                useCaseId = request.useCaseId,
+                presetId = request.preset.id.value,
+                presetRevision = request.preset.version,
+            ),
+            executionEnvironment(applicationId),
+        )
+        return when (resolution) {
+            is HostExecutionResolution.Failure -> ConsumerSetupResolutionResult.Rejected(resolution.code.toConsumerFailure())
+            is HostExecutionResolution.Success -> resolveConsumerSetup(applicationId, request, resolution.execution)
+        }
+    }
+
     override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
         val resolution = resolver.resolve(
             HostExecutionRequest(
@@ -161,6 +186,52 @@ internal class HarnessConsumerControlPlaneHost(
             .filter { it.applicationId == applicationId }
             .forEach { runtimeControl.removeActivationBinding(it.activationId) }
         released.warmRetentionByModelMs.forEach(onWarmRetention)
+    }
+
+    private fun resolveConsumerSetup(
+        applicationId: ApplicationId,
+        request: ConsumerSetupResolutionRequest,
+        execution: ResolvedHostExecution,
+    ): ConsumerSetupResolutionResult {
+        if (execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision) {
+            return ConsumerSetupResolutionResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.STALE_REVISION, "Consumer configuration changed; refresh assignments"),
+            )
+        }
+        val installed = modelStore.find(execution.modelDigest)
+            ?: return ConsumerSetupResolutionResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unavailable"),
+            )
+        val imported = importedModel(installed.digest, installed.sizeBytes)
+            ?: return ConsumerSetupResolutionResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE, "Required local model is unsupported"),
+            )
+        val runtimeResolved = runCatching { HarnessSharedRuntimeBindings.resolveOmbra(imported, applicationId) }
+            .getOrElse {
+                return ConsumerSetupResolutionResult.Rejected(
+                    failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved setup is unavailable to the runtime"),
+                )
+            }
+        if (runtimeResolved.model.id != execution.modelProfileId || runtimeResolved.model.artifact.digest != execution.modelDigest) {
+            return ConsumerSetupResolutionResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved model identity mismatch"),
+            )
+        }
+        val generation = runtimeResolved.effectiveGeneration(execution)
+            ?: return ConsumerSetupResolutionResult.Rejected(
+                failure(ConsumerControlPlaneErrorCode.RUNTIME_FAILURE, "Resolved inference preset is unavailable to the runtime"),
+            )
+        return ConsumerSetupResolutionResult.Resolved(
+            ConsumerResolvedSetup(
+                useCaseId = execution.useCaseId,
+                useCaseRevision = execution.useCaseRevision,
+                bindingRevision = execution.bindingRevision,
+                preset = InferencePresetRef(InferencePresetId(execution.presetId), execution.presetRevision),
+                modelProfileId = execution.modelProfileId,
+                contextTokens = execution.contextTokens,
+                generation = generation.toConsumerGenerationConfiguration(),
+            ),
+        )
     }
 
     private fun activateResolved(
@@ -277,6 +348,25 @@ internal class HarnessConsumerControlPlaneHost(
         )
     }
 }
+
+private fun ResolvedUseCase.effectiveGeneration(execution: ResolvedHostExecution): GenerationDefaults? =
+    useCase.presets.singleOrNull { it.ref == execution.inferencePreset }?.generation?.withPresetOverrides(execution.generationOverrides)
+
+private fun GenerationDefaults.toConsumerGenerationConfiguration() = ConsumerGenerationConfiguration(
+    maxOutputTokens = maxOutputTokens,
+    temperature = temperature,
+    topP = topP,
+    topK = topK,
+    minP = minP,
+    presencePenalty = presencePenalty,
+    repeatPenalty = repeatPenalty,
+    repeatLastN = repeatLastN,
+    thinkingMode = thinkingMode,
+    seedPolicy = when (seedPolicy) {
+        SeedPolicy.Random -> SeedPolicyType.RANDOM
+        is SeedPolicy.Fixed -> SeedPolicyType.FIXED
+    },
+)
 
 private fun activationPreparationFailure(
     staleRevision: Boolean,

@@ -5,7 +5,7 @@ import kotlinx.parcelize.Parcelize
 
 object BinderProtocolV1 {
     const val MAJOR = 1
-    const val MINOR = 4
+    const val MINOR = 5
     const val MIN_SUPPORTED_MINOR = 0
 
     const val MAX_IDENTIFIER_CHARACTERS = 128
@@ -28,6 +28,7 @@ object BinderProtocolV1 {
     const val FEATURE_CONSUMER_CONTROL_PLANE_V1 = "consumer-control-plane-v1"
     const val FEATURE_CONSUMER_TASK_DEFINITIONS_V1 = "consumer-task-definitions-v1"
     const val FEATURE_CONSUMER_RUNTIME_READINESS_V1 = "consumer-runtime-readiness-v1"
+    const val FEATURE_CONSUMER_SETUP_RESOLUTION_V1 = "consumer-setup-resolution-v1"
 
     val KNOWN_FEATURES: Set<String> =
         setOf(
@@ -42,9 +43,11 @@ object BinderProtocolV1 {
             FEATURE_CONSUMER_CONTROL_PLANE_V1,
             FEATURE_CONSUMER_TASK_DEFINITIONS_V1,
             FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+            FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
         )
 
     fun minimumMinorForFeature(feature: String): Int = when (feature) {
+        FEATURE_CONSUMER_SETUP_RESOLUTION_V1 -> 5
         FEATURE_CONSUMER_RUNTIME_READINESS_V1 -> 4
         FEATURE_CONSUMER_TASK_DEFINITIONS_V1 -> 3
         FEATURE_CONSUMER_CONTROL_PLANE_V1 -> 2
