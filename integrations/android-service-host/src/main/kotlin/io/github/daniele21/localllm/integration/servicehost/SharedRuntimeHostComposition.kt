@@ -17,29 +17,35 @@ class SharedRuntimeHostComposition(
     consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
+    logicalJobExecutionDemandListener: HostLogicalJobExecutionDemandListener = HostLogicalJobExecutionDemandListener {},
     policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
 ) : AutoCloseable {
-    private val delegate = SharedRuntimeHostDelegate(
-        client = client,
-        protocolInfo = hostProtocolInfo(
-            hostBuildId = hostBuildId,
-            consumerApiEnabled = consumerClientFactory != null,
-            consumerControlPlaneEnabled = consumerControlPlaneHost != null,
-            consumerRuntimeReadinessEnabled = consumerRuntimeReadinessHost != null,
-        ),
-        consumerClientFactory = consumerClientFactory,
-        consumerControlPlaneHost = consumerControlPlaneHost,
-        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
-    )
-    private val binderStub = SharedRuntimeBinderStub(
-        authorizer = CallerAuthorizer(
-            permissionName = permissionName,
-            policies = policies,
-            environment = AndroidCallerEnvironment(context.applicationContext),
-            policySource = policySource,
-        ),
-        delegate = delegate,
-    )
+    private val delegate =
+        SharedRuntimeHostDelegate(
+            client = client,
+            protocolInfo =
+                hostProtocolInfo(
+                    hostBuildId = hostBuildId,
+                    consumerApiEnabled = consumerClientFactory != null,
+                    consumerControlPlaneEnabled = consumerControlPlaneHost != null,
+                    consumerRuntimeReadinessEnabled = consumerRuntimeReadinessHost != null,
+                ),
+            consumerClientFactory = consumerClientFactory,
+            consumerControlPlaneHost = consumerControlPlaneHost,
+            consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+            logicalJobExecutionDemandListener = logicalJobExecutionDemandListener,
+        )
+    private val binderStub =
+        SharedRuntimeBinderStub(
+            authorizer =
+                CallerAuthorizer(
+                    permissionName = permissionName,
+                    policies = policies,
+                    environment = AndroidCallerEnvironment(context.applicationContext),
+                    policySource = policySource,
+                ),
+            delegate = delegate,
+        )
 
     val binder: IBinder
         get() = binderStub
@@ -65,32 +71,31 @@ internal fun hostProtocolInfo(
     require(!consumerRuntimeReadinessEnabled || consumerControlPlaneEnabled) {
         "Consumer runtime readiness requires the consumer control plane"
     }
-    val features = BinderProtocolV1.KNOWN_FEATURES
-        .let { known ->
-            if (consumerApiEnabled) {
-                known
-            } else {
-                known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 - BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1
+    val features =
+        BinderProtocolV1.KNOWN_FEATURES
+            .let { known ->
+                if (consumerApiEnabled) {
+                    known
+                } else {
+                    known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 - BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1
+                }
+            }.let { consumerFeatures ->
+                if (consumerControlPlaneEnabled) {
+                    consumerFeatures
+                } else {
+                    consumerFeatures -
+                        setOf(
+                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+                        )
+                }
+            }.let { controlPlaneFeatures ->
+                if (consumerRuntimeReadinessEnabled) {
+                    controlPlaneFeatures
+                } else {
+                    controlPlaneFeatures - BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1
+                }
             }
-        }
-        .let { consumerFeatures ->
-            if (consumerControlPlaneEnabled) {
-                consumerFeatures
-            } else {
-                consumerFeatures -
-                    setOf(
-                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                        BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
-                    )
-            }
-        }
-        .let { controlPlaneFeatures ->
-            if (consumerRuntimeReadinessEnabled) {
-                controlPlaneFeatures
-            } else {
-                controlPlaneFeatures - BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1
-            }
-        }
     return ProtocolInfoParcel(
         protocolMajor = BinderProtocolV1.MAJOR,
         protocolMinor = BinderProtocolV1.MINOR,
