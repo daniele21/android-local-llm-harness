@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.1.1",
+  "contract_version": "0.1.2",
   "applicability": {
     "status": "recommended",
     "reason": "Harnex has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
@@ -57,7 +57,7 @@
       "fidelity_class": "simulated_or_emulated",
       "automation": "automated",
       "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
-      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend and pre-provisioned ModelStore, consumed by a separately installed same-signer Consumer APK",
+      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend, pre-provisioned ModelStore and signature-protected pause/release/query generation fault control for downstream same-signer lifecycle tests",
       "target_environment_refs": ["android-arm64-device"],
       "known_gaps": [
         "x86_64 emulator does not execute the production arm64-v8a llama.cpp/JNI backend",
@@ -123,7 +123,7 @@
       "claim": "A clean Harnex process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
       "ui_surface": true,
       "required_media_artifacts": ["screenshots", "video"],
-      "target_environment_refs": ["android-arm64-device"],
+      "target_environment_refs": ["phone-cold-start-api35-emulator"],
       "automated_environment_refs": ["phone-cold-start-api35-emulator"],
       "minimum_automated_fidelity": "simulated_or_emulated",
       "residual_gaps": [
