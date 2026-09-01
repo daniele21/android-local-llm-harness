@@ -17,6 +17,7 @@ import io.github.daniele21.localllm.models.PresetLifecycleState
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.StoredPresetExposure
 import io.github.daniele21.localllm.models.UseCasePresetDefinition
+import io.github.daniele21.localllm.runtime.ActivationIdFactory
 import io.github.daniele21.localllm.runtime.ActivationResidencyCoordinator
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import io.github.daniele21.localllm.runtime.UseCaseActivationLeaseRegistry
@@ -155,7 +156,11 @@ private data class SetupFixture(
 )
 
 private class SetupRecordingRuntimeControl : HarnessConsumerRuntimeControl {
-    override val activationResidency = ActivationResidencyCoordinator(UseCaseActivationLeaseRegistry())
+    override val activationResidency = ActivationResidencyCoordinator(
+        UseCaseActivationLeaseRegistry(
+            ActivationIdFactory { error("Setup inspection must not allocate activation IDs") },
+        ),
+    )
     var installCalls = 0
         private set
 
