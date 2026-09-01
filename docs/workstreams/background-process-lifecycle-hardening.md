@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: shared-runtime/runtime lifecycle
 Canonical scope: workstream.background-process-lifecycle
 Read when: coordinating detached inference-job, Binder reconnect, host background execution or process-recovery implementation
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-01
 
 Repository priority and integrated/blocker truth remain owned by [`../current-state.md`](../current-state.md). This workstream coordinates only the bounded implementation sequence.
 
@@ -62,24 +62,22 @@ Canonical architectural decision: [ADR 0016](../adr/0016-detached-shared-runtime
 | HBG-23 | DONE | Add authenticated application/use-case-scoped idempotency lookup and duplicate-submit convergence. |
 | HBG-24 | TODO | Extend accepted job identity with exact use-case/binding/preset revision pins before public submission wiring. |
 
-The foundation is deliberately not wired into AIDL yet: connection-owned request/session cleanup remains unchanged until the durable-job protocol can query/reattach/cancel safely, preventing orphaned native work.
-
 ### Lane C — transport/session decoupling
 
 | ID | State | Task |
 | --- | --- | --- |
-| HBG-30 | TODO | Separate transport cleanup from semantic durable-job cancellation in service host. |
-| HBG-31 | TODO | Prevent callback delivery failure from cancelling detached accepted work. |
-| HBG-32 | TODO | Transfer active session/request ownership from connection ledger to durable logical job owner. |
-| HBG-33 | TODO | Add capability-negotiated `ConsumerInferenceJobId` submit/query/observe/cancel/reattach Binder contract and Consumer SDK adapter. |
-| HBG-34 | TODO | Preserve ADR 0012 behavior for clients/requests that do not opt into durable jobs. |
+| HBG-30 | DONE | Separate connection cleanup from semantic durable-job cancellation in service host. |
+| HBG-31 | DONE | Keep durable execution independent from Binder callback delivery after submission. |
+| HBG-32 | DONE | Transfer active logical-job session/generation-handle ownership to the durable job coordinator instead of the connection ledger. |
+| HBG-33 | IN_PROGRESS | Capability-negotiated `ConsumerInferenceJobId` submit/query/result/cancel + Consumer SDK adapter are wired; complete observe/reattach contract semantics and configuration revision pinning before declaring the public durable-job protocol complete. |
+| HBG-34 | DONE | Preserve ADR 0012 connection-scoped cleanup for clients/requests that do not opt into durable jobs. |
 
 ### Lane D — host execution and recovery
 
 | ID | State | Task |
 | --- | --- | --- |
-| HBG-40 | TODO | Add started + bound execution ownership while durable work exists. |
-| HBG-41 | TODO | Add Android foreground/user-visible execution path where platform rules require it. |
+| HBG-40 | DONE | Add started-service execution ownership while durable logical-job demand exists. |
+| HBG-41 | DONE | Add foreground/user-visible execution adapter and notification path for durable work. |
 | HBG-42 | TODO | Add runtimeSessionId and stale non-terminal job reconciliation after host process restart. |
 | HBG-43 | TODO | Add retry-attempt semantics only when required input remains safely available; otherwise fail closed as source-required/interrupted. |
 | HBG-50 | TODO | Integrate durable jobs with existing activation and warm-idle/model-residency policy without a second runtime owner. |
@@ -95,14 +93,20 @@ The foundation is deliberately not wired into AIDL yet: connection-owned request
 | HBG-63 | TODO | STRONG automated preflight on exact head/base. |
 | HBG-64 | TODO | Representative ARM64 same-signer two-APK + real-GGUF evidence. |
 
+## Current implementation evidence
+
+As of 2026-09-01, PR #502 has a green repository `Validate` FULL run on the exact branch head used for the implementation iteration. That run covers deterministic Android tests, lint/Detekt, AndroidTest assembly and native packaging. It is implementation evidence, not a substitute for HBG-61/HBG-63/HBG-64: lifecycle reconnect/process-death journeys, exact-head STRONG remote preflight and representative physical ARM64 + real-GGUF evidence remain open.
+
+The current host path stores accepted logical jobs in a bounded process-local registry. Connection cleanup still cancels legacy connection-owned requests/sessions, but does not enumerate or cancel logical jobs. Logical-job execution retains its own Consumer client/session/generation handle until terminal completion or explicit cancellation. Durable-job demand drives the Android started/foreground service adapter independently from Binder connection count.
+
 ## Integration points
 
 1. Lane A and the process-local Lane B foundation can ship without public protocol changes.
-2. HBG-24 must pin exact accepted configuration identity before HBG-33 exposes durable submission publicly.
-3. HBG-22/23 must be stable before HBG-30/31 removes current connection-owned cancellation.
+2. HBG-24 must pin exact accepted configuration identity before HBG-33 is considered complete for public durable submission.
+3. HBG-22/23 are stable and HBG-30/31/32 now decouple accepted logical work from connection cleanup; targeted disconnect/death evidence remains HBG-60/HBG-61.
 4. HBG-33 is the contract integration point consumed by RedactGuard HBG-55/LAS-08B reconciliation.
-5. HBG-40/41 follows logical-job ownership so service lifetime reflects semantic work rather than Binder count.
-6. Physical validation begins only after automated E2E/preflight is green.
+5. HBG-40/41 now reflect logical-job demand in Android service lifetime; residency integration remains HBG-50.
+6. Physical validation begins only after automated lifecycle E2E/preflight is green.
 
 ## Fault matrix
 
