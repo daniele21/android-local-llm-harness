@@ -25,17 +25,13 @@ import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerOutp
 import io.github.daniele21.localllm.transport.binder.contract.toCoreTaskDefinition
 import java.util.LinkedHashMap
 
-internal fun interface HostLogicalJobExecutionDemandListener {
-    fun onExecutionDemandChanged(active: Boolean)
-}
-
 /**
  * Tracks semantic durable-job demand independently from Binder connection count and runtime handles.
- * The listener observes only the zero-to-one / one-to-zero boundary, so multiple concurrent queued or
+ * The callback observes only the zero-to-one / one-to-zero boundary, so multiple concurrent queued or
  * running jobs cannot accidentally stop Android host lifetime while work still exists.
  */
 internal class HostLogicalJobExecutionDemand(
-    private val listener: HostLogicalJobExecutionDemandListener = HostLogicalJobExecutionDemandListener {},
+    private val onDemandChanged: (Boolean) -> Unit = {},
 ) : AutoCloseable {
     private val lock = Any()
     private val activeJobs = LinkedHashSet<HostLogicalJobId>()
@@ -47,7 +43,7 @@ internal class HostLogicalJobExecutionDemand(
                 val added = activeJobs.add(jobId)
                 added && wasEmpty
             }
-        if (becameActive) listener.onExecutionDemandChanged(true)
+        if (becameActive) onDemandChanged(true)
     }
 
     fun release(jobId: HostLogicalJobId) {
@@ -56,7 +52,7 @@ internal class HostLogicalJobExecutionDemand(
                 val removed = activeJobs.remove(jobId)
                 removed && activeJobs.isEmpty()
             }
-        if (becameIdle) listener.onExecutionDemandChanged(false)
+        if (becameIdle) onDemandChanged(false)
     }
 
     override fun close() {
@@ -66,7 +62,7 @@ internal class HostLogicalJobExecutionDemand(
                 activeJobs.clear()
                 active
             }
-        if (hadDemand) listener.onExecutionDemandChanged(false)
+        if (hadDemand) onDemandChanged(false)
     }
 }
 
@@ -78,7 +74,7 @@ internal class HostLogicalJobExecutionDemand(
  */
 internal class HostLogicalJobCoordinator(
     private val registry: HostLogicalJobRegistry,
-    executionDemandListener: HostLogicalJobExecutionDemandListener = HostLogicalJobExecutionDemandListener {},
+    onExecutionDemandChanged: (Boolean) -> Unit = {},
     private val maxReplayResults: Int = DEFAULT_MAX_REPLAY_RESULTS,
 ) : AutoCloseable {
     private data class Execution(
@@ -97,7 +93,7 @@ internal class HostLogicalJobCoordinator(
     private val executions = LinkedHashMap<HostLogicalJobId, Execution>()
     private val replayResults = LinkedHashMap<HostLogicalJobId, ReplayResult>()
     private val errorCodes = LinkedHashMap<HostLogicalJobId, String>()
-    private val executionDemand = HostLogicalJobExecutionDemand(executionDemandListener)
+    private val executionDemand = HostLogicalJobExecutionDemand(onExecutionDemandChanged)
 
     init {
         require(maxReplayResults > 0) { "Logical job replay capacity must be positive" }
