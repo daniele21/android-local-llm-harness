@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/brand/master/harness-symbol.png" width="128" alt="Harness H Bridge Core symbol">
+  <img src="docs/assets/brand/master/harnex-lockup-light.png" width="760" alt="Harnex — Your local AI harness for Android.">
 </p>
 
-<h1 align="center">Android Local LLM Harness</h1>
+<h1 align="center">Harnex</h1>
 
 <p align="center">
-  <strong>Local AI Gateway for Android</strong><br>
+  <strong>Your local AI harness for Android.</strong><br>
   One gateway. Many Android applications.<br>
   A shared on-device LLM runtime, model plane, and control plane—so Android teams can build local AI features without rebuilding the AI infrastructure inside every app.
 </p>
@@ -31,9 +31,9 @@
 
 My mission is to [scale AI, GenAI, and Data Science with impact](https://daniele21.github.io/): move beyond isolated demos and turn AI into an understandable, measurable, reusable capability.
 
-The vision behind Harness is that local AI should become an Android platform capability, not a native stack that every application team must assemble and maintain independently.
+The vision behind **Harnex** is that local AI should become an Android platform capability, not a native stack that every application team must assemble and maintain independently.
 
-Harness aims to become the device's **Local AI Gateway**: applications ask for an approved AI use case, while one host owns the native runtime, shared models, resource coordination, and operational visibility.
+Harnex aims to become the device's **Local AI Gateway**: applications ask for an approved AI use case, while one host owns the native runtime, shared models, resource coordination, and operational visibility.
 
 The end state is intentionally bigger than an LLM chat application:
 
@@ -42,13 +42,13 @@ The end state is intentionally bigger than an LLM chat application:
 - every use case remains explicit, observable, and independently measurable;
 - local AI can evolve from individual experiments into reusable product infrastructure.
 
-![Harness path from explicit model identity, lifecycle guardrails, measurements, and modular boundaries to a shared Android Local AI Gateway with measurable impact](docs/assets/readme/harness-vision-impact.png)
+![Harnex path from explicit model identity, lifecycle guardrails, measurements, and modular boundaries to a shared Android Local AI Gateway with measurable impact](docs/assets/readme/harness-vision-impact.png)
 
 _The final vision: turn explicit, measurable local inference into reusable Android product infrastructure._
 
 ## Values and opportunities
 
-Harness is designed around values that make local AI useful beyond a technical demonstration.
+Harnex is designed around values that make local AI useful beyond a technical demonstration.
 
 | Value | What it means | Opportunity it creates |
 | --- | --- | --- |
@@ -69,9 +69,9 @@ This opens several product opportunities:
 
 ## Local AI Gateway vision
 
-The target product is a **Local AI Gateway for Android**. Other Android applications integrate a lightweight, backend-neutral client and connect to a Harness host service instead of embedding `llama.cpp`, JNI libraries, GGUF files, and model-management logic in every APK.
+The target product is a **Local AI Gateway for Android**. Other Android applications integrate a lightweight, backend-neutral client and connect to a Harnex host service instead of embedding `llama.cpp`, JNI libraries, GGUF files, and model-management logic in every APK.
 
-In that target architecture, Harness will:
+In that target architecture, Harnex will:
 
 - expose local generation, streaming, cancellation, and typed failures to authorized Android client apps;
 - resolve each request explicitly through `applicationId + useCaseId`, without silently substituting a model;
@@ -86,7 +86,7 @@ This embedded-first sequence is deliberate: the shared host should reuse the sam
 
 The strategy is to prove the difficult runtime and model-management foundations in a real Android product surface before introducing cross-application IPC and shared ownership.
 
-![Harness evolution from today's embedded in-process Android runtime to a future shared out-of-process Local AI Host used by multiple Android apps](docs/assets/readme/harness-gateway-evolution.png)
+![Harnex evolution from today's embedded in-process Android runtime to a future shared out-of-process Local AI Host used by multiple Android apps](docs/assets/readme/harness-gateway-evolution.png)
 
 _Today the runtime is embedded in one application; the target is one protected host service serving many clients._
 
@@ -99,7 +99,7 @@ This sequence keeps each step useful on its own:
 
 ## Where we are today
 
-**Harness is currently a tangible Local AI Console for Android.** It is not yet the cross-application gateway, but it already turns the underlying runtime into a usable product for managing, exercising, measuring, and validating local LLMs on one device.
+**Harnex is currently a tangible Local AI Console for Android.** It is not yet the cross-application gateway, but it already turns the underlying runtime into a usable product for managing, exercising, measuring, and validating local LLMs on one device.
 
 The current console lets a user or developer:
 
@@ -109,9 +109,11 @@ The current console lets a user or developer:
 - run health, model-integrity, generation-sanity, resource, and validation workflows explicitly;
 - examine the same contracts, lifecycle, scheduling, and evidence model that the future gateway will expose to other applications.
 
-That is already a practical result: Harness can be used as an on-device LLM evaluation and engineering console, while simultaneously de-risking the final gateway architecture.
+That is already a practical result: Harnex can be used as an on-device LLM evaluation and engineering console, while simultaneously de-risking the final gateway architecture.
 
-> **Current boundary:** the runtime is still embedded and in-process inside the connected Harness application. Other Android apps cannot connect to a shared Harness IPC service yet and must not assume that Binder/AIDL, cross-application model sharing, or centralized RAM ownership is available.
+> **Current boundary:** the runtime is still embedded and in-process inside the connected application. Other Android apps cannot connect to a shared Harnex IPC service yet and must not assume that Binder/AIDL, cross-application model sharing, or centralized RAM ownership is available.
+
+> **Brand migration boundary:** this repository identity is Harnex. Current application screenshots and some internal implementation identifiers may still contain the legacy `Harness` label until the separately scoped product-surface migration is implemented and validated.
 
 The five connected surfaces make that current milestone visible:
 
@@ -122,9 +124,9 @@ The five connected surfaces make that current milestone visible:
     <th>Models</th>
   </tr>
   <tr>
-    <td align="center"><a href="docs/assets/readme/harness-overview.png"><img src="docs/assets/readme/harness-overview.png" width="220" alt="Harness Overview showing runtime readiness, no selected model, device resources, and recent activity"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-playground.png"><img src="docs/assets/readme/harness-playground.png" width="220" alt="Harness Playground showing local prompt and generation controls with no active model"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-models.png"><img src="docs/assets/readme/harness-models.png" width="220" alt="Harness Models showing local storage and compatible catalog entries"></a></td>
+    <td align="center"><a href="docs/assets/readme/harness-overview.png"><img src="docs/assets/readme/harness-overview.png" width="220" alt="Current connected Overview showing runtime readiness, no selected model, device resources, and recent activity"></a></td>
+    <td align="center"><a href="docs/assets/readme/harness-playground.png"><img src="docs/assets/readme/harness-playground.png" width="220" alt="Current connected Playground showing local prompt and generation controls with no active model"></a></td>
+    <td align="center"><a href="docs/assets/readme/harness-models.png"><img src="docs/assets/readme/harness-models.png" width="220" alt="Current connected Models surface showing local storage and compatible catalog entries"></a></td>
   </tr>
   <tr>
     <td align="center">Readiness and the next valid action</td>
@@ -139,8 +141,8 @@ The five connected surfaces make that current milestone visible:
     <th>Settings</th>
   </tr>
   <tr>
-    <td align="center"><a href="docs/assets/readme/harness-diagnostics.png"><img src="docs/assets/readme/harness-diagnostics.png" width="220" alt="Harness Diagnostics showing not-run health checks and explicit actions"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-settings.png"><img src="docs/assets/readme/harness-settings.png" width="220" alt="Harness Settings showing theme, privacy, storage, build information, and developer tools"></a></td>
+    <td align="center"><a href="docs/assets/readme/harness-diagnostics.png"><img src="docs/assets/readme/harness-diagnostics.png" width="220" alt="Current connected Diagnostics showing not-run health checks and explicit actions"></a></td>
+    <td align="center"><a href="docs/assets/readme/harness-settings.png"><img src="docs/assets/readme/harness-settings.png" width="220" alt="Current connected Settings showing theme, privacy, storage, build information, and developer tools"></a></td>
   </tr>
   <tr>
     <td align="center">Runs, health, resources, benchmarks, logs, and validation</td>
@@ -152,7 +154,7 @@ These are real captures from the current `0.5.0-debug` build on an Android 16 AR
 
 ## How it works
 
-![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, public client and transport boundaries, runtime orchestration, model plane, llama.cpp backend, observability, engineering principles, and future Binder/AIDL shared host](docs/assets/architecture.png)
+![Detailed Harnex Android local-AI architecture showing the product control plane, embedded data plane, public client and transport boundaries, runtime orchestration, model plane, llama.cpp backend, observability, engineering principles, and future Binder/AIDL shared host](docs/assets/architecture.png)
 
 The current runtime is embedded in the Android application:
 
@@ -162,7 +164,7 @@ The current runtime is embedded in the Android application:
 - **Model plane:** GGUF artifacts are verified and stored by immutable SHA-256 identity; installation, selection, and loading are distinct operations.
 - **Backend:** a Kotlin/JNI/C++ adapter contains the pinned `llama.cpp` implementation and Android `arm64-v8a` packaging.
 - **Observability:** stable contracts capture privacy-safe runs, logs, health, resources, cache state, and benchmarks without making inference depend on telemetry success.
-- **Gateway evolution:** a future Harness host will centralize GGUF storage, model residency, scheduling, and monitoring; authorized Android apps will connect through Binder/AIDL while reusing the same contracts and runtime core.
+- **Gateway evolution:** a future Harnex host will centralize GGUF storage, model residency, scheduling, and monitoring; authorized Android apps will connect through Binder/AIDL while reusing the same contracts and runtime core.
 
 The exact lifecycle stays visible end to end:
 
@@ -229,17 +231,17 @@ handle.cancel()
 
 The full assembly, generation, streaming, cancellation, and cleanup contract is documented in the [embedded API guide](docs/api-usage.md).
 
-In the target gateway phase, client applications will keep the transport-safe `LocalLlmClient` interaction but will no longer assemble the backend, own GGUF storage, or package `llama.cpp`; those responsibilities will move behind the Harness host service.
+In the target gateway phase, client applications will keep the transport-safe `LocalLlmClient` interaction but will no longer assemble the backend, own GGUF storage, or package `llama.cpp`; those responsibilities will move behind the Harnex host service.
 
 ## Evidence and maturity
 
-Harness is an active engineering and validation project, not a production-ready Android inference platform. The embedded GGUF path, connected product surfaces, and deterministic host/emulator validation are integrated. Production-readiness and device-performance claims remain blocked until the exact candidate completes representative physical-device GGUF, cancellation, memory, thermal, and packaging evidence.
+Harnex is an active engineering and validation project, not a production-ready Android inference platform. The embedded GGUF path, connected product surfaces, and deterministic host/emulator validation are integrated. Production-readiness and device-performance claims remain blocked until the exact candidate completes representative physical-device GGUF, cancellation, memory, thermal, and packaging evidence.
 
 Use these sources for the current truth:
 
 - [Current integrated state and blockers](docs/current-state.md)
 - [Capability roadmap](docs/roadmap.md)
-- [Harness 0.5 release gates](docs/releases/harness-0.5.md)
+- [Harnex 0.5 release gates](docs/releases/harness-0.5.md)
 - [Physical-device validation procedure](docs/device-e2e-testing.md)
 - [Definition of done](docs/definition-of-done.md)
 
@@ -261,6 +263,6 @@ Coding agents start from [`AGENTS.md`](AGENTS.md), which routes work to the owni
 
 ## License and author
 
-Harness is available under the [MIT License](LICENSE).
+Harnex is available under the [MIT License](LICENSE).
 
 Built by [Daniele Moltisanti](https://daniele21.github.io/) as part of a broader mission to make AI strategy practical: choose deliberately, evaluate before scaling, and communicate technical trade-offs clearly.
