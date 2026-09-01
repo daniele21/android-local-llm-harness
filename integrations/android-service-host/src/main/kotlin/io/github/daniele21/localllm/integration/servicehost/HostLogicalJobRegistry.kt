@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.UseCaseId
 
 @JvmInline
@@ -56,12 +57,14 @@ internal data class HostLogicalJobSnapshot(
     val jobId: HostLogicalJobId,
     val clientRequestId: HostClientRequestId,
     val scope: HostLogicalJobScope,
+    val execution: ConsumerExecutionIdentity,
     val state: HostLogicalJobState,
     val revision: Long,
     val attempt: Int,
     val runtimeSessionId: HostRuntimeSessionId,
 ) {
     init {
+        require(execution.useCaseId == scope.useCaseId) { "Logical job execution identity must match the authorized use case" }
         require(revision >= 0) { "Logical job revision must be non-negative" }
         require(attempt >= 1) { "Logical job attempt must be positive" }
     }
@@ -202,10 +205,17 @@ internal class HostLogicalJobRegistry(
     }
 
     @Synchronized
-    fun submit(scope: HostLogicalJobScope, clientRequestId: HostClientRequestId): HostLogicalJobSubmission {
+    fun submit(
+        scope: HostLogicalJobScope,
+        clientRequestId: HostClientRequestId,
+        execution: ConsumerExecutionIdentity,
+    ): HostLogicalJobSubmission {
+        require(execution.useCaseId == scope.useCaseId) { "Logical job execution identity must match the authorized use case" }
         val requestKey = RequestKey(scope, clientRequestId)
         jobsByRequest[requestKey]?.let { existingId ->
-            return HostLogicalJobSubmission(checkNotNull(jobsById[existingId]), created = false)
+            val existing = checkNotNull(jobsById[existingId])
+            if (existing.execution != execution) throw HostLogicalJobIdentityConflictException()
+            return HostLogicalJobSubmission(existing, created = false)
         }
 
         ensureCapacity()
@@ -216,6 +226,7 @@ internal class HostLogicalJobRegistry(
                 jobId = jobId,
                 clientRequestId = clientRequestId,
                 scope = scope,
+                execution = execution,
                 state = HostLogicalJobState.QUEUED,
                 revision = 0,
                 attempt = 1,
@@ -252,3 +263,6 @@ internal class HostLogicalJobRegistry(
 }
 
 internal class HostLogicalJobCapacityException : IllegalStateException("Logical job registry is at capacity")
+
+internal class HostLogicalJobIdentityConflictException :
+    IllegalStateException("Logical job request ID was reused with a different execution identity")
