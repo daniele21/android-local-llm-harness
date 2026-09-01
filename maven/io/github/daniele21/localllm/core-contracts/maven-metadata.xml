@@ -3,11 +3,11 @@
   <groupId>io.github.daniele21.localllm</groupId>
   <artifactId>core-contracts</artifactId>
   <versioning>
-    <latest>0.1.0-alpha.7</latest>
-    <release>0.1.0-alpha.7</release>
+    <latest>0.1.0-alpha.8</latest>
+    <release>0.1.0-alpha.8</release>
     <versions>
-      <version>0.1.0-alpha.7</version>
+      <version>0.1.0-alpha.8</version>
     </versions>
-    <lastUpdated>20260901063014</lastUpdated>
+    <lastUpdated>20260901144220</lastUpdated>
   </versioning>
 </metadata>
