@@ -11,11 +11,11 @@
     "logo_compact_lockup_dark": "docs/assets/brand/master/harnex-lockup-compact-dark.png",
     "wordmark": "docs/assets/brand/master/harnex-wordmark-light.png",
     "wordmark_dark": "docs/assets/brand/master/harnex-wordmark-dark.png",
-    "logo_monochrome": "Android themed icon derives its alpha mask from the canonical H Bridge Core PNG symbol",
+    "logo_monochrome": "Android themed icon derives its alpha mask from the approved H Bridge Core PNG symbol",
     "app_icon": "docs/assets/brand/master/harnex-app-icon-dark.png",
     "app_icon_light": "docs/assets/brand/master/harnex-app-icon-light.png",
     "app_icon_dark": "docs/assets/brand/master/harnex-app-icon-dark.png",
-    "android_launcher": "generated Android launcher resources synchronized from the canonical Harnex PNG masters",
+    "android_launcher": "generated Android launcher resources derive from the same approved H Bridge Core PNG bytes; current internal generation may consume a legacy harness-* compatibility alias",
     "favicon": "docs/assets/brand/light/favicon.png and docs/assets/brand/dark/favicon.png"
   },
   "brand_mark": {
