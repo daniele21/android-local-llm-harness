@@ -11,6 +11,8 @@ import io.github.daniele21.localllm.contracts.ConsumerControlPlaneErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
@@ -20,6 +22,7 @@ import io.github.daniele21.localllm.transport.binder.contract.toCoreActivationRe
 import io.github.daniele21.localllm.transport.binder.contract.toCoreAssignedUseCasesResult
 import io.github.daniele21.localllm.transport.binder.contract.toCoreDeactivationResult
 import io.github.daniele21.localllm.transport.binder.contract.toCorePublishedPresetsResult
+import io.github.daniele21.localllm.transport.binder.contract.toCoreSetupResolutionResult
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -43,17 +46,12 @@ internal class BinderConsumerControlPlaneAdapter(
         if (!controlPlaneEnabled()) return assignedFeatureUnavailable()
         val operationId = correlationIds.nextId()
         val request = ConsumerControlPlaneRequestParcel(endpoint.clientToken, operationId)
-        val outcome = await(endpoint) { callback ->
-            endpoint.service.consumer.discoverUseCases(request, callback)
-        }
+        val outcome = await(endpoint) { callback -> endpoint.service.consumer.discoverUseCases(request, callback) }
         return when (outcome) {
-            is ControlPlaneRemoteOutcome.Received -> {
-                if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
-                    assignedTransportFailure()
-                } else {
-                    runCatching { outcome.result.toCoreAssignedUseCasesResult() }
-                        .getOrElse { assignedTransportFailure() }
-                }
+            is ControlPlaneRemoteOutcome.Received -> if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
+                assignedTransportFailure()
+            } else {
+                runCatching { outcome.result.toCoreAssignedUseCasesResult() }.getOrElse { assignedTransportFailure() }
             }
 
             else -> assignedTransportFailure()
@@ -70,20 +68,33 @@ internal class BinderConsumerControlPlaneAdapter(
             operationId = operationId,
             useCaseId = useCaseId.value,
         )
-        val outcome = await(endpoint) { callback ->
-            endpoint.service.consumer.discoverPresets(request, callback)
-        }
+        val outcome = await(endpoint) { callback -> endpoint.service.consumer.discoverPresets(request, callback) }
         return when (outcome) {
-            is ControlPlaneRemoteOutcome.Received -> {
-                if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
-                    presetsTransportFailure()
-                } else {
-                    runCatching { outcome.result.toCorePublishedPresetsResult() }
-                        .getOrElse { presetsTransportFailure() }
-                }
+            is ControlPlaneRemoteOutcome.Received -> if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
+                presetsTransportFailure()
+            } else {
+                runCatching { outcome.result.toCorePublishedPresetsResult() }.getOrElse { presetsTransportFailure() }
             }
 
             else -> presetsTransportFailure()
+        }
+    }
+
+    override fun resolveSetup(request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult {
+        blockingCallGuard.requireAllowed()
+        val endpoint = endpointProvider() ?: return setupTransportFailure()
+        if (!setupResolutionEnabled()) return setupFeatureUnavailable()
+        val operationId = correlationIds.nextId()
+        val wire = request.toConsumerControlPlaneWire(endpoint.clientToken, operationId)
+        val outcome = await(endpoint) { callback -> endpoint.service.consumer.resolveSetup(wire, callback) }
+        return when (outcome) {
+            is ControlPlaneRemoteOutcome.Received -> if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
+                setupTransportFailure()
+            } else {
+                runCatching { outcome.result.toCoreSetupResolutionResult() }.getOrElse { setupTransportFailure() }
+            }
+
+            else -> setupTransportFailure()
         }
     }
 
@@ -93,17 +104,12 @@ internal class BinderConsumerControlPlaneAdapter(
         if (!controlPlaneEnabled()) return activationFeatureUnavailable()
         val operationId = correlationIds.nextId()
         val wire = request.toConsumerControlPlaneWire(endpoint.clientToken, operationId)
-        val outcome = await(endpoint) { callback ->
-            endpoint.service.consumer.activate(wire, callback)
-        }
+        val outcome = await(endpoint) { callback -> endpoint.service.consumer.activate(wire, callback) }
         return when (outcome) {
-            is ControlPlaneRemoteOutcome.Received -> {
-                if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
-                    activationTransportFailure()
-                } else {
-                    runCatching { outcome.result.toCoreActivationResult() }
-                        .getOrElse { activationTransportFailure() }
-                }
+            is ControlPlaneRemoteOutcome.Received -> if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
+                activationTransportFailure()
+            } else {
+                runCatching { outcome.result.toCoreActivationResult() }.getOrElse { activationTransportFailure() }
             }
 
             else -> activationTransportFailure()
@@ -120,17 +126,12 @@ internal class BinderConsumerControlPlaneAdapter(
             operationId = operationId,
             activationId = activationId.value,
         )
-        val outcome = await(endpoint) { callback ->
-            endpoint.service.consumer.deactivate(request, callback)
-        }
+        val outcome = await(endpoint) { callback -> endpoint.service.consumer.deactivate(request, callback) }
         return when (outcome) {
-            is ControlPlaneRemoteOutcome.Received -> {
-                if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
-                    deactivationTransportFailure()
-                } else {
-                    runCatching { outcome.result.toCoreDeactivationResult(activationId) }
-                        .getOrElse { deactivationTransportFailure() }
-                }
+            is ControlPlaneRemoteOutcome.Received -> if (outcome.result.operationId != operationId || !isCurrent(endpoint)) {
+                deactivationTransportFailure()
+            } else {
+                runCatching { outcome.result.toCoreDeactivationResult(activationId) }.getOrElse { deactivationTransportFailure() }
             }
 
             else -> deactivationTransportFailure()
@@ -138,6 +139,8 @@ internal class BinderConsumerControlPlaneAdapter(
     }
 
     private fun controlPlaneEnabled(): Boolean = BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in enabledFeaturesProvider()
+
+    private fun setupResolutionEnabled(): Boolean = BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in enabledFeaturesProvider()
 
     private fun await(
         endpoint: RegisteredSharedRuntimeEndpoint,

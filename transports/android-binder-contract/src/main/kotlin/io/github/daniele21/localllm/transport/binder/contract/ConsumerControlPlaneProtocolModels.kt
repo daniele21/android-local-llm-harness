@@ -33,6 +33,31 @@ data class ConsumerPublishedPresetMetadataParcel(
 ) : Parcelable
 
 @Parcelize
+data class ConsumerGenerationConfigurationParcel(
+    val maxOutputTokens: Int,
+    val temperature: Float,
+    val topP: Float,
+    val topK: Int,
+    val minP: Float,
+    val presencePenalty: Float,
+    val repeatPenalty: Float,
+    val repeatLastN: Int,
+    val thinkingModeTag: String,
+    val seedPolicyTag: String,
+) : Parcelable
+
+@Parcelize
+data class ConsumerResolvedSetupParcel(
+    val useCaseId: String,
+    val useCaseRevision: Int,
+    val bindingRevision: Int,
+    val preset: ConsumerPresetParcel,
+    val modelProfileId: String,
+    val contextTokens: Int,
+    val generation: ConsumerGenerationConfigurationParcel,
+) : Parcelable
+
+@Parcelize
 data class ConsumerActivationParcel(
     val activationId: String,
     val useCaseId: String,
@@ -48,6 +73,7 @@ data class ConsumerControlPlaneResultParcel(
     val useCaseId: String? = null,
     val bindingRevision: Int? = null,
     val presets: List<ConsumerPublishedPresetMetadataParcel> = emptyList(),
+    val resolvedSetup: ConsumerResolvedSetupParcel? = null,
     val activation: ConsumerActivationParcel? = null,
     val releasedActivationId: String? = null,
     val error: WireErrorParcel? = null,

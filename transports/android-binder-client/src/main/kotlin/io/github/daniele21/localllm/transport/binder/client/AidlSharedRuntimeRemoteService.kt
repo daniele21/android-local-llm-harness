@@ -123,6 +123,10 @@ private class AidlConsumerSharedRuntimeRemoteService(private val delegate: ICons
         delegate.discoverPresets(request, controlPlaneResultCallback(callback))
     }
 
+    override fun resolveSetup(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+        delegate.resolveSetup(request, controlPlaneResultCallback(callback))
+    }
+
     override fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
         delegate.activate(request, controlPlaneResultCallback(callback))
     }

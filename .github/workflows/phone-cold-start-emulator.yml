@@ -220,7 +220,7 @@ jobs:
           echo "Error: phone cold-start emulator did not finish booting." >&2
           exit 1
 
-      - name: Install canary and prove clean cold start
+      - name: Install canary and prove clean cold start with UI media evidence
         env:
           ANDROID_SERIAL: emulator-5554
           CANARY_APK: ${{ steps.canary.outputs.apk }}
@@ -230,34 +230,66 @@ jobs:
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/phone-cold-start"
+          media="$evidence/ui-media/phone-cold-start"
+          screenshots="$media/screenshots"
+          video_dir="$media/video"
+          remote_video="/sdcard/phone-cold-start.mp4"
           component="$PACKAGE_NAME/$ACTIVITY_NAME"
+          mkdir -p "$screenshots" "$video_dir"
+          media_started=0
+          media_finalized=0
+
+          finalize_media() {
+            if [[ "$media_finalized" == "1" ]]; then return; fi
+            media_finalized=1
+            set +e
+            if [[ "$media_started" == "1" ]]; then
+              adb exec-out screencap -p > "$screenshots/final-shell.png" || rm -f "$screenshots/final-shell.png"
+              record_pid="$(adb shell pidof screenrecord 2>/dev/null | tr -d '\r')"
+              if [[ -n "$record_pid" ]]; then adb shell kill -2 "$record_pid" || true; fi
+              sleep 2
+              adb pull "$remote_video" "$video_dir/journey.mp4" >/dev/null 2>&1 || true
+              adb shell rm -f "$remote_video" || true
+            fi
+            cat > "$media/manifest.txt" <<EOF
+          journey_id=phone-cold-start
+          source_revision=$(git rev-parse HEAD)
+          workflow_run=${GITHUB_RUN_ID:-local}
+          execution_environment=phone-cold-start-api35-emulator
+          fidelity_class=simulated_or_emulated
+          screenshot=screenshots/final-shell.png
+          video=video/journey.mp4
+          EOF
+          }
+          trap finalize_media EXIT
 
           adb install --no-streaming -r -t "$CANARY_APK" | tee "$evidence/install.txt"
           adb shell pm clear "$PACKAGE_NAME" | tee "$evidence/pm-clear.txt"
           adb shell am force-stop "$PACKAGE_NAME"
           adb logcat -c
+          adb shell rm -f "$remote_video"
+          adb shell "screenrecord --bit-rate 4000000 --time-limit 20 $remote_video >/dev/null 2>&1 &"
+          for attempt in $(seq 1 20); do
+            [[ -n "$(adb shell pidof screenrecord 2>/dev/null | tr -d '\r')" ]] && break
+            sleep 0.25
+          done
+          [[ -n "$(adb shell pidof screenrecord 2>/dev/null | tr -d '\r')" ]] || { echo "screenrecord did not start" >&2; exit 1; }
+          media_started=1
 
           adb shell am start -W -n "$component" | tee "$evidence/am-start.txt"
           sleep 3
           adb logcat -d -v threadtime > "$evidence/logcat.txt"
 
           pid=$(adb shell pidof "$PACKAGE_NAME" | tr -d '\r')
-          [[ -n "$pid" ]] || {
-            echo "Harness process is not alive after cold start." >&2
-            exit 1
-          }
+          [[ -n "$pid" ]] || { echo "Harness process is not alive after cold start." >&2; exit 1; }
           printf '%s\n' "$pid" | tee "$evidence/pid.txt"
 
           adb shell dumpsys activity activities > "$evidence/activity-state.txt"
-          grep -F "$PACKAGE_NAME" "$evidence/activity-state.txt" >/dev/null || {
-            echo "Harness package is absent from activity state after launch." >&2
-            exit 1
-          }
+          grep -F "$PACKAGE_NAME" "$evidence/activity-state.txt" >/dev/null || { echo "Harness package is absent from activity state after launch." >&2; exit 1; }
 
           adb shell uiautomator dump /sdcard/harness-cold-start.xml >/dev/null
           adb pull /sdcard/harness-cold-start.xml "$evidence/window.xml" >/dev/null
-          if ! grep -F 'text="Harness"' "$evidence/window.xml" >/dev/null && \
-             ! grep -F 'text="Local AI Console"' "$evidence/window.xml" >/dev/null; then
+          if ! grep -F 'text="Harness"' "$evidence/window.xml" >/dev/null && ! grep -F 'text="Local AI Console"' "$evidence/window.xml" >/dev/null; then
             echo "Harness startup shell was not rendered in the accessibility tree." >&2
             exit 1
           fi
@@ -266,6 +298,11 @@ jobs:
             echo "Fatal exception detected for Harness during cold start." >&2
             exit 1
           fi
+
+          finalize_media
+          trap - EXIT
+          [[ -s "$screenshots/final-shell.png" ]] || { echo "E2E_EVIDENCE_INCOMPLETE: missing phone-cold-start screenshot" >&2; exit 1; }
+          [[ -s "$video_dir/journey.mp4" ]] || { echo "E2E_EVIDENCE_INCOMPLETE: missing phone-cold-start video" >&2; exit 1; }
 
       - name: Clean emulator resources
         if: always()
@@ -281,5 +318,5 @@ jobs:
         with:
           name: phone-cold-start-emulator-evidence
           path: ${{ runner.temp }}/phone-cold-start/**
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
