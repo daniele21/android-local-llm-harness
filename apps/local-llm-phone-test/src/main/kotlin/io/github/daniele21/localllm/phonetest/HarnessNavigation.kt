@@ -98,7 +98,7 @@ internal object HarnessRoutes {
 
     private fun applicationDetailShellState(route: String?): HarnessShellState? {
         val detail = when (route) {
-            HarnessApplicationRoutes.APPLICATION_PATTERN -> "Application" to "Assigned Harness use cases"
+            HarnessApplicationRoutes.APPLICATION_PATTERN -> "Application" to "Assigned Harnex use cases"
             HarnessApplicationRoutes.ASSIGNMENT_PATTERN -> "Assigned use case" to "Default and available presets"
             HarnessApplicationRoutes.PRESET_PATTERN -> "Preset" to "Effective local inference configuration"
             HarnessApplicationRoutes.TECHNICAL_DETAILS_PATTERN -> "Technical details" to "Control-plane identity and revisions"
