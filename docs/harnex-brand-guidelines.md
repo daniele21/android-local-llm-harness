@@ -20,6 +20,14 @@ This document defines durable Harnex brand intent and routes exact visual values
 
 The repository name `android-local-llm-harness` and implementation identifiers prefixed with `Harness` are compatibility/engineering identifiers. They do not override the public product name **Harnex**.
 
+## Public product surface
+
+The connected Android application presents the product as **Harnex**. The launcher label and primary app-shell title use the canonical Android `app_name` resource. **Local AI Console** is a descriptive surface subtitle, not an alternate product name. The About/build surface may use the full payoff.
+
+User-facing product copy must say Harnex when it names the product. Internal compatibility identifiers such as `HarnessTheme`, `HarnessRuntimeGraph`, `harness_launcher_*`, package IDs, test tags, Binder transaction names and historical filenames do not require cosmetic renames and should not leak into user-facing explanations merely because they remain in code.
+
+A product-surface brand change is evidenced by an exact-head Android build plus the automated `phone-cold-start` journey. That journey must verify the packaged application label, require `Harnex` and `Local AI Console` in the accessibility tree, and retain both screenshot and video artifacts. Emulator evidence proves rendered brand/UI behavior only; it does not replace physical-device inference, memory, thermal, signing or release evidence.
+
 ## H Bridge Core invariant
 
 The approved symbol is **H Bridge Core**. It must not be redrawn, simplified through approximation or regenerated from the retired SVG geometry.
@@ -58,7 +66,7 @@ Canonical variants are:
 
 Use the primary lockup when enough horizontal space exists and the brand needs explanation. Use the compact lockup when the context already makes the product purpose clear. Use the symbol alone for launcher, favicon and constrained icon surfaces.
 
-Older `harness-*` PNG/SVG assets are compatibility/history only and must not be used for new product-facing work.
+Older `harness-*` PNG/SVG assets are compatibility/history only and must not be used as the source for new product-facing work.
 
 ## Visual system
 
@@ -103,14 +111,16 @@ Error messages should identify the failed operation, give a safe concise reason 
 
 - **Overview:** summarize readiness and the next relevant action without duplicating Diagnostics.
 - **Playground:** prioritize prompt entry, explicit generation controls, stop behavior and safe output presentation.
+- **Apps:** present consumer applications and assigned Harnex use cases without exposing transport internals as the user task.
+- **Performance:** present comparable, source-backed evidence and fail closed when evidence is insufficient.
 - **Models:** make catalog, download, installation, selection and residency visibly distinct.
 - **Diagnostics:** present logs, health, resources and benchmarks with provenance and evidence level.
-- **Settings:** expose durable preferences and links to detail screens without becoming a status ledger.
+- **Settings:** expose durable preferences, Harnex privacy language and About/build identity without becoming a status ledger.
 
 Detailed screen acceptance criteria remain in [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md). Application architecture remains in [`features/phone-app-architecture.md`](features/phone-app-architecture.md).
 
 ## Change rule
 
-A repository-brand change is complete only when the canonical assets, light/dark presentation copies, brand contract, generators and documentation agree. A product-surface brand migration additionally requires the relevant Compose/UI copy, accessibility presentation, previews, screenshots and E2E evidence to agree on the same exact head.
+A repository-brand change is complete only when the canonical assets, light/dark presentation copies, brand contract, generators and documentation agree. A product-surface brand migration additionally requires the relevant Compose/UI copy, accessibility presentation, previews, packaged application label, screenshots and E2E evidence to agree on the same exact head.
 
 New one-off screen constants, recreated logo geometry or duplicated brand tables are rejected.

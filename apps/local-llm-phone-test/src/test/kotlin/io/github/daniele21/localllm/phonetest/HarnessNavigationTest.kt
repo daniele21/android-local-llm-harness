@@ -58,6 +58,10 @@ class HarnessNavigationTest {
             assertTrue(state.isDetail)
             assertFalse(state.showBottomNavigation)
         }
+        assertEquals(
+            "Assigned Harnex use cases",
+            HarnessRoutes.shellState(HarnessApplicationRoutes.APPLICATION_PATTERN).detailSubtitle,
+        )
     }
 
     @Test

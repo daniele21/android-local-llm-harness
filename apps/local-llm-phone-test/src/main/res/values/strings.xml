@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LLM Console</string>
+    <string name="app_name">Harnex</string>
+    <string name="app_surface_subtitle">Local AI Console</string>
+    <string name="app_payoff">Your local AI harness for Android.</string>
 </resources>

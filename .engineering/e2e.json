@@ -3,7 +3,7 @@
   "contract_version": "0.1.1",
   "applicability": {
     "status": "recommended",
-    "reason": "Harness has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
+    "reason": "Harnex has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
   },
   "principles": {
     "final_environment_should_confirm_not_discover": true,
@@ -25,7 +25,7 @@
     {
       "id": "android-arm64-device",
       "platform": "Android ARM64 (API 26+ supported class)",
-      "description": "Representative physical Android ARM64 device running the Harness app, native llama.cpp backend and real GGUF model artifacts.",
+      "description": "Representative physical Android ARM64 device running the Harnex app, native llama.cpp backend and real GGUF model artifacts.",
       "material_dimensions": [
         "Android framework and process lifecycle",
         "arm64-v8a ABI and JNI/native llama.cpp backend",
@@ -57,7 +57,7 @@
       "fidelity_class": "simulated_or_emulated",
       "automation": "automated",
       "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
-      "artifact_surface": "real Harness app/Service/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend and pre-provisioned ModelStore, consumed by a separately installed same-signer Consumer APK",
+      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend and pre-provisioned ModelStore, consumed by a separately installed same-signer Consumer APK",
       "target_environment_refs": ["android-arm64-device"],
       "known_gaps": [
         "x86_64 emulator does not execute the production arm64-v8a llama.cpp/JNI backend",
@@ -71,7 +71,7 @@
       "fidelity_class": "simulated_or_emulated",
       "automation": "automated",
       "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
-      "artifact_surface": "installed phone debug APK derived from the production-shaped ARM64 debug APK by removing native library entries and re-signing only for the no-native cold-start canary",
+      "artifact_surface": "installed Harnex phone debug APK derived from the production-shaped ARM64 debug APK by removing native library entries and re-signing only for the no-native cold-start canary",
       "target_environment_refs": ["android-arm64-device"],
       "known_gaps": [
         "the canary intentionally removes the ARM64 native payload and therefore does not prove native loading or inference",
@@ -85,7 +85,7 @@
       "fidelity_class": "representative_physical",
       "automation": "real_environment",
       "platform": "Physical Android ARM64 device",
-      "artifact_surface": "installed Harness debug/release-candidate app plus identity-bearing device evidence scripts",
+      "artifact_surface": "installed Harnex debug/release-candidate app plus identity-bearing device evidence scripts",
       "target_environment_refs": ["android-arm64-device"],
       "known_gaps": ["one representative device does not establish every supported OEM/device configuration"]
     }
@@ -105,7 +105,7 @@
     },
     {
       "id": "shared-runtime-consumer-roundtrip",
-      "claim": "A separately installed same-signer Consumer can discover the real Harness Service, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, release and recover across Host restart without a fake Consumer runtime.",
+      "claim": "A separately installed same-signer Consumer can discover the real Harnex HarnessSharedRuntimeService, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, release and recover across Host restart without a fake Consumer runtime.",
       "ui_surface": false,
       "required_media_artifacts": [],
       "target_environment_refs": ["android-arm64-device"],
@@ -120,7 +120,7 @@
     },
     {
       "id": "phone-cold-start",
-      "claim": "A clean Harness process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
+      "claim": "A clean Harnex process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
       "ui_surface": true,
       "required_media_artifacts": ["screenshots", "video"],
       "target_environment_refs": ["android-arm64-device"],

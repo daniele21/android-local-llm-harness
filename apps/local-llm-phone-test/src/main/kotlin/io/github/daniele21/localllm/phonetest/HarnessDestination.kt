@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -63,6 +64,8 @@ internal enum class HarnessDestination(val route: String, val label: String, val
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -> Unit, onNavigateBack: () -> Unit) {
+    val appName = stringResource(R.string.app_name)
+    val appSubtitle = stringResource(R.string.app_surface_subtitle)
     TopAppBar(
         modifier = Modifier.testTag("harnessTopBar"),
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -70,7 +73,7 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
             if (destination == HarnessDestination.SETTINGS) {
                 IconButton(
                     onClick = onNavigateBack,
-                    modifier = Modifier.semantics { contentDescription = "Back to Harness" },
+                    modifier = Modifier.semantics { contentDescription = "Back to $appName" },
                 ) {
                     HarnessDestinationIcon(HarnessDestination.OVERVIEW, selected = false, backArrow = true)
                 }
@@ -95,9 +98,9 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
                     )
                     Spacer(Modifier.width(4.dp))
                     Column {
-                        Text("Harness", style = MaterialTheme.typography.titleLarge)
+                        Text(appName, style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Local AI Console",
+                            appSubtitle,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

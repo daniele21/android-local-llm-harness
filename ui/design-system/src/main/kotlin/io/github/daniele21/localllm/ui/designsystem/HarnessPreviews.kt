@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 
-@Preview(name = "Harness components dark", showBackground = true)
+@Preview(name = "Harnex components dark", showBackground = true)
 @Composable
 fun HarnessComponentsDarkPreview() {
     HarnessTheme(darkTheme = true) {
@@ -21,7 +21,7 @@ fun HarnessComponentsDarkPreview() {
     }
 }
 
-@Preview(name = "Harness components light", showBackground = true)
+@Preview(name = "Harnex components light", showBackground = true)
 @Composable
 fun HarnessComponentsLightPreview() {
     HarnessTheme(darkTheme = false) {
@@ -38,7 +38,7 @@ private fun HarnessComponentSheet() {
             .padding(LocalHarnessSpacing.current.large),
         verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
     ) {
-        HarnessTopAppBar(title = "Harness", subtitle = "Local AI Console")
+        HarnessTopAppBar(title = "Harnex", subtitle = "Local AI Console")
         HarnessCard {
             Text("Runtime", style = MaterialTheme.typography.titleLarge)
             HarnessMetricRow {

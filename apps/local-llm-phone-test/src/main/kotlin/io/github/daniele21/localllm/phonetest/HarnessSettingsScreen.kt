@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
@@ -35,13 +36,14 @@ internal fun HarnessSettingsScreen(
     onOpenDeveloperTools: () -> Unit,
 ) {
     val stackDenseContent = currentHarnessAdaptivePolicy().stackDenseContent
+    val appName = stringResource(R.string.app_name)
     HarnessScreenList(title = null) {
         item { SettingsSectionLabel("Appearance") }
         item {
             HarnessCard {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Choose how Harness follows the device appearance.",
+                    "Choose how $appName follows the device appearance.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -62,7 +64,7 @@ internal fun HarnessSettingsScreen(
             SettingsRow(
                 destination = HarnessDestination.DIAGNOSTICS,
                 title = "Local inference & privacy",
-                detail = "Prompts and generated output are not persisted by normal Harness telemetry.",
+                detail = "Prompts and generated output are not persisted by normal $appName telemetry.",
                 trailing = "On-device",
                 stackDenseContent = stackDenseContent,
                 onClick = onOpenPrivacy,

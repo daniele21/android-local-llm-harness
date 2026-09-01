@@ -5,7 +5,7 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating documentation ownership or changing documentation governance
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-01
 
 Use progressive disclosure: root guide -> closest scoped guide -> focused owner. One fact has one canonical owner. Machine policy: [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
 
@@ -22,8 +22,8 @@ A normal feature/operational change may therefore report `README_IDENTITY: N/A` 
 
 | Question | Canonical source |
 | --- | --- |
-| What is Harness and why does it exist? | root README identity sections |
-| How does a person set up/run/configure/use Harness now? | root README usage sections plus focused runbooks/API docs |
+| What is Harnex and why does it exist? | root README identity sections |
+| How does a person set up/run/configure/use Harnex now? | root README usage sections plus focused runbooks/API docs |
 | Integrated state/blockers | [`current-state.md`](current-state.md) |
 | Capability milestones | [`roadmap.md`](roadmap.md) |
 | Repository target | [`implementation-plan.md`](implementation-plan.md) |
@@ -115,7 +115,7 @@ E2E target/environment/fidelity changes are durable contract changes and update 
 - [`phone-inference-playground.md`](phone-inference-playground.md)
 - [`console-inference-playground.md`](console-inference-playground.md)
 - [`design-system.md`](design-system.md)
-- [`harness-brand-guidelines.md`](harness-brand-guidelines.md)
+- [`harnex-brand-guidelines.md`](harnex-brand-guidelines.md)
 - [`android-brand-assets.md`](android-brand-assets.md)
 - [`assets/brand/README.md`](assets/brand/README.md)
 - [`assets/brand/master/README.md`](assets/brand/master/README.md)

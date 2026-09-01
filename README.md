@@ -105,6 +105,7 @@ The current console lets a user or developer:
 
 - discover or import GGUF models, check compatibility, verify integrity, install them, and select an explicit model;
 - configure prompts and generation policies, run streaming inference locally, and cancel work cooperatively;
+- inspect consumer applications and their assigned use cases/presets;
 - inspect request timelines, time to first token, decode throughput, memory, thermal state, logs, and benchmark history;
 - run health, model-integrity, generation-sanity, resource, and validation workflows explicitly;
 - examine the same contracts, lifecycle, scheduling, and evidence model that the future gateway will expose to other applications.
@@ -113,44 +114,9 @@ That is already a practical result: Harnex can be used as an on-device LLM evalu
 
 > **Current boundary:** the runtime is still embedded and in-process inside the connected application. Other Android apps cannot connect to a shared Harnex IPC service yet and must not assume that Binder/AIDL, cross-application model sharing, or centralized RAM ownership is available.
 
-> **Brand migration boundary:** this repository identity is Harnex. Current application screenshots and some internal implementation identifiers may still contain the legacy `Harness` label until the separately scoped product-surface migration is implemented and validated.
+The connected Harnex product surfaces are **Overview, Playground, Apps, Performance, Models, Diagnostics, and Settings**. The launcher label, primary shell and About surface use the Harnex product identity while implementation identifiers may retain the legacy `Harness*` prefix for compatibility.
 
-The five connected surfaces make that current milestone visible:
-
-<table>
-  <tr>
-    <th>Overview</th>
-    <th>Playground</th>
-    <th>Models</th>
-  </tr>
-  <tr>
-    <td align="center"><a href="docs/assets/readme/harness-overview.png"><img src="docs/assets/readme/harness-overview.png" width="220" alt="Current connected Overview showing runtime readiness, no selected model, device resources, and recent activity"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-playground.png"><img src="docs/assets/readme/harness-playground.png" width="220" alt="Current connected Playground showing local prompt and generation controls with no active model"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-models.png"><img src="docs/assets/readme/harness-models.png" width="220" alt="Current connected Models surface showing local storage and compatible catalog entries"></a></td>
-  </tr>
-  <tr>
-    <td align="center">Readiness and the next valid action</td>
-    <td align="center">Prompt, configure, stream, and cancel locally</td>
-    <td align="center">Import, download, verify, select, and remove</td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <th>Diagnostics</th>
-    <th>Settings</th>
-  </tr>
-  <tr>
-    <td align="center"><a href="docs/assets/readme/harness-diagnostics.png"><img src="docs/assets/readme/harness-diagnostics.png" width="220" alt="Current connected Diagnostics showing not-run health checks and explicit actions"></a></td>
-    <td align="center"><a href="docs/assets/readme/harness-settings.png"><img src="docs/assets/readme/harness-settings.png" width="220" alt="Current connected Settings showing theme, privacy, storage, build information, and developer tools"></a></td>
-  </tr>
-  <tr>
-    <td align="center">Runs, health, resources, benchmarks, logs, and validation</td>
-    <td align="center">Theme, privacy, storage, build, and developer controls</td>
-  </tr>
-</table>
-
-These are real captures from the current `0.5.0-debug` build on an Android 16 ARM64 emulator. They deliberately show source-backed empty and not-run states. Emulator screenshots are UI preflight—not physical-device performance or production evidence.
+The repository-owned `Phone cold-start emulator evidence` workflow validates the packaged application label and the rendered **Harnex · Local AI Console** shell on the exact candidate, then retains both screenshot and video artifacts. Those emulator artifacts are UI evidence only—not physical-device inference, memory, thermal, signing or production evidence. Historical pre-rebrand captures remain in `docs/assets/readme/` for repository history and are no longer presented here as the current product UI.
 
 ## How it works
 
@@ -158,7 +124,7 @@ These are real captures from the current `0.5.0-debug` build on an Android 16 AR
 
 The current runtime is embedded in the Android application:
 
-- **Product surface:** the Compose app exposes Overview, Playground, Models, Diagnostics, and Settings without owning backend policy.
+- **Product surface:** the Compose app exposes Overview, Playground, Apps, Performance, Models, Diagnostics, and Settings without owning backend policy.
 - **Public boundary:** product code talks to `LocalLlmClient`; native pointers and `llama.cpp` structures never escape the backend module.
 - **Runtime:** `RuntimeOrchestrator` owns resolution, sessions, the request queue, one active decode, cancellation, and cleanup.
 - **Model plane:** GGUF artifacts are verified and stored by immutable SHA-256 identity; installation, selection, and loading are distinct operations.
@@ -197,7 +163,7 @@ For durable boundaries and dependency direction, read the [architecture document
 - An ARM64 Android emulator or device
 - Gradle 9.5.0 through the committed wrapper
 
-### Launch the connected app
+### Launch Harnex
 
 Start an ARM64 Android Virtual Device first, then run:
 
@@ -209,7 +175,7 @@ bash scripts/run-emulator-debug.sh --app phone-test
 
 In **Models**, import a GGUF from local storage or download a compatible catalog entry. Model binaries, download credentials, and signing material must never be committed to this repository.
 
-The runner installs and launches the debug application; it does not create or boot an emulator. See the complete [Android build and run guide](docs/android-build-and-run.md) for emulator selection, logs, signing, and Play bundle creation.
+The runner installs and launches the Harnex debug application; it does not create or boot an emulator. See the complete [Android build and run guide](docs/android-build-and-run.md) for emulator selection, logs, signing, and Play bundle creation.
 
 ### Use the current embedded API
 
