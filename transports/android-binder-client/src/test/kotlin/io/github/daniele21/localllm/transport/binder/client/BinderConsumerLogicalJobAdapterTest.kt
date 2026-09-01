@@ -51,16 +51,16 @@ class BinderConsumerLogicalJobAdapterTest {
                     ConsumerLogicalJobResultParcel(
                         operationId = request.operationId,
                         snapshot =
-                            ConsumerLogicalJobSnapshotParcel(
-                                jobId = "job-42",
-                                clientRequestId = request.clientRequestId,
-                                useCaseId = request.useCaseId,
-                                stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
-                                revision = 0,
-                                attempt = 1,
-                                runtimeSessionId = "runtime-42",
-                                resultAvailable = false,
-                            ),
+                        ConsumerLogicalJobSnapshotParcel(
+                            jobId = "job-42",
+                            clientRequestId = request.clientRequestId,
+                            useCaseId = request.useCaseId,
+                            stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
+                            revision = 0,
+                            attempt = 1,
+                            runtimeSessionId = "runtime-42",
+                            resultAvailable = false,
+                        ),
                     ),
                 )
             }
