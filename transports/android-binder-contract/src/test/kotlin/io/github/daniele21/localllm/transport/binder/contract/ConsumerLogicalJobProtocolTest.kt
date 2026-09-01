@@ -1,12 +1,18 @@
 package io.github.daniele21.localllm.transport.binder.contract
 
+import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.ConsumerGenerationInput
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobResponse
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobState
 import io.github.daniele21.localllm.contracts.ConsumerLogicalJobRequestId
 import io.github.daniele21.localllm.contracts.ConsumerLogicalJobSubmitRequest
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraint
+import io.github.daniele21.localllm.contracts.ConsumerOutputConstraintKind
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
+import io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode
+import io.github.daniele21.localllm.contracts.InferencePresetId
+import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,6 +21,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConsumerLogicalJobProtocolTest {
+    private val useCaseId = UseCaseId("document-pii-detection")
+    private val execution =
+        ConsumerExecutionIdentity(
+            useCaseId = useCaseId,
+            capabilityRevision = "capability-revision-7",
+            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+            outputConstraint = ConsumerOutputConstraintKind.JSON,
+            sessionKind = SessionKind.STATELESS,
+        )
+
     @Test
     fun `protocol minor six owns logical job feature after setup resolution`() {
         assertEquals(5, BinderProtocolV1.minimumMinorForFeature(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1))
@@ -27,8 +44,9 @@ class ConsumerLogicalJobProtocolTest {
         val request =
             ConsumerLogicalJobSubmitRequest(
                 clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
-                useCaseId = UseCaseId("document-pii-detection"),
+                useCaseId = useCaseId,
                 preparedId = ConsumerPreparedId("prepared-7"),
+                expectedExecution = execution,
                 input = ConsumerGenerationInput.Text("sensitive input"),
                 outputConstraint = ConsumerOutputConstraint.Json,
             )
@@ -38,6 +56,7 @@ class ConsumerLogicalJobProtocolTest {
         assertEquals("analysis-42", wire.clientRequestId)
         assertEquals("document-pii-detection", wire.useCaseId)
         assertEquals("prepared-7", wire.preparedId)
+        assertEquals(execution, wire.expectedExecution.toCoreExecutionIdentity())
         assertFalse(request.toString().contains("sensitive input"))
     }
 
@@ -51,6 +70,7 @@ class ConsumerLogicalJobProtocolTest {
                     jobId = "job-9",
                     clientRequestId = "analysis-42",
                     useCaseId = "document-pii-detection",
+                    execution = execution.toConsumerWire(),
                     stateTag = ConsumerLogicalJobWireTags.STATE_RUNNING,
                     revision = 3,
                     attempt = 1,
@@ -64,6 +84,7 @@ class ConsumerLogicalJobProtocolTest {
 
         assertEquals("job-9", response.snapshot.jobId.value)
         assertEquals("analysis-42", response.snapshot.clientRequestId.value)
+        assertEquals(execution, response.snapshot.execution)
         assertEquals(ConsumerInferenceJobState.RUNNING, response.snapshot.state)
         assertEquals(3L, response.snapshot.revision)
         assertEquals("runtime-1", response.snapshot.runtimeSessionId.value)
