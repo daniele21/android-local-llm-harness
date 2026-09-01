@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-01
 
 This is the single operational ledger for the integrated baseline, blockers and immediate next work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail belongs in its workstream/specification; release gates belong in [`releases/harness-0.5.md`](releases/harness-0.5.md).
 
@@ -23,13 +23,15 @@ This is the single operational ledger for the integrated baseline, blockers and 
 - GGUF inspection, SHA-256 content-addressed storage, verified curated installation and explicit model lifecycle;
 - load, context creation, generation, streaming, cancellation, single-decode scheduling and memory-pressure handling;
 - model-aware prompt/context planning, output constraints, versioned presets and privacy-safe failures;
-- product catalog restricted to curated Qwen3.5 dense 0.8B/2B artifacts; exact artifact choice remains Harness-owned.
+- product catalog restricted to curated Qwen3.5 dense 0.8B/2B artifacts; exact artifact choice remains Harnex-owned.
 
 Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candidate profiles still require representative physical-device tuning evidence. See [`qwen35/README.md`](qwen35/README.md).
 
 ### Android application and observability
 
 `apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
+
+The public product identity is **Harnex** with the payoff **“Your local AI harness for Android.”** The Android launcher label, primary shell, Settings/About copy, Compose previews and brand asset generators use the Harnex identity. Existing `Harness*`, `harness_launcher_*`, package/Binder identifiers and historical filenames remain compatibility/engineering identifiers rather than public product naming. The `phone-cold-start` emulator gate owns exact-head Harnex shell screenshot/video evidence; it does not replace physical-device runtime evidence.
 
 Applications control-plane implementation is complete through ACUX-80. The subsequent control-plane persistence regression has also been repaired repository-side: CPREC-10 through CPREC-70 are integrated through PRs #455, #459, #457, #458, #460, #461 and #464. Startup now reconciles mandatory built-ins atomically before UI/Binder readers are exposed, preserves valid custom/default/disabled state, remains off the Android main thread and keeps Binder discovery/activation free of bootstrap mutation. CPREC-80/90 remain physical evidence gates; see [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
 
@@ -45,7 +47,7 @@ The Consumer Runtime Visibility/Readiness convergence (CRV) is repository-comple
 - the consumer-safe Binder readiness contract is integrated through #472 using Consumer SDK `0.1.0-alpha.6` and Binder protocol minor 4;
 - activation-bound automatic runtime preparation and fail-closed no-global-fallback behavior are covered by #474;
 - source-backed `IDLE / PREPARING / READY / GENERATING / FAILED` plus `LOADING / REUSING / SWITCHING` observation is wired through #475 without adding a second loader;
-- Harness Applications runtime/readiness presentation is integrated through #476;
+- Harnex Applications runtime/readiness presentation is integrated through #476;
 - focused runtime failure regression gaps are covered through #477;
 - RedactGuard consumes the source-backed readiness lifecycle through its own integrated #100/#101 slices.
 
@@ -53,7 +55,7 @@ CRV-100 froze the automated physical candidate identities as Harness v31 source 
 
 ### Public Consumer API and OMBRA
 
-CA-0 through CA-4 are integrated in `dev`; the published consumer boundary has continued through the current Consumer SDK line used by CRV. RedactGuard remains a pure Consumer SDK client: concrete model/config/runtime/residency ownership stays in Harness and consumer surfaces receive only safe published state.
+CA-0 through CA-4 are integrated in `dev`; the published consumer boundary has continued through the current Consumer SDK line used by CRV. RedactGuard remains a pure Consumer SDK client: concrete model/config/runtime/residency ownership stays in Harnex and consumer surfaces receive only safe published state.
 
 CA-5 remains active through the OMBRA/RedactGuard quality and evidence program. Repository-side preparation includes:
 
@@ -118,4 +120,4 @@ Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone w
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
-- Harness 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
+- Harnex 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
