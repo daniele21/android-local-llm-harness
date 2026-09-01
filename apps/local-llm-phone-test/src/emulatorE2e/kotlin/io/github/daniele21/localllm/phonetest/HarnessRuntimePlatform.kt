@@ -100,6 +100,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
 
     override fun shutdown() {
         cancelledRequestIds.clear()
+        EmulatorE2eGenerationGate.reset()
     }
 
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
@@ -136,6 +137,22 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
         request: BackendGenerationRequest,
         onChunk: (text: String, generatedTokens: Int) -> Boolean,
     ): BackendGenerationOutcome {
+        if (
+            !EmulatorE2eGenerationGate.awaitRelease {
+                request.requestId in cancelledRequestIds
+            }
+        ) {
+            cancelledRequestIds.remove(request.requestId)
+            return BackendGenerationOutcome.Cancelled(
+                BackendGenerationMetrics(
+                    inputTokens = (request.prompt.length / 4).coerceAtLeast(1),
+                    outputTokens = 0,
+                    promptDurationMs = 2,
+                    generationDurationMs = 0,
+                ),
+            )
+        }
+
         val output = EmulatorE2eAnalysisResponder.output(request.prompt)
         val midpoint = (output.length / 2).coerceAtLeast(1)
         val chunks = listOf(output.substring(0, midpoint), output.substring(midpoint)).filter(String::isNotEmpty)
