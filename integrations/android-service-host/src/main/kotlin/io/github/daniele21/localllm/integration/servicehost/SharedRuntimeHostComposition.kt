@@ -17,7 +17,6 @@ class SharedRuntimeHostComposition(
     consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
-    onLogicalJobExecutionDemandChanged: (Boolean) -> Unit = {},
     policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
 ) : AutoCloseable {
     private val delegate = SharedRuntimeHostDelegate(
@@ -31,7 +30,6 @@ class SharedRuntimeHostComposition(
         consumerClientFactory = consumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
-        onLogicalJobExecutionDemandChanged = onLogicalJobExecutionDemandChanged,
     )
     private val binderStub = SharedRuntimeBinderStub(
         authorizer = CallerAuthorizer(
@@ -45,6 +43,10 @@ class SharedRuntimeHostComposition(
 
     val binder: IBinder
         get() = binderStub
+
+    fun setLogicalJobExecutionDemandListener(listener: (Boolean) -> Unit) {
+        delegate.setLogicalJobExecutionDemandListener(listener)
+    }
 
     override fun close() {
         delegate.close()
