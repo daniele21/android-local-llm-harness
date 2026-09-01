@@ -61,7 +61,9 @@ fun ConsumerControlPlaneResultParcel.toCorePublishedPresetsResult(): ConsumerPub
     presets = presets.map(ConsumerPublishedPresetMetadataParcel::toCore),
 )
 
-fun ConsumerSetupResolutionResult.toConsumerControlPlaneWire(operationId: String): ConsumerControlPlaneResultParcel = when (this) {
+fun ConsumerSetupResolutionResult.toConsumerControlPlaneWire(
+    operationId: String,
+): ConsumerControlPlaneResultParcel = when (this) {
     is ConsumerSetupResolutionResult.Resolved -> ConsumerControlPlaneResultParcel(
         operationId = operationId,
         resolvedSetup = setup.toWire(),
