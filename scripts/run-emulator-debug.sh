@@ -23,7 +23,7 @@ Examples:
   # Build, install, and launch local-llm-console on the running emulator
   bash scripts/run-emulator-debug.sh
 
-  # Build, install, and launch local-llm-phone-test
+  # Build, install, and launch Harnex (local-llm-phone-test)
   bash scripts/run-emulator-debug.sh --app phone-test
 
   # Specify custom ADB binary path
@@ -70,7 +70,7 @@ case "$APP_TARGET" in
     phone-test)
         GRADLE_TASK=":apps:local-llm-phone-test:installDebug"
         APP_ID="io.github.daniele21.localllm.phonetest.debug"
-        APP_NAME="Local LLM Phone Test (Debug)"
+        APP_NAME="Harnex (Debug)"
         ;;
     device-test)
         GRADLE_TASK=":apps:device-test-runner:installDebug"
@@ -84,7 +84,7 @@ case "$APP_TARGET" in
 esac
 
 echo "===================================================="
-echo "  Android Local LLM Harness — Emulator Debug Runner"
+echo "  Harnex — Android Emulator Debug Runner"
 echo "===================================================="
 echo "Target App : $APP_NAME ($APP_ID)"
 
