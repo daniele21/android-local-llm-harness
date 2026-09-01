@@ -9,14 +9,8 @@ import io.github.daniele21.localllm.transport.binder.contract.toConsumerWire
 import java.util.LinkedHashMap
 
 /** Bounded, process-local replay/error store for durable logical jobs. */
-internal class HostLogicalJobResultStore(
-    private val maxReplayResults: Int = DEFAULT_MAX_REPLAY_RESULTS,
-) {
-    private data class ReplayResult(
-        val answer: String,
-        val reasoning: String?,
-        val metrics: ConsumerInferenceMetricsParcel?,
-    )
+internal class HostLogicalJobResultStore(private val maxReplayResults: Int = DEFAULT_MAX_REPLAY_RESULTS) {
+    private data class ReplayResult(val answer: String, val reasoning: String?, val metrics: ConsumerInferenceMetricsParcel?)
 
     private val lock = Any()
     private val replayResults = LinkedHashMap<HostLogicalJobId, ReplayResult>()
@@ -38,11 +32,7 @@ internal class HostLogicalJobResultStore(
         synchronized(lock) { errorCodes[jobId] = code }
     }
 
-    fun response(
-        operationId: String,
-        snapshot: HostLogicalJobSnapshot,
-        includeReplay: Boolean = false,
-    ): ConsumerLogicalJobResultParcel {
+    fun response(operationId: String, snapshot: HostLogicalJobSnapshot, includeReplay: Boolean = false): ConsumerLogicalJobResultParcel {
         val replay = if (includeReplay) synchronized(lock) { replayResults[snapshot.jobId] } else null
         return ConsumerLogicalJobResultParcel(
             operationId = operationId,
@@ -54,11 +44,10 @@ internal class HostLogicalJobResultStore(
         )
     }
 
-    fun failure(operationId: String, code: String): ConsumerLogicalJobResultParcel =
-        ConsumerLogicalJobResultParcel(
-            operationId = operationId,
-            error = WireErrorParcel(code = code, safeMessage = "Logical job request failed", retryable = false),
-        )
+    fun failure(operationId: String, code: String): ConsumerLogicalJobResultParcel = ConsumerLogicalJobResultParcel(
+        operationId = operationId,
+        error = WireErrorParcel(code = code, safeMessage = "Logical job request failed", retryable = false),
+    )
 
     fun clear() {
         synchronized(lock) {
