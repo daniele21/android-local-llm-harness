@@ -12,9 +12,7 @@ import android.os.Handler
 import android.os.Looper
 
 /** Android adapter that keeps the shared-runtime service started/foreground only while durable work exists. */
-internal class HarnessLogicalJobServiceLifetime(
-    private val service: HarnessSharedRuntimeService,
-) : AutoCloseable {
+internal class HarnessLogicalJobServiceLifetime(private val service: HarnessSharedRuntimeService) : AutoCloseable {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var demandActive = false
     private var closed = false
