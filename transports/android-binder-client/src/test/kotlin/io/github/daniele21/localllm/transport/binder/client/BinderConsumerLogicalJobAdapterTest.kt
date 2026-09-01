@@ -51,16 +51,16 @@ class BinderConsumerLogicalJobAdapterTest {
                     ConsumerLogicalJobResultParcel(
                         operationId = request.operationId,
                         snapshot =
-                        ConsumerLogicalJobSnapshotParcel(
-                            jobId = "job-42",
-                            clientRequestId = request.clientRequestId,
-                            useCaseId = request.useCaseId,
-                            stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
-                            revision = 0,
-                            attempt = 1,
-                            runtimeSessionId = "runtime-42",
-                            resultAvailable = false,
-                        ),
+                            ConsumerLogicalJobSnapshotParcel(
+                                jobId = "job-42",
+                                clientRequestId = request.clientRequestId,
+                                useCaseId = request.useCaseId,
+                                stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
+                                revision = 0,
+                                attempt = 1,
+                                runtimeSessionId = "runtime-42",
+                                resultAvailable = false,
+                            ),
                     ),
                 )
             }
@@ -103,21 +103,19 @@ class BinderConsumerLogicalJobAdapterTest {
         assertEquals(0, service.consumerLogicalJobCancelCalls)
     }
 
-    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLogicalJobAdapter =
-        BinderConsumerLogicalJobAdapter(
-            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
-            enabledFeaturesProvider = { setOf(BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1) },
-            blockingCallGuard = BlockingCallGuard {},
-            operationTimeoutMillis = 100,
-            correlationIds = CorrelationIdSource { "logical-job-op" },
-        )
+    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLogicalJobAdapter = BinderConsumerLogicalJobAdapter(
+        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
+        enabledFeaturesProvider = { setOf(BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1) },
+        blockingCallGuard = BlockingCallGuard {},
+        operationTimeoutMillis = 100,
+        correlationIds = CorrelationIdSource { "logical-job-op" },
+    )
 
-    private fun submitRequest() =
-        ConsumerLogicalJobSubmitRequest(
-            clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
-            useCaseId = useCaseId,
-            preparedId = ConsumerPreparedId("prepared-42"),
-            input = ConsumerGenerationInput.Text("sensitive document text"),
-            outputConstraint = ConsumerOutputConstraint.Json,
-        )
+    private fun submitRequest() = ConsumerLogicalJobSubmitRequest(
+        clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
+        useCaseId = useCaseId,
+        preparedId = ConsumerPreparedId("prepared-42"),
+        input = ConsumerGenerationInput.Text("sensitive document text"),
+        outputConstraint = ConsumerOutputConstraint.Json,
+    )
 }
