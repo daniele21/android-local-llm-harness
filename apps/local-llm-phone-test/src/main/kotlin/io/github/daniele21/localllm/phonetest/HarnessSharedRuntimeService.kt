@@ -27,12 +27,12 @@ class HarnessSharedRuntimeService : Service() {
         val controlPlaneHost =
             HarnessWarmRetentionAwareControlPlaneHost(
                 delegate =
-                    HarnessConsumerControlPlaneHost(
-                        store = runtimeGraph.controlPlaneStore,
-                        modelStore = runtimeGraph.modelStore,
-                        runtimeGraph = runtimeGraph,
-                        onWarmRetention = resolvedWarmRetention::schedule,
-                    ),
+                HarnessConsumerControlPlaneHost(
+                    store = runtimeGraph.controlPlaneStore,
+                    modelStore = runtimeGraph.modelStore,
+                    runtimeGraph = runtimeGraph,
+                    onWarmRetention = resolvedWarmRetention::schedule,
+                ),
                 warmRetention = resolvedWarmRetention,
             )
         val runtimeReadinessHost =
@@ -92,8 +92,7 @@ class HarnessSharedRuntimeService : Service() {
         super.onRebind(intent)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
-        logicalJobLifetime.onStartCommand(startId)
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = logicalJobLifetime.onStartCommand(startId)
 
     override fun onTrimMemory(level: Int) {
         memoryPressureCallbacks.onTrimMemory(level)
