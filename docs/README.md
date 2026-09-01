@@ -120,6 +120,7 @@ E2E target/environment/fidelity changes are durable contract changes and update 
 - [`assets/brand/README.md`](assets/brand/README.md)
 - [`assets/brand/master/README.md`](assets/brand/master/README.md)
 - [`assets/brand/reference/hbridge-core/README.md`](assets/brand/reference/hbridge-core/README.md)
+- [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md)
 
 ### Build, distribution and evidence
 
