@@ -204,19 +204,18 @@ internal class HostLogicalJobCoordinator(
         if (execution != null) runCatching { execution.client.closeSession(execution.sessionId) }
     }
 
-    private fun transition(current: HostLogicalJobSnapshot, state: HostLogicalJobState): HostLogicalJobSnapshot =
-        checkNotNull(
-            registry.transition(
-                current.scope,
-                current.jobId,
-                HostLogicalJobTransition(
-                    state = state,
-                    revision = current.revision + 1,
-                    attempt = current.attempt,
-                    runtimeSessionId = current.runtimeSessionId,
-                ),
+    private fun transition(current: HostLogicalJobSnapshot, state: HostLogicalJobState): HostLogicalJobSnapshot = checkNotNull(
+        registry.transition(
+            current.scope,
+            current.jobId,
+            HostLogicalJobTransition(
+                state = state,
+                revision = current.revision + 1,
+                attempt = current.attempt,
+                runtimeSessionId = current.runtimeSessionId,
             ),
-        )
+        ),
+    )
 
     private fun current(scope: HostLogicalJobScope, jobId: HostLogicalJobId): HostLogicalJobSnapshot? = registry.snapshot(scope, jobId)
 
