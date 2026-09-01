@@ -54,8 +54,11 @@ internal class ConsumerLogicalJobHostOperations(
                 return@submitOrReject
             }
             callback.onResult(
-                if (includeResult) coordinator.result(request.operationId, scope, jobId)
-                else coordinator.query(request.operationId, scope, jobId),
+                if (includeResult) {
+                    coordinator.result(request.operationId, scope, jobId)
+                } else {
+                    coordinator.query(request.operationId, scope, jobId)
+                },
             )
         }
     }
@@ -69,20 +72,12 @@ internal class ConsumerLogicalJobHostOperations(
         }
     }
 
-    private fun validatedClient(
-        caller: AuthorizedCaller,
-        tokenParcel: ClientTokenParcel,
-        operationId: String,
-    ): ConsumerLocalLlmClient? {
+    private fun validatedClient(caller: AuthorizedCaller, tokenParcel: ClientTokenParcel, operationId: String): ConsumerLocalLlmClient? {
         if (!validatedConnection(caller, tokenParcel, operationId)) return null
         return consumerResources.client(HostClientToken(tokenParcel.value))
     }
 
-    private fun validatedConnection(
-        caller: AuthorizedCaller,
-        tokenParcel: ClientTokenParcel,
-        operationId: String,
-    ): Boolean {
+    private fun validatedConnection(caller: AuthorizedCaller, tokenParcel: ClientTokenParcel, operationId: String): Boolean {
         if (operationId.isBlank() || tokenParcel.value.isBlank()) return false
         val token = runCatching { HostClientToken(tokenParcel.value) }.getOrNull() ?: return false
         if (ledger.validateConnection(token, caller).failureOrNull() != null) return false
