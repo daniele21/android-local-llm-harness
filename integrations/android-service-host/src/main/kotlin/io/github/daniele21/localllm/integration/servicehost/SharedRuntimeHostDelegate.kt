@@ -25,7 +25,6 @@ class SharedRuntimeHostDelegate(
     private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
-    private val onLogicalJobExecutionDemandChanged: (Boolean) -> Unit = {},
     private val ledger: ClientConnectionLedger = ClientConnectionLedger(),
     private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
@@ -35,12 +34,13 @@ class SharedRuntimeHostDelegate(
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
     private val consumerActivity = ConsumerRuntimeActivityTracker()
+    private val logicalJobExecutionDemand = HostLogicalJobExecutionDemand()
     private val logicalJobRegistry = HostLogicalJobRegistry(
         maxJobs = LOGICAL_JOB_CAPACITY,
         runtimeSessionId = HostRuntimeSessionId("runtime:${UUID.randomUUID()}"),
         idFactory = { HostLogicalJobId(UUID.randomUUID().toString()) },
     )
-    private val logicalJobCoordinator = HostLogicalJobCoordinator(logicalJobRegistry, onLogicalJobExecutionDemandChanged)
+    private val logicalJobCoordinator = HostLogicalJobCoordinator(logicalJobRegistry, logicalJobExecutionDemand)
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
@@ -53,6 +53,10 @@ class SharedRuntimeHostDelegate(
         ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
     internal val readinessOperations =
         ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, readinessExecutor, consumerActivity)
+
+    fun setLogicalJobExecutionDemandListener(listener: (Boolean) -> Unit) {
+        logicalJobExecutionDemand.setListener(listener)
+    }
 
     fun registerClient(
         caller: AuthorizedCaller,
