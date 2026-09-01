@@ -16,6 +16,7 @@ import io.github.daniele21.localllm.transport.binder.contract.SessionResultParce
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SharedRuntimeHostDelegate(
@@ -33,16 +34,29 @@ class SharedRuntimeHostDelegate(
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
     private val consumerActivity = ConsumerRuntimeActivityTracker()
+    private val logicalJobExecutionDemand = HostLogicalJobExecutionDemand()
+    private val logicalJobRegistry = HostLogicalJobRegistry(
+        maxJobs = LOGICAL_JOB_CAPACITY,
+        runtimeSessionId = HostRuntimeSessionId("runtime:${UUID.randomUUID()}"),
+        idFactory = { HostLogicalJobId(UUID.randomUUID().toString()) },
+    )
+    private val logicalJobCoordinator = HostLogicalJobCoordinator(logicalJobRegistry, logicalJobExecutionDemand)
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
     internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
     internal val consumerOperations =
         ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
+    internal val logicalJobOperations =
+        ConsumerLogicalJobHostOperations(ledger, consumerResources, controlExecutor, logicalJobCoordinator)
     internal val controlPlaneOperations =
         ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
     internal val readinessOperations =
         ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, readinessExecutor, consumerActivity)
+
+    fun setLogicalJobExecutionDemandListener(listener: (Boolean) -> Unit) {
+        logicalJobExecutionDemand.setListener(listener)
+    }
 
     fun registerClient(
         caller: AuthorizedCaller,
@@ -90,6 +104,7 @@ class SharedRuntimeHostDelegate(
             ledger.activeConnections.forEach { connection ->
                 cleanupConnection(connection.token, connection.caller)
             }
+            logicalJobCoordinator.close()
             resources.closeAll()
             consumerResources.clear()
             consumerActivity.clear()
@@ -185,6 +200,10 @@ class SharedRuntimeHostDelegate(
         resources.removeDeathLink(token)?.unlinkSafely()
         resources.removeCallbackDispatcher(token)?.closeSafely()
         ledger.finishClose(token, caller)
+    }
+
+    private companion object {
+        const val LOGICAL_JOB_CAPACITY = 64
     }
 }
 

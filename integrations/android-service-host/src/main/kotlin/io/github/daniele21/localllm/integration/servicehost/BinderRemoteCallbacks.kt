@@ -3,10 +3,12 @@ package io.github.daniele21.localllm.integration.servicehost
 import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneResultParcel
+import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJobResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.ConsumerRuntimeReadinessResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerControlPlaneResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerGenerationCallback
+import io.github.daniele21.localllm.transport.binder.contract.IConsumerLogicalJobResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerRuntimeReadinessResultCallback
 import io.github.daniele21.localllm.transport.binder.contract.IGenerationCallback
@@ -89,6 +91,18 @@ internal fun remoteConsumerRuntimeReadinessResultCallback(
     token: ClientTokenParcel,
     remote: IConsumerRuntimeReadinessResultCallback,
 ): HostResultCallback<ConsumerRuntimeReadinessResultParcel> = HostResultCallback { result ->
+    if (!deliverRemote { remote.onResult(result) }) {
+        delegate.unregisterClient(caller, token.value)
+    }
+}
+
+/** Callback failure may tear down the transport connection, but never owns/cancels the logical job. */
+internal fun remoteConsumerLogicalJobResultCallback(
+    delegate: SharedRuntimeHostDelegate,
+    caller: AuthorizedCaller,
+    token: ClientTokenParcel,
+    remote: IConsumerLogicalJobResultCallback,
+): HostResultCallback<ConsumerLogicalJobResultParcel> = HostResultCallback { result ->
     if (!deliverRemote { remote.onResult(result) }) {
         delegate.unregisterClient(caller, token.value)
     }

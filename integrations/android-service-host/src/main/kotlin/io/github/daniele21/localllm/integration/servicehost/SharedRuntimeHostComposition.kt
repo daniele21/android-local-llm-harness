@@ -44,6 +44,10 @@ class SharedRuntimeHostComposition(
     val binder: IBinder
         get() = binderStub
 
+    fun setLogicalJobExecutionDemandListener(listener: (Boolean) -> Unit) {
+        delegate.setLogicalJobExecutionDemandListener(listener)
+    }
+
     override fun close() {
         delegate.close()
     }
@@ -66,7 +70,13 @@ internal fun hostProtocolInfo(
         "Consumer runtime readiness requires the consumer control plane"
     }
     val features = BinderProtocolV1.KNOWN_FEATURES
-        .let { known -> if (consumerApiEnabled) known else known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 }
+        .let { known ->
+            if (consumerApiEnabled) {
+                known
+            } else {
+                known - BinderProtocolV1.FEATURE_CONSUMER_API_V1 - BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1
+            }
+        }
         .let { consumerFeatures ->
             if (consumerControlPlaneEnabled) {
                 consumerFeatures
