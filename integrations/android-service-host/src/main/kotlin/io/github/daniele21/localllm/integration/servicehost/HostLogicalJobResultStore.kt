@@ -63,6 +63,7 @@ internal class HostLogicalJobResultStore(private val maxReplayResults: Int = DEF
             jobId = jobId.value,
             clientRequestId = clientRequestId.value,
             useCaseId = scope.useCaseId.value,
+            execution = execution.toConsumerWire(),
             stateTag = state.toWireTag(),
             revision = revision,
             attempt = attempt,
