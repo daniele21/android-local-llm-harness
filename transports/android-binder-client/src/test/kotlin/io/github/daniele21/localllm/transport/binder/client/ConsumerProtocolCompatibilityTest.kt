@@ -24,10 +24,11 @@ class ConsumerProtocolCompatibilityTest {
 
     @Test
     fun `legacy client remains compatible with protocol minor zero host`() {
-        val service = FakeSharedRuntimeRemoteService(
-            protocol = legacyProtocolInfo(),
-            registration = legacyRegistration(),
-        )
+        val service =
+            FakeSharedRuntimeRemoteService(
+                protocol = legacyProtocolInfo(),
+                registration = legacyRegistration(),
+            )
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, legacyHello(), binding)
 
@@ -42,10 +43,11 @@ class ConsumerProtocolCompatibilityTest {
 
     @Test
     fun `consumer client fails before registration when protocol minor zero host lacks feature`() {
-        val service = FakeSharedRuntimeRemoteService(
-            protocol = legacyProtocolInfo(),
-            registration = legacyRegistration(),
-        )
+        val service =
+            FakeSharedRuntimeRemoteService(
+                protocol = legacyProtocolInfo(),
+                registration = legacyRegistration(),
+            )
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, consumerHello(), binding)
 
@@ -78,21 +80,24 @@ class ConsumerProtocolCompatibilityTest {
     @Test
     fun `minor four host remains usable but cannot expose setup resolution`() {
         val features = BinderProtocolV1.KNOWN_FEATURES - BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1
-        val service = FakeSharedRuntimeRemoteService(
-            protocol = ProtocolInfoParcel(
-                protocolMajor = BinderProtocolV1.MAJOR,
-                protocolMinor = 4,
-                minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-                supportedFeatures = features.sorted(),
-                hostBuildId = "minor-four-host",
-            ),
-            registration = RegistrationResultParcel(
-                clientToken = ClientTokenParcel("minor-four-token"),
-                negotiatedMinor = 4,
-                enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 4 }.sorted(),
-                error = null,
-            ),
-        )
+        val service =
+            FakeSharedRuntimeRemoteService(
+                protocol =
+                    ProtocolInfoParcel(
+                        protocolMajor = BinderProtocolV1.MAJOR,
+                        protocolMinor = 4,
+                        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+                        supportedFeatures = features.sorted(),
+                        hostBuildId = "minor-four-host",
+                    ),
+                registration =
+                    RegistrationResultParcel(
+                        clientToken = ClientTokenParcel("minor-four-token"),
+                        negotiatedMinor = 4,
+                        enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 4 }.sorted(),
+                        error = null,
+                    ),
+            )
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, consumerHello(), binding)
 
@@ -139,10 +144,7 @@ class ConsumerProtocolCompatibilityTest {
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = true
 
-        override fun bind(
-            hostConfig: SharedRuntimeHostConfig,
-            callbacks: SharedRuntimeBindingCallbacks,
-        ): SharedRuntimeBindResult {
+        override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
             bindCalls += 1
             this.callbacks = callbacks
             return SharedRuntimeBindResult.STARTED
