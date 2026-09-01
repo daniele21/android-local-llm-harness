@@ -35,21 +35,22 @@ class SharedRuntimeHostDelegate(
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
     private val consumerActivity = ConsumerRuntimeActivityTracker()
-    private val logicalJobRegistry =
-        HostLogicalJobRegistry(
-            maxJobs = LOGICAL_JOB_CAPACITY,
-            runtimeSessionId = HostRuntimeSessionId("runtime:${UUID.randomUUID()}"),
-            idFactory = { HostLogicalJobId(UUID.randomUUID().toString()) },
-        )
+    private val logicalJobRegistry = HostLogicalJobRegistry(
+        maxJobs = LOGICAL_JOB_CAPACITY,
+        runtimeSessionId = HostRuntimeSessionId("runtime:${UUID.randomUUID()}"),
+        idFactory = { HostLogicalJobId(UUID.randomUUID().toString()) },
+    )
     private val logicalJobCoordinator = HostLogicalJobCoordinator(logicalJobRegistry, onLogicalJobExecutionDemandChanged)
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
     internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
-    internal val consumerOperations = ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
+    internal val consumerOperations =
+        ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
     internal val logicalJobOperations =
         ConsumerLogicalJobHostOperations(ledger, consumerResources, controlExecutor, logicalJobCoordinator)
-    internal val controlPlaneOperations = ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
+    internal val controlPlaneOperations =
+        ConsumerControlPlaneHostOperations(ledger, consumerControlPlaneHost, controlExecutor)
     internal val readinessOperations =
         ConsumerRuntimeReadinessHostOperations(ledger, consumerRuntimeReadinessHost, readinessExecutor, consumerActivity)
 
@@ -71,9 +72,17 @@ class SharedRuntimeHostDelegate(
                 return
             }
         controlExecutor.submitOrReject(
-            onRejected = { callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE))) },
+            onRejected = {
+                callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
+            },
         ) {
-            completeRegistration(caller, lifecycle, callback, negotiated.minor, negotiated.enabledFeatures.sorted())
+            completeRegistration(
+                caller,
+                lifecycle,
+                callback,
+                negotiated.minor,
+                negotiated.enabledFeatures.sorted(),
+            )
         }
     }
 
@@ -88,7 +97,9 @@ class SharedRuntimeHostDelegate(
         controlExecutor.closeSafely()
         readinessExecutor.closeSafely()
         synchronized(lifecycleLock) {
-            ledger.activeConnections.forEach { connection -> cleanupConnection(connection.token, connection.caller) }
+            ledger.activeConnections.forEach { connection ->
+                cleanupConnection(connection.token, connection.caller)
+            }
             logicalJobCoordinator.close()
             resources.closeAll()
             consumerResources.clear()
@@ -108,7 +119,9 @@ class SharedRuntimeHostDelegate(
             return@synchronized
         }
         when (val registration = ledger.register(caller, negotiatedMinor, enabledFeatures.toSet())) {
-            is LedgerResult.Failure -> callback.onResult(registrationFailure(registration.reason.toHostWireError()))
+            is LedgerResult.Failure ->
+                callback.onResult(registrationFailure(registration.reason.toHostWireError()))
+
             is LedgerResult.Success ->
                 finishRegistration(
                     caller,
@@ -136,14 +149,20 @@ class SharedRuntimeHostDelegate(
             return
         }
         resources.attachCallbackDispatcher(token, dispatcher)
-        val consumer = consumerClientFactory?.let { factory -> runCatching { factory(caller.applicationId) }.getOrNull() }
+        val consumer =
+            consumerClientFactory?.let { factory ->
+                runCatching { factory(caller.applicationId) }.getOrNull()
+            }
         if (consumerClientFactory != null && consumer == null) {
             cleanupConnection(token, caller)
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
             return
         }
         consumer?.let {
-            consumerResources.attachClient(token, RuntimeActivityTrackingConsumerClient(token, it, consumerActivity))
+            consumerResources.attachClient(
+                token,
+                RuntimeActivityTrackingConsumerClient(token, it, consumerActivity),
+            )
         }
         val deathLink = lifecycle.link {
             controlExecutor.submitOrReject(onRejected = {}) { cleanupConnection(token, caller) }
@@ -159,7 +178,9 @@ class SharedRuntimeHostDelegate(
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
         val closing = ledger.beginClose(token, caller).successOrNull() ?: return
-        closing.requestIds.forEach { requestId -> resources.removeHandle(requestId)?.cancelSafely() }
+        closing.requestIds.forEach { requestId ->
+            resources.removeHandle(requestId)?.cancelSafely()
+        }
         val consumer = consumerResources.client(token)
         closing.sessionIds.forEach { sessionId ->
             if (consumerResources.ownsSession(token, sessionId) && consumer != null) {
