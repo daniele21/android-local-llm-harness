@@ -123,7 +123,7 @@
       "claim": "A clean Harnex process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
       "ui_surface": true,
       "required_media_artifacts": ["screenshots", "video"],
-      "target_environment_refs": ["phone-cold-start-api35-emulator"],
+      "target_environment_refs": ["android-arm64-device"],
       "automated_environment_refs": ["phone-cold-start-api35-emulator"],
       "minimum_automated_fidelity": "simulated_or_emulated",
       "residual_gaps": [
