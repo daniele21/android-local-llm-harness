@@ -64,8 +64,7 @@ private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() =
         attempt = attempt,
         runtimeSessionId = ConsumerRuntimeSessionId(runtimeSessionId),
         resultAvailable = resultAvailable,
-        errorCode =
-            errorCode?.let {
-                WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
-            },
+        errorCode = errorCode?.let {
+            WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
+        },
     )
