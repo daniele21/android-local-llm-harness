@@ -80,17 +80,11 @@ data class ConsumerInferenceJobSnapshot(
     }
 }
 
-data class ConsumerInferenceJobOutput(
-    val answer: String,
-    val surfacedReasoning: String?,
-    val metrics: ConsumerInferenceMetrics,
-)
+data class ConsumerInferenceJobOutput(val answer: String, val surfacedReasoning: String?, val metrics: ConsumerInferenceMetrics)
 
 sealed interface ConsumerInferenceJobResponse {
-    data class Available(
-        val snapshot: ConsumerInferenceJobSnapshot,
-        val output: ConsumerInferenceJobOutput? = null,
-    ) : ConsumerInferenceJobResponse
+    data class Available(val snapshot: ConsumerInferenceJobSnapshot, val output: ConsumerInferenceJobOutput? = null) :
+        ConsumerInferenceJobResponse
 
     data class Rejected(val failure: ConsumerFailure) : ConsumerInferenceJobResponse
 }
