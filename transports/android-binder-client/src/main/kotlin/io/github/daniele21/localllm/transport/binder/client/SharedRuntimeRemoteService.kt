@@ -49,32 +49,50 @@ internal interface ConsumerSharedRuntimeRemoteService {
     fun closeSession(request: CloseSessionRequestParcel)
 
     @Throws(RemoteException::class)
-    fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+    fun discoverUseCases(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerControlPlaneResultParcel) -> Unit,
+    ) {
         callback(controlPlaneUnavailable(request.operationId))
     }
 
     @Throws(RemoteException::class)
-    fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+    fun discoverPresets(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerControlPlaneResultParcel) -> Unit,
+    ) {
         callback(controlPlaneUnavailable(request.operationId))
     }
 
     @Throws(RemoteException::class)
-    fun resolveSetup(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+    fun resolveSetup(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerControlPlaneResultParcel) -> Unit,
+    ) {
         callback(controlPlaneUnavailable(request.operationId))
     }
 
     @Throws(RemoteException::class)
-    fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+    fun activate(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerControlPlaneResultParcel) -> Unit,
+    ) {
         callback(controlPlaneUnavailable(request.operationId))
     }
 
     @Throws(RemoteException::class)
-    fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
+    fun deactivate(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerControlPlaneResultParcel) -> Unit,
+    ) {
         callback(controlPlaneUnavailable(request.operationId))
     }
 
     @Throws(RemoteException::class)
-    fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
+    fun runtimeReadiness(
+        request: ConsumerControlPlaneRequestParcel,
+        callback: (ConsumerRuntimeReadinessResultParcel) -> Unit,
+    ) {
         callback(runtimeReadinessUnavailable(request.operationId))
     }
 }
@@ -86,7 +104,11 @@ internal interface SharedRuntimeRemoteService {
     fun protocolInfo(): ProtocolInfoParcel
 
     @Throws(RemoteException::class)
-    fun registerClient(hello: ClientHelloParcel, hostDisconnectingCallback: () -> Unit, callback: (RegistrationResultParcel) -> Unit)
+    fun registerClient(
+        hello: ClientHelloParcel,
+        hostDisconnectingCallback: () -> Unit,
+        callback: (RegistrationResultParcel) -> Unit,
+    )
 
     @Throws(RemoteException::class)
     fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit)
