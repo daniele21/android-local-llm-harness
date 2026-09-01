@@ -4,7 +4,6 @@ import io.github.daniele21.localllm.contracts.ConsumerInferenceJobId
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobOutput
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobResponse
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobSnapshot
-import io.github.daniele21.localllm.contracts.ConsumerInferenceJobState
 import io.github.daniele21.localllm.contracts.ConsumerLogicalJobRequestId
 import io.github.daniele21.localllm.contracts.ConsumerLogicalJobSubmitRequest
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeSessionId
@@ -19,6 +18,7 @@ fun ConsumerLogicalJobSubmitRequest.toConsumerLogicalJobWire(
     clientRequestId = clientRequestId.value,
     useCaseId = useCaseId.value,
     preparedId = preparedId.value,
+    expectedExecution = expectedExecution.toConsumerWire(),
     input = input.toConsumerWire(),
     outputConstraint = outputConstraint.toConsumerWire(),
     taskDefinitions = taskDefinitions.map { it.toConsumerWire() },
@@ -58,6 +58,7 @@ private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() = Consum
     jobId = ConsumerInferenceJobId(jobId),
     clientRequestId = ConsumerLogicalJobRequestId(clientRequestId),
     useCaseId = UseCaseId(useCaseId),
+    execution = execution.toCoreExecutionIdentity(),
     state = enumTag(stateTag, "consumer inference job state"),
     revision = revision,
     attempt = attempt,
