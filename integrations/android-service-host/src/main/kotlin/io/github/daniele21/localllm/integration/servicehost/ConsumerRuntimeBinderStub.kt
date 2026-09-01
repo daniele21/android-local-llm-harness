@@ -137,37 +137,37 @@ internal class ConsumerRuntimeBinderStub(
     override fun submitLogicalGeneration(
         request: ConsumerLogicalJobSubmitParcel,
         callback: IConsumerLogicalJobResultCallback,
-    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
-        delegate.logicalJobOperations.submit(
-            caller,
-            request,
-            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
-        )
-    }
+    ) =
+        withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+            delegate.logicalJobOperations.submit(
+                caller,
+                request,
+                remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
-    override fun getLogicalJob(
-        request: ConsumerLogicalJobQueryParcel,
-        callback: IConsumerLogicalJobResultCallback,
-    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
-        delegate.logicalJobOperations.query(
-            caller,
-            request,
-            includeResult = false,
-            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
-        )
-    }
+    override fun getLogicalJob(request: ConsumerLogicalJobQueryParcel, callback: IConsumerLogicalJobResultCallback) =
+        withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+            delegate.logicalJobOperations.query(
+                caller,
+                request,
+                includeResult = false,
+                remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     override fun getLogicalJobResult(
         request: ConsumerLogicalJobQueryParcel,
         callback: IConsumerLogicalJobResultCallback,
-    ) = withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
-        delegate.logicalJobOperations.query(
-            caller,
-            request,
-            includeResult = true,
-            remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
-        )
-    }
+    ) =
+        withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
+            delegate.logicalJobOperations.query(
+                caller,
+                request,
+                includeResult = true,
+                remoteConsumerLogicalJobResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
 
     override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) {
         authorizedCallerOrNull(authorizer, callingProcessSource)?.let { delegate.logicalJobOperations.cancel(it, request) }
