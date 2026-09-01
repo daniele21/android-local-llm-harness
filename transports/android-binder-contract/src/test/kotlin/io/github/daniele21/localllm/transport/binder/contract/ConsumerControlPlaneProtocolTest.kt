@@ -163,7 +163,8 @@ class ConsumerControlPlaneProtocolTest {
             ),
         )
 
-        val roundTrip = result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult() as ConsumerActivationResult.Activated
+        val roundTrip =
+            result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult() as ConsumerActivationResult.Activated
 
         assertEquals(ConsumerActivationId("activation-opaque"), roundTrip.activation.activationId)
         assertEquals(8, roundTrip.activation.bindingRevision)
@@ -182,12 +183,14 @@ class ConsumerControlPlaneProtocolTest {
         hostBuildId = "host-1.${BinderProtocolV1.MINOR}",
     )
 
-    private fun client(protocolMinor: Int, requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1)) =
-        ClientHelloParcel(
-            protocolMajor = 1,
-            protocolMinor = protocolMinor,
-            minSupportedMinor = 0,
-            requiredFeatures = requiredFeatures,
-            clientBuildId = "client-$protocolMinor",
-        )
+    private fun client(
+        protocolMinor: Int,
+        requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
+    ) = ClientHelloParcel(
+        protocolMajor = 1,
+        protocolMinor = protocolMinor,
+        minSupportedMinor = 0,
+        requiredFeatures = requiredFeatures,
+        clientBuildId = "client-$protocolMinor",
+    )
 }
