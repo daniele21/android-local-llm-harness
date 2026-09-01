@@ -243,11 +243,8 @@ internal class HostLogicalJobCoordinator(
 }
 
 private sealed interface SubmissionIdentityResolution {
-    data class Valid(
-        val scope: HostLogicalJobScope,
-        val clientRequestId: HostClientRequestId,
-        val preparedId: String,
-    ) : SubmissionIdentityResolution
+    data class Valid(val scope: HostLogicalJobScope, val clientRequestId: HostClientRequestId, val preparedId: String) :
+        SubmissionIdentityResolution
 
     data class Rejected(val code: String) : SubmissionIdentityResolution
 }
