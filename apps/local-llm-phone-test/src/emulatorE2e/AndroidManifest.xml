@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".EmulatorE2eFaultReceiver"
+            android:exported="true"
+            android:permission="${sharedRuntimePermission}">
+            <intent-filter>
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.PAUSE_GENERATION" />
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION" />
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RESET" />
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
