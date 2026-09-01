@@ -87,23 +87,9 @@ internal class HostLogicalJobCoordinator(
         caller: AuthorizedCaller,
         client: ConsumerLocalLlmClient,
         request: ConsumerLogicalJobSubmitParcel,
-    ): ConsumerLogicalJobResultParcel {
-        val identity = request.resolveSubmissionIdentity(caller)
-        if (identity is SubmissionIdentityResolution.Rejected) {
-            return resultStore.failure(request.operationId, identity.code)
-        }
-        identity as SubmissionIdentityResolution.Valid
-        val submission = try {
-            registry.submit(identity.scope, identity.clientRequestId, identity.execution)
-        } catch (_: HostLogicalJobIdentityConflictException) {
-            return resultStore.failure(request.operationId, WireErrorCodes.INVALID_WIRE_REQUEST)
-        } catch (_: HostLogicalJobCapacityException) {
-            return resultStore.failure(request.operationId, WireErrorCodes.CLIENT_BACKPRESSURE)
-        }
-        if (!submission.created) return resultStore.response(request.operationId, submission.snapshot)
-
-        executionDemand.acquire(submission.snapshot.jobId)
-        return startCreatedJob(client, request, identity.preparedId, submission.snapshot)
+    ): ConsumerLogicalJobResultParcel = when (val identity = request.resolveSubmissionIdentity(caller)) {
+        is SubmissionIdentityResolution.Rejected -> resultStore.failure(request.operationId, identity.code)
+        is SubmissionIdentityResolution.Valid -> submitResolvedIdentity(client, request, identity)
     }
 
     fun query(operationId: String, scope: HostLogicalJobScope, jobId: HostLogicalJobId): ConsumerLogicalJobResultParcel {
@@ -142,6 +128,37 @@ internal class HostLogicalJobCoordinator(
             runCatching { execution.handle?.cancel() }
             runCatching { execution.client.closeSession(execution.sessionId) }
         }
+    }
+
+    private fun submitResolvedIdentity(
+        client: ConsumerLocalLlmClient,
+        request: ConsumerLogicalJobSubmitParcel,
+        identity: SubmissionIdentityResolution.Valid,
+    ): ConsumerLogicalJobResultParcel = when (val resolution = submitToRegistry(identity)) {
+        is RegistrySubmissionResolution.Rejected -> resultStore.failure(request.operationId, resolution.code)
+        is RegistrySubmissionResolution.Accepted -> respondToSubmission(client, request, identity, resolution.submission)
+    }
+
+    private fun submitToRegistry(identity: SubmissionIdentityResolution.Valid): RegistrySubmissionResolution = try {
+        RegistrySubmissionResolution.Accepted(
+            registry.submit(identity.scope, identity.clientRequestId, identity.execution),
+        )
+    } catch (_: HostLogicalJobIdentityConflictException) {
+        RegistrySubmissionResolution.Rejected(WireErrorCodes.INVALID_WIRE_REQUEST)
+    } catch (_: HostLogicalJobCapacityException) {
+        RegistrySubmissionResolution.Rejected(WireErrorCodes.CLIENT_BACKPRESSURE)
+    }
+
+    private fun respondToSubmission(
+        client: ConsumerLocalLlmClient,
+        request: ConsumerLogicalJobSubmitParcel,
+        identity: SubmissionIdentityResolution.Valid,
+        submission: HostLogicalJobSubmission,
+    ): ConsumerLogicalJobResultParcel = if (submission.created) {
+        executionDemand.acquire(submission.snapshot.jobId)
+        startCreatedJob(client, request, identity.preparedId, submission.snapshot)
+    } else {
+        resultStore.response(request.operationId, submission.snapshot)
     }
 
     private fun startCreatedJob(
@@ -208,46 +225,51 @@ internal class HostLogicalJobCoordinator(
     private fun onEvent(scope: HostLogicalJobScope, jobId: HostLogicalJobId, event: ConsumerGenerationEvent) {
         val current = registry.snapshot(scope, jobId) ?: return
         when (event) {
-            is ConsumerGenerationEvent.Prepared -> {
-                if (current.state != HostLogicalJobState.PREPARING || event.execution != current.execution) {
-                    finishFailure(scope, jobId, WireErrorCodes.RUNTIME_FAILURE)
-                } else {
-                    transitionLogicalJob(registry, current, HostLogicalJobState.RUNNING)
-                }
-            }
-
-            is ConsumerGenerationEvent.Started -> {
-                if (current.state != HostLogicalJobState.RUNNING) {
-                    finishFailure(scope, jobId, WireErrorCodes.RUNTIME_FAILURE)
-                }
-            }
-
-            is ConsumerGenerationEvent.Completed -> {
-                if (event.execution != current.execution) {
-                    finishFailure(scope, jobId, WireErrorCodes.RUNTIME_FAILURE)
-                } else {
-                    resultStore.recordSuccess(jobId, event)
-                    finish(scope, jobId, HostLogicalJobState.SUCCEEDED)
-                }
-            }
-
-            is ConsumerGenerationEvent.Failed -> {
-                if (current.state == HostLogicalJobState.CANCEL_REQUESTED || event.failure.code == ConsumerErrorCode.CANCELLED) {
-                    finishCancellation(scope, jobId)
-                } else {
-                    finishFailure(scope, jobId, event.failure.code.toWireCode())
-                }
-            }
-
-            is ConsumerGenerationEvent.ContentDelta -> {
-                if (current.state != HostLogicalJobState.RUNNING ||
-                    (event.contentType != ConsumerContentType.REASONING && event.contentType != ConsumerContentType.ANSWER)
-                ) {
-                    finishFailure(scope, jobId, WireErrorCodes.RUNTIME_FAILURE)
-                }
-            }
-
+            is ConsumerGenerationEvent.Prepared -> onPrepared(current, event)
+            is ConsumerGenerationEvent.Started -> onStarted(current)
+            is ConsumerGenerationEvent.Completed -> onCompleted(current, event)
+            is ConsumerGenerationEvent.Failed -> onFailed(current, event)
+            is ConsumerGenerationEvent.ContentDelta -> onContentDelta(current, event)
             is ConsumerGenerationEvent.Queued -> Unit
+        }
+    }
+
+    private fun onPrepared(current: HostLogicalJobSnapshot, event: ConsumerGenerationEvent.Prepared) {
+        if (current.state != HostLogicalJobState.PREPARING || event.execution != current.execution) {
+            finishFailure(current.scope, current.jobId, WireErrorCodes.RUNTIME_FAILURE)
+        } else {
+            transitionLogicalJob(registry, current, HostLogicalJobState.RUNNING)
+        }
+    }
+
+    private fun onStarted(current: HostLogicalJobSnapshot) {
+        if (current.state != HostLogicalJobState.RUNNING) {
+            finishFailure(current.scope, current.jobId, WireErrorCodes.RUNTIME_FAILURE)
+        }
+    }
+
+    private fun onCompleted(current: HostLogicalJobSnapshot, event: ConsumerGenerationEvent.Completed) {
+        if (event.execution != current.execution) {
+            finishFailure(current.scope, current.jobId, WireErrorCodes.RUNTIME_FAILURE)
+        } else {
+            resultStore.recordSuccess(current.jobId, event)
+            finish(current.scope, current.jobId, HostLogicalJobState.SUCCEEDED)
+        }
+    }
+
+    private fun onFailed(current: HostLogicalJobSnapshot, event: ConsumerGenerationEvent.Failed) {
+        if (current.state == HostLogicalJobState.CANCEL_REQUESTED || event.failure.code == ConsumerErrorCode.CANCELLED) {
+            finishCancellation(current.scope, current.jobId)
+        } else {
+            finishFailure(current.scope, current.jobId, event.failure.code.toWireCode())
+        }
+    }
+
+    private fun onContentDelta(current: HostLogicalJobSnapshot, event: ConsumerGenerationEvent.ContentDelta) {
+        val validContentType =
+            event.contentType == ConsumerContentType.REASONING || event.contentType == ConsumerContentType.ANSWER
+        if (current.state != HostLogicalJobState.RUNNING || !validContentType) {
+            finishFailure(current.scope, current.jobId, WireErrorCodes.RUNTIME_FAILURE)
         }
     }
 
@@ -281,19 +303,33 @@ private sealed interface SubmissionIdentityResolution {
     data class Rejected(val code: String) : SubmissionIdentityResolution
 }
 
+private sealed interface RegistrySubmissionResolution {
+    data class Accepted(val submission: HostLogicalJobSubmission) : RegistrySubmissionResolution
+
+    data class Rejected(val code: String) : RegistrySubmissionResolution
+}
+
 private fun ConsumerLogicalJobSubmitParcel.resolveSubmissionIdentity(caller: AuthorizedCaller): SubmissionIdentityResolution {
     val scope = authorizedScope(caller)
-        ?: return SubmissionIdentityResolution.Rejected(WireErrorCodes.UNAUTHORIZED_USE_CASE)
-    val clientRequestId = runCatching { HostClientRequestId(clientRequestId) }.getOrNull()
-        ?: return SubmissionIdentityResolution.Rejected(WireErrorCodes.INVALID_WIRE_REQUEST)
-    val preparedId = preparedId.takeIf(String::isNotBlank)
-        ?: return SubmissionIdentityResolution.Rejected(WireErrorCodes.INVALID_WIRE_REQUEST)
+    val resolvedClientRequestId = runCatching { HostClientRequestId(clientRequestId) }.getOrNull()
+    val resolvedPreparedId = preparedId.takeIf(String::isNotBlank)
     val execution = runCatching { expectedExecution.toCoreExecutionIdentity() }.getOrNull()
-        ?: return SubmissionIdentityResolution.Rejected(WireErrorCodes.INVALID_WIRE_REQUEST)
-    if (execution.useCaseId != scope.useCaseId) {
-        return SubmissionIdentityResolution.Rejected(WireErrorCodes.INVALID_WIRE_REQUEST)
+    val rejectionCode = when {
+        scope == null -> WireErrorCodes.UNAUTHORIZED_USE_CASE
+        resolvedClientRequestId == null || resolvedPreparedId == null || execution == null -> WireErrorCodes.INVALID_WIRE_REQUEST
+        execution.useCaseId != scope.useCaseId -> WireErrorCodes.INVALID_WIRE_REQUEST
+        else -> null
     }
-    return SubmissionIdentityResolution.Valid(scope, clientRequestId, preparedId, execution)
+    return if (rejectionCode != null) {
+        SubmissionIdentityResolution.Rejected(rejectionCode)
+    } else {
+        SubmissionIdentityResolution.Valid(
+            scope = requireNotNull(scope),
+            clientRequestId = requireNotNull(resolvedClientRequestId),
+            preparedId = requireNotNull(resolvedPreparedId),
+            execution = requireNotNull(execution),
+        )
+    }
 }
 
 private fun transitionLogicalJob(
