@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize presentation PNGs from the canonical H Bridge Core masters."""
+"""Synchronize presentation PNGs from the canonical Harnex masters."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "assets" / "brand"
 MASTER = OUT / "master"
 
-SYMBOL = MASTER / "harness-symbol.png"
-LOCKUP_LIGHT = MASTER / "harness-lockup-light.png"
-LOCKUP_DARK = MASTER / "harness-lockup-dark.png"
-APP_ICON_LIGHT = MASTER / "harness-app-icon-light.png"
-APP_ICON_DARK = MASTER / "harness-app-icon-dark.png"
+SYMBOL = MASTER / "harnex-symbol.png"
+LOCKUP_LIGHT = MASTER / "harnex-lockup-light.png"
+LOCKUP_DARK = MASTER / "harnex-lockup-dark.png"
+APP_ICON_LIGHT = MASTER / "harnex-app-icon-light.png"
+APP_ICON_DARK = MASTER / "harnex-app-icon-dark.png"
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
