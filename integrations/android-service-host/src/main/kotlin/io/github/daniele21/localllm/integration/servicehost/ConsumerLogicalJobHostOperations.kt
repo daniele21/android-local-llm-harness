@@ -10,7 +10,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ConsumerLogicalJob
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorParcel
 
-/** Minor-v5 detached-job transport facade. Connection validation is separate from job ownership. */
+/** Minor-v6 detached-job transport facade. Connection validation is separate from job ownership. */
 internal class ConsumerLogicalJobHostOperations(
     private val ledger: ClientConnectionLedger,
     private val consumerResources: ConsumerHostResources,
