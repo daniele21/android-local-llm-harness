@@ -25,6 +25,51 @@ import io.github.daniele21.localllm.transport.binder.contract.toCoreConsumerOutp
 import io.github.daniele21.localllm.transport.binder.contract.toCoreTaskDefinition
 import java.util.LinkedHashMap
 
+internal fun interface HostLogicalJobExecutionDemandListener {
+    fun onExecutionDemandChanged(active: Boolean)
+}
+
+/**
+ * Tracks semantic durable-job demand independently from Binder connection count and runtime handles.
+ * The listener observes only the zero-to-one / one-to-zero boundary, so multiple concurrent queued or
+ * running jobs cannot accidentally stop Android host lifetime while work still exists.
+ */
+internal class HostLogicalJobExecutionDemand(
+    private val listener: HostLogicalJobExecutionDemandListener = HostLogicalJobExecutionDemandListener {},
+) : AutoCloseable {
+    private val lock = Any()
+    private val activeJobs = LinkedHashSet<HostLogicalJobId>()
+
+    fun acquire(jobId: HostLogicalJobId) {
+        val becameActive =
+            synchronized(lock) {
+                val wasEmpty = activeJobs.isEmpty()
+                val added = activeJobs.add(jobId)
+                added && wasEmpty
+            }
+        if (becameActive) listener.onExecutionDemandChanged(true)
+    }
+
+    fun release(jobId: HostLogicalJobId) {
+        val becameIdle =
+            synchronized(lock) {
+                val removed = activeJobs.remove(jobId)
+                removed && activeJobs.isEmpty()
+            }
+        if (becameIdle) listener.onExecutionDemandChanged(false)
+    }
+
+    override fun close() {
+        val hadDemand =
+            synchronized(lock) {
+                val active = activeJobs.isNotEmpty()
+                activeJobs.clear()
+                active
+            }
+        if (hadDemand) listener.onExecutionDemandChanged(false)
+    }
+}
+
 /**
  * Owns detached Consumer generation execution independently from Binder connection ownership.
  *
@@ -33,6 +78,7 @@ import java.util.LinkedHashMap
  */
 internal class HostLogicalJobCoordinator(
     private val registry: HostLogicalJobRegistry,
+    executionDemandListener: HostLogicalJobExecutionDemandListener = HostLogicalJobExecutionDemandListener {},
     private val maxReplayResults: Int = DEFAULT_MAX_REPLAY_RESULTS,
 ) : AutoCloseable {
     private data class Execution(
@@ -51,6 +97,7 @@ internal class HostLogicalJobCoordinator(
     private val executions = LinkedHashMap<HostLogicalJobId, Execution>()
     private val replayResults = LinkedHashMap<HostLogicalJobId, ReplayResult>()
     private val errorCodes = LinkedHashMap<HostLogicalJobId, String>()
+    private val executionDemand = HostLogicalJobExecutionDemand(executionDemandListener)
 
     init {
         require(maxReplayResults > 0) { "Logical job replay capacity must be positive" }
@@ -72,12 +119,14 @@ internal class HostLogicalJobCoordinator(
         }
         if (!submission.created) return response(request.operationId, submission.snapshot)
 
+        executionDemand.acquire(submission.snapshot.jobId)
         val coreInput = runCatching { request.input.toCoreConsumerInput() }.getOrNull()
         val coreOutput = runCatching { request.outputConstraint.toCoreConsumerOutput() }.getOrNull()
         val taskDefinitions = runCatching { request.taskDefinitions.map { it.toCoreTaskDefinition() } }.getOrNull()
         if (coreInput == null || coreOutput == null || taskDefinitions == null) {
             val failed = transition(submission.snapshot, HostLogicalJobState.FAILED_FINAL)
             recordError(submission.snapshot.jobId, WireErrorCodes.INVALID_WIRE_REQUEST)
+            executionDemand.release(submission.snapshot.jobId)
             return response(request.operationId, failed)
         }
 
@@ -89,6 +138,7 @@ internal class HostLogicalJobCoordinator(
                 preparing.jobId,
                 (session as? ConsumerSessionResult.Rejected)?.failure?.code?.toWireCode() ?: WireErrorCodes.RUNTIME_FAILURE,
             )
+            executionDemand.release(preparing.jobId)
             return response(request.operationId, failed)
         }
 
@@ -145,13 +195,15 @@ internal class HostLogicalJobCoordinator(
     }
 
     override fun close() {
-        val active = synchronized(lock) {
-            val copy = executions.values.toList()
-            executions.clear()
-            replayResults.clear()
-            errorCodes.clear()
-            copy
-        }
+        val active =
+            synchronized(lock) {
+                val copy = executions.values.toList()
+                executions.clear()
+                replayResults.clear()
+                errorCodes.clear()
+                copy
+            }
+        executionDemand.close()
         active.forEach { execution ->
             runCatching { execution.handle?.cancel() }
             runCatching { execution.client.closeSession(execution.sessionId) }
@@ -202,20 +254,22 @@ internal class HostLogicalJobCoordinator(
         runCatching { transition(current, state) }
         val execution = synchronized(lock) { executions.remove(jobId) }
         if (execution != null) runCatching { execution.client.closeSession(execution.sessionId) }
+        executionDemand.release(jobId)
     }
 
-    private fun transition(current: HostLogicalJobSnapshot, state: HostLogicalJobState): HostLogicalJobSnapshot = checkNotNull(
-        registry.transition(
-            current.scope,
-            current.jobId,
-            HostLogicalJobTransition(
-                state = state,
-                revision = current.revision + 1,
-                attempt = current.attempt,
-                runtimeSessionId = current.runtimeSessionId,
+    private fun transition(current: HostLogicalJobSnapshot, state: HostLogicalJobState): HostLogicalJobSnapshot =
+        checkNotNull(
+            registry.transition(
+                current.scope,
+                current.jobId,
+                HostLogicalJobTransition(
+                    state = state,
+                    revision = current.revision + 1,
+                    attempt = current.attempt,
+                    runtimeSessionId = current.runtimeSessionId,
+                ),
             ),
-        ),
-    )
+        )
 
     private fun current(scope: HostLogicalJobScope, jobId: HostLogicalJobId): HostLogicalJobSnapshot? = registry.snapshot(scope, jobId)
 
@@ -223,14 +277,15 @@ internal class HostLogicalJobCoordinator(
         operationId: String,
         snapshot: HostLogicalJobSnapshot,
         replay: ReplayResult? = null,
-    ): ConsumerLogicalJobResultParcel = ConsumerLogicalJobResultParcel(
-        operationId = operationId,
-        snapshot = snapshot.toWire(resultAvailable(snapshot.jobId)),
-        answerText = replay?.answer,
-        reasoningText = replay?.reasoning,
-        metrics = replay?.metrics,
-        error = null,
-    )
+    ): ConsumerLogicalJobResultParcel =
+        ConsumerLogicalJobResultParcel(
+            operationId = operationId,
+            snapshot = snapshot.toWire(resultAvailable(snapshot.jobId)),
+            answerText = replay?.answer,
+            reasoningText = replay?.reasoning,
+            metrics = replay?.metrics,
+            error = null,
+        )
 
     private fun resultAvailable(jobId: HostLogicalJobId): Boolean = synchronized(lock) { replayResults.containsKey(jobId) }
 
@@ -258,10 +313,11 @@ internal class HostLogicalJobCoordinator(
         }
     }
 
-    private fun failure(operationId: String, code: String): ConsumerLogicalJobResultParcel = ConsumerLogicalJobResultParcel(
-        operationId = operationId,
-        error = WireErrorParcel(code = code, safeMessage = "Logical job request failed", retryable = false),
-    )
+    private fun failure(operationId: String, code: String): ConsumerLogicalJobResultParcel =
+        ConsumerLogicalJobResultParcel(
+            operationId = operationId,
+            error = WireErrorParcel(code = code, safeMessage = "Logical job request failed", retryable = false),
+        )
 
     private companion object {
         const val DEFAULT_MAX_REPLAY_RESULTS = 32
@@ -273,34 +329,36 @@ private fun ConsumerLogicalJobSubmitParcel.authorizedScope(caller: AuthorizedCal
     return HostLogicalJobScope(caller.applicationId, useCase)
 }
 
-private fun HostLogicalJobState.toWireTag(): String = when (this) {
-    HostLogicalJobState.QUEUED -> ConsumerLogicalJobWireTags.STATE_QUEUED
-    HostLogicalJobState.PREPARING -> ConsumerLogicalJobWireTags.STATE_PREPARING
-    HostLogicalJobState.RUNNING -> ConsumerLogicalJobWireTags.STATE_RUNNING
-    HostLogicalJobState.SUCCEEDED -> ConsumerLogicalJobWireTags.STATE_SUCCEEDED
-    HostLogicalJobState.CANCEL_REQUESTED -> ConsumerLogicalJobWireTags.STATE_CANCEL_REQUESTED
-    HostLogicalJobState.CANCELLED -> ConsumerLogicalJobWireTags.STATE_CANCELLED
-    HostLogicalJobState.FAILED_RETRYABLE -> ConsumerLogicalJobWireTags.STATE_FAILED_RETRYABLE
-    HostLogicalJobState.RECOVERING -> ConsumerLogicalJobWireTags.STATE_RECOVERING
-    HostLogicalJobState.INTERRUPTED -> ConsumerLogicalJobWireTags.STATE_INTERRUPTED
-    HostLogicalJobState.FAILED_FINAL -> ConsumerLogicalJobWireTags.STATE_FAILED_FINAL
-}
+private fun HostLogicalJobState.toWireTag(): String =
+    when (this) {
+        HostLogicalJobState.QUEUED -> ConsumerLogicalJobWireTags.STATE_QUEUED
+        HostLogicalJobState.PREPARING -> ConsumerLogicalJobWireTags.STATE_PREPARING
+        HostLogicalJobState.RUNNING -> ConsumerLogicalJobWireTags.STATE_RUNNING
+        HostLogicalJobState.SUCCEEDED -> ConsumerLogicalJobWireTags.STATE_SUCCEEDED
+        HostLogicalJobState.CANCEL_REQUESTED -> ConsumerLogicalJobWireTags.STATE_CANCEL_REQUESTED
+        HostLogicalJobState.CANCELLED -> ConsumerLogicalJobWireTags.STATE_CANCELLED
+        HostLogicalJobState.FAILED_RETRYABLE -> ConsumerLogicalJobWireTags.STATE_FAILED_RETRYABLE
+        HostLogicalJobState.RECOVERING -> ConsumerLogicalJobWireTags.STATE_RECOVERING
+        HostLogicalJobState.INTERRUPTED -> ConsumerLogicalJobWireTags.STATE_INTERRUPTED
+        HostLogicalJobState.FAILED_FINAL -> ConsumerLogicalJobWireTags.STATE_FAILED_FINAL
+    }
 
-private fun ConsumerErrorCode.toWireCode(): String = when (this) {
-    ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> WireErrorCodes.UNAUTHORIZED_USE_CASE
+private fun ConsumerErrorCode.toWireCode(): String =
+    when (this) {
+        ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> WireErrorCodes.UNAUTHORIZED_USE_CASE
 
-    ConsumerErrorCode.MODEL_UNAVAILABLE -> WireErrorCodes.MODEL_UNAVAILABLE
+        ConsumerErrorCode.MODEL_UNAVAILABLE -> WireErrorCodes.MODEL_UNAVAILABLE
 
-    ConsumerErrorCode.CANCELLED -> WireErrorCodes.CANCELLED
+        ConsumerErrorCode.CANCELLED -> WireErrorCodes.CANCELLED
 
-    ConsumerErrorCode.SESSION_NOT_FOUND,
-    ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
-    ConsumerErrorCode.PREPARED_SELECTION_STALE,
-    -> WireErrorCodes.SESSION_UNAVAILABLE
+        ConsumerErrorCode.SESSION_NOT_FOUND,
+        ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
+        ConsumerErrorCode.PREPARED_SELECTION_STALE,
+        -> WireErrorCodes.SESSION_UNAVAILABLE
 
-    ConsumerErrorCode.INVALID_INPUT -> WireErrorCodes.INVALID_WIRE_REQUEST
+        ConsumerErrorCode.INVALID_INPUT -> WireErrorCodes.INVALID_WIRE_REQUEST
 
-    ConsumerErrorCode.PREPARE_FAILED -> WireErrorCodes.PREPARATION_FAILED
+        ConsumerErrorCode.PREPARE_FAILED -> WireErrorCodes.PREPARATION_FAILED
 
-    else -> WireErrorCodes.RUNTIME_FAILURE
-}
+        else -> WireErrorCodes.RUNTIME_FAILURE
+    }
