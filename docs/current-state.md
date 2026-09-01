@@ -41,6 +41,8 @@ General phone work still includes process/back-stack evidence, representative Ta
 
 SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures. Production/release readiness still requires representative physical SR-6 evidence. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
+Background/process lifecycle hardening is active through PR #502 and ADR 0016. The Harness-side candidate separates explicit durable logical jobs from transient Binder/UI lifetime: bounded caller/use-case-scoped `ConsumerInferenceJobId` state, idempotent submit, authoritative query/result after reconnect, explicit cancel, exact prepared `ConsumerExecutionIdentity` pinning, detached session/generation-handle ownership and started/foreground service demand while durable work is active. Protocol minor 5 remains setup resolution; logical jobs are append-only minor 6. The Consumer SDK candidate is `0.1.0-alpha.8` with a frozen ABI baseline. RedactGuard logical-job consumption, dedicated lifecycle E2E, host-process restart reconciliation and representative physical evidence remain open; see [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md).
+
 CRV is repository-complete through the automated candidate gate: exact activated identity/custom-preset policy (#467/#468), Consumer SDK `0.1.0-alpha.6` Binder readiness contract/protocol minor 4 (#472), automatic preparation with fail-closed fallback (#474), source-backed readiness/residency observation (#475), Harnex Applications presentation (#476), focused failure regressions (#477), and RedactGuard readiness consumption (#100/#101).
 
 CRV-100 froze the automated physical candidate identities as Harness v31 source `a30f67b21e24adc6efea838e9a9d65cc78446f28` and RedactGuard v11 source `4679c23a9a22e5242761fe52af97f4eb7432aec7`. Both have exact-source automated package evidence. Later CI/documentation-only descendants do not replace those frozen APK source identities. CRV-110 remains the real-device same-signer + real-GGUF gate; CRV-120 cleanup follows only after that evidence passes.
@@ -70,15 +72,19 @@ EVAL-0, EVAL-1 and EVAL-3 are complete. Contracts/evaluators provide backend-ind
 
 ## Open blockers
 
-### 1. OMB-6B final identity review
+### 1. Background/process lifecycle convergence
+
+The Harness durable-job protocol/service candidate is implemented in #502, but the user-facing continuity claim is not complete until all layers agree. Required remaining work is: final exact-head automated preflight; publish Consumer SDK `0.1.0-alpha.8` from `dev`; migrate RedactGuard multi-chunk generation from connection-scoped requests to stable Harness logical jobs; prove app-switch, Activity recreation, Binder disconnect/reconnect and explicit cancel through deterministic two-APK emulator journeys with privacy-safe state plus screenshots/video; then record representative same-signer ARM64/JNI/GGUF/OEM/model-residency evidence separately. Host process death remains a truthful interruption boundary.
+
+### 2. OMB-6B final identity review
 
 PR #248 contains a review-gated symbol candidate, not approved production identity. Closure requires approved symbol/wordmark/lockup, deterministic adaptive/monochrome launcher assets and packaging checks without changing package/signing boundaries. Do not infer visual approval from a green candidate workflow.
 
-### 2. OMB-8 quality execution
+### 3. OMB-8 quality execution
 
 Corpus v2 and policy v1 are integrated and identity-bound. Before any Qwen3.5 support claim, execute each reviewed artifact/configuration, evaluate aggregate/per-type precision/recall/F1 plus structured-completion and invalid-result/finding rates, preserve exact identities and fail closed on threshold/category/identity failure. Policy v1 must not be lowered to fit observed results.
 
-### 3. Physical control-plane / CRV evidence
+### 4. Physical control-plane / CRV evidence
 
 The persisted control-plane repair and Consumer runtime-readiness convergence are implemented and automatically validated. What remains is representative-device evidence, not repository implementation.
 
@@ -86,26 +92,28 @@ A physical session must use same-signer release APKs built from the frozen Harne
 
 CI, packaging and emulator evidence must not be reported as this physical gate.
 
-### 4. Other representative Android evidence
+### 5. Other representative Android evidence
 
-Hardware sessions may also combine phone UX, Q35-6, SR-6 and OMB-8 execution where practical, but each exit gate remains independent. Do not claim representative-device UX, `MEASURED` Q35 profiles, production-ready OMBRA/shared-host transport or physical Consumer readiness from CI/emulator evidence alone.
+Hardware sessions may also combine phone UX, Q35-6, SR-6, HBG-64 and OMB-8 execution where practical, but each exit gate remains independent. Do not claim representative-device UX, `MEASURED` Q35 profiles, production-ready OMBRA/shared-host transport or physical Consumer readiness from CI/emulator evidence alone.
 
-### 5. Follow-on validation and product hardening
+### 6. Follow-on validation and product hardening
 
 Repository-side UX/UI and CRV runtime visibility are complete. Remaining phone work is device/restoration evidence, RAM warm-idle policy and Q35-7 semantic/lifecycle/memory/thermal validation. Parallel upgrade plan: [`LLUP`](workstreams/llama-cpp-v0-3-residency-qualification.md).
 
 ## Immediate next block
 
-1. build same-signer release APKs from the frozen Harness v31 and RedactGuard v11 source revisions using their repository release helpers;
-2. execute CRV-110 / RG-HCP-8 on a representative ARM64 Android device with a real GGUF, recording the exact candidate identity and privacy-safe evidence;
-3. in the same hardware window where appropriate, execute CPREC-80 upgrade-repair first and then the clean CPREC-90/ACUX-90 path without collapsing their independent acceptance criteria;
-4. keep OMB-6B review, OMB-8 quality execution, Q35-6, SR-6 and broader phone UX evidence parallel where their ownership does not conflict;
-5. after CRV-110 passes, perform CRV-120 durable handoff/cleanup and close the temporary CRV coordinator rather than merging its stale planning branch;
-6. complete release privacy/security, packaging, versioning/signing and documentation checks on the exact promoted build when a release promotion is intentionally requested.
+1. close #502 on a documentation-current exact head with required automated gates and repository-owned STRONG preflight;
+2. merge #502 to `dev` and verify `Publish Consumer Android SDK` successfully publishes `0.1.0-alpha.8` from the integrated source;
+3. update RedactGuard to alpha.8 and complete LAS-08B so process-local `AnalysisJobId` orchestration uses/reconciles stable Harness logical jobs across Binder reconnect without duplicate generation;
+4. add LAS-08C deterministic two-APK lifecycle journeys with screenshots/video artifacts before any real-device validation;
+5. execute the remaining representative ARM64/JNI/GGUF lifecycle/model-memory/OEM evidence, keeping CRV/CPREC/Q35/SR-6 acceptance criteria independently identifiable;
+6. continue OMB-6B review, OMB-8 quality execution and LLUP where their ownership does not conflict.
 
 ## Source links
 
 - Capability roadmap: [`roadmap.md`](roadmap.md)
+- Background/process lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
+- Consumer Android SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
 - Applications UX: [`features/application-control-plane-ux.md`](features/application-control-plane-ux.md), [`workstreams/application-control-plane-ux.md`](workstreams/application-control-plane-ux.md)
 - Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
