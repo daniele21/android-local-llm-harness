@@ -89,20 +89,20 @@ class ConsumerProtocolCompatibilityTest {
         val service =
             FakeSharedRuntimeRemoteService(
                 protocol =
-                    ProtocolInfoParcel(
-                        protocolMajor = BinderProtocolV1.MAJOR,
-                        protocolMinor = 4,
-                        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-                        supportedFeatures = features.sorted(),
-                        hostBuildId = "minor-four-host",
-                    ),
+                ProtocolInfoParcel(
+                    protocolMajor = BinderProtocolV1.MAJOR,
+                    protocolMinor = 4,
+                    minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+                    supportedFeatures = features.sorted(),
+                    hostBuildId = "minor-four-host",
+                ),
                 registration =
-                    RegistrationResultParcel(
-                        clientToken = ClientTokenParcel("minor-four-token"),
-                        negotiatedMinor = 4,
-                        enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 4 }.sorted(),
-                        error = null,
-                    ),
+                RegistrationResultParcel(
+                    clientToken = ClientTokenParcel("minor-four-token"),
+                    negotiatedMinor = 4,
+                    enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 4 }.sorted(),
+                    error = null,
+                ),
             )
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, consumerHello(), binding)
@@ -122,20 +122,20 @@ class ConsumerProtocolCompatibilityTest {
         val service =
             FakeSharedRuntimeRemoteService(
                 protocol =
-                    ProtocolInfoParcel(
-                        protocolMajor = BinderProtocolV1.MAJOR,
-                        protocolMinor = 5,
-                        minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
-                        supportedFeatures = features.sorted(),
-                        hostBuildId = "minor-five-host",
-                    ),
+                ProtocolInfoParcel(
+                    protocolMajor = BinderProtocolV1.MAJOR,
+                    protocolMinor = 5,
+                    minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+                    supportedFeatures = features.sorted(),
+                    hostBuildId = "minor-five-host",
+                ),
                 registration =
-                    RegistrationResultParcel(
-                        clientToken = ClientTokenParcel("minor-five-token"),
-                        negotiatedMinor = 5,
-                        enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 5 }.sorted(),
-                        error = null,
-                    ),
+                RegistrationResultParcel(
+                    clientToken = ClientTokenParcel("minor-five-token"),
+                    negotiatedMinor = 5,
+                    enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 5 }.sorted(),
+                    error = null,
+                ),
             )
         val binding = CompatibilityBinding()
         val connection = SharedRuntimeConnection(host, consumerHello(), binding)
