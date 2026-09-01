@@ -53,6 +53,7 @@ internal class BinderConsumerControlPlaneAdapter(
             } else {
                 runCatching { outcome.result.toCoreAssignedUseCasesResult() }.getOrElse { assignedTransportFailure() }
             }
+
             else -> assignedTransportFailure()
         }
     }
@@ -74,6 +75,7 @@ internal class BinderConsumerControlPlaneAdapter(
             } else {
                 runCatching { outcome.result.toCorePublishedPresetsResult() }.getOrElse { presetsTransportFailure() }
             }
+
             else -> presetsTransportFailure()
         }
     }
@@ -91,6 +93,7 @@ internal class BinderConsumerControlPlaneAdapter(
             } else {
                 runCatching { outcome.result.toCoreSetupResolutionResult() }.getOrElse { setupTransportFailure() }
             }
+
             else -> setupTransportFailure()
         }
     }
@@ -108,6 +111,7 @@ internal class BinderConsumerControlPlaneAdapter(
             } else {
                 runCatching { outcome.result.toCoreActivationResult() }.getOrElse { activationTransportFailure() }
             }
+
             else -> activationTransportFailure()
         }
     }
@@ -129,6 +133,7 @@ internal class BinderConsumerControlPlaneAdapter(
             } else {
                 runCatching { outcome.result.toCoreDeactivationResult(activationId) }.getOrElse { deactivationTransportFailure() }
             }
+
             else -> deactivationTransportFailure()
         }
     }
@@ -157,7 +162,8 @@ internal class BinderConsumerControlPlaneAdapter(
         }
     }
 
-    private fun isCurrent(endpoint: RegisteredSharedRuntimeEndpoint): Boolean = endpointProvider()?.connectionEpoch == endpoint.connectionEpoch
+    private fun isCurrent(endpoint: RegisteredSharedRuntimeEndpoint): Boolean =
+        endpointProvider()?.connectionEpoch == endpoint.connectionEpoch
 
     private companion object {
         const val DEFAULT_OPERATION_TIMEOUT_MILLIS = 120_000L
@@ -166,8 +172,11 @@ internal class BinderConsumerControlPlaneAdapter(
 
 private sealed interface ControlPlaneRemoteOutcome {
     data class Received(val result: ConsumerControlPlaneResultParcel) : ControlPlaneRemoteOutcome
+
     data object Timeout : ControlPlaneRemoteOutcome
+
     data object Disconnected : ControlPlaneRemoteOutcome
+
     data object TransportFailure : ControlPlaneRemoteOutcome
 }
 
@@ -197,30 +206,39 @@ private fun controlPlaneFailure(code: ConsumerControlPlaneErrorCode, message: St
 private fun assignedFeatureUnavailable() = ConsumerAssignedUseCasesResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
 )
+
 private fun assignedTransportFailure() = ConsumerAssignedUseCasesResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
+
 private fun presetsFeatureUnavailable() = ConsumerPublishedPresetsResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
 )
+
 private fun presetsTransportFailure() = ConsumerPublishedPresetsResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
+
 private fun setupFeatureUnavailable() = ConsumerSetupResolutionResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer setup resolution is unavailable"),
 )
+
 private fun setupTransportFailure() = ConsumerSetupResolutionResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
+
 private fun activationFeatureUnavailable() = ConsumerActivationResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
 )
+
 private fun activationTransportFailure() = ConsumerActivationResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
+
 private fun deactivationFeatureUnavailable() = ConsumerDeactivationResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
 )
+
 private fun deactivationTransportFailure() = ConsumerDeactivationResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
