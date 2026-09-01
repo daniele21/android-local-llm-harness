@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and verify Android launcher resources from H Bridge Core PNG masters."""
+"""Generate and verify Android launcher resources from canonical Harnex PNG masters."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MASTER_DIR = ROOT / "docs" / "assets" / "brand" / "master"
-SYMBOL_MASTER = MASTER_DIR / "harness-symbol.png"
-APP_ICON_MASTER = MASTER_DIR / "harness-app-icon-dark.png"
+SYMBOL_MASTER = MASTER_DIR / "harnex-symbol.png"
+APP_ICON_MASTER = MASTER_DIR / "harnex-app-icon-dark.png"
 APP_DIR = ROOT / "apps" / "local-llm-phone-test"
 RES_DIR = APP_DIR / "src" / "main" / "res"
 MANIFEST = APP_DIR / "src" / "main" / "AndroidManifest.xml"
@@ -145,7 +145,7 @@ def check_generated() -> int:
         for failure in failures:
             print(failure, file=sys.stderr)
         return 1
-    print("Android H Bridge Core PNG assets are reproducible and manifest-linked.")
+    print("Android Harnex H Bridge Core PNG assets are reproducible and manifest-linked.")
     return 0
 
 
