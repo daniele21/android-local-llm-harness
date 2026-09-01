@@ -50,23 +50,27 @@ data class ConsumerLogicalJobSubmitRequest(
     val clientRequestId: ConsumerLogicalJobRequestId,
     val useCaseId: UseCaseId,
     val preparedId: ConsumerPreparedId,
+    val expectedExecution: ConsumerExecutionIdentity,
     val input: ConsumerGenerationInput,
     val outputConstraint: ConsumerOutputConstraint,
     val taskDefinitions: List<TaskDefinition> = emptyList(),
 ) {
     init {
+        require(expectedExecution.useCaseId == useCaseId) { "Logical job execution identity must match the requested use case" }
         TaskDefinitionLimits.validate(taskDefinitions)
     }
 
     override fun toString(): String =
         "ConsumerLogicalJobSubmitRequest(clientRequestId=$clientRequestId, useCaseId=$useCaseId, preparedId=$preparedId, " +
-            "input=<redacted>, outputConstraint=${outputConstraint::class.simpleName}, taskDefinitionCount=${taskDefinitions.size})"
+            "expectedExecution=$expectedExecution, input=<redacted>, outputConstraint=${outputConstraint::class.simpleName}, " +
+            "taskDefinitionCount=${taskDefinitions.size})"
 }
 
 data class ConsumerInferenceJobSnapshot(
     val jobId: ConsumerInferenceJobId,
     val clientRequestId: ConsumerLogicalJobRequestId,
     val useCaseId: UseCaseId,
+    val execution: ConsumerExecutionIdentity,
     val state: ConsumerInferenceJobState,
     val revision: Long,
     val attempt: Int,
@@ -75,6 +79,7 @@ data class ConsumerInferenceJobSnapshot(
     val errorCode: ConsumerErrorCode? = null,
 ) {
     init {
+        require(execution.useCaseId == useCaseId) { "Logical job execution identity must match the job use case" }
         require(revision >= 0) { "Consumer inference job revision must be non-negative" }
         require(attempt >= 1) { "Consumer inference job attempt must be positive" }
     }
@@ -98,3 +103,13 @@ interface ConsumerLogicalJobClient {
 
     fun cancelLogicalJob(jobId: ConsumerInferenceJobId, useCaseId: UseCaseId)
 }
+
+fun ConsumerPreparedSelection.toExecutionIdentity(): ConsumerExecutionIdentity =
+    ConsumerExecutionIdentity(
+        useCaseId = useCaseId,
+        capabilityRevision = capabilityRevision,
+        preset = preset,
+        reasoningMode = reasoningMode,
+        outputConstraint = outputConstraint,
+        sessionKind = sessionKind,
+    )
