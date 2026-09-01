@@ -139,12 +139,11 @@ private class LogicalJobCallbackWaiter {
         if (detail.isNotBlank()) finish(LogicalJobRemoteOutcome.Disconnected)
     }
 
-    fun await(timeoutMillis: Long): LogicalJobRemoteOutcome =
-        if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
-            requireNotNull(outcome.get())
-        } else {
-            LogicalJobRemoteOutcome.Timeout
-        }
+    fun await(timeoutMillis: Long): LogicalJobRemoteOutcome = if (latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
+        requireNotNull(outcome.get())
+    } else {
+        LogicalJobRemoteOutcome.Timeout
+    }
 
     private fun finish(value: LogicalJobRemoteOutcome) {
         if (outcome.compareAndSet(null, value)) latch.countDown()
