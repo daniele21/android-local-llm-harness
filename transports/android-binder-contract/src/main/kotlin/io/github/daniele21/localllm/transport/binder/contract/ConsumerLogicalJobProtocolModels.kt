@@ -3,7 +3,7 @@ package io.github.daniele21.localllm.transport.binder.contract
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
-/** Wire tags for protocol-minor-5 detached Consumer generation jobs. */
+/** Wire tags for protocol-minor-6 detached Consumer generation jobs. */
 object ConsumerLogicalJobWireTags {
     const val STATE_QUEUED = "QUEUED"
     const val STATE_PREPARING = "PREPARING"
@@ -18,7 +18,7 @@ object ConsumerLogicalJobWireTags {
 }
 
 /**
- * Minor-v5 submit envelope for a detached logical generation.
+ * Minor-v6 submit envelope for a detached logical generation.
  *
  * The host owns the runtime session created from [preparedId]. The caller supplies a stable,
  * privacy-safe [clientRequestId] so a retry after Binder loss converges on the same logical job.
