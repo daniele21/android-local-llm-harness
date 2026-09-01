@@ -13,9 +13,13 @@ internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
         val unusedContext = context
         when (intent.action) {
             EmulatorE2eFaultActions.PAUSE_GENERATION -> EmulatorE2eGenerationGate.pause()
+
             EmulatorE2eFaultActions.RELEASE_GENERATION -> EmulatorE2eGenerationGate.release()
+
             EmulatorE2eFaultActions.RESET -> EmulatorE2eGenerationGate.reset()
+
             EmulatorE2eFaultActions.QUERY -> Unit
+
             else -> {
                 resultCode = Activity.RESULT_CANCELED
                 resultData = "unsupported"
@@ -80,10 +84,9 @@ internal object EmulatorE2eGenerationGate {
         return !isCancelled()
     }
 
-    fun status(): String =
-        synchronized(monitor) {
-            "paused=$paused;waiting=$waitingRequests"
-        }
+    fun status(): String = synchronized(monitor) {
+        "paused=$paused;waiting=$waitingRequests"
+    }
 
     private const val CANCEL_POLL_MILLIS = 100L
     private const val MAX_WAIT_MILLIS = 30_000L
