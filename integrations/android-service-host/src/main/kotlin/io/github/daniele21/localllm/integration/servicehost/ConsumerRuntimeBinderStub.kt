@@ -134,10 +134,7 @@ internal class ConsumerRuntimeBinderStub(
             )
         }
 
-    override fun submitLogicalGeneration(
-        request: ConsumerLogicalJobSubmitParcel,
-        callback: IConsumerLogicalJobResultCallback,
-    ) =
+    override fun submitLogicalGeneration(request: ConsumerLogicalJobSubmitParcel, callback: IConsumerLogicalJobResultCallback) =
         withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
             delegate.logicalJobOperations.submit(
                 caller,
@@ -156,10 +153,7 @@ internal class ConsumerRuntimeBinderStub(
             )
         }
 
-    override fun getLogicalJobResult(
-        request: ConsumerLogicalJobQueryParcel,
-        callback: IConsumerLogicalJobResultCallback,
-    ) =
+    override fun getLogicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: IConsumerLogicalJobResultCallback) =
         withLogicalJobCaller(authorizer, callingProcessSource, request.operationId, callback) { caller ->
             delegate.logicalJobOperations.query(
                 caller,
