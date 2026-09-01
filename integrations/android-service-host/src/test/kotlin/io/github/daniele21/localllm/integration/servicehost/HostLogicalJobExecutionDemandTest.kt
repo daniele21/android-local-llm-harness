@@ -7,7 +7,7 @@ class HostLogicalJobExecutionDemandTest {
     @Test
     fun `first job acquires demand and last job releases it`() {
         val changes = mutableListOf<Boolean>()
-        val demand = HostLogicalJobExecutionDemand(changes::add)
+        val demand = HostLogicalJobExecutionDemand().also { it.setListener(changes::add) }
         val first = HostLogicalJobId("job-1")
         val second = HostLogicalJobId("job-2")
 
@@ -22,7 +22,7 @@ class HostLogicalJobExecutionDemandTest {
     @Test
     fun `duplicate acquire and release do not publish duplicate demand`() {
         val changes = mutableListOf<Boolean>()
-        val demand = HostLogicalJobExecutionDemand(changes::add)
+        val demand = HostLogicalJobExecutionDemand().also { it.setListener(changes::add) }
         val job = HostLogicalJobId("job-1")
 
         demand.acquire(job)
@@ -36,7 +36,7 @@ class HostLogicalJobExecutionDemandTest {
     @Test
     fun `close releases outstanding demand exactly once`() {
         val changes = mutableListOf<Boolean>()
-        val demand = HostLogicalJobExecutionDemand(changes::add)
+        val demand = HostLogicalJobExecutionDemand().also { it.setListener(changes::add) }
 
         demand.acquire(HostLogicalJobId("job-1"))
         demand.acquire(HostLogicalJobId("job-2"))
