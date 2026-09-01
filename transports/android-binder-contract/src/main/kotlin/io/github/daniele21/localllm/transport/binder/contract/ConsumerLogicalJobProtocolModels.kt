@@ -22,6 +22,8 @@ object ConsumerLogicalJobWireTags {
  *
  * The host owns the runtime session created from [preparedId]. The caller supplies a stable,
  * privacy-safe [clientRequestId] so a retry after Binder loss converges on the same logical job.
+ * [expectedExecution] freezes the already prepared Consumer execution identity; the Host verifies
+ * the runtime-emitted identity before accepting execution progress.
  */
 @Parcelize
 data class ConsumerLogicalJobSubmitParcel(
@@ -30,6 +32,7 @@ data class ConsumerLogicalJobSubmitParcel(
     val clientRequestId: String,
     val useCaseId: String,
     val preparedId: String,
+    val expectedExecution: ConsumerExecutionIdentityParcel,
     val input: ConsumerGenerationInputParcel,
     val outputConstraint: ConsumerOutputConstraintParcel,
     val taskDefinitions: List<TaskDefinitionParcel> = emptyList(),
@@ -50,6 +53,7 @@ data class ConsumerLogicalJobSnapshotParcel(
     val jobId: String,
     val clientRequestId: String,
     val useCaseId: String,
+    val execution: ConsumerExecutionIdentityParcel,
     val stateTag: String,
     val revision: Long,
     val attempt: Int,
