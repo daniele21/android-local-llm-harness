@@ -22,15 +22,14 @@ import org.junit.Test
 
 class ConsumerLogicalJobProtocolTest {
     private val useCaseId = UseCaseId("document-pii-detection")
-    private val execution =
-        ConsumerExecutionIdentity(
-            useCaseId = useCaseId,
-            capabilityRevision = "capability-revision-7",
-            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-            outputConstraint = ConsumerOutputConstraintKind.JSON,
-            sessionKind = SessionKind.STATELESS,
-        )
+    private val execution = ConsumerExecutionIdentity(
+        useCaseId = useCaseId,
+        capabilityRevision = "capability-revision-7",
+        preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+        reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+        outputConstraint = ConsumerOutputConstraintKind.JSON,
+        sessionKind = SessionKind.STATELESS,
+    )
 
     @Test
     fun `protocol minor six owns logical job feature after setup resolution`() {
@@ -41,15 +40,14 @@ class ConsumerLogicalJobProtocolTest {
 
     @Test
     fun `logical submit maps public identity and redaction-safe request metadata`() {
-        val request =
-            ConsumerLogicalJobSubmitRequest(
-                clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
-                useCaseId = useCaseId,
-                preparedId = ConsumerPreparedId("prepared-7"),
-                expectedExecution = execution,
-                input = ConsumerGenerationInput.Text("sensitive input"),
-                outputConstraint = ConsumerOutputConstraint.Json,
-            )
+        val request = ConsumerLogicalJobSubmitRequest(
+            clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
+            useCaseId = useCaseId,
+            preparedId = ConsumerPreparedId("prepared-7"),
+            expectedExecution = execution,
+            input = ConsumerGenerationInput.Text("sensitive input"),
+            outputConstraint = ConsumerOutputConstraint.Json,
+        )
 
         val wire = request.toConsumerLogicalJobWire(ClientTokenParcel("token"), "operation-1")
 
@@ -62,23 +60,21 @@ class ConsumerLogicalJobProtocolTest {
 
     @Test
     fun `logical job snapshot round trip keeps reattachment identity without content`() {
-        val wire =
-            ConsumerLogicalJobResultParcel(
-                operationId = "operation-2",
-                snapshot =
-                ConsumerLogicalJobSnapshotParcel(
-                    jobId = "job-9",
-                    clientRequestId = "analysis-42",
-                    useCaseId = "document-pii-detection",
-                    execution = execution.toConsumerWire(),
-                    stateTag = ConsumerLogicalJobWireTags.STATE_RUNNING,
-                    revision = 3,
-                    attempt = 1,
-                    runtimeSessionId = "runtime-1",
-                    resultAvailable = false,
-                    errorCode = null,
-                ),
-            )
+        val wire = ConsumerLogicalJobResultParcel(
+            operationId = "operation-2",
+            snapshot = ConsumerLogicalJobSnapshotParcel(
+                jobId = "job-9",
+                clientRequestId = "analysis-42",
+                useCaseId = "document-pii-detection",
+                execution = execution.toConsumerWire(),
+                stateTag = ConsumerLogicalJobWireTags.STATE_RUNNING,
+                revision = 3,
+                attempt = 1,
+                runtimeSessionId = "runtime-1",
+                resultAvailable = false,
+                errorCode = null,
+            ),
+        )
 
         val response = wire.toCoreLogicalJobResponse() as ConsumerInferenceJobResponse.Available
 

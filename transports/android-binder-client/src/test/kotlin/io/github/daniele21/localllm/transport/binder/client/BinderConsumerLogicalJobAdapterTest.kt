@@ -26,15 +26,14 @@ import org.junit.Test
 class BinderConsumerLogicalJobAdapterTest {
     private val token = successfulRegistration().clientToken!!
     private val useCaseId = UseCaseId("document-pii-detection")
-    private val execution =
-        ConsumerExecutionIdentity(
-            useCaseId = useCaseId,
-            capabilityRevision = "capability-revision-42",
-            preset = InferencePresetRef(InferencePresetId("balanced"), 2),
-            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-            outputConstraint = ConsumerOutputConstraintKind.JSON,
-            sessionKind = SessionKind.STATELESS,
-        )
+    private val execution = ConsumerExecutionIdentity(
+        useCaseId = useCaseId,
+        capabilityRevision = "capability-revision-42",
+        preset = InferencePresetRef(InferencePresetId("balanced"), 2),
+        reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+        outputConstraint = ConsumerOutputConstraintKind.JSON,
+        sessionKind = SessionKind.STATELESS,
+    )
 
     @Test
     fun `minor five feature gating rejects logical job before remote call`() {
@@ -65,18 +64,17 @@ class BinderConsumerLogicalJobAdapterTest {
                 callback(
                     ConsumerLogicalJobResultParcel(
                         operationId = request.operationId,
-                        snapshot =
-                            ConsumerLogicalJobSnapshotParcel(
-                                jobId = "job-42",
-                                clientRequestId = request.clientRequestId,
-                                useCaseId = request.useCaseId,
-                                execution = request.expectedExecution,
-                                stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
-                                revision = 0,
-                                attempt = 1,
-                                runtimeSessionId = "runtime-42",
-                                resultAvailable = false,
-                            ),
+                        snapshot = ConsumerLogicalJobSnapshotParcel(
+                            jobId = "job-42",
+                            clientRequestId = request.clientRequestId,
+                            useCaseId = request.useCaseId,
+                            execution = request.expectedExecution,
+                            stateTag = ConsumerLogicalJobWireTags.STATE_QUEUED,
+                            revision = 0,
+                            attempt = 1,
+                            runtimeSessionId = "runtime-42",
+                            resultAvailable = false,
+                        ),
                     ),
                 )
             }
@@ -120,22 +118,20 @@ class BinderConsumerLogicalJobAdapterTest {
         assertEquals(0, service.consumerLogicalJobCancelCalls)
     }
 
-    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLogicalJobAdapter =
-        BinderConsumerLogicalJobAdapter(
-            endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
-            enabledFeaturesProvider = { setOf(BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1) },
-            blockingCallGuard = BlockingCallGuard {},
-            operationTimeoutMillis = 100,
-            correlationIds = CorrelationIdSource { "logical-job-op" },
-        )
+    private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLogicalJobAdapter = BinderConsumerLogicalJobAdapter(
+        endpointProvider = { RegisteredSharedRuntimeEndpoint(service, token) },
+        enabledFeaturesProvider = { setOf(BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1) },
+        blockingCallGuard = BlockingCallGuard {},
+        operationTimeoutMillis = 100,
+        correlationIds = CorrelationIdSource { "logical-job-op" },
+    )
 
-    private fun submitRequest() =
-        ConsumerLogicalJobSubmitRequest(
-            clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
-            useCaseId = useCaseId,
-            preparedId = ConsumerPreparedId("prepared-42"),
-            expectedExecution = execution,
-            input = ConsumerGenerationInput.Text("sensitive document text"),
-            outputConstraint = ConsumerOutputConstraint.Json,
-        )
+    private fun submitRequest() = ConsumerLogicalJobSubmitRequest(
+        clientRequestId = ConsumerLogicalJobRequestId("analysis-42"),
+        useCaseId = useCaseId,
+        preparedId = ConsumerPreparedId("prepared-42"),
+        expectedExecution = execution,
+        input = ConsumerGenerationInput.Text("sensitive document text"),
+        outputConstraint = ConsumerOutputConstraint.Json,
+    )
 }

@@ -37,29 +37,26 @@ class HostLogicalJobCoordinatorTest {
 
     @Test
     fun `runtime prepared identity mismatch fails logical job before running`() {
-        val registry =
-            HostLogicalJobRegistry(
-                maxJobs = 4,
-                runtimeSessionId = HostRuntimeSessionId("runtime-A"),
-                idFactory = { HostLogicalJobId("job-1") },
-            )
+        val registry = HostLogicalJobRegistry(
+            maxJobs = 4,
+            runtimeSessionId = HostRuntimeSessionId("runtime-A"),
+            idFactory = { HostLogicalJobId("job-1") },
+        )
         val coordinator = HostLogicalJobCoordinator(registry)
-        val caller =
-            AuthorizedCaller(
-                uid = 42,
-                packageName = "io.github.daniele21.redactguard",
-                applicationId = ApplicationId("redactguard"),
-                allowedUseCases = setOf(useCaseId),
-            )
-        val request =
-            ConsumerLogicalJobSubmitRequest(
-                clientRequestId = ConsumerLogicalJobRequestId("analysis-1:chunk-1"),
-                useCaseId = useCaseId,
-                preparedId = ConsumerPreparedId("prepared-1"),
-                expectedExecution = expectedExecution,
-                input = ConsumerGenerationInput.Text("sensitive input"),
-                outputConstraint = ConsumerOutputConstraint.Json,
-            ).toConsumerLogicalJobWire(ClientTokenParcel("token"), "operation-1")
+        val caller = AuthorizedCaller(
+            uid = 42,
+            packageName = "io.github.daniele21.redactguard",
+            applicationId = ApplicationId("redactguard"),
+            allowedUseCases = setOf(useCaseId),
+        )
+        val request = ConsumerLogicalJobSubmitRequest(
+            clientRequestId = ConsumerLogicalJobRequestId("analysis-1:chunk-1"),
+            useCaseId = useCaseId,
+            preparedId = ConsumerPreparedId("prepared-1"),
+            expectedExecution = expectedExecution,
+            input = ConsumerGenerationInput.Text("sensitive input"),
+            outputConstraint = ConsumerOutputConstraint.Json,
+        ).toConsumerLogicalJobWire(ClientTokenParcel("token"), "operation-1")
 
         val response = coordinator.submit(caller, MismatchingPreparedClient(), request)
         val snapshot = requireNotNull(response.snapshot)
@@ -69,15 +66,14 @@ class HostLogicalJobCoordinatorTest {
         assertFalse(snapshot.resultAvailable)
     }
 
-    private fun execution(capabilityRevision: String, presetVersion: Int): ConsumerExecutionIdentity =
-        ConsumerExecutionIdentity(
-            useCaseId = useCaseId,
-            capabilityRevision = capabilityRevision,
-            preset = InferencePresetRef(InferencePresetId("balanced"), presetVersion),
-            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-            outputConstraint = ConsumerOutputConstraintKind.JSON,
-            sessionKind = SessionKind.STATELESS,
-        )
+    private fun execution(capabilityRevision: String, presetVersion: Int): ConsumerExecutionIdentity = ConsumerExecutionIdentity(
+        useCaseId = useCaseId,
+        capabilityRevision = capabilityRevision,
+        preset = InferencePresetRef(InferencePresetId("balanced"), presetVersion),
+        reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+        outputConstraint = ConsumerOutputConstraintKind.JSON,
+        sessionKind = SessionKind.STATELESS,
+    )
 
     private inner class MismatchingPreparedClient : ConsumerLocalLlmClient {
         override fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult = error("not used")

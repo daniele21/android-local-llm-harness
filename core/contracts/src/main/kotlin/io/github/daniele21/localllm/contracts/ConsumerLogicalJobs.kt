@@ -104,12 +104,11 @@ interface ConsumerLogicalJobClient {
     fun cancelLogicalJob(jobId: ConsumerInferenceJobId, useCaseId: UseCaseId)
 }
 
-fun ConsumerPreparedSelection.toExecutionIdentity(): ConsumerExecutionIdentity =
-    ConsumerExecutionIdentity(
-        useCaseId = useCaseId,
-        capabilityRevision = capabilityRevision,
-        preset = preset,
-        reasoningMode = reasoningMode,
-        outputConstraint = outputConstraint,
-        sessionKind = sessionKind,
-    )
+fun ConsumerPreparedSelection.toExecutionIdentity(): ConsumerExecutionIdentity = ConsumerExecutionIdentity(
+    useCaseId = useCaseId,
+    capabilityRevision = capabilityRevision,
+    preset = preset,
+    reasoningMode = reasoningMode,
+    outputConstraint = outputConstraint,
+    sessionKind = sessionKind,
+)

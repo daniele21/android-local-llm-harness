@@ -176,15 +176,14 @@ class HostLogicalJobRegistryTest {
         assertEquals(1, registry.size())
     }
 
-    private fun execution(capabilityRevision: String, presetVersion: Int): ConsumerExecutionIdentity =
-        ConsumerExecutionIdentity(
-            useCaseId = useCaseId,
-            capabilityRevision = capabilityRevision,
-            preset = InferencePresetRef(InferencePresetId("balanced"), presetVersion),
-            reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-            outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-            sessionKind = SessionKind.STATELESS,
-        )
+    private fun execution(capabilityRevision: String, presetVersion: Int): ConsumerExecutionIdentity = ConsumerExecutionIdentity(
+        useCaseId = useCaseId,
+        capabilityRevision = capabilityRevision,
+        preset = InferencePresetRef(InferencePresetId("balanced"), presetVersion),
+        reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+        outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+        sessionKind = SessionKind.STATELESS,
+    )
 
     private fun registry(maxJobs: Int = 8): HostLogicalJobRegistry = HostLogicalJobRegistry(
         maxJobs = maxJobs,
