@@ -28,4 +28,7 @@ interface IConsumerLocalLlmService {
 
     // Appended in protocol minor 4; the request reuses control-plane activation identity only.
     void runtimeReadiness(in ConsumerControlPlaneRequestParcel request, IConsumerRuntimeReadinessResultCallback callback);
+
+    // Appended in protocol minor 5. Read-only: no activation, preparation, model load or residency side effect.
+    void resolveSetup(in ConsumerControlPlaneRequestParcel request, IConsumerControlPlaneResultCallback callback);
 }

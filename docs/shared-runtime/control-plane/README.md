@@ -5,9 +5,9 @@ Document type: feature-index
 Owner: shared-runtime-control-plane
 Canonical scope: shared-runtime.control-plane.routing
 Read when: designing or implementing dynamic application/use-case bindings, presets, residency ownership, Harness decisions/notifications, or unified cross-app inference observability
-Last reviewed: 2026-08-18
+Last reviewed: 2026-08-31
 
-Harness is the owner of local-AI execution policy for both its own UI and authorized consumer applications. Consumers declare intent through host-advertised use cases and presets; they never own exact GGUF/model selection, residency, backend tuning or host diagnostics.
+Harness is the owner of local-AI execution policy for both its own UI and authorized consumer applications. Consumers declare intent through host-advertised use cases and presets; they never own exact GGUF/artifact selection, residency, backend tuning or host diagnostics.
 
 This workstream closes the gap between the accepted public Consumer API boundary and the current proof-host implementation, where several consumer bindings and warm-idle decisions are still composed statically in the phone host.
 
@@ -18,6 +18,7 @@ consumer app
   -> authenticated connection
   -> discover assigned use cases
   -> discover published presets
+  -> resolve selected setup read-only
   -> activate one use case + preset
   -> create sessions / generate / close sessions
   -> deactivate
@@ -28,7 +29,8 @@ Harness control plane
   -> suggest and manage presets in Harness
   -> allow user-created presets and per-application exposure
   -> resolve preset revision to exact model + execution profile
-  -> acquire/release model residency leases
+  -> project consumer-safe effective setup without acquiring residency
+  -> acquire/release model residency leases only at explicit activation
   -> surface decisions through an in-app decision center and Android notifications
 
 Harness runtime + observability
@@ -41,7 +43,9 @@ Harness runtime + observability
 
 - Use cases and consumer-visible presets are Harness-owned persistent configuration, not application-specific `when` branches.
 - Suggested presets such as Fast, Balanced or Quality are templates, not protocol constants. Users may create custom presets and choose which presets are published to each consumer application.
-- A consumer sees only safe preset metadata such as ID, display name, description and revision. Exact model, quantization, context, generation profile, cache and residency policy remain Harness-only.
+- Discovery exposes safe preset metadata. The additive setup-resolution projection may also expose the resolved public model-profile ID, context tokens and effective consumer-safe generation values required to explain compatibility/readiness. Artifact digest/path, GGUF location, backend-private tuning, prompts and residency policy remain Harness-only.
+- Setup resolution is observational. Opening or refreshing a consumer setup surface must not activate, prepare, verify/hash or load a model, open a session, start inference or acquire a residency lease.
+- Setup resolution revalidates the exact use-case, binding and preset revisions supplied by the consumer and fails closed when the observed configuration became stale.
 - A published configuration change creates a new revision. Existing activations/sessions retain the revision they started with.
 - Model residency is protected by explicit activation leases. Normal warm-idle unload cannot evict a model with an active lease.
 - Every inference executed by the Harness runtime is observable through the same host-owned telemetry path, regardless of whether it originated in Harness, device validation or an external Binder consumer.
@@ -50,6 +54,19 @@ Harness runtime + observability
 - Unknown/missing bindings, unavailable models, incompatible presets, conflicts and evictions fail explicitly with stable codes and evidence. No silent model substitution or consumer-specific fallback is allowed.
 - The current default remains one resident model and one active decode until representative evidence justifies a different policy.
 
+## Consumer setup resolution
+
+Binder protocol minor 5 adds `consumer-setup-resolution-v1` as an append-only Consumer Control Plane feature. A consumer sends the exact `(useCaseId, useCaseRevision, bindingRevision, presetRef)` it already discovered. Harness resolves that identity through the canonical `HostExecutionResolver` and returns only the consumer-safe projection:
+
+- exact use-case/binding/preset revisions;
+- public model-profile ID;
+- effective context size;
+- effective generation controls after published preset overrides: output-token limit, sampling values, repetition values, thinking mode and seed policy type.
+
+A random/fixed seed value is not projected as setup state: a random effective seed is chosen only for a concrete generation request, while fixed seed values remain host execution detail. Request-time fields such as prompt token count and selected chat-template implementation are likewise not setup metadata.
+
+Minor-4 and older clients remain compatible and do not negotiate this feature. Consumer SDK implementations that do not implement the new method fail explicitly with `FEATURE_UNAVAILABLE` rather than synthesizing setup state.
+
 ## Ownership
 
 | Concern | Owner |
@@ -57,6 +74,7 @@ Harness runtime + observability
 | Application registration, use-case definitions, presets, bindings and revisions | model/control-plane domain in Harness |
 | Persistent control-plane configuration | dedicated Harness persistence adapter |
 | Exact model resolution and compatibility | Harness model/runtime domain |
+| Consumer-safe setup projection | Harness Control Plane + Consumer SDK/Binder adapter |
 | Activation and residency leases | `core/runtime-core` |
 | Consumer discovery/activation protocol | Consumer API + Binder transport |
 | Session/run telemetry contracts | `observability/contracts` |
@@ -80,4 +98,4 @@ Harness runtime + observability
 
 ## Cross-repository consumer work
 
-RedactGuard remains a pure consumer. Its repository owns only the app-side adaptation needed to discover host-published presets, let the user choose among them, preserve the selected preset as product state and consume future activation semantics. Harness remains the canonical owner of use-case definition, preset creation, model assignment, residency and telemetry.
+RedactGuard remains a pure consumer. Its repository owns only the app-side adaptation needed to discover host-published presets, inspect the source-backed setup, let the user choose among published presets, preserve the selected preset as product state and consume activation/runtime semantics. Harness remains the canonical owner of use-case definition, preset creation, model assignment, execution resolution, residency and telemetry.

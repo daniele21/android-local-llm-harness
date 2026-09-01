@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,6 +19,7 @@ class ConsumerProtocolCompatibilityTest {
             BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
             BinderProtocolV1.FEATURE_CONSUMER_TASK_DEFINITIONS_V1,
             BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
         )
 
     @Test
@@ -71,7 +73,40 @@ class ConsumerProtocolCompatibilityTest {
         assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
         assertEquals(BinderProtocolV1.MINOR, connection.snapshot.negotiatedMinor)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_API_V1 in connection.snapshot.enabledFeatures)
+        assertTrue(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in connection.snapshot.enabledFeatures)
         assertEquals(1, service.registerCalls)
+    }
+
+    @Test
+    fun `minor four host remains usable but cannot expose setup resolution`() {
+        val features = BinderProtocolV1.KNOWN_FEATURES - BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1
+        val service =
+            FakeSharedRuntimeRemoteService(
+                protocol =
+                ProtocolInfoParcel(
+                    protocolMajor = BinderProtocolV1.MAJOR,
+                    protocolMinor = 4,
+                    minSupportedMinor = BinderProtocolV1.MIN_SUPPORTED_MINOR,
+                    supportedFeatures = features.sorted(),
+                    hostBuildId = "minor-four-host",
+                ),
+                registration =
+                RegistrationResultParcel(
+                    clientToken = ClientTokenParcel("minor-four-token"),
+                    negotiatedMinor = 4,
+                    enabledFeatures = features.filter { BinderProtocolV1.minimumMinorForFeature(it) <= 4 }.sorted(),
+                    error = null,
+                ),
+            )
+        val binding = CompatibilityBinding()
+        val connection = SharedRuntimeConnection(host, consumerHello(), binding)
+
+        connection.connect()
+        binding.connectHost(service)
+
+        assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
+        assertEquals(4, connection.snapshot.negotiatedMinor)
+        assertFalse(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in connection.snapshot.enabledFeatures)
     }
 
     private fun legacyProtocolInfo() = ProtocolInfoParcel(

@@ -17,22 +17,25 @@ class SharedRuntimeHostCompositionTest {
         assertEquals(BinderProtocolV1.MIN_SUPPORTED_MINOR, info.minSupportedMinor)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_API_V1 in info.supportedFeatures)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in info.supportedFeatures)
+        assertFalse(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in info.supportedFeatures)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1 in info.supportedFeatures)
         assertEquals("phone-test-0.5.0-debug", info.hostBuildId)
     }
 
     @Test
-    fun `consumer-enabled host advertises v1 inference without unwired control plane or readiness`() {
+    fun `consumer-enabled host advertises v1 inference without unwired control plane setup or readiness`() {
         val info = hostProtocolInfo("phone-test-0.5.0-debug", consumerApiEnabled = true)
 
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_API_V1 in info.supportedFeatures)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in info.supportedFeatures)
+        assertFalse(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in info.supportedFeatures)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1 in info.supportedFeatures)
         assertEquals(
             (
                 BinderProtocolV1.KNOWN_FEATURES -
                     setOf(
                         BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
                         BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
                     )
                 ).sorted(),
@@ -41,7 +44,7 @@ class SharedRuntimeHostCompositionTest {
     }
 
     @Test
-    fun `control-plane host does not advertise readiness before a real provider is wired`() {
+    fun `control-plane host advertises setup resolution without runtime readiness`() {
         val info = hostProtocolInfo(
             "phone-test-0.5.0-debug",
             consumerApiEnabled = true,
@@ -50,6 +53,7 @@ class SharedRuntimeHostCompositionTest {
 
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_API_V1 in info.supportedFeatures)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in info.supportedFeatures)
+        assertTrue(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in info.supportedFeatures)
         assertFalse(BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1 in info.supportedFeatures)
     }
 
@@ -64,6 +68,7 @@ class SharedRuntimeHostCompositionTest {
 
         assertEquals(BinderProtocolV1.KNOWN_FEATURES.sorted(), info.supportedFeatures)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1 in info.supportedFeatures)
+        assertTrue(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in info.supportedFeatures)
     }
 
     @Test

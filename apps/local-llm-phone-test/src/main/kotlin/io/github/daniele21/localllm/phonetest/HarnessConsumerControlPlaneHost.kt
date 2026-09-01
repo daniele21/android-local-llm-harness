@@ -1,6 +1,5 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerActivation
 import io.github.daniele21.localllm.contracts.ConsumerActivationId
@@ -13,6 +12,8 @@ import io.github.daniele21.localllm.contracts.ConsumerControlPlaneFailure
 import io.github.daniele21.localllm.contracts.ConsumerDeactivationResult
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPreset
 import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.ModelDigest
@@ -65,6 +66,7 @@ internal class HarnessConsumerControlPlaneHost(
     )
 
     private val resolver = HostExecutionResolver(store)
+    private val setupResolver = HarnessConsumerSetupResolver(modelStore)
     private val useCaseDiscovery = AssignedUseCaseDiscovery(store)
     private val presetDiscovery = PublishedPresetDiscovery(store)
 
@@ -107,6 +109,22 @@ internal class HarnessConsumerControlPlaneHost(
                 result.reason.toConsumerFailure(),
             )
         }
+
+    override fun resolveSetup(applicationId: ApplicationId, request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult {
+        val resolution = resolver.resolve(
+            HostExecutionRequest(
+                applicationId = applicationId,
+                useCaseId = request.useCaseId,
+                presetId = request.preset.id.value,
+                presetRevision = request.preset.version,
+            ),
+            executionEnvironment(applicationId),
+        )
+        return when (resolution) {
+            is HostExecutionResolution.Failure -> ConsumerSetupResolutionResult.Rejected(resolution.code.toConsumerFailure())
+            is HostExecutionResolution.Success -> setupResolver.resolve(applicationId, request, resolution.execution)
+        }
+    }
 
     override fun activate(ownerId: String, applicationId: ApplicationId, request: ConsumerActivationRequest): ConsumerActivationResult {
         val resolution = resolver.resolve(
@@ -171,7 +189,7 @@ internal class HarnessConsumerControlPlaneHost(
     ): ConsumerActivationResult {
         val execution = resolution.execution
         val installed = modelStore.find(execution.modelDigest)
-        val imported = installed?.let { importedModel(it.digest, it.sizeBytes) }
+        val imported = installed?.let { importedPhoneModel(it.digest, it.sizeBytes) }
         val baseRuntimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
         val preparationFailure = activationPreparationFailure(
             staleRevision = execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision,
@@ -252,7 +270,7 @@ internal class HarnessConsumerControlPlaneHost(
     private fun executionEnvironment(applicationId: ApplicationId): HostExecutionEnvironment {
         val installed = modelStore.snapshot().entries
         val profiles = installed.mapNotNull { stored ->
-            importedModel(stored.digest, stored.sizeBytes)?.let { model ->
+            importedPhoneModel(stored.digest, stored.sizeBytes)?.let { model ->
                 runCatching { HarnessSharedRuntimeBindings.resolveOmbra(model, applicationId).model }.getOrNull()
             }
         }
@@ -261,19 +279,6 @@ internal class HarnessConsumerControlPlaneHost(
             installedModelDigests = installed.map { it.digest }.toSet(),
             backendId = LLAMA_CPP_BACKEND_ID,
             backendRevision = Qwen35RuntimeTuningProfiles.LLAMA_CPP_REVISION,
-        )
-    }
-
-    private fun importedModel(digest: ModelDigest, sizeBytes: Long): ImportedPhoneModel? {
-        val release = CuratedModelCatalog.releases.singleOrNull { candidate ->
-            candidate.artifact.digest == digest && candidate.artifact.sizeBytes == sizeBytes
-        } ?: return null
-        return ImportedPhoneModel(
-            digest = digest,
-            fileName = release.artifact.fileName,
-            sizeBytes = sizeBytes,
-            architecture = release.artifact.architecture,
-            quantization = release.artifact.quantization,
         )
     }
 }
