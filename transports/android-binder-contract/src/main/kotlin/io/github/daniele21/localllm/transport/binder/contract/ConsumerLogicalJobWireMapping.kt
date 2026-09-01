@@ -54,17 +54,16 @@ fun ConsumerLogicalJobResultParcel.toCoreLogicalJobResponse(): ConsumerInference
     return ConsumerInferenceJobResponse.Available(coreSnapshot, output)
 }
 
-private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() =
-    ConsumerInferenceJobSnapshot(
-        jobId = ConsumerInferenceJobId(jobId),
-        clientRequestId = ConsumerLogicalJobRequestId(clientRequestId),
-        useCaseId = UseCaseId(useCaseId),
-        state = enumTag(stateTag, "consumer inference job state"),
-        revision = revision,
-        attempt = attempt,
-        runtimeSessionId = ConsumerRuntimeSessionId(runtimeSessionId),
-        resultAvailable = resultAvailable,
-        errorCode = errorCode?.let {
-            WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
-        },
-    )
+private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() = ConsumerInferenceJobSnapshot(
+    jobId = ConsumerInferenceJobId(jobId),
+    clientRequestId = ConsumerLogicalJobRequestId(clientRequestId),
+    useCaseId = UseCaseId(useCaseId),
+    state = enumTag(stateTag, "consumer inference job state"),
+    revision = revision,
+    attempt = attempt,
+    runtimeSessionId = ConsumerRuntimeSessionId(runtimeSessionId),
+    resultAvailable = resultAvailable,
+    errorCode = errorCode?.let {
+        WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
+    },
+)
