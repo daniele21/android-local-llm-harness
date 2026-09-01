@@ -29,11 +29,11 @@ Q35-1 through Q35-5 are complete. Q35-6 remains active because the 0.8B/2B candi
 
 ### Android application and observability
 
-`apps/local-llm-phone-test` has connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings with real model/runtime/evaluation/observability/control-plane sources. Repository-side product-experience realignment is complete, including task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior, adaptive/accessibility rules and ViewModel-owned async state/effects.
+`apps/local-llm-phone-test` exposes connected Overview, Playground, Applications, Performance, Models, Diagnostics and Settings backed by real model/runtime/evaluation/observability/control-plane sources. Task-first navigation, progressive disclosure, evidence-backed Diagnostics/Performance behavior and adaptive/accessibility rules are integrated.
 
-The public product identity is **Harnex** with the payoff **“Your local AI harness for Android.”** The Android launcher label, primary shell, Settings/About copy, Compose previews and brand asset generators use the Harnex identity. Existing `Harness*`, `harness_launcher_*`, package/Binder identifiers and historical filenames remain compatibility/engineering identifiers rather than public product naming. The `phone-cold-start` emulator gate owns exact-head Harnex shell screenshot/video evidence; it does not replace physical-device runtime evidence.
+Public identity is **Harnex** — **“Your local AI harness for Android.”** Launcher, shell, Settings/About, previews and brand generators use it; `Harness*`, `harness_launcher_*`, package/Binder IDs and historical filenames remain compatibility identifiers. Exact-head `phone-cold-start` owns Harnex screenshot/video UI evidence, not physical-runtime claims.
 
-Applications control-plane implementation is complete through ACUX-80. The subsequent control-plane persistence regression has also been repaired repository-side: CPREC-10 through CPREC-70 are integrated through PRs #455, #459, #457, #458, #460, #461 and #464. Startup now reconciles mandatory built-ins atomically before UI/Binder readers are exposed, preserves valid custom/default/disabled state, remains off the Android main thread and keeps Binder discovery/activation free of bootstrap mutation. CPREC-80/90 remain physical evidence gates; see [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
+Applications control-plane work is complete through ACUX-80 and CPREC-10 through CPREC-70 (#455, #459, #457, #458, #460, #461, #464). Startup atomically reconciles mandatory built-ins before UI/Binder readers, preserves valid custom/default/disabled state and stays off the main thread; CPREC-80/90 remain physical evidence gates. See [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
 
 General phone work still includes process/back-stack evidence, representative TalkBack/large-font/layout/screenshots, RAM warm-idle policy/controls and signed physical-GGUF evidence.
 
@@ -41,15 +41,7 @@ General phone work still includes process/back-stack evidence, representative Ta
 
 SR-0 through SR-5 are integrated. SR-6 repository-side release-evidence tooling is integrated, including packaged-client, same-signer/invalid-signer and process-death/reconnect fixtures. Production/release readiness still requires representative physical SR-6 evidence. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
-The Consumer Runtime Visibility/Readiness convergence (CRV) is repository-complete through its automated candidate gate:
-
-- exact activated preset/execution identity and custom-preset model policy are integrated through #467/#468;
-- the consumer-safe Binder readiness contract is integrated through #472 using Consumer SDK `0.1.0-alpha.6` and Binder protocol minor 4;
-- activation-bound automatic runtime preparation and fail-closed no-global-fallback behavior are covered by #474;
-- source-backed `IDLE / PREPARING / READY / GENERATING / FAILED` plus `LOADING / REUSING / SWITCHING` observation is wired through #475 without adding a second loader;
-- Harnex Applications runtime/readiness presentation is integrated through #476;
-- focused runtime failure regression gaps are covered through #477;
-- RedactGuard consumes the source-backed readiness lifecycle through its own integrated #100/#101 slices.
+CRV is repository-complete through the automated candidate gate: exact activated identity/custom-preset policy (#467/#468), Consumer SDK `0.1.0-alpha.6` Binder readiness contract/protocol minor 4 (#472), automatic preparation with fail-closed fallback (#474), source-backed readiness/residency observation (#475), Harnex Applications presentation (#476), focused failure regressions (#477), and RedactGuard readiness consumption (#100/#101).
 
 CRV-100 froze the automated physical candidate identities as Harness v31 source `a30f67b21e24adc6efea838e9a9d65cc78446f28` and RedactGuard v11 source `4679c23a9a22e5242761fe52af97f4eb7432aec7`. Both have exact-source automated package evidence. Later CI/documentation-only descendants do not replace those frozen APK source identities. CRV-110 remains the real-device same-signer + real-GGUF gate; CRV-120 cleanup follows only after that evidence passes.
 
