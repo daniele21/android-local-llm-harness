@@ -107,6 +107,15 @@ internal class ConsumerRuntimeBinderStub(
             )
         }
 
+    override fun resolveSetup(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
+        withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
+            delegate.controlPlaneOperations.resolveSetup(
+                caller,
+                request,
+                remoteConsumerControlPlaneResultCallback(delegate, caller, request.clientToken, callback),
+            )
+        }
+
     override fun activate(request: ConsumerControlPlaneRequestParcel, callback: IConsumerControlPlaneResultCallback) =
         withControlPlaneCaller(authorizer, callingProcessSource, request, callback) { caller ->
             delegate.controlPlaneOperations.activate(
