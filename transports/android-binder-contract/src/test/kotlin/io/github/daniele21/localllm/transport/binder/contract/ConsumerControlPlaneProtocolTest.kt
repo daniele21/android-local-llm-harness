@@ -37,10 +37,10 @@ class ConsumerControlPlaneProtocolTest {
                 client(
                     protocolMinor = 2,
                     requiredFeatures =
-                        listOf(
-                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                        ),
+                    listOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                    ),
                 ),
             )
 
@@ -65,11 +65,11 @@ class ConsumerControlPlaneProtocolTest {
                 client(
                     protocolMinor = 5,
                     requiredFeatures =
-                        listOf(
-                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
-                        ),
+                    listOf(
+                        BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                        BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+                    ),
                 ),
             )
 
@@ -136,18 +136,18 @@ class ConsumerControlPlaneProtocolTest {
                     modelProfileId = "qwen35-0.8b-ombra-pii",
                     contextTokens = 4096,
                     generation =
-                        ConsumerGenerationConfiguration(
-                            maxOutputTokens = 384,
-                            temperature = 0.1f,
-                            topP = 0.9f,
-                            topK = 20,
-                            minP = 0.05f,
-                            presencePenalty = 0f,
-                            repeatPenalty = 1.1f,
-                            repeatLastN = 64,
-                            thinkingMode = ThinkingMode.DISABLED,
-                            seedPolicy = SeedPolicyType.RANDOM,
-                        ),
+                    ConsumerGenerationConfiguration(
+                        maxOutputTokens = 384,
+                        temperature = 0.1f,
+                        topP = 0.9f,
+                        topK = 20,
+                        minP = 0.05f,
+                        presencePenalty = 0f,
+                        repeatPenalty = 1.1f,
+                        repeatLastN = 64,
+                        thinkingMode = ThinkingMode.DISABLED,
+                        seedPolicy = SeedPolicyType.RANDOM,
+                    ),
                 ),
             )
         val wire = result.toConsumerControlPlaneWire("operation-setup")
@@ -186,12 +186,12 @@ class ConsumerControlPlaneProtocolTest {
         protocolMinor = BinderProtocolV1.MINOR,
         minSupportedMinor = 0,
         supportedFeatures =
-            listOf(
-                BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
-                BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
-            ),
+        listOf(
+            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+        ),
         hostBuildId = "host-1.${BinderProtocolV1.MINOR}",
     )
 
