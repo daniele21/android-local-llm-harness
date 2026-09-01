@@ -32,7 +32,10 @@ interface IConsumerLocalLlmService {
     // Appended in protocol minor 4; the request reuses control-plane activation identity only.
     void runtimeReadiness(in ConsumerControlPlaneRequestParcel request, IConsumerRuntimeReadinessResultCallback callback);
 
-    // Appended in protocol minor 5. Detached jobs are owned by authenticated caller scope, not Binder connection lifetime.
+    // Appended in protocol minor 5. Read-only: no activation, preparation, model load or residency side effect.
+    void resolveSetup(in ConsumerControlPlaneRequestParcel request, IConsumerControlPlaneResultCallback callback);
+
+    // Appended in protocol minor 6. Detached jobs are owned by authenticated caller scope, not Binder connection lifetime.
     void submitLogicalGeneration(in ConsumerLogicalJobSubmitParcel request, IConsumerLogicalJobResultCallback callback);
     void getLogicalJob(in ConsumerLogicalJobQueryParcel request, IConsumerLogicalJobResultCallback callback);
     void getLogicalJobResult(in ConsumerLogicalJobQueryParcel request, IConsumerLogicalJobResultCallback callback);
