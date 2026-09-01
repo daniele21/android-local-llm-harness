@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.1.2",
+  "contract_version": "0.1.1",
   "applicability": {
     "status": "recommended",
     "reason": "Harnex has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
