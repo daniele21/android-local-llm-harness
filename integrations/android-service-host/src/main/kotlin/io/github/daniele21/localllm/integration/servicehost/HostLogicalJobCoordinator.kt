@@ -82,6 +82,13 @@ internal class HostLogicalJobCoordinator(
 
     private val lock = Any()
     private val executions = LinkedHashMap<HostLogicalJobId, Execution>()
+    private val eventHandler =
+        HostLogicalJobEventHandler(
+            registry = registry,
+            resultStore = resultStore,
+            executionDemand = executionDemand,
+            closeExecution = ::closeExecution,
+        )
 
     fun submit(
         caller: AuthorizedCaller,
@@ -112,7 +119,7 @@ internal class HostLogicalJobCoordinator(
         if (handle != null) {
             runCatching(handle::cancel)
         } else {
-            finishCancellation(requested.scope, requested.jobId)
+            eventHandler.finishCancellation(requested.scope, requested.jobId)
         }
     }
 
@@ -203,26 +210,41 @@ internal class HostLogicalJobCoordinator(
             taskDefinitions = requestParts.third,
         )
         val start = runCatching {
-            client.generate(coreRequest, ConsumerGenerationListener { event -> onEvent(preparing.scope, preparing.jobId, event) })
+            client.generate(
+                coreRequest,
+                ConsumerGenerationListener { event -> eventHandler.onEvent(preparing.scope, preparing.jobId, event) },
+            )
         }.getOrNull()
         when (start) {
             is ConsumerGenerationStartResult.Accepted -> synchronized(lock) {
                 executions[preparing.jobId]?.handle = start.handle
             }
 
-            is ConsumerGenerationStartResult.Rejected -> finishFailure(
+            is ConsumerGenerationStartResult.Rejected -> eventHandler.finishFailure(
                 preparing.scope,
                 preparing.jobId,
                 start.failure.code.toWireCode(),
             )
 
-            null -> finishFailure(preparing.scope, preparing.jobId, WireErrorCodes.RUNTIME_FAILURE)
+            null -> eventHandler.finishFailure(preparing.scope, preparing.jobId, WireErrorCodes.RUNTIME_FAILURE)
         }
         val current = registry.snapshot(preparing.scope, preparing.jobId) ?: preparing
         return resultStore.response(request.operationId, current)
     }
 
-    private fun onEvent(scope: HostLogicalJobScope, jobId: HostLogicalJobId, event: ConsumerGenerationEvent) {
+    private fun closeExecution(jobId: HostLogicalJobId) {
+        val execution = synchronized(lock) { executions.remove(jobId) }
+        if (execution != null) runCatching { execution.client.closeSession(execution.sessionId) }
+    }
+}
+
+private class HostLogicalJobEventHandler(
+    private val registry: HostLogicalJobRegistry,
+    private val resultStore: HostLogicalJobResultStore,
+    private val executionDemand: HostLogicalJobExecutionDemand,
+    private val closeExecution: (HostLogicalJobId) -> Unit,
+) {
+    fun onEvent(scope: HostLogicalJobScope, jobId: HostLogicalJobId, event: ConsumerGenerationEvent) {
         val current = registry.snapshot(scope, jobId) ?: return
         when (event) {
             is ConsumerGenerationEvent.Prepared -> onPrepared(current, event)
@@ -232,6 +254,16 @@ internal class HostLogicalJobCoordinator(
             is ConsumerGenerationEvent.ContentDelta -> onContentDelta(current, event)
             is ConsumerGenerationEvent.Queued -> Unit
         }
+    }
+
+    fun finishFailure(scope: HostLogicalJobScope, jobId: HostLogicalJobId, code: String) {
+        resultStore.recordError(jobId, code)
+        finish(scope, jobId, HostLogicalJobState.FAILED_FINAL)
+    }
+
+    fun finishCancellation(scope: HostLogicalJobScope, jobId: HostLogicalJobId) {
+        resultStore.recordError(jobId, WireErrorCodes.CANCELLED)
+        finish(scope, jobId, HostLogicalJobState.CANCELLED)
     }
 
     private fun onPrepared(current: HostLogicalJobSnapshot, event: ConsumerGenerationEvent.Prepared) {
@@ -273,21 +305,10 @@ internal class HostLogicalJobCoordinator(
         }
     }
 
-    private fun finishFailure(scope: HostLogicalJobScope, jobId: HostLogicalJobId, code: String) {
-        resultStore.recordError(jobId, code)
-        finish(scope, jobId, HostLogicalJobState.FAILED_FINAL)
-    }
-
-    private fun finishCancellation(scope: HostLogicalJobScope, jobId: HostLogicalJobId) {
-        resultStore.recordError(jobId, WireErrorCodes.CANCELLED)
-        finish(scope, jobId, HostLogicalJobState.CANCELLED)
-    }
-
     private fun finish(scope: HostLogicalJobScope, jobId: HostLogicalJobId, state: HostLogicalJobState) {
         val current = registry.snapshot(scope, jobId) ?: return
         runCatching { transitionLogicalJob(registry, current, state) }
-        val execution = synchronized(lock) { executions.remove(jobId) }
-        if (execution != null) runCatching { execution.client.closeSession(execution.sessionId) }
+        closeExecution(jobId)
         executionDemand.release(jobId)
     }
 }
