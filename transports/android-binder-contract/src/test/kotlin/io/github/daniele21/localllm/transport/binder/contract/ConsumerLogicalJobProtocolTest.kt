@@ -47,17 +47,17 @@ class ConsumerLogicalJobProtocolTest {
             ConsumerLogicalJobResultParcel(
                 operationId = "operation-2",
                 snapshot =
-                    ConsumerLogicalJobSnapshotParcel(
-                        jobId = "job-9",
-                        clientRequestId = "analysis-42",
-                        useCaseId = "document-pii-detection",
-                        stateTag = ConsumerLogicalJobWireTags.STATE_RUNNING,
-                        revision = 3,
-                        attempt = 1,
-                        runtimeSessionId = "runtime-1",
-                        resultAvailable = false,
-                        errorCode = null,
-                    ),
+                ConsumerLogicalJobSnapshotParcel(
+                    jobId = "job-9",
+                    clientRequestId = "analysis-42",
+                    useCaseId = "document-pii-detection",
+                    stateTag = ConsumerLogicalJobWireTags.STATE_RUNNING,
+                    revision = 3,
+                    attempt = 1,
+                    runtimeSessionId = "runtime-1",
+                    resultAvailable = false,
+                    errorCode = null,
+                ),
             )
 
         val response = wire.toCoreLogicalJobResponse() as ConsumerInferenceJobResponse.Available
