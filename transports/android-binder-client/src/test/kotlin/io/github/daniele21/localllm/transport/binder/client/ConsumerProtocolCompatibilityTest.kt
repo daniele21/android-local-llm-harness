@@ -139,7 +139,10 @@ class ConsumerProtocolCompatibilityTest {
 
         override fun hostExists(hostConfig: SharedRuntimeHostConfig): Boolean = true
 
-        override fun bind(hostConfig: SharedRuntimeHostConfig, callbacks: SharedRuntimeBindingCallbacks): SharedRuntimeBindResult {
+        override fun bind(
+            hostConfig: SharedRuntimeHostConfig,
+            callbacks: SharedRuntimeBindingCallbacks,
+        ): SharedRuntimeBindResult {
             bindCalls += 1
             this.callbacks = callbacks
             return SharedRuntimeBindResult.STARTED
