@@ -31,16 +31,18 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `version 1_2 client can require consumer control plane`() {
-        val negotiated = negotiateProtocol(
-            host(),
-            client(
-                protocolMinor = 2,
-                requiredFeatures = listOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+        val negotiated =
+            negotiateProtocol(
+                host(),
+                client(
+                    protocolMinor = 2,
+                    requiredFeatures =
+                        listOf(
+                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                        ),
                 ),
-            ),
-        )
+            )
 
         assertEquals(2, negotiated.minor)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1 in negotiated.enabledFeatures)
@@ -57,17 +59,19 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `version 1_5 client can require read-only setup resolution`() {
-        val negotiated = negotiateProtocol(
-            host(),
-            client(
-                protocolMinor = 5,
-                requiredFeatures = listOf(
-                    BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-                    BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+        val negotiated =
+            negotiateProtocol(
+                host(),
+                client(
+                    protocolMinor = 5,
+                    requiredFeatures =
+                        listOf(
+                            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+                        ),
                 ),
-            ),
-        )
+            )
 
         assertEquals(5, negotiated.minor)
         assertTrue(BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1 in negotiated.enabledFeatures)
@@ -90,12 +94,13 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `activation request wire identity contains revisions but no model identity`() {
-        val request = ConsumerActivationRequest(
-            useCaseId = UseCaseId("document-pii-detection"),
-            useCaseRevision = 4,
-            bindingRevision = 8,
-            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-        )
+        val request =
+            ConsumerActivationRequest(
+                useCaseId = UseCaseId("document-pii-detection"),
+                useCaseRevision = 4,
+                bindingRevision = 8,
+                preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+            )
 
         val wire = request.toConsumerControlPlaneWire(ClientTokenParcel("opaque-token"), "operation-1")
 
@@ -110,37 +115,41 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `setup resolution round trip exposes public profile and effective configuration without private artifact identity`() {
-        val request = ConsumerSetupResolutionRequest(
-            useCaseId = UseCaseId("document-pii-detection"),
-            useCaseRevision = 4,
-            bindingRevision = 8,
-            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-        )
-        val wireRequest = request.toConsumerControlPlaneWire(ClientTokenParcel("opaque-token"), "operation-setup")
+        val request =
+            ConsumerSetupResolutionRequest(
+                useCaseId = UseCaseId("document-pii-detection"),
+                useCaseRevision = 4,
+                bindingRevision = 8,
+                preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+            )
+        val wireRequest =
+            request.toConsumerControlPlaneWire(ClientTokenParcel("opaque-token"), "operation-setup")
         assertFalse(wireRequest.toString().contains("digest", ignoreCase = true))
 
-        val result = ConsumerSetupResolutionResult.Resolved(
-            ConsumerResolvedSetup(
-                useCaseId = request.useCaseId,
-                useCaseRevision = request.useCaseRevision,
-                bindingRevision = request.bindingRevision,
-                preset = request.preset,
-                modelProfileId = "qwen35-0.8b-ombra-pii",
-                contextTokens = 4096,
-                generation = ConsumerGenerationConfiguration(
-                    maxOutputTokens = 384,
-                    temperature = 0.1f,
-                    topP = 0.9f,
-                    topK = 20,
-                    minP = 0.05f,
-                    presencePenalty = 0f,
-                    repeatPenalty = 1.1f,
-                    repeatLastN = 64,
-                    thinkingMode = ThinkingMode.DISABLED,
-                    seedPolicy = SeedPolicyType.RANDOM,
+        val result =
+            ConsumerSetupResolutionResult.Resolved(
+                ConsumerResolvedSetup(
+                    useCaseId = request.useCaseId,
+                    useCaseRevision = request.useCaseRevision,
+                    bindingRevision = request.bindingRevision,
+                    preset = request.preset,
+                    modelProfileId = "qwen35-0.8b-ombra-pii",
+                    contextTokens = 4096,
+                    generation =
+                        ConsumerGenerationConfiguration(
+                            maxOutputTokens = 384,
+                            temperature = 0.1f,
+                            topP = 0.9f,
+                            topK = 20,
+                            minP = 0.05f,
+                            presencePenalty = 0f,
+                            repeatPenalty = 1.1f,
+                            repeatLastN = 64,
+                            thinkingMode = ThinkingMode.DISABLED,
+                            seedPolicy = SeedPolicyType.RANDOM,
+                        ),
                 ),
-            ),
-        )
+            )
         val wire = result.toConsumerControlPlaneWire("operation-setup")
         val roundTrip = wire.toCoreSetupResolutionResult() as ConsumerSetupResolutionResult.Resolved
 
@@ -153,18 +162,20 @@ class ConsumerControlPlaneProtocolTest {
 
     @Test
     fun `activation response preserves opaque activation identity`() {
-        val result = ConsumerActivationResult.Activated(
-            ConsumerActivation(
-                activationId = ConsumerActivationId("activation-opaque"),
-                useCaseId = UseCaseId("document-pii-detection"),
-                useCaseRevision = 4,
-                bindingRevision = 8,
-                preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-            ),
-        )
+        val result =
+            ConsumerActivationResult.Activated(
+                ConsumerActivation(
+                    activationId = ConsumerActivationId("activation-opaque"),
+                    useCaseId = UseCaseId("document-pii-detection"),
+                    useCaseRevision = 4,
+                    bindingRevision = 8,
+                    preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+                ),
+            )
 
         val roundTrip =
-            result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult() as ConsumerActivationResult.Activated
+            result.toConsumerControlPlaneWire("operation-2").toCoreActivationResult()
+                as ConsumerActivationResult.Activated
 
         assertEquals(ConsumerActivationId("activation-opaque"), roundTrip.activation.activationId)
         assertEquals(8, roundTrip.activation.bindingRevision)
@@ -174,23 +185,22 @@ class ConsumerControlPlaneProtocolTest {
         protocolMajor = 1,
         protocolMinor = BinderProtocolV1.MINOR,
         minSupportedMinor = 0,
-        supportedFeatures = listOf(
-            BinderProtocolV1.FEATURE_CONSUMER_API_V1,
-            BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
-            BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
-            BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
-        ),
+        supportedFeatures =
+            listOf(
+                BinderProtocolV1.FEATURE_CONSUMER_API_V1,
+                BinderProtocolV1.FEATURE_CONSUMER_CONTROL_PLANE_V1,
+                BinderProtocolV1.FEATURE_CONSUMER_RUNTIME_READINESS_V1,
+                BinderProtocolV1.FEATURE_CONSUMER_SETUP_RESOLUTION_V1,
+            ),
         hostBuildId = "host-1.${BinderProtocolV1.MINOR}",
     )
 
-    private fun client(
-        protocolMinor: Int,
-        requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1),
-    ) = ClientHelloParcel(
-        protocolMajor = 1,
-        protocolMinor = protocolMinor,
-        minSupportedMinor = 0,
-        requiredFeatures = requiredFeatures,
-        clientBuildId = "client-$protocolMinor",
-    )
+    private fun client(protocolMinor: Int, requiredFeatures: List<String> = listOf(BinderProtocolV1.FEATURE_CONSUMER_API_V1)) =
+        ClientHelloParcel(
+            protocolMajor = 1,
+            protocolMinor = protocolMinor,
+            minSupportedMinor = 0,
+            requiredFeatures = requiredFeatures,
+            clientBuildId = "client-$protocolMinor",
+        )
 }
