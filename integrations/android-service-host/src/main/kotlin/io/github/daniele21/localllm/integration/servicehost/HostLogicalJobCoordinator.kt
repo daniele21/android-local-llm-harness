@@ -288,13 +288,19 @@ private fun HostLogicalJobState.toWireTag(): String = when (this) {
 
 private fun ConsumerErrorCode.toWireCode(): String = when (this) {
     ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> WireErrorCodes.UNAUTHORIZED_USE_CASE
+
     ConsumerErrorCode.MODEL_UNAVAILABLE -> WireErrorCodes.MODEL_UNAVAILABLE
+
     ConsumerErrorCode.CANCELLED -> WireErrorCodes.CANCELLED
+
     ConsumerErrorCode.SESSION_NOT_FOUND,
     ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
     ConsumerErrorCode.PREPARED_SELECTION_STALE,
     -> WireErrorCodes.SESSION_UNAVAILABLE
+
     ConsumerErrorCode.INVALID_INPUT -> WireErrorCodes.INVALID_WIRE_REQUEST
+
     ConsumerErrorCode.PREPARE_FAILED -> WireErrorCodes.PREPARATION_FAILED
+
     else -> WireErrorCodes.RUNTIME_FAILURE
 }
