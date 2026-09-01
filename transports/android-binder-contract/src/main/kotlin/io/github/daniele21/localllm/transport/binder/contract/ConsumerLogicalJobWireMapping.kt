@@ -41,12 +41,14 @@ fun ConsumerLogicalJobResultParcel.toCoreLogicalJobResponse(): ConsumerInference
     val coreSnapshot = requireNotNull(snapshot).toCoreLogicalJobSnapshot()
     val output = when {
         answerText == null && metrics == null -> null
+
         answerText != null && metrics != null ->
             ConsumerInferenceJobOutput(
                 answer = answerText,
                 surfacedReasoning = reasoningText,
                 metrics = metrics.toCoreConsumerMetrics(),
             )
+
         else -> error("Logical job result payload is incomplete")
     }
     return ConsumerInferenceJobResponse.Available(coreSnapshot, output)
@@ -63,7 +65,7 @@ private fun ConsumerLogicalJobSnapshotParcel.toCoreLogicalJobSnapshot() =
         runtimeSessionId = ConsumerRuntimeSessionId(runtimeSessionId),
         resultAvailable = resultAvailable,
         errorCode =
-        errorCode?.let {
-            WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
-        },
+            errorCode?.let {
+                WireErrorParcel(it, "Logical job failed", false).toConsumerFailure().code
+            },
     )
