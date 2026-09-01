@@ -219,14 +219,6 @@ private fun presetsTransportFailure() = ConsumerPublishedPresetsResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
 )
 
-private fun setupFeatureUnavailable() = ConsumerSetupResolutionResult.Rejected(
-    controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer setup resolution is unavailable"),
-)
-
-private fun setupTransportFailure() = ConsumerSetupResolutionResult.Rejected(
-    controlPlaneFailure(ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE, "Shared runtime transport is unavailable"),
-)
-
 private fun activationFeatureUnavailable() = ConsumerActivationResult.Rejected(
     controlPlaneFailure(ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE, "Consumer control plane is unavailable"),
 )
