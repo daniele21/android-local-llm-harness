@@ -9,7 +9,7 @@
   "experience_context": {
     "primary_users": [
       "Android/AI engineer evaluating candidate local LLMs on a target device",
-      "Android developer integrating the Harness shared runtime into an application"
+      "Android developer integrating the Harnex shared runtime into an application"
     ],
     "primary_jobs": [
       "compare candidate models and inference configurations for a concrete use case and device",
@@ -18,7 +18,7 @@
       "validate shared-runtime integration without silent cloud fallback"
     ],
     "primary_surfaces": [
-      "Harness Android phone application",
+      "Harnex Android phone application",
       "model evaluation and benchmark surfaces",
       "application and assigned-use-case control-plane surfaces",
       "shared-runtime consumer and diagnostics surfaces"
