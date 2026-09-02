@@ -5,7 +5,7 @@ Document type: runbook
 Owner: apps/local-llm-phone-test
 Canonical scope: release.play-internal
 Read when: preparing, uploading or validating the phone application through Google Play Internal Testing
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-02
 
 `apps/local-llm-phone-test` is a standalone Android application for validating the real local-LLM runtime on a physical device when developer mode, USB debugging or ADB is unavailable.
 
@@ -119,7 +119,9 @@ The default signed output is:
 apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
 ```
 
-For ordinary local builds, the helper increments the repository-local `apps/local-llm-phone-test/version.properties` value. Protected Play CI instead provides a positive `PLAY_VERSION_CODE` override, which prevents local-file mutation and makes Gradle embed the exact version code resolved from Play.
+For an ordinary local signed-bundle build, the helper advances `apps/local-llm-phone-test/version.properties` as one paired release identity: it increments `versionCode` and derives `versionName` from the existing major/minor train plus that new code as the patch component. For example, `versionCode=33` and `versionName=1.0.0` advance to `versionCode=34` and `versionName=1.0.34`.
+
+Protected Play CI does not mutate `version.properties`. It supplies both `PLAY_VERSION_CODE` and `PLAY_VERSION_NAME`; the two overrides are mandatory as a pair. Gradle and the canonical release helper fail closed if only one is supplied, if either format is invalid, or if the version name does not match the repository major/minor train and exact version code.
 
 ## Sign the unsigned CI bundle manually
 
@@ -149,12 +151,13 @@ The workflow then:
 1. authenticates to Google through GitHub OIDC and Workload Identity Federation;
 2. creates a temporary Android Publisher edit and lists all current APK/AAB version codes;
 3. selects `max(versionCode) + 1`, or `1` for an app with no uploaded artifacts;
-4. reconstructs the PKCS12 upload keystore only inside the GitHub runner;
-5. invokes the same canonical `bash scripts/build-android-aab.sh build` entrypoint with `PLAY_VERSION_CODE` and the protected signing variables;
-6. verifies the signed AAB with `jarsigner`;
-7. refreshes the short-lived Google access token after the potentially long native build;
-8. uploads the AAB, updates the `internal` track to a completed release and commits the Play edit;
-9. stores the exact released AAB as a seven-day GitHub Actions evidence artifact.
+4. derives the matching `versionName` through the canonical release helper, preserving the repository major/minor train and using the exact Play version code as patch;
+5. reconstructs the PKCS12 upload keystore only inside the GitHub runner;
+6. invokes the same canonical `bash scripts/build-android-aab.sh build` entrypoint with `PLAY_VERSION_CODE`, `PLAY_VERSION_NAME` and the protected signing variables;
+7. verifies the signed AAB with `jarsigner`;
+8. refreshes the short-lived Google access token after the potentially long native build;
+9. uploads the AAB, updates the `internal` track to a completed release and commits the Play edit;
+10. stores the exact released AAB as a seven-day GitHub Actions evidence artifact whose name records both version identities.
 
 Publishing is serialized for the application, preventing concurrent release jobs from selecting the same next Play version code. If upload/track update fails before commit, the helper attempts to delete the uncommitted Play edit.
 
@@ -241,7 +244,7 @@ Google Play installation does not require developer mode or ADB. A company-manag
 
 ## Release and evidence discipline
 
-- Every Play upload uses a strictly increasing version code; CI resolves it from current Play state rather than GitHub run numbers.
+- Every Play upload uses a strictly increasing `versionCode` resolved from current Play state and a matching incremented `versionName` on the repository major/minor train; neither identity may advance alone.
 - Keep the package name stable after the Play Console application is created.
 - Do not commit GGUFs, keystores, passwords, Google private keys or generated credentials.
 - Restrict upload-keystore access, keep an encrypted external backup and test recovery before it is needed.
