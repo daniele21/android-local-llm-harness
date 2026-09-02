@@ -19,19 +19,62 @@ import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
-class SharedRuntimeHostDelegate(
+class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
-    private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
-    private val consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
-    private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
-    private val ledger: ClientConnectionLedger = ClientConnectionLedger(),
-    private val controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
-    private val readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
-    private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
-        HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
-    private val logicalJobMetadataStore: HostLogicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
+    private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+    private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
+    private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
+    private val ledger: ClientConnectionLedger,
+    private val controlExecutor: HostControlExecutor,
+    private val readinessExecutor: HostControlExecutor,
+    private val callbackDispatcherFactory: HostCallbackDispatcherFactory,
+    private val logicalJobMetadataStore: HostLogicalJobMetadataStore,
 ) : AutoCloseable {
+    constructor(
+        client: LocalLlmClient,
+        protocolInfo: ProtocolInfoParcel,
+        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
+        consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
+        consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
+        ledger: ClientConnectionLedger = ClientConnectionLedger(),
+        controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        callbackDispatcherFactory: HostCallbackDispatcherFactory =
+            HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+    ) : this(
+        client = client,
+        protocolInfo = protocolInfo,
+        consumerClientFactory = consumerClientFactory,
+        consumerControlPlaneHost = consumerControlPlaneHost,
+        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+        ledger = ledger,
+        controlExecutor = controlExecutor,
+        readinessExecutor = readinessExecutor,
+        callbackDispatcherFactory = callbackDispatcherFactory,
+        logicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
+    )
+
+    internal constructor(
+        client: LocalLlmClient,
+        protocolInfo: ProtocolInfoParcel,
+        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+        consumerControlPlaneHost: ConsumerControlPlaneHost?,
+        consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
+        logicalJobMetadataStore: HostLogicalJobMetadataStore,
+    ) : this(
+        client = client,
+        protocolInfo = protocolInfo,
+        consumerClientFactory = consumerClientFactory,
+        consumerControlPlaneHost = consumerControlPlaneHost,
+        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+        ledger = ClientConnectionLedger(),
+        controlExecutor = BoundedSerialHostControlExecutor(),
+        readinessExecutor = BoundedSerialHostControlExecutor(),
+        callbackDispatcherFactory = HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+        logicalJobMetadataStore = logicalJobMetadataStore,
+    )
+
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
     private val consumerActivity = ConsumerRuntimeActivityTracker()
