@@ -1,22 +1,21 @@
 name: HBG-42 format once
 
 on:
-  push:
-    branches:
-      - fix/hbg42-host-restart-reconciliation
+  pull_request:
+    types: [synchronize]
 
 permissions:
   contents: write
 
 jobs:
   format:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'fix/hbg42-host-restart-reconciliation' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out HBG-42 head
         uses: actions/checkout@v7
         with:
-          ref: fix/hbg42-host-restart-reconciliation
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - name: Set up Java
