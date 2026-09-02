@@ -125,7 +125,13 @@ internal object HostLogicalJobLifecycle {
     }
 
     fun interruptStaleRuntime(current: HostLogicalJobSnapshot, activeRuntimeSessionId: HostRuntimeSessionId): HostLogicalJobSnapshot {
-        if (current.isTerminal || current.runtimeSessionId == activeRuntimeSessionId) return current
+        if (
+            current.isTerminal ||
+            current.state == HostLogicalJobState.INTERRUPTED ||
+            current.runtimeSessionId == activeRuntimeSessionId
+        ) {
+            return current
+        }
         return current.copy(
             state = HostLogicalJobState.INTERRUPTED,
             revision = current.revision + 1,
@@ -187,13 +193,14 @@ internal object HostLogicalJobLifecycle {
 internal data class HostLogicalJobSubmission(val snapshot: HostLogicalJobSnapshot, val created: Boolean)
 
 /**
- * Bounded process-local identity/state registry. It stores no prompt or generated content. Binder
- * integration is intentionally separate so transport death cannot become registry ownership.
+ * Bounded logical-job identity/state registry. Only privacy-safe metadata is persisted; transport
+ * callbacks and inference input/output remain process-local.
  */
 internal class HostLogicalJobRegistry(
     private val maxJobs: Int,
     private val runtimeSessionId: HostRuntimeSessionId,
     private val idFactory: () -> HostLogicalJobId,
+    private val metadataStore: HostLogicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
 ) {
     private data class RequestKey(val scope: HostLogicalJobScope, val clientRequestId: HostClientRequestId)
 
@@ -202,6 +209,7 @@ internal class HostLogicalJobRegistry(
 
     init {
         require(maxJobs > 0) { "Logical job registry capacity must be positive" }
+        restorePersistedJobs()
     }
 
     @Synchronized
@@ -218,7 +226,7 @@ internal class HostLogicalJobRegistry(
             return HostLogicalJobSubmission(existing, created = false)
         }
 
-        ensureCapacity()
+        val evictable = evictionCandidate()
         val jobId = idFactory()
         require(jobId !in jobsById) { "Logical job ID factory returned a duplicate ID" }
         val snapshot =
@@ -232,6 +240,8 @@ internal class HostLogicalJobRegistry(
                 attempt = 1,
                 runtimeSessionId = runtimeSessionId,
             )
+        if (!metadataStore.replace(snapshot, evictable?.jobId)) throw HostLogicalJobPersistenceException()
+        evictable?.let(::removeFromMemory)
         jobsById[jobId] = snapshot
         jobsByRequest[requestKey] = jobId
         return HostLogicalJobSubmission(snapshot, created = true)
@@ -245,6 +255,8 @@ internal class HostLogicalJobRegistry(
     fun transition(scope: HostLogicalJobScope, jobId: HostLogicalJobId, transition: HostLogicalJobTransition): HostLogicalJobSnapshot? {
         val current = snapshot(scope, jobId) ?: return null
         val next = HostLogicalJobLifecycle.apply(current, transition)
+        if (next == current) return current
+        if (!metadataStore.replace(next)) throw HostLogicalJobPersistenceException()
         jobsById[jobId] = next
         return next
     }
@@ -252,13 +264,26 @@ internal class HostLogicalJobRegistry(
     @Synchronized
     fun size(): Int = jobsById.size
 
-    private fun ensureCapacity() {
-        if (jobsById.size < maxJobs) return
-        val evictable =
-            jobsById.values.firstOrNull(HostLogicalJobSnapshot::isTerminal)
-                ?: throw HostLogicalJobCapacityException()
-        jobsById.remove(evictable.jobId)
-        jobsByRequest.remove(RequestKey(evictable.scope, evictable.clientRequestId))
+    private fun restorePersistedJobs() {
+        metadataStore.load(maxJobs).forEach { persisted ->
+            val requestKey = RequestKey(persisted.scope, persisted.clientRequestId)
+            if (persisted.jobId in jobsById || requestKey in jobsByRequest || jobsById.size >= maxJobs) return@forEach
+            val reconciled = HostLogicalJobLifecycle.interruptStaleRuntime(persisted, runtimeSessionId)
+            if (reconciled != persisted) metadataStore.replace(reconciled)
+            jobsById[reconciled.jobId] = reconciled
+            jobsByRequest[requestKey] = reconciled.jobId
+        }
+    }
+
+    private fun evictionCandidate(): HostLogicalJobSnapshot? {
+        if (jobsById.size < maxJobs) return null
+        return jobsById.values.firstOrNull(HostLogicalJobSnapshot::isTerminal)
+            ?: throw HostLogicalJobCapacityException()
+    }
+
+    private fun removeFromMemory(snapshot: HostLogicalJobSnapshot) {
+        jobsById.remove(snapshot.jobId)
+        jobsByRequest.remove(RequestKey(snapshot.scope, snapshot.clientRequestId))
     }
 }
 
@@ -266,3 +291,5 @@ internal class HostLogicalJobCapacityException : IllegalStateException("Logical 
 
 internal class HostLogicalJobIdentityConflictException :
     IllegalStateException("Logical job request ID was reused with a different execution identity")
+
+internal class HostLogicalJobPersistenceException : IllegalStateException("Logical job metadata could not be persisted")
