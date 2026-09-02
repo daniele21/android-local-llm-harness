@@ -33,7 +33,7 @@ class HarnessSharedRuntimeService : Service() {
                     runtimeGraph = runtimeGraph,
                     onWarmRetention = resolvedWarmRetention::schedule,
                 ),
-                warmRetention = resolvedWarmRetention,
+                cancelWarmRetention = resolvedWarmRetention::cancel,
             )
         val runtimeReadinessHost =
             HarnessConsumerRuntimeReadinessHost(

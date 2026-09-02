@@ -44,12 +44,7 @@ class HarnessConsumerSetupResolutionTest {
 
         val result = host.resolveSetup(
             applicationId = applicationId,
-            request = ConsumerSetupResolutionRequest(
-                useCaseId = fixture.spec.useCase.useCaseId,
-                useCaseRevision = fixture.spec.useCase.revision,
-                bindingRevision = fixture.bindingRevision,
-                preset = fixture.publicPreset,
-            ),
+            request = fixture.setupRequest(),
         )
 
         assertTrue(result is ConsumerSetupResolutionResult.Resolved)
@@ -60,6 +55,35 @@ class HarnessConsumerSetupResolutionTest {
         assertEquals(0.2f, setup.generation.temperature)
         assertEquals(0, runtimeControl.installCalls)
         assertEquals(0, runtimeControl.activationResidency.activeLeaseCount(fixture.storedModel.digest))
+    }
+
+    @Test
+    fun `warm retention host forwards setup resolution to its delegate`() {
+        val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
+        val fixture = fixture(applicationId)
+        val runtimeControl = SetupRecordingRuntimeControl()
+        val delegate = HarnessConsumerControlPlaneHost(
+            store = InMemoryHostControlPlaneStore(fixture.state),
+            modelStore = SetupReadOnlyModelStore(fixture.storedModel),
+            runtimeControl = runtimeControl,
+        )
+        var cancelCalls = 0
+        val host = HarnessWarmRetentionAwareControlPlaneHost(
+            delegate = delegate,
+            cancelWarmRetention = { cancelCalls += 1 },
+        )
+
+        val result = host.resolveSetup(
+            applicationId = applicationId,
+            request = fixture.setupRequest(),
+        )
+
+        assertTrue(result is ConsumerSetupResolutionResult.Resolved)
+        val setup = (result as ConsumerSetupResolutionResult.Resolved).setup
+        assertEquals(fixture.publicPreset, setup.preset)
+        assertEquals(321, setup.generation.maxOutputTokens)
+        assertEquals(0, cancelCalls)
+        assertEquals(0, runtimeControl.installCalls)
     }
 
     @Test
@@ -75,12 +99,7 @@ class HarnessConsumerSetupResolutionTest {
 
         val result = host.resolveSetup(
             applicationId = applicationId,
-            request = ConsumerSetupResolutionRequest(
-                useCaseId = fixture.spec.useCase.useCaseId,
-                useCaseRevision = fixture.spec.useCase.revision,
-                bindingRevision = fixture.bindingRevision + 1,
-                preset = fixture.publicPreset,
-            ),
+            request = fixture.setupRequest(bindingRevision = fixture.bindingRevision + 1),
         )
 
         assertTrue(result is ConsumerSetupResolutionResult.Rejected)
@@ -153,7 +172,14 @@ private data class SetupFixture(
     val publicPreset: InferencePresetRef,
     val bindingRevision: Int,
     val storedModel: StoredModel,
-)
+) {
+    fun setupRequest(bindingRevision: Int = this.bindingRevision): ConsumerSetupResolutionRequest = ConsumerSetupResolutionRequest(
+        useCaseId = spec.useCase.useCaseId,
+        useCaseRevision = spec.useCase.revision,
+        bindingRevision = bindingRevision,
+        preset = publicPreset,
+    )
+}
 
 private class SetupRecordingRuntimeControl : HarnessConsumerRuntimeControl {
     override val activationResidency = ActivationResidencyCoordinator(
