@@ -30,6 +30,7 @@ class SharedRuntimeHostComposition(
         consumerClientFactory = consumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+        logicalJobMetadataStore = AndroidHostLogicalJobMetadataStore(context.applicationContext),
     )
     private val binderStub = SharedRuntimeBinderStub(
         authorizer = CallerAuthorizer(
