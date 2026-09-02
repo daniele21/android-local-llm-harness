@@ -117,35 +117,31 @@ internal class AndroidHostLogicalJobMetadataStore(
 
     private fun readRecord(jobId: String): HostLogicalJobMetadataRecord? {
         val prefix = recordPrefix(jobId)
-        val clientRequestId = preferences.getString(prefix + FIELD_CLIENT_REQUEST_ID, null) ?: return null
-        val applicationId = preferences.getString(prefix + FIELD_APPLICATION_ID, null) ?: return null
-        val useCaseId = preferences.getString(prefix + FIELD_USE_CASE_ID, null) ?: return null
-        val capabilityRevision = preferences.getString(prefix + FIELD_CAPABILITY_REVISION, null) ?: return null
-        val reasoningMode = preferences.getString(prefix + FIELD_REASONING_MODE, null) ?: return null
-        val outputConstraint = preferences.getString(prefix + FIELD_OUTPUT_CONSTRAINT, null) ?: return null
-        val sessionKind = preferences.getString(prefix + FIELD_SESSION_KIND, null) ?: return null
-        val state = preferences.getString(prefix + FIELD_STATE, null) ?: return null
-        val runtimeSessionId = preferences.getString(prefix + FIELD_RUNTIME_SESSION_ID, null) ?: return null
+        val requiredStrings =
+            REQUIRED_STRING_FIELDS.associateWith { field -> preferences.getString(prefix + field, null) }
+        if (requiredStrings.values.any { value -> value == null }) return null
+
         val revision = preferences.getLong(prefix + FIELD_REVISION, INVALID_LONG)
         val attempt = preferences.getInt(prefix + FIELD_ATTEMPT, INVALID_INT)
         if (revision < 0 || attempt < 1) return null
+
         val presetId = preferences.getString(prefix + FIELD_PRESET_ID, null)
         val presetVersion = preferences.getInt(prefix + FIELD_PRESET_VERSION, NO_PRESET_VERSION).takeIf { it != NO_PRESET_VERSION }
         return HostLogicalJobMetadataRecord(
             jobId = jobId,
-            clientRequestId = clientRequestId,
-            applicationId = applicationId,
-            useCaseId = useCaseId,
-            capabilityRevision = capabilityRevision,
+            clientRequestId = requireNotNull(requiredStrings[FIELD_CLIENT_REQUEST_ID]),
+            applicationId = requireNotNull(requiredStrings[FIELD_APPLICATION_ID]),
+            useCaseId = requireNotNull(requiredStrings[FIELD_USE_CASE_ID]),
+            capabilityRevision = requireNotNull(requiredStrings[FIELD_CAPABILITY_REVISION]),
             presetId = presetId,
             presetVersion = presetVersion,
-            reasoningMode = reasoningMode,
-            outputConstraint = outputConstraint,
-            sessionKind = sessionKind,
-            state = state,
+            reasoningMode = requireNotNull(requiredStrings[FIELD_REASONING_MODE]),
+            outputConstraint = requireNotNull(requiredStrings[FIELD_OUTPUT_CONSTRAINT]),
+            sessionKind = requireNotNull(requiredStrings[FIELD_SESSION_KIND]),
+            state = requireNotNull(requiredStrings[FIELD_STATE]),
             revision = revision,
             attempt = attempt,
-            runtimeSessionId = runtimeSessionId,
+            runtimeSessionId = requireNotNull(requiredStrings[FIELD_RUNTIME_SESSION_ID]),
         )
     }
 
@@ -196,6 +192,18 @@ internal class AndroidHostLogicalJobMetadataStore(
         const val INVALID_LONG = -1L
         const val INVALID_INT = -1
         const val NO_PRESET_VERSION = Int.MIN_VALUE
+        val REQUIRED_STRING_FIELDS =
+            listOf(
+                FIELD_CLIENT_REQUEST_ID,
+                FIELD_APPLICATION_ID,
+                FIELD_USE_CASE_ID,
+                FIELD_CAPABILITY_REVISION,
+                FIELD_REASONING_MODE,
+                FIELD_OUTPUT_CONSTRAINT,
+                FIELD_SESSION_KIND,
+                FIELD_STATE,
+                FIELD_RUNTIME_SESSION_ID,
+            )
         val RECORD_FIELDS =
             listOf(
                 FIELD_CLIENT_REQUEST_ID,

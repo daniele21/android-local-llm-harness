@@ -19,17 +19,21 @@ import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
+private class SharedRuntimeHostInfrastructure(
+    val ledger: ClientConnectionLedger,
+    val controlExecutor: HostControlExecutor,
+    val readinessExecutor: HostControlExecutor,
+    val callbackDispatcherFactory: HostCallbackDispatcherFactory,
+)
+
 class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
     private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
-    private val ledger: ClientConnectionLedger,
-    private val controlExecutor: HostControlExecutor,
-    private val readinessExecutor: HostControlExecutor,
-    private val callbackDispatcherFactory: HostCallbackDispatcherFactory,
-    private val logicalJobMetadataStore: HostLogicalJobMetadataStore,
+    infrastructure: SharedRuntimeHostInfrastructure,
+    logicalJobMetadataStore: HostLogicalJobMetadataStore,
 ) : AutoCloseable {
     constructor(
         client: LocalLlmClient,
@@ -48,10 +52,13 @@ class SharedRuntimeHostDelegate private constructor(
         consumerClientFactory = consumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
-        ledger = ledger,
-        controlExecutor = controlExecutor,
-        readinessExecutor = readinessExecutor,
-        callbackDispatcherFactory = callbackDispatcherFactory,
+        infrastructure =
+        SharedRuntimeHostInfrastructure(
+            ledger = ledger,
+            controlExecutor = controlExecutor,
+            readinessExecutor = readinessExecutor,
+            callbackDispatcherFactory = callbackDispatcherFactory,
+        ),
         logicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
     )
 
@@ -68,13 +75,20 @@ class SharedRuntimeHostDelegate private constructor(
         consumerClientFactory = consumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
-        ledger = ClientConnectionLedger(),
-        controlExecutor = BoundedSerialHostControlExecutor(),
-        readinessExecutor = BoundedSerialHostControlExecutor(),
-        callbackDispatcherFactory = HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+        infrastructure =
+        SharedRuntimeHostInfrastructure(
+            ledger = ClientConnectionLedger(),
+            controlExecutor = BoundedSerialHostControlExecutor(),
+            readinessExecutor = BoundedSerialHostControlExecutor(),
+            callbackDispatcherFactory = HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+        ),
         logicalJobMetadataStore = logicalJobMetadataStore,
     )
 
+    private val ledger = infrastructure.ledger
+    private val controlExecutor = infrastructure.controlExecutor
+    private val readinessExecutor = infrastructure.readinessExecutor
+    private val callbackDispatcherFactory = infrastructure.callbackDispatcherFactory
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
     private val consumerActivity = ConsumerRuntimeActivityTracker()
