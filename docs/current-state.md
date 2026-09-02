@@ -31,9 +31,11 @@ Applications control-plane work is complete through ACUX-80 and CPREC-10..70. St
 
 SR-0..5 and repository-side SR-6 release-evidence tooling are integrated; representative physical SR-6 evidence remains. CRV repository implementation is complete through its automated candidate gate, while CRV-110 remains the frozen same-signer real-GGUF physical gate. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
-Background/process lifecycle hardening is integrated through the core durable-job/service boundary. PR #502 provides caller/use-case-scoped durable `ConsumerInferenceJobId`, idempotent submit, authoritative query/result after reconnect, explicit cancel, exact prepared `ConsumerExecutionIdentity` pinning, detached session/generation-handle ownership and started/foreground service demand while durable work is active. Setup resolution remains protocol minor 5 and logical jobs protocol minor 6. PR #510 supplies the protected emulator fault gate used by downstream disconnect/rebind tests. PR #511 fixes concrete Consumer setup-resolution forwarding through Binder. Consumer SDK `0.1.0-alpha.9` is published from the integrated `dev` line at `f86b53ad29d2396660f095d5eaadd41c19bda8c7`.
+Background/process lifecycle hardening is integrated through durable logical jobs, detached execution ownership, explicit cancellation, exact prepared execution identity and started/foreground Host demand. PR #510 supplies the signature-protected emulator fault gate. PR #517 fixed the confirmed warm-retention Host forwarding defect for Consumer setup resolution and is merged on `dev` at `50ca8bd8621bb5019a4539b36548a1500bbf2af9`.
 
-RedactGuard has consumed logical jobs and alpha.9 on its active LAS candidate. Remaining lifecycle work is Host process-restart reconciliation/retry semantics, deterministic downstream lifecycle completion and representative physical evidence. See [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md).
+HBG-42 in PR #518 adds privacy-safe durable logical-job metadata and Host-restart reconciliation: persisted non-terminal work from a previous runtime becomes `INTERRUPTED` rather than impossible zombie `RUNNING`, while native handles/sessions and sensitive inference content remain process-local. Implementation head `9377db91389edd20d4f4e6ec0d856c54052172dc` passed repository-owned STRONG run `33684350491`, including repository guards, selected Android validation, native packaging and repository validation. The merge gate is a final exact-head STRONG run including the updated repository ledger.
+
+RedactGuard's LAS candidate has integrated typed setup semantics, cause-specific accessible recovery and ProductViewModel setup ownership. Its LAS parent at `4764251ab2f6fe6ca6ab31a64d24717aad58479e` also contains the corrected Android Home/app-switch lifecycle probe. Binder disconnect/rebind instrumentation already proves same logical-job identity and no implicit cancellation, but the canonical Two-APK workflow still needs to execute that test against the official merged HBG-42 source. Active Host-process-loss instrumentation is being added downstream to require typed `HOST_PROCESS_LOST` recovery after Harnex restart.
 
 ### Consumer API, OMBRA and evaluation
 
@@ -45,11 +47,19 @@ Model-evaluation contracts/evaluators and core dataset pipeline are integrated t
 
 ### 1. Background/process lifecycle convergence
 
-The durable-job/Binder/service foundation is no longer waiting on RedactGuard migration: RedactGuard's LAS candidate consumes the logical-job API and contains app-switch/ViewModel/Binder lifecycle journeys. The current downstream exact Two-APK run `33594812860` fails **before those lifecycle assertions**. It successfully builds/installs the Harnex Host, passes the Host-absent scenario, negotiates protocol minor 6 with `consumer-setup-resolution-v1`, and validates the assigned use case plus published preset; RedactGuard then remains at generic `INCOMPATIBLE` and emits no setup-resolution diagnostic event.
+The old generic-`INCOMPATIBLE` setup blocker is resolved. RedactGuard now preserves typed setup/runtime identity, Harnex's confirmed concrete setup-resolution forwarding defect is fixed on `dev`, and downstream setup stage/problem/recovery semantics no longer encode missing configuration/model/transient failures as incompatibility.
 
-Current RedactGuard source analysis shows its diagnostic reason formatting can mask the original typed `ConsumerControlPlaneFailure`. Therefore the current failure is not sufficient evidence of a Harnex model-store/setup-resolver/runtime defect. RedactGuard must first preserve the typed setup-resolution outcome and rerun the exact journey; only that result may route a new Harnex functional fix. Do not seed a different model or weaken setup criteria to make the downstream E2E pass.
+HBG-42 closes the Host-restart state-reconciliation gap at the Harnex owner: stale non-terminal durable metadata cannot remain `RUNNING` across process restart and no native work is claimed to survive. Remaining automated work is cross-repo lifecycle convergence rather than another speculative setup/model fix:
 
-Independent Harnex work remains: reconcile stale non-terminal logical-job metadata after actual Host process restart so impossible native work becomes interrupted/process-lost, then define privacy-safe retry-attempt semantics. After the initial downstream setup gate is healthy, complete disconnect/reconnect/cancel lifecycle evidence, residency composition evidence and final physical validation.
+- execute Binder disconnect/rebind in the canonical Two-APK workflow;
+- execute active-job Host process loss against the merged HBG-42 Host and require structured downstream `HOST_PROCESS_LOST`;
+- retain ViewModel recreation and Home/app-switch same-job evidence;
+- add any missing explicit-cancel Two-APK evidence;
+- prove RedactGuard process-loss behavior remains source/privacy aware rather than reconstructing sensitive process-local context;
+- integrate durable-job state with the existing Harnex `LOW_MEMORY -> CANCEL_AND_RELEASE_ALL` runtime owner and prove structured cleanup/interruption;
+- prove multiple jobs/consumers remain deterministically serialized by the existing single-decode scheduler and bounded Host admission.
+
+Automatic retry after Host process loss remains a separate HBG-43 decision and must never reconstruct sensitive input that the owning process no longer has.
 
 ### 2. OMBRA completion
 
@@ -65,13 +75,12 @@ Remaining parallel work includes RAM warm-idle/device restoration evidence, Q35-
 
 ## Immediate next block
 
-1. continue independent Harnex HBG-42 Host process-restart reconciliation from current `dev`, with STRONG selector-driven validation;
-2. on RedactGuard, make setup diagnostics non-interfering and preserve the typed Consumer setup-resolution code;
-3. rerun the exact Two-APK setup path and route the first typed outcome to its canonical owner; create a Harnex corrective slice only if that evidence points to Harnex;
-4. after setup resolution reaches the lifecycle journey, complete deterministic app-switch, Activity recreation, Binder disconnect/reconnect, explicit-cancel and process-loss evidence;
-5. finish HBG retry/residency evidence and exact-head automated preflight;
-6. execute remaining ARM64/JNI/GGUF/model-memory/OEM evidence;
-7. continue OMB-6B, OMB-8, evaluation and LLUP independently where ownership does not conflict.
+1. run final exact-head STRONG validation for HBG-42 including the updated lifecycle/current-state documentation, then merge PR #518 only on exact green evidence;
+2. pin RedactGuard's canonical Two-APK workflow to the official HBG-42 merge SHA and execute Home/app-switch, ViewModel recreation, Binder disconnect/rebind and active Host-process-loss on exact RedactGuard/Harnex source identities;
+3. close the remaining LAS-08C explicit-cancel, RedactGuard-process-loss, critical-memory-pressure and multiple-job/consumer journeys without duplicating canonical Harnex owners;
+4. advance HBG-43 retry semantics only where required input is still safely available, then HBG-50 residency composition and HBG-62/63 final automated evidence;
+5. execute remaining ARM64/JNI/GGUF/model-memory/OEM evidence separately as REAL_ENVIRONMENT evidence;
+6. continue OMB-6B, OMB-8, evaluation and LLUP independently where ownership does not conflict.
 
 ## Source links
 
@@ -79,7 +88,7 @@ Remaining parallel work includes RAM warm-idle/device restoration evidence, Q35-
 - Consumer SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
-- Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
+- Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
 - Harnex 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
