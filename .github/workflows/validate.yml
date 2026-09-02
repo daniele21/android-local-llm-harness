@@ -3,7 +3,8 @@ name: Validate
 on:
   push:
     branches: [main, dev]
-  pull_request: {}
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       validation_profile:
@@ -11,6 +12,11 @@ on:
         type: choice
         options: [auto, strong, full]
         default: auto
+      delivery_stage:
+        description: Delivery stage for remote preflight
+        type: choice
+        options: [integration, release]
+        default: integration
       base_sha:
         description: Exact comparison base SHA for remote preflight
         type: string
@@ -41,29 +47,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
+      stage: ${{ steps.scope.outputs.stage }}
       profile: ${{ steps.scope.outputs.profile }}
       reason: ${{ steps.scope.outputs.reason }}
+      risk_dimensions: ${{ steps.scope.outputs.risk_dimensions }}
+      required_gates: ${{ steps.scope.outputs.required_gates }}
       android: ${{ steps.scope.outputs.android }}
       native: ${{ steps.scope.outputs.native }}
       packaging: ${{ steps.scope.outputs.packaging }}
       modules: ${{ steps.scope.outputs.modules }}
-
+      source_head_sha: ${{ steps.identity.outputs.source_head_sha }}
+      target_base_sha: ${{ steps.identity.outputs.target_base_sha }}
     steps:
+      - name: Resolve validation identity
+        id: identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DISPATCH_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$GITHUB_SHA_VALUE"
+          base_sha="$PUSH_BASE_SHA"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            head_sha="$PR_HEAD_SHA"
+            base_sha="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            head_sha="$DISPATCH_HEAD_SHA"
+            base_sha="$DISPATCH_BASE_SHA"
+          fi
+          [[ -n "$head_sha" && -n "$base_sha" ]] || { echo "Missing validation identity" >&2; exit 1; }
+          echo "source_head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "target_base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ steps.identity.outputs.source_head_sha }}
 
       - name: Verify remote-preflight exact head
         if: github.event_name == 'workflow_dispatch' && inputs.expected_head_sha != ''
         env:
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-          ACTUAL_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          [[ "$ACTUAL_HEAD_SHA" == "$EXPECTED_HEAD_SHA" ]] || {
-            echo "Expected remote-preflight head $EXPECTED_HEAD_SHA but workflow runs $ACTUAL_HEAD_SHA" >&2
-            exit 1
-          }
+          actual_head=$(git rev-parse HEAD)
+          [[ "$actual_head" == "$EXPECTED_HEAD_SHA" ]] || { echo "Expected $EXPECTED_HEAD_SHA but checked out $actual_head" >&2; exit 1; }
 
       - name: Enforce pull request base policy
         if: github.event_name == 'pull_request'
@@ -76,29 +110,28 @@ jobs:
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          DISPATCH_BASE_SHA: ${{ inputs.base_sha }}
-          HEAD_SHA: ${{ github.sha }}
+          SOURCE_HEAD_SHA: ${{ steps.identity.outputs.source_head_sha }}
+          TARGET_BASE_SHA: ${{ steps.identity.outputs.target_base_sha }}
           REQUESTED_PROFILE: ${{ inputs.validation_profile || 'auto' }}
-          FORCE_PROMOTION: ${{ (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref_name == 'main') }}
+          DISPATCH_STAGE: ${{ inputs.delivery_stage || 'integration' }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          BASE_REF: ${{ github.base_ref }}
+          REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          base_sha="$EVENT_BASE_SHA"
+          stage=integration
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            base_sha="$DISPATCH_BASE_SHA"
+            stage="$DISPATCH_STAGE"
+          elif [[ "$EVENT_NAME" == "pull_request" && "$BASE_REF" == "main" ]]; then
+            stage=release
+          elif [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            stage=iteration
+          elif [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
+            stage=release
           fi
-
-          args=(
-            --event "$EVENT_NAME"
-            --base-sha "$base_sha"
-            --head-sha "$HEAD_SHA"
-            --github-output "$GITHUB_OUTPUT"
-            --profile "$REQUESTED_PROFILE"
-          )
-          if [[ "$FORCE_PROMOTION" == "true" ]]; then
-            args+=(--force-full)
-          fi
+          args=(--event "$EVENT_NAME" --base-sha "$TARGET_BASE_SHA" --head-sha "$SOURCE_HEAD_SHA" --github-output "$GITHUB_OUTPUT" --profile "$REQUESTED_PROFILE" --stage "$stage")
+          if [[ "$stage" == "release" ]]; then args+=(--force-full); fi
           python3 scripts/detect_ci_scope.py "${args[@]}"
 
       - name: Verify coding-agent navigation
@@ -107,12 +140,11 @@ jobs:
       - name: Check repository scripts and architecture
         shell: bash
         run: |
-          while IFS= read -r -d '' script; do
-            bash -n "$script"
-          done < <(find scripts -type f -name '*.sh' -print0)
+          while IFS= read -r -d '' script; do bash -n "$script"; done < <(find scripts -type f -name '*.sh' -print0)
           python3 -m py_compile scripts/*.py
           python3 scripts/verify_repository.py
           python3 scripts/verify_operations.py
+          python3 scripts/verify_e2e.py
           python3 scripts/test_summarize_qwen35_tuning.py
           python3 scripts/test_llrt7_opencl_tools.py
           python3 scripts/test_render_llrt_device_suite_report.py
@@ -124,16 +156,48 @@ jobs:
           python3 scripts/verify_architecture.py
           python3 scripts/verify-llama-cpp-opencl-preflight.py
           bash scripts/test-verify-llama-cpp-pin.sh
-          bash scripts/run-device-e2e.sh --help >/dev/null
-          bash scripts/capture-device-e2e-evidence.sh --help >/dev/null
-          bash scripts/capture-shared-runtime-release-evidence.sh --help >/dev/null
-          bash scripts/run-llama-cpp-opencl-evidence.sh --help >/dev/null
-          bash scripts/run-llrt-device-suite.sh --help >/dev/null
+
+  reuse:
+    name: Reuse equivalent validation evidence
+    needs: scope
+    if: github.event_name == 'workflow_dispatch' && needs.scope.outputs.stage == 'integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reused: ${{ steps.reuse.outputs.reused }}
+      artifact_id: ${{ steps.reuse.outputs.artifact_id }}
+      source_run_id: ${{ steps.reuse.outputs.source_run_id }}
+    steps:
+      - name: Find exact reusable evidence
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.scope.outputs.source_head_sha }}
+          BASE_SHA: ${{ needs.scope.outputs.target_base_sha }}
+          PROFILE: ${{ needs.scope.outputs.profile }}
+          REQUIRED_GATES: ${{ needs.scope.outputs.required_gates }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate_key=$(printf '%s' "$REQUIRED_GATES" | sha256sum | cut -c1-16)
+          name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
+          artifact=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}&per_page=20" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0] // empty')
+          if [[ -z "$artifact" ]]; then
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "reused=true" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$(jq -r '.id' <<<"$artifact")" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=$(jq -r '.workflow_run.id // empty' <<<"$artifact")" >> "$GITHUB_OUTPUT"
+          echo "Reusing exact validation evidence: $name"
 
   native:
     name: Native host tests
-    needs: scope
-    if: needs.scope.outputs.native == 'true'
+    needs: [scope, reuse]
+    if: always() && needs.scope.result == 'success' && contains(needs.scope.outputs.required_gates, 'native-host') && needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -143,6 +207,7 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
+          ref: ${{ needs.scope.outputs.source_head_sha }}
       - name: Verify llama.cpp pin
         run: ./scripts/verify-llama-cpp-pin.sh
       - name: Install ccache
@@ -150,23 +215,17 @@ jobs:
       - name: Determine native cache key
         id: native-cache-key
         run: echo "llama-sha=$(git -C third_party/llama.cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Restore native compiler cache
-        uses: actions/cache@v5
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/ccache
           key: ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-${{ hashFiles('backends/llama-cpp/src/main/cpp/**', 'backends/llama-cpp/src/test-native/**') }}
           restore-keys: |
             ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-
             ccache-${{ runner.os }}-
-      - name: Configure ccache
-        run: |
-          mkdir -p "$HOME/.cache/ccache"
-          ccache --set-config=cache_dir="$HOME/.cache/ccache"
-          ccache --set-config=max_size=750M
-          ccache --set-config=compression=true
-          ccache --zero-stats
       - name: Run native host tests
         run: |
+          ccache --set-config=max_size=750M
+          ccache --zero-stats
           cmake -S backends/llama-cpp/src/test-native -B build/native-tests -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build/native-tests --parallel "$(nproc)"
           ctest --test-dir build/native-tests --output-on-failure
@@ -175,9 +234,9 @@ jobs:
         run: ccache --show-stats
 
   android:
-    name: Android validation (${{ needs.scope.outputs.profile }})
-    needs: scope
-    if: needs.scope.outputs.android == 'true'
+    name: Android validation (${{ needs.scope.outputs.stage }} / ${{ needs.scope.outputs.profile }})
+    needs: [scope, reuse]
+    if: always() && needs.scope.result == 'success' && needs.scope.outputs.android == 'true' && needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -186,15 +245,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
-
+          ref: ${{ needs.scope.outputs.source_head_sha }}
       - name: Initialize native sources
-        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
+        if: contains(needs.scope.outputs.required_gates, 'android-packaging')
         run: git submodule update --init --depth=1 --recursive
-
       - name: Verify llama.cpp pin
-        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
+        if: contains(needs.scope.outputs.required_gates, 'android-packaging')
         run: ./scripts/verify-llama-cpp-pin.sh
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -209,85 +266,48 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
-
       - name: Run selected Android validation
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.gradle_profile }}
+          DELIVERY_STAGE: ${{ needs.scope.outputs.stage }}
           VALIDATION_PROFILE: ${{ needs.scope.outputs.profile }}
           GRADLE_MODULES: ${{ needs.scope.outputs.modules }}
-          PACKAGING_SENSITIVE: ${{ needs.scope.outputs.packaging }}
+          REQUIRED_GATES: ${{ needs.scope.outputs.required_gates }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build
           gradle_args=(--no-configuration-cache --stacktrace)
           if [[ "$ENABLE_GRADLE_PROFILE" == "true" ]]; then gradle_args+=(--profile); fi
-
           mapfile -t all_modules < <(python3 scripts/gradle_module_inventory.py)
           [[ "${#all_modules[@]}" -gt 0 ]] || { echo "Canonical Gradle module inventory is empty" >&2; exit 1; }
-          if [[ "$GRADLE_MODULES" == "all" ]]; then
-            selected_modules=("${all_modules[@]}")
-          else
-            IFS=',' read -r -a selected_modules <<< "$GRADLE_MODULES"
-          fi
-
+          if [[ "$GRADLE_MODULES" == "all" ]]; then selected_modules=("${all_modules[@]}"); else IFS=',' read -r -a selected_modules <<< "$GRADLE_MODULES"; fi
           tasks=(spotlessCheck detekt verifyNoModelArtifacts)
+          run_lint=false
+          if [[ "$DELIVERY_STAGE" != "iteration" ]]; then run_lint=true; fi
           for module in "${selected_modules[@]}"; do
             [[ -n "$module" ]] || continue
             if [[ "$module" == "apps:shared-runtime-client-consumer-fixture" ]]; then
-              tasks+=(":${module}:lintDebug")
+              tasks+=(":${module}:compileDebugKotlin")
             else
-              tasks+=(":${module}:testDebugUnitTest" ":${module}:lintDebug")
+              tasks+=(":${module}:testDebugUnitTest")
             fi
-            if [[ "$module" == "models:control-plane-room-store" ]]; then
-              tasks+=(":${module}:assembleDebugAndroidTest")
-            fi
-            if [[ "$module" == "apps:local-llm-console" ]]; then tasks+=(":apps:local-llm-console:lintInternal"); fi
+            if [[ "$run_lint" == "true" ]]; then tasks+=(":${module}:lintDebug"); fi
+            if [[ "$run_lint" == "true" && "$module" == "models:control-plane-room-store" ]]; then tasks+=(":${module}:assembleDebugAndroidTest"); fi
+            if [[ "$run_lint" == "true" && "$module" == "apps:local-llm-console" ]]; then tasks+=(":apps:local-llm-console:lintInternal"); fi
           done
-
-          run_packaging=false
-          if [[ "$PACKAGING_SENSITIVE" == "true" && ("$VALIDATION_PROFILE" == "strong" || "$VALIDATION_PROFILE" == "full") ]]; then
-            run_packaging=true
-          fi
-
-          if [[ "$run_packaging" == "true" ]]; then
-            tasks+=(
-              :backends:llama-cpp:assembleDebug
-              :transports:android-binder-contract:assembleDebug
-              :transports:android-binder-contract:assembleDebugAndroidTest
-              :transports:android-binder-contract:assembleRelease
-              :transports:android-binder-client:assembleDebug
-              :transports:android-binder-client:assembleRelease
-              :integrations:android-service-host:assembleDebug
-              :apps:local-llm-console:assembleInternal
-              :apps:shared-runtime-client-consumer-fixture:assembleDebug
-              :apps:shared-runtime-client-consumer-fixture:assembleRelease
-              :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest
-              :apps:device-test-runner:assembleDebug
-              :apps:device-test-runner:assembleDebugAndroidTest
-              :apps:local-llm-phone-test:assembleDebug
-            )
+          if [[ "$DELIVERY_STAGE" == "iteration" || ! "$REQUIRED_GATES" =~ android-packaging ]]; then
+            tasks+=( :apps:local-llm-console:compileInternalKotlin :apps:shared-runtime-client-consumer-fixture:compileDebugKotlin :apps:device-test-runner:compileDebugKotlin :apps:local-llm-phone-test:compileDebugKotlin )
           else
-            tasks+=(
-              :apps:local-llm-console:compileInternalKotlin
-              :apps:shared-runtime-client-consumer-fixture:compileDebugKotlin
-              :apps:device-test-runner:compileDebugKotlin
-              :apps:local-llm-phone-test:compileDebugKotlin
-            )
+            tasks+=( :backends:llama-cpp:assembleDebug :transports:android-binder-contract:assembleDebug :transports:android-binder-contract:assembleDebugAndroidTest :transports:android-binder-contract:assembleRelease :transports:android-binder-client:assembleDebug :transports:android-binder-client:assembleRelease :integrations:android-service-host:assembleDebug :apps:local-llm-console:assembleInternal :apps:shared-runtime-client-consumer-fixture:assembleDebug :apps:shared-runtime-client-consumer-fixture:assembleRelease :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest :apps:local-llm-phone-test:assembleDebug )
           fi
-
-          printf 'Validation profile: %s\n' "$VALIDATION_PROFILE"
-          printf 'Gradle modules: %s\n' "${selected_modules[*]}"
-          printf 'Gradle tasks: %s\n' "${tasks[*]}"
+          printf 'Stage: %s\nProfile: %s\nGates: %s\nGradle tasks: %s\n' "$DELIVERY_STAGE" "$VALIDATION_PROFILE" "$REQUIRED_GATES" "${tasks[*]}"
           ./gradlew "${gradle_args[@]}" "${tasks[@]}" 2>&1 | tee build/android-validation.log
-
       - name: Verify Android native packaging
-        if: needs.scope.outputs.packaging == 'true' && (needs.scope.outputs.profile == 'strong' || needs.scope.outputs.profile == 'full')
+        if: contains(needs.scope.outputs.required_gates, 'android-packaging')
         run: python3 scripts/verify-android-packaging.py
-
       - name: Upload Gradle profile
         if: always() && inputs.gradle_profile == true
         uses: actions/upload-artifact@v7
@@ -296,7 +316,6 @@ jobs:
           path: build/reports/profile/**
           if-no-files-found: warn
           retention-days: 7
-
       - name: Upload failure reports
         if: failure() && !cancelled()
         uses: actions/upload-artifact@v7
@@ -309,31 +328,63 @@ jobs:
           retention-days: 7
 
   validation:
-    name: Repository validation
+    name: Repository validation (${{ needs.scope.outputs.stage }} / ${{ needs.scope.outputs.profile }})
     if: always()
-    needs: [scope, native, android]
+    needs: [scope, reuse, native, android]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Evaluate validation jobs
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
+          REUSED: ${{ needs.reuse.outputs.reused }}
           NATIVE_RESULT: ${{ needs.native.result }}
           ANDROID_RESULT: ${{ needs.android.result }}
+          STAGE: ${{ needs.scope.outputs.stage }}
           PROFILE: ${{ needs.scope.outputs.profile }}
           REASON: ${{ needs.scope.outputs.reason }}
         run: |
           set -euo pipefail
           [[ "$SCOPE_RESULT" == "success" ]] || { echo "Validation scope failed: $SCOPE_RESULT" >&2; exit 1; }
-          for result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
-            [[ "$result" == "success" || "$result" == "skipped" ]] || { echo "Required validation job failed: $result" >&2; exit 1; }
-          done
-          echo "Repository validation passed: profile=$PROFILE reason=$REASON"
+          if [[ "$REUSED" == "true" ]]; then echo "Equivalent exact validation evidence reused"; exit 0; fi
+          for result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do [[ "$result" == "success" || "$result" == "skipped" ]] || { echo "Required validation job failed: $result" >&2; exit 1; }; done
+          echo "Repository validation passed: stage=$STAGE profile=$PROFILE reason=$REASON"
+
+  evidence:
+    name: Publish reusable validation evidence
+    needs: [scope, reuse, validation]
+    if: always() && needs.validation.result == 'success' && needs.reuse.outputs.reused != 'true' && needs.scope.outputs.stage != 'iteration'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Create evidence identity
+        env:
+          HEAD_SHA: ${{ needs.scope.outputs.source_head_sha }}
+          BASE_SHA: ${{ needs.scope.outputs.target_base_sha }}
+          STAGE: ${{ needs.scope.outputs.stage }}
+          PROFILE: ${{ needs.scope.outputs.profile }}
+          RISKS: ${{ needs.scope.outputs.risk_dimensions }}
+          GATES: ${{ needs.scope.outputs.required_gates }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p validation-evidence
+          gate_key=$(printf '%s' "$GATES" | sha256sum | cut -c1-16)
+          name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
+          printf '{"head":"%s","target_base":"%s","stage":"%s","profile":"%s","risk_dimensions":"%s","required_gates":"%s","e2e_environment":"none","run_id":"%s"}\n' "$HEAD_SHA" "$BASE_SHA" "$STAGE" "$PROFILE" "$RISKS" "$GATES" "$GITHUB_RUN_ID" > validation-evidence/evidence.json
+          echo "$name" > validation-evidence/name.txt
+          echo "ARTIFACT_NAME=$name" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: validation-evidence/evidence.json
+          retention-days: 7
 
   report-remote-preflight:
     name: Report remote preflight
     if: always() && github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
-    needs: [scope, validation]
+    needs: [scope, reuse, validation]
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -343,12 +394,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+          STAGE: ${{ needs.scope.outputs.stage }}
           PROFILE: ${{ needs.scope.outputs.profile }}
           REASON: ${{ needs.scope.outputs.reason }}
+          REUSED: ${{ needs.reuse.outputs.reused }}
+          SOURCE_RUN_ID: ${{ needs.reuse.outputs.source_run_id }}
           RESULT: ${{ needs.validation.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          body=$(printf 'Remote preflight `%s` for `%s`: **%s**\n\nReason: %s\nRun: %s' "$PROFILE" "$EXPECTED_HEAD" "$RESULT" "$REASON" "$RUN_URL")
-          if ! gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"; then
-            echo "::warning::Remote preflight result is $RESULT for exact head $EXPECTED_HEAD, but posting the result comment failed."
-          fi
+          source_note=""
+          if [[ "$REUSED" == "true" && -n "$SOURCE_RUN_ID" ]]; then source_note=$(printf '\nReused run: https://github.com/%s/actions/runs/%s' "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID"); fi
+          body=$(printf 'Remote preflight `%s/%s` for `%s`: **%s** (reused=%s)\n\nReason: %s\nRun: %s%s' "$STAGE" "$PROFILE" "$EXPECTED_HEAD" "$RESULT" "$REUSED" "$REASON" "$RUN_URL" "$source_note")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" || echo "::warning::Preflight result comment failed."
