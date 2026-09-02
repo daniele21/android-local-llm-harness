@@ -17,7 +17,7 @@ implementation("io.github.daniele21.localllm:consumer-android:<version>")
 
 The publication carries `core-contracts` and the Binder contract transitively. Consumers must not use `project(...)`, composite builds, git submodules or a Harness source checkout.
 
-Current candidate: `0.1.0-alpha.8`.
+Current candidate: `0.1.0-alpha.9`.
 
 ## Published artifacts
 
@@ -84,7 +84,7 @@ For alpha.8 the correct sequence is:
 
 1. exact-head PR documentation/validation/preflight is green;
 2. merge the owning change to `dev`;
-3. `Publish Consumer Android SDK` validates and publishes `0.1.0-alpha.8` from `dev`;
+3. `Publish Consumer Android SDK` validates and publishes `0.1.0-alpha.9` from `dev`;
 4. downstream apps update their Maven dependency only after publication succeeds.
 
 Do not treat the pull-request `Consumer SDK validation` workflow as package publication: it uses a run-specific `0.1.0-ci.<run_id>` local repository solely to prove external consumption and ABI compatibility.
