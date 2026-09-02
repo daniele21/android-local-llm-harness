@@ -261,6 +261,27 @@ internal class HostLogicalJobRegistry(
         return next
     }
 
+    /**
+     * Fail-safe current-process view after durable metadata can no longer be updated. The previous
+     * persisted non-terminal snapshot is intentionally left intact; a future Host runtime will
+     * reconcile it through its stale runtimeSessionId. No new execution may continue from here.
+     */
+    @Synchronized
+    fun interruptInMemoryAfterPersistenceFailure(
+        scope: HostLogicalJobScope,
+        jobId: HostLogicalJobId,
+    ): HostLogicalJobSnapshot? {
+        val current = snapshot(scope, jobId) ?: return null
+        if (current.isTerminal || current.state == HostLogicalJobState.INTERRUPTED) return current
+        val interrupted =
+            current.copy(
+                state = HostLogicalJobState.INTERRUPTED,
+                revision = current.revision + 1,
+            )
+        jobsById[jobId] = interrupted
+        return interrupted
+    }
+
     @Synchronized
     fun size(): Int = jobsById.size
 
