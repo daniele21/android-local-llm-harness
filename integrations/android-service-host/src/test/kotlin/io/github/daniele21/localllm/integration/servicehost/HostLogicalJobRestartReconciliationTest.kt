@@ -9,7 +9,6 @@ import io.github.daniele21.localllm.contracts.InferencePresetRef
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -124,40 +123,58 @@ class HostLogicalJobRestartReconciliationTest {
 
         val record = original.toMetadataRecord()
         val restored = record.toSnapshot()
+        val persistedFieldNames =
+            HostLogicalJobMetadataRecord::class.java.declaredFields
+                .filterNot { field -> field.isSynthetic || java.lang.reflect.Modifier.isStatic(field.modifiers) }
+                .map { field -> field.name }
+                .toSet()
 
         assertEquals(original, restored)
-        assertFalse(record.toString().contains("prompt", ignoreCase = true))
-        assertFalse(record.toString().contains("document", ignoreCase = true))
-        assertFalse(record.toString().contains("answer", ignoreCase = true))
-        assertFalse(record.toString().contains("reasoningText", ignoreCase = true))
+        assertEquals(
+            setOf(
+                "jobId",
+                "clientRequestId",
+                "applicationId",
+                "useCaseId",
+                "capabilityRevision",
+                "presetId",
+                "presetVersion",
+                "reasoningMode",
+                "outputConstraint",
+                "sessionKind",
+                "state",
+                "revision",
+                "attempt",
+                "runtimeSessionId",
+            ),
+            persistedFieldNames,
+        )
     }
 
     private fun registry(
         runtimeSession: String,
         store: HostLogicalJobMetadataStore,
         maxJobs: Int = 8,
-    ): HostLogicalJobRegistry =
-        HostLogicalJobRegistry(
-            maxJobs = maxJobs,
-            runtimeSessionId = HostRuntimeSessionId(runtimeSession),
-            idFactory = { HostLogicalJobId("job-new") },
-            metadataStore = store,
-        )
+    ): HostLogicalJobRegistry = HostLogicalJobRegistry(
+        maxJobs = maxJobs,
+        runtimeSessionId = HostRuntimeSessionId(runtimeSession),
+        idFactory = { HostLogicalJobId("job-new") },
+        metadataStore = store,
+    )
 
     private fun snapshot(
         state: HostLogicalJobState,
         revision: Long,
-    ): HostLogicalJobSnapshot =
-        HostLogicalJobSnapshot(
-            jobId = JOB_ID,
-            clientRequestId = HostClientRequestId("request-1"),
-            scope = scope,
-            execution = execution,
-            state = state,
-            revision = revision,
-            attempt = 1,
-            runtimeSessionId = HostRuntimeSessionId("runtime-A"),
-        )
+    ): HostLogicalJobSnapshot = HostLogicalJobSnapshot(
+        jobId = JOB_ID,
+        clientRequestId = HostClientRequestId("request-1"),
+        scope = scope,
+        execution = execution,
+        state = state,
+        revision = revision,
+        attempt = 1,
+        runtimeSessionId = HostRuntimeSessionId("runtime-A"),
+    )
 
     private companion object {
         val JOB_ID = HostLogicalJobId("job-1")
