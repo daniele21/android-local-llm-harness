@@ -50,6 +50,7 @@ val versionProperties = Properties().apply {
 }
 val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
 val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+val numericVersionNamePattern = Regex("""([0-9]+)\.([0-9]+)\.([0-9]+)""")
 val playVersionCodeOverride =
     System.getenv("PLAY_VERSION_CODE")
         ?.trim()
@@ -58,7 +59,34 @@ val playVersionCodeOverride =
             raw.toIntOrNull()?.takeIf { it > 0 }
                 ?: throw GradleException("PLAY_VERSION_CODE must be a positive integer")
         }
+val playVersionNameOverride =
+    System.getenv("PLAY_VERSION_NAME")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.also { raw ->
+            if (!numericVersionNamePattern.matches(raw)) {
+                throw GradleException("PLAY_VERSION_NAME must use numeric major.minor.patch format")
+            }
+        }
+if ((playVersionCodeOverride == null) != (playVersionNameOverride == null)) {
+    throw GradleException("PLAY_VERSION_CODE and PLAY_VERSION_NAME must be provided together")
+}
+if (playVersionCodeOverride != null && playVersionNameOverride != null) {
+    val currentVersionMatch =
+        numericVersionNamePattern.matchEntire(currentVersionName)
+            ?: throw GradleException(
+                "version.properties versionName must use numeric major.minor.patch format when Play overrides are used",
+            )
+    val expectedVersionName =
+        "${currentVersionMatch.groupValues[1]}.${currentVersionMatch.groupValues[2]}.$playVersionCodeOverride"
+    if (playVersionNameOverride != expectedVersionName) {
+        throw GradleException(
+            "PLAY_VERSION_NAME must be $expectedVersionName for PLAY_VERSION_CODE=$playVersionCodeOverride",
+        )
+    }
+}
 val effectiveVersionCode = playVersionCodeOverride ?: currentVersionCode
+val effectiveVersionName = playVersionNameOverride ?: currentVersionName
 
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
@@ -71,7 +99,7 @@ android {
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = effectiveVersionCode
-        versionName = currentVersionName
+        versionName = effectiveVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
         buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")

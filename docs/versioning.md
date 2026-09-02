@@ -5,7 +5,7 @@ Document type: release-policy
 Owner: repository
 Canonical scope: release.versioning
 Read when: changing versions, compatibility promises, promotion or release artifacts
-Last reviewed: 2026-08-13
+Last reviewed: 2026-09-02
 
 ## SDK versions
 
@@ -61,6 +61,18 @@ Signing certificate digests are evidence/security identities, not product versio
 - Feature pull requests normally squash into `dev`; promotions use a merge commit to preserve the exact validated candidate.
 - Tags, changelog release entries and distributed Android artifacts are created only from validated `main` commits.
 - Emergency hotfixes are applied to `main` and then forward-ported to `dev`.
+
+## Play Internal phone-test identity
+
+Every Google Play Internal Testing upload of `apps/local-llm-phone-test` uses one paired Android application identity:
+
+- `versionCode` is strictly increasing and is resolved from current Play state as `max(uploaded versionCode) + 1`;
+- `versionName` keeps the repository `major.minor` train and uses that exact Play `versionCode` as its patch component, for example `versionCode=34` -> `versionName=1.0.34` on the `1.0.x` train;
+- protected CI must provide `PLAY_VERSION_CODE` and `PLAY_VERSION_NAME` together, and the build fails closed if the pair is incomplete or inconsistent;
+- the canonical local signed-bundle helper increments both values together in `apps/local-llm-phone-test/version.properties`; it must not advance only one side of the pair;
+- exact-candidate physical-E2E APK builds keep the checked-in identity unchanged because they are evidence artifacts, not Play deployments.
+
+The source `versionName` patch is not the Play release counter. It provides the reviewed major/minor train; Play's monotonic version code owns the per-deploy patch identity. This lets repeated publication attempts or later deployments remain unique without mutating the validated source commit in CI.
 
 ## Release gate
 
