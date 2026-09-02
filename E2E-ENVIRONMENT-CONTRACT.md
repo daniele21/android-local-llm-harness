@@ -1,61 +1,57 @@
 # E2E Environment Fidelity Contract
 
-Version: 0.1.0
+Version: 0.2.0
 
-This contract defines how Android Local LLM Harness chooses end-to-end execution environments so automated evidence becomes progressively representative of the real target while physical-device validation remains responsible only for irreducible native/hardware differences.
+Harnex separates **executor**, **environment fidelity** and **UI evidence mode**. `.engineering/e2e.json` owns the concrete target/execution environments and critical journeys.
 
-The governing rule is:
+## Governing rules
 
-> Final target-environment validation should confirm residual environment-specific claims, not become the first time the complete workflow is exercised.
+> Final physical/device validation confirms residual ARM64/native/model/resource claims; it should not be the first complete-system test.
 
-This contract complements the existing operating and execution-capability contracts:
+> Use the cheapest automated environment sufficient for the changed claim and escalate fidelity only when a material target dimension requires it.
 
-- `.engineering/commands.json` owns project command semantics;
-- `EXECUTION-CAPABILITY-CONTRACT.md` owns `AGENT_LOCAL`, `REMOTE_AUTOMATED` and `REAL_ENVIRONMENT` executor classification;
-- `.engineering/e2e.json` owns Harness target environments, execution environments, critical journeys, fidelity classes and residual gaps.
+> UI presence alone does not force video.
 
-## Execution capability is not environment fidelity
+## Fidelity
 
-Executor location and environment representativeness are independent. An Android emulator running in GitHub Actions is `REMOTE_AUTOMATED` but remains `simulated_or_emulated`; it is not physical ARM64/JNI/model/memory/thermal evidence. A physical-device run is `REAL_ENVIRONMENT` unless a repository-owned device farm automates it.
+Canonical order:
 
-## Fidelity classes
+1. `host_or_fake`
+2. `simulated_or_emulated`
+3. `representative_virtual`
+4. `representative_physical`
+5. `target_environment`
 
-Harness uses the standard ordering:
+A GitHub Android emulator remains `simulated_or_emulated`; it does not establish ARM64 JNI/llama.cpp, real GGUF loading, physical memory, thermal or OEM behavior.
 
-1. `host_or_fake`;
-2. `simulated_or_emulated`;
-3. `representative_virtual`;
-4. `representative_physical`;
-5. `target_environment`.
+## Critical journeys
 
-Use the cheapest reliable environment that proves the changed claim. Higher fidelity is required only when the claim depends on a dimension missing from the cheaper environment.
+Keep E2E small. Lower-level tests own deterministic invariants; E2E owns assembled outcomes.
 
-## Harness specialization
+For every journey declare target environments, automated environments, minimum automated fidelity, residual gaps and real-environment confirmation. Execute against built/package surfaces when package/install behavior is part of the claim.
 
-Material target dimensions include Android framework/process lifecycle, CPU ABI, JNI/native `llama.cpp`, real GGUF storage/model lifecycle, Binder/process behavior, memory pressure/reclamation, and thermal/OEM behavior.
+## UI evidence modes
 
-Current automated emulator evidence proves Android/Binder contract behavior within its declared scope. It does not prove production ARM64 inference. Current identity-bearing physical-device workflows remain required for the native/model/resource claims declared in `.engineering/e2e.json`.
+- `ASSERTIONS` — UI is incidental and deterministic system behavior is the changed claim.
+- `SCREENSHOTS` — stable visible layout/hierarchy/copy/state/recovery/adaptive semantics must be inspected.
+- `FULL_MEDIA` — sequence over time matters: motion, timing/progression, navigation/transitions, lifecycle visibility or release/product acceptance.
 
-When a practical automated environment can reproduce a failure currently discovered only on the physical device, move that evidence earlier instead of normalizing final device validation as the first whole-system test.
+The selected mode is a **minimum**. A workflow may retain stronger evidence when useful, but stronger media should not be required solely because a journey traverses UI.
 
-## Critical-journey rule
+Harnex mapping:
 
-Keep E2E small. Unit/integration/contract tests remain primary for deterministic invariants. Each critical journey in `.engineering/e2e.json` declares:
+- Binder serialization and shared-runtime roundtrip: assertions;
+- `phone-cold-start`: screenshots normally suffice;
+- production local-inference lifecycle: lower-level automation plus explicit physical ARM64/GGUF/resource evidence.
 
-- the complete user/system outcome being claimed;
-- target environment refs;
-- automated execution environments when available;
-- minimum automated fidelity;
-- residual real-environment gaps;
-- whether real-environment confirmation is required, conditional or unnecessary;
-- an explicit automation-gap reason when no truthful automated environment exists.
+If required evidence for the selected mode is missing, report `E2E_EVIDENCE_INCOMPLETE` rather than overclaiming PASS.
 
-## Built artifacts and evidence
+## Evidence identity and lifecycle
 
-When install/package behavior is part of a claim, execute the produced APK/AAB-derived installable surface where technically practical. Running a real APK on an emulator can prove packaging/install/workflow behavior but still cannot establish physical ARM64 resource/thermal claims.
+Evidence must identify journey, source/build/run, execution environment/fidelity and selected UI evidence mode. Logs/screenshots/videos remain privacy-safe bounded artifacts, not durable design truth.
 
-E2E evidence records source/build/run identity, `.engineering/e2e.json` environment ID, fidelity class, artifact surface, known gaps and privacy-safe logs/traces. Do not report a generic `E2E PASS` when stronger environment claims remain pending.
+E2E owns cleanup of project processes/listeners, emulator/device run state, temporary model/test data and generated evidence on success/failure/timeout/cancellation.
 
-## Completion
+## Escalation
 
-The strongest product/release claim requires applicable lower-level evidence, required automated E2E at the declared fidelity, built-artifact coverage when material, explicit residual gaps and required physical/target confirmation. `AUTOMATED_PREFLIGHT_CONFIRMED` means deterministic automated evidence is complete; it does not convert pending physical-device evidence into a pass.
+During ITERATION, do not run E2E by default unless a cheap journey is the fastest useful falsifier. At INTEGRATION run only affected critical journeys. At RELEASE add release-critical and residual environment evidence required by the claim.
