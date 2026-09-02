@@ -173,13 +173,12 @@ private data class SetupFixture(
     val bindingRevision: Int,
     val storedModel: StoredModel,
 ) {
-    fun setupRequest(bindingRevision: Int = this.bindingRevision): ConsumerSetupResolutionRequest =
-        ConsumerSetupResolutionRequest(
-            useCaseId = spec.useCase.useCaseId,
-            useCaseRevision = spec.useCase.revision,
-            bindingRevision = bindingRevision,
-            preset = publicPreset,
-        )
+    fun setupRequest(bindingRevision: Int = this.bindingRevision): ConsumerSetupResolutionRequest = ConsumerSetupResolutionRequest(
+        useCaseId = spec.useCase.useCaseId,
+        useCaseRevision = spec.useCase.revision,
+        bindingRevision = bindingRevision,
+        preset = publicPreset,
+    )
 }
 
 private class SetupRecordingRuntimeControl : HarnessConsumerRuntimeControl {
