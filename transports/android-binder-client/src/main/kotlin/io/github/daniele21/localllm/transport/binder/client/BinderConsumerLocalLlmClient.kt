@@ -13,6 +13,8 @@ import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
 import io.github.daniele21.localllm.contracts.ConsumerRuntimeReadinessClient
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionRequest
+import io.github.daniele21.localllm.contracts.ConsumerSetupResolutionResult
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
@@ -45,6 +47,11 @@ private constructor(
     override fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult {
         checkOpen()
         return lifecycle.capabilities(useCaseId)
+    }
+
+    override fun resolveSetup(request: ConsumerSetupResolutionRequest): ConsumerSetupResolutionResult {
+        checkOpen()
+        return controlPlane.resolveSetup(request)
     }
 
     override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult {
