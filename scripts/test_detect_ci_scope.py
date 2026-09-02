@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from detect_ci_scope import adjust_for_event, apply_requested_profile, classify_paths
+from test_development_velocity import DevelopmentVelocityTest  # imported for unittest discovery
 
 
 class DetectCiScopeTest(unittest.TestCase):
@@ -67,13 +68,11 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("evaluation:room-store",))
 
     def test_model_distribution_modules_are_selected_explicitly(self) -> None:
-        scope = classify_paths(
-            [
-                "models/model-catalog/src/main/kotlin/Catalog.kt",
-                "models/model-download/src/main/kotlin/Download.kt",
-                "models/model-install/src/main/kotlin/Install.kt",
-            ]
-        )
+        scope = classify_paths([
+            "models/model-catalog/src/main/kotlin/Catalog.kt",
+            "models/model-download/src/main/kotlin/Download.kt",
+            "models/model-install/src/main/kotlin/Install.kt",
+        ])
         self.assertEqual(scope.profile, "scoped")
         self.assertEqual(scope.modules, ("models:model-catalog", "models:model-download", "models:model-install"))
 
@@ -121,12 +120,10 @@ class DetectCiScopeTest(unittest.TestCase):
         self.assertEqual(scope.modules, ("apps:local-llm-console",))
 
     def test_mixed_scoped_modules_preserve_repository_order(self) -> None:
-        scope = classify_paths(
-            [
-                "observability/health-engine/src/main/kotlin/Health.kt",
-                "evaluation/evaluators/src/main/kotlin/Evaluator.kt",
-            ]
-        )
+        scope = classify_paths([
+            "observability/health-engine/src/main/kotlin/Health.kt",
+            "evaluation/evaluators/src/main/kotlin/Evaluator.kt",
+        ])
         self.assertEqual(scope.profile, "scoped")
         self.assertEqual(scope.modules, ("evaluation:evaluators", "observability:health-engine"))
 
