@@ -30,6 +30,7 @@ class SharedRuntimeHostDelegate(
     private val readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
     private val callbackDispatcherFactory: HostCallbackDispatcherFactory =
         HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+    private val logicalJobMetadataStore: HostLogicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
 ) : AutoCloseable {
     private val resources = HostRuntimeResources()
     private val consumerResources = ConsumerHostResources()
@@ -39,6 +40,7 @@ class SharedRuntimeHostDelegate(
         maxJobs = LOGICAL_JOB_CAPACITY,
         runtimeSessionId = HostRuntimeSessionId("runtime:${UUID.randomUUID()}"),
         idFactory = { HostLogicalJobId(UUID.randomUUID().toString()) },
+        metadataStore = logicalJobMetadataStore,
     )
     private val logicalJobCoordinator = HostLogicalJobCoordinator(logicalJobRegistry, logicalJobExecutionDemand)
     private val closed = AtomicBoolean(false)
