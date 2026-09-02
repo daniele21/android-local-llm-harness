@@ -1,7 +1,9 @@
 package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
+import io.github.daniele21.localllm.contracts.LocalLlmError
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,6 +75,46 @@ class RuntimeFailurePolicyTest {
         expected.forEach { (code, reason) ->
             assertEquals(reason, RuntimeFailurePolicy.classifyBackendCode(code).configurationError)
         }
+    }
+
+    @Test
+    fun `backend failure resolution preserves stable configuration reason`() {
+        val resolution = RuntimeFailurePolicy.resolveBackendFailure(
+            BackendException(" context_overflow ", "requested context exceeds capacity"),
+        )
+
+        val publicError = resolution.publicError as LocalLlmError.Configuration
+        assertEquals(ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED, publicError.reason)
+        assertEquals("requested context exceeds capacity", publicError.message)
+        assertEquals(RuntimeFailureFamily.CONTEXT, resolution.decision.family)
+        assertEquals("CONTEXT_OVERFLOW", resolution.backendCode)
+    }
+
+    @Test
+    fun `non configuration backend details do not become public error contracts`() {
+        val resolution = RuntimeFailurePolicy.resolveBackendFailure(
+            BackendException("provider_specific_42", "private backend detail at slash tmp secret"),
+        )
+
+        val publicError = resolution.publicError as LocalLlmError.NativeRuntime
+        assertEquals("NATIVE_RUNTIME", publicError.code)
+        assertEquals("Local generation failed", publicError.message)
+        assertFalse(publicError.message.contains("PROVIDER_SPECIFIC_42"))
+        assertFalse(publicError.message.contains("private backend detail"))
+        assertEquals("PROVIDER_SPECIFIC_42", resolution.backendCode)
+        assertEquals(0, resolution.decision.automaticRetryLimit)
+    }
+
+    @Test
+    fun `storage integrity failures map to stable model unavailable category`() {
+        val resolution = RuntimeFailurePolicy.resolveBackendFailure(
+            BackendException("MODEL_INTEGRITY", "digest mismatch at private path"),
+        )
+
+        assertTrue(resolution.publicError is LocalLlmError.ModelUnavailable)
+        assertEquals("MODEL_UNAVAILABLE", resolution.publicError.code)
+        assertFalse(resolution.publicError.message.contains("private path"))
+        assertEquals(RuntimeRecoveryConsequence.REQUIRE_USER_ACTION, resolution.decision.recovery)
     }
 
     @Test
