@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-09-01
+Last reviewed: 2026-09-02
 
 This is the operational ledger for integrated state, blockers and immediate work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail stays in its focused workstream/specification.
 
@@ -31,7 +31,9 @@ Applications control-plane work is complete through ACUX-80 and CPREC-10..70. St
 
 SR-0..5 and repository-side SR-6 release-evidence tooling are integrated; representative physical SR-6 evidence remains. CRV repository implementation is complete through its automated candidate gate, while CRV-110 remains the frozen same-signer real-GGUF physical gate. See [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md) and [`shared-runtime/sr6-release-evidence.md`](shared-runtime/sr6-release-evidence.md).
 
-Background/process lifecycle hardening is active in PR #502 and ADR 0016. The Harness candidate now provides caller/use-case-scoped durable `ConsumerInferenceJobId` state, idempotent submit, authoritative query/result after reconnect, explicit cancel, exact prepared `ConsumerExecutionIdentity` pinning, detached session/generation-handle ownership and started/foreground service demand while durable work is active. Setup resolution remains protocol minor 5; logical jobs are minor 6. Consumer SDK candidate `0.1.0-alpha.8` has a frozen ABI baseline. Remaining work is RedactGuard logical-job consumption, host-process restart reconciliation, dedicated lifecycle E2E and physical evidence. See [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md).
+Background/process lifecycle hardening is integrated through the core durable-job/service boundary. PR #502 provides caller/use-case-scoped durable `ConsumerInferenceJobId`, idempotent submit, authoritative query/result after reconnect, explicit cancel, exact prepared `ConsumerExecutionIdentity` pinning, detached session/generation-handle ownership and started/foreground service demand while durable work is active. Setup resolution remains protocol minor 5 and logical jobs protocol minor 6. PR #510 supplies the protected emulator fault gate used by downstream disconnect/rebind tests. PR #511 fixes concrete Consumer setup-resolution forwarding through Binder. Consumer SDK `0.1.0-alpha.9` is published from the integrated `dev` line at `f86b53ad29d2396660f095d5eaadd41c19bda8c7`.
+
+RedactGuard has consumed logical jobs and alpha.9 on its active LAS candidate. Remaining lifecycle work is Host process-restart reconciliation/retry semantics, deterministic downstream lifecycle completion and representative physical evidence. See [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md).
 
 ### Consumer API, OMBRA and evaluation
 
@@ -43,7 +45,11 @@ Model-evaluation contracts/evaluators and core dataset pipeline are integrated t
 
 ### 1. Background/process lifecycle convergence
 
-PR #502 implements the Harness durable-job/service candidate, but end-to-end continuity is not complete. Required sequence: exact-head automated preflight; merge to `dev`; publish Consumer SDK `0.1.0-alpha.8`; migrate RedactGuard multi-chunk generation to stable Harness logical jobs; prove app switch, Activity recreation, Binder disconnect/reconnect and explicit cancel through deterministic two-APK journeys with privacy-safe state plus screenshots/video; then record same-signer ARM64/JNI/GGUF/OEM/model-residency evidence. Host process death remains a truthful interruption boundary.
+The durable-job/Binder/service foundation is no longer waiting on RedactGuard migration: RedactGuard's LAS candidate consumes the logical-job API and contains app-switch/ViewModel/Binder lifecycle journeys. The current downstream exact Two-APK run `33594812860` fails **before those lifecycle assertions**. It successfully builds/installs the Harnex Host, passes the Host-absent scenario, negotiates protocol minor 6 with `consumer-setup-resolution-v1`, and validates the assigned use case plus published preset; RedactGuard then remains at generic `INCOMPATIBLE` and emits no setup-resolution diagnostic event.
+
+Current RedactGuard source analysis shows its diagnostic reason formatting can mask the original typed `ConsumerControlPlaneFailure`. Therefore the current failure is not sufficient evidence of a Harnex model-store/setup-resolver/runtime defect. RedactGuard must first preserve the typed setup-resolution outcome and rerun the exact journey; only that result may route a new Harnex functional fix. Do not seed a different model or weaken setup criteria to make the downstream E2E pass.
+
+Independent Harnex work remains: reconcile stale non-terminal logical-job metadata after actual Host process restart so impossible native work becomes interrupted/process-lost, then define privacy-safe retry-attempt semantics. After the initial downstream setup gate is healthy, complete disconnect/reconnect/cancel lifecycle evidence, residency composition evidence and final physical validation.
 
 ### 2. OMBRA completion
 
@@ -59,12 +65,13 @@ Remaining parallel work includes RAM warm-idle/device restoration evidence, Q35-
 
 ## Immediate next block
 
-1. close #502 on a documentation-current exact head with required CI and `/preflight strong`;
-2. merge #502 to `dev` and verify GitHub Packages publishes `0.1.0-alpha.8` from that integrated source;
-3. bump RedactGuard to alpha.8 and complete LAS-08B logical-job reconciliation without duplicate generation;
-4. add LAS-08C two-APK lifecycle journeys with screenshots/video before real-device validation;
-5. execute remaining ARM64/JNI/GGUF/model-memory/OEM evidence;
-6. continue OMB-6B, OMB-8, evaluation and LLUP independently.
+1. continue independent Harnex HBG-42 Host process-restart reconciliation from current `dev`, with STRONG selector-driven validation;
+2. on RedactGuard, make setup diagnostics non-interfering and preserve the typed Consumer setup-resolution code;
+3. rerun the exact Two-APK setup path and route the first typed outcome to its canonical owner; create a Harnex corrective slice only if that evidence points to Harnex;
+4. after setup resolution reaches the lifecycle journey, complete deterministic app-switch, Activity recreation, Binder disconnect/reconnect, explicit-cancel and process-loss evidence;
+5. finish HBG retry/residency evidence and exact-head automated preflight;
+6. execute remaining ARM64/JNI/GGUF/model-memory/OEM evidence;
+7. continue OMB-6B, OMB-8, evaluation and LLUP independently where ownership does not conflict.
 
 ## Source links
 
