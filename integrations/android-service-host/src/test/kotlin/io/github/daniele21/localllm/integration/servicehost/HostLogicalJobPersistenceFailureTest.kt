@@ -81,28 +81,24 @@ class HostLogicalJobPersistenceFailureTest {
         assertEquals(listOf(true, false), demandEvents)
     }
 
-    private fun registry(store: HostLogicalJobMetadataStore): HostLogicalJobRegistry =
-        HostLogicalJobRegistry(
-            maxJobs = 4,
-            runtimeSessionId = HostRuntimeSessionId("runtime-A"),
-            idFactory = { HostLogicalJobId("job-1") },
-            metadataStore = store,
-        )
+    private fun registry(store: HostLogicalJobMetadataStore): HostLogicalJobRegistry = HostLogicalJobRegistry(
+        maxJobs = 4,
+        runtimeSessionId = HostRuntimeSessionId("runtime-A"),
+        idFactory = { HostLogicalJobId("job-1") },
+        metadataStore = store,
+    )
 
-    private fun request() =
-        ConsumerLogicalJobSubmitRequest(
-            clientRequestId = ConsumerLogicalJobRequestId("analysis-1:chunk-1"),
-            useCaseId = useCaseId,
-            preparedId = ConsumerPreparedId("prepared-1"),
-            expectedExecution = execution,
-            input = ConsumerGenerationInput.Text("sensitive input must remain process-local"),
-            outputConstraint = ConsumerOutputConstraint.Json,
-        ).toConsumerLogicalJobWire(ClientTokenParcel("token"), "operation-1")
+    private fun request() = ConsumerLogicalJobSubmitRequest(
+        clientRequestId = ConsumerLogicalJobRequestId("analysis-1:chunk-1"),
+        useCaseId = useCaseId,
+        preparedId = ConsumerPreparedId("prepared-1"),
+        expectedExecution = execution,
+        input = ConsumerGenerationInput.Text("sensitive input must remain process-local"),
+        outputConstraint = ConsumerOutputConstraint.Json,
+    ).toConsumerLogicalJobWire(ClientTokenParcel("token"), "operation-1")
 }
 
-private class CountingMetadataStore(
-    private val failOnReplace: Int,
-) : HostLogicalJobMetadataStore {
+private class CountingMetadataStore(private val failOnReplace: Int) : HostLogicalJobMetadataStore {
     private var replaceCalls = 0
     private val snapshots = LinkedHashMap<HostLogicalJobId, HostLogicalJobSnapshot>()
 
@@ -129,10 +125,8 @@ private class CountingClient : ConsumerLocalLlmClient {
         return ConsumerSessionResult.Created(SessionId("session-1"))
     }
 
-    override fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult = error("must not be reached")
+    override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult =
+        error("must not be reached")
 
     override fun closeSession(sessionId: SessionId) = Unit
 }

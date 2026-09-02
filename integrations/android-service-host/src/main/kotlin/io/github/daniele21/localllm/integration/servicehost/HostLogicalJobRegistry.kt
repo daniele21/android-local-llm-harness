@@ -267,10 +267,7 @@ internal class HostLogicalJobRegistry(
      * reconcile it through its stale runtimeSessionId. No new execution may continue from here.
      */
     @Synchronized
-    fun interruptInMemoryAfterPersistenceFailure(
-        scope: HostLogicalJobScope,
-        jobId: HostLogicalJobId,
-    ): HostLogicalJobSnapshot? {
+    fun interruptInMemoryAfterPersistenceFailure(scope: HostLogicalJobScope, jobId: HostLogicalJobId): HostLogicalJobSnapshot? {
         val current = snapshot(scope, jobId) ?: return null
         if (current.isTerminal || current.state == HostLogicalJobState.INTERRUPTED) return current
         val interrupted =

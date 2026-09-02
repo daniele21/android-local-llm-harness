@@ -45,23 +45,22 @@ internal data class HostLogicalJobMetadataRecord(
     val runtimeSessionId: String,
 )
 
-internal fun HostLogicalJobSnapshot.toMetadataRecord(): HostLogicalJobMetadataRecord =
-    HostLogicalJobMetadataRecord(
-        jobId = jobId.value,
-        clientRequestId = clientRequestId.value,
-        applicationId = scope.applicationId.value,
-        useCaseId = scope.useCaseId.value,
-        capabilityRevision = execution.capabilityRevision,
-        presetId = execution.preset?.id?.value,
-        presetVersion = execution.preset?.version,
-        reasoningMode = execution.reasoningMode.name,
-        outputConstraint = execution.outputConstraint.name,
-        sessionKind = execution.sessionKind.name,
-        state = state.name,
-        revision = revision,
-        attempt = attempt,
-        runtimeSessionId = runtimeSessionId.value,
-    )
+internal fun HostLogicalJobSnapshot.toMetadataRecord(): HostLogicalJobMetadataRecord = HostLogicalJobMetadataRecord(
+    jobId = jobId.value,
+    clientRequestId = clientRequestId.value,
+    applicationId = scope.applicationId.value,
+    useCaseId = scope.useCaseId.value,
+    capabilityRevision = execution.capabilityRevision,
+    presetId = execution.preset?.id?.value,
+    presetVersion = execution.preset?.version,
+    reasoningMode = execution.reasoningMode.name,
+    outputConstraint = execution.outputConstraint.name,
+    sessionKind = execution.sessionKind.name,
+    state = state.name,
+    revision = revision,
+    attempt = attempt,
+    runtimeSessionId = runtimeSessionId.value,
+)
 
 internal fun HostLogicalJobMetadataRecord.toSnapshot(): HostLogicalJobSnapshot {
     require((presetId == null) == (presetVersion == null)) { "Logical job preset metadata must be complete or absent" }
@@ -71,20 +70,20 @@ internal fun HostLogicalJobMetadataRecord.toSnapshot(): HostLogicalJobSnapshot {
         clientRequestId = HostClientRequestId(clientRequestId),
         scope = HostLogicalJobScope(ApplicationId(applicationId), useCase),
         execution =
-            ConsumerExecutionIdentity(
-                useCaseId = useCase,
-                capabilityRevision = capabilityRevision,
-                preset =
-                    presetId?.let { id ->
-                        InferencePresetRef(
-                            InferencePresetId(id),
-                            requireNotNull(presetVersion),
-                        )
-                    },
-                reasoningMode = enumValueOf<EffectiveConsumerReasoningMode>(reasoningMode),
-                outputConstraint = enumValueOf<ConsumerOutputConstraintKind>(outputConstraint),
-                sessionKind = enumValueOf<SessionKind>(sessionKind),
-            ),
+        ConsumerExecutionIdentity(
+            useCaseId = useCase,
+            capabilityRevision = capabilityRevision,
+            preset =
+            presetId?.let { id ->
+                InferencePresetRef(
+                    InferencePresetId(id),
+                    requireNotNull(presetVersion),
+                )
+            },
+            reasoningMode = enumValueOf<EffectiveConsumerReasoningMode>(reasoningMode),
+            outputConstraint = enumValueOf<ConsumerOutputConstraintKind>(outputConstraint),
+            sessionKind = enumValueOf<SessionKind>(sessionKind),
+        ),
         state = enumValueOf<HostLogicalJobState>(state),
         revision = revision,
         attempt = attempt,

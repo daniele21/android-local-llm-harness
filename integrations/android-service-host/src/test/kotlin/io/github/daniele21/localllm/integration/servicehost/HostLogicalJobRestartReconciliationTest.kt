@@ -151,21 +151,15 @@ class HostLogicalJobRestartReconciliationTest {
         )
     }
 
-    private fun registry(
-        runtimeSession: String,
-        store: HostLogicalJobMetadataStore,
-        maxJobs: Int = 8,
-    ): HostLogicalJobRegistry = HostLogicalJobRegistry(
-        maxJobs = maxJobs,
-        runtimeSessionId = HostRuntimeSessionId(runtimeSession),
-        idFactory = { HostLogicalJobId("job-new") },
-        metadataStore = store,
-    )
+    private fun registry(runtimeSession: String, store: HostLogicalJobMetadataStore, maxJobs: Int = 8): HostLogicalJobRegistry =
+        HostLogicalJobRegistry(
+            maxJobs = maxJobs,
+            runtimeSessionId = HostRuntimeSessionId(runtimeSession),
+            idFactory = { HostLogicalJobId("job-new") },
+            metadataStore = store,
+        )
 
-    private fun snapshot(
-        state: HostLogicalJobState,
-        revision: Long,
-    ): HostLogicalJobSnapshot = HostLogicalJobSnapshot(
+    private fun snapshot(state: HostLogicalJobState, revision: Long): HostLogicalJobSnapshot = HostLogicalJobSnapshot(
         jobId = JOB_ID,
         clientRequestId = HostClientRequestId("request-1"),
         scope = scope,
@@ -181,10 +175,8 @@ class HostLogicalJobRestartReconciliationTest {
     }
 }
 
-private class InMemoryMetadataStore(
-    snapshots: List<HostLogicalJobSnapshot> = emptyList(),
-    var replaceSucceeds: Boolean = true,
-) : HostLogicalJobMetadataStore {
+private class InMemoryMetadataStore(snapshots: List<HostLogicalJobSnapshot> = emptyList(), var replaceSucceeds: Boolean = true) :
+    HostLogicalJobMetadataStore {
     private val snapshotsById = LinkedHashMap<HostLogicalJobId, HostLogicalJobSnapshot>()
 
     init {

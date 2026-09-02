@@ -345,12 +345,7 @@ private class HostLogicalJobEventHandler(
         }
     }
 
-    private fun finish(
-        scope: HostLogicalJobScope,
-        jobId: HostLogicalJobId,
-        state: HostLogicalJobState,
-        errorCode: String,
-    ) {
+    private fun finish(scope: HostLogicalJobScope, jobId: HostLogicalJobId, state: HostLogicalJobState, errorCode: String) {
         val current = registry.snapshot(scope, jobId) ?: return
         val transitioned = transitionLogicalJobSafely(registry, current, state)
         if (transitioned == null) {
@@ -424,13 +419,12 @@ private fun transitionLogicalJobSafely(
     registry: HostLogicalJobRegistry,
     current: HostLogicalJobSnapshot,
     state: HostLogicalJobState,
-): HostLogicalJobSnapshot? =
-    try {
-        transitionLogicalJob(registry, current, state)
-    } catch (_: HostLogicalJobPersistenceException) {
-        registry.interruptInMemoryAfterPersistenceFailure(current.scope, current.jobId)
-        null
-    }
+): HostLogicalJobSnapshot? = try {
+    transitionLogicalJob(registry, current, state)
+} catch (_: HostLogicalJobPersistenceException) {
+    registry.interruptInMemoryAfterPersistenceFailure(current.scope, current.jobId)
+    null
+}
 
 private fun ConsumerLogicalJobSubmitParcel.authorizedScope(caller: AuthorizedCaller): HostLogicalJobScope? {
     val useCase = useCaseId.takeIf(String::isNotBlank)?.let(::UseCaseId)?.takeIf(caller::allows) ?: return null
