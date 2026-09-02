@@ -169,15 +169,25 @@ internal class HostLogicalJobCoordinator(
         preparedId: String,
         submitted: HostLogicalJobSnapshot,
     ): ConsumerLogicalJobResultParcel {
-        val requestParts = runCatching {
-            Triple(
-                request.input.toCoreConsumerInput(),
-                request.outputConstraint.toCoreConsumerOutput(),
-                request.taskDefinitions.map { it.toCoreTaskDefinition() },
-            )
-        }.getOrNull()
-        val response =
-            if (requestParts == null) {
+        val requestParts =
+            runCatching {
+                Triple(
+                    request.input.toCoreConsumerInput(),
+                    request.outputConstraint.toCoreConsumerOutput(),
+                    request.taskDefinitions.map { it.toCoreTaskDefinition() },
+                )
+            }.getOrNull()
+        val preparing =
+            requestParts?.let {
+                transitionLogicalJobSafely(registry, submitted, HostLogicalJobState.PREPARING)
+            }
+        val session =
+            preparing?.let {
+                runCatching { client.createSession(ConsumerPreparedId(preparedId)) }.getOrNull()
+            }
+
+        return when {
+            requestParts == null -> {
                 val failed = transitionLogicalJobSafely(registry, submitted, HostLogicalJobState.FAILED_FINAL)
                 executionDemand.release(submitted.jobId)
                 if (failed == null) {
@@ -187,73 +197,73 @@ internal class HostLogicalJobCoordinator(
                     resultStore.recordError(submitted.jobId, WireErrorCodes.INVALID_WIRE_REQUEST)
                     resultStore.response(request.operationId, failed)
                 }
-            } else {
-                val preparing = transitionLogicalJobSafely(registry, submitted, HostLogicalJobState.PREPARING)
-                if (preparing == null) {
-                    executionDemand.release(submitted.jobId)
-                    resultStore.recordError(submitted.jobId, WireErrorCodes.RUNTIME_FAILURE)
+            }
+
+            preparing == null -> {
+                executionDemand.release(submitted.jobId)
+                resultStore.recordError(submitted.jobId, WireErrorCodes.RUNTIME_FAILURE)
+                resultStore.failure(request.operationId, WireErrorCodes.RUNTIME_FAILURE)
+            }
+
+            session !is ConsumerSessionResult.Created -> {
+                val failed = transitionLogicalJobSafely(registry, preparing, HostLogicalJobState.FAILED_FINAL)
+                executionDemand.release(preparing.jobId)
+                if (failed == null) {
+                    resultStore.recordError(preparing.jobId, WireErrorCodes.RUNTIME_FAILURE)
                     resultStore.failure(request.operationId, WireErrorCodes.RUNTIME_FAILURE)
                 } else {
-                    val session = runCatching { client.createSession(ConsumerPreparedId(preparedId)) }.getOrNull()
-                    if (session !is ConsumerSessionResult.Created) {
-                        val failed = transitionLogicalJobSafely(registry, preparing, HostLogicalJobState.FAILED_FINAL)
-                        executionDemand.release(preparing.jobId)
-                        if (failed == null) {
-                            resultStore.recordError(preparing.jobId, WireErrorCodes.RUNTIME_FAILURE)
-                            resultStore.failure(request.operationId, WireErrorCodes.RUNTIME_FAILURE)
-                        } else {
-                            resultStore.recordError(
-                                preparing.jobId,
-                                (session as? ConsumerSessionResult.Rejected)?.failure?.code?.toWireCode()
-                                    ?: WireErrorCodes.RUNTIME_FAILURE,
-                            )
-                            resultStore.response(request.operationId, failed)
-                        }
-                    } else {
-                        val execution = Execution(client, session.sessionId)
-                        synchronized(lock) { executions[preparing.jobId] = execution }
-                        val coreRequest =
-                            ConsumerGenerationRequest(
-                                requestId = RequestId("logical:${preparing.jobId.value}"),
-                                sessionId = session.sessionId,
-                                input = requestParts.first,
-                                outputConstraint = requestParts.second,
-                                taskDefinitions = requestParts.third,
-                            )
-                        val start =
-                            runCatching {
-                                client.generate(
-                                    coreRequest,
-                                    ConsumerGenerationListener { event ->
-                                        eventHandler.onEvent(preparing.scope, preparing.jobId, event)
-                                    },
-                                )
-                            }.getOrNull()
-                        when (start) {
-                            is ConsumerGenerationStartResult.Accepted -> synchronized(lock) {
-                                executions[preparing.jobId]?.handle = start.handle
-                            }
-
-                            is ConsumerGenerationStartResult.Rejected ->
-                                eventHandler.finishFailure(
-                                    preparing.scope,
-                                    preparing.jobId,
-                                    start.failure.code.toWireCode(),
-                                )
-
-                            null ->
-                                eventHandler.finishFailure(
-                                    preparing.scope,
-                                    preparing.jobId,
-                                    WireErrorCodes.RUNTIME_FAILURE,
-                                )
-                        }
-                        val current = registry.snapshot(preparing.scope, preparing.jobId) ?: preparing
-                        resultStore.response(request.operationId, current)
-                    }
+                    resultStore.recordError(
+                        preparing.jobId,
+                        (session as? ConsumerSessionResult.Rejected)?.failure?.code?.toWireCode()
+                            ?: WireErrorCodes.RUNTIME_FAILURE,
+                    )
+                    resultStore.response(request.operationId, failed)
                 }
             }
-        return response
+
+            else -> {
+                val execution = Execution(client, session.sessionId)
+                synchronized(lock) { executions[preparing.jobId] = execution }
+                val coreRequest =
+                    ConsumerGenerationRequest(
+                        requestId = RequestId("logical:${preparing.jobId.value}"),
+                        sessionId = session.sessionId,
+                        input = requestParts.first,
+                        outputConstraint = requestParts.second,
+                        taskDefinitions = requestParts.third,
+                    )
+                val generationStart =
+                    runCatching {
+                        client.generate(
+                            coreRequest,
+                            ConsumerGenerationListener { event ->
+                                eventHandler.onEvent(preparing.scope, preparing.jobId, event)
+                            },
+                        )
+                    }.getOrNull()
+                when (generationStart) {
+                    is ConsumerGenerationStartResult.Accepted -> synchronized(lock) {
+                        executions[preparing.jobId]?.handle = generationStart.handle
+                    }
+
+                    is ConsumerGenerationStartResult.Rejected ->
+                        eventHandler.finishFailure(
+                            preparing.scope,
+                            preparing.jobId,
+                            generationStart.failure.code.toWireCode(),
+                        )
+
+                    null ->
+                        eventHandler.finishFailure(
+                            preparing.scope,
+                            preparing.jobId,
+                            WireErrorCodes.RUNTIME_FAILURE,
+                        )
+                }
+                val current = registry.snapshot(preparing.scope, preparing.jobId) ?: preparing
+                resultStore.response(request.operationId, current)
+            }
+        }
     }
 
     private fun closeExecution(jobId: HostLogicalJobId) {
