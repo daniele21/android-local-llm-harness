@@ -21,7 +21,6 @@ COMMANDS = (
     "stop",
     "clean",
 )
-
 REQUIRED_NON_NA = {"setup", "check", "test", "build", "clean"}
 STATUSES = {"required", "recommended", "optional", "n/a"}
 PLACEHOLDER_MARKERS = ("<REPLACE_WITH_", "<PROJECT_")
@@ -41,6 +40,10 @@ REQUIRED_PUBLICATION_FLAGS = (
 )
 REQUIRED_EXECUTION_CLASSES = {"agent_local", "remote_automated", "real_environment"}
 REQUIRED_VALIDATION_PROFILES = {"lean", "scoped", "strong", "full"}
+REQUIRED_DELIVERY_STAGES = ["iteration", "integration", "release"]
+REQUIRED_UI_EVIDENCE_MODES = ["assertions", "screenshots", "full_media"]
+REQUIRED_EVIDENCE_IDENTITY_FIELDS = {"head", "target_base", "required_gates", "profile", "e2e_environment"}
+REQUIRED_VALIDATION_ECONOMICS = {"duration", "flake_rate", "unique_regression_signal", "overlap"}
 REQUIRED_CLEANUP_PATHS = {"success", "failure", "timeout", "cancellation", "interrupt", "partial-initialization"}
 REQUIRED_DELTA_DIMENSIONS = {"source", "dependencies", "toolchain", "configuration", "compatibility_migrations", "artifact_metrics", "validation"}
 REQUIRED_E2E_FLAGS = (
@@ -51,6 +54,8 @@ REQUIRED_E2E_FLAGS = (
     "run_against_built_artifact_when_material",
     "failure_evidence_bounded",
     "zero_residue_required",
+    "incidental_ui_does_not_force_full_media",
+    "full_media_for_motion_timing_sequence_or_release_claims",
 )
 
 
@@ -66,6 +71,15 @@ def expect_true(section: dict, key: str, errors: list[str], prefix: str) -> None
         errors.append(f"{prefix}.{key} must be true")
 
 
+def expect_false(section: dict, key: str, errors: list[str], prefix: str) -> None:
+    if section.get(key) is not False:
+        errors.append(f"{prefix}.{key} must be false")
+
+
+def positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def main() -> int:
     args = parse_args()
     root = Path(args.root).resolve()
@@ -77,7 +91,6 @@ def main() -> int:
         print("Project operating contract check")
         print("FAIL: missing required file: .engineering/commands.json")
         return 1
-
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
@@ -87,14 +100,13 @@ def main() -> int:
 
     if data.get("schema_version") != 1:
         errors.append("schema_version must be 1")
-    if data.get("contract_version") != "0.5.0":
-        errors.append("contract_version must be 0.5.0")
+    if data.get("contract_version") != "0.6.0":
+        errors.append("contract_version must be 0.6.0")
 
     commands = data.get("commands")
     if not isinstance(commands, dict):
         errors.append("commands must be an object")
         commands = {}
-
     for name in COMMANDS:
         entry = commands.get(name)
         if not isinstance(entry, dict):
@@ -113,10 +125,60 @@ def main() -> int:
                 if marker in run:
                     errors.append(f"unresolved command placeholder in commands.{name}.run")
 
+    velocity = data.get("development_velocity")
+    if not isinstance(velocity, dict):
+        errors.append("development_velocity must be an object")
+        velocity = {}
+    if velocity.get("default_stage") != "iteration":
+        errors.append("development_velocity.default_stage must be iteration")
+    if velocity.get("stages") != REQUIRED_DELIVERY_STAGES:
+        errors.append("development_velocity.stages must be iteration, integration, release in that order")
+
+    iteration = velocity.get("iteration")
+    if not isinstance(iteration, dict):
+        errors.append("development_velocity.iteration must be an object")
+        iteration = {}
+    if not positive_int(iteration.get("target_feedback_minutes")):
+        errors.append("development_velocity.iteration.target_feedback_minutes must be a positive integer")
+    expect_false(iteration, "exact_head_required", errors, "development_velocity.iteration")
+    expect_false(iteration, "full_diff_review_required", errors, "development_velocity.iteration")
+    expect_false(iteration, "durable_documentation_current_required", errors, "development_velocity.iteration")
+    expect_false(iteration, "remote_preflight_required", errors, "development_velocity.iteration")
+    if iteration.get("e2e_default") != "risk_only":
+        errors.append("development_velocity.iteration.e2e_default must be risk_only")
+
+    integration = velocity.get("integration")
+    if not isinstance(integration, dict):
+        errors.append("development_velocity.integration must be an object")
+        integration = {}
+    if not positive_int(integration.get("target_feedback_minutes")):
+        errors.append("development_velocity.integration.target_feedback_minutes must be a positive integer")
+    expect_true(integration, "exact_head_required", errors, "development_velocity.integration")
+    expect_true(integration, "full_diff_review_required", errors, "development_velocity.integration")
+    expect_true(integration, "durable_documentation_current_required", errors, "development_velocity.integration")
+    expect_true(integration, "remote_preflight_when_required_gates_unavailable_local", errors, "development_velocity.integration")
+    if integration.get("e2e_default") != "affected_critical_journeys":
+        errors.append("development_velocity.integration.e2e_default must be affected_critical_journeys")
+
+    release = velocity.get("release")
+    if not isinstance(release, dict):
+        errors.append("development_velocity.release must be an object")
+        release = {}
+    expect_true(release, "exact_head_required", errors, "development_velocity.release")
+    expect_true(release, "full_diff_review_required", errors, "development_velocity.release")
+    expect_true(release, "durable_documentation_current_required", errors, "development_velocity.release")
+    expect_true(release, "full_validation_required", errors, "development_velocity.release")
+    if release.get("e2e_default") != "release_critical_journeys":
+        errors.append("development_velocity.release.e2e_default must be release_critical_journeys")
+    expect_true(velocity, "parallel_development_prefers_early_convergence", errors, "development_velocity")
+    expect_true(velocity, "stacked_publication_exception_only", errors, "development_velocity")
+
     publication = data.get("publication_gate")
     if not isinstance(publication, dict):
         errors.append("publication_gate must be an object")
         publication = {}
+    if publication.get("applies_from_stage") != "integration":
+        errors.append("publication_gate.applies_from_stage must be integration")
     for key in REQUIRED_PUBLICATION_FLAGS:
         expect_true(publication, key, errors, "publication_gate")
 
@@ -146,7 +208,11 @@ def main() -> int:
         errors.append("validation_profiles.selector is required")
     elif not args.template_mode and any(marker in selector for marker in PLACEHOLDER_MARKERS):
         errors.append("unresolved validation_profiles.selector placeholder")
+    if profiles.get("selector_output") != "risk_dimensions_and_required_gates":
+        errors.append("validation_profiles.selector_output must be risk_dimensions_and_required_gates")
     for key in (
+        "profiles_are_shorthand",
+        "gate_selection_preferred_over_suite_selection",
         "unknown_executable_paths_fail_safe",
         "selector_changes_force_full",
         "promotion_validation_full",
@@ -175,11 +241,17 @@ def main() -> int:
             "stronger_profile_override_allowed",
             "weaker_profile_override_requires_explicit_justification",
             "exact_head_required",
+            "reuse_successful_equivalent_evidence",
+            "rerun_only_when_missing_stale_or_insufficient",
             "trusted_requesters_only",
             "same_repository_prs_only_by_default",
             "report_result_to_pr",
         ):
             expect_true(remote, key, errors, "remote_preflight")
+        identity_fields = set(remote.get("evidence_identity_fields") or [])
+        missing_identity = sorted(REQUIRED_EVIDENCE_IDENTITY_FIELDS - identity_fields)
+        if missing_identity:
+            errors.append("remote_preflight.evidence_identity_fields missing: " + ", ".join(missing_identity))
         if remote.get("execution_job_write_credentials") is not False:
             errors.append("remote_preflight.execution_job_write_credentials must be false")
 
@@ -189,6 +261,24 @@ def main() -> int:
         e2e = {}
     for key in REQUIRED_E2E_FLAGS:
         expect_true(e2e, key, errors, "end_to_end")
+    if e2e.get("ui_evidence_modes") != REQUIRED_UI_EVIDENCE_MODES:
+        errors.append("end_to_end.ui_evidence_modes must be assertions, screenshots, full_media in that order")
+    if e2e.get("ui_evidence_selection") != "risk_based":
+        errors.append("end_to_end.ui_evidence_selection must be risk_based")
+
+    economics = data.get("validation_economics")
+    if not isinstance(economics, dict):
+        errors.append("validation_economics must be an object")
+        economics = {}
+    if economics.get("status") not in {"required", "recommended", "optional", "n/a"}:
+        errors.append("validation_economics.status must be required, recommended, optional or n/a")
+    if economics.get("optimize_for") != "sufficient-confidence-per-feedback-time":
+        errors.append("validation_economics.optimize_for must be sufficient-confidence-per-feedback-time")
+    economics_dimensions = set(economics.get("dimensions") or [])
+    missing_economics = sorted(REQUIRED_VALIDATION_ECONOMICS - economics_dimensions)
+    if missing_economics:
+        errors.append("validation_economics.dimensions missing: " + ", ".join(missing_economics))
+    expect_true(economics, "periodic_review", errors, "validation_economics")
 
     identity = data.get("build_identity")
     if not isinstance(identity, dict):
@@ -214,12 +304,12 @@ def main() -> int:
     if str(artifacts.get("checksum_algorithm", "")).lower() != "sha256":
         errors.append("artifact_lifecycle.checksum_algorithm must be sha256")
     keep = artifacts.get("local_keep_successful_per_lineage")
-    if not isinstance(keep, int) or keep < 1:
+    if not positive_int(keep):
         errors.append("artifact_lifecycle.local_keep_successful_per_lineage must be a positive integer")
     elif keep > 2:
         warnings.append("local artifact retention exceeds the default of 2 successful builds per lineage")
     retention = artifacts.get("ci_retention_days")
-    if not isinstance(retention, int) or retention < 1:
+    if not positive_int(retention):
         errors.append("artifact_lifecycle.ci_retention_days must be a positive integer")
     if not artifacts.get("ci_store"):
         errors.append("artifact_lifecycle.ci_store is required")
