@@ -38,7 +38,7 @@ def main() -> int:
         standard = baseline.get("standard", {})
         if baseline.get("schema_version") != 1: errors.append("baseline schema_version must be 1")
         if standard.get("source") != "daniele21/repo-template-sw": errors.append("baseline standard.source must identify daniele21/repo-template-sw")
-        if standard.get("version") != "0.9.0": errors.append("baseline standard.version must be 0.9.0")
+        if standard.get("version") != "0.9.1": errors.append("baseline standard.version must be 0.9.1")
         if baseline.get("target_level") not in {"L0", "L1", "L2"}: errors.append("target_level must be L0, L1 or L2")
         if not isinstance(baseline.get("profiles"), list): errors.append("profiles must be a list")
         skills = baseline.get("skills", {})
