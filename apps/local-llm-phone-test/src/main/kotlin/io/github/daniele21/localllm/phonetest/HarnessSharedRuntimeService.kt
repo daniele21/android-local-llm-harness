@@ -71,6 +71,7 @@ class HarnessSharedRuntimeService : Service() {
                 onPressure = { pressure ->
                     if (pressure == RuntimeMemoryPressure.LOW_MEMORY) {
                         warmIdleResidency.onCriticalPressure()
+                        hostComposition.failActiveLogicalJobsForRuntimePressure()
                     }
                     runtimeGraph.handleMemoryPressure(pressure)
                 },
