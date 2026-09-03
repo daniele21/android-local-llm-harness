@@ -1,27 +1,36 @@
 ---
 name: remote-preflight
-description: Reuse sufficient exact validation evidence first, then execute only missing deterministic gates through repository-owned automation.
+description: Reuse trusted equivalent validation evidence first, then execute only missing deterministic integration/release gates.
 ---
 
 # Remote Preflight
 
-Use only after `preflight-change` identifies `REMOTE_AUTOMATED` gates at INTEGRATION/RELEASE.
+Use after `preflight-change` identifies `REMOTE_AUTOMATED` gates at INTEGRATION or RELEASE.
 
-## Workflow
+## Candidate preflight
 
-1. Read `.engineering/commands.json`; resolve live PR head/base and selector output.
-2. Search existing successful evidence for the same head + live base and sufficient profile/required gates/E2E identity.
-3. If sufficient evidence exists, reuse it and report the source run; do **not** dispatch another heavy validation run.
-4. Otherwise trigger `/preflight auto` or the justified stronger profile once.
-5. Inspect result/logs. On failure classify `CHANGE_REGRESSION`, `BASELINE_FAILURE`, `ENVIRONMENT`, `FLAKY`, `BASE_DRIFT` or `ASSUMPTION`; fix the owning invariant and reselect gates.
-6. Retrigger only because evidence is missing/stale/insufficient or the source changed.
+1. Read `.engineering/commands.json`; resolve exact PR head, live base, source tree, risks, gates/profile and relevant E2E identity.
+2. Search successful **exact-head** evidence first.
+3. If it is sufficient, report the source run without starting another heavy Validate.
+4. Otherwise dispatch `/preflight auto` or a justified stronger profile once.
+5. On failure classify `CHANGE_REGRESSION`, `BASELINE_FAILURE`, `ENVIRONMENT`, `FLAKY`, `BASE_DRIFT` or `ASSUMPTION`, repair the owner and reselect gates.
+6. Rerun only missing/stale/insufficient proof.
 
-Do not ask the user to execute automatable Gradle/native/build gates. Do not downgrade the selector or suppress legitimate tests to save time.
+Do not ask the user to execute automatable Gradle/native/build gates. Do not downgrade/suppress legitimate contract, lifecycle, native or packaging evidence for speed.
 
-Preserve trusted-requester, same-repository, exact-head, least-privilege and secret-free execution rules.
+## Post-merge equivalence
 
-## Evidence validity
+Exact-head remains the rule for the integration candidate. After a content-preserving squash/rebase to `dev`, repository CI may reuse that green proof under a new commit SHA only when:
 
-Collaboration metadata (new PR number, draft/ready state, comments) does not invalidate equivalent source evidence. Source edits, material live-base/dependency changes, changed required gates, or stronger E2E environment/evidence requirements do.
+- the final Git tree exactly matches the validated candidate tree;
+- the push base exactly matches the candidate target/base;
+- required gates/profile and material E2E identity remain sufficient;
+- the evidence artifact is trusted and current.
 
-Report stage, profile, risk dimensions, required gates, reused/new run identity, failures and remaining REAL_ENVIRONMENT gaps.
+Moved base, changed tree, broader gates, direct push without evidence or RELEASE must validate normally. This matters especially in Harnex when `dev` advances before merge: the integrated tree may differ even if the feature branch did not, and native/Android validation must then run.
+
+Report tree reuse truthfully as `tree-equivalent`; do not imply the earlier run executed on the new commit object.
+
+Preserve trusted-requester, same-repository, exact-head pinning for new runs, least privilege and secret-free execution.
+
+Report stage, head/tree/base, risks, required gates, exact-head or tree-equivalent reused evidence, new runs, failures and remaining `REAL_ENVIRONMENT` gaps.

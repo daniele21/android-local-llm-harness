@@ -58,6 +58,7 @@ jobs:
       modules: ${{ steps.scope.outputs.modules }}
       source_head_sha: ${{ steps.identity.outputs.source_head_sha }}
       target_base_sha: ${{ steps.identity.outputs.target_base_sha }}
+      source_tree: ${{ steps.tree.outputs.source_tree }}
     steps:
       - name: Resolve validation identity
         id: identity
@@ -90,10 +91,16 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.identity.outputs.source_head_sha }}
 
+      - name: Resolve source tree identity
+        id: tree
+        shell: bash
+        run: echo "source_tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
       - name: Verify remote-preflight exact head
         if: github.event_name == 'workflow_dispatch' && inputs.expected_head_sha != ''
         env:
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           actual_head=$(git rev-parse HEAD)
@@ -160,7 +167,10 @@ jobs:
   reuse:
     name: Reuse equivalent validation evidence
     needs: scope
-    if: github.event_name == 'workflow_dispatch' && needs.scope.outputs.stage == 'integration'
+    if: >-
+      needs.scope.outputs.stage == 'integration' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.ref_name == 'dev'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -170,12 +180,15 @@ jobs:
       reused: ${{ steps.reuse.outputs.reused }}
       artifact_id: ${{ steps.reuse.outputs.artifact_id }}
       source_run_id: ${{ steps.reuse.outputs.source_run_id }}
+      reuse_kind: ${{ steps.reuse.outputs.reuse_kind }}
     steps:
-      - name: Find exact reusable evidence
+      - name: Find reusable evidence
         id: reuse
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
           HEAD_SHA: ${{ needs.scope.outputs.source_head_sha }}
+          SOURCE_TREE: ${{ needs.scope.outputs.source_tree }}
           BASE_SHA: ${{ needs.scope.outputs.target_base_sha }}
           PROFILE: ${{ needs.scope.outputs.profile }}
           REQUIRED_GATES: ${{ needs.scope.outputs.required_gates }}
@@ -183,16 +196,25 @@ jobs:
         run: |
           set -euo pipefail
           gate_key=$(printf '%s' "$REQUIRED_GATES" | sha256sum | cut -c1-16)
-          name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            name="validation-tree-evidence-${SOURCE_TREE}-${BASE_SHA}-${PROFILE}-${gate_key}"
+            reuse_kind=tree-equivalent
+          else
+            name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
+            reuse_kind=exact-head
+          fi
           artifact=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}&per_page=20" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0] // empty')
           if [[ -z "$artifact" ]]; then
             echo "reused=false" >> "$GITHUB_OUTPUT"
+            echo "reuse_kind=none" >> "$GITHUB_OUTPUT"
+            echo "No equivalent evidence found for $name"
             exit 0
           fi
           echo "reused=true" >> "$GITHUB_OUTPUT"
+          echo "reuse_kind=$reuse_kind" >> "$GITHUB_OUTPUT"
           echo "artifact_id=$(jq -r '.id' <<<"$artifact")" >> "$GITHUB_OUTPUT"
           echo "source_run_id=$(jq -r '.workflow_run.id // empty' <<<"$artifact")" >> "$GITHUB_OUTPUT"
-          echo "Reusing exact validation evidence: $name"
+          echo "Reusing $reuse_kind validation evidence: $name"
 
   native:
     name: Native host tests
@@ -223,6 +245,7 @@ jobs:
             ccache-${{ runner.os }}-${{ steps.native-cache-key.outputs.llama-sha }}-
             ccache-${{ runner.os }}-
       - name: Run native host tests
+        shell: bash
         run: |
           ccache --set-config=max_size=750M
           ccache --zero-stats
@@ -338,16 +361,23 @@ jobs:
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
           REUSED: ${{ needs.reuse.outputs.reused }}
+          REUSE_KIND: ${{ needs.reuse.outputs.reuse_kind }}
           NATIVE_RESULT: ${{ needs.native.result }}
           ANDROID_RESULT: ${{ needs.android.result }}
           STAGE: ${{ needs.scope.outputs.stage }}
           PROFILE: ${{ needs.scope.outputs.profile }}
           REASON: ${{ needs.scope.outputs.reason }}
+        shell: bash
         run: |
           set -euo pipefail
           [[ "$SCOPE_RESULT" == "success" ]] || { echo "Validation scope failed: $SCOPE_RESULT" >&2; exit 1; }
-          if [[ "$REUSED" == "true" ]]; then echo "Equivalent exact validation evidence reused"; exit 0; fi
-          for result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do [[ "$result" == "success" || "$result" == "skipped" ]] || { echo "Required validation job failed: $result" >&2; exit 1; }; done
+          if [[ "$REUSED" == "true" ]]; then
+            echo "Equivalent validation evidence reused: $REUSE_KIND"
+            exit 0
+          fi
+          for result in "$NATIVE_RESULT" "$ANDROID_RESULT"; do
+            [[ "$result" == "success" || "$result" == "skipped" ]] || { echo "Required validation job failed: $result" >&2; exit 1; }
+          done
           echo "Repository validation passed: stage=$STAGE profile=$PROFILE reason=$REASON"
 
   evidence:
@@ -361,6 +391,7 @@ jobs:
       - name: Create evidence identity
         env:
           HEAD_SHA: ${{ needs.scope.outputs.source_head_sha }}
+          SOURCE_TREE: ${{ needs.scope.outputs.source_tree }}
           BASE_SHA: ${{ needs.scope.outputs.target_base_sha }}
           STAGE: ${{ needs.scope.outputs.stage }}
           PROFILE: ${{ needs.scope.outputs.profile }}
@@ -371,13 +402,21 @@ jobs:
           set -euo pipefail
           mkdir -p validation-evidence
           gate_key=$(printf '%s' "$GATES" | sha256sum | cut -c1-16)
-          name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
-          printf '{"head":"%s","target_base":"%s","stage":"%s","profile":"%s","risk_dimensions":"%s","required_gates":"%s","e2e_environment":"none","run_id":"%s"}\n' "$HEAD_SHA" "$BASE_SHA" "$STAGE" "$PROFILE" "$RISKS" "$GATES" "$GITHUB_RUN_ID" > validation-evidence/evidence.json
-          echo "$name" > validation-evidence/name.txt
-          echo "ARTIFACT_NAME=$name" >> "$GITHUB_ENV"
-      - uses: actions/upload-artifact@v7
+          exact_name="validation-evidence-${HEAD_SHA}-${BASE_SHA}-${PROFILE}-${gate_key}"
+          tree_name="validation-tree-evidence-${SOURCE_TREE}-${BASE_SHA}-${PROFILE}-${gate_key}"
+          printf '{"head":"%s","source_tree":"%s","target_base":"%s","stage":"%s","profile":"%s","risk_dimensions":"%s","required_gates":"%s","e2e_environment":"none","run_id":"%s"}\n' "$HEAD_SHA" "$SOURCE_TREE" "$BASE_SHA" "$STAGE" "$PROFILE" "$RISKS" "$GATES" "$GITHUB_RUN_ID" > validation-evidence/evidence.json
+          echo "EXACT_ARTIFACT_NAME=$exact_name" >> "$GITHUB_ENV"
+          echo "TREE_ARTIFACT_NAME=$tree_name" >> "$GITHUB_ENV"
+      - name: Upload exact-head validation evidence
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.EXACT_ARTIFACT_NAME }}
+          path: validation-evidence/evidence.json
+          retention-days: 7
+      - name: Upload tree-equivalent validation evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.TREE_ARTIFACT_NAME }}
           path: validation-evidence/evidence.json
           retention-days: 7
 
@@ -401,6 +440,7 @@ jobs:
           SOURCE_RUN_ID: ${{ needs.reuse.outputs.source_run_id }}
           RESULT: ${{ needs.validation.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
         run: |
           source_note=""
           if [[ "$REUSED" == "true" && -n "$SOURCE_RUN_ID" ]]; then source_note=$(printf '\nReused run: https://github.com/%s/actions/runs/%s' "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID"); fi
