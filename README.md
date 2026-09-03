@@ -138,7 +138,7 @@ The README stays product-first, but the main implementation owners remain easy t
 | Public contracts and runtime | `core/contracts`, `core/runtime-core` |
 | Models | `models/model-profile`, `models/model-store`, `models/model-catalog`, `models/model-download`, `models/model-install` |
 | Native backend | `backends/llama-cpp` |
-| Observability | `observability/in-memory-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
+| Observability | `observability/in-memory-store`, `observability/room-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
 | Embedded transport | `transports/in-process` |
 | Product surfaces | `apps/local-llm-phone-test`, `apps/local-llm-console`, `apps/device-test-runner`, `ui/design-system` |
 
