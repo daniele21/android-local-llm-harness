@@ -568,7 +568,11 @@ class RuntimeOrchestrator(
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: BackendException) {
-            val failure = error.toPublicError()
+            val failure = if (lifecycle.isCancellationRequested()) {
+                LocalLlmError.Cancelled()
+            } else {
+                error.toPublicError()
+            }
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: Throwable) {
