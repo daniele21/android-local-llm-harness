@@ -49,8 +49,7 @@ class SharedRuntimeHostComposition(
         delegate.setLogicalJobExecutionDemandListener(listener)
     }
 
-    fun failActiveLogicalJobsForRuntimePressure(): Int =
-        delegate.failActiveLogicalJobsForRuntimePressure()
+    fun failActiveLogicalJobsForRuntimePressure(): Int = delegate.failActiveLogicalJobsForRuntimePressure()
 
     override fun close() {
         delegate.close()
