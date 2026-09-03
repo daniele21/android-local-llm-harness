@@ -98,8 +98,12 @@ internal class BinderConsumerLogicalJobAdapter(
             if (epoch == endpoint.connectionEpoch) waiter.disconnect(detail)
         }
         return try {
-            call(waiter::complete)
-            waiter.await(operationTimeoutMillis)
+            if (!isCurrent(endpoint)) {
+                LogicalJobRemoteOutcome.Disconnected
+            } else {
+                call(waiter::complete)
+                waiter.await(operationTimeoutMillis)
+            }
         } catch (_: DeadObjectException) {
             LogicalJobRemoteOutcome.Disconnected
         } catch (_: RemoteException) {
