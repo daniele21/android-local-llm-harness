@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerCapabilityResult
+import io.github.daniele21.localllm.contracts.ConsumerErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.ConsumerFailure
 import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
@@ -19,7 +20,6 @@ import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
 import io.github.daniele21.localllm.contracts.ConsumerPreparedId
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
-import io.github.daniele21.localllm.contracts.ConsumerErrorCode
 import io.github.daniele21.localllm.contracts.EffectiveConsumerReasoningMode
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
