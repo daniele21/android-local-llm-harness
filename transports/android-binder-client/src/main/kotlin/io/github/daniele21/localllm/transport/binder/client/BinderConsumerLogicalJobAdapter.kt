@@ -68,7 +68,23 @@ internal class BinderConsumerLogicalJobAdapter(
         val endpoint = endpointProvider() ?: return
         if (!logicalJobsEnabled()) return
         val wire = consumerLogicalJobQueryWire(endpoint.clientToken, correlationIds.nextId(), jobId, useCaseId)
+        println(
+            "HARNEX_CANCEL_TRACE stage=binder_cancel_send operation_id=${wire.operationId} job_id=${wire.jobId}",
+        )
         runCatching { endpoint.service.consumer.cancelLogicalJob(wire) }
+            .fold(
+                onSuccess = {
+                    println(
+                        "HARNEX_CANCEL_TRACE stage=binder_cancel_return operation_id=${wire.operationId} job_id=${wire.jobId}",
+                    )
+                },
+                onFailure = { failure ->
+                    println(
+                        "HARNEX_CANCEL_TRACE stage=binder_cancel_exception operation_id=${wire.operationId} " +
+                            "job_id=${wire.jobId} exception=${failure::class.java.simpleName}",
+                    )
+                },
+            )
     }
 
     private fun awaitResponse(
