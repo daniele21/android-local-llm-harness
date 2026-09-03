@@ -23,7 +23,7 @@ jobs:
       issues: write
       contents: read
     steps:
-      - name: Resolve trusted request and dispatch exact-head validation
+      - name: Reuse equivalent evidence or dispatch exact-head validation
         env:
           GH_TOKEN: ${{ github.token }}
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -31,38 +31,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           command=$(printf '%s' "$COMMENT_BODY" | tr -d '\r' | xargs)
           case "$command" in
             /preflight|"/preflight auto") profile=auto ;;
             "/preflight strong") profile=strong ;;
             "/preflight full") profile=full ;;
-            *)
-              echo "Ignoring unsupported preflight command: $command"
-              exit 0
-              ;;
+            *) echo "Ignoring unsupported preflight command: $command"; exit 0 ;;
           esac
 
           pr_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
           head_repo=$(jq -r '.head.repo.full_name' <<<"$pr_json")
           head_ref=$(jq -r '.head.ref' <<<"$pr_json")
           head_sha=$(jq -r '.head.sha' <<<"$pr_json")
-          base_sha=$(jq -r '.base.sha' <<<"$pr_json")
+          base_repo=$(jq -r '.base.repo.full_name' <<<"$pr_json")
+          base_ref=$(jq -r '.base.ref' <<<"$pr_json")
+          [[ "$head_repo" == "$GITHUB_REPOSITORY" && "$base_repo" == "$GITHUB_REPOSITORY" ]] || { echo "Remote preflight is restricted to same-repository PR/base" >&2; exit 1; }
+          base_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${base_ref}" --jq '.object.sha')
 
-          [[ "$head_repo" == "$GITHUB_REPOSITORY" ]] || {
-            echo "Remote preflight is restricted to same-repository PRs" >&2
-            exit 1
-          }
+          prefix="validation-evidence-${head_sha}-${base_sha}-"
+          artifacts=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --jq '.artifacts | map(select(.expired == false))')
+          case "$profile" in
+            auto) artifact=$(jq -c --arg p "$prefix" '[.[] | select(.name | startswith($p))] | sort_by(.created_at) | reverse | .[0] // empty' <<<"$artifacts") ;;
+            strong) artifact=$(jq -c --arg p "$prefix" '[.[] | select((.name | startswith($p)) and ((.name | contains("-strong-")) or (.name | contains("-full-"))))] | sort_by(.created_at) | reverse | .[0] // empty' <<<"$artifacts") ;;
+            full) artifact=$(jq -c --arg p "$prefix" '[.[] | select((.name | startswith($p)) and (.name | contains("-full-")))] | sort_by(.created_at) | reverse | .[0] // empty' <<<"$artifacts") ;;
+          esac
+
+          if [[ -n "$artifact" ]]; then
+            artifact_name=$(jq -r '.name' <<<"$artifact")
+            source_run=$(jq -r '.workflow_run.id // empty' <<<"$artifact")
+            body=$(printf 'Remote preflight `%s` for exact head `%s` reuses existing integration evidence `%s` against live `%s@%s`.' "$profile" "$head_sha" "$artifact_name" "$base_ref" "$base_sha")
+            if [[ -n "$source_run" ]]; then body+=$(printf '\n\nEvidence run: https://github.com/%s/actions/runs/%s' "$GITHUB_REPOSITORY" "$source_run"); fi
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" || true
+            echo "Equivalent evidence found; skipping duplicate validation dispatch."
+            exit 0
+          fi
 
           gh api --method POST \
             "repos/${GITHUB_REPOSITORY}/actions/workflows/validate.yml/dispatches" \
             -f ref="$head_ref" \
             -f "inputs[validation_profile]=$profile" \
+            -f "inputs[delivery_stage]=integration" \
             -f "inputs[base_sha]=$base_sha" \
             -f "inputs[expected_head_sha]=$head_sha" \
             -f "inputs[pr_number]=$PR_NUMBER"
-
-          body=$(printf 'Remote preflight requested: `%s` for exact head `%s`. Validation will resolve the blast-radius profile and report the result back here.' "$profile" "$head_sha")
-          if ! gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body"; then
-            echo "::warning::Remote preflight was dispatched for exact head $head_sha, but posting the acknowledgement comment failed."
-          fi
+          body=$(printf 'Remote preflight requested: `%s` for exact head `%s` against live `%s@%s`; no sufficient reusable evidence was found.' "$profile" "$head_sha" "$base_ref" "$base_sha")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" || echo "::warning::Preflight dispatched but acknowledgement comment failed."

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.5.0",
+  "contract_version": "0.6.0",
   "commands": {
     "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
     "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
@@ -14,7 +14,37 @@
     "stop": {"status": "n/a", "run": "n/a"},
     "clean": {"status": "required", "run": "./gradlew clean && rm -rf build/native-tests build/llrt-suite"}
   },
+  "development_velocity": {
+    "default_stage": "iteration",
+    "stages": ["iteration", "integration", "release"],
+    "iteration": {
+      "target_feedback_minutes": 3,
+      "exact_head_required": false,
+      "full_diff_review_required": false,
+      "durable_documentation_current_required": false,
+      "remote_preflight_required": false,
+      "e2e_default": "risk_only"
+    },
+    "integration": {
+      "target_feedback_minutes": 8,
+      "exact_head_required": true,
+      "full_diff_review_required": true,
+      "durable_documentation_current_required": true,
+      "remote_preflight_when_required_gates_unavailable_local": true,
+      "e2e_default": "affected_critical_journeys"
+    },
+    "release": {
+      "exact_head_required": true,
+      "full_diff_review_required": true,
+      "durable_documentation_current_required": true,
+      "full_validation_required": true,
+      "e2e_default": "release_critical_journeys"
+    },
+    "parallel_development_prefers_early_convergence": true,
+    "stacked_publication_exception_only": true
+  },
   "publication_gate": {
+    "applies_from_stage": "integration",
     "agent_preflight_required": true,
     "target_base_freshness_required": true,
     "full_diff_review_required": true,
@@ -37,6 +67,9 @@
     "default": "auto",
     "profiles": ["lean", "scoped", "strong", "full"],
     "selector": "python3 scripts/detect_ci_scope.py",
+    "selector_output": "risk_dimensions_and_required_gates",
+    "profiles_are_shorthand": true,
+    "gate_selection_preferred_over_suite_selection": true,
     "unknown_executable_paths_fail_safe": true,
     "selector_changes_force_full": true,
     "promotion_validation_full": true,
@@ -51,6 +84,9 @@
     "stronger_profile_override_allowed": true,
     "weaker_profile_override_requires_explicit_justification": true,
     "exact_head_required": true,
+    "reuse_successful_equivalent_evidence": true,
+    "rerun_only_when_missing_stale_or_insufficient": true,
+    "evidence_identity_fields": ["head", "target_base", "required_gates", "profile", "e2e_environment"],
     "trusted_requesters_only": true,
     "same_repository_prs_only_by_default": true,
     "execution_job_write_credentials": false,
@@ -63,7 +99,17 @@
     "use_stack_native_tooling": true,
     "run_against_built_artifact_when_material": true,
     "failure_evidence_bounded": true,
-    "zero_residue_required": true
+    "zero_residue_required": true,
+    "ui_evidence_modes": ["assertions", "screenshots", "full_media"],
+    "ui_evidence_selection": "risk_based",
+    "incidental_ui_does_not_force_full_media": true,
+    "full_media_for_motion_timing_sequence_or_release_claims": true
+  },
+  "validation_economics": {
+    "status": "recommended",
+    "optimize_for": "sufficient-confidence-per-feedback-time",
+    "dimensions": ["duration", "flake_rate", "unique_regression_signal", "overlap"],
+    "periodic_review": true
   },
   "build_identity": {
     "unique_per_build": true,

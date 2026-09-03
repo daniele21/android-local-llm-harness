@@ -2,18 +2,18 @@
   "schema_version": 1,
   "standard": {
     "source": "daniele21/repo-template-sw",
-    "version": "0.8.0",
-    "revision": "6677c5349d64ea6d935f1b460d03a47c236821bc"
+    "version": "0.9.0",
+    "revision": "43fcddb2bfa8ff7f7df6b30d0095186f7cb58bca"
   },
   "target_level": "L2",
   "profiles": ["android", "local-ai", "product-ui"],
   "skills": {
-    "plan-workstream": {"source_version": "0.1.0", "customized": false},
-    "structured-change": {"source_version": "0.6.0", "customized": false},
+    "plan-workstream": {"source_version": "0.9.0", "customized": true},
+    "structured-change": {"source_version": "0.9.0", "customized": true},
     "design-product-experience": {"source_version": "0.5.0", "customized": false},
-    "validate-change": {"source_version": "0.8.0", "customized": false},
-    "preflight-change": {"source_version": "0.8.0", "customized": true},
-    "remote-preflight": {"source_version": "0.2.0", "customized": true},
+    "validate-change": {"source_version": "0.9.0", "customized": true},
+    "preflight-change": {"source_version": "0.9.0", "customized": true},
+    "remote-preflight": {"source_version": "0.9.0", "customized": true},
     "finalize-workstream": {"source_version": "0.1.0", "customized": false},
     "review-reference-quality": {"source_version": "0.4.0", "customized": false}
   },
