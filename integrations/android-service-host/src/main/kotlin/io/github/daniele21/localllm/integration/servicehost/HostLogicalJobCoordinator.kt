@@ -75,6 +75,7 @@ internal class HostLogicalJobCoordinator(
     private val resultStore: HostLogicalJobResultStore = HostLogicalJobResultStore(),
 ) : AutoCloseable {
     private data class Execution(
+        val scope: HostLogicalJobScope,
         val client: ConsumerLocalLlmClient,
         val sessionId: SessionId,
         var handle: ConsumerGenerationHandle? = null,
@@ -125,6 +126,15 @@ internal class HostLogicalJobCoordinator(
             runCatching(handle::cancel)
         } else {
             eventHandler.finishCancellation(requested.scope, requested.jobId)
+        }
+    }
+
+    fun failActiveJobsForRuntimePressure(): Int {
+        val active = synchronized(lock) {
+            executions.map { (jobId, execution) -> jobId to execution.scope }
+        }
+        return active.count { (jobId, scope) ->
+            eventHandler.finishRuntimePressure(scope, jobId)
         }
     }
 
@@ -222,7 +232,7 @@ internal class HostLogicalJobCoordinator(
             }
 
             else -> {
-                val execution = Execution(client, session.sessionId)
+                val execution = Execution(preparing.scope, client, session.sessionId)
                 synchronized(lock) { executions[preparing.jobId] = execution }
                 val coreRequest =
                     ConsumerGenerationRequest(
@@ -289,6 +299,7 @@ private class HostLogicalJobEventHandler(
 ) {
     fun onEvent(scope: HostLogicalJobScope, jobId: HostLogicalJobId, event: ConsumerGenerationEvent) {
         val current = registry.snapshot(scope, jobId) ?: return
+        if (current.isTerminal) return
         when (event) {
             is ConsumerGenerationEvent.Prepared -> onPrepared(current, event)
             is ConsumerGenerationEvent.Started -> onStarted(current)
@@ -305,6 +316,20 @@ private class HostLogicalJobEventHandler(
 
     fun finishCancellation(scope: HostLogicalJobScope, jobId: HostLogicalJobId) {
         finish(scope, jobId, HostLogicalJobState.CANCELLED, WireErrorCodes.CANCELLED)
+    }
+
+    fun finishRuntimePressure(scope: HostLogicalJobScope, jobId: HostLogicalJobId): Boolean {
+        val current = registry.snapshot(scope, jobId) ?: return false
+        if (current.isTerminal || current.state == HostLogicalJobState.CANCEL_REQUESTED) return false
+        val transitioned = transitionLogicalJobSafely(registry, current, HostLogicalJobState.FAILED_FINAL)
+        if (transitioned == null) {
+            abortAfterPersistenceFailure(scope, jobId)
+            return true
+        }
+        resultStore.recordError(jobId, WireErrorCodes.RUNTIME_FAILURE)
+        abortExecution(jobId)
+        executionDemand.release(jobId)
+        return true
     }
 
     fun abortAfterPersistenceFailure(scope: HostLogicalJobScope, jobId: HostLogicalJobId) {
