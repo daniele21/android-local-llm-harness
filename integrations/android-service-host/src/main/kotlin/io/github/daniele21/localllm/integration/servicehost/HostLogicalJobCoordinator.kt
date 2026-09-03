@@ -113,17 +113,54 @@ internal class HostLogicalJobCoordinator(
     }
 
     fun cancel(scope: HostLogicalJobScope, jobId: HostLogicalJobId) {
-        val current = registry.snapshot(scope, jobId) ?: return
-        if (current.isTerminal || current.state == HostLogicalJobState.CANCEL_REQUESTED) return
+        println("HARNEX_CANCEL_TRACE stage=coordinator_cancel_enter job_id=${jobId.value}")
+        val current = registry.snapshot(scope, jobId)
+        if (current == null) {
+            println("HARNEX_CANCEL_TRACE stage=coordinator_cancel_missing job_id=${jobId.value}")
+            return
+        }
+        println(
+            "HARNEX_CANCEL_TRACE stage=cancel_requested_before job_id=${jobId.value} " +
+                "state=${current.state} revision=${current.revision}",
+        )
+        if (current.isTerminal || current.state == HostLogicalJobState.CANCEL_REQUESTED) {
+            val reason = if (current.isTerminal) "terminal" else "already_cancel_requested"
+            println(
+                "HARNEX_CANCEL_TRACE stage=coordinator_cancel_noop job_id=${jobId.value} " +
+                    "state=${current.state} revision=${current.revision} reason=$reason",
+            )
+            return
+        }
         val requested = transitionLogicalJobSafely(registry, current, HostLogicalJobState.CANCEL_REQUESTED)
         if (requested == null) {
+            println(
+                "HARNEX_CANCEL_TRACE stage=cancel_requested_persist_failed job_id=${jobId.value} " +
+                    "state=${current.state} revision=${current.revision}",
+            )
             eventHandler.abortAfterPersistenceFailure(scope, jobId)
             return
         }
+        println(
+            "HARNEX_CANCEL_TRACE stage=cancel_requested_after job_id=${jobId.value} " +
+                "state=${requested.state} revision=${requested.revision}",
+        )
         val handle = synchronized(lock) { executions[jobId]?.handle }
         if (handle != null) {
-            runCatching(handle::cancel)
+            println("HARNEX_CANCEL_TRACE stage=handle_cancel_call job_id=${jobId.value}")
+            runCatching { handle.cancel() }
+                .fold(
+                    onSuccess = {
+                        println("HARNEX_CANCEL_TRACE stage=handle_cancel_return job_id=${jobId.value}")
+                    },
+                    onFailure = { failure ->
+                        println(
+                            "HARNEX_CANCEL_TRACE stage=handle_cancel_exception job_id=${jobId.value} " +
+                                "exception=${failure::class.java.simpleName}",
+                        )
+                    },
+                )
         } else {
+            println("HARNEX_CANCEL_TRACE stage=handle_cancel_missing job_id=${jobId.value}")
             eventHandler.finishTerminal(
                 requested.scope,
                 requested.jobId,
@@ -298,7 +335,34 @@ private class HostLogicalJobEventHandler(
     private val finishExecution: (HostLogicalJobId, Boolean) -> Unit,
 ) {
     fun onEvent(scope: HostLogicalJobScope, jobId: HostLogicalJobId, event: ConsumerGenerationEvent) {
-        val current = registry.snapshot(scope, jobId) ?: return
+        val terminalEvent = when (event) {
+            is ConsumerGenerationEvent.Completed -> "completed"
+            is ConsumerGenerationEvent.Failed -> "failed"
+            else -> null
+        }
+        if (terminalEvent != null) {
+            val failureCode = (event as? ConsumerGenerationEvent.Failed)?.failure?.code?.name ?: "none"
+            println(
+                "HARNEX_CANCEL_TRACE stage=terminal_event_received job_id=${jobId.value} " +
+                    "event=$terminalEvent failure_code=$failureCode",
+            )
+        }
+        val current = registry.snapshot(scope, jobId)
+        if (current == null) {
+            if (terminalEvent != null) {
+                println(
+                    "HARNEX_CANCEL_TRACE stage=terminal_event_reconcile job_id=${jobId.value} " +
+                        "event=$terminalEvent state=missing revision=missing",
+                )
+            }
+            return
+        }
+        if (terminalEvent != null) {
+            println(
+                "HARNEX_CANCEL_TRACE stage=terminal_event_reconcile job_id=${jobId.value} " +
+                    "event=$terminalEvent state=${current.state} revision=${current.revision}",
+            )
+        }
         if (current.isTerminal) return
         when (event) {
             is ConsumerGenerationEvent.Prepared -> onPrepared(current, event)
@@ -412,11 +476,23 @@ private class HostLogicalJobEventHandler(
 
     private fun finish(scope: HostLogicalJobScope, jobId: HostLogicalJobId, state: HostLogicalJobState, errorCode: String) {
         val current = registry.snapshot(scope, jobId) ?: return
+        println(
+            "HARNEX_CANCEL_TRACE stage=terminal_transition_before job_id=${jobId.value} " +
+                "target_state=$state state=${current.state} revision=${current.revision}",
+        )
         val transitioned = transitionLogicalJobSafely(registry, current, state)
         if (transitioned == null) {
+            println(
+                "HARNEX_CANCEL_TRACE stage=terminal_transition_persist_failed job_id=${jobId.value} " +
+                    "target_state=$state state=${current.state} revision=${current.revision}",
+            )
             abortAfterPersistenceFailure(scope, jobId)
             return
         }
+        println(
+            "HARNEX_CANCEL_TRACE stage=terminal_transition_after job_id=${jobId.value} " +
+                "target_state=$state state=${transitioned.state} revision=${transitioned.revision}",
+        )
         resultStore.recordError(jobId, errorCode)
         finishExecution(jobId, false)
         executionDemand.release(jobId)
