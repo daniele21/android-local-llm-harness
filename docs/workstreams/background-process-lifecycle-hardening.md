@@ -5,7 +5,7 @@ Document type: workstream-state
 Owner: shared-runtime/runtime lifecycle
 Canonical scope: workstream.background-process-lifecycle
 Read when: coordinating durable inference jobs, Binder reconnect, Host process recovery or lifecycle evidence
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 
 Repository priority/blocker truth remains in [`../current-state.md`](../current-state.md). Canonical architecture is [ADR 0016](../adr/0016-detached-shared-runtime-jobs.md).
 
@@ -29,6 +29,8 @@ Keep explicitly durable local inference independent from Activity/Compose and tr
 - Revisioned `query/result` is authoritative after reconnect; callbacks are advisory and generated content is not a durable callback log.
 - Legacy connection-scoped behavior remains backward-compatible.
 - Host process death becomes explicit interruption/process loss, never zombie `RUNNING`.
+- Explicit user cancellation remains `CANCEL_REQUESTED -> CANCELLED`.
+- Critical runtime pressure is a runtime failure boundary, not user cancellation and not Host process loss.
 - Failure identity is typed/versioned; free-form Host messages are not product policy.
 - Sensitive content stays out of durable storage, normal telemetry and shared evidence.
 
@@ -38,7 +40,7 @@ Keep explicitly durable local inference independent from Activity/Compose and tr
 | --- | --- | --- | --- |
 | Binder registration/callback | connection | removed | connection |
 | durable logical job | Host job coordinator | survives | terminal/policy |
-| retained session/generation handle | logical job/runtime | survives ordinary Binder loss only | terminal/cancel/process loss |
+| retained session/generation handle | logical job/runtime | survives ordinary Binder loss only | terminal/cancel/process loss/critical pressure |
 | started/foreground service demand | active durable demand | survives ordinary Binder loss only | final active terminal/interruption |
 | loaded model | runtime/residency policy | unchanged by Binder detachment | unload/idle/pressure/shutdown |
 
@@ -48,10 +50,10 @@ Keep explicitly durable local inference independent from Activity/Compose and tr
 - PR #510 delivered the signature-protected emulator fault gate.
 - PR #511 hardened durable Consumer setup-resolution/reconnect behavior; Consumer SDK `0.1.0-alpha.9` was published and resolved externally.
 - PR #517 fixed the confirmed concrete Host forwarding defect for setup resolution through the warm-retention Host and is merged on `dev` at `50ca8bd8621bb5019a4539b36548a1500bbf2af9`.
+- PR #518 / HBG-42 is merged on `dev` at `fc525a301a208f7f243ddbf87c0d523c39097627`; Host restart reconciliation is now part of the canonical base.
 - RedactGuard LAS-09..14 are integrated on its LAS parent; setup stage, product problem, recovery and technical identity are separated and setup observation/refresh is behind `RedactGuardProductViewModel`.
-- RedactGuard Home/app-switch lifecycle evidence now uses AndroidX Activity lifecycle state rather than shell-text foreground inference and is integrated on its LAS parent at `4764251ab2f6fe6ca6ab31a64d24717aad58479e`.
-- Binder disconnect/rebind coverage exists downstream and preserves the same Harnex logical-job identity without implicit cancellation; the canonical Two-APK workflow still needs to execute that journey.
-- HBG-42 implementation head `9377db91389edd20d4f4e6ec0d856c54052172dc` passed repository-owned STRONG run `33684350491`: repository guards, selected Android validation, native packaging and repository validation all succeeded. This workstream update is followed by a final exact-head preflight before merge.
+- RedactGuard Home/app-switch lifecycle evidence uses AndroidX Activity lifecycle state rather than shell-text foreground inference. Binder disconnect/rebind, explicit-cancel, active Host-process-loss and RedactGuard-process-loss instrumentation are also integrated on the LAS candidate.
+- PR #525 is the active Harnex pressure slice: it joins durable logical-job terminalization to the existing runtime-core `LOW_MEMORY -> CANCEL_AND_RELEASE_ALL` owner and adds explicit bounded cross-consumer admission evidence.
 
 ## Work graph
 
@@ -68,8 +70,8 @@ Keep explicitly durable local inference independent from Activity/Compose and tr
 | HBG-50 | Prove active demand composes with existing residency policy | runtime/residency evidence | HBG-40, HBG-61 | no | BLOCKED |
 | HBG-55 | RedactGuard logical-job consumption/reattach | downstream integration | HBG-33 | yes | DONE |
 | HBG-56 | Route setup failure by typed evidence and fix confirmed owner | cross-repo evidence | RedactGuard LAS-09/10 | no | DONE |
-| HBG-60 | Disconnect/reconnect/cancel matrix | Binder/Host + downstream tests | HBG-55, HBG-56 | no | ACTIVE |
-| HBG-61 | Two-APK app-switch/reconnect/process-loss journeys | E2E/workflow | HBG-60 | no | READY |
+| HBG-60 | Disconnect/reconnect/cancel/pressure matrix | Binder/Host + downstream tests | HBG-55, HBG-56 | no | ACTIVE |
+| HBG-61 | Two-APK app-switch/reconnect/process-loss/pressure journeys | E2E/workflow | HBG-60 | no | ACTIVE |
 | HBG-62 | Privacy-safe state + screenshot/video evidence | E2E evidence | HBG-61 | no | BLOCKED |
 | HBG-63 | Final exact-head automated preflight | Harnex CI | HBG-43/50/62 | no | BLOCKED |
 | HBG-64 | ARM64 same-signer real-GGUF/residency/OEM evidence | physical evidence | HBG-63 | no | BLOCKED |
@@ -88,7 +90,7 @@ HBG-42 establishes a durable, privacy-safe Host restart boundary:
 - bounded terminal eviction updates durable metadata consistently with replacement admission;
 - legacy connection-scoped inference contracts are unchanged.
 
-The implementation head `9377db91389edd20d4f4e6ec0d856c54052172dc` passed STRONG run `33684350491`. Physical model-memory survival/reclamation claims remain explicitly outside that automated evidence.
+The implementation head `9377db91389edd20d4f4e6ec0d856c54052172dc` passed STRONG run `33684350491` and HBG-42 is merged through PR #518. Physical model-memory survival/reclamation claims remain explicitly outside that automated evidence.
 
 ## Current executable slice
 
@@ -97,10 +99,12 @@ The implementation head `9377db91389edd20d4f4e6ec0d856c54052172dc` passed STRONG
 Immediate cross-repo evidence work:
 
 1. run the existing Binder disconnect/rebind test in the canonical Two-APK workflow and preserve same logical-job identity/no implicit cancel;
-2. run an active-job Host process-loss journey against the merged HBG-42 Host and require `INTERRUPTED` -> downstream typed `HOST_PROCESS_LOST` recovery;
-3. keep Home/app-switch and ViewModel recreation evidence on the same exact RedactGuard/Harnex source identities;
-4. add explicit-cancel Two-APK evidence where unit-level state-machine evidence is insufficient;
-5. keep all evidence privacy-safe and bounded.
+2. run explicit-cancel evidence and require `CANCEL_REQUESTED -> CANCELLED` plus Host waiter cleanup;
+3. run an active-job Host process-loss journey against the merged HBG-42 Host and require `INTERRUPTED` -> downstream typed `HOST_PROCESS_LOST` recovery;
+4. run RedactGuard process loss and prove a new process does not reconstruct lost sensitive document/product context;
+5. run critical trim through the real Host Service callback and require downstream runtime-failure terminalization plus Host execution cleanup;
+6. keep Home/app-switch and ViewModel recreation evidence on the same exact RedactGuard/Harnex source identities;
+7. keep all evidence privacy-safe and bounded.
 
 HBG-43 may proceed independently once it preserves the rule that retry cannot reconstruct sensitive input after the owning process has lost it.
 
@@ -112,14 +116,17 @@ Critical memory-pressure policy already belongs to Harnex runtime-core:
 - `RuntimeOrchestrator.handleMemoryPressure(...)` owns execution of that runtime action;
 - Android trim-memory callbacks map platform pressure into the runtime policy.
 
-LAS/HBG lifecycle evidence must integrate durable logical-job state with this existing owner and prove a structured interruption/cleanup outcome. Do not create a duplicate Consumer-side memory policy.
+PR #525 extends that existing owner boundary rather than creating a second policy: `TRIM_MEMORY_RUNNING_CRITICAL` maps to `LOW_MEMORY`, active durable jobs become `FAILED_FINAL` with existing `RUNTIME_FAILURE` identity before runtime cancellation, their Host execution handles/sessions and active demand are released, and late backend cancellation cannot rewrite the terminal pressure failure. `CANCELLED` remains explicit user cancellation and `INTERRUPTED` remains Host process loss.
+
+The emulator can prove Android callback and logical-job cleanup semantics. Genuine physical RAM pressure, reclamation, ARM64 JNI/GGUF residency, thermal behavior and OEM process policy remain REAL_ENVIRONMENT evidence.
 
 ## Integration points
 
 1. HBG-42 owns Host restart reconciliation only; automatic attempt+1 retry remains HBG-43.
-2. HBG-60/61 now own exact Binder-loss/app-switch/Host-process-loss Two-APK convergence against merged Harnex source.
+2. HBG-60/61 own exact Binder-loss/app-switch/cancel/Host-process-loss/Consumer-process-loss/pressure Two-APK convergence against merged Harnex source.
 3. Durable demand composes with the existing residency and memory-pressure owner; it never introduces a second model policy.
-4. Physical validation follows deterministic Two-APK lifecycle evidence and exact-head automated preflight.
+4. Existing `SingleDecodeScheduler` no-overlap evidence remains canonical for decode serialization; PR #525 adds bounded admission evidence across distinct Consumer scopes rather than another scheduler.
+5. Physical validation follows deterministic Two-APK lifecycle evidence and exact-head automated preflight.
 
 ## Durable documentation destinations
 

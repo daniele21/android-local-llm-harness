@@ -63,11 +63,12 @@
       "fidelity_class": "simulated_or_emulated",
       "automation": "automated",
       "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
-      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend, pre-provisioned ModelStore and signature-protected pause/release/query generation fault control for downstream same-signer lifecycle tests",
+      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend, pre-provisioned ModelStore, signature-protected pause/release/query generation fault control, and Android critical trim delivery through the production Host Service callback",
       "target_environment_refs": ["android-arm64-device"],
       "known_gaps": [
         "x86_64 emulator does not execute the production arm64-v8a llama.cpp/JNI backend",
         "GGUF bytes and native generation are replaced by a deterministic emulator backend",
+        "critical trim injection proves Android callback and logical-job cleanup semantics but not genuine physical RAM pressure or reclamation",
         "physical memory, thermal and OEM behavior remain unrepresented",
         "the emulator ModelStore deliberately mirrors production find/snapshot semantics by exposing present models with verified=false and leaving integrity verification to RuntimeOrchestrator prepare"
       ]

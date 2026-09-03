@@ -117,6 +117,8 @@ class SharedRuntimeHostDelegate private constructor(
         logicalJobExecutionDemand.setListener(listener)
     }
 
+    internal fun failActiveLogicalJobsForRuntimePressure(): Int = logicalJobCoordinator.failActiveJobsForRuntimePressure()
+
     fun registerClient(
         caller: AuthorizedCaller,
         hello: ClientHelloParcel,
