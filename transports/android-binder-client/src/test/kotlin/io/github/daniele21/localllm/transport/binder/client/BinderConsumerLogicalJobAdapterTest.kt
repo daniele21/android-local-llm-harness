@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.transport.binder.client
 import io.github.daniele21.localllm.contracts.ConsumerErrorCode
 import io.github.daniele21.localllm.contracts.ConsumerExecutionIdentity
 import io.github.daniele21.localllm.contracts.ConsumerGenerationInput
+import io.github.daniele21.localllm.contracts.ConsumerInferenceJobId
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobResponse
 import io.github.daniele21.localllm.contracts.ConsumerInferenceJobState
 import io.github.daniele21.localllm.contracts.ConsumerLogicalJobRequestId
@@ -116,6 +117,35 @@ class BinderConsumerLogicalJobAdapterTest {
             (result as ConsumerInferenceJobResponse.Rejected).failure.code,
         )
         assertEquals(0, service.consumerLogicalJobCancelCalls)
+    }
+
+    @Test
+    fun `stale endpoint after invalidation subscription fails before remote logical job wait`() {
+        val service = FakeSharedRuntimeRemoteService()
+        var activeEndpoint: RegisteredSharedRuntimeEndpoint? =
+            RegisteredSharedRuntimeEndpoint(service, token, connectionEpoch = 11L)
+        val invalidations = SharedRuntimeEndpointInvalidationSource {
+            activeEndpoint = null
+            AutoCloseable {}
+        }
+        val adapter =
+            BinderConsumerLogicalJobAdapter(
+                endpointProvider = { activeEndpoint },
+                enabledFeaturesProvider = { setOf(BinderProtocolV1.FEATURE_CONSUMER_LOGICAL_JOBS_V1) },
+                endpointInvalidations = invalidations,
+                blockingCallGuard = BlockingCallGuard {},
+                operationTimeoutMillis = 5_000,
+                correlationIds = CorrelationIdSource { "logical-job-op" },
+            )
+
+        val result = adapter.logicalJobResult(ConsumerInferenceJobId("job-42"), useCaseId)
+
+        assertTrue(result is ConsumerInferenceJobResponse.Rejected)
+        assertEquals(
+            ConsumerErrorCode.RUNTIME_FAILURE,
+            (result as ConsumerInferenceJobResponse.Rejected).failure.code,
+        )
+        assertEquals(0, service.consumerLogicalJobResultCalls)
     }
 
     private fun adapter(service: FakeSharedRuntimeRemoteService): BinderConsumerLogicalJobAdapter = BinderConsumerLogicalJobAdapter(
