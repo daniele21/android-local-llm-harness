@@ -76,6 +76,10 @@ internal class ConsumerLogicalJobHostOperations(
                 )
             },
         ) {
+            println(
+                "HARNEX_CANCEL_TRACE stage=host_cancel_executor_enter operation_id=${request.operationId} " +
+                    "job_id=${request.jobId}",
+            )
             if (!validatedConnection(caller, request.clientToken, request.operationId)) {
                 println(
                     "HARNEX_CANCEL_TRACE stage=host_cancel_connection_rejected operation_id=${request.operationId} " +
