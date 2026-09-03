@@ -93,7 +93,7 @@ Open **Playground**, choose the configured use case and run a prompt. Harnex han
 
 Consumer apps integrate the versioned Consumer Android SDK and call Harnex over Binder. The app owns its product workflow; Harnex keeps model, runtime and residency ownership.
 
-See [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) for the current integration contract.
+See [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) for the current integration contract.
 
 For build, emulator, signing and device details, see [`docs/android-build-and-run.md`](docs/android-build-and-run.md).
 
@@ -164,7 +164,7 @@ The exact integrated state and blockers live in [`docs/current-state.md`](docs/c
 | --- | --- |
 | Current state | [`docs/current-state.md`](docs/current-state.md) |
 | Architecture | [`docs/architecture.md`](docs/architecture.md) |
-| Consumer SDK | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) |
+| Consumer SDK | [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) |
 | Android build and run | [`docs/android-build-and-run.md`](docs/android-build-and-run.md) |
 | Physical-device testing | [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) |
 | Roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
