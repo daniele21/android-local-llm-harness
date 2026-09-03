@@ -310,12 +310,7 @@ private class HostLogicalJobEventHandler(
         }
     }
 
-    fun finishTerminal(
-        scope: HostLogicalJobScope,
-        jobId: HostLogicalJobId,
-        state: HostLogicalJobState,
-        code: String,
-    ) {
+    fun finishTerminal(scope: HostLogicalJobScope, jobId: HostLogicalJobId, state: HostLogicalJobState, code: String) {
         finish(scope, jobId, state, code)
     }
 
