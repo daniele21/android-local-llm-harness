@@ -129,6 +129,21 @@ Harnex keeps a few boundaries explicit:
 
 For the full architecture, see [`docs/architecture.md`](docs/architecture.md) and the accepted [`docs/adr/README.md`](docs/adr/README.md).
 
+### Repository map
+
+The README stays product-first, but the main implementation owners remain easy to find:
+
+| Area | Main paths |
+| --- | --- |
+| Public contracts and runtime | `core/contracts`, `core/runtime-core` |
+| Models | `models/model-profile`, `models/model-store`, `models/model-catalog`, `models/model-download`, `models/model-install` |
+| Native backend | `backends/llama-cpp` |
+| Observability | `observability/in-memory-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
+| Embedded transport | `transports/in-process` |
+| Product surfaces | `apps/local-llm-phone-test`, `apps/local-llm-console`, `apps/device-test-runner`, `ui/design-system` |
+
+`settings.gradle.kts` is the authoritative module list.
+
 ## Current status and limits
 
 Harnex is an active engineering project, not a production-ready Android AI platform.
