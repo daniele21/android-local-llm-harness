@@ -64,11 +64,50 @@ internal class ConsumerLogicalJobHostOperations(
     }
 
     fun cancel(caller: AuthorizedCaller, request: ConsumerLogicalJobQueryParcel) {
-        controlExecutor.submitOrReject(onRejected = {}) {
-            if (!validatedConnection(caller, request.clientToken, request.operationId)) return@submitOrReject
-            val scope = request.scopeOrNull(caller) ?: return@submitOrReject
-            val jobId = runCatching { HostLogicalJobId(request.jobId) }.getOrNull() ?: return@submitOrReject
+        println(
+            "HARNEX_CANCEL_TRACE stage=host_cancel_received operation_id=${request.operationId} " +
+                "job_id=${request.jobId}",
+        )
+        controlExecutor.submitOrReject(
+            onRejected = {
+                println(
+                    "HARNEX_CANCEL_TRACE stage=host_cancel_queue_rejected operation_id=${request.operationId} " +
+                        "job_id=${request.jobId}",
+                )
+            },
+        ) {
+            if (!validatedConnection(caller, request.clientToken, request.operationId)) {
+                println(
+                    "HARNEX_CANCEL_TRACE stage=host_cancel_connection_rejected operation_id=${request.operationId} " +
+                        "job_id=${request.jobId}",
+                )
+                return@submitOrReject
+            }
+            val scope = request.scopeOrNull(caller)
+            if (scope == null) {
+                println(
+                    "HARNEX_CANCEL_TRACE stage=host_cancel_scope_rejected operation_id=${request.operationId} " +
+                        "job_id=${request.jobId}",
+                )
+                return@submitOrReject
+            }
+            val jobId = runCatching { HostLogicalJobId(request.jobId) }.getOrNull()
+            if (jobId == null) {
+                println(
+                    "HARNEX_CANCEL_TRACE stage=host_cancel_job_id_rejected operation_id=${request.operationId} " +
+                        "job_id=${request.jobId}",
+                )
+                return@submitOrReject
+            }
+            println(
+                "HARNEX_CANCEL_TRACE stage=host_cancel_before_coordinator operation_id=${request.operationId} " +
+                    "job_id=${request.jobId}",
+            )
             coordinator.cancel(scope, jobId)
+            println(
+                "HARNEX_CANCEL_TRACE stage=host_cancel_after_coordinator operation_id=${request.operationId} " +
+                    "job_id=${request.jobId}",
+            )
         }
     }
 
