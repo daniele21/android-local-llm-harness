@@ -244,10 +244,7 @@ internal class SharedRuntimeConnection(
         runCatching { observer.onStateChanged(snapshot) }
     }
 
-    private data class ConnectionLoss(
-        val endpoint: RegisteredSharedRuntimeEndpoint?,
-        val snapshot: SharedRuntimeConnectionSnapshot,
-    )
+    private data class ConnectionLoss(val endpoint: RegisteredSharedRuntimeEndpoint?, val snapshot: SharedRuntimeConnectionSnapshot)
 
     companion object {
         fun create(
