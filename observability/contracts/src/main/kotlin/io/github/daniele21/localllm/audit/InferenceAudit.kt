@@ -116,9 +116,8 @@ data class InferenceAuditPrepared(
         }
     }
 
-    override fun toString(): String =
-        "InferenceAuditPrepared(requestId=$requestId, preparedAtEpochMs=$preparedAtEpochMs, " +
-            "effectivePrompt=<redacted>, execution=$execution)"
+    override fun toString(): String = "InferenceAuditPrepared(requestId=$requestId, preparedAtEpochMs=$preparedAtEpochMs, " +
+        "effectivePrompt=<redacted>, execution=$execution)"
 }
 
 data class InferenceAuditExecutionIdentity(
@@ -217,18 +216,14 @@ data class InferenceAuditMetrics(
     }
 }
 
-data class InferenceAuditTerminalContent(
-    val answerOutput: String = "",
-    val reasoningOutput: String = "",
-) {
+data class InferenceAuditTerminalContent(val answerOutput: String = "", val reasoningOutput: String = "") {
     init {
         validateAuditOutput(answerOutput, "Answer output")
         validateAuditOutput(reasoningOutput, "Reasoning output")
     }
 
-    override fun toString(): String =
-        "InferenceAuditTerminalContent(answerOutput=<redacted:${answerOutput.length}>, " +
-            "reasoningOutput=<redacted:${reasoningOutput.length}>)"
+    override fun toString(): String = "InferenceAuditTerminalContent(answerOutput=<redacted:${answerOutput.length}>, " +
+        "reasoningOutput=<redacted:${reasoningOutput.length}>)"
 }
 
 data class InferenceAuditTerminal(
@@ -275,9 +270,8 @@ data class InferenceAuditRecord(
     val requestId: RequestId
         get() = admission.requestId
 
-    override fun toString(): String =
-        "InferenceAuditRecord(requestId=$requestId, origin=${admission.origin}, status=$status, " +
-            "prepared=${prepared != null}, runningAtEpochMs=$runningAtEpochMs, terminal=${terminal?.status}, content=<redacted>)"
+    override fun toString(): String = "InferenceAuditRecord(requestId=$requestId, origin=${admission.origin}, status=$status, " +
+        "prepared=${prepared != null}, runningAtEpochMs=$runningAtEpochMs, terminal=${terminal?.status}, content=<redacted>)"
 }
 
 data class InferenceAuditSummary(
