@@ -2,8 +2,8 @@ package io.github.daniele21.localllm.transport.binder.client
 
 import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
-import io.github.daniele21.localllm.transport.binder.contract.ConsumerControlPlaneRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
@@ -75,7 +75,7 @@ class AidlSharedRuntimeRemoteServiceTest {
         val expected = RemoteException("binder died")
         val consumerDelegate = consumerProxy { methodName ->
             when (methodName) {
-                "deactivate" -> {
+                "cancel" -> {
                     timeline += "remote"
                     throw expected
                 }
@@ -97,13 +97,7 @@ class AidlSharedRuntimeRemoteServiceTest {
         }
 
         try {
-            service.consumer.deactivate(
-                ConsumerControlPlaneRequestParcel(
-                    clientToken = ClientTokenParcel("client-token"),
-                    operationId = "operation-id",
-                    activationId = "activation-id",
-                ),
-            ) {}
+            service.consumer.cancel(CancelRequestParcel(ClientTokenParcel("client-token"), "request-id"))
             fail("Expected RemoteException")
         } catch (error: RemoteException) {
             assertSame(expected, error)
