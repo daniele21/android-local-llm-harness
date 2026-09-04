@@ -5,17 +5,17 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-08-19
+Last reviewed: 2026-09-04
 
 This file tracks capability-level milestones and remaining outcomes. It does not own active branch names, pull-request narratives or the next implementation task; those belong in [`current-state.md`](current-state.md).
 
-The repository remains not production-ready until representative physical-device GGUF evidence is complete.
+The repository remains not production-ready for broad device/runtime claims until representative physical-device GGUF evidence is complete.
 
 ## Milestone summary
 
 | Milestone | Status | Remaining outcome |
 | --- | --- | --- |
-| Repository foundation and protected integration | Implemented | Confirm the repository-level `dev` ruleset before release |
+| Repository foundation and protected integration | Implemented | Complete controlled `dev -> main` release promotion and keep rulesets current |
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | llama.cpp runtime efficiency and hardware execution | Planned / baseline-first | Qualify upstream evolution, improve CPU efficiency, then evaluate measured accelerator lanes |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
@@ -25,20 +25,20 @@ The repository remains not production-ready until representative physical-device
 | Connected Compose phone application | Partially complete | Remaining UDF migration, restoration, accessibility and responsive evidence |
 | Model RAM residency and memory governance | Implemented / device calibration pending | MEM-7 measured profiles, MEM-8 certification and remaining product-facing controls |
 | Reference-grade architecture hardening | In progress | RA-2/4/5/6/7/8/9/10/11 completion and cumulative certification |
-| Public Consumer API and OMBRA reference consumer | In progress | OMB-6B identity plus OMB-8 quality, physical-device and release evidence |
+| Public Consumer API and OMBRA reference consumer | In progress | OMB-6B identity plus OMB-8 quality and representative physical/release evidence |
 | Native Android SDK integration | Planned | Stable consumer adapter over the embedded contracts |
 | Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
 | Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
-| Shared Binder/AIDL runtime | Implemented / physical evidence pending | SR-6 signer, process-death/reconnect and Binder-vs-in-process release evidence |
+| Shared Binder/AIDL runtime | Implemented / physical evidence pending | Formal representative ARM64/signer/resource evidence; automated lifecycle/fault matrix is complete |
 
 ## Priority order across active plans
 
-- **P0 — current release/evidence lane:** OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and the Harness 0.5 release gates remain ahead of non-critical runtime optimization. A new llama.cpp pin or optimization may preempt this lane only for a correctness or security blocker.
+- **P0 — release/evidence lane:** promote the validated Harnex and RedactGuard baselines to `main`, then complete the representative physical gates that genuinely remain: LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 release evidence. A new llama.cpp pin or optimization may preempt this lane only for a correctness or security blocker.
 - **P1 — safe parallel hardening:** upstream qualification, backend capability/effective-plan telemetry, prompt-token reuse and bounded CPU-side measurements may proceed when ownership is disjoint. Reference-architecture RA-4/5/7/9/10 and model-evaluation work remain parallel owners rather than being duplicated here.
 - **P2 — post-CPU-evidence execution expansion:** Adreno OpenCL, OpenCL kernel caching, K/V cache type experiments, evaluation-only multi-sequence execution and deterministic device-plan evolution begin only after the CPU baseline is evidence-stable or on an explicitly non-release experimental lane.
 - **P3 — research:** Hexagon/HTP and broader heterogeneous execution remain deferred until CPU/OpenCL ownership, packaging and evidence are understood.
 
-Detailed IDs, dependencies and acceptance rules for this new lane are owned by [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md).
+Detailed IDs, dependencies and acceptance rules for the runtime-optimization lane are owned by [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md).
 
 ## 1. Repository and release discipline
 
@@ -54,7 +54,8 @@ Implemented:
 
 Remaining:
 
-- confirm `dev` branch protection through repository settings;
+- complete the current FULL-validated `dev -> main` promotion while preserving valid main-only hotfix history;
+- confirm and maintain `dev`/`main` branch protection through repository settings;
 - remove obsolete remote branches after audit;
 - retain concise documentation governance and consistency guards;
 - keep release tags and artifacts tied to an exact validated `main` commit.
@@ -149,28 +150,28 @@ Remaining:
 - later signature-protected diagnostics bridge for cross-application inspection;
 - extend execution identity only with material backend/device/load/cache/reuse facts required by measured llama.cpp plans.
 
-Dataset-based semantic model evaluation is a separate active control-plane capability. EVAL-1 now provides deterministic contracts/identity while dataset, evaluator, runner, persistence and Performance UI lanes proceed independently under [`model-evaluation/README.md`](model-evaluation/README.md). The existing benchmark engine remains the owner of telemetry-derived runtime baselines and regression health.
+Dataset-based semantic model evaluation is a separate active control-plane capability. EVAL-1 provides deterministic contracts/identity while dataset, evaluator, runner, persistence and Performance UI lanes proceed independently under [`model-evaluation/README.md`](model-evaluation/README.md). The existing benchmark engine remains the owner of telemetry-derived runtime baselines and regression health.
 
 ## 5. Connected Android application
 
 Implemented:
 
-- Compose/Material 3 surface with Overview, Playground, Models, Diagnostics and Settings;
+- Compose/Material 3 surface with Overview, Playground, Applications, Performance, Models, Diagnostics and Settings;
 - compact and expanded navigation shell;
-- reproducible Harness identity and shared design system;
+- reproducible Harnex identity and shared design system;
 - shared process runtime graph;
 - real model management and Playground inference;
 - Playground and Models ViewModel/UDF boundaries;
 - typed Settings, request-timeline and model-detail routes;
-- privacy-safe model inventory, diagnostics and validation reports.
+- privacy-safe model inventory, diagnostics and validation reports;
+- repository-owned Google Play Internal Testing publication for the integrated current candidate.
 
 Remaining:
 
-- migrate Overview, Diagnostics and Settings state/effects from `MainActivity`;
+- migrate remaining Overview, Diagnostics and Settings state/effects from `MainActivity` where still owned there;
 - complete process recreation, state restoration and Back-stack evidence;
 - complete Compose state, screenshot, accessibility, large-font, landscape and expanded-layout matrices;
-- validate remote distribution, inference, cancellation and recovery on representative phones;
-- publish the signed candidate through Google Play Internal Testing.
+- finish representative-phone evidence for distribution, inference, cancellation, resource behavior and recovery beyond the automated API 35 matrix.
 
 Focused acceptance criteria remain in [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md), and the durable application boundary is documented in [`features/phone-app-architecture.md`](features/phone-app-architecture.md).
 
@@ -189,15 +190,17 @@ These integrations must not duplicate runtime policy or create a second model st
 
 ## 7. Shared runtime, Consumer API and control plane
 
-Integrated repository-side capabilities include the Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, packaged Consumer API boundaries and the OMBRA reference consumer flow. These capabilities remain evidence-gated rather than production-ready.
+Integrated repository-side capabilities include the Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries and the OMBRA reference consumer flow.
+
+The final automated lifecycle convergence is complete: Harnex `dev@6b34fe9f...` publishes Consumer Android SDK `0.1.0-alpha.10`, RedactGuard consumes that SDK, and the complete API 35 Two-APK lifecycle/fault/serialization matrix is green. A representative manual RedactGuard run also confirms the practical real-device product flow works. These facts do not replace formal ARM64/JNI/GGUF/memory/thermal/OEM evidence.
 
 Remaining:
 
-- SR-6 physical same-signer/invalid-signer, process-death/reconnect and Binder-vs-in-process overhead evidence;
+- SR-6/LAS-07 formal physical same-signer/ARM64/model/resource evidence where required by the claim;
 - OMB-6B approved identity/launcher closure;
-- OMB-8 exact-model quality execution, physical two-APK document workflow and release evidence;
+- OMB-8 exact-model quality execution and representative physical document workflow evidence;
 - signature-protected cross-application diagnostics only when its separate read/control contract is justified;
-- release/version/signing documentation against the exact distributed build.
+- release/version/signing documentation against the exact promoted `main` build.
 
 Canonical sequencing remains in [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md). The shared runtime and Consumer API must not duplicate model, scheduler, retry or memory policy from runtime core.
 
@@ -233,4 +236,4 @@ Deferred until the CPU embedded path and release evidence are stable:
 
 ## Release boundary
 
-The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). Emulator, host-native and simulated acceptance evidence support merge readiness but do not satisfy physical-device production readiness.
+The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The current Harnex/RedactGuard automated integration baseline is release-promotion ready, but emulator and manual-product acceptance evidence do not by themselves satisfy the remaining formal physical-device production claims.
