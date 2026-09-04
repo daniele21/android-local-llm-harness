@@ -9,6 +9,8 @@ Last reviewed: 2026-09-04
 
 Operational ledger: [`../current-state.md`](../current-state.md). Existing privacy-safe telemetry contract: [`../harness-telemetry-composition.md`](../harness-telemetry-composition.md). This file owns temporary sequencing, dependencies and write boundaries only.
 
+Current checkpoint (2026-09-04): LIA-00 and LIA-05 are implemented; LIA-10 and LIA-40 have implementation on the feature branch and remain validation-pending. Runtime lifecycle, verified Host attribution, Activity UI, convergence/recovery and cross-process proof remain open. The DAG state column below is the original sequencing plan; this checkpoint is the live execution status until the next convergence update.
+
 ## Goal
 
 Make every inference accepted by Harnex locally reconstructible after restart: who invoked it, what input/effective prompt was executed, what answer/reasoning was produced, which model/configuration ran, how it performed and how it terminated.
