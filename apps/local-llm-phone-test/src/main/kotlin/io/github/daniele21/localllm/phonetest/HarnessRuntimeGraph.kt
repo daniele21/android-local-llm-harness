@@ -18,7 +18,7 @@ import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
-import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.observability.room.RoomTelemetryRepository
 import io.github.daniele21.localllm.runtime.ActivationIdFactory
 import io.github.daniele21.localllm.runtime.ActivationResidencyCoordinator
 import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
@@ -49,6 +49,15 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     private val controlPlaneStoreOwner =
         RoomHostControlPlaneStoreOwner.open(appContext, CONTROL_PLANE_DATABASE_NAME)
+    private val telemetryRepositoryOwner = RoomTelemetryRepository.open(
+        context = appContext,
+        databaseName = TELEMETRY_DATABASE_NAME,
+        retention = TelemetryRetentionPolicy(
+            maxRuns = MAX_RETAINED_RUNS,
+            maxLogs = MAX_RETAINED_LOGS,
+            maxResourceSnapshots = MAX_RETAINED_RESOURCE_SNAPSHOTS,
+        ),
+    )
 
     init {
         HarnessControlPlaneStartup(
@@ -69,14 +78,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             runtimeSnapshot = ::runtimeSnapshot,
         ),
     )
-
-    val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
-        TelemetryRetentionPolicy(
-            maxRuns = MAX_RETAINED_RUNS,
-            maxLogs = MAX_RETAINED_LOGS,
-            maxResourceSnapshots = MAX_RETAINED_RESOURCE_SNAPSHOTS,
-        ),
-    )
+    val telemetryRepository: TelemetryRepository = telemetryRepositoryOwner
 
     val loadedModelDigest: ModelDigest?
         get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
@@ -204,6 +206,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             registry.clearActivationBindings()
             registry.selectedModel = null
         }
+        telemetryRepositoryOwner.close()
         controlPlaneStoreOwner.close()
     }
 
@@ -229,6 +232,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     companion object {
         private const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
+        private const val TELEMETRY_DATABASE_NAME = "harnex-telemetry.db"
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
