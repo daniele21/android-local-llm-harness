@@ -1,0 +1,49 @@
+name: Agent spotless materialize
+
+on:
+  push:
+    branches:
+      - feature/local-inference-activity-audit
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build components
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Materialize Spotless formatting
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache spotlessApply
+
+      - name: Upload formatted audit sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-spotless-audit-sources
+          retention-days: 1
+          path: |
+            observability/contracts/src/main/kotlin/io/github/daniele21/localllm/audit/InferenceAudit.kt
+            observability/room-store/src/main/kotlin/io/github/daniele21/localllm/audit/room/*.kt
+            observability/room-store/src/test/kotlin/io/github/daniele21/localllm/audit/room/*.kt
+            observability/room-store/src/androidTest/kotlin/io/github/daniele21/localllm/audit/room/*.kt
