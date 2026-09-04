@@ -211,7 +211,7 @@ data class InferenceAuditMetrics(
         listOf(inputTokens, outputTokens, reasoningTokens, answerTokens).forEach { value ->
             require(value == null || value >= 0) { "Audit token counts must not be negative" }
         }
-        require(decodeTokensPerSecond == null || decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0) {
+        require(decodeTokensPerSecond == null || (decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0)) {
             "Audit throughput must be finite and non-negative"
         }
     }
@@ -296,7 +296,7 @@ data class InferenceAuditSummary(
             "Audit summary completion must not precede admission"
         }
         require(totalMs == null || totalMs >= 0) { "Audit summary total duration must not be negative" }
-        require(decodeTokensPerSecond == null || decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0) {
+        require(decodeTokensPerSecond == null || (decodeTokensPerSecond.isFinite() && decodeTokensPerSecond >= 0.0)) {
             "Audit summary throughput must be finite and non-negative"
         }
     }
