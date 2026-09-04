@@ -138,7 +138,7 @@ The README stays product-first, but the main implementation owners remain easy t
 | Public contracts and runtime | `core/contracts`, `core/runtime-core` |
 | Models | `models/model-profile`, `models/model-store`, `models/model-catalog`, `models/model-download`, `models/model-install` |
 | Native backend | `backends/llama-cpp` |
-| Observability | `observability/in-memory-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
+| Observability | `observability/in-memory-store`, `observability/room-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
 | Embedded transport | `transports/in-process` |
 | Product surfaces | `apps/local-llm-phone-test`, `apps/local-llm-console`, `apps/device-test-runner`, `ui/design-system` |
 
@@ -146,15 +146,17 @@ The README stays product-first, but the main implementation owners remain easy t
 
 ## Current status and limits
 
-Harnex is an active engineering project, not a production-ready Android AI platform.
+Harnex is an active engineering project, not yet a universally certified Android AI platform.
 
 Today:
 
 - the Android product and control plane are integrated;
-- shared runtime and Consumer/Binder boundaries are implemented;
+- shared runtime and Consumer/Binder boundaries are implemented and the API 35 cross-application lifecycle/fault/serialization matrix is green;
+- Consumer Android SDK `0.1.0-alpha.10` is published from integrated `dev@6b34fe9fcba70f6b8abd107fd58b61c418ac737d`;
+- the corresponding Harnex phone-test is published to Google Play Internal Testing;
+- RedactGuard consumes alpha.10, is integrated on its own `dev`, has green cross-repository automated evidence and has been manually confirmed working end to end on a real Android device;
 - product support is currently curated around Qwen3.5 dense 0.8B and 2B;
-- background/process lifecycle hardening is integrated and still being completed with cross-repository evidence;
-- representative physical-device gates are still required for several release, memory, thermal and lifecycle claims.
+- representative physical-device evidence is still required for formal ARM64/JNI/GGUF, memory, thermal, OEM and selected release claims.
 
 The exact integrated state and blockers live in [`docs/current-state.md`](docs/current-state.md).
 
