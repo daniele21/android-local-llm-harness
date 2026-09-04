@@ -5,28 +5,28 @@ Document type: feature-specification
 Owner: apps/local-llm-phone-test
 Canonical scope: phone.diagnostics.telemetry
 Read when: changing connected-app telemetry assembly, retention or timeline presentation
-Last reviewed: 2026-08-06
-
-**Status:** Implemented first iteration
-**Application:** `apps/local-llm-phone-test`
-**Last updated:** 2026-08-04
+Last reviewed: 2026-09-04
 
 ## Decision
 
-The first connected Harness iteration uses one process-scoped `InMemoryTelemetryRepository` owned by `HarnessRuntimeGraph`.
+Harnex uses one process-scoped `RoomTelemetryRepository` owned by `HarnessRuntimeGraph` for normal privacy-safe telemetry. The repository lives in the Harnex application sandbox as `harnex-telemetry.db` and uses the existing Room telemetry schema/migrations.
 
-The same repository is injected into the single shared `RuntimeOrchestrator` used by Playground and physical-device validation. Diagnostics reads from this repository through `HarnessDiagnosticsSource`; it does not create a parallel runtime, model store, telemetry store, or registry.
+The same repository is injected into the single shared `RuntimeOrchestrator` used by Playground, authenticated Consumer execution and physical-device validation. Diagnostics reads through `HarnessDiagnosticsSource`; it does not create a parallel runtime, model store, telemetry store or registry.
+
+This is distinct from the sensitive inference-audit domain defined by [ADR 0017](adr/0017-durable-local-inference-audit.md). Prompt, effective prompt, reasoning and generated output remain forbidden from normal telemetry even though the new audit ledger may persist them under its separate encryption/failure policy.
 
 ## Rationale
 
-The in-memory implementation is selected for the first connected vertical slice because it:
+Persistent normal telemetry is now required because runtime evidence must remain available after ordinary Harnex UI recreation and process restart. The existing `RoomTelemetryRepository` already owns the required behavior:
 
-- uses the existing stable `TelemetryRepository` contract;
-- avoids introducing a Room schema and migration lifecycle into the Compose/runtime refactor PR;
-- makes real generation runs and structured logs immediately observable;
-- preserves bounded retention;
-- keeps telemetry ownership inside the application process;
-- allows a later transition to `RoomTelemetryRepository` without changing Diagnostics presentation contracts.
+- stable `TelemetryRepository` contracts;
+- serialized off-main-thread writes and ordered query barriers;
+- lifecycle upsert by request ID;
+- bounded independent retention;
+- Room migrations and schema validation;
+- best-effort write isolation from inference behavior.
+
+The app keeps `observability:in-memory-store` as a test/fake dependency; it is no longer the production runtime-graph telemetry owner.
 
 ## Retention
 
@@ -36,31 +36,35 @@ The connected graph retains at most:
 - 1,000 structured logs;
 - 200 resource snapshots.
 
-Diagnostics uses smaller bounded query windows for presentation.
+Diagnostics uses smaller bounded query windows for presentation. Benchmark/health retention continues to follow the stable telemetry repository contract and existing store policy.
 
 ## Lifecycle
 
-- Constructing `HarnessRuntimeGraph` creates the telemetry repository but does not load llama.cpp or a GGUF model.
-- The runtime is created lazily when an operation requests a `PhoneHarness`.
-- Replacing or removing the active model closes the runtime but does not clear process telemetry.
-- Activity recreation does not own the process-scoped repository.
-- Android process death clears the in-memory telemetry history.
+- Constructing `HarnessRuntimeGraph` opens the process-scoped telemetry database but does not load llama.cpp or a GGUF model.
+- The runtime is created lazily when an operation needs it and receives the already-owned telemetry repository.
+- Replacing or removing the active model closes the runtime but does not clear telemetry history.
+- Activity recreation does not own or reopen a parallel repository.
+- The shared-runtime Service and Harnex UI resolve the same `HarnessRuntimeGraph` and therefore the same telemetry owner.
+- `HarnessRuntimeGraph.close()` closes runtime ownership first, then drains/closes the telemetry repository and finally closes the control-plane store.
+- Android process restart reopens the same app-private telemetry database, so retained Runs/Logs remain queryable.
 
-## Privacy
+## Privacy and failure semantics
 
-Normal telemetry includes identifiers, lifecycle status, typed error codes, timings, token counts, throughput, model load classification and fixed structured fields.
+Normal telemetry includes identifiers, lifecycle status, typed error codes, timings, token counts, throughput, model/configuration execution identity and fixed structured fields.
 
 It excludes:
 
-- prompts;
-- generated output;
+- prompts and effective prompts;
+- generated answer/reasoning content;
 - arbitrary exception messages;
 - private model paths;
 - source document URIs;
 - model bytes.
 
-The Diagnostics UI maps only safe identifiers, digest prefixes and numeric metrics.
+The Diagnostics UI maps only source-backed safe identifiers, digest prefixes and numeric metrics.
 
-## Known limitation and follow-up
+Normal telemetry remains best-effort: lifecycle write failures inside `RoomTelemetryRepository` are isolated from inference success/cancellation. This is deliberately weaker than ADR-0017 audit persistence, which becomes a correctness gate for accepted/normal-success inference once its production composition is integrated.
 
-Telemetry does not survive process death in this iteration. Persistent cross-restart history requires a deliberate follow-up migration to `RoomTelemetryRepository`, including database lifecycle, storage reporting, retention verification and schema migration tests.
+## Verification
+
+Changes to this composition require the existing Room repository unit/migration coverage plus phone-test compile/unit/lint/package checks selected by repository scope. Cross-restart product evidence belongs to the local-inference Activity/audit workstream when the complete runtime + audit + UI path is composed; this document does not promote emulator evidence into physical performance or hardware claims.
