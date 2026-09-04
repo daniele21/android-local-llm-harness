@@ -108,21 +108,19 @@ class AidlSharedRuntimeRemoteServiceTest {
         hostBuildId = "current-host",
     )
 
-    private fun transportFailingConsumer(
-        expected: RemoteException,
-        timeline: MutableList<String>,
-    ): IConsumerLocalLlmService = consumerProxy { methodName ->
-        when (methodName) {
-            "cancel" -> {
-                timeline += "remote"
-                throw expected
+    private fun transportFailingConsumer(expected: RemoteException, timeline: MutableList<String>): IConsumerLocalLlmService =
+        consumerProxy { methodName ->
+            when (methodName) {
+                "cancel" -> {
+                    timeline += "remote"
+                    throw expected
+                }
+
+                "asBinder" -> null
+
+                else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
             }
-
-            "asBinder" -> null
-
-            else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
         }
-    }
 
     private fun localLlmWithConsumer(consumer: IConsumerLocalLlmService): ILocalLlmService = localLlmProxy { methodName ->
         when (methodName) {
