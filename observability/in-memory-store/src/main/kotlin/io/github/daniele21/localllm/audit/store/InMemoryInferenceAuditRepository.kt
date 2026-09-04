@@ -16,9 +16,8 @@ import io.github.daniele21.localllm.contracts.RequestId
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Deterministic process-local audit store for tests, previews and non-persistent compositions. */
-class InMemoryInferenceAuditRepository(
-    private val retention: InferenceAuditRetentionPolicy = InferenceAuditRetentionPolicy(),
-) : InferenceAuditRepository {
+class InMemoryInferenceAuditRepository(private val retention: InferenceAuditRetentionPolicy = InferenceAuditRetentionPolicy()) :
+    InferenceAuditRepository {
     private val lock = Any()
     private val closed = AtomicBoolean(false)
     private val records = linkedMapOf<RequestId, InferenceAuditRecord>()
