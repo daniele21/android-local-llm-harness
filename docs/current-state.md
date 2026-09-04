@@ -12,7 +12,7 @@ This is the operational ledger for integrated state, blockers and immediate work
 ## Integration lines
 
 - `dev` is the canonical base/target for ordinary work and Internal Testing candidates.
-- `main` is the protected stable/release line.
+- `main` is the stable/release line.
 - New work starts from the latest green `dev` unless explicitly hotfixed.
 
 ## Integrated baseline
@@ -33,11 +33,19 @@ SR-0..5 and repository-side SR-6 release-evidence tooling are integrated; repres
 
 Background/process lifecycle hardening is integrated through durable logical jobs, detached execution ownership, explicit cancellation, exact prepared execution identity and started/foreground Host demand. HBG-42 reconciles stale persisted non-terminal jobs to `INTERRUPTED` across Host restart without claiming native work survives process death.
 
-PR #527 is the active Harnex integration candidate for the final LAS automated lifecycle fixes. It preserves accepted cancellation when a concurrent backend error arrives, closes the Binder connection-loss ordering race, prevents stale endpoint failures from tearing down replacement registrations and makes the reusable Two-APK candidate build Host + Consumer SDK from one exact Harnex revision.
+The final LAS runtime/Binder fixes are integrated at `dev@6b34fe9fcba70f6b8abd107fd58b61c418ac737d`. They preserve accepted cancellation when a concurrent backend error arrives, close Binder connection-loss ordering races, prevent stale endpoint failures from tearing down replacement registrations and make the reusable Two-APK candidate build Host + Consumer SDK from one exact Harnex revision.
 
-The executable runtime/Binder behavior of PR #527 was proven cross-repository by RedactGuard Two-APK #144: Host absence, cross-process product flow, ViewModel/Home continuity, Binder loss/reconnect without implicit cancellation, explicit cancellation, Host process loss/restart, critical-pressure interruption, RedactGuard process loss/privacy behavior and independent-consumer deterministic serialization are green on API 35. Emulator evidence remains emulator evidence and does not establish ARM64/JNI/GGUF/resource/OEM claims.
+The public Consumer SDK `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.10` is published successfully from that integrated source. The corresponding Harnex phone-test is also published to Google Play Internal Testing.
 
-The production Consumer SDK candidate is now `0.1.0-alpha.10`. Publication is owned by `.github/workflows/publish-consumer-sdk.yml`: after exact-head integration validation and merge of PR #527 to `dev`, the workflow must publish alpha.10 successfully before downstream applications adopt it. See [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md).
+### Cross-repository RedactGuard evidence
+
+RedactGuard now consumes alpha.10 and is integrated at `dev@0e329c49e8ce5985b3677e9ca5566bc3cb6f3b96`.
+
+The final RedactGuard PR candidate passed FULL integration validation and the complete API 35 Two-APK lifecycle/fault/serialization matrix against Harnex `6b34fe9f...`. After merge, exact RedactGuard `dev@0e329c49...` passed its `Validate` push run #949 and Play Internal publication run #4.
+
+That automated evidence covers Host absence, cross-process product flow, ViewModel/Home continuity, Binder loss/reconnect without implicit cancellation, explicit cancellation, Host process loss/restart, critical-pressure interruption, RedactGuard process-loss privacy behavior and independent-consumer deterministic serialization.
+
+A representative manual product run has additionally confirmed the real Android application works end to end. This is product acceptance evidence, not a replacement for the formal ARM64/JNI/GGUF/resource identity bundle where those stronger claims are required.
 
 ### Consumer API, OMBRA and evaluation
 
@@ -47,25 +55,17 @@ Model-evaluation contracts/evaluators and core dataset pipeline are integrated t
 
 ## Open blockers
 
-### 1. LAS publication convergence
+### 1. Main-line release promotion
 
-The automated lifecycle/fault/serialization matrix is complete. No additional Harnex runtime patch is indicated by the current automated evidence.
+The LAS publication-convergence sequence is complete on `dev`: Harnex fixes are integrated, alpha.10 is published, Harnex Play Internal is green, RedactGuard consumes alpha.10, the final cross-repository automated matrix is green, RedactGuard is integrated and its Play Internal publication is green.
 
-The remaining publication sequence is:
-
-1. exact-head integration validation for PR #527;
-2. merge PR #527 to `dev`;
-3. publish `consumer-android:0.1.0-alpha.10` from that integrated Harnex source;
-4. publish the corresponding Harnex phone-test candidate to Play Internal Testing;
-5. update RedactGuard to consume alpha.10 and re-establish its exact-head/cross-repository evidence before its Internal Testing publication.
-
-This sequence is required so the phone candidate does not combine a new Host with the older alpha.9 Consumer Binder client.
+The remaining release-management step is controlled promotion of the validated Harnex and RedactGuard baselines to their `main` branches. Both repositories have `main`-only hotfix history, so promotion must preserve valid local changes and ancestry rather than force-moving `main`. RELEASE requires FULL exact-head validation against live `main`.
 
 ### 2. Representative Android evidence
 
-LAS-07 and the remaining CRV/SR/Q35/phone resource claims require representative physical Android evidence. LAS-07 specifically requires a physical `arm64-v8a` device, the production JNI/llama.cpp path, a real compatible GGUF and the exact Harnex/RedactGuard candidate identities. Physical memory/thermal/OEM observations remain distinct from emulator evidence.
+LAS-07 and the remaining CRV/SR/Q35/phone resource claims require representative physical Android evidence. LAS-07 specifically requires a physical `arm64-v8a` device, the production JNI/llama.cpp path, a real compatible GGUF and exact Harnex/RedactGuard candidate identities. Physical memory/thermal/OEM observations remain distinct from emulator evidence.
 
-Play Internal builds are useful for on-device product/runtime testing, but the canonical two-APK LAS-07 Binder journey still requires signer identity to satisfy the signature-protected shared-runtime permission. If Play-installed packages do not share the same app-signing certificate, use the repository-owned same-signer release-APK runbook instead of treating Play installation as equivalent evidence.
+A successful ordinary manual app run is useful product acceptance evidence, but does not automatically satisfy every LAS-07 identity/scenario requirement. Play Internal builds are useful for on-device testing, while the canonical same-signer two-APK Binder claim still depends on verified signer identity.
 
 ### 3. OMBRA and follow-on work
 
@@ -73,12 +73,10 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 
 ## Immediate next block
 
-1. complete exact-head automated validation for PR #527 with Consumer SDK alpha.10 metadata;
-2. integrate PR #527 to `dev` and verify both real Consumer SDK alpha.10 publication and Harnex Play Internal publication;
-3. update RedactGuard to alpha.10 in one coherent dependency/documentation change and rerun affected deterministic + Two-APK evidence;
-4. integrate the validated RedactGuard candidate to `dev` and verify its Play Internal publication;
-5. execute LAS-07 on representative physical hardware, keeping Play/device-product evidence separate from the canonical same-signer Binder claim when app-signing certificates differ;
-6. continue OMB-6B, OMB-8, evaluation and LLUP independently where ownership does not conflict.
+1. promote integrated Harnex `dev@6b34fe9f...` to `main` through the repository RELEASE/FULL path while preserving valid `main` hotfixes;
+2. promote integrated RedactGuard `dev@0e329c49...` to its `main` through the equivalent release path;
+3. execute LAS-07 only for the representative physical claims it genuinely owns, retaining exact source/APK/model/device identity;
+4. continue OMB-6B, OMB-8, evaluation, Q35 device tuning and LLUP independently where ownership does not conflict.
 
 ## Source links
 
