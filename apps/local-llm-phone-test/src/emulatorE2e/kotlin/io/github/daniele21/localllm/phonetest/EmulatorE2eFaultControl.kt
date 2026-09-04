@@ -61,42 +61,27 @@ internal object EmulatorE2eGenerationGate {
     fun awaitRelease(isCancelled: () -> Boolean): Boolean {
         val deadline = SystemClock.elapsedRealtime() + MAX_WAIT_MILLIS
         synchronized(monitor) {
-            if (!paused) {
-                val cancelled = isCancelled()
-                println("HARNEX_CANCEL_TRACE stage=gate_bypass cancelled=$cancelled")
-                return !cancelled
-            }
+            if (!paused) return !isCancelled()
             waitingRequests += 1
-            println("HARNEX_CANCEL_TRACE stage=gate_waiter_enter waiting=$waitingRequests")
             monitor.notifyAll()
             try {
                 while (paused) {
-                    if (isCancelled()) {
-                        println("HARNEX_CANCEL_TRACE stage=gate_cancel_observed waiting=$waitingRequests")
-                        return false
-                    }
+                    if (isCancelled()) return false
                     val remaining = deadline - SystemClock.elapsedRealtime()
-                    if (remaining <= 0L) {
-                        println("HARNEX_CANCEL_TRACE stage=gate_timeout waiting=$waitingRequests")
-                        error("Emulator E2E generation gate timed out")
-                    }
+                    check(remaining > 0L) { "Emulator E2E generation gate timed out" }
                     try {
                         monitor.wait(minOf(remaining, CANCEL_POLL_MILLIS))
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
-                        println("HARNEX_CANCEL_TRACE stage=gate_interrupted waiting=$waitingRequests")
                         return false
                     }
                 }
             } finally {
                 waitingRequests -= 1
-                println("HARNEX_CANCEL_TRACE stage=gate_waiter_exit waiting=$waitingRequests")
                 monitor.notifyAll()
             }
         }
-        val cancelled = isCancelled()
-        println("HARNEX_CANCEL_TRACE stage=gate_released cancelled=$cancelled")
-        return !cancelled
+        return !isCancelled()
     }
 
     fun status(): String = synchronized(monitor) {
