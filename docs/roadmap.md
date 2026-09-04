@@ -15,7 +15,7 @@ Broad device/runtime production claims still require representative physical-dev
 
 | Milestone | Status | Remaining outcome |
 | --- | --- | --- |
-| Repository foundation and protected integration | Implemented | Controlled `dev -> main` release promotion and current rulesets |
+| Repository foundation and protected integration | Implemented | Maintain rulesets, release tagging and post-promotion ancestry sync |
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | llama.cpp runtime efficiency and hardware execution | Planned / baseline-first | Qualify upstream evolution, improve CPU efficiency, then evaluate measured accelerator lanes |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
@@ -33,7 +33,7 @@ Broad device/runtime production claims still require representative physical-dev
 
 ## Priority order across active plans
 
-- **P0 — release/evidence lane:** promote validated Harnex and RedactGuard baselines to `main`, then complete the remaining representative physical gates: LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5. A new llama.cpp pin may preempt only for correctness/security.
+- **P0 — evidence/certification lane:** complete the remaining representative physical gates: LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 release evidence. The validated Harnex and RedactGuard baselines are already promoted to `main`. A new llama.cpp pin may preempt only for correctness/security.
 - **P1 — safe parallel hardening:** upstream qualification, backend capability/effective-plan telemetry, prompt-token reuse and bounded CPU measurements may proceed with disjoint ownership. RA-4/5/7/9/10 and model evaluation remain separate owners.
 - **P2 — post-CPU-evidence execution expansion:** Adreno OpenCL, kernel caching, K/V cache experiments, evaluation-only multi-sequence execution and deterministic device-plan evolution start after the CPU baseline is evidence-stable or on an explicit experimental lane.
 - **P3 — research:** Hexagon/HTP and broader heterogeneous execution remain deferred until CPU/OpenCL ownership, packaging and evidence are understood.
@@ -50,15 +50,16 @@ Implemented:
 - `dev` integration and `main` stable promotion lines;
 - scoped PR validation, cumulative `dev` validation and complete promotion validation;
 - protected promotion, hotfix and forward-port rules in ADR 0008;
-- reproducible Android packaging and launcher assets.
+- reproducible Android packaging and launcher assets;
+- 2026-09-04 validated Harnex/RedactGuard release promotion with `main -> dev` ancestry synchronization completed.
 
 Remaining:
 
-- complete FULL-validated `dev -> main` promotion while preserving valid main-only hotfix history;
-- maintain `dev`/`main` branch protection;
+- maintain `dev`/`main` branch protection and rulesets;
 - remove obsolete remote branches after audit;
 - retain concise documentation governance and consistency guards;
-- tie release tags/artifacts to an exact validated `main` commit.
+- tie future release tags/artifacts to exact validated `main` commits;
+- keep ADR 0008 post-promotion synchronization explicit in each release cycle.
 
 ## 2. Embedded runtime
 
@@ -164,7 +165,8 @@ Implemented:
 - Playground and Models ViewModel/UDF boundaries;
 - typed Settings, request-timeline and model-detail routes;
 - privacy-safe model inventory, diagnostics and validation reports;
-- Google Play Internal Testing publication for the integrated candidate.
+- Google Play Internal Testing publication for the integrated candidate;
+- stable-line promotion of the validated current baseline.
 
 Remaining:
 
@@ -192,7 +194,7 @@ These integrations must not duplicate runtime policy or create a second model st
 
 Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries and the OMBRA reference flow.
 
-Automated lifecycle convergence is complete: Harnex `dev@6b34fe9f...` publishes Consumer SDK `0.1.0-alpha.10`, RedactGuard consumes it, and the complete API 35 Two-APK lifecycle/fault/serialization matrix is green. A representative manual RedactGuard run confirms the practical real-device flow. Formal ARM64/JNI/GGUF/memory/thermal/OEM evidence remains separate.
+Automated lifecycle convergence is complete: Harnex source `6b34fe9f...` publishes Consumer SDK `0.1.0-alpha.10`, RedactGuard consumes it, and the complete API 35 Two-APK lifecycle/fault/serialization matrix is green. The validated Harnex and RedactGuard baselines are now promoted to their stable `main` lines. A representative manual RedactGuard run confirms the practical real-device flow. Formal ARM64/JNI/GGUF/memory/thermal/OEM evidence remains separate.
 
 Remaining:
 
@@ -200,7 +202,7 @@ Remaining:
 - OMB-6B identity/launcher closure;
 - OMB-8 exact-model quality and representative physical document-workflow evidence;
 - signature-protected cross-application diagnostics only if separately justified;
-- release/version/signing documentation against exact promoted `main`.
+- future release/version/signing documentation against exact promoted `main` identities.
 
 Canonical sequencing: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md), [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md), [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
 
@@ -236,4 +238,4 @@ Deferred until the CPU embedded path and release evidence are stable:
 
 ## Release boundary
 
-The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The Harnex/RedactGuard automated baseline is release-promotion ready; emulator/manual product acceptance does not replace remaining formal physical-device production evidence.
+The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The Harnex/RedactGuard automated integration baseline is now on the stable `main` lines; emulator/manual product acceptance still does not replace the remaining formal physical-device production evidence.
