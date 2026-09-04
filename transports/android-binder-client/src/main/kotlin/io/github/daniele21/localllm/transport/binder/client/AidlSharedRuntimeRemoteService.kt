@@ -211,10 +211,7 @@ private class AidlConsumerSharedRuntimeRemoteService(
     }
 }
 
-private inline fun <T> reportTransportFailure(
-    onTransportFailure: (RemoteException) -> Unit,
-    call: () -> T,
-): T = try {
+private inline fun <T> reportTransportFailure(onTransportFailure: (RemoteException) -> Unit, call: () -> T): T = try {
     call()
 } catch (error: RemoteException) {
     onTransportFailure(error)
