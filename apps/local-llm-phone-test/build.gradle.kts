@@ -1,76 +1,98 @@
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import java.io.FileInputStream
 import java.util.Properties
-import java.util.concurrent.atomic.AtomicInteger
-import org.gradle.api.GradleException
-import org.gradle.api.Project
-import org.gradle.api.provider.ProviderFactory
-import org.gradle.api.tasks.Exec
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.compose)
 }
 
-fun Project.readPropertiesFile(fileName: String): Properties? {
-    val file = rootProject.file(fileName)
-    if (!file.exists()) return null
-    return Properties().apply { FileInputStream(file).use(::load) }
-}
-
-fun ProviderFactory.environmentOrNull(name: String): String? = environmentVariable(name).orNull?.trim()?.takeIf(String::isNotEmpty)
-
-val versionProperties = requireNotNull(project.readPropertiesFile("apps/local-llm-phone-test/version.properties")) {
-    "Missing apps/local-llm-phone-test/version.properties"
-}
-val configuredVersionName = requireNotNull(versionProperties.getProperty("VERSION_NAME")?.trim()?.takeIf(String::isNotEmpty)) {
-    "Missing VERSION_NAME in apps/local-llm-phone-test/version.properties"
-}
-val configuredVersionCode = requireNotNull(versionProperties.getProperty("VERSION_CODE")?.trim()?.toIntOrNull()) {
-    "Missing or invalid VERSION_CODE in apps/local-llm-phone-test/version.properties"
-}
-val phoneTestVersionCodeOverride = providers.gradleProperty("phoneTestVersionCode").orNull?.trim()?.takeIf(String::isNotEmpty)
-val effectiveVersionCode = phoneTestVersionCodeOverride?.toIntOrNull()?.takeIf { it > 0 }
-    ?: if (phoneTestVersionCodeOverride == null) {
-        configuredVersionCode
-    } else {
-        throw GradleException("phoneTestVersionCode must be a positive integer")
-    }
-val phoneTestVersionNameOverride = providers.gradleProperty("phoneTestVersionName").orNull?.trim()?.takeIf(String::isNotEmpty)
-val effectiveVersionName = phoneTestVersionNameOverride ?: configuredVersionName
-
-val releaseProperties = project.readPropertiesFile("release.properties")
-val phoneTestUploadSigningEnvironment = mapOf(
-    "storeFile" to providers.environmentOrNull("PHONE_TEST_UPLOAD_STORE_FILE"),
-    "storePassword" to providers.environmentOrNull("PHONE_TEST_UPLOAD_STORE_PASSWORD"),
-    "keyAlias" to providers.environmentOrNull("PHONE_TEST_UPLOAD_KEY_ALIAS"),
-    "keyPassword" to providers.environmentOrNull("PHONE_TEST_UPLOAD_KEY_PASSWORD"),
-)
-val phoneTestUploadSigningProperties = mapOf(
-    "storeFile" to releaseProperties?.getProperty("phoneTest.upload.storeFile")?.trim()?.takeIf(String::isNotEmpty),
-    "storePassword" to releaseProperties?.getProperty("phoneTest.upload.storePassword")?.trim()?.takeIf(String::isNotEmpty),
-    "keyAlias" to releaseProperties?.getProperty("phoneTest.upload.keyAlias")?.trim()?.takeIf(String::isNotEmpty),
-    "keyPassword" to releaseProperties?.getProperty("phoneTest.upload.keyPassword")?.trim()?.takeIf(String::isNotEmpty),
-)
-val phoneTestUploadSigning = phoneTestUploadSigningEnvironment.mapValues { (key, value) ->
-    value ?: phoneTestUploadSigningProperties[key]
-}
-val phoneTestUploadSigningConfigured = phoneTestUploadSigning.values.all { it != null }
-val allowUnsignedRelease = providers.environmentOrNull("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE") == "true"
-if (!phoneTestUploadSigningConfigured && !allowUnsignedRelease) {
-    logger.lifecycle(
-        "Phone test upload signing is not configured. Release bundle tasks require signing unless " +
-            "LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true is set for local validation.",
+val phoneTestUploadSigningEnvironment =
+    mapOf(
+        "storeFile" to System.getenv("LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE"),
+        "storePassword" to System.getenv("LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD"),
+        "keyAlias" to System.getenv("LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS"),
+        "keyPassword" to System.getenv("LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD"),
     )
+val phoneTestUploadSigningConfigured =
+    phoneTestUploadSigningEnvironment.values.all { !it.isNullOrBlank() }
+val phoneTestUploadSigningPartiallyConfigured =
+    phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
+val allowUnsignedRelease =
+    System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
+val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
+val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM"
+
+gradle.taskGraph.whenReady {
+    val packagesPhoneTestRelease =
+        allTasks.any { task ->
+            task.path == ":apps:local-llm-phone-test:bundleRelease" ||
+                task.path == ":apps:local-llm-phone-test:assembleRelease"
+        }
+    if (phoneTestUploadSigningPartiallyConfigured) {
+        throw GradleException(
+            "Phone-test release signing is incomplete. Set all " +
+                "LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_* variables; never commit upload-key material.",
+        )
+    }
+    if (packagesPhoneTestRelease && !phoneTestUploadSigningConfigured && !allowUnsignedRelease) {
+        throw GradleException(
+            "Phone-test release signing is not configured. Use scripts/build-phone-test-release.sh, " +
+                "or set LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true only for an intentional unsigned CI artifact.",
+        )
+    }
 }
 
-val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.BIND_SHARED_RUNTIME"
-val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.BIND_SHARED_RUNTIME"
+val versionPropertiesFile = file("version.properties")
+val versionProperties = Properties().apply {
+    if (versionPropertiesFile.exists()) {
+        FileInputStream(versionPropertiesFile).use { load(it) }
+    }
+}
+val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
+val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+val numericVersionNamePattern = Regex("""([0-9]+)\.([0-9]+)\.([0-9]+)""")
+val playVersionCodeOverride =
+    System.getenv("PLAY_VERSION_CODE")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { raw ->
+            raw.toIntOrNull()?.takeIf { it > 0 }
+                ?: throw GradleException("PLAY_VERSION_CODE must be a positive integer")
+        }
+val playVersionNameOverride =
+    System.getenv("PLAY_VERSION_NAME")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.also { raw ->
+            if (!numericVersionNamePattern.matches(raw)) {
+                throw GradleException("PLAY_VERSION_NAME must use numeric major.minor.patch format")
+            }
+        }
+if ((playVersionCodeOverride == null) != (playVersionNameOverride == null)) {
+    throw GradleException("PLAY_VERSION_CODE and PLAY_VERSION_NAME must be provided together")
+}
+if (playVersionCodeOverride != null && playVersionNameOverride != null) {
+    val currentVersionMatch =
+        numericVersionNamePattern.matchEntire(currentVersionName)
+            ?: throw GradleException(
+                "version.properties versionName must use numeric major.minor.patch format when Play overrides are used",
+            )
+    val expectedVersionName =
+        "${currentVersionMatch.groupValues[1]}.${currentVersionMatch.groupValues[2]}.$playVersionCodeOverride"
+    if (playVersionNameOverride != expectedVersionName) {
+        throw GradleException(
+            "PLAY_VERSION_NAME must be $expectedVersionName for PLAY_VERSION_CODE=$playVersionCodeOverride",
+        )
+    }
+}
+val effectiveVersionCode = playVersionCodeOverride ?: currentVersionCode
+val effectiveVersionName = playVersionNameOverride ?: currentVersionName
 
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "io.github.daniele21.localllm.phonetest"
@@ -86,10 +108,10 @@ android {
     signingConfigs {
         create("upload") {
             if (phoneTestUploadSigningConfigured) {
-                storeFile = file(phoneTestUploadSigning.getValue("storeFile")!!)
-                storePassword = phoneTestUploadSigning.getValue("storePassword")
-                keyAlias = phoneTestUploadSigning.getValue("keyAlias")
-                keyPassword = phoneTestUploadSigning.getValue("keyPassword")
+                storeFile = file(phoneTestUploadSigningEnvironment.getValue("storeFile")!!)
+                storePassword = phoneTestUploadSigningEnvironment.getValue("storePassword")
+                keyAlias = phoneTestUploadSigningEnvironment.getValue("keyAlias")
+                keyPassword = phoneTestUploadSigningEnvironment.getValue("keyPassword")
                 storeType = "PKCS12"
             }
         }
@@ -198,27 +220,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit4)
-}
-
-val androidComponents = extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
-val releaseVariantCounter = AtomicInteger(0)
-androidComponents.onVariants(androidComponents.selector().withBuildType("release")) { variant ->
-    releaseVariantCounter.incrementAndGet()
-}
-
-tasks.withType<Exec>().configureEach {
-    if (name == "processReleaseResources" && !phoneTestUploadSigningConfigured && !allowUnsignedRelease) {
-        doFirst {
-            throw GradleException(
-                "Phone test upload signing is required for release bundles. Configure PHONE_TEST_UPLOAD_* " +
-                    "or release.properties, or set LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true for local validation.",
-            )
-        }
-    }
-}
-
-tasks.register("verifyPhoneTestReleaseVariant") {
-    doLast {
-        check(releaseVariantCounter.get() == 1) { "Expected exactly one release variant" }
-    }
 }
