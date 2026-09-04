@@ -19,6 +19,8 @@ val phoneTestUploadSigningPartiallyConfigured =
     phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
 val allowUnsignedRelease =
     System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
+val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
+val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM"
 
 gradle.taskGraph.whenReady {
     val packagesPhoneTestRelease =
@@ -48,6 +50,43 @@ val versionProperties = Properties().apply {
 }
 val currentVersionCode = (versionProperties.getProperty("versionCode") ?: "4").toInt()
 val currentVersionName = versionProperties.getProperty("versionName") ?: "0.4.0"
+val numericVersionNamePattern = Regex("""([0-9]+)\.([0-9]+)\.([0-9]+)""")
+val playVersionCodeOverride =
+    System.getenv("PLAY_VERSION_CODE")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { raw ->
+            raw.toIntOrNull()?.takeIf { it > 0 }
+                ?: throw GradleException("PLAY_VERSION_CODE must be a positive integer")
+        }
+val playVersionNameOverride =
+    System.getenv("PLAY_VERSION_NAME")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.also { raw ->
+            if (!numericVersionNamePattern.matches(raw)) {
+                throw GradleException("PLAY_VERSION_NAME must use numeric major.minor.patch format")
+            }
+        }
+if ((playVersionCodeOverride == null) != (playVersionNameOverride == null)) {
+    throw GradleException("PLAY_VERSION_CODE and PLAY_VERSION_NAME must be provided together")
+}
+if (playVersionCodeOverride != null && playVersionNameOverride != null) {
+    val currentVersionMatch =
+        numericVersionNamePattern.matchEntire(currentVersionName)
+            ?: throw GradleException(
+                "version.properties versionName must use numeric major.minor.patch format when Play overrides are used",
+            )
+    val expectedVersionName =
+        "${currentVersionMatch.groupValues[1]}.${currentVersionMatch.groupValues[2]}.$playVersionCodeOverride"
+    if (playVersionNameOverride != expectedVersionName) {
+        throw GradleException(
+            "PLAY_VERSION_NAME must be $expectedVersionName for PLAY_VERSION_CODE=$playVersionCodeOverride",
+        )
+    }
+}
+val effectiveVersionCode = playVersionCodeOverride ?: currentVersionCode
+val effectiveVersionName = playVersionNameOverride ?: currentVersionName
 
 android {
     namespace = "io.github.daniele21.localllm.phonetest"
@@ -59,13 +98,11 @@ android {
         applicationId = "io.github.daniele21.localllm.phonetest"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = currentVersionCode
-        versionName = currentVersionName
+        versionCode = effectiveVersionCode
+        versionName = effectiveVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
+        manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
+        buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
     }
 
     signingConfigs {
@@ -84,18 +121,38 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeDebugPermission
+            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeDebugPermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
         release {
             isDebuggable = false
             isMinifyEnabled = false
+            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
+            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
             if (phoneTestUploadSigningConfigured) {
                 signingConfig = signingConfigs.getByName("upload")
+            }
+        }
+        create("emulatorE2e") {
+            initWith(getByName("debug"))
+            versionNameSuffix = "-emulator-e2e"
+            matchingFallbacks += listOf("debug")
+            ndk {
+                abiFilters.clear()
+                abiFilters += "x86_64"
             }
         }
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -129,8 +186,10 @@ dependencies {
 
     implementation(project(":core:contracts"))
     implementation(project(":core:runtime-core"))
+    implementation(project(":evaluation:contracts"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
+    implementation(project(":models:control-plane-room-store"))
     implementation(project(":models:model-catalog"))
     implementation(project(":models:model-download"))
     implementation(project(":models:model-install"))
@@ -141,6 +200,7 @@ dependencies {
     implementation(project(":observability:android-resource-probe"))
     implementation(project(":observability:benchmark-engine"))
     implementation(project(":transports:in-process"))
+    implementation(project(":integrations:android-service-host"))
     implementation(project(":ui:design-system"))
 
     implementation(libs.androidx.activity.compose)

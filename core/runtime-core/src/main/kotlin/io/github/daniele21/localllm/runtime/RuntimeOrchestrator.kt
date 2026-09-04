@@ -1,21 +1,18 @@
 package io.github.daniele21.localllm.runtime
 
 import io.github.daniele21.localllm.contracts.ApplicationId
-import io.github.daniele21.localllm.contracts.ChatTemplateSource
 import io.github.daniele21.localllm.contracts.ConfigurationErrorCode
 import io.github.daniele21.localllm.contracts.ContextPolicy
 import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationContentType
 import io.github.daniele21.localllm.contracts.GenerationEvent
 import io.github.daniele21.localllm.contracts.GenerationHandle
-import io.github.daniele21.localllm.contracts.GenerationInput
 import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelLoadKind
-import io.github.daniele21.localllm.contracts.OutputConstraint
 import io.github.daniele21.localllm.contracts.PrepareResult
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
@@ -28,21 +25,16 @@ import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
-import io.github.daniele21.localllm.models.ContextPreference
-import io.github.daniele21.localllm.models.GenerationGuardPolicy
-import io.github.daniele21.localllm.models.InferencePreset
 import io.github.daniele21.localllm.models.ModelProfileRegistry
-import io.github.daniele21.localllm.models.OutputMode
-import io.github.daniele21.localllm.models.ReasoningStreamProtocol
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.store.ModelStore
+import io.github.daniele21.localllm.store.StoredModel
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -64,10 +56,14 @@ class RuntimeOrchestrator(
     private val clock: MonotonicClock = MonotonicClock(System::nanoTime),
     private val priorityResolver: (GenerationRequest) -> DecodePriority = { DecodePriority.USER_INTERACTIVE },
     private val memoryPolicy: RuntimeMemoryPolicy = RuntimeMemoryPolicy(),
-    private val seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
+    private val memoryAwareContextPlanner: MemoryAwareContextPlanner? = null,
+    private val memoryAwareModelLoadPlanner: MemoryAwareModelLoadPlanner? = null,
+    private val memoryAwareEvaluationBatchContextPlanner: MemoryAwareEvaluationBatchContextPlanner? = null,
+    seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
     telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
     epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
 ) : LocalLlmClient,
+    RuntimeEvaluationBatchClient,
     AutoCloseable {
     private val resourceLock = Any()
     private val state = AtomicReference(RuntimeState.IDLE)
@@ -75,18 +71,17 @@ class RuntimeOrchestrator(
     private val closed = AtomicBoolean(false)
     private val deferredModelUnload = AtomicBoolean(false)
     private val runtimeTelemetry = RuntimeTelemetry(telemetryRepository, epochClock)
+    private val generationPlanning = GenerationPlanningPolicy(seedSource)
+    private val modelResidency = ModelResidencyLifecycle()
 
     @Volatile
     private var backendInitialized = false
-
-    @Volatile
-    private var loadedModel: LoadedModelDescriptor? = null
 
     override fun runtimeSnapshot(): RuntimeSnapshot {
         val schedulerSnapshot = scheduler.snapshot()
         return RuntimeSnapshot(
             state = state.get(),
-            loadedModel = loadedModel?.handle?.digest,
+            loadedModel = modelResidency.residentModelOrNull()?.handle?.digest,
             activeSessions = sessions.size,
             queuedRequests = schedulerSnapshot.queuedRequests,
         )
@@ -124,7 +119,7 @@ class RuntimeOrchestrator(
         val resolved = registry.resolve(applicationId, useCaseId)
         return synchronized(resourceLock) {
             val requestedDigest = resolved.model.artifact.digest
-            val warm = loadedModel?.let { current ->
+            val warm = modelResidency.reusableModelOrNull()?.let { current ->
                 current.handle.digest == requestedDigest && current.profileId == resolved.model.id
             } == true
             val model = ensureModelLoaded(resolved)
@@ -162,7 +157,7 @@ class RuntimeOrchestrator(
                 LocalLlmError.Configuration("Generation request does not match its session binding"),
             )
         }
-        if (!session.acquireRequest()) {
+        if (!session.lifecycle.tryAcquireRequest()) {
             return failImmediately(
                 request.requestId,
                 listener,
@@ -184,13 +179,13 @@ class RuntimeOrchestrator(
                 priority = priorityResolver(request),
                 task = { executeGeneration(request, session, lifecycle, enqueuedAt) },
                 onQueuedCancellation = {
-                    lifecycle.cancelRequested.set(true)
+                    lifecycle.requestCancellation()
                     val cancellation = LocalLlmError.Cancelled("Generation cancelled before execution")
                     runtimeTelemetry.failed(request.requestId, cancellation)
                     lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
                 },
                 onRunningCancellation = {
-                    lifecycle.cancelRequested.set(true)
+                    lifecycle.requestCancellation()
                     runCatching { backend.cancel(request.requestId.value) }
                 },
                 onQueued = { position ->
@@ -212,10 +207,100 @@ class RuntimeOrchestrator(
         )
     }
 
+    @Suppress("ReturnCount")
+    override fun generateEvaluationBatch(
+        request: RuntimeEvaluationBatchRequest,
+        listener: RuntimeEvaluationBatchListener,
+    ): RuntimeEvaluationBatchHandle {
+        if (closed.get()) {
+            return failEvaluationBatchImmediately(request.batchId, listener, LocalLlmError.Configuration("Runtime is closed"))
+        }
+        val batchBackend = backend as? EvaluationBatchInferenceBackend
+            ?: return failEvaluationBatchImmediately(
+                request.batchId,
+                listener,
+                LocalLlmError.Configuration("Backend ${backend.id} does not support evaluation batching"),
+            )
+        val bindings = try {
+            acquireEvaluationBatchBindings(request)
+        } catch (error: Throwable) {
+            return failEvaluationBatchImmediately(
+                request.batchId,
+                listener,
+                LocalLlmError.Configuration(error.message ?: "Invalid evaluation batch binding"),
+            )
+        }
+        val lifecycle = RuntimeEvaluationBatchLifecycle(
+            requestIds = request.requests.map(GenerationRequest::requestId).toSet(),
+            onTerminal = { bindings.forEach { releaseSessionRequest(it.session) } },
+        )
+        val enqueuedAt = clock.nowNanos()
+        bindings.forEach { binding -> runtimeTelemetry.queued(binding.request, binding.session.model.digest) }
+
+        val submission = try {
+            scheduler.submit(
+                requestId = request.batchId,
+                priority = DecodePriority.BACKGROUND,
+                task = {
+                    if (!lifecycle.markRunning()) return@submit
+                    executeEvaluationBatch(
+                        bindings = bindings,
+                        lifecycle = lifecycle,
+                        listener = listener,
+                        batchBackend = batchBackend,
+                        enqueuedAt = enqueuedAt,
+                    )
+                },
+                onQueuedCancellation = {
+                    lifecycle.requestCancellation()
+                    failEvaluationBatch(
+                        bindings,
+                        lifecycle,
+                        listener,
+                        LocalLlmError.Cancelled("Evaluation batch cancelled before execution"),
+                    )
+                },
+                onRunningCancellation = {
+                    lifecycle.requestCancellation()
+                    if (lifecycle.isRunning()) {
+                        bindings.forEach { binding ->
+                            runCatching { batchBackend.cancelEvaluationCase(binding.request.requestId.value) }
+                        }
+                    } else {
+                        failEvaluationBatch(
+                            bindings,
+                            lifecycle,
+                            listener,
+                            LocalLlmError.Cancelled("Evaluation batch cancelled before execution"),
+                        )
+                    }
+                },
+                onQueued = { position ->
+                    bindings.forEach { binding -> runtimeTelemetry.queuedPosition(binding.request.requestId, position) }
+                },
+            )
+        } catch (error: Throwable) {
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.Configuration(error.message ?: "Unable to schedule evaluation batch"),
+            )
+            return NoOpRuntimeEvaluationBatchHandle(request.batchId)
+        }
+
+        return ScheduledRuntimeEvaluationBatchHandle(
+            batchId = request.batchId,
+            schedulerHandle = submission.handle,
+            lifecycle = lifecycle,
+            cancelRunningCase = { requestId -> batchBackend.cancelEvaluationCase(requestId.value) },
+        )
+    }
+
     override fun closeSession(sessionId: SessionId) {
         val session = sessions[sessionId] ?: return
-        session.closing.set(true)
-        if (session.activeRequests.get() == 0) {
+        session.lifecycle.beginClose()
+        if (session.lifecycle.isReleaseReady()) {
             releaseSession(session)
         }
     }
@@ -223,7 +308,7 @@ class RuntimeOrchestrator(
     fun memoryResourceSnapshot(): RuntimeMemoryResourceSnapshot {
         val schedulerSnapshot = scheduler.snapshot()
         return RuntimeMemoryResourceSnapshot(
-            modelLoaded = loadedModel != null,
+            modelLoaded = modelResidency.hasResidentModel(),
             activeSessions = sessions.size,
             activeGeneration = schedulerSnapshot.activeRequest != null,
             queuedGenerations = schedulerSnapshot.queuedRequests,
@@ -249,9 +334,9 @@ class RuntimeOrchestrator(
         if (sessions.isNotEmpty() || schedulerSnapshot.activeRequest != null || schedulerSnapshot.queuedRequests != 0) {
             return@synchronized false
         }
-        val model = loadedModel ?: return@synchronized false
-        backend.unloadModel(model.handle)
-        loadedModel = null
+        if (!unloadResidentModel()) {
+            return@synchronized false
+        }
         state.set(RuntimeState.IDLE)
         true
     }
@@ -260,32 +345,25 @@ class RuntimeOrchestrator(
         if (!closed.compareAndSet(false, true)) {
             return
         }
+        deferredModelUnload.set(true)
         scheduler.snapshot().activeRequest?.let(scheduler::cancel)
         scheduler.close()
         sessions.values.forEach { session ->
-            session.closing.set(true)
-            if (session.activeRequests.get() == 0) {
+            session.lifecycle.beginClose()
+            if (session.lifecycle.isReleaseReady()) {
                 releaseSession(session)
             }
         }
-        synchronized(resourceLock) {
-            if (sessions.isEmpty()) {
-                loadedModel?.let { backend.unloadModel(it.handle) }
-                loadedModel = null
-                if (backendInitialized) {
-                    backend.shutdown()
-                    backendInitialized = false
-                }
-            }
-        }
-        deferredModelUnload.set(false)
+        val finalized = attemptDeferredModelUnload(ignoreActiveGeneration = false)
         integrityCache.clear()
-        state.set(RuntimeState.IDLE)
+        if (!finalized) {
+            state.set(RuntimeState.DEGRADED)
+        }
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun executeGeneration(request: GenerationRequest, session: SessionDescriptor, lifecycle: RequestLifecycle, enqueuedAt: Long) {
-        if (lifecycle.cancelRequested.get()) {
+        if (lifecycle.isCancellationRequested()) {
             val cancellation = LocalLlmError.Cancelled()
             runtimeTelemetry.failed(request.requestId, cancellation)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
@@ -294,7 +372,7 @@ class RuntimeOrchestrator(
 
         try {
             val executionStartedAt = clock.nowNanos()
-            val resolved = resolveGenerationConfiguration(request, session)
+            val resolved = generationPlanning.resolveConfiguration(request, session.resolved)
             lifecycle.ensureNotCancelled()
             val planningStartedAt = clock.nowNanos()
             val promptPlan = backend.planPrompt(
@@ -310,20 +388,27 @@ class RuntimeOrchestrator(
             val promptPlanningMs = nanosToMillis(clock.nowNanos() - planningStartedAt)
             val capabilities = backend.modelCapabilities(session.model)
             lifecycle.ensureNotCancelled()
-            validateOutputConstraint(request, resolved, capabilities)
-            val requestedContextSize = resolveContextSize(
-                session = session,
+            generationPlanning.validateOutputConstraint(
+                outputConstraint = request.outputConstraint,
+                resolved = resolved,
+                resolvedUseCase = session.resolved,
+                capabilities = capabilities,
+            )
+            val contextPlan = generationPlanning.planContextSize(
+                resolvedUseCase = session.resolved,
+                options = session.options,
                 promptTokenCount = promptPlan.tokenCount,
                 maxOutputTokens = resolved.maxOutputTokens,
                 capabilities = capabilities,
                 preference = resolved.contextPreference,
             )
             lifecycle.ensureNotCancelled()
-            val contextResult = materializeContext(session, requestedContextSize)
-            if (lifecycle.cancelRequested.get()) {
+            val contextResult = materializeContext(session, contextPlan)
+            if (lifecycle.isCancellationRequested()) {
                 releaseCancelledMaterialization(session, contextResult)
                 throw GenerationCancelledException()
             }
+            val executionEvidence = backend.executionEvidence(contextResult.context)
             val effective = EffectiveGenerationMetadata(
                 preset = resolved.preset?.ref,
                 temperature = resolved.temperature,
@@ -348,6 +433,7 @@ class RuntimeOrchestrator(
                 configuration = effective,
                 promptPlanningMs = promptPlanningMs,
                 contextCreationMs = contextResult.creationMs,
+                executionEvidence = executionEvidence,
             )
             lifecycle.emit(GenerationEvent.Prepared(request.requestId, session.model.digest, effective))
 
@@ -357,7 +443,7 @@ class RuntimeOrchestrator(
             val reasoningOutput = StringBuilder()
             val answerOutput = StringBuilder()
             val streamProtocol = (resolved.preset?.generation ?: session.resolved.useCase.generationDefaults).reasoningStreamProtocol
-            val reasoningControl = resolveReasoningControl(
+            val reasoningControl = generationPlanning.resolveReasoningControl(
                 thinkingMode = resolved.thinkingMode,
                 guardPolicy = resolved.guardPolicy,
                 streamProtocol = streamProtocol,
@@ -415,7 +501,7 @@ class RuntimeOrchestrator(
             )
             lifecycle.ensureNotCancelled()
             val outcome = backend.generate(contextResult.context, backendRequest) { text, generatedTokens ->
-                if (lifecycle.cancelRequested.get()) {
+                if (lifecycle.isCancellationRequested()) {
                     false
                 } else {
                     firstTokenAt.compareAndSet(0, clock.nowNanos())
@@ -424,15 +510,15 @@ class RuntimeOrchestrator(
                     streamParser.accept(text).forEach { emitParsedChunk(it, generatedTokens) }
                     val guardReason = generationGuard.observe(text, generatedTokens)
                     if (guardReason != null) guardStopReason.compareAndSet(null, guardReason)
-                    guardReason == null && !lifecycle.cancelRequested.get()
+                    guardReason == null && !lifecycle.isCancellationRequested()
                 }
             }
-            if (!lifecycle.cancelRequested.get()) {
+            if (!lifecycle.isCancellationRequested()) {
                 streamParser.finish().forEach { emitParsedChunk(it, lastGeneratedTokens) }
             }
 
             val guardReason = guardStopReason.get()
-            if (lifecycle.cancelRequested.get()) {
+            if (lifecycle.isCancellationRequested()) {
                 val cancellation = LocalLlmError.Cancelled()
                 runtimeTelemetry.failed(request.requestId, cancellation)
                 lifecycle.finish(GenerationEvent.Failed(request.requestId, cancellation))
@@ -482,7 +568,11 @@ class RuntimeOrchestrator(
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: BackendException) {
-            val failure = error.toPublicError()
+            val failure = if (lifecycle.isCancellationRequested()) {
+                LocalLlmError.Cancelled()
+            } else {
+                error.toPublicError()
+            }
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
         } catch (error: Throwable) {
@@ -497,236 +587,413 @@ class RuntimeOrchestrator(
         }
     }
 
-    @Suppress("CyclomaticComplexMethod", "ComplexCondition", "ThrowsCount")
-    private fun resolveGenerationConfiguration(request: GenerationRequest, session: SessionDescriptor): ResolvedRequestConfiguration {
-        val useCase = session.resolved.useCase
-        val requestedPreset = request.overrides.preset ?: useCase.defaultPreset
-        val preset = requestedPreset?.let { ref ->
-            useCase.presets.firstOrNull { it.ref == ref }
-                ?: throw GenerationPlanningException(
-                    ConfigurationErrorCode.PRESET_NOT_FOUND,
-                    "Preset ${ref.id.value} version ${ref.version} is not available",
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    private fun executeEvaluationBatch(
+        bindings: List<BatchSessionBinding>,
+        lifecycle: RuntimeEvaluationBatchLifecycle,
+        listener: RuntimeEvaluationBatchListener,
+        batchBackend: EvaluationBatchInferenceBackend,
+        enqueuedAt: Long,
+    ) {
+        if (lifecycle.isCancellationRequested()) {
+            failEvaluationBatch(bindings, lifecycle, listener, LocalLlmError.Cancelled())
+            return
+        }
+
+        var context: BackendEvaluationBatchContextHandle? = null
+        try {
+            val executionStartedAt = clock.nowNanos()
+            val prepared = bindings.map { binding -> prepareEvaluationBatchCase(binding) }
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            val perSequenceContextSize = resolveEvaluationBatchContextSize(bindings, prepared)
+            val contextStartedAt = clock.nowNanos()
+            context = synchronized(resourceLock) {
+                batchBackend.createEvaluationBatchContext(
+                    model = bindings.first().session.model,
+                    profile = bindings.first().session.resolved.model,
+                    configuration = BackendEvaluationBatchContextConfiguration(
+                        perSequenceContextSize = perSequenceContextSize,
+                        maxSequences = bindings.size,
+                    ),
                 )
-        }
-        val defaults = preset?.generation ?: useCase.generationDefaults
-        val maxOutputTokens = request.overrides.maxOutputTokens ?: defaults.maxOutputTokens
-        val temperature = request.overrides.temperature ?: defaults.temperature
-        val topP = request.overrides.topP ?: defaults.topP
-        val topK = request.overrides.topK ?: defaults.topK
-        val minP = request.overrides.minP ?: defaults.minP
-        val presencePenalty = request.overrides.presencePenalty ?: defaults.presencePenalty
-        val thinkingMode = request.overrides.thinkingMode ?: defaults.thinkingMode
-        val repeatPenalty = request.overrides.repeatPenalty ?: defaults.repeatPenalty
-        val repeatLastN = request.overrides.repeatLastN ?: defaults.repeatLastN
-        validateGenerationValues(
-            maxOutputTokens,
-            temperature,
-            topP,
-            topK,
-            minP,
-            presencePenalty,
-            repeatPenalty,
-            repeatLastN,
-        )
+            }
+            val contextCreationMs = nanosToMillis(clock.nowNanos() - contextStartedAt)
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            val executionEvidence = backend.executionEvidence(context)
+            prepared.forEach { preparedCase ->
+                val effective = EffectiveGenerationMetadata(
+                    preset = preparedCase.resolved.preset?.ref,
+                    temperature = preparedCase.resolved.temperature,
+                    topP = preparedCase.resolved.topP,
+                    topK = preparedCase.resolved.topK,
+                    minP = preparedCase.resolved.minP,
+                    presencePenalty = preparedCase.resolved.presencePenalty,
+                    repeatPenalty = preparedCase.resolved.repeatPenalty,
+                    repeatLastN = preparedCase.resolved.repeatLastN,
+                    requestedSeedPolicy = preparedCase.resolved.seedPolicy.toType(),
+                    effectiveSeed = preparedCase.resolved.effectiveSeed,
+                    maxOutputTokens = preparedCase.resolved.maxOutputTokens,
+                    contextSize = perSequenceContextSize,
+                    promptTokenCount = preparedCase.promptPlan.tokenCount,
+                    chatTemplateId = preparedCase.promptPlan.chatTemplateId,
+                    chatTemplateSource = preparedCase.promptPlan.chatTemplateSource,
+                    systemPromptVersion = preparedCase.resolved.systemPromptVersion,
+                    thinkingMode = preparedCase.resolved.thinkingMode,
+                )
+                runtimeTelemetry.prepared(
+                    requestId = preparedCase.binding.request.requestId,
+                    configuration = effective,
+                    promptPlanningMs = preparedCase.promptPlanningMs,
+                    contextCreationMs = contextCreationMs,
+                    executionEvidence = executionEvidence,
+                )
+            }
+            state.set(RuntimeState.GENERATING)
+            prepared.forEach { runtimeTelemetry.started(it.binding.request.requestId) }
+            val backendResult = batchBackend.generateEvaluationBatch(
+                context = context,
+                requests = prepared.map(PreparedEvaluationBatchCase::backendRequest),
+            )
+            ensureEvaluationBatchNotCancelled(lifecycle)
+            validateEvaluationBatchResultOrder(prepared, backendResult)
+            val totalMs = nanosToMillis(clock.nowNanos() - enqueuedAt)
+            val queueMs = nanosToMillis(executionStartedAt - enqueuedAt)
+            val results = backendResult.cases.zip(prepared).map { (backendCase, preparedCase) ->
+                val metrics = backendCase.outcome.metrics().toPublicMetrics(
+                    queueMs = queueMs,
+                    modelLoadMs = preparedCase.binding.session.modelLoadDurationMs,
+                    modelLoadKind = preparedCase.binding.session.modelLoadKind,
+                    timeToFirstTokenMs = null,
+                    timeToFirstAnswerMs = null,
+                    totalMs = totalMs,
+                    promptPlanningMs = preparedCase.promptPlanningMs,
+                    contextCreationMs = contextCreationMs,
+                )
+                when (backendCase.outcome) {
+                    is BackendGenerationOutcome.Completed -> RuntimeEvaluationBatchCaseResult.Completed(
+                        requestId = preparedCase.binding.request.requestId,
+                        output = backendCase.output,
+                        metrics = metrics,
+                    )
 
-        val seedPolicy = request.overrides.requestedSeedPolicy() ?: defaults.seedPolicy
-        val effectiveSeed = when (seedPolicy) {
-            is SeedPolicy.Fixed -> seedPolicy.value
-            SeedPolicy.Random -> seedSource.nextSeed()
-        }
-        if (effectiveSeed !in 0 until MAX_SEED_EXCLUSIVE) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Seed source returned a value outside the unsigned 32-bit range",
-            )
-        }
-        if (request.input is GenerationInput.RawCompletion && thinkingMode == ThinkingMode.ENABLED) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Thinking mode requires chat-template rendering and cannot be used with raw completion",
-            )
-        }
-        if (request.input is GenerationInput.RawCompletion && !session.resolved.model.chatTemplatePolicy.allowRawCompletion) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.RAW_COMPLETION_NOT_ALLOWED,
-                "Raw completion is not allowed for this model profile",
-            )
-        }
-        return ResolvedRequestConfiguration(
-            preset = preset,
-            maxOutputTokens = maxOutputTokens,
-            temperature = temperature,
-            topP = topP,
-            topK = topK,
-            minP = minP,
-            presencePenalty = presencePenalty,
-            thinkingMode = thinkingMode,
-            repeatPenalty = repeatPenalty,
-            repeatLastN = repeatLastN,
-            seedPolicy = seedPolicy,
-            effectiveSeed = effectiveSeed,
-            systemPromptVersion = preset?.systemPromptVersion ?: useCase.systemPromptVersion,
-            systemPrompt = preset?.systemPrompt ?: useCase.systemPrompt,
-            contextPreference = preset?.contextPreference ?: ContextPreference(),
-            guardPolicy = defaults.guardPolicy,
-        )
-    }
-
-    private fun validateGenerationValues(
-        maxOutputTokens: Int,
-        temperature: Float,
-        topP: Float,
-        topK: Int,
-        minP: Float,
-        presencePenalty: Float,
-        repeatPenalty: Float,
-        repeatLastN: Int,
-    ) {
-        val valid = outputAndTemperatureValid(maxOutputTokens, temperature) &&
-            samplingValuesValid(topP, topK, minP) &&
-            penaltyValuesValid(presencePenalty, repeatPenalty, repeatLastN)
-        if (!valid) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Generation settings are outside the supported bounds",
-            )
-        }
-    }
-
-    private fun outputAndTemperatureValid(maxOutputTokens: Int, temperature: Float): Boolean =
-        maxOutputTokens in 1..MAX_OUTPUT_TOKENS && temperature.isFinite() && temperature in 0f..2f
-
-    private fun samplingValuesValid(topP: Float, topK: Int, minP: Float): Boolean = topP.isFinite() && topP > 0f && topP <= 1f &&
-        topK in 0..MAX_TOP_K &&
-        minP.isFinite() && minP in 0f..1f
-
-    private fun penaltyValuesValid(presencePenalty: Float, repeatPenalty: Float, repeatLastN: Int): Boolean =
-        presencePenalty.isFinite() && presencePenalty in 0f..2f &&
-            repeatPenalty.isFinite() && repeatPenalty in MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY &&
-            repeatLastN in 0..MAX_REPEAT_LAST_N &&
-            (repeatPenalty == MIN_REPEAT_PENALTY || repeatLastN != 0)
-
-    private fun resolveReasoningControl(
-        thinkingMode: ThinkingMode,
-        guardPolicy: GenerationGuardPolicy,
-        streamProtocol: ReasoningStreamProtocol,
-        maxOutputTokens: Int,
-        capabilities: BackendModelCapabilities,
-    ): BackendReasoningControl? {
-        if (thinkingMode != ThinkingMode.ENABLED ||
-            !guardPolicy.enabled ||
-            !capabilities.supportsReasoningTransition
-        ) {
-            return null
-        }
-        val closeMarker = streamProtocol.closeMarker ?: return null
-        val forcedCloseText = streamProtocol.forcedCloseText ?: return null
-        if (maxOutputTokens < MIN_CONTROLLED_THINKING_OUTPUT_TOKENS) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Thinking mode requires at least $MIN_CONTROLLED_THINKING_OUTPUT_TOKENS output tokens",
-            )
-        }
-        val answerReserve = minOf(guardPolicy.answerReserveTokens, maxOutputTokens / 2).coerceAtLeast(1)
-        val reasoningBudget = minOf(guardPolicy.thinkingTokenBudget, maxOutputTokens - answerReserve)
-        if (reasoningBudget <= 0) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
-                "Thinking budget must leave capacity for a final answer",
-            )
-        }
-        return BackendReasoningControl(
-            maxReasoningTokens = reasoningBudget,
-            closeMarker = closeMarker,
-            forcedCloseText = forcedCloseText,
-        )
-    }
-
-    private fun validateOutputConstraint(
-        request: GenerationRequest,
-        resolved: ResolvedRequestConfiguration,
-        capabilities: BackendModelCapabilities,
-    ) {
-        val requestedMode = when (request.outputConstraint) {
-            OutputConstraint.Text -> OutputMode.TEXT
-            OutputConstraint.Json -> OutputMode.JSON
-            is OutputConstraint.JsonSchema -> OutputMode.JSON_SCHEMA
-        }
-        val allowedModes = resolved.preset?.allowedOutputModes
-            ?: setOf(sessionOutputMode(request.sessionId))
-        if (requestedMode !in allowedModes ||
-            (request.outputConstraint !is OutputConstraint.Text && !capabilities.supportsGrammar)
-        ) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.OUTPUT_CONSTRAINT_UNSUPPORTED,
-                "The requested output constraint is not supported by this use case and backend",
-            )
-        }
-    }
-
-    private fun sessionOutputMode(sessionId: SessionId): OutputMode = sessions[sessionId]?.resolved?.useCase?.outputMode
-        ?: throw GenerationPlanningException(ConfigurationErrorCode.CONFIGURATION, "Session is no longer available")
-
-    @Suppress("ThrowsCount")
-    private fun resolveContextSize(
-        session: SessionDescriptor,
-        promptTokenCount: Int,
-        maxOutputTokens: Int,
-        capabilities: BackendModelCapabilities,
-        preference: ContextPreference,
-    ): Int {
-        if (promptTokenCount <= 0 || capabilities.maximumContextTokens <= 0) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.PROMPT_TOKENIZATION_FAILED,
-                "Prompt tokenization did not produce a valid token count",
-            )
-        }
-        val runtimeCapabilities = session.resolved.model.runtimeCapabilities
-        val required = runCatching {
-            Math.addExact(Math.addExact(promptTokenCount, maxOutputTokens), runtimeCapabilities.contextSafetyReserveTokens)
-        }.getOrElse {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
-                "Prompt and output budget exceed the supported context capacity",
-            )
-        }
-        val approvedTiers = runtimeCapabilities.approvedContextTiers.ifEmpty { ContextSizeSelector.supportedSizes }
-        val maximum = minOf(
-            capabilities.maximumContextTokens,
-            preference.maximumTokens ?: Int.MAX_VALUE,
-            approvedTiers.maxOrNull() ?: Int.MAX_VALUE,
-        )
-        if (required > maximum) {
-            throw GenerationPlanningException(
-                ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
-                "Prompt and output require $required tokens but the maximum is $maximum",
-            )
-        }
-        return when (val policy = session.options.contextPolicy) {
-            is ContextPolicy.Manual -> {
-                if (!ContextSizeSelector.supportsManual(policy.tokens, required, maximum, approvedTiers)) {
-                    throw GenerationPlanningException(
-                        ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
-                        "Prompt and output require $required tokens but the manual context is ${policy.tokens}",
+                    is BackendGenerationOutcome.Cancelled -> RuntimeEvaluationBatchCaseResult.Cancelled(
+                        requestId = preparedCase.binding.request.requestId,
+                        metrics = metrics,
                     )
                 }
-                policy.tokens
             }
+            val releasing = context
+            context = null
+            releaseEvaluationBatchContext(batchBackend, releasing)
+            results.forEach { result ->
+                when (result) {
+                    is RuntimeEvaluationBatchCaseResult.Completed -> runtimeTelemetry.completed(result.requestId, result.metrics)
 
-            ContextPolicy.Auto -> ContextSizeSelector.selectAuto(
-                required = required,
-                maximum = maximum,
-                preferredMinimum = preference.preferredTokens,
-                candidateSizes = approvedTiers,
-            ) ?: throw GenerationPlanningException(
-                ConfigurationErrorCode.CONTEXT_CAPACITY_EXCEEDED,
-                "No supported context size can contain the requested prompt and output",
+                    is RuntimeEvaluationBatchCaseResult.Cancelled -> {
+                        runtimeTelemetry.failed(result.requestId, LocalLlmError.Cancelled())
+                    }
+                }
+            }
+            lifecycle.finish(listener, RuntimeEvaluationBatchOutcome.Completed(results))
+        } catch (_: GenerationCancelledException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(bindings, lifecycle, listener, LocalLlmError.Cancelled())
+        } catch (error: GenerationPlanningException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.Configuration(error.message.orEmpty(), error.reason),
+            )
+        } catch (error: BackendException) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(bindings, lifecycle, listener, error.toPublicError())
+        } catch (error: Throwable) {
+            context?.let { activeContext ->
+                context = null
+                runCatching { releaseEvaluationBatchContext(batchBackend, activeContext) }
+                    .onFailure { state.set(RuntimeState.DEGRADED) }
+            }
+            failEvaluationBatch(
+                bindings,
+                lifecycle,
+                listener,
+                LocalLlmError.NativeRuntime(error.message ?: "Unexpected evaluation batch failure"),
+            )
+        } finally {
+            val unloaded = attemptDeferredModelUnload(ignoreActiveGeneration = true)
+            if (!closed.get() && !unloaded) {
+                state.set(if (deferredModelUnload.get()) RuntimeState.DEGRADED else RuntimeState.READY)
+            }
+        }
+    }
+
+    private fun ensureEvaluationBatchNotCancelled(lifecycle: RuntimeEvaluationBatchLifecycle) {
+        if (lifecycle.isCancellationRequested()) throw GenerationCancelledException()
+    }
+
+    private fun validateEvaluationBatchResultOrder(
+        prepared: List<PreparedEvaluationBatchCase>,
+        backendResult: BackendEvaluationBatchResult,
+    ) {
+        val expectedRequestIds = prepared.map { it.binding.request.requestId.value }
+        if (backendResult.cases.map(BackendEvaluationBatchCaseResult::requestId) != expectedRequestIds) {
+            throw BackendException(
+                "EVALUATION_BATCH_ATTRIBUTION",
+                "Evaluation batch backend result order does not match the submitted request order",
             )
         }
     }
 
-    private fun materializeContext(session: SessionDescriptor, requestedContextSize: Int): ContextMaterialization =
+    private fun acquireEvaluationBatchBindings(request: RuntimeEvaluationBatchRequest): List<BatchSessionBinding> {
+        val acquired = ArrayList<BatchSessionBinding>(request.requests.size)
+        try {
+            request.requests.forEach { generationRequest ->
+                val session = sessions[generationRequest.sessionId]
+                    ?: error("Unknown session ${generationRequest.sessionId.value}")
+                check(
+                    session.applicationId == generationRequest.applicationId &&
+                        session.useCaseId == generationRequest.useCaseId,
+                ) { "Evaluation batch request does not match its session binding" }
+                check(session.options.kind == SessionKind.STATELESS) {
+                    "Evaluation batching requires stateless isolated sessions"
+                }
+                check(session.context == null) {
+                    "Evaluation batching requires sessions without an ordinary materialized context"
+                }
+                check(session.lifecycle.tryAcquireRequest()) {
+                    "Session ${generationRequest.sessionId.value} is closing"
+                }
+                acquired += BatchSessionBinding(generationRequest, session)
+            }
+            validateEvaluationBatchBindings(acquired)
+            return acquired
+        } catch (error: Throwable) {
+            acquired.forEach { binding -> releaseSessionRequest(binding.session) }
+            throw error
+        }
+    }
+
+    private fun validateEvaluationBatchBindings(bindings: List<BatchSessionBinding>) {
+        val first = bindings.first()
+        bindings.forEach { binding ->
+            check(binding.session.applicationId == first.session.applicationId) {
+                "Evaluation batch cases must share one application binding"
+            }
+            check(binding.session.useCaseId == first.session.useCaseId) {
+                "Evaluation batch cases must share one use-case binding"
+            }
+            check(binding.session.model.digest == first.session.model.digest) {
+                "Evaluation batch cases must use one resident model artifact"
+            }
+            check(binding.session.resolved.model.id == first.session.resolved.model.id) {
+                "Evaluation batch cases must use one model profile"
+            }
+            check(binding.session.options == first.session.options) {
+                "Evaluation batch cases must use identical session options"
+            }
+        }
+        val resident = modelResidency.reusableModelOrNull()
+        check(resident != null && resident.handle.digest == first.session.model.digest) {
+            "Evaluation batch requires the selected model to remain resident"
+        }
+    }
+
+    private fun prepareEvaluationBatchCase(binding: BatchSessionBinding): PreparedEvaluationBatchCase {
+        val resolved = generationPlanning.resolveConfiguration(binding.request, binding.session.resolved)
+        if (resolved.thinkingMode != ThinkingMode.DISABLED) {
+            throw GenerationPlanningException(
+                ConfigurationErrorCode.INVALID_GENERATION_CONFIGURATION,
+                "Evaluation batching currently requires thinking mode to be disabled",
+            )
+        }
+        val planningStartedAt = clock.nowNanos()
+        val promptPlan = backend.planPrompt(
+            binding.session.model,
+            BackendPromptPlanningRequest(
+                input = binding.request.input,
+                systemPrompt = resolved.systemPrompt,
+                chatTemplatePolicy = binding.session.resolved.model.chatTemplatePolicy,
+                thinkingMode = resolved.thinkingMode,
+            ),
+        )
+        val promptPlanningMs = nanosToMillis(clock.nowNanos() - planningStartedAt)
+        val capabilities = backend.modelCapabilities(binding.session.model)
+        generationPlanning.validateOutputConstraint(
+            outputConstraint = binding.request.outputConstraint,
+            resolved = resolved,
+            resolvedUseCase = binding.session.resolved,
+            capabilities = capabilities,
+        )
+        val contextPlan = generationPlanning.planContextSize(
+            resolvedUseCase = binding.session.resolved,
+            options = binding.session.options,
+            promptTokenCount = promptPlan.tokenCount,
+            maxOutputTokens = resolved.maxOutputTokens,
+            capabilities = capabilities,
+            preference = resolved.contextPreference,
+        )
+        return PreparedEvaluationBatchCase(
+            binding = binding,
+            resolved = resolved,
+            promptPlan = promptPlan,
+            contextPlan = contextPlan,
+            promptPlanningMs = promptPlanningMs,
+            backendRequest = BackendGenerationRequest(
+                requestId = binding.request.requestId.value,
+                prompt = promptPlan.prompt,
+                maxOutputTokens = resolved.maxOutputTokens,
+                temperature = resolved.temperature,
+                topP = resolved.topP,
+                topK = resolved.topK,
+                minP = resolved.minP,
+                presencePenalty = resolved.presencePenalty,
+                repeatPenalty = resolved.repeatPenalty,
+                repeatLastN = resolved.repeatLastN,
+                seed = resolved.effectiveSeed,
+                outputConstraint = binding.request.outputConstraint,
+                stopTokenIds = promptPlan.stopTokenIds,
+                stopSequences = promptPlan.stopSequences,
+                reasoningControl = null,
+            ),
+        )
+    }
+
+    private fun resolveEvaluationBatchContextSize(bindings: List<BatchSessionBinding>, prepared: List<PreparedEvaluationBatchCase>): Int {
+        val requestedPerSequence = prepared.maxOf { it.contextPlan.requestedContextTokens }
+        val minimumPerSequence = prepared.maxOf { it.contextPlan.minimumRequiredTokens }
+        val sequenceCount = bindings.size
+        val requestedAggregate = aggregateContextTokens(requestedPerSequence, sequenceCount)
+        val planner = memoryAwareEvaluationBatchContextPlanner
+        if (planner == null) {
+            if (memoryAwareContextPlanner != null) {
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    "Evaluation batch aggregate memory planner is required when memory-aware context admission is enabled",
+                )
+            }
+            return requestedPerSequence
+        }
+        val firstSession = bindings.first().session
+        val approvedTiers = when (val policy = firstSession.options.contextPolicy) {
+            is ContextPolicy.Manual -> listOf(policy.tokens)
+
+            ContextPolicy.Auto -> firstSession.resolved.model.runtimeCapabilities.approvedContextTiers.ifEmpty {
+                ContextSizeSelector.supportedSizes
+            }
+        }
+        val schedulerSnapshot = scheduler.snapshot()
+        val decision = planner.plan(
+            MemoryAwareEvaluationBatchContextRequest(
+                modelProfileId = firstSession.resolved.model.id,
+                requestedPerSequenceContextTokens = requestedPerSequence,
+                minimumPerSequenceContextTokens = minimumPerSequence,
+                approvedPerSequenceContextTiers = approvedTiers,
+                sequenceCount = sequenceCount,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = modelResidency.hasResidentModel(),
+                    residentContexts = sessions.values.count { it.context != null },
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
+        )
+        return when (decision) {
+            is MemoryAwareEvaluationBatchContextDecision.Allow -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = if (decision.downshifted) MemoryAdmissionOutcome.DOWNSHIFT else MemoryAdmissionOutcome.ALLOW,
+                    estimate = decision.estimate,
+                    requestedContextTokens = requestedAggregate,
+                    effectiveContextTokens = decision.aggregateContextTokens,
+                )
+                decision.perSequenceContextTokens
+            }
+
+            is MemoryAwareEvaluationBatchContextDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                    requestedContextTokens = requestedAggregate,
+                )
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    evaluationBatchMemoryFailureMessage(requestedAggregate, decision),
+                )
+            }
+        }
+    }
+
+    private fun aggregateContextTokens(perSequenceTokens: Int, sequenceCount: Int): Int = try {
+        Math.multiplyExact(perSequenceTokens, sequenceCount)
+    } catch (_: ArithmeticException) {
+        throw GenerationPlanningException(
+            ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+            "Evaluation batch aggregate context size overflow",
+        )
+    }
+
+    private fun evaluationBatchMemoryFailureMessage(
+        requestedAggregate: Int,
+        decision: MemoryAwareEvaluationBatchContextDecision.Reject,
+    ): String = buildString {
+        append("Memory admission rejected evaluation batch aggregate context ")
+        append(requestedAggregate)
+        append(" tokens: ")
+        append(decision.reason.name)
+        decision.admissionReason?.let { reason ->
+            append(" (")
+            append(reason.name)
+            append(')')
+        }
+    }
+
+    private fun releaseEvaluationBatchContext(
+        batchBackend: EvaluationBatchInferenceBackend,
+        context: BackendEvaluationBatchContextHandle,
+    ) {
         synchronized(resourceLock) {
+            batchBackend.releaseEvaluationBatchContext(context)
+        }
+    }
+
+    private fun failEvaluationBatch(
+        bindings: List<BatchSessionBinding>,
+        lifecycle: RuntimeEvaluationBatchLifecycle,
+        listener: RuntimeEvaluationBatchListener,
+        error: LocalLlmError,
+    ) {
+        bindings.forEach { binding -> runtimeTelemetry.failed(binding.request.requestId, error) }
+        lifecycle.finish(listener, RuntimeEvaluationBatchOutcome.Failed(error))
+    }
+
+    private fun failEvaluationBatchImmediately(
+        batchId: RequestId,
+        listener: RuntimeEvaluationBatchListener,
+        error: LocalLlmError,
+    ): RuntimeEvaluationBatchHandle {
+        runCatching { listener.onTerminal(RuntimeEvaluationBatchOutcome.Failed(error)) }
+        return NoOpRuntimeEvaluationBatchHandle(batchId)
+    }
+
+    private fun materializeContext(session: SessionDescriptor, contextPlan: ContextPlanningResult): ContextMaterialization =
+        synchronized(resourceLock) {
+            val requestedContextSize = contextPlan.requestedContextTokens
             val current = session.context
             val capabilities = session.resolved.model.runtimeCapabilities
             val statelessReuse = session.resolved.useCase.cachePolicy.reuseStatelessContext &&
@@ -745,14 +1012,73 @@ class RuntimeOrchestrator(
                 backend.releaseContext(current)
                 session.context = null
             }
+            val admittedContextSize = resolveMemoryAwareContextSize(session, contextPlan)
             val startedAt = clock.nowNanos()
             val created = backend.createContext(
                 model = session.model,
                 profile = session.resolved.model,
-                configuration = BackendContextConfiguration(requestedContextSize),
+                configuration = BackendContextConfiguration(admittedContextSize),
             )
             session.context = created
             ContextMaterialization(created, nanosToMillis(clock.nowNanos() - startedAt), created = true)
+        }
+
+    private fun resolveMemoryAwareContextSize(session: SessionDescriptor, contextPlan: ContextPlanningResult): Int {
+        val planner = memoryAwareContextPlanner ?: return contextPlan.requestedContextTokens
+        val schedulerSnapshot = scheduler.snapshot()
+        val decision = planner.plan(
+            MemoryAwareContextRequest(
+                modelProfileId = session.resolved.model.id,
+                requestedContextTokens = contextPlan.requestedContextTokens,
+                minimumContextTokens = contextPlan.minimumRequiredTokens,
+                approvedContextTiers = contextPlan.memoryEligibleContextTiers,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = modelResidency.hasResidentModel(),
+                    residentContexts = sessions.values.count { it.context != null },
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
+        )
+        return when (decision) {
+            is MemoryAwareContextDecision.Allow -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = if (decision.downshifted) MemoryAdmissionOutcome.DOWNSHIFT else MemoryAdmissionOutcome.ALLOW,
+                    estimate = decision.estimate,
+                    requestedContextTokens = contextPlan.requestedContextTokens,
+                    effectiveContextTokens = decision.contextTokens,
+                )
+                decision.contextTokens
+            }
+
+            is MemoryAwareContextDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.CONTEXT,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                    requestedContextTokens = contextPlan.requestedContextTokens,
+                )
+                throw GenerationPlanningException(
+                    ConfigurationErrorCode.MEMORY_BUDGET_EXCEEDED,
+                    memoryAdmissionFailureMessage(contextPlan, decision),
+                )
+            }
+        }
+    }
+
+    private fun memoryAdmissionFailureMessage(contextPlan: ContextPlanningResult, decision: MemoryAwareContextDecision.Reject): String =
+        buildString {
+            append("Memory admission rejected context ")
+            append(contextPlan.requestedContextTokens)
+            append(" tokens: ")
+            append(decision.reason.name)
+            decision.admissionReason?.let { reason ->
+                append(" (")
+                append(reason.name)
+                append(')')
+            }
         }
 
     private fun releaseCancelledMaterialization(session: SessionDescriptor, materialization: ContextMaterialization) {
@@ -787,11 +1113,11 @@ class RuntimeOrchestrator(
         }
     }
 
-    private fun ensureModelLoaded(resolved: ResolvedUseCase): LoadedModelDescriptor {
+    private fun ensureModelLoaded(resolved: ResolvedUseCase): ResidentModel {
         check(!closed.get()) { "Runtime is closed" }
         validateRuntimeCapabilities(resolved)
         val requestedDigest = resolved.model.artifact.digest
-        val current = loadedModel
+        val current = modelResidency.reusableModelOrNull()
         if (current != null && current.handle.digest == requestedDigest && current.profileId == resolved.model.id) {
             return current
         }
@@ -808,19 +1134,77 @@ class RuntimeOrchestrator(
             throw BackendException("MODEL_INTEGRITY", verification.detail)
         }
 
+        if (current != null) {
+            check(unloadResidentModel()) { "Unable to unload current model before switching" }
+        }
+        admitModelLoad(resolved, schedulerSnapshot)
+
         if (!backendInitialized) {
             backend.initialize()
             backendInitialized = true
         }
-        current?.let { backend.unloadModel(it.handle) }
-        loadedModel = null
 
-        val loaded = LoadedModelDescriptor(
-            profileId = resolved.model.id,
-            handle = backend.loadModel(stored, resolved.model),
+        return loadResidentModel(stored, resolved)
+    }
+
+    private fun loadResidentModel(stored: StoredModel, resolved: ResolvedUseCase): ResidentModel {
+        val requestedDigest = resolved.model.artifact.digest
+        modelResidency.beginLoad(resolved.model.id, requestedDigest)
+        return try {
+            val loaded = ResidentModel(
+                profileId = resolved.model.id,
+                handle = backend.loadModel(stored, resolved.model),
+            )
+            modelResidency.loadSucceeded(loaded)
+            loaded
+        } catch (error: Throwable) {
+            modelResidency.loadFailed()
+            throw error
+        }
+    }
+
+    private fun unloadResidentModel(): Boolean {
+        val resident = modelResidency.beginUnload() ?: return false
+        return try {
+            backend.unloadModel(resident.handle)
+            modelResidency.unloadSucceeded()
+            true
+        } catch (error: Throwable) {
+            modelResidency.unloadFailed()
+            throw error
+        }
+    }
+
+    private fun admitModelLoad(resolved: ResolvedUseCase, schedulerSnapshot: DecodeSchedulerSnapshot) {
+        val planner = memoryAwareModelLoadPlanner ?: return
+        val decision = planner.plan(
+            MemoryAwareModelLoadRequest(
+                modelProfileId = resolved.model.id,
+                residency = RuntimeResidencySnapshot(
+                    modelLoaded = false,
+                    residentContexts = 0,
+                    activeGeneration = schedulerSnapshot.activeRequest != null,
+                    queuedGenerations = schedulerSnapshot.queuedRequests,
+                ),
+            ),
         )
-        loadedModel = loaded
-        return loaded
+        when (decision) {
+            is MemoryAwareModelLoadDecision.Allow -> runtimeTelemetry.memoryAdmission(
+                resource = MemoryAdmissionResource.MODEL,
+                outcome = MemoryAdmissionOutcome.ALLOW,
+                estimate = decision.estimate,
+            )
+
+            is MemoryAwareModelLoadDecision.Reject -> {
+                runtimeTelemetry.memoryAdmission(
+                    resource = MemoryAdmissionResource.MODEL,
+                    outcome = MemoryAdmissionOutcome.REJECT,
+                    decisionReason = decision.reason.name,
+                    admissionReason = decision.admissionReason,
+                )
+                throw ModelLoadMemoryAdmissionException(resolved.model.id, decision)
+            }
+        }
     }
 
     private fun validateRuntimeCapabilities(resolved: ResolvedUseCase) {
@@ -884,15 +1268,13 @@ class RuntimeOrchestrator(
     }
 
     private fun releaseSessionRequest(session: SessionDescriptor) {
-        val remaining = session.activeRequests.decrementAndGet()
-        check(remaining >= 0) { "Session request count became negative" }
-        if (remaining == 0 && session.closing.get()) {
+        if (session.lifecycle.releaseRequest()) {
             releaseSession(session)
         }
     }
 
     private fun releaseSession(session: SessionDescriptor) {
-        if (!session.released.compareAndSet(false, true)) {
+        if (!session.lifecycle.tryBeginRelease()) {
             return
         }
         val release = runCatching {
@@ -903,19 +1285,20 @@ class RuntimeOrchestrator(
             }
         }
         if (release.isFailure) {
-            session.released.set(false)
+            session.lifecycle.releaseFailed()
             state.set(RuntimeState.DEGRADED)
             release.getOrThrow()
         }
+        session.lifecycle.releaseSucceeded()
         attemptDeferredModelUnload(ignoreActiveGeneration = false)
     }
 
     private fun releaseForCriticalMemory(action: RuntimeMemoryAction): RuntimeMemoryResult {
         deferredModelUnload.set(true)
-        sessions.values.forEach { session -> session.closing.set(true) }
+        sessions.values.forEach { session -> session.lifecycle.beginClose() }
         val cancelled = scheduler.cancelAll()
         sessions.values.forEach { session ->
-            if (session.activeRequests.get() == 0) {
+            if (session.lifecycle.isReleaseReady()) {
                 releaseSession(session)
             }
         }
@@ -932,7 +1315,7 @@ class RuntimeOrchestrator(
     }
 
     private fun attemptDeferredModelUnload(ignoreActiveGeneration: Boolean): Boolean {
-        if (!deferredModelUnload.get()) return false
+        if (!deferredModelUnload.get() && !closed.get()) return false
         return synchronized(resourceLock) {
             val schedulerSnapshot = scheduler.snapshot()
             val activeBlocksUnload = !ignoreActiveGeneration && schedulerSnapshot.activeRequest != null
@@ -940,8 +1323,11 @@ class RuntimeOrchestrator(
                 return@synchronized false
             }
 
-            loadedModel?.let { backend.unloadModel(it.handle) }
-            loadedModel = null
+            unloadResidentModel()
+            if (closed.get() && backendInitialized) {
+                backend.shutdown()
+                backendInitialized = false
+            }
             deferredModelUnload.set(false)
             state.set(RuntimeState.IDLE)
             true
@@ -988,7 +1374,16 @@ class RuntimeOrchestrator(
 
     private fun nanosToMillis(nanos: Long): Long = nanos / 1_000_000
 
-    private data class LoadedModelDescriptor(val profileId: String, val handle: BackendModelHandle)
+    private data class BatchSessionBinding(val request: GenerationRequest, val session: SessionDescriptor)
+
+    private data class PreparedEvaluationBatchCase(
+        val binding: BatchSessionBinding,
+        val resolved: ResolvedRequestConfiguration,
+        val promptPlan: BackendPromptPlan,
+        val contextPlan: ContextPlanningResult,
+        val promptPlanningMs: Long,
+        val backendRequest: BackendGenerationRequest,
+    )
 
     private data class SessionDescriptor(
         val id: SessionId,
@@ -1000,71 +1395,33 @@ class RuntimeOrchestrator(
         val modelLoadDurationMs: Long?,
         val modelLoadKind: ModelLoadKind,
         @Volatile var context: BackendContextHandle? = null,
-        val activeRequests: AtomicInteger = AtomicInteger(0),
-        val closing: AtomicBoolean = AtomicBoolean(false),
-        val released: AtomicBoolean = AtomicBoolean(false),
-    ) {
-        fun acquireRequest(): Boolean {
-            if (closing.get()) return false
-            activeRequests.incrementAndGet()
-            if (!closing.get()) return true
-            activeRequests.decrementAndGet()
-            return false
-        }
-    }
-
-    private data class ResolvedRequestConfiguration(
-        val preset: InferencePreset?,
-        val maxOutputTokens: Int,
-        val temperature: Float,
-        val topP: Float,
-        val topK: Int,
-        val minP: Float,
-        val presencePenalty: Float,
-        val thinkingMode: ThinkingMode,
-        val repeatPenalty: Float,
-        val repeatLastN: Int,
-        val seedPolicy: SeedPolicy,
-        val effectiveSeed: Long,
-        val systemPromptVersion: String,
-        val systemPrompt: String?,
-        val contextPreference: ContextPreference,
-        val guardPolicy: GenerationGuardPolicy,
+        val lifecycle: SessionLifecycle = SessionLifecycle(),
     )
 
     private data class ContextMaterialization(val context: BackendContextHandle, val creationMs: Long?, val created: Boolean)
-
-    private class GenerationPlanningException(val reason: ConfigurationErrorCode, message: String) : IllegalArgumentException(message)
-
-    private companion object {
-        const val MAX_SEED_EXCLUSIVE = 0x1_0000_0000L
-        const val MAX_OUTPUT_TOKENS = 32_768
-        const val MAX_TOP_K = 1_000
-        const val MIN_REPEAT_PENALTY = 1f
-        const val MAX_REPEAT_PENALTY = 2f
-        const val MAX_REPEAT_LAST_N = 4_096
-        const val MIN_CONTROLLED_THINKING_OUTPUT_TOKENS = 16
-    }
 }
 
 private class GenerationCancelledException : RuntimeException()
 
 private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
-    val cancelRequested = AtomicBoolean(false)
-    private val terminal = AtomicBoolean(false)
+    private val generationLifecycle = GenerationLifecycle()
+
+    fun requestCancellation(): Boolean = generationLifecycle.requestCancellation()
+
+    fun isCancellationRequested(): Boolean = generationLifecycle.isCancellationRequested()
 
     fun emit(event: GenerationEvent) {
-        if (!terminal.get()) {
+        if (!generationLifecycle.isTerminal()) {
             runCatching { listener.onEvent(event) }
         }
     }
 
     fun ensureNotCancelled() {
-        if (cancelRequested.get()) throw GenerationCancelledException()
+        if (generationLifecycle.isCancellationRequested()) throw GenerationCancelledException()
     }
 
     fun finish(event: GenerationEvent) {
-        if (!terminal.compareAndSet(false, true)) {
+        if (!generationLifecycle.tryFinish()) {
             return
         }
         try {
@@ -1081,8 +1438,9 @@ private class RuntimeGenerationHandle(
     private val lifecycle: RequestLifecycle,
 ) : GenerationHandle {
     override fun cancel() {
-        lifecycle.cancelRequested.set(true)
-        schedulerHandle.cancel()
+        if (lifecycle.requestCancellation()) {
+            schedulerHandle.cancel()
+        }
     }
 }
 

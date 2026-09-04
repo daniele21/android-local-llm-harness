@@ -5,7 +5,7 @@ Document type: adr-index
 Owner: repository
 Canonical scope: architecture.decisions
 Read when: a change may alter a durable architectural constraint or supersede an accepted decision
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-31
 
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
@@ -22,6 +22,11 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0009-model-aware-generation-planning.md`](0009-model-aware-generation-planning.md) — versioned generation planning, trusted prompt templates and lazy context materialization
 - [`0010-model-aware-embedded-first.md`](0010-model-aware-embedded-first.md) — explicit application/use-case model binding and embedded-first deployment
 - [`0011-qwen35-only-product-support.md`](0011-qwen35-only-product-support.md) — Qwen3.5-only product support over family-neutral lifecycle contracts
+- [`0012-shared-runtime-same-signer-binder-boundary.md`](0012-shared-runtime-same-signer-binder-boundary.md) — same-signer trust/protocol/model-authority boundary and original bound-only v1 lifecycle; lifecycle/background portions are superseded by ADR 0016
+- [`0013-public-consumer-capability-boundary.md`](0013-public-consumer-capability-boundary.md) — host-owned model authority, capability discovery, policy-scoped selection and deterministic prepared execution for public consumers
+- [`0014-backend-spi-boundary.md`](0014-backend-spi-boundary.md) — backend-neutral SPI ownership, runtime dependency inversion and store-neutral model-loading boundary
+- [`0015-harness-managed-control-plane.md`](0015-harness-managed-control-plane.md) — Harness-owned persistent applications/use cases/presets/bindings, activation-residency leases, unified cross-app telemetry and decision/notification ownership
+- [`0016-detached-shared-runtime-jobs.md`](0016-detached-shared-runtime-jobs.md) — logical inference jobs independent from transient Binder/UI lifetime, idempotent reconnect/recovery semantics and explicit Android background execution
 
 ## Status values
 

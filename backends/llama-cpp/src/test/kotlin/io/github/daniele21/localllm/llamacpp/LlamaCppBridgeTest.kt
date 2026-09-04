@@ -6,6 +6,7 @@ import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -26,18 +27,112 @@ class LlamaCppBridgeTest {
         assertTrue(status.supportsMmap)
         assertEquals("b9637 (aedb2a5e)", status.runtimeVersion)
         assertEquals("test-profile", status.modelProfileId)
-        assertEquals("Pinned llama.cpp CPU backend linked", status.detail)
+        assertEquals("Pinned llama.cpp runtime linked", status.detail)
     }
 
     @Test
-    fun `runtime initialization exposes registered device count`() {
+    fun `runtime initialization exposes typed registered device inventory`() {
         val nativeDirectory = createTempDirectory("native-libraries").toFile()
-        val nativeApi = FakeNativeLlamaApi(initialization = arrayOf("ok", "3"))
+        val nativeApi = FakeNativeLlamaApi(
+            initialization = arrayOf("ok", "16"),
+            deviceInventory = arrayOf(
+                "ok",
+                "2",
+                "0",
+                "CPU",
+                "ARM CPU",
+                "CPU",
+                "",
+                "4294967296",
+                "8589934592",
+                "true",
+                "true",
+                "false",
+                "true",
+                "1",
+                "Adreno",
+                "Qualcomm Adreno",
+                "IGPU",
+                "gpu0",
+                "2147483648",
+                "4294967296",
+                "true",
+                "false",
+                "true",
+                "true",
+            ),
+        )
 
         val result = LlamaCppBridge(nativeApi).initializeRuntime(nativeDirectory)
 
-        assertEquals(RuntimeInitializationResult.Success(deviceCount = 3), result)
+        assertTrue(result is RuntimeInitializationResult.Success)
+        val success = result as RuntimeInitializationResult.Success
+        assertEquals(16, success.deviceCapacity)
+        assertEquals(2, success.registeredDeviceCount)
+        assertNull(success.deviceInventoryError)
+        assertEquals(2, success.devices?.size)
+        assertEquals(NativeBackendDeviceType.CPU, success.devices?.get(0)?.type)
+        assertEquals(NativeBackendDeviceType.IGPU, success.devices?.get(1)?.type)
+        assertEquals("gpu0", success.devices?.get(1)?.deviceId)
+        assertEquals(4294967296uL, success.devices?.get(1)?.memoryTotalBytes)
+        assertTrue(success.devices?.get(1)?.capabilities?.bufferFromHostPointer == true)
         assertEquals(nativeDirectory.absolutePath, nativeApi.initializedDirectory)
+        nativeDirectory.deleteRecursively()
+    }
+
+    @Test
+    fun `registered inventory is independent from legacy llama device capacity`() {
+        val nativeDirectory = createTempDirectory("native-libraries").toFile()
+        val nativeApi = FakeNativeLlamaApi(
+            initialization = arrayOf("ok", "16"),
+            deviceInventory = syntheticDeviceInventory(1),
+        )
+
+        val result = LlamaCppBridge(nativeApi).initializeRuntime(nativeDirectory)
+
+        assertEquals(
+            RuntimeInitializationResult.Success(
+                deviceCapacity = 16,
+                registeredDeviceCount = 1,
+                devices = listOf(
+                    NativeBackendDevice(
+                        index = 0,
+                        name = "CPU-0",
+                        description = "Synthetic CPU 0",
+                        type = NativeBackendDeviceType.CPU,
+                        deviceId = null,
+                        memoryFreeBytes = 1024uL,
+                        memoryTotalBytes = 2048uL,
+                        capabilities = NativeBackendDeviceCapabilities(
+                            asynchronous = true,
+                            hostBuffer = true,
+                            bufferFromHostPointer = false,
+                            events = true,
+                        ),
+                    ),
+                ),
+            ),
+            result,
+        )
+        nativeDirectory.deleteRecursively()
+    }
+
+    @Test
+    fun `unavailable device inventory leaves registered count unavailable`() {
+        val nativeDirectory = createTempDirectory("native-libraries").toFile()
+        val nativeApi = FakeNativeLlamaApi(
+            initialization = arrayOf("ok", "16"),
+            deviceInventory = arrayOf("error", "BACKEND_UNAVAILABLE", "Inventory probe unavailable"),
+        )
+
+        val result = LlamaCppBridge(nativeApi).initializeRuntime(nativeDirectory)
+
+        assertTrue(result is RuntimeInitializationResult.Success)
+        val success = result as RuntimeInitializationResult.Success
+        assertEquals(16, success.deviceCapacity)
+        assertNull(success.registeredDeviceCount)
+        assertNull(success.devices)
+        assertEquals(NativeRuntimeErrorCode.BACKEND_UNAVAILABLE, success.deviceInventoryError?.code)
         nativeDirectory.deleteRecursively()
     }
 
@@ -57,7 +152,7 @@ class LlamaCppBridgeTest {
     }
 
     @Test
-    fun `model load forwards exact profile parameters and decodes handle`() {
+    fun `model load forwards exact profile parameters and records requested execution`() {
         val model = temporaryFile()
         val nativeApi = FakeNativeLlamaApi(modelLoad = arrayOf("ok", "42", "123"))
         val profile = testProfile(gpuLayers = 7, useMmap = false, useMlock = true)
@@ -70,6 +165,10 @@ class LlamaCppBridgeTest {
         assertEquals(123L, loaded.loadDurationMs)
         assertEquals(profile.id, loaded.profileId)
         assertEquals(profile.artifact.digest, loaded.digest)
+        assertEquals(
+            NativeModelExecutionRequest(gpuLayers = 7, useMmap = false, useMlock = true),
+            loaded.requestedExecution,
+        )
         assertEquals(listOf(model.absolutePath, 7, false, true), nativeApi.lastModelLoad)
     }
 
@@ -238,11 +337,30 @@ class LlamaCppBridgeTest {
     )
 }
 
+private fun syntheticDeviceInventory(count: Int): Array<String> = buildList {
+    add("ok")
+    add(count.toString())
+    repeat(count) { index ->
+        add(index.toString())
+        add("CPU-$index")
+        add("Synthetic CPU $index")
+        add("CPU")
+        add("")
+        add("1024")
+        add("2048")
+        add("true")
+        add("true")
+        add("false")
+        add("true")
+    }
+}.toTypedArray()
+
 private class FakeNativeLlamaApi(
     private val version: String = "test-version",
     private val linked: Boolean = true,
     private val mmap: Boolean = true,
-    private val initialization: Array<String> = arrayOf("ok", "1"),
+    private val initialization: Array<String> = arrayOf("ok", "16"),
+    private val deviceInventory: Array<String>? = null,
     private val modelLoad: Array<String> = arrayOf("ok", "1", "0"),
     private val modelUnload: Array<String> = arrayOf("ok"),
     private val shutdown: Array<String> = arrayOf("ok"),
@@ -263,6 +381,8 @@ private class FakeNativeLlamaApi(
         initializedDirectory = nativeLibraryDir
         return initialization
     }
+
+    override fun backendDevices(): Array<String> = deviceInventory ?: syntheticDeviceInventory(1)
 
     override fun shutdown(): Array<String> {
         shutdownCalled = true

@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.update
 internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState()) : ViewModel() {
     private val mutableUiState = MutableStateFlow(initialState)
     private var playgroundEffects: PlaygroundEffects? = null
+    private val diagnosticActionGenerations = mutableMapOf<HarnessDiagnosticAction, Long>()
+    private var nextDiagnosticGeneration = 0L
 
     val uiState: StateFlow<HarnessUiState> = mutableUiState.asStateFlow()
     val models = HarnessModelActions(
@@ -20,6 +22,31 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun dispatch(event: HarnessUiEvent) {
         mutableUiState.update { current -> HarnessUiReducer.reduce(current, event) }
+    }
+
+    @Synchronized
+    fun beginDiagnosticAction(action: HarnessDiagnosticAction): HarnessDiagnosticActionToken {
+        nextDiagnosticGeneration += 1
+        val token = HarnessDiagnosticActionToken(action, nextDiagnosticGeneration)
+        diagnosticActionGenerations[action] = token.generation
+        dispatch(HarnessUiEvent.DiagnosticActionChanged(action, running = true))
+        return token
+    }
+
+    @Synchronized
+    fun finishDiagnosticAction(token: HarnessDiagnosticActionToken): Boolean {
+        if (diagnosticActionGenerations[token.action] != token.generation) return false
+        diagnosticActionGenerations.remove(token.action)
+        dispatch(HarnessUiEvent.DiagnosticActionChanged(token.action, running = false))
+        return true
+    }
+
+    @Synchronized
+    fun invalidateDiagnosticActions() {
+        diagnosticActionGenerations.clear()
+        HarnessDiagnosticAction.entries.forEach { action ->
+            dispatch(HarnessUiEvent.DiagnosticActionChanged(action, running = false))
+        }
     }
 
     fun attachPlaygroundEffects(effects: PlaygroundEffects) {
@@ -63,6 +90,10 @@ internal class HarnessViewModel(initialState: HarnessUiState = HarnessUiState())
 
     fun updatePlaygroundSeed(seed: String) {
         dispatch(HarnessUiEvent.PlaygroundSeedChanged(seed))
+    }
+
+    fun updateThemePreference(preference: HarnessThemePreference) {
+        dispatch(HarnessUiEvent.ThemeChanged(preference))
     }
 
     fun startPlayground(): PlaygroundStartResult {

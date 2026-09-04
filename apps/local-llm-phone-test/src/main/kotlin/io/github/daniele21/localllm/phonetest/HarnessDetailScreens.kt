@@ -18,6 +18,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -64,13 +65,14 @@ internal fun HarnessDetailTopBar(title: String, subtitle: String, onNavigateBack
 
 @Composable
 internal fun PrivacyDetailScreen() {
+    val appName = stringResource(R.string.app_name)
     DetailList {
         item {
             HarnessCard(emphasized = true) {
                 Text("Local by design", style = MaterialTheme.typography.titleLarge)
                 Text(
                     "Prompts, generated output, and GGUF model data remain on this device " +
-                        "during normal Harness operation.",
+                        "during normal $appName operation.",
                 )
                 HarnessStatusBadge("On-device", HarnessStatusTone.SUCCESS)
             }
@@ -109,8 +111,9 @@ internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModel
             HarnessCard(emphasized = true) {
                 Text("Local model storage", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    importedModel?.let { "One active GGUF model is selected for this application." }
-                        ?: "No GGUF model is currently selected.",
+                    importedModel?.let {
+                        "A GGUF model is selected for this application. This view does not infer total installed storage."
+                    } ?: "No GGUF model is currently selected.",
                 )
                 HarnessMetricRow {
                     HarnessMetric(
@@ -120,12 +123,20 @@ internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModel
                     )
                     HarnessMetric(
                         label = "Selected size",
-                        value = importedModel?.sizeBytes?.let(::formatDetailBytes) ?: "0 MB",
+                        value = importedModel?.sizeBytes?.let(::formatDetailBytes) ?: "Unavailable",
                         modifier = Modifier.weight(1f),
                     )
                 }
                 HarnessPrimaryButton("Manage models", onClick = onOpenModels)
             }
+        }
+        item {
+            DetailCard(
+                title = "Storage accounting",
+                detail =
+                "This surface reports only source-backed selected-model size. " +
+                    "It does not derive total installed storage from selection state.",
+            )
         }
         item {
             DetailCard(
@@ -146,11 +157,13 @@ internal fun StorageDetailScreen(importedModel: ImportedPhoneModel?, onOpenModel
 
 @Composable
 internal fun BuildDetailScreen(versionName: String, versionCode: String, applicationId: String) {
+    val appName = stringResource(R.string.app_name)
+    val payoff = stringResource(R.string.app_payoff)
     DetailList {
         item {
             HarnessCard(emphasized = true) {
-                Text("Harness", style = MaterialTheme.typography.titleLarge)
-                Text("Local AI Console")
+                Text(appName, style = MaterialTheme.typography.titleLarge)
+                Text(payoff)
                 HarnessMetricRow {
                     HarnessMetric("Version", versionName, Modifier.weight(1f))
                     HarnessMetric("Build", versionCode, Modifier.weight(1f))
@@ -166,7 +179,7 @@ internal fun BuildDetailScreen(versionName: String, versionCode: String, applica
         item {
             DetailCard(
                 "Execution boundary",
-                "This release uses the in-process HarnessRuntimeGraph. " +
+                "This release uses the embedded in-process runtime graph. " +
                     "Binder/AIDL sharing is not enabled in this phase.",
             )
         }

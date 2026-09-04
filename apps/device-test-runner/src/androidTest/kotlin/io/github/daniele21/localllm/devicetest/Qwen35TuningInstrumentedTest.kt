@@ -1,10 +1,13 @@
 package io.github.daniele21.localllm.devicetest
 
 import android.app.ActivityManager
+import android.app.Instrumentation
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Debug
 import android.os.PowerManager
+import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -14,6 +17,7 @@ import io.github.daniele21.localllm.contracts.GenerationListener
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
@@ -40,6 +44,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -48,21 +53,24 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class Qwen35TuningInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val config = Qwen35TuningConfig.fromInstrumentation()
+    private val config by lazy { Qwen35TuningConfig.fromInstrumentation() }
 
     @Test
     fun recordsColdAndWarmEvidence() {
+        if (config.experimentalOpenClBuild) {
+            assertTrue("Experimental OpenCL build is missing libggml-opencl.so", openClBackendLibraryPresent())
+        }
         val harness = buildHarness()
         val runtime = harness.runtime
         try {
             val cold = runMeasuredGeneration(runtime, harness, sampleIndex = 0)
             assertEquals("Expected a cold first tuning run", "COLD", cold.completed.metrics.modelLoadKind.name)
-            println("LOCAL_LLM_TUNING_JSON ${evidence(cold)}")
+            emitEvidence(cold)
 
             repeat(config.warmRepetitions) { index ->
                 val warm = runMeasuredGeneration(runtime, harness, sampleIndex = index + 1)
                 assertEquals("Expected a warm tuning run", "WARM", warm.completed.metrics.modelLoadKind.name)
-                println("LOCAL_LLM_TUNING_JSON ${evidence(warm)}")
+                emitEvidence(warm)
             }
 
             assertTrue("Idle model was not unloaded", runtime.unloadIdleModel())
@@ -70,6 +78,11 @@ class Qwen35TuningInstrumentedTest {
         } finally {
             runtime.close()
         }
+    }
+
+    @Test
+    fun reportsThermalStatus() {
+        emitStatus("LOCAL_LLM_THERMAL_STATUS ${currentThermalStatus()}")
     }
 
     private fun runMeasuredGeneration(runtime: RuntimeOrchestrator, harness: Qwen35TuningHarness, sampleIndex: Int): MeasuredGeneration {
@@ -99,6 +112,11 @@ class Qwen35TuningInstrumentedTest {
         }
         val generationProfile = Qwen35GenerationProfiles.forTier(config.tier)
             .single { it.id == generationProfileId }
+        val generationDefaults = generationProfile.defaults.copy(maxOutputTokens = config.maxOutputTokens).let { defaults ->
+            config.generationSeed?.let { seed ->
+                defaults.copy(seed = seed, seedPolicy = SeedPolicy.Fixed(seed))
+            } ?: defaults
+        }
         val artifact = GgufArtifact(
             digest = config.digest,
             fileName = sourceModel.name,
@@ -115,17 +133,19 @@ class Qwen35TuningInstrumentedTest {
             microBatchSize = config.microBatchSize,
             cpuThreads = config.cpuThreads,
             batchThreads = config.batchThreads,
-            gpuLayers = 0,
+            gpuLayers = config.gpuLayers,
             useMmap = true,
             useMlock = false,
-            flashAttention = false,
+            flashAttention = config.flashAttention,
+            kvCacheTypeK = config.kvCacheTypeK,
+            kvCacheTypeV = config.kvCacheTypeV,
             runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
         )
         val useCase = UseCaseProfile(
             id = useCaseProfileId,
             modelProfileId = modelProfileId,
             systemPromptVersion = "qwen35-tuning-v1",
-            generationDefaults = generationProfile.defaults.copy(maxOutputTokens = config.maxOutputTokens),
+            generationDefaults = generationDefaults,
             outputMode = OutputMode.TEXT,
             cachePolicy = UseCaseCachePolicy(0, false, false, false),
             healthSuiteId = "qwen35-tuning-health",
@@ -202,6 +222,17 @@ class Qwen35TuningInstrumentedTest {
         return condition()
     }
 
+    private fun emitEvidence(measured: MeasuredGeneration) {
+        emitStatus("LOCAL_LLM_TUNING_JSON ${evidence(measured)}")
+    }
+
+    private fun emitStatus(line: String) {
+        val status = Bundle().apply {
+            putString(Instrumentation.REPORT_KEY_STREAMRESULT, "$line\n")
+        }
+        InstrumentationRegistry.getInstrumentation().sendStatus(0, status)
+    }
+
     private fun evidence(measured: MeasuredGeneration): JSONObject {
         val completed = measured.completed
         val inputTokens = completed.metrics.inputTokens
@@ -211,11 +242,13 @@ class Qwen35TuningInstrumentedTest {
         } else {
             null
         }
-        return JSONObject()
-            .put("schemaVersion", EVIDENCE_SCHEMA_VERSION)
+        val evidence = JSONObject()
+            .put("schemaVersion", config.evidenceSchemaVersion)
             .put("tuningCaseId", config.caseId)
             .put("sampleIndex", measured.sampleIndex)
             .put("warmRepetitionsRequested", config.warmRepetitions)
+            .put("maxOutputTokens", config.maxOutputTokens)
+            .put("promptDigest", config.promptDigest)
             .put("modelDigest", config.digest.sha256)
             .put("modelTier", config.tier.name)
             .put("architecture", "qwen35")
@@ -232,6 +265,28 @@ class Qwen35TuningInstrumentedTest {
             .put("batchSize", config.batchSize)
             .put("microBatchSize", config.microBatchSize)
             .put("thinkingMode", config.thinkingMode.name)
+        if (config.evidenceSchemaVersion >= 5) {
+            evidence
+                .put("outputDigest", sha256(completed.output))
+                .put("flashAttention", config.flashAttention)
+                .put("kvCacheTypeK", config.kvCacheTypeK ?: "DEFAULT")
+                .put("kvCacheTypeV", config.kvCacheTypeV ?: "DEFAULT")
+                .put("seedPolicy", if (config.generationSeed == null) "PROFILE_DEFAULT" else "FIXED")
+                .put("generationSeed", config.generationSeed ?: JSONObject.NULL)
+        }
+        if (config.evidenceSchemaVersion >= 6) {
+            evidence
+                .put("experimentalOpenClBuild", config.experimentalOpenClBuild)
+                .put(
+                    "executionLane",
+                    if (config.gpuLayers == 0) "OPENCL_BUILD_CPU_CONTROL" else "OPENCL_REQUESTED_OFFLOAD",
+                )
+                .put("requestedGpuLayers", config.gpuLayers)
+                .put("openClBackendTarget", "ggml-opencl")
+                .put("openClBackendLibraryPresent", openClBackendLibraryPresent())
+                .put("effectivePlacement", "UNAVAILABLE")
+        }
+        return evidence
             .put("modelLoadKind", completed.metrics.modelLoadKind.name)
             .put("deviceModel", Build.MODEL)
             .put("androidRelease", Build.VERSION.RELEASE)
@@ -257,20 +312,27 @@ class Qwen35TuningInstrumentedTest {
             .put("thermalStatus", maxOf(measured.before.thermalStatus, measured.after.thermalStatus))
     }
 
+    private fun currentThermalStatus(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return -1
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.currentThermalStatus
+    }
+
     private fun deviceSnapshot(): DeviceSnapshot {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val debugMemory = Debug.MemoryInfo().also(Debug::getMemoryInfo)
         return DeviceSnapshot(
             processPssKb = debugMemory.totalPss,
             availableMemoryBytes = memoryInfo.availMem,
-            thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager.currentThermalStatus else -1,
+            thermalStatus = currentThermalStatus(),
         )
     }
 
+    private fun openClBackendLibraryPresent(): Boolean = File(context.applicationInfo.nativeLibraryDir, OPENCL_BACKEND_LIBRARY).isFile
+
     private companion object {
-        const val EVIDENCE_SCHEMA_VERSION = 2
+        const val OPENCL_BACKEND_LIBRARY = "libggml-opencl.so"
     }
 }
 
@@ -308,12 +370,20 @@ private data class Qwen35TuningConfig(
     val microBatchSize: Int,
     val cpuThreads: Int,
     val batchThreads: Int,
+    val gpuLayers: Int,
     val maxOutputTokens: Int,
     val warmRepetitions: Int,
+    val evidenceSchemaVersion: Int,
+    val experimentalOpenClBuild: Boolean,
+    val flashAttention: Boolean,
+    val kvCacheTypeK: String?,
+    val kvCacheTypeV: String?,
+    val generationSeed: Long?,
     val thinkingMode: ThinkingMode,
     val caseId: String,
     val harnessCommit: String,
     val prompt: String,
+    val promptDigest: String,
     val timeoutSeconds: Long,
 ) {
     val runtimeProfileId: String
@@ -339,48 +409,126 @@ private data class Qwen35TuningConfig(
 
     companion object {
         fun fromInstrumentation(): Qwen35TuningConfig {
-            val arguments = InstrumentationRegistry.getArguments()
+            val arguments = InstrumentationArguments(InstrumentationRegistry.getArguments())
             val processors = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
-            fun string(name: String, default: String): String = arguments.getString(name)?.takeIf(String::isNotBlank) ?: default
-            fun required(name: String): String = arguments.getString(name)?.takeIf(String::isNotBlank)
-                ?: error("Missing required instrumentation argument: $name")
-            fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
-                require(it > 0) { "$name must be positive" }
-            }
-            val tier = when (required("modelTier").lowercase()) {
-                "0.8b" -> Qwen35ModelTier.B0_8
-                "2b" -> Qwen35ModelTier.B2
-                else -> error("modelTier must be 0.8b or 2b")
-            }
-            val contextSize = positiveInt("contextSize", 2_048)
+            val tier = arguments.modelTier()
+            val contextSize = arguments.positiveInt("contextSize", 2_048)
             require(contextSize in Qwen35RuntimeTuningProfiles.APPROVED_CONTEXT_TIERS) {
                 "contextSize must be an approved Qwen3.5 tier"
             }
-            val warmRepetitions = positiveInt("warmRepetitions", 3)
+            val warmRepetitions = arguments.positiveInt("warmRepetitions", 3)
             require(warmRepetitions >= 3) { "warmRepetitions must be at least 3 for tuning evidence" }
+            val generationSeed = arguments.optionalNonNegativeLong("generationSeed")
+            val gpuLayers = arguments.nonNegativeInt("gpuLayers", 0)
+            val experimentalOpenClBuild = arguments.boolean("experimentalOpenClBuild", false)
+            require(gpuLayers == 0 || experimentalOpenClBuild) {
+                "gpuLayers > 0 is reserved for the explicit experimental OpenCL evidence lane"
+            }
+            val defaultSchemaVersion = when {
+                experimentalOpenClBuild || gpuLayers > 0 -> 6
+                generationSeed == null -> 4
+                else -> 5
+            }
+            val evidenceSchemaVersion = arguments.positiveInt("evidenceSchemaVersion", defaultSchemaVersion)
+            require(evidenceSchemaVersion in 4..6) { "evidenceSchemaVersion must be 4, 5 or 6" }
+            require(evidenceSchemaVersion < 6 || experimentalOpenClBuild) {
+                "evidenceSchemaVersion 6 is reserved for the experimental OpenCL build"
+            }
+            require(evidenceSchemaVersion >= 6 || (gpuLayers == 0 && !experimentalOpenClBuild)) {
+                "OpenCL build or gpuLayers evidence requires schemaVersion 6"
+            }
+            require(evidenceSchemaVersion < 6 || generationSeed != null) {
+                "schemaVersion 6 requires a fixed generationSeed"
+            }
+            val prompt = arguments.prompt()
+            val promptDigest = sha256(prompt)
+            arguments.requirePromptDigest(promptDigest)
             return Qwen35TuningConfig(
-                relativePath = string("modelRelativePath", "files/e2e/model.gguf"),
-                digest = ModelDigest(required("modelSha256").lowercase()),
+                relativePath = arguments.string("modelRelativePath", "files/e2e/model.gguf"),
+                digest = ModelDigest(arguments.required("modelSha256").lowercase()),
                 tier = tier,
                 contextSize = contextSize,
-                batchSize = positiveInt("batchSize", 128),
-                microBatchSize = positiveInt("microBatchSize", 64),
-                cpuThreads = positiveInt("cpuThreads", processors.coerceAtMost(4)),
-                batchThreads = positiveInt("batchThreads", processors.coerceAtMost(4)),
-                maxOutputTokens = positiveInt("maxOutputTokens", 64),
+                batchSize = arguments.positiveInt("batchSize", 128),
+                microBatchSize = arguments.positiveInt("microBatchSize", 64),
+                cpuThreads = arguments.positiveInt("cpuThreads", processors.coerceAtMost(4)),
+                batchThreads = arguments.positiveInt("batchThreads", processors.coerceAtMost(4)),
+                gpuLayers = gpuLayers,
+                maxOutputTokens = arguments.positiveInt("maxOutputTokens", 64),
                 warmRepetitions = warmRepetitions,
-                thinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
-                    "ENABLED" -> ThinkingMode.ENABLED
-                    "DISABLED" -> ThinkingMode.DISABLED
-                    else -> error("thinkingMode must be ENABLED or DISABLED")
-                },
-                caseId = required("tuningCaseId"),
-                harnessCommit = required("harnessCommit"),
-                prompt = string("prompt", "How much is the Earth radius?"),
-                timeoutSeconds = string("timeoutSeconds", "180").toLong().also {
-                    require(it > 0) { "timeoutSeconds must be positive" }
-                },
+                evidenceSchemaVersion = evidenceSchemaVersion,
+                experimentalOpenClBuild = experimentalOpenClBuild,
+                flashAttention = arguments.boolean("flashAttention", false),
+                kvCacheTypeK = arguments.optionalString("kvCacheTypeK"),
+                kvCacheTypeV = arguments.optionalString("kvCacheTypeV"),
+                generationSeed = generationSeed,
+                thinkingMode = arguments.thinkingMode(),
+                caseId = arguments.required("tuningCaseId"),
+                harnessCommit = arguments.required("harnessCommit"),
+                prompt = prompt,
+                promptDigest = promptDigest,
+                timeoutSeconds = arguments.positiveLong("timeoutSeconds", 600),
             )
         }
     }
 }
+
+private class InstrumentationArguments(private val arguments: Bundle) {
+    fun string(name: String, default: String): String = arguments.getString(name)?.takeIf(String::isNotBlank) ?: default
+
+    fun optionalString(name: String): String? = arguments.getString(name)?.takeIf(String::isNotBlank)
+
+    fun required(name: String): String = arguments.getString(name)?.takeIf(String::isNotBlank)
+        ?: error("Missing required instrumentation argument: $name")
+
+    fun positiveInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it > 0) { "$name must be positive" }
+    }
+
+    fun nonNegativeInt(name: String, default: Int): Int = string(name, default.toString()).toInt().also {
+        require(it >= 0) { "$name must not be negative" }
+    }
+
+    fun positiveLong(name: String, default: Long): Long = string(name, default.toString()).toLong().also {
+        require(it > 0) { "$name must be positive" }
+    }
+
+    fun optionalNonNegativeLong(name: String): Long? = optionalString(name)?.toLong()?.also {
+        require(it >= 0) { "$name must not be negative" }
+    }
+
+    fun boolean(name: String, default: Boolean): Boolean = when (string(name, default.toString()).lowercase()) {
+        "true" -> true
+        "false" -> false
+        else -> error("$name must be true or false")
+    }
+
+    fun modelTier(): Qwen35ModelTier = when (required("modelTier").lowercase()) {
+        "0.8b" -> Qwen35ModelTier.B0_8
+        "2b" -> Qwen35ModelTier.B2
+        else -> error("modelTier must be 0.8b or 2b")
+    }
+
+    fun thinkingMode(): ThinkingMode = when (string("thinkingMode", "DISABLED").uppercase()) {
+        "ENABLED" -> ThinkingMode.ENABLED
+        "DISABLED" -> ThinkingMode.DISABLED
+        else -> error("thinkingMode must be ENABLED or DISABLED")
+    }
+
+    fun prompt(): String {
+        val prompt = arguments.getString("promptBase64")?.takeIf(String::isNotBlank)?.let { encoded ->
+            String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8)
+        } ?: string("prompt", "How much is the Earth radius?")
+        require(prompt.isNotBlank()) { "prompt must not be blank" }
+        return prompt
+    }
+
+    fun requirePromptDigest(actualDigest: String) {
+        arguments.getString("promptSha256")?.takeIf(String::isNotBlank)?.let { supplied ->
+            require(supplied.lowercase() == actualDigest) { "promptSha256 does not match decoded prompt" }
+        }
+    }
+}
+
+private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+    .digest(value.toByteArray(Charsets.UTF_8))
+    .joinToString("") { byte -> "%02x".format(byte) }

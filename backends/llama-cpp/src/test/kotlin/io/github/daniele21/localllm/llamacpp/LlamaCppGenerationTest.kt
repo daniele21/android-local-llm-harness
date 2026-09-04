@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.models.ArtifactSource
 import io.github.daniele21.localllm.models.GgufArtifact
 import io.github.daniele21.localllm.models.GgufModelProfile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -25,9 +26,103 @@ class LlamaCppGenerationTest {
             result,
         )
         assertEquals(
-            listOf(7L, 1024, 256, 128, 3, 4, true),
+            listOf(7L, 1024, 256, 128, 3, 4, NativeFlashAttentionMode.ENABLED.nativeValue, null, null),
             nativeApi.lastContextCreation,
         )
+    }
+
+    @Test
+    fun `profile false maps to explicitly disabled flash attention`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+        val profile = testProfile().copy(flashAttention = false)
+
+        LlamaCppGenerationBridge(nativeApi).createContext(testModel(), profile)
+
+        assertEquals(NativeFlashAttentionMode.DISABLED.nativeValue, nativeApi.lastContextCreation?.get(6))
+    }
+
+    @Test
+    fun `auto flash attention is only forwarded when explicitly requested`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        LlamaCppGenerationBridge(nativeApi).createContext(
+            model = testModel(),
+            profile = testProfile().copy(flashAttention = false),
+            flashAttentionMode = NativeFlashAttentionMode.AUTO,
+        )
+
+        assertEquals(NativeFlashAttentionMode.AUTO.nativeValue, nativeApi.lastContextCreation?.get(6))
+    }
+
+    @Test
+    fun `supported explicit KV cache types are forwarded to JNI`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+        val model = testModel()
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            model,
+            testProfile().copy(kvCacheTypeK = "q8_0", kvCacheTypeV = "q4_0"),
+        )
+
+        assertEquals(
+            ContextCreationResult.Success(LoadedNativeContext(NativeContextHandle(13), model)),
+            result,
+        )
+        assertEquals("q8_0", nativeApi.lastContextCreation?.get(7))
+        assertEquals("q4_0", nativeApi.lastContextCreation?.get(8))
+    }
+
+    @Test
+    fun `quantized V cache fails before JNI when flash attention is disabled`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            testModel(),
+            testProfile().copy(flashAttention = false, kvCacheTypeV = "q8_0"),
+        )
+
+        assertTrue(result is ContextCreationResult.Failure)
+        assertEquals(
+            GenerationNativeErrorCode.UNSUPPORTED_CONFIGURATION,
+            (result as ContextCreationResult.Failure).error.code,
+        )
+        assertNull(nativeApi.lastContextCreation)
+    }
+
+    @Test
+    fun `quantized V cache can use explicit auto flash attention`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+        val model = testModel()
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            model = model,
+            profile = testProfile().copy(flashAttention = false, kvCacheTypeV = "q8_0"),
+            flashAttentionMode = NativeFlashAttentionMode.AUTO,
+        )
+
+        assertEquals(
+            ContextCreationResult.Success(LoadedNativeContext(NativeContextHandle(13), model)),
+            result,
+        )
+        assertEquals(NativeFlashAttentionMode.AUTO.nativeValue, nativeApi.lastContextCreation?.get(6))
+        assertEquals("q8_0", nativeApi.lastContextCreation?.get(8))
+    }
+
+    @Test
+    fun `unknown explicit KV cache type fails before JNI`() {
+        val nativeApi = FakeNativeGenerationApi(contextCreation = arrayOf("ok", "13"))
+
+        val result = LlamaCppGenerationBridge(nativeApi).createContext(
+            testModel(),
+            testProfile().copy(kvCacheTypeK = "q3_not_real"),
+        )
+
+        assertTrue(result is ContextCreationResult.Failure)
+        assertEquals(
+            GenerationNativeErrorCode.INVALID_ARGUMENT,
+            (result as ContextCreationResult.Failure).error.code,
+        )
+        assertNull(nativeApi.lastContextCreation)
     }
 
     @Test
@@ -89,7 +184,7 @@ private class FakeNativeGenerationApi(
     private val contextCreation: Array<String> = arrayOf("ok", "1"),
     private val contextRelease: Array<String> = arrayOf("ok"),
 ) : NativeLlamaGenerationApi {
-    var lastContextCreation: List<Any>? = null
+    var lastContextCreation: List<Any?>? = null
     var releasedContextHandle: Long? = null
 
     override fun createContext(
@@ -99,7 +194,9 @@ private class FakeNativeGenerationApi(
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String> {
         lastContextCreation = listOf(
             modelHandle,
@@ -108,7 +205,9 @@ private class FakeNativeGenerationApi(
             microBatchSize,
             threads,
             batchThreads,
-            flashAttention,
+            flashAttentionMode,
+            kvCacheTypeK,
+            kvCacheTypeV,
         )
         return contextCreation
     }

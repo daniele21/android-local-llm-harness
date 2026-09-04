@@ -4,8 +4,10 @@ import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.runtime.UseCaseActivationId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessPhoneBindingRegistryTest {
@@ -14,7 +16,7 @@ class HarnessPhoneBindingRegistryTest {
     @Test
     fun `resolves playground and validation from the selected curated Qwen35 model`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
         val playground = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         val validation = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId)
@@ -31,8 +33,8 @@ class HarnessPhoneBindingRegistryTest {
         val registry = HarnessPhoneBindingRegistry()
         val replacement = curatedModel(1)
 
-        registry.select(model)
-        registry.select(replacement)
+        registry.selectedModel = model
+        registry.selectedModel = replacement
 
         val playground = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         val validation = registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PHYSICAL_VALIDATION.useCaseId)
@@ -50,7 +52,7 @@ class HarnessPhoneBindingRegistryTest {
         )
 
         assertThrows(IllegalArgumentException::class.java) {
-            registry.select(unsupported)
+            registry.selectedModel = unsupported
         }
     }
 
@@ -64,11 +66,11 @@ class HarnessPhoneBindingRegistryTest {
     }
 
     @Test
-    fun `clear removes the selected model`() {
+    fun `clearing selected model removes the binding`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
-        registry.clear()
+        registry.selectedModel = null
 
         assertThrows(IllegalArgumentException::class.java) {
             registry.resolve(APPLICATION_ID, HarnessRuntimePurpose.PLAYGROUND.useCaseId)
@@ -76,13 +78,53 @@ class HarnessPhoneBindingRegistryTest {
     }
 
     @Test
-    fun `rejects unknown application and use case ids`() {
+    fun `external application cannot fall back to selected model`() {
         val registry = HarnessPhoneBindingRegistry()
-        registry.select(model)
+        registry.selectedModel = model
 
-        assertThrows(IllegalArgumentException::class.java) {
+        val failure = assertThrows(IllegalStateException::class.java) {
             registry.resolve(ApplicationId("other-app"), HarnessRuntimePurpose.PLAYGROUND.useCaseId)
         }
+
+        assertTrue(failure.message?.contains("control-plane activation") == true)
+    }
+
+    @Test
+    fun `external application resolves exact active control-plane configuration and fails closed after deactivation`() {
+        val registry = HarnessPhoneBindingRegistry()
+        val externalApplicationId = ApplicationId("consumer-fixture")
+        val externalUseCaseId = UseCaseId("configured-generation")
+        val activationId = UseCaseActivationId("activation-acux-90")
+        val expected = resolvedPhonePlaygroundUseCase(model).let { resolved ->
+            resolved.copy(
+                binding = resolved.binding.copy(
+                    applicationId = externalApplicationId,
+                    useCaseId = externalUseCaseId,
+                ),
+            )
+        }
+
+        registry.installActivationBinding(
+            activationId = activationId,
+            applicationId = externalApplicationId,
+            useCaseId = externalUseCaseId,
+            resolved = expected,
+        )
+
+        assertEquals(expected, registry.resolve(externalApplicationId, externalUseCaseId))
+
+        registry.removeActivationBinding(activationId)
+        val failure = assertThrows(IllegalStateException::class.java) {
+            registry.resolve(externalApplicationId, externalUseCaseId)
+        }
+        assertTrue(failure.message?.contains("control-plane activation") == true)
+    }
+
+    @Test
+    fun `internal application rejects unknown use case id`() {
+        val registry = HarnessPhoneBindingRegistry()
+        registry.selectedModel = model
+
         assertThrows(IllegalStateException::class.java) {
             registry.resolve(APPLICATION_ID, UseCaseId("unknown"))
         }

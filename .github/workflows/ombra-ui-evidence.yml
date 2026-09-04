@@ -1,0 +1,177 @@
+name: OMBRA UI state evidence
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "apps/local-llm-console/src/main/kotlin/io/github/daniele21/localllm/console/ombra/**"
+      - "apps/local-llm-console/src/main/kotlin/io/github/daniele21/localllm/console/presentation/OmbraReviewProjection.kt"
+      - "apps/local-llm-console/src/androidTest/kotlin/io/github/daniele21/localllm/console/ombra/**"
+      - "ui/design-system/src/main/kotlin/io/github/daniele21/localllm/ui/designsystem/Ombra*.kt"
+      - "apps/local-llm-console/build.gradle.kts"
+      - ".github/workflows/ombra-ui-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review-state-evidence:
+    name: Review privacy, adaptive and screenshot evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Android AVD home
+        shell: bash
+        run: |
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/android-avd" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=$RUNNER_TEMP/android-user" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-avd" "$RUNNER_TEMP/android-user"
+
+      - name: Install emulator image
+        shell: bash
+        run: |
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+
+      - name: Enable KVM access
+        shell: bash
+        run: |
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+      - name: Create and start emulator
+        shell: bash
+        run: |
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          test -x "$EMULATOR_BIN"
+
+          echo "no" | avdmanager create avd \
+            --force \
+            --name ombra-ui-api35 \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6"
+
+          nohup "$EMULATOR_BIN" \
+            -avd ombra-ui-api35 \
+            -port 5554 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            > "$RUNNER_TEMP/ombra-ui-emulator.log" 2>&1 &
+
+          timeout 180 adb -s emulator-5554 wait-for-device
+          for attempt in $(seq 1 90); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              adb -s emulator-5554 shell settings put global window_animation_scale 0
+              adb -s emulator-5554 shell settings put global transition_animation_scale 0
+              adb -s emulator-5554 shell settings put global animator_duration_scale 0
+              exit 0
+            fi
+            sleep 2
+          done
+
+          adb devices -l >&2 || true
+          cat "$RUNNER_TEMP/ombra-ui-emulator.log" >&2 || true
+          echo "Error: OMBRA UI emulator did not finish booting." >&2
+          exit 1
+
+      - name: Run OMB-7 review state evidence in portrait
+        env:
+          ANDROID_SERIAL: emulator-5554
+        shell: bash
+        run: |
+          set -o pipefail
+          adb shell settings put system accelerometer_rotation 0
+          adb shell settings put system user_rotation 0
+          ./gradlew \
+            :apps:local-llm-console:connectedDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
+            2>&1 | tee "$RUNNER_TEMP/ombra-ui-evidence-portrait.log"
+
+      - name: Run OMB-7 review state evidence in landscape
+        env:
+          ANDROID_SERIAL: emulator-5554
+        shell: bash
+        run: |
+          set -o pipefail
+          adb shell settings put system accelerometer_rotation 0
+          adb shell settings put system user_rotation 1
+          ./gradlew \
+            :apps:local-llm-console:connectedDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
+            2>&1 | tee "$RUNNER_TEMP/ombra-ui-evidence-landscape.log"
+
+      - name: Capture privacy-safe code-owned screenshots
+        env:
+          ANDROID_SERIAL: emulator-5554
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_name="io.github.daniele21.localllm.console.debug"
+          main_activity="io.github.daniele21.localllm.console.MainActivity"
+          evidence_dir="$RUNNER_TEMP/ombra-ui-screenshots"
+          mkdir -p "$evidence_dir"
+
+          # connectedDebugAndroidTest may uninstall the target APK after instrumentation.
+          # Reinstall the exact branch build when needed, then clear app state so screenshots
+          # always start from OMBRA's content-free Import screen.
+          if ! adb shell pm path "$package_name" | grep -q '^package:'; then
+            ./gradlew :apps:local-llm-console:installDebug
+          fi
+          adb shell pm clear "$package_name" >/dev/null
+
+          adb shell settings put system accelerometer_rotation 0
+          adb shell settings put system user_rotation 0
+          adb shell am start -W -S -n "$package_name/$main_activity" >/dev/null
+          adb shell pidof "$package_name" >/dev/null
+          sleep 2
+          adb exec-out screencap -p > "$evidence_dir/import-portrait.png"
+
+          adb shell settings put system user_rotation 1
+          sleep 2
+          adb exec-out screencap -p > "$evidence_dir/import-landscape.png"
+
+          adb shell settings put system user_rotation 0
+          adb shell settings put system accelerometer_rotation 1
+          test -s "$evidence_dir/import-portrait.png"
+          test -s "$evidence_dir/import-landscape.png"
+          file "$evidence_dir/import-portrait.png" | grep -q 'PNG image data'
+          file "$evidence_dir/import-landscape.png" | grep -q 'PNG image data'
+
+      - name: Upload privacy-safe UI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ombra-ui-state-evidence
+          path: |
+            apps/local-llm-console/build/reports/androidTests/**
+            apps/local-llm-console/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/ombra-ui-evidence-portrait.log
+            ${{ runner.temp }}/ombra-ui-evidence-landscape.log
+            ${{ runner.temp }}/ombra-ui-emulator.log
+            ${{ runner.temp }}/ombra-ui-screenshots/**
+          if-no-files-found: warn
+          retention-days: 14

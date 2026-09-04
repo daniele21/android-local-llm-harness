@@ -2,7 +2,20 @@ package io.github.daniele21.localllm.llamacpp
 
 import io.github.daniele21.localllm.models.GgufModelProfile
 
+enum class NativeFlashAttentionMode(val nativeValue: Int) {
+    AUTO(-1),
+    DISABLED(0),
+    ENABLED(1),
+    ;
+
+    companion object {
+        fun fromProfile(enabled: Boolean): NativeFlashAttentionMode = if (enabled) ENABLED else DISABLED
+    }
+}
+
 interface NativeLlamaGenerationApi {
+    // Keep this flat: it mirrors the stable JNI createContext ABI implemented in llama_jni.cpp.
+    @Suppress("LongParameterList")
     fun createContext(
         modelHandle: Long,
         contextSize: Int,
@@ -10,7 +23,9 @@ interface NativeLlamaGenerationApi {
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     fun releaseContext(contextHandle: Long): Array<String>
@@ -28,15 +43,28 @@ class JniLlamaGenerationApi : NativeLlamaGenerationApi {
         microBatchSize: Int,
         threads: Int,
         batchThreads: Int,
-        flashAttention: Boolean,
+        flashAttentionMode: Int,
+        kvCacheTypeK: String?,
+        kvCacheTypeV: String?,
     ): Array<String>
 
     external override fun releaseContext(contextHandle: Long): Array<String>
 }
 
 class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi = JniLlamaGenerationApi()) {
-    fun createContext(model: LoadedNativeModel, profile: GgufModelProfile, contextSize: Int = profile.contextSize): ContextCreationResult =
-        decodeContextCreation(
+    fun createContext(
+        model: LoadedNativeModel,
+        profile: GgufModelProfile,
+        contextSize: Int = profile.contextSize,
+        flashAttentionMode: NativeFlashAttentionMode = NativeFlashAttentionMode.fromProfile(profile.flashAttention),
+    ): ContextCreationResult {
+        profile.explicitKvCacheSelectionError()?.let { error ->
+            return ContextCreationResult.Failure(error)
+        }
+        profile.kvCacheCompatibilityError(flashAttentionMode)?.let { error ->
+            return ContextCreationResult.Failure(error)
+        }
+        return decodeContextCreation(
             response = nativeApi.createContext(
                 modelHandle = model.handle.value,
                 contextSize = contextSize,
@@ -44,10 +72,13 @@ class LlamaCppGenerationBridge(private val nativeApi: NativeLlamaGenerationApi =
                 microBatchSize = profile.microBatchSize,
                 threads = profile.cpuThreads,
                 batchThreads = profile.batchThreads,
-                flashAttention = profile.flashAttention,
+                flashAttentionMode = flashAttentionMode.nativeValue,
+                kvCacheTypeK = profile.kvCacheTypeK,
+                kvCacheTypeV = profile.kvCacheTypeV,
             ),
             model = model,
         )
+    }
 
     fun releaseContext(context: LoadedNativeContext): GenerationNativeOperationResult = decodeOperation(
         nativeApi.releaseContext(context.handle.value),
@@ -208,6 +239,7 @@ enum class GenerationNativeErrorCode {
     INVALID_ARGUMENT,
     UNKNOWN_HANDLE,
     CONTEXT_CREATE_FAILED,
+    UNSUPPORTED_CONFIGURATION,
     UNSUPPORTED_MODEL,
     TOKENIZATION_FAILED,
     CONTEXT_OVERFLOW,

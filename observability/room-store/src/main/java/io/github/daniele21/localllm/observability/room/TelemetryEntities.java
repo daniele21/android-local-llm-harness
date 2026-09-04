@@ -106,6 +106,10 @@ public final class TelemetryEntities {
         @Nullable @ColumnInfo(name = "chat_template_id") public String chatTemplateId;
         @Nullable @ColumnInfo(name = "chat_template_source") public String chatTemplateSource;
         @Nullable @ColumnInfo(name = "system_prompt_version") public String systemPromptVersion;
+        @Nullable @ColumnInfo(name = "backend_id") public String backendId;
+        @Nullable @ColumnInfo(name = "backend_revision") public String backendRevision;
+        @Nullable @ColumnInfo(name = "backend_execution_fingerprint") public String backendExecutionFingerprint;
+        @Nullable @ColumnInfo(name = "effective_placement") public String effectivePlacement;
         @Nullable @ColumnInfo(name = "stop_reason") public String stopReason;
         @Nullable @ColumnInfo(name = "prompt_planning_ms") public Long promptPlanningMs;
         @Nullable @ColumnInfo(name = "context_creation_ms") public Long contextCreationMs;

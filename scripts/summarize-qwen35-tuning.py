@@ -9,11 +9,12 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = {3, 4, 5, 6}
 MIN_WARM_SAMPLES = 3
-IDENTITY_FIELDS = [
+BASE_IDENTITY_FIELDS = [
     "tuningCaseId",
     "warmRepetitionsRequested",
+    "maxOutputTokens",
     "modelDigest",
     "modelTier",
     "architecture",
@@ -35,6 +36,23 @@ IDENTITY_FIELDS = [
     "sdkInt",
     "abi",
 ]
+V4_IDENTITY_FIELDS = ["promptDigest"]
+V5_IDENTITY_FIELDS = [
+    "flashAttention",
+    "kvCacheTypeK",
+    "kvCacheTypeV",
+    "seedPolicy",
+    "generationSeed",
+]
+V6_IDENTITY_FIELDS = [
+    "experimentalOpenClBuild",
+    "executionLane",
+    "requestedGpuLayers",
+    "openClBackendTarget",
+    "openClBackendLibraryPresent",
+    "effectivePlacement",
+]
+OUTPUT_IDENTITY_FIELDS = BASE_IDENTITY_FIELDS + V4_IDENTITY_FIELDS + V5_IDENTITY_FIELDS + V6_IDENTITY_FIELDS
 NUMERIC_METRICS = [
     "ttftMs",
     "prefillMs",
@@ -43,11 +61,28 @@ NUMERIC_METRICS = [
     "prefillTokensPerSecond",
     "decodeTokensPerSecond",
 ]
-REQUIRED_FIELDS = set(
+SUSTAINED_METRICS = [
+    "ttftMs",
+    "totalMs",
+    "decodeTokensPerSecond",
+]
+BASE_REQUIRED_FIELDS = set(
     ["schemaVersion", "sampleIndex", "modelLoadKind", "stopReason", "processPssKb", "availableMemoryBytes", "thermalStatus"]
-    + IDENTITY_FIELDS
+    + BASE_IDENTITY_FIELDS
     + NUMERIC_METRICS
 )
+
+
+def identity_fields_for(record: dict[str, object]) -> list[str]:
+    schema_version = int(record["schemaVersion"])
+    fields = list(BASE_IDENTITY_FIELDS)
+    if schema_version >= 4:
+        fields += V4_IDENTITY_FIELDS
+    if schema_version >= 5:
+        fields += V5_IDENTITY_FIELDS
+    if schema_version >= 6:
+        fields += V6_IDENTITY_FIELDS
+    return fields
 
 
 def numeric_values(records: list[dict[str, object]], field: str) -> list[float]:
@@ -77,17 +112,62 @@ def min_numeric(records: list[dict[str, object]], field: str) -> float | None:
     return min(values) if values else None
 
 
+def first_last_drift(records: list[dict[str, object]], field: str) -> tuple[float | None, float | None, float | None]:
+    ordered = sorted(records, key=lambda record: int(record["sampleIndex"]))
+    values = [(float(record[field]), int(record["sampleIndex"])) for record in ordered if record.get(field) is not None]
+    if not values:
+        return None, None, None
+    first = values[0][0]
+    last = values[-1][0]
+    drift_percent = None if first == 0 else (last - first) * 100.0 / first
+    return first, last, drift_percent
+
+
 def read_records(path: Path) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for line_number, line in enumerate(path.read_text().splitlines(), start=1):
         if not line.strip():
             continue
         record = json.loads(line)
-        missing = sorted(REQUIRED_FIELDS.difference(record))
+        missing = sorted(BASE_REQUIRED_FIELDS.difference(record))
         if missing:
             raise SystemExit(f"line {line_number}: missing evidence fields: {', '.join(missing)}")
-        if record["schemaVersion"] != SCHEMA_VERSION:
-            raise SystemExit(f"line {line_number}: expected schemaVersion {SCHEMA_VERSION}")
+        schema_version = int(record["schemaVersion"])
+        if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise SystemExit(
+                f"line {line_number}: unsupported schemaVersion {schema_version}; "
+                f"expected one of {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
+            )
+        if schema_version >= 4:
+            prompt_digest = record.get("promptDigest")
+            if not isinstance(prompt_digest, str) or len(prompt_digest) != 64:
+                raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char promptDigest")
+        if schema_version >= 5:
+            missing_v5 = [field for field in V5_IDENTITY_FIELDS if field not in record]
+            if missing_v5:
+                raise SystemExit(
+                    f"line {line_number}: schemaVersion {schema_version} missing identity fields: {', '.join(missing_v5)}"
+                )
+            output_digest = record.get("outputDigest")
+            if not isinstance(output_digest, str) or len(output_digest) != 64:
+                raise SystemExit(f"line {line_number}: schemaVersion {schema_version} requires 64-char outputDigest")
+        if schema_version >= 6:
+            missing_v6 = [field for field in V6_IDENTITY_FIELDS if field not in record]
+            if missing_v6:
+                raise SystemExit(
+                    f"line {line_number}: schemaVersion {schema_version} missing OpenCL identity fields: {', '.join(missing_v6)}"
+                )
+            if record.get("experimentalOpenClBuild") is not True:
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires experimentalOpenClBuild=true")
+            if record.get("openClBackendTarget") != "ggml-opencl":
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires openClBackendTarget=ggml-opencl")
+            if record.get("openClBackendLibraryPresent") is not True:
+                raise SystemExit(f"line {line_number}: schemaVersion 6 requires packaged libggml-opencl.so")
+            if record.get("effectivePlacement") != "UNAVAILABLE":
+                raise SystemExit(f"line {line_number}: pinned runtime must report effectivePlacement=UNAVAILABLE")
+            requested_gpu_layers = record.get("requestedGpuLayers")
+            if not isinstance(requested_gpu_layers, int) or isinstance(requested_gpu_layers, bool) or requested_gpu_layers < 0:
+                raise SystemExit(f"line {line_number}: requestedGpuLayers must be a non-negative integer")
         if record["modelLoadKind"] not in {"COLD", "WARM"}:
             raise SystemExit(f"line {line_number}: modelLoadKind must be COLD or WARM")
         records.append(record)
@@ -98,7 +178,9 @@ def read_records(path: Path) -> list[dict[str, object]]:
 
 def verify_identity(records: list[dict[str, object]]) -> None:
     first = records[0]
-    for field in IDENTITY_FIELDS:
+    if any(record.get("schemaVersion") != first.get("schemaVersion") for record in records):
+        raise SystemExit(f"identity drift for {first['tuningCaseId']}: schemaVersion")
+    for field in identity_fields_for(first):
         if any(record.get(field) != first.get(field) for record in records):
             raise SystemExit(f"identity drift for {first['tuningCaseId']}: {field}")
 
@@ -119,6 +201,8 @@ def eligibility(cold: list[dict[str, object]], warm: list[dict[str, object]]) ->
     unsafe_markers = ("GUARD", "CANCEL", "UNKNOWN", "BUDGET")
     if any(any(marker in reason for marker in unsafe_markers) for reason in stop_reasons):
         return False, f"non-comparable stop reason: {','.join(sorted(stop_reasons))}"
+    if int((cold or warm)[0]["schemaVersion"]) >= 6:
+        return False, "complete experimental OpenCL evidence; effective placement is unavailable and cannot select a profile"
     return True, "complete comparable evidence"
 
 
@@ -128,17 +212,35 @@ def summarize_case(records: list[dict[str, object]]) -> dict[str, object]:
     cold = [record for record in records if record["modelLoadKind"] == "COLD"]
     warm = [record for record in records if record["modelLoadKind"] == "WARM"]
     eligible, reason = eligibility(cold, warm)
-    row: dict[str, object] = {field: first.get(field) for field in IDENTITY_FIELDS}
+    row: dict[str, object] = {field: first.get(field) for field in OUTPUT_IDENTITY_FIELDS}
+    row["schemaVersion"] = first.get("schemaVersion")
     row["coldSamples"] = len(cold)
     row["warmSamples"] = len(warm)
     for field in NUMERIC_METRICS:
         row[f"cold_{field}"] = median(cold, field)
         row[f"warm_median_{field}"] = median(warm, field)
         row[f"warm_p95_{field}"] = p95(warm, field)
+    for field in SUSTAINED_METRICS:
+        first_value, last_value, drift_percent = first_last_drift(warm, field)
+        row[f"warm_first_{field}"] = first_value
+        row[f"warm_last_{field}"] = last_value
+        row[f"warm_driftPercent_{field}"] = drift_percent
+    ordered_warm = sorted(warm, key=lambda record: int(record["sampleIndex"]))
+    row["warm_first_thermalStatus"] = float(ordered_warm[0]["thermalStatus"]) if ordered_warm else None
+    row["warm_last_thermalStatus"] = float(ordered_warm[-1]["thermalStatus"]) if ordered_warm else None
+    row["warm_thermalStatusDelta"] = (
+        row["warm_last_thermalStatus"] - row["warm_first_thermalStatus"]
+        if row["warm_first_thermalStatus"] is not None and row["warm_last_thermalStatus"] is not None
+        else None
+    )
     row["peak_processPssKb"] = max_numeric(records, "processPssKb")
     row["min_availableMemoryBytes"] = min_numeric(records, "availableMemoryBytes")
     row["max_thermalStatus"] = max_numeric(records, "thermalStatus")
     row["stopReasons"] = ",".join(sorted({str(record["stopReason"]) for record in records}))
+    output_digests = sorted({str(record["outputDigest"]) for record in records if record.get("outputDigest")})
+    row["outputDigestCount"] = len(output_digests)
+    row["outputDigestStable"] = len(output_digests) == 1
+    row["stableOutputDigest"] = output_digests[0] if len(output_digests) == 1 else ""
     row["eligibleForProfileSelection"] = eligible
     row["eligibilityReason"] = reason
     return row
@@ -159,14 +261,24 @@ def main() -> int:
     metric_columns: list[str] = []
     for field in NUMERIC_METRICS:
         metric_columns.extend([f"cold_{field}", f"warm_median_{field}", f"warm_p95_{field}"])
-    fieldnames = IDENTITY_FIELDS + [
+    sustained_columns: list[str] = []
+    for field in SUSTAINED_METRICS:
+        sustained_columns.extend([f"warm_first_{field}", f"warm_last_{field}", f"warm_driftPercent_{field}"])
+    fieldnames = ["schemaVersion", *OUTPUT_IDENTITY_FIELDS] + [
         "coldSamples",
         "warmSamples",
         *metric_columns,
+        *sustained_columns,
+        "warm_first_thermalStatus",
+        "warm_last_thermalStatus",
+        "warm_thermalStatusDelta",
         "peak_processPssKb",
         "min_availableMemoryBytes",
         "max_thermalStatus",
         "stopReasons",
+        "outputDigestCount",
+        "outputDigestStable",
+        "stableOutputDigest",
         "eligibleForProfileSelection",
         "eligibilityReason",
     ]

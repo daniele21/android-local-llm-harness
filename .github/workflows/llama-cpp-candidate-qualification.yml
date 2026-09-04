@@ -1,0 +1,98 @@
+name: llama.cpp candidate qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact 40-character llama.cpp commit SHA to qualify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llama-cpp-candidate-${{ github.ref }}-${{ inputs.candidate_sha }}
+  cancel-in-progress: true
+
+env:
+  LLAMA_CPP_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+
+jobs:
+  host-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LLRT_RUN_NATIVE: "1"
+      LLRT_RUN_ANDROID: "0"
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Qualify candidate host-native lane
+        run: bash scripts/qualify-llama-cpp-candidate.sh "$LLAMA_CPP_CANDIDATE_SHA"
+
+      - name: Restore and verify production pin
+        if: always()
+        shell: bash
+        run: |
+          expected_sha="$(git ls-tree HEAD third_party/llama.cpp | awk '{print $3}')"
+          if [[ ! "$expected_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Unable to resolve the production llama.cpp gitlink from the checked-out repository" >&2
+            exit 1
+          fi
+          git -C third_party/llama.cpp checkout --quiet --detach "$expected_sha"
+          bash scripts/verify-llama-cpp-pin.sh
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LLRT_RUN_NATIVE: "0"
+      LLRT_RUN_ANDROID: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Qualify candidate Android lane
+        run: bash scripts/qualify-llama-cpp-candidate.sh "$LLAMA_CPP_CANDIDATE_SHA"
+
+      - name: Restore and verify production pin
+        if: always()
+        shell: bash
+        run: |
+          expected_sha="$(git ls-tree HEAD third_party/llama.cpp | awk '{print $3}')"
+          if [[ ! "$expected_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Unable to resolve the production llama.cpp gitlink from the checked-out repository" >&2
+            exit 1
+          fi
+          git -C third_party/llama.cpp checkout --quiet --detach "$expected_sha"
+          bash scripts/verify-llama-cpp-pin.sh

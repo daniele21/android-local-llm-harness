@@ -126,7 +126,7 @@ private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
             tone = when (feedback.tone) {
                 ModelActionFeedbackTone.INFO -> HarnessStatusTone.INFO
                 ModelActionFeedbackTone.SUCCESS -> HarnessStatusTone.SUCCESS
-                ModelActionFeedbackTone.ERROR -> HarnessStatusTone.WARNING
+                ModelActionFeedbackTone.ERROR -> HarnessStatusTone.ERROR
             },
         )
         Text(
@@ -257,9 +257,10 @@ internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this)
     -> HarnessStatusTone.INFO
 
     HarnessModelLifecycle.DEGRADED,
-    HarnessModelLifecycle.FAILED,
     HarnessModelLifecycle.INCOMPATIBLE,
     -> HarnessStatusTone.WARNING
+
+    HarnessModelLifecycle.FAILED -> HarnessStatusTone.ERROR
 
     HarnessModelLifecycle.INSTALLED,
     HarnessModelLifecycle.READY_TO_DOWNLOAD,

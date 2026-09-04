@@ -61,7 +61,16 @@ val detektInputs = providers.provider {
     fileTree(rootDir) {
         include("**/src/**/*.kt")
         exclude("**/build/**", "third_party/**")
-    }.files.joinToString(",") { it.absolutePath }
+    }.files
+        .map { file ->
+            generateSequence(file.parentFile) { parent -> parent.parentFile }
+                .firstOrNull { directory -> directory.name == "kotlin" }
+                ?: generateSequence(file.parentFile) { parent -> parent.parentFile }
+                    .first { directory -> directory.name == "src" }
+        }
+        .distinct()
+        .sortedBy { it.absolutePath }
+        .joinToString(",") { it.absolutePath }
 }
 
 tasks.register<JavaExec>("detekt") {

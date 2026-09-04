@@ -16,8 +16,17 @@ on:
       - "gradle.properties"
       - ".gitmodules"
       - "third_party/llama.cpp"
+      - "scripts/build-console-release.sh"
+      - "scripts/package_artifact_baseline.py"
+      - "scripts/package_artifact_metadata.py"
+      - "scripts/test_package_artifact_baseline.py"
+      - "scripts/test_package_artifact_metadata.py"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
+  # Ordinary PRs to dev are validated by the blast-radius-aware Validate
+  # workflow. Full distributable packaging remains automatic for stable
+  # promotion/hotfix PRs; dev artifacts are produced after integration or on
+  # explicit workflow_dispatch when a candidate is needed for device evidence.
   pull_request:
     branches: [main]
     paths:
@@ -33,6 +42,11 @@ on:
       - "gradle.properties"
       - ".gitmodules"
       - "third_party/llama.cpp"
+      - "scripts/build-console-release.sh"
+      - "scripts/package_artifact_baseline.py"
+      - "scripts/package_artifact_metadata.py"
+      - "scripts/test_package_artifact_baseline.py"
+      - "scripts/test_package_artifact_metadata.py"
       - "scripts/verify-android-packaging.py"
       - ".github/workflows/package.yml"
   workflow_dispatch:
@@ -47,6 +61,7 @@ on:
         default: false
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -123,9 +138,15 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
+      - name: Test package metadata tooling
+        run: |
+          python3 scripts/test_package_artifact_baseline.py
+          python3 scripts/test_package_artifact_metadata.py
+
       - name: Build and validate Android packages
         env:
           ENABLE_GRADLE_PROFILE: ${{ inputs.profile }}
+          LOCAL_LLM_CONSOLE_ALLOW_UNSIGNED_RELEASE: "true"
           LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
         shell: bash
         run: |
@@ -139,7 +160,12 @@ jobs:
 
           ./gradlew "${gradle_args[@]}" \
             assembleDebug \
+            :transports:android-binder-contract:assembleRelease \
+            :transports:android-binder-client:assembleRelease \
             :apps:local-llm-console:assembleInternal \
+            :apps:local-llm-console:bundleRelease \
+            :apps:shared-runtime-client-consumer-fixture:assembleRelease \
+            :apps:shared-runtime-client-consumer-fixture:assembleReleaseAndroidTest \
             :apps:device-test-runner:assembleDebugAndroidTest \
             :apps:local-llm-phone-test:lintRelease \
             :apps:local-llm-phone-test:bundleRelease \
@@ -149,15 +175,115 @@ jobs:
       - name: Verify Android native packaging
         run: python3 scripts/verify-android-packaging.py
 
+      - name: Resolve package build identity
+        id: package-identity
+        shell: bash
+        env:
+          DISPATCH_REF: ${{ inputs.candidate_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          source_ref="${DISPATCH_REF:-${HEAD_REF:-$REF_NAME}}"
+          case "$EVENT_NAME" in
+            push)
+              channel="$REF_NAME"
+              ;;
+            pull_request)
+              channel="pr-${BASE_REF}"
+              ;;
+            workflow_dispatch)
+              channel="manual"
+              ;;
+            *)
+              channel="$EVENT_NAME"
+              ;;
+          esac
+          echo "build-id=${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "source-revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "source-ref=$source_ref" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch previous successful comparable package metadata
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/package_artifact_baseline.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --current-run-id "${GITHUB_RUN_ID}" \
+            --channel "${{ steps.package-identity.outputs.channel }}" \
+            --source-ref "${{ steps.package-identity.outputs.source-ref }}" \
+            --output build/package-metadata/previous-build-manifest.json
+
+      - name: Generate package manifest and build delta
+        run: |
+          python3 scripts/package_artifact_metadata.py manifest \
+            --output build/package-metadata/build-manifest.json \
+            --build-id "${{ steps.package-identity.outputs.build-id }}" \
+            --source-revision "${{ steps.package-identity.outputs.source-revision }}" \
+            --source-ref "${{ steps.package-identity.outputs.source-ref }}" \
+            --channel "${{ steps.package-identity.outputs.channel }}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}"
+          previous_args=()
+          if [[ -f build/package-metadata/previous-build-manifest.json ]]; then
+            previous_args=(--previous build/package-metadata/previous-build-manifest.json)
+          fi
+          python3 scripts/package_artifact_metadata.py delta \
+            --current build/package-metadata/build-manifest.json \
+            "${previous_args[@]}" \
+            --output build/package-metadata/BUILD_CHANGELOG.md
+
       - name: Report Android native compiler cache
         if: always()
         run: ccache --show-stats
+
+      - name: Upload package identity metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-build-metadata
+          path: |
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload console APKs
         uses: actions/upload-artifact@v7
         with:
           name: local-llm-console-apks
-          path: apps/local-llm-console/build/outputs/apk/**/*.apk
+          path: |
+            apps/local-llm-console/build/outputs/apk/**/*.apk
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload console release bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-llm-console-release-bundle
+          path: |
+            apps/local-llm-console/build/outputs/bundle/**/*.aab
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload shared-runtime consumer fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: shared-runtime-consumer-fixture
+          path: |
+            apps/shared-runtime-client-consumer-fixture/build/outputs/apk/**/*.apk
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -166,7 +292,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: local-llm-device-test-apks
-          path: apps/device-test-runner/build/outputs/apk/**/*.apk
+          path: |
+            apps/device-test-runner/build/outputs/apk/**/*.apk
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -178,6 +307,8 @@ jobs:
           path: |
             apps/local-llm-phone-test/build/outputs/apk/**/*.apk
             apps/local-llm-phone-test/build/outputs/bundle/**/*.aab
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -186,7 +317,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: local-llm-harness-aars
-          path: "**/build/outputs/aar/*.aar"
+          path: |
+            **/build/outputs/aar/*.aar
+            build/package-metadata/build-manifest.json
+            build/package-metadata/BUILD_CHANGELOG.md
           if-no-files-found: error
           compression-level: 0
           retention-days: 7

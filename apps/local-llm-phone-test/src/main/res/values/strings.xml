@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LLM Console</string>
+    <string name="app_name">Harnex</string>
+    <string name="app_surface_subtitle">Local AI Console</string>
+    <string name="app_payoff">Your local AI harness for Android.</string>
+    <string name="logical_job_notification_channel_name">Local AI execution</string>
+    <string name="logical_job_notification_channel_description">Shows when an app is actively using Harnex for on-device AI.</string>
+    <string name="logical_job_notification_title">Local AI analysis in progress</string>
+    <string name="logical_job_notification_text">Harnex is processing a user-requested analysis on this device.</string>
 </resources>

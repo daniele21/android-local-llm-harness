@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.5.0",
+  "product_name": "Harnex",
+  "payoff": "Your local AI harness for Android.",
+  "assets": {
+    "logo_primary": "docs/assets/brand/master/harnex-lockup-light.png",
+    "logo_primary_dark": "docs/assets/brand/master/harnex-lockup-dark.png",
+    "logo_compact": "docs/assets/brand/master/harnex-symbol.png",
+    "logo_compact_lockup": "docs/assets/brand/master/harnex-lockup-compact-light.png",
+    "logo_compact_lockup_dark": "docs/assets/brand/master/harnex-lockup-compact-dark.png",
+    "wordmark": "docs/assets/brand/master/harnex-wordmark-light.png",
+    "wordmark_dark": "docs/assets/brand/master/harnex-wordmark-dark.png",
+    "logo_monochrome": "Android themed icon derives its alpha mask from the approved H Bridge Core PNG symbol",
+    "app_icon": "docs/assets/brand/master/harnex-app-icon-dark.png",
+    "app_icon_light": "docs/assets/brand/master/harnex-app-icon-light.png",
+    "app_icon_dark": "docs/assets/brand/master/harnex-app-icon-dark.png",
+    "android_launcher": "generated Android launcher resources derive from the same approved H Bridge Core PNG bytes; current internal generation may consume a legacy harness-* compatibility alias",
+    "favicon": "docs/assets/brand/light/favicon.png and docs/assets/brand/dark/favicon.png"
+  },
+  "brand_mark": {
+    "name": "H Bridge Core",
+    "primary_meaning": "Harnex is the connection layer between a consumer application and a local LLM/runtime",
+    "invariant": "preserve the approved H Bridge Core geometry, three horizontal bridge lines, nodes, proportions and color treatment; do not recreate or reinterpret the symbol",
+    "android_role": "secondary platform cue; Android must not dominate the H or the app-to-LLM connection",
+    "source_format": "PNG"
+  },
+  "implementation_compatibility": {
+    "legacy_prefix": "Harness",
+    "policy": "Existing Kotlin, Compose, Android resource and design-system identifiers may retain the Harness prefix until a separately scoped implementation rename is justified. They are implementation identifiers, not public product branding."
+  },
+  "themes": {
+    "light": true,
+    "dark": true
+  },
+  "tokens": {
+    "colors": {
+      "surface": "ui/design-system HarnessColors/HarnessTheme semantic surface token",
+      "surface_elevated": "ui/design-system semantic elevated/container surface token",
+      "text_primary": "MaterialTheme colorScheme on-surface semantic token",
+      "text_secondary": "MaterialTheme colorScheme secondary/on-surface-variant semantic token",
+      "primary": "ui/design-system Harness purple primary semantic token",
+      "success": "ui/design-system HarnessStatusTone success semantic token",
+      "warning": "ui/design-system HarnessStatusTone warning semantic token",
+      "error": "MaterialTheme/HarnessStatusTone error semantic token",
+      "border": "MaterialTheme outline semantic token",
+      "focus": "platform/Material focus indication using semantic theme colors"
+    },
+    "typography": "ui/design-system HarnessTypography.kt and offline HarnessFontFamilies aliases",
+    "spacing": "ui/design-system HarnessSpacing.kt",
+    "radius": "ui/design-system HarnessShapes.kt",
+    "elevation": "Material 3 semantic surface/elevation behavior through shared Harness components"
+  },
+  "style": {
+    "iconography": "Material/platform-appropriate icons with text or semantic cues for critical status; never color-only meaning",
+    "motion": "restrained and purposeful; use motion only for feedback, continuity, spatial relationship, state transition, progress, attention, hierarchy or meaningful completion; never to compensate for unclear structure",
+    "imagery": "functional technical product evidence, orientation, explanation, data visualization and bounded reference views before decoration; core workflows must remain understandable without decorative imagery",
+    "voice_microcopy": "direct, specific, technical and privacy-conscious; name the operation/object, distinguish lifecycle states, give actionable recovery, and never overclaim evidence"
+  },
+  "motion_tokens": {
+    "durations": {
+      "instant": "immediate state update/no animation when continuity adds no user value",
+      "fast": "Compose/Material platform-default motion for frequent feedback; no Harnex numeric override",
+      "standard": "Compose/Material platform-default motion for ordinary state transitions; no Harnex numeric override",
+      "large": "Compose/Material platform-default motion for infrequent large navigation/continuity transitions; no Harnex numeric override"
+    },
+    "easing": {
+      "enter": "Compose/Material platform easing; no Harnex override",
+      "exit": "Compose/Material platform easing; no Harnex override",
+      "move": "Compose/Material platform easing; no Harnex override"
+    },
+    "spring": {
+      "default": "Compose/Material platform spring only when interaction semantics benefit; no Harnex override",
+      "bounce": "avoid bounce by default; allow only restrained use when it communicates meaningful completion"
+    },
+    "reduced_motion_strategy": "respect Android/Compose accessibility and animator-scale signals where available; prefer immediate or simplified transitions and never require motion to understand state or progress"
+  }
+}

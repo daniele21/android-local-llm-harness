@@ -58,6 +58,7 @@ internal class PhoneTestController(
     private var currentModel: ImportedPhoneModel? = restoreModel()
 
     init {
+        runtimeGraph.selectedModel = currentModel
         post { listener.onModelChanged(currentModel) }
     }
 
@@ -79,6 +80,7 @@ internal class PhoneTestController(
                 progress("${model.fileName} loaded and ready for Playground")
             } catch (error: Throwable) {
                 runtimeGraph.releaseModel(model.digest)
+                runtimeGraph.selectedModel = currentModel
                 throw error
             }
         }
@@ -92,6 +94,7 @@ internal class PhoneTestController(
             modelStore.remove(model.digest)
             preferences.edit().clear().apply()
             currentModel = null
+            runtimeGraph.selectedModel = null
             post { listener.onModelChanged(null) }
             progress("Model removed")
         }
@@ -267,7 +270,7 @@ internal class PhoneTestController(
         check(eventually { runtime.runtimeSnapshot().activeSessions == 0 }) {
             "Session context was not released"
         }
-        check(runtimeGraph.unloadIdleModel()) { "Idle model was not unloaded" }
+        check(runtime.unloadIdleModel()) { "Idle model was not unloaded" }
     }
 
     private fun eventually(condition: () -> Boolean): Boolean {
@@ -300,6 +303,7 @@ internal class PhoneTestController(
                 quantization = preferences.getString(KEY_QUANTIZATION, DEFAULT_QUANTIZATION) ?: DEFAULT_QUANTIZATION,
             )
             require(model.sizeBytes >= 0 && modelStore.find(model.digest) != null)
+            Qwen35PhoneModelPolicy.requireCurated(model)
             model
         }.getOrElse {
             preferences.edit().clear().apply()

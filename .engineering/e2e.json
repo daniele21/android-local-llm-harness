@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.2.0",
+  "applicability": {
+    "status": "recommended",
+    "reason": "Harnex has complete Android/Binder/model lifecycle workflows whose assembled outcome is not fully established by unit and host contract tests alone."
+  },
+  "principles": {
+    "final_environment_should_confirm_not_discover": true,
+    "execution_capability_separate_from_environment_fidelity": true,
+    "lowest_sufficient_test_level": true,
+    "critical_journeys_only": true,
+    "built_artifact_when_material": true,
+    "residual_fidelity_gaps_explicit": true,
+    "ui_evidence_risk_based": true
+  },
+  "ui_evidence": {
+    "modes": ["assertions", "screenshots", "full_media"],
+    "default_mode": "screenshots",
+    "assertions_allowed_when_ui_incidental": true,
+    "full_media_triggers": [
+      "motion_or_animation",
+      "timing_or_progression",
+      "navigation_or_transition_sequence",
+      "lifecycle_visibility",
+      "release_acceptance"
+    ]
+  },
+  "fidelity_order": ["host_or_fake", "simulated_or_emulated", "representative_virtual", "representative_physical", "target_environment"],
+  "target_environments": [
+    {
+      "id": "android-arm64-device",
+      "platform": "Android ARM64 (API 26+ supported class)",
+      "description": "Representative physical Android ARM64 device running the Harnex app, native llama.cpp backend and real GGUF model artifacts.",
+      "material_dimensions": [
+        "Android framework and process lifecycle",
+        "arm64-v8a ABI and JNI/native llama.cpp backend",
+        "real GGUF storage and model lifecycle",
+        "Binder/process behavior where shared-runtime surfaces are exercised",
+        "physical memory pressure and reclamation",
+        "thermal and sustained-decode behavior",
+        "device/OEM resource behavior"
+      ]
+    }
+  ],
+  "execution_environments": [
+    {
+      "id": "binder-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "instrumented tests for transports/android-binder-contract",
+      "target_environment_refs": ["android-arm64-device"],
+      "known_gaps": [
+        "x86_64 emulator does not represent arm64-v8a native inference",
+        "does not load a production GGUF through the llama.cpp backend",
+        "does not establish physical memory, thermal or OEM behavior",
+        "Binder Parcelable evidence is narrower than a full two-application host/client round trip"
+      ]
+    },
+    {
+      "id": "shared-runtime-two-apk-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "real Harnex app/HarnessSharedRuntimeService/Binder Host/Control Plane/activation/residency/RuntimeOrchestrator with an emulator-only deterministic backend, pre-provisioned ModelStore, signature-protected pause/release/query generation fault control, and Android critical trim delivery through the production Host Service callback",
+      "target_environment_refs": ["android-arm64-device"],
+      "known_gaps": [
+        "x86_64 emulator does not execute the production arm64-v8a llama.cpp/JNI backend",
+        "GGUF bytes and native generation are replaced by a deterministic emulator backend",
+        "critical trim injection proves Android callback and logical-job cleanup semantics but not genuine physical RAM pressure or reclamation",
+        "physical memory, thermal and OEM behavior remain unrepresented",
+        "the emulator ModelStore deliberately mirrors production find/snapshot semantics by exposing present models with verified=false and leaving integrity verification to RuntimeOrchestrator prepare"
+      ]
+    },
+    {
+      "id": "phone-cold-start-api35-emulator",
+      "fidelity_class": "simulated_or_emulated",
+      "automation": "automated",
+      "platform": "GitHub-hosted Linux + Android API 35 Google APIs x86_64 emulator",
+      "artifact_surface": "installed Harnex phone debug APK derived from the production-shaped ARM64 debug APK by removing native library entries and re-signing only for the no-native cold-start canary",
+      "target_environment_refs": ["android-arm64-device"],
+      "known_gaps": [
+        "the canary intentionally removes the ARM64 native payload and therefore does not prove native loading or inference",
+        "the re-signed canary is not the release/promoted artifact and does not establish production signing identity",
+        "x86_64 emulator does not represent ARM64 package installation, physical memory, thermal or OEM behavior",
+        "the journey proves clean startup remains independent of JNI; native packaging/linkability remains covered separately"
+      ]
+    },
+    {
+      "id": "physical-arm64-device",
+      "fidelity_class": "representative_physical",
+      "automation": "real_environment",
+      "platform": "Physical Android ARM64 device",
+      "artifact_surface": "installed Harnex debug/release-candidate app plus identity-bearing device evidence scripts",
+      "target_environment_refs": ["android-arm64-device"],
+      "known_gaps": ["one representative device does not establish every supported OEM/device configuration"]
+    }
+  ],
+  "critical_journeys": [
+    {
+      "id": "binder-contract-serialization",
+      "claim": "The public Android Binder contract types survive Android framework parceling/unparceling with the expected contract semantics.",
+      "ui_surface": false,
+      "minimum_ui_evidence_mode": "assertions",
+      "target_environment_refs": ["android-arm64-device"],
+      "automated_environment_refs": ["binder-api35-emulator"],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": ["full two-application behavior is owned by the separate shared-runtime-consumer-roundtrip journey"],
+      "real_environment_confirmation": "conditional",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "shared-runtime-consumer-roundtrip",
+      "claim": "A separately installed same-signer Consumer can discover the real Harnex HarnessSharedRuntimeService, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, release and recover across Host restart without a fake Consumer runtime.",
+      "ui_surface": false,
+      "minimum_ui_evidence_mode": "assertions",
+      "target_environment_refs": ["android-arm64-device"],
+      "automated_environment_refs": ["shared-runtime-two-apk-api35-emulator"],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": [
+        "production ARM64 JNI/llama.cpp execution and real GGUF byte loading remain physical",
+        "physical memory, thermal and OEM lifecycle fidelity remain physical"
+      ],
+      "real_environment_confirmation": "required",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "phone-cold-start",
+      "claim": "A clean Harnex process can install and render the initial phone shell without loading or requiring the native llama.cpp/JNI payload during application startup.",
+      "ui_surface": true,
+      "minimum_ui_evidence_mode": "screenshots",
+      "target_environment_refs": ["android-arm64-device"],
+      "automated_environment_refs": ["phone-cold-start-api35-emulator"],
+      "minimum_automated_fidelity": "simulated_or_emulated",
+      "residual_gaps": [
+        "the no-native canary does not prove ARM64 native linker compatibility, model loading or inference",
+        "release signing and exact promoted-artifact launch remain separate packaging/physical evidence"
+      ],
+      "real_environment_confirmation": "conditional",
+      "automation_gap_reason": null
+    },
+    {
+      "id": "local-inference-device-lifecycle",
+      "claim": "A verified compatible GGUF can be selected, prepared, streamed/cancelled through the production native backend, and cleaned up with truthful lifecycle/resource evidence on Android ARM64.",
+      "ui_surface": false,
+      "minimum_ui_evidence_mode": "assertions",
+      "target_environment_refs": ["android-arm64-device"],
+      "automated_environment_refs": [],
+      "minimum_automated_fidelity": "host_or_fake",
+      "residual_gaps": [
+        "production arm64-v8a JNI/llama.cpp execution",
+        "real model loading and memory reclamation",
+        "physical thermal/resource behavior",
+        "OEM/device-specific lifecycle behavior"
+      ],
+      "real_environment_confirmation": "required",
+      "automation_gap_reason": "Current hosted CI has no representative Android ARM64 device/model environment for the production llama.cpp backend. Lower-level deterministic tests cover orchestration and contracts, while identity-bearing physical-device evidence owns the remaining native/model/resource claim."
+    }
+  ]
+}

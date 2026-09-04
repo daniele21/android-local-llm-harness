@@ -1,0 +1,90 @@
+name: Publish Consumer SDK public Maven repository
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - '.github/workflows/publish-consumer-sdk-public-maven.yml'
+      - 'docs/shared-runtime/consumer-sdk-version.txt'
+      - 'samples/external-consumer-android/settings.gradle.kts'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-public-maven:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Resolve pinned SDK version
+        id: version
+        run: |
+          SDK_VERSION="$(tr -d '[:space:]' < docs/shared-runtime/consumer-sdk-version.txt)"
+          if [[ ! "$SDK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid Consumer SDK version: $SDK_VERSION" >&2
+            exit 1
+          fi
+          echo "sdk_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build and validate Maven repository
+        env:
+          CONSUMER_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: |
+          bash scripts/verify-consumer-sdk-publication.sh
+          bash scripts/dump-consumer-sdk-abi.sh
+          bash scripts/verify-consumer-sdk-abi.sh
+
+      - name: Publish immutable version into public branch
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: |
+          git fetch origin consumer-sdk-maven:refs/remotes/origin/consumer-sdk-maven
+          git worktree add /tmp/consumer-sdk-maven origin/consumer-sdk-maven
+          cd /tmp/consumer-sdk-maven
+          git checkout -B consumer-sdk-maven origin/consumer-sdk-maven
+          mkdir -p maven
+          cp -R "$GITHUB_WORKSPACE/build/consumer-sdk-repository/io" maven/
+          mkdir -p "maven/evidence/$SDK_VERSION"
+          cp "$GITHUB_WORKSPACE/build/consumer-sdk-repository/build-manifest.txt" "maven/evidence/$SDK_VERSION/"
+          cp "$GITHUB_WORKSPACE/build/consumer-sdk-repository/SHA256SUMS" "maven/evidence/$SDK_VERSION/"
+          cp "$GITHUB_WORKSPACE/build/consumer-sdk-repository/public-abi.txt" "maven/evidence/$SDK_VERSION/"
+          git add maven
+          if git diff --cached --quiet; then
+            echo "Public Maven repository already contains $SDK_VERSION"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "build(sdk): publish Consumer Android SDK $SDK_VERSION"
+            git push origin HEAD:consumer-sdk-maven
+          fi
+
+      - name: Prove unauthenticated public consumption
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: >-
+          ./gradlew -p samples/external-consumer-android --no-daemon
+          -PconsumerSdkVersion=$SDK_VERSION
+          -PconsumerSdkRepositoryUrl=https://raw.githubusercontent.com/daniele21/android-local-llm-harness/consumer-sdk-maven/maven
+          :consumer:assembleDebug

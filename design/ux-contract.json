@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "contract_version": "0.5.0",
+  "applicable": true,
+  "design_source_of_truth": {
+    "type": "code-first-in-repo",
+    "location": "ui/design-system"
+  },
+  "experience_context": {
+    "primary_users": [
+      "Android/AI engineer evaluating candidate local LLMs on a target device",
+      "Android developer integrating the Harnex shared runtime into an application"
+    ],
+    "primary_jobs": [
+      "compare candidate models and inference configurations for a concrete use case and device",
+      "install, select and run a local model while inspecting evidence-backed performance, health and diagnostics",
+      "inspect consumer applications, assigned use cases and effective inference presets, then configure them without relying on internal binding or transport concepts",
+      "validate shared-runtime integration without silent cloud fallback"
+    ],
+    "primary_surfaces": [
+      "Harnex Android phone application",
+      "model evaluation and benchmark surfaces",
+      "application and assigned-use-case control-plane surfaces",
+      "shared-runtime consumer and diagnostics surfaces"
+    ]
+  },
+  "decision_model": {
+    "user_outcome_first": true,
+    "task_model_before_layout": true,
+    "hierarchy_before_visual_polish": true,
+    "states_before_motion": true,
+    "motion_requires_purpose": true,
+    "evidence_before_completion": true
+  },
+  "principles": {
+    "user_task_model_over_internal_architecture": true,
+    "progressive_disclosure": true,
+    "sensible_defaults": true,
+    "clear_primary_action_hierarchy": true,
+    "platform_appropriate": true,
+    "bounded_information_density": true,
+    "actionable_error_recovery": true
+  },
+  "critical_states": [
+    "loading",
+    "empty",
+    "error",
+    "disabled",
+    "unavailable",
+    "populated",
+    "cancelling"
+  ],
+  "accessibility": {
+    "target": "Android platform accessibility with WCAG 2.2 AA-equivalent contrast and semantics",
+    "keyboard_when_applicable": true,
+    "focus_visibility_order": true,
+    "assistive_semantics": true,
+    "text_scaling_when_applicable": true,
+    "no_color_only_critical_meaning": true,
+    "reduced_motion_when_applicable": true
+  },
+  "adaptive_layout": {
+    "applicable": true,
+    "supported_contexts": [
+      "compact-phone portrait",
+      "compact-phone landscape",
+      "medium window",
+      "expanded window"
+    ]
+  },
+  "design_system": {
+    "component_source": "ui/design-system",
+    "brand_tokens": "design/brand-kit.json",
+    "reuse_existing_semantic_component_first": true
+  },
+  "motion": {
+    "purpose_required": true,
+    "supported_purposes": [
+      "feedback",
+      "continuity",
+      "spatial_relationship",
+      "state_transition",
+      "progress",
+      "attention",
+      "hierarchy",
+      "meaningful_completion"
+    ],
+    "frequent_interactions_are_restrained": true,
+    "gesture_motion_tracks_input": true,
+    "performance_over_decorative_complexity": true,
+    "reduced_motion": true
+  },
+  "graphics": {
+    "functional_before_decorative": true,
+    "ui_understandable_without_decorative_imagery": true,
+    "supported_roles": [
+      "explanation",
+      "orientation",
+      "onboarding",
+      "empty_state",
+      "status",
+      "meaningful_completion",
+      "data_visualization",
+      "brand"
+    ]
+  },
+  "critical_journeys": [
+    {
+      "id": "model-lifecycle",
+      "name": "Import or download a GGUF, install it, explicitly select it and reconcile residency state",
+      "e2e": "required"
+    },
+    {
+      "id": "local-generation",
+      "name": "Select a usable model, submit a prompt, stream generation, cancel or complete, and inspect terminal metrics",
+      "e2e": "required"
+    },
+    {
+      "id": "consumer-configuration",
+      "name": "Open a consumer application, inspect its assigned use cases, select or create an inference preset, persist the default assignment and verify the effective configuration after restart",
+      "e2e": "required"
+    },
+    {
+      "id": "diagnostics-evidence",
+      "name": "Inspect source-backed diagnostics and export a privacy-safe evidence snapshot",
+      "e2e": "recommended"
+    },
+    {
+      "id": "physical-validation",
+      "name": "Run an explicit physical-device validation flow and preserve evidence identity without overstating emulator results",
+      "e2e": "required"
+    }
+  ],
+  "reference_views": [
+    "docs/harness-ux-ui-implementation-plan.md",
+    "docs/features/application-control-plane-ux.md",
+    "docs/features/phone-app-architecture.md",
+    "docs/design-system.md",
+    "ui/design-system Compose previews"
+  ],
+  "validation": {
+    "accessibility_automation": "ui/design-system contrast and touch-target JVM tests, Compose semantics coverage and Android Lint",
+    "visual_regression": "code-owned Compose previews and scoped screenshot evidence where the owning UX specification requires it; no blanket golden suite is claimed",
+    "manual_accessibility": "representative-device TalkBack, dynamic-text, focus, portrait/landscape and low-motion acceptance before release claims",
+    "usability_evidence": "task-based physical-device acceptance for primary model, generation, consumer-configuration and diagnostics flows; no formal representative-user study is claimed"
+  },
+  "evidence": {
+    "bounded_ci_retention": true,
+    "identity_with_source_build_environment": true,
+    "zero_residue_after_ui_e2e": true
+  }
+}

@@ -5,7 +5,7 @@ Document type: release-policy
 Owner: repository
 Canonical scope: release.versioning
 Read when: changing versions, compatibility promises, promotion or release artifacts
-Last reviewed: 2026-08-06
+Last reviewed: 2026-09-02
 
 ## SDK versions
 
@@ -13,10 +13,16 @@ Published Android and Capacitor artifacts follow Semantic Versioning.
 
 Before `1.0.0`, minor releases may contain deliberate API changes, but every breaking change must include migration notes. Patch releases must remain backward compatible within the same minor line.
 
+The shared-runtime Android client artifact has its own SDK identity. Development builds use snapshot semantics; a distributable client version is not inferred from the host application version or Binder protocol version.
+
 ## Independent identities
 
-The following identities are versioned separately from the SDK release:
+The following identities are versioned or recorded separately from the SDK release:
 
+- Harness repository/version identity;
+- shared-runtime host application version/build identity;
+- shared-runtime Android client SDK version;
+- shared-runtime Binder protocol major/minor and negotiated feature set;
 - GGUF artifact digest;
 - model load profile schema;
 - use-case profile schema;
@@ -24,10 +30,29 @@ The following identities are versioned separately from the SDK release:
 - health suite definition;
 - benchmark definition;
 - diagnostics protocol;
-- future shared-runtime Binder protocol;
 - pinned `llama.cpp` commit.
 
-Changing an SDK version must never implicitly change an application's configured model identity.
+Changing an SDK version must never implicitly change an application's configured model identity. Changing the host version must not silently redefine the Binder compatibility contract. Changing a compatible Binder minor does not, by itself, require the host and client package versions to match.
+
+## Shared-runtime compatibility identity
+
+A shared-runtime release or physical evidence record must identify at least:
+
+```text
+harness git commit
+host package + version/build
+client SDK version
+Binder protocol major/minor
+negotiated protocol minor/features when execution evidence exists
+host/client signing-certificate digest identity
+selected curated model digest
+pinned llama.cpp revision
+Android device/version/ABI for physical evidence
+```
+
+The Binder protocol remains independently versioned from host/client packaging. Major incompatibility fails before registration; compatible minor differences negotiate the common feature set. The protocol fixture policy is owned by the shared-runtime contract documentation rather than Semantic Versioning of either APK.
+
+Signing certificate digests are evidence/security identities, not product versions. Full certificates, private keys and passwords are never release metadata.
 
 ## Integration and release lines
 
@@ -36,6 +61,18 @@ Changing an SDK version must never implicitly change an application's configured
 - Feature pull requests normally squash into `dev`; promotions use a merge commit to preserve the exact validated candidate.
 - Tags, changelog release entries and distributed Android artifacts are created only from validated `main` commits.
 - Emergency hotfixes are applied to `main` and then forward-ported to `dev`.
+
+## Play Internal phone-test identity
+
+Every Google Play Internal Testing upload of `apps/local-llm-phone-test` uses one paired Android application identity:
+
+- `versionCode` is strictly increasing and is resolved from current Play state as `max(uploaded versionCode) + 1`;
+- `versionName` keeps the repository `major.minor` train and uses that exact Play `versionCode` as its patch component, for example `versionCode=34` -> `versionName=1.0.34` on the `1.0.x` train;
+- protected CI must provide `PLAY_VERSION_CODE` and `PLAY_VERSION_NAME` together, and the build fails closed if the pair is incomplete or inconsistent;
+- the canonical local signed-bundle helper increments both values together in `apps/local-llm-phone-test/version.properties`; it must not advance only one side of the pair;
+- exact-candidate physical-E2E APK builds keep the checked-in identity unchanged because they are evidence artifacts, not Play deployments.
+
+The source `versionName` patch is not the Play release counter. It provides the reviewed major/minor train; Play's monotonic version code owns the per-deploy patch identity. This lets repeated publication attempts or later deployments remain unique without mutating the validated source commit in CI.
 
 ## Release gate
 
@@ -52,6 +89,18 @@ A release requires:
 - explicit cache/snapshot compatibility decision;
 - checksums for distributed artifacts.
 
+For a shared-runtime client/host distribution, the release gate additionally requires:
+
+- same-signer physical two-APK evidence for the exact candidate identity;
+- independently signed client denial;
+- packaged release client-AAR consumer execution;
+- cancellation, host-death/reconnect, memory and thermal evidence;
+- protocol compatibility fixtures and applicable package replacement/upgrade evidence;
+- release notes binding host version, client SDK version, protocol identity, runtime/backend identity and selected model evidence;
+- a security review of exported service, signature permission, caller identity policy and privacy boundary.
+
 ## Development versions
 
-Development builds on `dev` use snapshot semantics and are not releases. Harness `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. It must not be described as production-ready until representative physical-device GGUF lifecycle, cancellation, memory, JNI-loading and thermal evidence is complete.
+Development builds on `dev` use snapshot semantics and are not releases. Harness `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. The shared-runtime client currently carries snapshot identity until its physical/release gates close.
+
+Harness 0.5.0 and the shared runtime must not be described as production-ready until representative physical-device Qwen3.5 lifecycle, cancellation, memory, JNI-loading, thermal and cross-process release evidence is complete.

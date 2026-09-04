@@ -8,17 +8,60 @@ import org.junit.Test
 
 class HarnessNavigationTest {
     @Test
-    fun `top level routes retain their shell destination`() {
-        HarnessDestination.entries.forEach { destination ->
+    fun `primary destinations expose Apps and keep Diagnostics out of main navigation`() {
+        assertEquals(
+            listOf(
+                HarnessDestination.OVERVIEW,
+                HarnessDestination.PLAYGROUND,
+                HarnessDestination.APPS,
+                HarnessDestination.PERFORMANCE,
+                HarnessDestination.MODELS,
+            ),
+            HarnessDestination.main,
+        )
+        assertFalse(HarnessDestination.main.contains(HarnessDestination.DIAGNOSTICS))
+    }
+
+    @Test
+    fun `primary top level routes retain their shell destination`() {
+        HarnessDestination.main.forEach { destination ->
             val state = HarnessRoutes.shellState(destination.route)
 
             assertEquals(destination, state.destination)
             assertFalse(state.isDetail)
-            assertEquals(
-                destination != HarnessDestination.SETTINGS,
-                state.showBottomNavigation,
-            )
+            assertTrue(state.showBottomNavigation)
         }
+    }
+
+    @Test
+    fun `diagnostics is an expert detail destination outside primary navigation`() {
+        val state = HarnessRoutes.shellState(HarnessDestination.DIAGNOSTICS.route)
+
+        assertEquals(HarnessDestination.DIAGNOSTICS, state.destination)
+        assertEquals("Diagnostics", state.detailTitle)
+        assertTrue(state.isDetail)
+        assertFalse(state.showBottomNavigation)
+    }
+
+    @Test
+    fun `application detail routes stay in Apps shell and hide bottom navigation`() {
+        listOf(
+            HarnessApplicationRoutes.APPLICATION_PATTERN,
+            HarnessApplicationRoutes.ASSIGNMENT_PATTERN,
+            HarnessApplicationRoutes.PRESET_PATTERN,
+            HarnessApplicationRoutes.TECHNICAL_DETAILS_PATTERN,
+            HarnessApplicationRoutes.NEW_PRESET_PATTERN,
+        ).forEach { route ->
+            val state = HarnessRoutes.shellState(route)
+
+            assertEquals(HarnessDestination.APPS, state.destination)
+            assertTrue(state.isDetail)
+            assertFalse(state.showBottomNavigation)
+        }
+        assertEquals(
+            "Assigned Harnex use cases",
+            HarnessRoutes.shellState(HarnessApplicationRoutes.APPLICATION_PATTERN).detailSubtitle,
+        )
     }
 
     @Test

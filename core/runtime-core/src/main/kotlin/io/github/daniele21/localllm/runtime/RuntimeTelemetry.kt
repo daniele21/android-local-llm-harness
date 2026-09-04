@@ -7,6 +7,7 @@ import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.observability.ExecutionPlacementStatus
 import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.LogLevel
 import io.github.daniele21.localllm.observability.RunStatus
@@ -76,7 +77,13 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         )
     }
 
-    fun prepared(requestId: RequestId, configuration: EffectiveGenerationMetadata, promptPlanningMs: Long, contextCreationMs: Long?) {
+    fun prepared(
+        requestId: RequestId,
+        configuration: EffectiveGenerationMetadata,
+        promptPlanningMs: Long,
+        contextCreationMs: Long?,
+        executionEvidence: BackendExecutionEvidence? = null,
+    ) {
         val current = activeRuns[requestId] ?: return
         val updated = current.copy(
             presetId = configuration.preset?.id,
@@ -97,6 +104,12 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
             chatTemplateId = configuration.chatTemplateId,
             chatTemplateSource = configuration.chatTemplateSource,
             systemPromptVersion = configuration.systemPromptVersion,
+            backendId = executionEvidence?.backendId,
+            backendRevision = executionEvidence?.backendRevision,
+            backendExecutionFingerprint = executionEvidence?.materialFingerprint,
+            effectivePlacement = executionEvidence?.effectivePlacement?.let { status ->
+                ExecutionPlacementStatus.valueOf(status.name)
+            },
             promptPlanningMs = promptPlanningMs,
             contextCreationMs = contextCreationMs,
         )
@@ -120,6 +133,42 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
                     put("presetId", it.id.value)
                     put("presetVersion", it.version.toString())
                 }
+                executionEvidence?.let {
+                    put("backendId", it.backendId)
+                    it.backendRevision?.let { revision -> put("backendRevision", revision) }
+                    put("backendExecutionFingerprint", it.materialFingerprint)
+                    put("effectivePlacement", it.effectivePlacement.name)
+                }
+            },
+        )
+    }
+
+    fun memoryAdmission(
+        resource: MemoryAdmissionResource,
+        outcome: MemoryAdmissionOutcome,
+        estimate: MemoryCostEstimate? = null,
+        decisionReason: String? = null,
+        admissionReason: MemoryAdmissionRejectReason? = null,
+        requestedContextTokens: Int? = null,
+        effectiveContextTokens: Int? = null,
+    ) {
+        log(
+            level = if (outcome == MemoryAdmissionOutcome.REJECT) LogLevel.WARN else LogLevel.INFO,
+            event = "memory.admission",
+            requestId = null,
+            fields = buildMap {
+                put("resource", resource.name)
+                put("outcome", outcome.name)
+                decisionReason?.let { put("decisionReason", it) }
+                admissionReason?.let { put("admissionReason", it.name) }
+                estimate?.let {
+                    put("profileId", it.profileId)
+                    put("source", it.source.name)
+                    put("residentBytes", it.residentBytes.toString())
+                    put("peakIncrementalBytes", it.peakIncrementalBytes.toString())
+                }
+                requestedContextTokens?.let { put("requestedContextTokens", it.toString()) }
+                effectiveContextTokens?.let { put("effectiveContextTokens", it.toString()) }
             },
         )
     }
@@ -186,7 +235,7 @@ internal class RuntimeTelemetry(private val repository: TelemetryRepository, pri
         safely { repository.recordRun(run) }
     }
 
-    private fun log(level: LogLevel, event: String, requestId: RequestId, fields: Map<String, String> = emptyMap()) {
+    private fun log(level: LogLevel, event: String, requestId: RequestId?, fields: Map<String, String> = emptyMap()) {
         safely {
             repository.appendLog(
                 StructuredLog(

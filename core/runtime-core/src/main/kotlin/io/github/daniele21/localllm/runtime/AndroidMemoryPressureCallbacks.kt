@@ -24,6 +24,7 @@ object AndroidTrimMemoryMapper {
     fun map(level: Int): RuntimeMemoryPressure? = when {
         level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> RuntimeMemoryPressure.BACKGROUND
         level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> RuntimeMemoryPressure.UI_HIDDEN
+        level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> RuntimeMemoryPressure.LOW_MEMORY
         else -> null
     }
 }

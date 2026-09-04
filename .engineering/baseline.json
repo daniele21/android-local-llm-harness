@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "standard": {
+    "source": "daniele21/repo-template-sw",
+    "version": "0.9.1",
+    "revision": "8da9ef69ba4f670daec9fb2f0251ece88a218025"
+  },
+  "target_level": "L2",
+  "profiles": ["android", "local-ai", "product-ui"],
+  "skills": {
+    "plan-workstream": {"source_version": "0.9.0", "customized": true},
+    "structured-change": {"source_version": "0.9.0", "customized": true},
+    "design-product-experience": {"source_version": "0.5.0", "customized": false},
+    "validate-change": {"source_version": "0.9.0", "customized": true},
+    "preflight-change": {"source_version": "0.9.0", "customized": true},
+    "remote-preflight": {"source_version": "0.9.1", "customized": true},
+    "finalize-workstream": {"source_version": "0.1.0", "customized": false},
+    "review-reference-quality": {"source_version": "0.4.0", "customized": false}
+  },
+  "documentation": {
+    "completed_workstreams": "delete-by-default",
+    "historical_archive": "exception-only"
+  }
+}

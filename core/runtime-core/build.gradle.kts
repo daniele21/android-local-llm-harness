@@ -26,9 +26,9 @@ android {
 
 dependencies {
     api(project(":core:contracts"))
+    api(project(":core:backend-spi"))
     implementation(project(":models:model-profile"))
     implementation(project(":models:model-store"))
-    implementation(project(":backends:llama-cpp"))
     implementation(project(":observability:contracts"))
 
     testImplementation(project(":observability:in-memory-store"))

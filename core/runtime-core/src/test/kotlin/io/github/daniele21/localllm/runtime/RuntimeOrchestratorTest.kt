@@ -308,6 +308,31 @@ class RuntimeOrchestratorTest {
     }
 
     @Test
+    fun `running cancellation dominates backend failure released by cancel`() {
+        val fixture = RuntimeFixture()
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        fixture.backend.blockGeneration = CountDownLatch(1)
+        fixture.backend.generateFailureAfterUnblockCode = "GENERATION_FAILED"
+        val terminal = CountDownLatch(1)
+        val events = Collections.synchronizedList(mutableListOf<GenerationEvent>())
+
+        val handle = fixture.runtime.generate(
+            fixture.request("running-failure-race", session),
+            GenerationListener { event ->
+                events += event
+                if (event is GenerationEvent.Failed) terminal.countDown()
+            },
+        )
+        assertTrue(fixture.backend.generationStarted.await(2, TimeUnit.SECONDS))
+        handle.cancel()
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(1, fixture.backend.cancelCalls)
+        assertTrue((events.last() as GenerationEvent.Failed).error is LocalLlmError.Cancelled)
+        fixture.close()
+    }
+
+    @Test
     fun `generation guard completes with typed reason instead of cancellation`() {
         val fixture = RuntimeFixture(
             generationDefaults = GenerationDefaults(
@@ -531,6 +556,7 @@ private class FakeInferenceBackend : InferenceBackend {
     var generationCalls: Int = 0
     var plannedStopSequences: List<String> = emptyList()
     var generateFailureCode: String? = null
+    var generateFailureAfterUnblockCode: String? = null
     val createdContextSizes = Collections.synchronizedList(mutableListOf<Int>())
 
     @Volatile var lastGenerationRequest: BackendGenerationRequest? = null
@@ -541,9 +567,9 @@ private class FakeInferenceBackend : InferenceBackend {
 
     override fun shutdown() = Unit
 
-    override fun loadModel(storedModel: StoredModel, profile: GgufModelProfile): BackendModelHandle {
+    override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle {
         loadCalls += 1
-        return FakeBackendModel(storedModel.digest, profile.id)
+        return FakeBackendModel(source.digest, profile.id)
     }
 
     override fun unloadModel(model: BackendModelHandle) {
@@ -583,6 +609,9 @@ private class FakeInferenceBackend : InferenceBackend {
         lastGenerationRequest = request
         generationStarted.countDown()
         blockGeneration?.await()
+        generateFailureAfterUnblockCode?.let {
+            throw BackendException(it, "Generation failed while cancellation was in flight")
+        }
         if (!onChunk("hello ", 1)) {
             return BackendGenerationOutcome.Cancelled(BackendGenerationMetrics(2, 1, 5, 1))
         }

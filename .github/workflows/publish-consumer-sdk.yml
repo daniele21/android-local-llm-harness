@@ -1,0 +1,79 @@
+name: Publish Consumer Android SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_version:
+        description: Consumer SDK version to publish
+        required: true
+        type: string
+  push:
+    branches:
+      - dev
+    paths:
+      - 'docs/shared-runtime/consumer-sdk-version.txt'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve and validate SDK version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.sdk_version }}
+        run: |
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            SDK_VERSION="$REQUESTED_VERSION"
+          else
+            SDK_VERSION="$(tr -d '[:space:]' < docs/shared-runtime/consumer-sdk-version.txt)"
+          fi
+          if [[ ! "$SDK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid Consumer SDK version: $SDK_VERSION" >&2
+            exit 1
+          fi
+          echo "sdk_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Validate external consumption before publication
+        env:
+          CONSUMER_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: bash scripts/verify-consumer-sdk-publication.sh
+
+      - name: Verify supported public ABI
+        env:
+          CONSUMER_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: |
+          bash scripts/dump-consumer-sdk-abi.sh
+          bash scripts/verify-consumer-sdk-abi.sh
+
+      - name: Publish Maven artifacts to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          ./gradlew --no-daemon
+          -PconsumerSdkVersion=${{ steps.version.outputs.sdk_version }}
+          :core:contracts:publishReleasePublicationToGithubPackagesRepository
+          :transports:android-binder-contract:publishReleasePublicationToGithubPackagesRepository
+          :transports:android-binder-client:publishReleasePublicationToGithubPackagesRepository

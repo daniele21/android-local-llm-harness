@@ -1,0 +1,201 @@
+name: Publish Play Internal
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "apps/local-llm-phone-test/**"
+      - "backends/**"
+      - "core/**"
+      - "models/**"
+      - "observability/**"
+      - "transports/**"
+      - "integrations/**"
+      - "ui/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "third_party/llama.cpp"
+      - "scripts/build-android-aab.sh"
+      - "scripts/build-phone-test-release.sh"
+      - "scripts/google-play-internal.py"
+      - ".github/workflows/play-internal.yml"
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Branch, tag, or commit to publish; it must already have a successful push Validate run
+        type: string
+        default: dev
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: play-internal-phone-test
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Sign and publish phone test to Play Internal Testing
+    if: github.event_name == 'workflow_dispatch' || vars.PLAY_INTERNAL_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: play-internal
+    env:
+      PLAY_PACKAGE_NAME: io.github.daniele21.localllm.phonetest
+      PLAY_TRACK: internal
+
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+          ref: ${{ github.event_name == 'push' && github.sha || inputs.candidate_ref }}
+
+      - name: Require successful Validate for exact candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_sha="$(git rev-parse HEAD)"
+          for attempt in $(seq 1 180); do
+            response="$(gh api -X GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/validate.yml/runs" \
+              -f head_sha="$candidate_sha" \
+              -f event=push \
+              -f per_page=20)"
+            state="$(printf '%s' "$response" | python3 -c 'import json,sys; runs=json.load(sys.stdin).get("workflow_runs", []); r=runs[0] if runs else {}; print("{}|{}|{}".format(r.get("id", "-"), r.get("status", "-"), r.get("conclusion", "-")))')"
+            IFS='|' read -r run_id status conclusion <<< "$state"
+            if [[ "$run_id" == "-" ]]; then
+              sleep 10
+              continue
+            fi
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "Validate run $run_id passed for $candidate_sha"
+                exit 0
+              fi
+              echo "Validate run $run_id completed with conclusion: $conclusion" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "No completed Validate run found for $candidate_sha within the release gate window." >&2
+          exit 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Validate release helper syntax
+        run: |
+          python3 -m py_compile scripts/google-play-internal.py
+          bash -n scripts/build-android-aab.sh
+          bash -n scripts/build-phone-test-release.sh
+          test "$(bash scripts/build-phone-test-release.sh derive-version-name 1.0.0 34)" = "1.0.34"
+
+      - name: Authenticate to Google Play for version resolution
+        id: play-auth-version
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+
+      - name: Resolve next Play version identity
+        id: play-version
+        env:
+          GOOGLE_PLAY_ACCESS_TOKEN: ${{ steps.play-auth-version.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_code="$(python3 scripts/google-play-internal.py next-version-code --package "$PLAY_PACKAGE_NAME")"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+
+          base_version_name="$(sed -n 's/^versionName=//p' apps/local-llm-phone-test/version.properties | tail -n 1)"
+          version_name="$(bash scripts/build-phone-test-release.sh derive-version-name "$base_version_name" "$version_code")"
+
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "Play release identity: versionCode=$version_code versionName=$version_name"
+
+      - name: Restore protected upload keystore
+        env:
+          ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_UPLOAD_KEYSTORE_B64"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/play-upload.p12"
+          chmod 600 "$RUNNER_TEMP/play-upload.p12"
+
+      - name: Build signed release AAB
+        env:
+          PLAY_VERSION_CODE: ${{ steps.play-version.outputs.version_code }}
+          PLAY_VERSION_NAME: ${{ steps.play-version.outputs.version_name }}
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE: ${{ runner.temp }}/play-upload.p12
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_ALIAS: ${{ vars.ANDROID_UPLOAD_KEY_ALIAS || 'local-llm-phone-test-upload' }}
+          LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD || secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+        run: bash scripts/build-android-aab.sh build
+
+      - name: Verify signed AAB
+        run: jarsigner -verify apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
+
+      - name: Refresh Google Play authentication
+        id: play-auth-publish
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+
+      - name: Publish to Internal Testing
+        env:
+          GOOGLE_PLAY_ACCESS_TOKEN: ${{ steps.play-auth-publish.outputs.access_token }}
+          PLAY_VERSION_CODE: ${{ steps.play-version.outputs.version_code }}
+          PLAY_VERSION_NAME: ${{ steps.play-version.outputs.version_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="$(git rev-parse --short=12 HEAD)"
+          python3 scripts/google-play-internal.py publish \
+            --package "$PLAY_PACKAGE_NAME" \
+            --aab apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab \
+            --track "$PLAY_TRACK" \
+            --release-name "dev-${short_sha}-vn${PLAY_VERSION_NAME}-vc${PLAY_VERSION_CODE}" \
+            --expected-version-code "$PLAY_VERSION_CODE"
+
+      - name: Upload released AAB as bounded CI evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: play-internal-phone-test-${{ steps.play-version.outputs.version_name }}-vc${{ steps.play-version.outputs.version_code }}
+          path: apps/local-llm-phone-test/build/outputs/bundle/release/local-llm-phone-test-release.aab
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

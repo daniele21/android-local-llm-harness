@@ -18,6 +18,8 @@ internal enum class HarnessDiagnosticAction {
     BENCHMARK_CAPTURE,
 }
 
+internal data class HarnessDiagnosticActionToken(val action: HarnessDiagnosticAction, val generation: Long)
+
 internal data class PlaygroundPresetOption(
     val id: String,
     val profileId: Qwen35GenerationProfileId,
@@ -86,11 +88,12 @@ internal data class HarnessUiState(
     val operationStatus: String = "Ready",
     val playground: PlaygroundState = PlaygroundState(),
     val diagnostics: DiagnosticsUiState = DiagnosticsUiState(null, emptyList(), emptyList()),
+    val resourceHistory: DiagnosticsResourceHistoryUi = DiagnosticsResourceHistoryUi(),
     val benchmark: BenchmarkUiState = BenchmarkUiState(),
     val logFilter: DiagnosticsLogFilter = DiagnosticsLogFilter(),
     val logs: DiagnosticsLogUiState = DiagnosticsLogUiState(),
     val selectedRequestTimeline: DiagnosticsRequestTimelineUi? = null,
-    val diagnosticsSection: DiagnosticsSection = DiagnosticsSection.HEALTH,
+    val diagnosticsSection: DiagnosticsSection = DiagnosticsSection.OVERVIEW,
     val playgroundPrompt: String = DEFAULT_PROMPT,
     val playgroundMaxTokens: String = DEFAULT_MAX_OUTPUT_TOKENS,
     val playgroundTemperature: String = DEFAULT_TEMPERATURE,
@@ -192,6 +195,8 @@ internal sealed interface HarnessUiEvent {
 
     data class DiagnosticsChanged(val state: DiagnosticsUiState) : Diagnostics
 
+    data class ResourceHistoryChanged(val state: DiagnosticsResourceHistoryUi) : Diagnostics
+
     data class BenchmarkChanged(val state: BenchmarkUiState) : Diagnostics
 
     data class LogFilterChanged(val filter: DiagnosticsLogFilter, val state: DiagnosticsLogUiState) : Diagnostics
@@ -288,7 +293,7 @@ internal object HarnessUiReducer {
 
         is HarnessUiEvent.ReportChanged -> state.copy(
             latestReport = event.report,
-            operationStatus = "Validation completed",
+            operationStatus = if (event.report.isBlank()) state.operationStatus else "Validation completed",
         )
 
         is HarnessUiEvent.OperationStatusChanged -> state.copy(operationStatus = event.status)
@@ -347,6 +352,8 @@ internal object HarnessUiReducer {
         )
 
         is HarnessUiEvent.DiagnosticsChanged -> state.copy(diagnostics = event.state)
+
+        is HarnessUiEvent.ResourceHistoryChanged -> state.copy(resourceHistory = event.state)
 
         is HarnessUiEvent.BenchmarkChanged -> state.copy(benchmark = event.state)
 

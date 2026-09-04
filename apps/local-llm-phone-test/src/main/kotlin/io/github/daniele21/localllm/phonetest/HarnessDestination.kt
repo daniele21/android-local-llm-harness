@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
@@ -38,22 +37,25 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-internal enum class HarnessDestination(val route: String, val label: String) {
+internal enum class HarnessDestination(val route: String, val label: String, val compactLabel: String = label) {
     OVERVIEW("overview", "Overview"),
     PLAYGROUND("playground", "Playground"),
+    APPS("applications", "Apps"),
+    PERFORMANCE("performance", "Performance", "Perf"),
     MODELS("models", "Models"),
-    DIAGNOSTICS("diagnostics", "Diagnostics"),
+    DIAGNOSTICS("diagnostics", "Diagnostics", "Diag"),
     SETTINGS("settings", "Settings"),
     ;
 
     companion object {
-        val main = listOf(OVERVIEW, PLAYGROUND, MODELS, DIAGNOSTICS)
+        val main = listOf(OVERVIEW, PLAYGROUND, APPS, PERFORMANCE, MODELS)
 
         fun fromRoute(route: String?): HarnessDestination = entries.firstOrNull { it.route == route } ?: OVERVIEW
     }
@@ -62,6 +64,8 @@ internal enum class HarnessDestination(val route: String, val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -> Unit, onNavigateBack: () -> Unit) {
+    val appName = stringResource(R.string.app_name)
+    val appSubtitle = stringResource(R.string.app_surface_subtitle)
     TopAppBar(
         modifier = Modifier.testTag("harnessTopBar"),
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -69,7 +73,7 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
             if (destination == HarnessDestination.SETTINGS) {
                 IconButton(
                     onClick = onNavigateBack,
-                    modifier = Modifier.semantics { contentDescription = "Back to Harness" },
+                    modifier = Modifier.semantics { contentDescription = "Back to $appName" },
                 ) {
                     HarnessDestinationIcon(HarnessDestination.OVERVIEW, selected = false, backArrow = true)
                 }
@@ -80,7 +84,7 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
                 Column {
                     Text("Settings", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Brand",
+                        "Preferences and local controls",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -88,15 +92,15 @@ internal fun HarnessTopBar(destination: HarnessDestination, onOpenSettings: () -
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
-                        painter = painterResource(R.drawable.harness_launcher_foreground),
+                        painter = painterResource(R.drawable.harness_launcher_symbol),
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
                     )
                     Spacer(Modifier.width(4.dp))
                     Column {
-                        Text("Harness", style = MaterialTheme.typography.titleLarge)
+                        Text(appName, style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Local AI Console",
+                            appSubtitle,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -134,6 +138,7 @@ internal fun HarnessBottomBar(destination: HarnessDestination, onNavigate: (Harn
                             .weight(1f)
                             .fillMaxHeight()
                             .testTag("nav-${item.route}")
+                            .semantics { contentDescription = item.label }
                             .selectable(
                                 selected = selected,
                                 role = Role.Tab,
@@ -147,7 +152,7 @@ internal fun HarnessBottomBar(destination: HarnessDestination, onNavigate: (Harn
                         ) {
                             HarnessDestinationIcon(item, selected = selected, modifier = Modifier.size(18.dp))
                             Text(
-                                item.label,
+                                item.compactLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 color = color,
@@ -228,73 +233,116 @@ internal fun HarnessDestinationIcon(
             drawLine(color, Offset(width * 0.28f, height * 0.5f), Offset(width * 0.76f, height * 0.82f), stroke.width)
             return@Canvas
         }
-        when (destination) {
-            HarnessDestination.OVERVIEW -> {
-                val path = Path().apply {
-                    moveTo(width * 0.14f, height * 0.48f)
-                    lineTo(width * 0.5f, height * 0.16f)
-                    lineTo(width * 0.86f, height * 0.48f)
-                    moveTo(width * 0.24f, height * 0.42f)
-                    lineTo(width * 0.24f, height * 0.84f)
-                    lineTo(width * 0.76f, height * 0.84f)
-                    lineTo(width * 0.76f, height * 0.42f)
-                }
-                drawPath(path, color, style = stroke)
-            }
+        drawHarnessDestinationGlyph(destination = destination, color = color, stroke = stroke)
+    }
+}
 
-            HarnessDestination.PLAYGROUND -> {
-                drawCircle(color, radius = width * 0.38f, style = stroke)
-                val play = Path().apply {
-                    moveTo(width * 0.43f, height * 0.35f)
-                    lineTo(width * 0.69f, height * 0.5f)
-                    lineTo(width * 0.43f, height * 0.65f)
-                    close()
-                }
-                drawPath(play, color)
+private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestination, color: Color, stroke: Stroke) {
+    val width = size.width
+    val height = size.height
+    when (destination) {
+        HarnessDestination.OVERVIEW -> {
+            val path = Path().apply {
+                moveTo(width * 0.14f, height * 0.48f)
+                lineTo(width * 0.5f, height * 0.16f)
+                lineTo(width * 0.86f, height * 0.48f)
+                moveTo(width * 0.24f, height * 0.42f)
+                lineTo(width * 0.24f, height * 0.84f)
+                lineTo(width * 0.76f, height * 0.84f)
+                lineTo(width * 0.76f, height * 0.42f)
             }
-
-            HarnessDestination.MODELS -> {
-                val hexagon = Path().apply {
-                    moveTo(width * 0.5f, height * 0.12f)
-                    lineTo(width * 0.84f, height * 0.31f)
-                    lineTo(width * 0.84f, height * 0.69f)
-                    lineTo(width * 0.5f, height * 0.88f)
-                    lineTo(width * 0.16f, height * 0.69f)
-                    lineTo(width * 0.16f, height * 0.31f)
-                    close()
-                }
-                drawPath(hexagon, color, style = stroke)
-                drawLine(color, Offset(width * 0.5f, height * 0.12f), Offset(width * 0.5f, height * 0.88f), stroke.width)
-            }
-
-            HarnessDestination.DIAGNOSTICS -> {
-                val pulse = Path().apply {
-                    moveTo(width * 0.08f, height * 0.56f)
-                    lineTo(width * 0.28f, height * 0.56f)
-                    lineTo(width * 0.4f, height * 0.3f)
-                    lineTo(width * 0.58f, height * 0.75f)
-                    lineTo(width * 0.7f, height * 0.48f)
-                    lineTo(width * 0.92f, height * 0.48f)
-                }
-                drawPath(pulse, color, style = stroke)
-            }
-
-            HarnessDestination.SETTINGS -> {
-                drawCircle(color, radius = width * 0.24f, style = stroke)
-                drawCircle(color, radius = width * 0.07f, style = stroke)
-                listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
-                    val radians = Math.toRadians(degrees.toDouble())
-                    val inner = Offset(
-                        x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
-                        y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
-                    )
-                    val outer = Offset(
-                        x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
-                        y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
-                    )
-                    drawLine(color, inner, outer, stroke.width)
-                }
-            }
+            drawPath(path, color, style = stroke)
         }
+
+        HarnessDestination.PLAYGROUND -> {
+            drawCircle(color, radius = width * 0.38f, style = stroke)
+            val play = Path().apply {
+                moveTo(width * 0.43f, height * 0.35f)
+                lineTo(width * 0.69f, height * 0.5f)
+                lineTo(width * 0.43f, height * 0.65f)
+                close()
+            }
+            drawPath(play, color)
+        }
+
+        HarnessDestination.APPS -> drawAppsGlyph(color, stroke)
+
+        HarnessDestination.PERFORMANCE -> {
+            drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)
+            drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.88f, height * 0.78f), stroke.width)
+            val chart = Path().apply {
+                moveTo(width * 0.22f, height * 0.68f)
+                lineTo(width * 0.4f, height * 0.5f)
+                lineTo(width * 0.57f, height * 0.58f)
+                lineTo(width * 0.82f, height * 0.28f)
+            }
+            drawPath(chart, color, style = stroke)
+        }
+
+        HarnessDestination.MODELS -> {
+            val hexagon = Path().apply {
+                moveTo(width * 0.5f, height * 0.12f)
+                lineTo(width * 0.84f, height * 0.31f)
+                lineTo(width * 0.84f, height * 0.69f)
+                lineTo(width * 0.5f, height * 0.88f)
+                lineTo(width * 0.16f, height * 0.69f)
+                lineTo(width * 0.16f, height * 0.31f)
+                close()
+            }
+            drawPath(hexagon, color, style = stroke)
+            drawLine(color, Offset(width * 0.5f, height * 0.12f), Offset(width * 0.5f, height * 0.88f), stroke.width)
+        }
+
+        HarnessDestination.DIAGNOSTICS -> {
+            val pulse = Path().apply {
+                moveTo(width * 0.08f, height * 0.56f)
+                lineTo(width * 0.28f, height * 0.56f)
+                lineTo(width * 0.4f, height * 0.3f)
+                lineTo(width * 0.58f, height * 0.75f)
+                lineTo(width * 0.7f, height * 0.48f)
+                lineTo(width * 0.92f, height * 0.48f)
+            }
+            drawPath(pulse, color, style = stroke)
+        }
+
+        HarnessDestination.SETTINGS -> drawSettingsGlyph(color, stroke)
+    }
+}
+
+private fun DrawScope.drawAppsGlyph(color: Color, stroke: Stroke) {
+    val width = size.width
+    val height = size.height
+    listOf(0.32f, 0.68f).forEach { row ->
+        drawCircle(
+            color = color,
+            radius = width * 0.08f,
+            center = Offset(width * 0.22f, height * row),
+            style = stroke,
+        )
+        drawLine(
+            color = color,
+            start = Offset(width * 0.42f, height * row),
+            end = Offset(width * 0.86f, height * row),
+            strokeWidth = stroke.width,
+        )
+    }
+}
+
+private fun DrawScope.drawSettingsGlyph(color: Color, stroke: Stroke) {
+    val width = size.width
+    val height = size.height
+    drawCircle(color, radius = width * 0.24f, style = stroke)
+    drawCircle(color, radius = width * 0.07f, style = stroke)
+    listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { degrees ->
+        val radians = Math.toRadians(degrees.toDouble())
+        val inner = Offset(
+            x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.33f,
+            y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.33f,
+        )
+        val outer = Offset(
+            x = width * 0.5f + kotlin.math.cos(radians).toFloat() * width * 0.43f,
+            y = height * 0.5f + kotlin.math.sin(radians).toFloat() * height * 0.43f,
+        )
+        drawLine(color, inner, outer, stroke.width)
     }
 }

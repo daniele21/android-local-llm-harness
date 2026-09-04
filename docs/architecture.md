@@ -5,7 +5,7 @@ Document type: architecture
 Owner: repository
 Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-18
 
 ![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, runtime and model boundaries, observability, and future shared host](assets/architecture.png)
 
@@ -26,12 +26,24 @@ Native app / Capacitor plugin
       |       |
       |    Model store
       |       |
-      +--- llama.cpp JNI ---> GGUF
+      |  verified StoredModel
+      |       |
+      |  BackendModelSource
+      |       |
+      +--> Backend SPI
+              |
+       llama.cpp adapter
+              |
+          JNI / C++ ---> GGUF
 ```
 
-The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change.
+The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change. The future deployment and workstream routing are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
 
-Runtime orchestration depends only on `observability/contracts`. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+Runtime orchestration depends on `core:backend-spi` for backend-neutral execution operations and on `observability/contracts` for telemetry. It does not depend on a concrete inference backend. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+
+The Harness Host Control Plane follows the same isolation rule: platform-neutral application/use-case/preset/binding contracts live in `models/model-profile`, while durable Android persistence lives in `models/control-plane-room-store`. Runtime/model-loading code consumes resolved control-plane identity through contracts and does not depend directly on Room.
+
+The backend SPI is store-neutral. Runtime/model-store code resolves and verifies an installed artifact, then adapts it to `BackendModelSource` immediately before loading. Backend implementations do not own installation, integrity policy or model selection. This dependency boundary is recorded in [ADR 0014](adr/0014-backend-spi-boundary.md).
 
 ## Product support envelope
 
@@ -90,6 +102,8 @@ The `local-llm-console` application is the initial developer control plane. It w
 - benchmark history;
 - privacy-safe diagnostic export.
 
+Harness-managed application/use-case configuration has one durable persistence boundary. `models/model-profile` owns the neutral domain and `HostControlPlaneStore` contract; `models/control-plane-room-store` owns the Android Room adapter for registered applications, revisioned use cases, revisioned presets, revisioned bindings and exact preset exposure. Configuration replacement is transactional, and persisted preset execution policy includes the configured cache/residency settings without moving runtime resource ownership into the store.
+
 During the embedded phase, apps will expose a signature-protected diagnostics bridge. In the shared phase, the console will query the central host directly.
 
 A Room database stored in one embedded application's private directory is not directly readable by the separate console application. The Room repository establishes persistence and query semantics now; cross-application viewing remains dependent on the protected diagnostics bridge planned for the integration phase.
@@ -104,6 +118,8 @@ Its instrumentation tests use the production implementations of:
 FileSystemModelStore
         |
 RuntimeOrchestrator
+        |
+Backend SPI
         |
 LlamaCppInferenceBackend
         |
@@ -157,8 +173,13 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - Prompt/output persistence is disabled by default.
 - Telemetry failures are non-fatal to inference.
 - Native handles are never exposed outside the backend module.
+- Runtime core never selects or imports a concrete backend implementation.
+- Backend implementations never own model-store integrity, installation or selection policy.
 - Large payloads will not cross the future Binder boundary inline.
-- State mutations and backend-handle ownership changes are serialized by the runtime orchestrator.
+- Physical backend operations and lifecycle transitions are serialized by `RuntimeOrchestrator`; lifecycle-specific state/handle ownership remains with the explicit owner below.
+- Per-session request admission, close intent and release reservation are owned by `SessionLifecycle`; the session descriptor is the single context-handle owner and `RuntimeOrchestrator` serializes physical context creation/release.
+- Per-generation cancellation intent and terminal-once delivery are owned by `GenerationLifecycle`; `SingleDecodeScheduler` remains authoritative for queued and active decode state.
+- Physical model residency state and the single resident model handle are owned by `ModelResidencyLifecycle`; `ModelStore` owns installation/integrity, memory policy decides admission/eviction demand, and `RuntimeOrchestrator` serializes native load/unload calls around the residency transitions.
 - Cancellation and partial failures must leave the runtime recoverable.
 
 ## Modularity and maintainability
@@ -168,38 +189,61 @@ The codebase must remain modular, extensible and independently testable without 
 Dependencies follow this direction:
 
 ```text
-apps / integrations
+apps / integrations / composition roots
         |
      transports
         |
- core contracts + runtime orchestration
+ core contracts + runtime-core
+        |              \
+        |               +--> model-profile + model-store + observability contracts
         |
- model profiles + model store + observability contracts
+ core/backend-spi
         |
- backend interfaces
+ concrete backend implementations
         |
- llama.cpp Kotlin bridge / JNI / C++ implementation
+ llama.cpp Kotlin bridge / JNI / C++
 ```
 
-Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
+Control-plane persistence is a one-way Android adapter dependency:
+
+```text
+models/control-plane-room-store
+        |
+models/model-profile
+        |
+core/contracts
+```
+
+Runtime core depends inward on the backend SPI. Concrete backends depend on the SPI and are selected only by composition roots; runtime core does not depend outward on them. Higher layers may depend on lower-level contracts. Lower layers must not import application UI, Capacitor adapters or other product-specific integrations.
 
 The main ownership boundaries are:
 
 ```text
 core/contracts
-    public contracts and backend-independent DTOs
+    public application/consumer contracts and backend-independent DTOs
+
+core/backend-spi
+    internal backend-neutral model-source, capability, prompt, context,
+    generation, cancellation and backend-error contracts
 
 core/runtime-core
-    orchestration, sessions, scheduling, lifecycle and telemetry emission
+    orchestration, model verification/adaptation, sessions, scheduling,
+    explicit session/generation/model-residency lifecycle ownership,
+    recovery policy and telemetry emission
 
 models/model-profile
-    model, use-case and application binding configuration
+    model, use-case and application binding configuration plus the
+    platform-neutral Host Control Plane store contract
+
+models/control-plane-room-store
+    Android Room persistence for Harness applications, revisioned use cases,
+    revisioned presets, revisioned bindings and exact preset exposure
 
 models/model-store
     artifact storage, identity and integrity
 
 backends/llama-cpp
-    Kotlin/JNI/C++ implementation specific to llama.cpp
+    InferenceBackend implementation plus Kotlin/JNI/C++ llama.cpp adaptation
 
 observability/contracts
     stable telemetry, log, health, retention and query contracts
@@ -211,13 +255,13 @@ observability/room-store
     Android Room schema, persistence, retention and database lifecycle
 
 transports
-    in-process communication now and Binder later
+    in-process and Binder communication; no runtime policy ownership
 
 integrations
     thin native Android and Capacitor adapters
 
 apps
-    developer console, sample applications and isolated device validation surfaces
+    composition roots, developer surfaces and isolated device validation
 ```
 
 A new module is justified only when it owns a real responsibility, creates a necessary dependency boundary, provides actual reuse, isolates a platform or third-party dependency, or needs an independent testing/release boundary.

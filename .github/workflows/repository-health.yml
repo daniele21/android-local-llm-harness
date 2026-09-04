@@ -1,0 +1,56 @@
+name: Repository health
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-health-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engineering-baseline:
+    name: Engineering baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify no generated build artifacts are tracked
+        run: python3 scripts/verify_no_tracked_generated_artifacts.py
+      - name: Verify repo-template-sw repository baseline
+        run: python3 scripts/verify_repository.py
+      - name: Verify repo-template-sw operating contract
+        run: python3 scripts/verify_operations.py
+      - name: Verify E2E environment contract
+        run: python3 scripts/verify_e2e.py
+      - name: Verify product experience contract
+        run: python3 scripts/verify_product_experience.py
+      - name: Verify Harness agent navigation
+        run: python3 scripts/verify-agent-navigation.py
+      - name: Verify documentation policy mirror
+        run: cmp .engineering/documentation-policy.json docs/documentation-policy.json
+      - name: Verify documentation lifecycle
+        env:
+          DOCS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 scripts/test_verify_docs.py
+          python3 scripts/verify-docs.py --base "$DOCS_BASE_SHA"
+      - name: Verify repository scripts remain parseable
+        run: |
+          python3 -m py_compile scripts/*.py
+          bash -n scripts/run-llrt6-physical-evidence.sh
+          bash -n scripts/run-llrt9-width4-diagnostic.sh
+          bash -n scripts/run-qwen35-lifecycle-acceptance.sh
+          python3 scripts/test_package_artifact_metadata.py
+          python3 scripts/test_verify_no_tracked_generated_artifacts.py
+          python3 scripts/test_llrt6_physical_evidence.py
+          python3 scripts/test_llrt9_width4_diagnostic.py
+          python3 scripts/test_qwen35_lifecycle_acceptance.py
+      - name: Verify clean diff semantics
+        run: git diff --check
