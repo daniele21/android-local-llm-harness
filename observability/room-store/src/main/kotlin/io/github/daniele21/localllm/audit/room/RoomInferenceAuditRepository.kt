@@ -24,9 +24,12 @@ import io.github.daniele21.localllm.contracts.ModelLoadKind
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.UseCaseId
+import java.io.IOException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -182,14 +185,18 @@ class RoomInferenceAuditRepository internal constructor(
         if (candidate.encryptedContentBytes > retention.maxEncryptedContentBytes) return false
 
         while (projectedCount > retention.maxRecords || projectedBytes > retention.maxEncryptedContentBytes) {
-            val oldestTerminalId = dao.oldestTerminalRequestIds(1).firstOrNull() ?: return false
-            if (oldestTerminalId == candidate.requestId) return false
-            val evicted = dao.find(oldestTerminalId) ?: return false
-            if (dao.deleteByRequestId(oldestTerminalId) == 0) return false
+            val evictedBytes = evictOldestTerminal(candidate.requestId) ?: return false
             projectedCount -= 1
-            projectedBytes -= evicted.encryptedContentBytes
+            projectedBytes -= evictedBytes
         }
         return true
+    }
+
+    private fun evictOldestTerminal(protectedRequestId: String): Long? {
+        val oldestTerminalId = dao.oldestTerminalRequestIds(1).firstOrNull() ?: return null
+        if (oldestTerminalId == protectedRequestId) return null
+        val evicted = dao.find(oldestTerminalId) ?: return null
+        return if (dao.deleteByRequestId(oldestTerminalId) > 0) evicted.encryptedContentBytes else null
     }
 
     private fun decodeRecord(entity: InferenceAuditEntities.InferenceAuditEntity): InferenceAuditRecord = try {
@@ -224,7 +231,11 @@ class RoomInferenceAuditRepository internal constructor(
         )
     } catch (error: InferenceAuditCipherException) {
         throw error
-    } catch (error: RuntimeException) {
+    } catch (error: IllegalArgumentException) {
+        throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
+    } catch (error: IllegalStateException) {
+        throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
+    } catch (error: IOException) {
         throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
     }
 
@@ -288,7 +299,7 @@ class RoomInferenceAuditRepository internal constructor(
             runningAtEpochMs = record.runningAtEpochMs
             completedAtEpochMs = record.terminal?.completedAtEpochMs
             record.prepared?.execution?.let { execution ->
-                modelDigest = execution.modelDigest.value
+                modelDigest = execution.modelDigest.sha256
                 modelLoadKind = execution.modelLoadKind.name
                 presetId = execution.presetId
                 presetVersion = execution.presetVersion
@@ -339,7 +350,9 @@ class RoomInferenceAuditRepository internal constructor(
             totalMs = entity.totalMs,
             decodeTokensPerSecond = entity.decodeTokensPerSecond,
         )
-    } catch (error: RuntimeException) {
+    } catch (error: IllegalArgumentException) {
+        throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
+    } catch (error: IllegalStateException) {
         throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
     }
 
@@ -352,7 +365,9 @@ class RoomInferenceAuditRepository internal constructor(
             InferenceAuditResult.Failure(InferenceAuditFailureCode.STORAGE_FAILURE)
         } catch (error: ExecutionException) {
             failureFor(error.cause ?: error)
-        } catch (error: RuntimeException) {
+        } catch (error: RejectedExecutionException) {
+            failureFor(error)
+        } catch (error: CancellationException) {
             failureFor(error)
         }
     }
