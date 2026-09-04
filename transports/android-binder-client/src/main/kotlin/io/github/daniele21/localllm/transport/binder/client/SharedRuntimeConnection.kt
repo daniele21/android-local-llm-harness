@@ -191,13 +191,26 @@ internal class SharedRuntimeConnection(
     }
 
     private fun connectionLost(detail: String, epoch: Long) {
-        val invalidated = synchronized(lock) {
-            if (epoch != connectionEpoch || current.state == SharedRuntimeConnectionState.CLOSED) return
-            registeredEndpoint.also { registeredEndpoint = null }
+        val lost = synchronized(lock) {
+            if (
+                epoch != connectionEpoch ||
+                current.state == SharedRuntimeConnectionState.CLOSED ||
+                current.state == SharedRuntimeConnectionState.CONNECTION_LOST
+            ) {
+                return
+            }
+            val endpoint = registeredEndpoint
+            registeredEndpoint = null
+            val snapshot =
+                SharedRuntimeConnectionSnapshot(
+                    state = SharedRuntimeConnectionState.CONNECTION_LOST,
+                    detail = detail,
+                ).also { current = it }
+            ConnectionLoss(endpoint, snapshot)
         }
+        lost.endpoint?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
         binding.unbind()
-        transitionForEpoch(epoch, SharedRuntimeConnectionState.CONNECTION_LOST, detail = detail)
-        invalidated?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
+        runCatching { observer.onStateChanged(lost.snapshot) }
     }
 
     private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
@@ -230,6 +243,8 @@ internal class SharedRuntimeConnection(
         }
         runCatching { observer.onStateChanged(snapshot) }
     }
+
+    private data class ConnectionLoss(val endpoint: RegisteredSharedRuntimeEndpoint?, val snapshot: SharedRuntimeConnectionSnapshot)
 
     companion object {
         fun create(
@@ -349,7 +364,12 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
                 if (proxy == null) {
                     callbacks.onDisconnected()
                 } else {
-                    callbacks.onConnected(AidlSharedRuntimeRemoteService(proxy))
+                    callbacks.onConnected(
+                        AidlSharedRuntimeRemoteService(
+                            delegate = proxy,
+                            onTransportFailure = { callbacks.onDisconnected() },
+                        ),
+                    )
                 }
             }
 

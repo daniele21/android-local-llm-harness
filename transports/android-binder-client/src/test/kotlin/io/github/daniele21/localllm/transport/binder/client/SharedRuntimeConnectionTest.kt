@@ -115,6 +115,27 @@ class SharedRuntimeConnectionTest {
     }
 
     @Test
+    fun `disconnect publishes connection lost before unbinding old endpoint`() {
+        val binding = FakeBinding()
+        val service = FakeSharedRuntimeRemoteService()
+        lateinit var connection: SharedRuntimeConnection
+        var stateAtUnbind: SharedRuntimeConnectionState? = null
+        var endpointMissingAtUnbind = false
+        binding.onUnbind = {
+            stateAtUnbind = connection.snapshot.state
+            endpointMissingAtUnbind = connection.endpoint == null
+        }
+        connection = SharedRuntimeConnection(host, hello, binding)
+
+        connection.connect()
+        binding.connectHost(service)
+        binding.disconnectHost()
+
+        assertEquals(SharedRuntimeConnectionState.CONNECTION_LOST, stateAtUnbind)
+        assertTrue(endpointMissingAtUnbind)
+    }
+
+    @Test
     fun `late registration from old connection cannot replace reconnected endpoint`() {
         val binding = FakeBinding()
         var delayedRegistration: ((RegistrationResultParcel) -> Unit)? = null
@@ -233,6 +254,7 @@ class SharedRuntimeConnectionTest {
     ) : SharedRuntimeBinding {
         var bindCalls = 0
         var unbindCalls = 0
+        var onUnbind: (() -> Unit)? = null
         private var activeCallbacks: SharedRuntimeBindingCallbacks? = null
         private val callbackHistory = mutableListOf<SharedRuntimeBindingCallbacks>()
 
@@ -249,6 +271,7 @@ class SharedRuntimeConnectionTest {
 
         override fun unbind() {
             unbindCalls += 1
+            onUnbind?.invoke()
             activeCallbacks = null
         }
 

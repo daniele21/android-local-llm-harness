@@ -1,4 +1,4 @@
-name: Build shared-runtime emulator host
+name: Build shared-runtime emulator candidate
 
 on:
   workflow_call:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build-emulator-host:
-    name: Build exact emulator host APK
+    name: Build exact emulator Host + Consumer SDK
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -75,19 +75,39 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-configuration-cache :apps:local-llm-phone-test:assembleEmulatorE2e
 
-      - name: Stage bounded emulator host artifact
+      - name: Publish exact Consumer SDK candidate
+        shell: bash
+        env:
+          CONSUMER_SDK_VERSION: 0.1.0-e2e.${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify-consumer-sdk-publication.sh
+          printf '%s\n' "$CONSUMER_SDK_VERSION" > "$RUNNER_TEMP/consumer-sdk-version.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/consumer-sdk-source-revision.txt"
+
+      - name: Stage bounded emulator candidate artifact
         shell: bash
         run: |
           set -euo pipefail
           host_apk="$(find apps/local-llm-phone-test/build/outputs/apk -type f -name '*.apk' -path '*emulatorE2e*' | head -n 1)"
           test -f "$host_apk"
+          test -d build/consumer-sdk-repository/io/github/daniele21/localllm
+          test -s build/consumer-sdk-repository/build-manifest.txt
+          test -s build/consumer-sdk-repository/SHA256SUMS
+          cmp -s "$RUNNER_TEMP/harness-source-revision.txt" "$RUNNER_TEMP/consumer-sdk-source-revision.txt"
+
           mkdir -p "$RUNNER_TEMP/harness-emulator-host"
           cp "$host_apk" "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk"
           cp "$RUNNER_TEMP/harness-source-revision.txt" "$RUNNER_TEMP/harness-emulator-host/source-revision.txt"
+          cp "$RUNNER_TEMP/consumer-sdk-version.txt" "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-version.txt"
+          cp "$RUNNER_TEMP/consumer-sdk-source-revision.txt" \
+            "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-source-revision.txt"
+          cp -R build/consumer-sdk-repository \
+            "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-repository"
           sha256sum "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk" \
             > "$RUNNER_TEMP/harness-emulator-host/apk-sha256.txt"
 
-      - name: Upload emulator host APK
+      - name: Upload emulator candidate
         uses: actions/upload-artifact@v7
         with:
           name: shared-runtime-emulator-host

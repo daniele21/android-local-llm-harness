@@ -39,7 +39,7 @@ data class AuthorizedClientPolicy(
 data class CallingProcess(val uid: Int, val pid: Int) {
     init {
         require(uid >= 0) { "Calling UID must be non-negative" }
-        require(pid > 0) { "Calling PID must be positive" }
+        require(pid >= 0) { "Calling PID must be non-negative" }
     }
 }
 

@@ -1,11 +1,15 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
+import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
+import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
 import io.github.daniele21.localllm.transport.binder.contract.IConsumerLocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.ILocalLlmService
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 import org.junit.Test
 import java.lang.reflect.Proxy
 
@@ -65,6 +69,29 @@ class AidlSharedRuntimeRemoteServiceTest {
         assertEquals(1, consumerApiReads)
     }
 
+    @Test
+    fun `consumer remote exception reports transport loss before propagating`() {
+        val timeline = mutableListOf<String>()
+        val expected = RemoteException("binder died")
+        val service = AidlSharedRuntimeRemoteService(
+            delegate = localLlmWithConsumer(transportFailingConsumer(expected, timeline)),
+            onTransportFailure = { error ->
+                assertSame(expected, error)
+                timeline += "connection-lost"
+            },
+        )
+
+        try {
+            service.consumer.cancel(CancelRequestParcel(ClientTokenParcel("client-token"), "request-id"))
+            fail("Expected RemoteException")
+        } catch (error: RemoteException) {
+            assertSame(expected, error)
+            timeline += "caller"
+        }
+
+        assertEquals(listOf("remote", "connection-lost", "caller"), timeline)
+    }
+
     private fun legacyProtocolInfo() = ProtocolInfoParcel(
         protocolMajor = BinderProtocolV1.MAJOR,
         protocolMinor = 0,
@@ -81,18 +108,42 @@ class AidlSharedRuntimeRemoteServiceTest {
         hostBuildId = "current-host",
     )
 
+    private fun transportFailingConsumer(expected: RemoteException, timeline: MutableList<String>): IConsumerLocalLlmService =
+        consumerProxy { methodName ->
+            when (methodName) {
+                "cancel" -> {
+                    timeline += "remote"
+                    throw expected
+                }
+
+                "asBinder" -> null
+
+                else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
+            }
+        }
+
+    private fun localLlmWithConsumer(consumer: IConsumerLocalLlmService): ILocalLlmService = localLlmProxy { methodName ->
+        when (methodName) {
+            "getConsumerApi" -> consumer
+            "asBinder" -> null
+            else -> throw AssertionError("Unexpected ILocalLlmService call: $methodName")
+        }
+    }
+
     private fun localLlmProxy(handler: (String) -> Any?): ILocalLlmService = Proxy.newProxyInstance(
         ILocalLlmService::class.java.classLoader,
         arrayOf(ILocalLlmService::class.java),
     ) { _, method, _ -> handler(method.name) } as ILocalLlmService
 
-    private fun consumerProxy(): IConsumerLocalLlmService = Proxy.newProxyInstance(
+    private fun consumerProxy(): IConsumerLocalLlmService = consumerProxy { methodName ->
+        when (methodName) {
+            "asBinder" -> null
+            else -> throw AssertionError("Consumer delegate should not be invoked by endpoint construction: $methodName")
+        }
+    }
+
+    private fun consumerProxy(handler: (String) -> Any?): IConsumerLocalLlmService = Proxy.newProxyInstance(
         IConsumerLocalLlmService::class.java.classLoader,
         arrayOf(IConsumerLocalLlmService::class.java),
-    ) { _, method, _ ->
-        when (method.name) {
-            "asBinder" -> null
-            else -> throw AssertionError("Consumer delegate should not be invoked by endpoint construction: ${method.name}")
-        }
-    } as IConsumerLocalLlmService
+    ) { _, method, _ -> handler(method.name) } as IConsumerLocalLlmService
 }

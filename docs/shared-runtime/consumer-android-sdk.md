@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-client
 Canonical scope: shared-runtime.consumer-android-sdk
 Read when: publishing, versioning, validating or consuming the external Android Consumer SDK artifact
-Last reviewed: 2026-09-01
+Last reviewed: 2026-09-04
 
 ## Public dependency
 
@@ -17,7 +17,7 @@ implementation("io.github.daniele21.localllm:consumer-android:<version>")
 
 The publication carries `core-contracts` and the Binder contract transitively. Consumers must not use `project(...)`, composite builds, git submodules or a Harness source checkout.
 
-Current candidate: `0.1.0-alpha.9`.
+Current candidate: `0.1.0-alpha.10`.
 
 ## Published artifacts
 
@@ -80,11 +80,11 @@ Validation generates the current ABI with `scripts/dump-consumer-sdk-abi.sh` and
 
 `.github/workflows/publish-consumer-sdk.yml` owns real publication. It validates external consumption and ABI before publishing all three Maven artifacts to GitHub Packages. A push to `dev` that changes `docs/shared-runtime/consumer-sdk-version.txt` resolves the version from that file; workflow dispatch may provide an explicit version.
 
-For alpha.8 the correct sequence is:
+For the current alpha.10 candidate the correct sequence is:
 
 1. exact-head PR documentation/validation/preflight is green;
 2. merge the owning change to `dev`;
-3. `Publish Consumer Android SDK` validates and publishes `0.1.0-alpha.9` from `dev`;
+3. `Publish Consumer Android SDK` validates and publishes `0.1.0-alpha.10` from `dev`;
 4. downstream apps update their Maven dependency only after publication succeeds.
 
 Do not treat the pull-request `Consumer SDK validation` workflow as package publication: it uses a run-specific `0.1.0-ci.<run_id>` local repository solely to prove external consumption and ABI compatibility.

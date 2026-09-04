@@ -30,6 +30,33 @@ class CallerAuthorizationTest {
     }
 
     @Test
+    fun onewayCallerWithUnavailablePidStillUsesAuthorizedUidPolicy() {
+        val environment = FakeCallerEnvironment(packages = listOf(policy.packageName), acceptedCertificate = digest)
+        val result = authorizer(environment).authorize(CallingProcess(uid = 10001, pid = 0), useCase)
+
+        assertTrue(result is AuthorizationResult.Allowed)
+        assertEquals(0, requireNotNull(environment.lastPermissionProcess).pid)
+        assertEquals(policy.packageName, (result as AuthorizationResult.Allowed).caller.packageName)
+    }
+
+    @Test
+    fun onewayCallerWithUnavailablePidStillRequiresPermission() {
+        val environment =
+            FakeCallerEnvironment(
+                permissionGranted = false,
+                packages = listOf(policy.packageName),
+                acceptedCertificate = digest,
+            )
+
+        assertDenied(
+            AuthorizationFailure.PERMISSION_DENIED,
+            authorizer(environment).authorize(CallingProcess(uid = 10001, pid = 0)),
+        )
+        assertEquals(0, environment.packageLookupCount)
+        assertEquals(0, environment.signerLookupCount)
+    }
+
+    @Test
     fun permissionDenialFailsBeforePackageOrSignerLookup() {
         val environment = FakeCallerEnvironment(permissionGranted = false, packages = listOf(policy.packageName))
 
@@ -93,8 +120,12 @@ class CallerAuthorizationTest {
     ) : CallerEnvironment {
         var packageLookupCount = 0
         var signerLookupCount = 0
+        var lastPermissionProcess: CallingProcess? = null
 
-        override fun hasPermission(permissionName: String, callingProcess: CallingProcess): Boolean = permissionGranted
+        override fun hasPermission(permissionName: String, callingProcess: CallingProcess): Boolean {
+            lastPermissionProcess = callingProcess
+            return permissionGranted
+        }
 
         override fun packagesForUid(uid: Int): List<String> {
             packageLookupCount += 1
