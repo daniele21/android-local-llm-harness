@@ -152,9 +152,10 @@ Today:
 
 - the Android product and control plane are integrated;
 - shared runtime and Consumer/Binder boundaries are implemented and the API 35 cross-application lifecycle/fault/serialization matrix is green;
-- Consumer Android SDK `0.1.0-alpha.10` is published from integrated `dev@6b34fe9fcba70f6b8abd107fd58b61c418ac737d`;
+- Consumer Android SDK `0.1.0-alpha.10` is published from the validated Harnex integration baseline;
 - the corresponding Harnex phone-test is published to Google Play Internal Testing;
-- RedactGuard consumes alpha.10, is integrated on its own `dev`, has green cross-repository automated evidence and has been manually confirmed working end to end on a real Android device;
+- the validated Harnex baseline has been promoted to the stable `main` line through the repository RELEASE/FULL path;
+- RedactGuard consumes alpha.10, has also been promoted to its stable `main`, has green cross-repository automated evidence and has been manually confirmed working end to end on a real Android device;
 - product support is currently curated around Qwen3.5 dense 0.8B and 2B;
 - representative physical-device evidence is still required for formal ARM64/JNI/GGUF, memory, thermal, OEM and selected release claims.
 
