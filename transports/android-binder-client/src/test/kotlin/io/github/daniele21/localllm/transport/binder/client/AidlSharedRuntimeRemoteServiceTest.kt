@@ -73,29 +73,13 @@ class AidlSharedRuntimeRemoteServiceTest {
     fun `consumer remote exception reports transport loss before propagating`() {
         val timeline = mutableListOf<String>()
         val expected = RemoteException("binder died")
-        val consumerDelegate = consumerProxy { methodName ->
-            when (methodName) {
-                "cancel" -> {
-                    timeline += "remote"
-                    throw expected
-                }
-
-                "asBinder" -> null
-
-                else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
-            }
-        }
-        val delegate = localLlmProxy { methodName ->
-            when (methodName) {
-                "getConsumerApi" -> consumerDelegate
-                "asBinder" -> null
-                else -> throw AssertionError("Unexpected ILocalLlmService call: $methodName")
-            }
-        }
-        val service = AidlSharedRuntimeRemoteService(delegate) { error ->
-            assertSame(expected, error)
-            timeline += "connection-lost"
-        }
+        val service = AidlSharedRuntimeRemoteService(
+            delegate = localLlmWithConsumer(transportFailingConsumer(expected, timeline)),
+            onTransportFailure = { error ->
+                assertSame(expected, error)
+                timeline += "connection-lost"
+            },
+        )
 
         try {
             service.consumer.cancel(CancelRequestParcel(ClientTokenParcel("client-token"), "request-id"))
@@ -123,6 +107,30 @@ class AidlSharedRuntimeRemoteServiceTest {
         supportedFeatures = BinderProtocolV1.KNOWN_FEATURES.sorted(),
         hostBuildId = "current-host",
     )
+
+    private fun transportFailingConsumer(
+        expected: RemoteException,
+        timeline: MutableList<String>,
+    ): IConsumerLocalLlmService = consumerProxy { methodName ->
+        when (methodName) {
+            "cancel" -> {
+                timeline += "remote"
+                throw expected
+            }
+
+            "asBinder" -> null
+
+            else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
+        }
+    }
+
+    private fun localLlmWithConsumer(consumer: IConsumerLocalLlmService): ILocalLlmService = localLlmProxy { methodName ->
+        when (methodName) {
+            "getConsumerApi" -> consumer
+            "asBinder" -> null
+            else -> throw AssertionError("Unexpected ILocalLlmService call: $methodName")
+        }
+    }
 
     private fun localLlmProxy(handler: (String) -> Any?): ILocalLlmService = Proxy.newProxyInstance(
         ILocalLlmService::class.java.classLoader,
