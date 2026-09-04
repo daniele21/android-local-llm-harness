@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.transport.binder.client
 
+import android.os.RemoteException
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientHelloParcel
 import io.github.daniele21.localllm.transport.binder.contract.ClientTokenParcel
@@ -35,9 +36,12 @@ import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 import io.github.daniele21.localllm.transport.binder.contract.RegistrationResultParcel
 import io.github.daniele21.localllm.transport.binder.contract.SessionResultParcel
 
-internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmService) : SharedRuntimeRemoteService {
+internal class AidlSharedRuntimeRemoteService(
+    private val delegate: ILocalLlmService,
+    private val onTransportFailure: (RemoteException) -> Unit = {},
+) : SharedRuntimeRemoteService {
     override val consumer: ConsumerSharedRuntimeRemoteService by lazy {
-        AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi)
+        AidlConsumerSharedRuntimeRemoteService(delegate.consumerApi, onTransportFailure)
     }
 
     override fun protocolInfo(): ProtocolInfoParcel = delegate.protocolInfo
@@ -59,103 +63,162 @@ internal class AidlSharedRuntimeRemoteService(private val delegate: ILocalLlmSer
     }
 
     override fun prepare(request: PrepareRequestParcel, callback: (PrepareResultParcel) -> Unit) {
-        delegate.prepare(
-            request,
-            object : IPrepareCallback.Stub() {
-                override fun onResult(result: PrepareResultParcel) = callback(result)
-            },
-        )
+        reportTransportFailure(onTransportFailure) {
+            delegate.prepare(
+                request,
+                object : IPrepareCallback.Stub() {
+                    override fun onResult(result: PrepareResultParcel) = callback(result)
+                },
+            )
+        }
     }
 
     override fun openSession(request: OpenSessionRequestParcel, callback: (SessionResultParcel) -> Unit) {
-        delegate.openSession(
-            request,
-            object : ISessionCallback.Stub() {
-                override fun onResult(result: SessionResultParcel) = callback(result)
-            },
-        )
+        reportTransportFailure(onTransportFailure) {
+            delegate.openSession(
+                request,
+                object : ISessionCallback.Stub() {
+                    override fun onResult(result: SessionResultParcel) = callback(result)
+                },
+            )
+        }
     }
 
-    override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
+    override fun closeSession(request: CloseSessionRequestParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.closeSession(request)
+    }
 
     override fun generate(request: GenerationRequestParcel, callback: (GenerationEventParcel) -> Unit) {
-        delegate.generate(
-            request,
-            object : IGenerationCallback.Stub() {
-                override fun onEvent(event: GenerationEventParcel) = callback(event)
-            },
-        )
+        reportTransportFailure(onTransportFailure) {
+            delegate.generate(
+                request,
+                object : IGenerationCallback.Stub() {
+                    override fun onEvent(event: GenerationEventParcel) = callback(event)
+                },
+            )
+        }
     }
 
-    override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
+    override fun cancel(request: CancelRequestParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.cancel(request)
+    }
 
-    override fun unregisterClient(clientToken: ClientTokenParcel) = delegate.unregisterClient(clientToken)
+    override fun unregisterClient(clientToken: ClientTokenParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.unregisterClient(clientToken)
+    }
 }
 
 /** Mirrors the AIDL Consumer service exactly so wire transactions remain easy to audit. */
 @Suppress("TooManyFunctions")
-private class AidlConsumerSharedRuntimeRemoteService(private val delegate: IConsumerLocalLlmService) : ConsumerSharedRuntimeRemoteService {
+private class AidlConsumerSharedRuntimeRemoteService(
+    private val delegate: IConsumerLocalLlmService,
+    private val onTransportFailure: (RemoteException) -> Unit,
+) : ConsumerSharedRuntimeRemoteService {
     override fun capabilities(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.capabilities(request, resultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.capabilities(request, resultCallback(callback))
+        }
     }
 
     override fun prepare(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.prepare(request, resultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.prepare(request, resultCallback(callback))
+        }
     }
 
     override fun openSession(request: ConsumerRequestParcel, callback: (ConsumerResultParcel) -> Unit) {
-        delegate.openSession(request, resultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.openSession(request, resultCallback(callback))
+        }
     }
 
     override fun generate(request: ConsumerRequestParcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
-        delegate.generate(request, generationCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.generate(request, generationCallback(callback))
+        }
     }
 
     override fun generateV2(request: ConsumerGenerationRequestV2Parcel, callback: (ConsumerGenerationEventParcel) -> Unit) {
-        delegate.generateV2(request, generationCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.generateV2(request, generationCallback(callback))
+        }
     }
 
-    override fun cancel(request: CancelRequestParcel) = delegate.cancel(request)
+    override fun cancel(request: CancelRequestParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.cancel(request)
+    }
 
-    override fun closeSession(request: CloseSessionRequestParcel) = delegate.closeSession(request)
+    override fun closeSession(request: CloseSessionRequestParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.closeSession(request)
+    }
 
     override fun discoverUseCases(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
-        delegate.discoverUseCases(request, controlPlaneResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.discoverUseCases(request, controlPlaneResultCallback(callback))
+        }
     }
 
     override fun discoverPresets(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
-        delegate.discoverPresets(request, controlPlaneResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.discoverPresets(request, controlPlaneResultCallback(callback))
+        }
     }
 
     override fun resolveSetup(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
-        delegate.resolveSetup(request, controlPlaneResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.resolveSetup(request, controlPlaneResultCallback(callback))
+        }
     }
 
     override fun activate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
-        delegate.activate(request, controlPlaneResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.activate(request, controlPlaneResultCallback(callback))
+        }
     }
 
     override fun deactivate(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerControlPlaneResultParcel) -> Unit) {
-        delegate.deactivate(request, controlPlaneResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.deactivate(request, controlPlaneResultCallback(callback))
+        }
     }
 
     override fun runtimeReadiness(request: ConsumerControlPlaneRequestParcel, callback: (ConsumerRuntimeReadinessResultParcel) -> Unit) {
-        delegate.runtimeReadiness(request, runtimeReadinessResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.runtimeReadiness(request, runtimeReadinessResultCallback(callback))
+        }
     }
 
     override fun submitLogicalGeneration(request: ConsumerLogicalJobSubmitParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
-        delegate.submitLogicalGeneration(request, logicalJobResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.submitLogicalGeneration(request, logicalJobResultCallback(callback))
+        }
     }
 
     override fun logicalJobStatus(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
-        delegate.getLogicalJob(request, logicalJobResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.getLogicalJob(request, logicalJobResultCallback(callback))
+        }
     }
 
     override fun logicalJobResult(request: ConsumerLogicalJobQueryParcel, callback: (ConsumerLogicalJobResultParcel) -> Unit) {
-        delegate.getLogicalJobResult(request, logicalJobResultCallback(callback))
+        reportTransportFailure(onTransportFailure) {
+            delegate.getLogicalJobResult(request, logicalJobResultCallback(callback))
+        }
     }
 
-    override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) = delegate.cancelLogicalJob(request)
+    override fun cancelLogicalJob(request: ConsumerLogicalJobQueryParcel) = reportTransportFailure(onTransportFailure) {
+        delegate.cancelLogicalJob(request)
+    }
+}
+
+private inline fun <T> reportTransportFailure(
+    onTransportFailure: (RemoteException) -> Unit,
+    call: () -> T,
+): T = try {
+    call()
+} catch (error: RemoteException) {
+    onTransportFailure(error)
+    throw error
 }
 
 private fun resultCallback(callback: (ConsumerResultParcel) -> Unit): IConsumerResultCallback = object : IConsumerResultCallback.Stub() {
