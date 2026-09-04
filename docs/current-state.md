@@ -69,7 +69,7 @@ Play Internal builds are useful for on-device product/runtime testing, but the c
 
 ### 3. OMBRA and follow-on work
 
-OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/configuration identities against policy v1 without lowering thresholds to fit results. Remaining parallel work includes representative RAM/thermal/device restoration evidence, model evaluation and the LLUP upgrade stream where ownership does not conflict.
+OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/configuration identities against policy v1 without lowering thresholds to fit results. Remaining parallel work includes representative RAM/thermal/device restoration evidence, model evaluation and the [LLUP residency-qualification workstream](workstreams/llama-cpp-v0-3-residency-qualification.md) where ownership does not conflict.
 
 ## Immediate next block
 
@@ -89,4 +89,5 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
+- LLUP / llama.cpp residency qualification: [`workstreams/llama-cpp-v0-3-residency-qualification.md`](workstreams/llama-cpp-v0-3-residency-qualification.md)
 - Harnex 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
