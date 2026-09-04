@@ -191,7 +191,7 @@ internal class SharedRuntimeConnection(
     }
 
     private fun connectionLost(detail: String, epoch: Long) {
-        val invalidated = synchronized(lock) {
+        val lost = synchronized(lock) {
             if (
                 epoch != connectionEpoch ||
                 current.state == SharedRuntimeConnectionState.CLOSED ||
@@ -199,11 +199,18 @@ internal class SharedRuntimeConnection(
             ) {
                 return
             }
-            registeredEndpoint.also { registeredEndpoint = null }
+            val endpoint = registeredEndpoint
+            registeredEndpoint = null
+            val snapshot =
+                SharedRuntimeConnectionSnapshot(
+                    state = SharedRuntimeConnectionState.CONNECTION_LOST,
+                    detail = detail,
+                ).also { current = it }
+            ConnectionLoss(endpoint, snapshot)
         }
+        lost.endpoint?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
         binding.unbind()
-        transitionForEpoch(epoch, SharedRuntimeConnectionState.CONNECTION_LOST, detail = detail)
-        invalidated?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
+        runCatching { observer.onStateChanged(lost.snapshot) }
     }
 
     private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
@@ -236,6 +243,11 @@ internal class SharedRuntimeConnection(
         }
         runCatching { observer.onStateChanged(snapshot) }
     }
+
+    private data class ConnectionLoss(
+        val endpoint: RegisteredSharedRuntimeEndpoint?,
+        val snapshot: SharedRuntimeConnectionSnapshot,
+    )
 
     companion object {
         fun create(
