@@ -76,7 +76,8 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 1. promote integrated Harnex `dev@6b34fe9f...` to `main` through the repository RELEASE/FULL path while preserving valid `main` hotfixes;
 2. promote integrated RedactGuard `dev@0e329c49...` to its `main` through the equivalent release path;
 3. execute LAS-07 only for the representative physical claims it genuinely owns, retaining exact source/APK/model/device identity;
-4. continue OMB-6B, OMB-8, evaluation, Q35 device tuning and LLUP independently where ownership does not conflict.
+4. continue OMB-6B, OMB-8, evaluation, Q35 device tuning and LLUP independently where ownership does not conflict;
+5. start the [Local inference activity and audit workstream](workstreams/local-inference-activity-audit.md) with LIA-00/LIA-05 contract convergence, then fan out the independent telemetry/runtime/Host/store/UI foundations in parallel.
 
 ## Source links
 
@@ -84,6 +85,7 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 - Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
+- Local inference activity/audit: [`workstreams/local-inference-activity-audit.md`](workstreams/local-inference-activity-audit.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
