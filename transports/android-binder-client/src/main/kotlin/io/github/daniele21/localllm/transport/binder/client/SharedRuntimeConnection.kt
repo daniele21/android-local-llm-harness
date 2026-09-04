@@ -192,7 +192,13 @@ internal class SharedRuntimeConnection(
 
     private fun connectionLost(detail: String, epoch: Long) {
         val invalidated = synchronized(lock) {
-            if (epoch != connectionEpoch || current.state == SharedRuntimeConnectionState.CLOSED) return
+            if (
+                epoch != connectionEpoch ||
+                current.state == SharedRuntimeConnectionState.CLOSED ||
+                current.state == SharedRuntimeConnectionState.CONNECTION_LOST
+            ) {
+                return
+            }
             registeredEndpoint.also { registeredEndpoint = null }
         }
         binding.unbind()
@@ -349,7 +355,12 @@ private class AndroidSharedRuntimeBinding(private val context: Context) : Shared
                 if (proxy == null) {
                     callbacks.onDisconnected()
                 } else {
-                    callbacks.onConnected(AidlSharedRuntimeRemoteService(proxy))
+                    callbacks.onConnected(
+                        AidlSharedRuntimeRemoteService(
+                            delegate = proxy,
+                            onTransportFailure = { callbacks.onDisconnected() },
+                        ),
+                    )
                 }
             }
 
