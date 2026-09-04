@@ -81,6 +81,7 @@ class AidlSharedRuntimeRemoteServiceTest {
                 }
 
                 "asBinder" -> null
+
                 else -> throw AssertionError("Unexpected IConsumerLocalLlmService call: $methodName")
             }
         }
