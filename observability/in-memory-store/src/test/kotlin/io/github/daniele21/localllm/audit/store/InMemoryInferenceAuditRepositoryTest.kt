@@ -126,12 +126,7 @@ class InMemoryInferenceAuditRepositoryTest {
         assertNotNull(successValue(repository.find(active)))
     }
 
-    private fun complete(
-        repository: InMemoryInferenceAuditRepository,
-        requestId: RequestId,
-        admittedAt: Long,
-        completedAt: Long,
-    ) {
+    private fun complete(repository: InMemoryInferenceAuditRepository, requestId: RequestId, admittedAt: Long, completedAt: Long) {
         assertSuccess(repository.admit(admission(requestId, admittedAt)))
         assertSuccess(repository.markPrepared(prepared(requestId, admittedAt + 10)))
         assertSuccess(repository.markRunning(requestId, admittedAt + 20))
