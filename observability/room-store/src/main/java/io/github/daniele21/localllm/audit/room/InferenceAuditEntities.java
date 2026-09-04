@@ -100,6 +100,13 @@ public final class InferenceAuditEntities {
         @ColumnInfo(name = "terminal_code")
         public String terminalCode;
 
+        @ColumnInfo(name = "terminal_has_metrics")
+        public boolean terminalHasMetrics;
+
+        @Nullable
+        @ColumnInfo(name = "metric_model_load_kind")
+        public String metricModelLoadKind;
+
         @Nullable
         @ColumnInfo(name = "queue_ms")
         public Long queueMs;
