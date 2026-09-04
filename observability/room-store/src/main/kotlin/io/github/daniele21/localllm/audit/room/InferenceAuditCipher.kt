@@ -21,15 +21,11 @@ internal interface InferenceAuditCipher {
     fun open(ciphertext: ByteArray): ByteArray
 }
 
-internal class InferenceAuditCipherException(
-    val code: InferenceAuditFailureCode,
-    cause: Throwable? = null,
-) : RuntimeException("Inference audit cryptographic operation failed", cause)
+internal class InferenceAuditCipherException(val code: InferenceAuditFailureCode, cause: Throwable? = null) :
+    RuntimeException("Inference audit cryptographic operation failed", cause)
 
 /** Encrypts audit content with an app-scoped Android Keystore AES-GCM key. */
-internal class AndroidKeystoreInferenceAuditCipher(
-    private val keyAlias: String = DEFAULT_KEY_ALIAS,
-) : InferenceAuditCipher {
+internal class AndroidKeystoreInferenceAuditCipher(private val keyAlias: String = DEFAULT_KEY_ALIAS) : InferenceAuditCipher {
     init {
         require(keyAlias.isNotBlank()) { "Audit key alias must not be blank" }
     }

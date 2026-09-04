@@ -74,7 +74,9 @@ internal object InferenceAuditSensitiveCodec {
 
     private fun readInput(input: DataInputStream): InferenceAuditInput = when (input.readInt()) {
         INPUT_TEXT -> InferenceAuditInput.Text(readString(input))
+
         INPUT_RAW_COMPLETION -> InferenceAuditInput.RawCompletion(readString(input))
+
         INPUT_MESSAGES -> {
             val size = input.readInt()
             require(size in 1..MAX_AUDIT_MESSAGES) { "Invalid audit message count" }

@@ -275,55 +275,53 @@ class RoomInferenceAuditRepository internal constructor(
         answerTokens = entity.answerTokens,
     )
 
-    private fun entityFromRecord(
-        record: InferenceAuditRecord,
-        encrypted: ByteArray,
-    ): InferenceAuditEntities.InferenceAuditEntity = InferenceAuditEntities.InferenceAuditEntity().apply {
-        requestId = record.requestId.value
-        originKind = record.admission.origin.kind.name
-        applicationId = record.admission.origin.applicationId.value
-        useCaseId = record.admission.origin.useCaseId.value
-        verifiedPackageName = record.admission.origin.verifiedPackageName
-        receivedAtEpochMs = record.admission.receivedAtEpochMs
-        status = record.status.name
-        preparedAtEpochMs = record.prepared?.preparedAtEpochMs
-        runningAtEpochMs = record.runningAtEpochMs
-        completedAtEpochMs = record.terminal?.completedAtEpochMs
-        record.prepared?.execution?.let { execution ->
-            modelDigest = execution.modelDigest.value
-            modelLoadKind = execution.modelLoadKind.name
-            presetId = execution.presetId
-            presetVersion = execution.presetVersion
-            backendId = execution.backendId
-            backendRevision = execution.backendRevision
-            backendExecutionFingerprint = execution.backendExecutionFingerprint
-            effectivePlacement = execution.effectivePlacement
-            useCaseRevision = execution.useCaseRevision
-            bindingRevision = execution.bindingRevision
+    private fun entityFromRecord(record: InferenceAuditRecord, encrypted: ByteArray): InferenceAuditEntities.InferenceAuditEntity =
+        InferenceAuditEntities.InferenceAuditEntity().apply {
+            requestId = record.requestId.value
+            originKind = record.admission.origin.kind.name
+            applicationId = record.admission.origin.applicationId.value
+            useCaseId = record.admission.origin.useCaseId.value
+            verifiedPackageName = record.admission.origin.verifiedPackageName
+            receivedAtEpochMs = record.admission.receivedAtEpochMs
+            status = record.status.name
+            preparedAtEpochMs = record.prepared?.preparedAtEpochMs
+            runningAtEpochMs = record.runningAtEpochMs
+            completedAtEpochMs = record.terminal?.completedAtEpochMs
+            record.prepared?.execution?.let { execution ->
+                modelDigest = execution.modelDigest.value
+                modelLoadKind = execution.modelLoadKind.name
+                presetId = execution.presetId
+                presetVersion = execution.presetVersion
+                backendId = execution.backendId
+                backendRevision = execution.backendRevision
+                backendExecutionFingerprint = execution.backendExecutionFingerprint
+                effectivePlacement = execution.effectivePlacement
+                useCaseRevision = execution.useCaseRevision
+                bindingRevision = execution.bindingRevision
+            }
+            terminalCode = record.terminal?.terminalCode?.value
+            terminalHasMetrics = record.terminal?.metrics != null
+            record.terminal?.metrics?.let { value ->
+                metricModelLoadKind = value.modelLoadKind.name
+                queueMs = value.queueMs
+                modelLoadMs = value.modelLoadMs
+                timeToFirstTokenMs = value.timeToFirstTokenMs
+                totalMs = value.totalMs
+                inputTokens = value.inputTokens
+                outputTokens = value.outputTokens
+                decodeTokensPerSecond = value.decodeTokensPerSecond
+                prefillMs = value.prefillMs
+                decodeMs = value.decodeMs
+                stopReason = value.stopReason.name
+                promptPlanningMs = value.promptPlanningMs
+                contextCreationMs = value.contextCreationMs
+                timeToFirstAnswerMs = value.timeToFirstAnswerMs
+                reasoningTokens = value.reasoningTokens
+                answerTokens = value.answerTokens
+            }
+            encryptedContent = encrypted
+            encryptedContentBytes = encrypted.size.toLong()
         }
-        terminalCode = record.terminal?.terminalCode?.value
-        terminalHasMetrics = record.terminal?.metrics != null
-        record.terminal?.metrics?.let { value ->
-            metricModelLoadKind = value.modelLoadKind.name
-            queueMs = value.queueMs
-            modelLoadMs = value.modelLoadMs
-            timeToFirstTokenMs = value.timeToFirstTokenMs
-            totalMs = value.totalMs
-            inputTokens = value.inputTokens
-            outputTokens = value.outputTokens
-            decodeTokensPerSecond = value.decodeTokensPerSecond
-            prefillMs = value.prefillMs
-            decodeMs = value.decodeMs
-            stopReason = value.stopReason.name
-            promptPlanningMs = value.promptPlanningMs
-            contextCreationMs = value.contextCreationMs
-            timeToFirstAnswerMs = value.timeToFirstAnswerMs
-            reasoningTokens = value.reasoningTokens
-            answerTokens = value.answerTokens
-        }
-        encryptedContent = encrypted
-        encryptedContentBytes = encrypted.size.toLong()
-    }
 
     private fun summaryFromEntity(entity: InferenceAuditEntities.InferenceAuditEntity): InferenceAuditSummary = try {
         InferenceAuditSummary(
@@ -366,11 +364,9 @@ class RoomInferenceAuditRepository internal constructor(
 
     private fun successUnit(): InferenceAuditResult<Unit> = InferenceAuditResult.Success(Unit)
 
-    private fun invalidState(): InferenceAuditResult.Failure =
-        InferenceAuditResult.Failure(InferenceAuditFailureCode.INVALID_STATE)
+    private fun invalidState(): InferenceAuditResult.Failure = InferenceAuditResult.Failure(InferenceAuditFailureCode.INVALID_STATE)
 
-    private fun notFound(): InferenceAuditResult.Failure =
-        InferenceAuditResult.Failure(InferenceAuditFailureCode.NOT_FOUND)
+    private fun notFound(): InferenceAuditResult.Failure = InferenceAuditResult.Failure(InferenceAuditFailureCode.NOT_FOUND)
 
     companion object {
         const val DEFAULT_DATABASE_NAME: String = "harnex-inference-audit.db"

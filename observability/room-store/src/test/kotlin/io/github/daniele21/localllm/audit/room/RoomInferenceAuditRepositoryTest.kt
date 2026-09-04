@@ -127,50 +127,47 @@ class RoomInferenceAuditRepositoryTest {
         executor = Executors.newSingleThreadExecutor(),
     )
 
-    private fun admission(requestId: RequestId, timestamp: Long, input: String): InferenceAuditAdmission =
-        InferenceAuditAdmission(
-            requestId = requestId,
-            origin = InferenceAuditOrigin(
-                kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-                applicationId = ApplicationId("consumer-app"),
-                useCaseId = UseCaseId("assistant"),
-                verifiedPackageName = "com.example.consumer",
-            ),
-            receivedAtEpochMs = timestamp,
-            input = InferenceAuditInput.Text(input),
-        )
+    private fun admission(requestId: RequestId, timestamp: Long, input: String): InferenceAuditAdmission = InferenceAuditAdmission(
+        requestId = requestId,
+        origin = InferenceAuditOrigin(
+            kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+            applicationId = ApplicationId("consumer-app"),
+            useCaseId = UseCaseId("assistant"),
+            verifiedPackageName = "com.example.consumer",
+        ),
+        receivedAtEpochMs = timestamp,
+        input = InferenceAuditInput.Text(input),
+    )
 
-    private fun prepared(requestId: RequestId, timestamp: Long, prompt: String): InferenceAuditPrepared =
-        InferenceAuditPrepared(
-            requestId = requestId,
-            preparedAtEpochMs = timestamp,
-            effectivePrompt = prompt,
-            execution = InferenceAuditExecutionIdentity(
-                modelDigest = ModelDigest("a".repeat(64)),
-                modelLoadKind = ModelLoadKind.WARM,
-                backendId = "llama.cpp",
-                backendExecutionFingerprint = "b".repeat(64),
-            ),
-        )
+    private fun prepared(requestId: RequestId, timestamp: Long, prompt: String): InferenceAuditPrepared = InferenceAuditPrepared(
+        requestId = requestId,
+        preparedAtEpochMs = timestamp,
+        effectivePrompt = prompt,
+        execution = InferenceAuditExecutionIdentity(
+            modelDigest = ModelDigest("a".repeat(64)),
+            modelLoadKind = ModelLoadKind.WARM,
+            backendId = "llama.cpp",
+            backendExecutionFingerprint = "b".repeat(64),
+        ),
+    )
 
-    private fun completed(requestId: RequestId, timestamp: Long, answer: String): InferenceAuditTerminal =
-        InferenceAuditTerminal(
-            requestId = requestId,
-            status = InferenceAuditStatus.COMPLETED,
-            completedAtEpochMs = timestamp,
-            content = InferenceAuditTerminalContent(answerOutput = answer),
-            metrics = InferenceAuditMetrics(
-                queueMs = 1L,
-                modelLoadMs = 2L,
-                timeToFirstTokenMs = 3L,
-                totalMs = 50L,
-                inputTokens = 4,
-                outputTokens = 5,
-                decodeTokensPerSecond = 6.0,
-                modelLoadKind = ModelLoadKind.WARM,
-                stopReason = StopReason.END_OF_GENERATION,
-            ),
-        )
+    private fun completed(requestId: RequestId, timestamp: Long, answer: String): InferenceAuditTerminal = InferenceAuditTerminal(
+        requestId = requestId,
+        status = InferenceAuditStatus.COMPLETED,
+        completedAtEpochMs = timestamp,
+        content = InferenceAuditTerminalContent(answerOutput = answer),
+        metrics = InferenceAuditMetrics(
+            queueMs = 1L,
+            modelLoadMs = 2L,
+            timeToFirstTokenMs = 3L,
+            totalMs = 50L,
+            inputTokens = 4,
+            outputTokens = 5,
+            decodeTokensPerSecond = 6.0,
+            modelLoadKind = ModelLoadKind.WARM,
+            stopReason = StopReason.END_OF_GENERATION,
+        ),
+    )
 
     private fun complete(repository: RoomInferenceAuditRepository, requestId: RequestId, timestamp: Long) {
         assertSuccess(repository.admit(admission(requestId, timestamp, "input-$timestamp")))
