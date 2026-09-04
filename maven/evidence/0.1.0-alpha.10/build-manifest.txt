@@ -1,0 +1,12 @@
+consumer_sdk_version=0.1.0-alpha.10
+source_revision=6b34fe9fcba70f6b8abd107fd58b61c418ac737d
+artifacts:
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/android-binder-contract/0.1.0-alpha.10/android-binder-contract-0.1.0-alpha.10.aar
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/android-binder-contract/0.1.0-alpha.10/android-binder-contract-0.1.0-alpha.10.module
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/android-binder-contract/0.1.0-alpha.10/android-binder-contract-0.1.0-alpha.10.pom
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/consumer-android/0.1.0-alpha.10/consumer-android-0.1.0-alpha.10.aar
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/consumer-android/0.1.0-alpha.10/consumer-android-0.1.0-alpha.10.module
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/consumer-android/0.1.0-alpha.10/consumer-android-0.1.0-alpha.10.pom
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/core-contracts/0.1.0-alpha.10/core-contracts-0.1.0-alpha.10.aar
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/core-contracts/0.1.0-alpha.10/core-contracts-0.1.0-alpha.10.module
+/home/runner/work/android-local-llm-harness/android-local-llm-harness/build/consumer-sdk-repository/io/github/daniele21/localllm/core-contracts/0.1.0-alpha.10/core-contracts-0.1.0-alpha.10.pom
