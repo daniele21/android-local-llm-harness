@@ -7,8 +7,10 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.security.ProviderException
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -35,29 +37,37 @@ internal class AndroidKeystoreInferenceAuditCipher(private val keyAlias: String 
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(plaintext)
         encodeEnvelope(cipher.iv, encrypted)
+    } catch (error: InferenceAuditCipherException) {
+        throw error
     } catch (error: GeneralSecurityException) {
         throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
-    } catch (error: RuntimeException) {
-        if (error is InferenceAuditCipherException) throw error
+    } catch (error: IOException) {
+        throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
+    } catch (error: ProviderException) {
         throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
     }
 
     override fun open(ciphertext: ByteArray): ByteArray {
         val envelope = try {
             decodeEnvelope(ciphertext)
-        } catch (error: RuntimeException) {
+        } catch (error: IllegalArgumentException) {
+            throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
+        } catch (error: IOException) {
             throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
         }
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_BITS, envelope.iv))
             cipher.doFinal(envelope.ciphertext)
+        } catch (error: InferenceAuditCipherException) {
+            throw error
         } catch (error: AEADBadTagException) {
             throw InferenceAuditCipherException(InferenceAuditFailureCode.CORRUPT_CONTENT, error)
         } catch (error: GeneralSecurityException) {
             throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
-        } catch (error: RuntimeException) {
-            if (error is InferenceAuditCipherException) throw error
+        } catch (error: IOException) {
+            throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
+        } catch (error: ProviderException) {
             throw InferenceAuditCipherException(InferenceAuditFailureCode.ENCRYPTION_UNAVAILABLE, error)
         }
     }
