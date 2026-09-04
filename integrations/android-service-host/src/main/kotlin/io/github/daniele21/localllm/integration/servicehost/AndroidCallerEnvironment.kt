@@ -9,8 +9,21 @@ class AndroidCallerEnvironment(context: Context) : CallerEnvironment {
     private val appContext = context.applicationContext
     private val packageManager = appContext.packageManager
 
-    override fun hasPermission(permissionName: String, callingProcess: CallingProcess): Boolean =
-        appContext.checkPermission(permissionName, callingProcess.pid, callingProcess.uid) == PackageManager.PERMISSION_GRANTED
+    override fun hasPermission(permissionName: String, callingProcess: CallingProcess): Boolean {
+        if (callingProcess.pid > 0) {
+            return appContext.checkPermission(
+                permissionName,
+                callingProcess.pid,
+                callingProcess.uid,
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+
+        // Binder one-way transactions do not carry a reliable calling PID. Keep the permission
+        // check bound to the kernel-provided UID by resolving exactly one package for that UID;
+        // CallerAuthorizer independently repeats the UID/package uniqueness check and signer check.
+        val packageName = packagesForUid(callingProcess.uid).distinct().singleOrNull() ?: return false
+        return packageManager.checkPermission(permissionName, packageName) == PackageManager.PERMISSION_GRANTED
+    }
 
     override fun packagesForUid(uid: Int): List<String> = packageManager.getPackagesForUid(uid)?.toList().orEmpty()
 
