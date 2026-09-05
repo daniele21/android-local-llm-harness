@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.runtime
 
+import io.github.daniele21.localllm.audit.InferenceAuditInput
 import io.github.daniele21.localllm.audit.InferenceAuditOrigin
 import io.github.daniele21.localllm.audit.InferenceAuditOriginKind
 import io.github.daniele21.localllm.audit.InferenceAuditResult
@@ -27,15 +28,15 @@ import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.ThinkingMode
 import io.github.daniele21.localllm.contracts.UseCaseId
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class InferenceAuditLocalLlmClientTest {
     private val applicationId = ApplicationId("consumer")
@@ -53,12 +54,15 @@ class InferenceAuditLocalLlmClientTest {
         val terminal = CountDownLatch(1)
         val forwarded = AtomicReference<GenerationEvent?>()
 
-        client.generate(request(), GenerationListener { event ->
-            if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
-                forwarded.set(event)
-                terminal.countDown()
-            }
-        })
+        client.generate(
+            request(),
+            GenerationListener { event ->
+                if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
+                    forwarded.set(event)
+                    terminal.countDown()
+                }
+            },
+        )
         delegate.startEvents.countDown()
 
         assertTrue(terminal.await(2, TimeUnit.SECONDS))
@@ -68,7 +72,7 @@ class InferenceAuditLocalLlmClientTest {
         requireNotNull(record)
         assertEquals(InferenceAuditStatus.COMPLETED, record.status)
         assertEquals("io.redactguard", record.admission.origin.verifiedPackageName)
-        assertEquals("secret input", (record.admission.input as io.github.daniele21.localllm.audit.InferenceAuditInput.Text).value)
+        assertEquals("secret input", (record.admission.input as InferenceAuditInput.Text).value)
         assertEquals("final answer", record.terminal?.content?.answerOutput)
         assertEquals("private reasoning", record.terminal?.content?.reasoningOutput)
         assertEquals(24L, record.terminal?.metrics?.totalMs)
@@ -177,7 +181,8 @@ class InferenceAuditLocalLlmClientTest {
 
         override fun runtimeSnapshot(): RuntimeSnapshot = RuntimeSnapshot(RuntimeState.READY, null, 1, 0)
 
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult = PrepareResult(true, null, "ready")
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
+            PrepareResult(true, null, "ready")
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId = SessionId("session-1")
 
@@ -188,6 +193,7 @@ class InferenceAuditLocalLlmClientTest {
             generateCalled = true
             val handle = object : GenerationHandle {
                 override val requestId: RequestId = request.requestId
+
                 override fun cancel() = Unit
             }
             Thread {
