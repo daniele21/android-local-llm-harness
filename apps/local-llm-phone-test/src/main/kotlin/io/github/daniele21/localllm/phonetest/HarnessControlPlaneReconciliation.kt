@@ -239,9 +239,7 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         return null
     }
 
-    private fun reconcileBindings(
-        bindings: MutableList<ApplicationUseCaseBinding>,
-    ): HarnessControlPlaneReconciliationResult.Conflict? {
+    private fun reconcileBindings(bindings: MutableList<ApplicationUseCaseBinding>): HarnessControlPlaneReconciliationResult.Conflict? {
         for (requirement in spec.applications) {
             val expected = spec.bindingFor(requirement.applicationId)
             val revisions = bindings.filter { it.bindingId == expected.bindingId }
@@ -266,8 +264,7 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         HarnessControlPlaneReconciliationResult.Conflict(code, identity)
 }
 
-internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String =
-    "builtin:${applicationId.value}:$useCaseId"
+internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "builtin:${applicationId.value}:$useCaseId"
 
 internal fun builtInOmbraUseCase(): UseCaseDefinition = UseCaseDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
