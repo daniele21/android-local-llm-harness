@@ -4,16 +4,22 @@ Status: active
 Document type: evidence-runbook
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.sr6-release-evidence
-Read when: preparing or reviewing the physical two-APK release gate
-Last reviewed: 2026-08-13
+Read when: preparing or reviewing the physical/two-APK release gate
+Last reviewed: 2026-09-05
 
 ## Goal
 
-SR-6 validates the exact deployment boundary that an application consumer would receive: a separately installed host APK, a packaged Binder client AAR consumed by a separate APK, signature-protected Binder authorization and release-like signing identities.
+SR-6 validates the exact deployment boundary being claimed for a consumer: a separately installed Harnex Host, a packaged Consumer SDK, Android Binder caller authorization and the real signing topology of the participating applications.
 
-This gate is deliberately stronger than SR-4 emulator/debug preflight. Emulator execution may prove installation and wiring only; it cannot close SR-6.
+ADR 0017 supersedes the original assumption that every production consumer shares the Host signing identity. Harnex and external consumers such as RedactGuard may use distinct Play App Signing identities. The manifest `BIND_LOCAL_LLM` permission is only a bind capability; Binder UID/package/signer verification plus explicit Harnex Control Plane authorization is the trust boundary.
 
-## Runner
+Deterministic emulator E2E can prove the Binder authorization state machine with distinct ephemeral identities. Physical/Play evidence remains required when the claim depends on actual Play App Signing identity, representative hardware or real GGUF/runtime behavior.
+
+## Evidence paths
+
+SR-6 has two complementary paths rather than one universal signing fixture.
+
+### Packaged same-publisher fixture
 
 Use:
 
@@ -21,9 +27,11 @@ Use:
 bash scripts/capture-shared-runtime-release-evidence.sh --device <adb-serial>
 ```
 
+This path validates packaged release AAR consumption, real Binder/process behavior and real runtime/device evidence using the repository-owned consumer fixture. The positive Host and fixture may intentionally share the external phone-test signing configuration because this path is a same-publisher fixture, not proof of independent-consumer compatibility.
+
 The runner requires a physical `arm64-v8a` device by default. `--allow-emulator` is available only for explicitly labelled preflight evidence.
 
-The positive host and consumer fixture use the existing external phone-test signing configuration:
+The positive Host and fixture use the existing external phone-test signing configuration:
 
 ```text
 LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_STORE_FILE
@@ -34,9 +42,25 @@ LOCAL_LLM_PHONE_TEST_ANDROID_UPLOAD_KEY_PASSWORD
 
 On macOS the runner may reuse the same Keychain entry documented by `scripts/build-phone-test-release.sh`. Signing secrets are never written to the evidence directory.
 
-## Model setup
+### Independently signed consumer path
 
-The runner never downloads, copies or discovers a host-private GGUF path. The release host must already have a curated Qwen3.5 model installed and selected.
+For RedactGuard or another separately distributed consumer, exact-head automation must:
+
+1. build the exact Harnex Host and Consumer SDK candidate;
+2. build the exact consumer against that SDK candidate;
+3. sign Host/Host-owned test APKs with identity A and consumer/consumer-test APKs with identity B;
+4. prove A != B from APK certificate digests;
+5. install both applications;
+6. prove the consumer is denied while its observed identity is pending;
+7. use Host-owned instrumentation/UI authority to authorize the exact observed package + signer;
+8. prove authorized connect -> disconnect -> reconnect;
+9. preserve bounded source/signing/result evidence and delete ephemeral private keys.
+
+For a Play-distributed candidate, physical confirmation installs the actual Internal Testing builds and records the Host and consumer Play App Signing digest identities. Local ephemeral signing is not presented as evidence of the real Play identity.
+
+## Model setup for packaged physical evidence
+
+The physical runner never downloads, copies or discovers a host-private GGUF path. The release Host must already have a curated Qwen3.5 model installed and selected.
 
 For first-time setup:
 
@@ -46,9 +70,9 @@ bash scripts/capture-shared-runtime-release-evidence.sh \
   --host-only
 ```
 
-This builds, installs and launches the signed release host while preserving its app-private state. Install/select the curated model through the host UI, then rerun the normal evidence command.
+This builds, installs and launches the signed release Host while preserving its app-private state. Install/select the curated model through the Host UI, then rerun the normal evidence command.
 
-## Positive same-signer flow
+## Packaged fixture positive flow
 
 The runner builds:
 
@@ -57,86 +81,90 @@ The runner builds:
 - `transports/android-binder-contract` release AAR;
 - `apps/shared-runtime-client-consumer-fixture` release APK and instrumentation APK.
 
-The consumer fixture references the packaged AARs rather than project-source client classes. Before installation, the runner verifies that host, client and instrumentation APKs have the same SHA-256 signing-certificate digest.
+The consumer fixture references the packaged AARs rather than project-source client classes. For the intentional same-publisher positive path, the runner verifies that Host, fixture and instrumentation APKs have the expected common SHA-256 signing-certificate digest.
 
 `SharedRuntimeReleaseEvidenceTest` then verifies over the real Binder/process boundary:
 
 - bind and registration;
-- prepare against the host-selected curated model;
+- prepare against the Host-selected curated model;
 - session creation;
 - streamed generation and successful completion;
 - privacy-safe TTFT/total/token/throughput markers;
 - active generation cancellation and cancellation latency;
 - session close;
-- host process termination, typed `CONNECTION_LOST`, host restart and clean reconnect.
+- Host process termination, typed `CONNECTION_LOST`, Host restart and clean reconnect.
 
 The instrumentation test does not print prompt or generated output content.
 
 ## Repository authorization review
 
-The repository-side security boundary is deliberately narrower than a same-signer check alone:
+The current security boundary is deliberately stronger than possession of an Android permission:
 
-- the exported host service requires a `signature` protection-level permission;
-- host authorization checks the Binder calling UID/PID permission result before registration;
-- a calling UID must resolve to exactly one package; empty or ambiguous UID/package mappings fail closed;
-- the package must match an exact host allowlist entry;
-- the package signing certificate must match the host-derived accepted certificate set;
-- the host owns the `ApplicationId`, allowed `UseCaseId` and model binding rather than accepting client-selected model identity;
-- a release host allows only the exact release Console package and `io.github.daniele21.localllm.consumerfixture` for the SR-6 packaged-consumer proof;
-- debug hosts do not authorize the release evidence consumer package.
+- the exported Host service requires the variant-specific normal `BIND_LOCAL_LLM` capability permission;
+- Host authorization captures Binder calling UID before dispatch and resolves the exact installed package;
+- empty or ambiguous UID/package mappings fail closed;
+- the installed package signing certificate must match the exact live Host policy;
+- for independently signed consumers, live policy comes from explicitly authorized Harnex Control Plane state for the source-observed package + signer;
+- newly observed independent consumers are `PENDING` and denied;
+- signing identity replacement is `SIGNATURE_CHANGED` and denied until explicit reauthorization;
+- the Host owns `ApplicationId`, allowed `UseCaseId` and model binding rather than accepting client-selected authority;
+- emulator fault/control and broader diagnostics remain separate from inference binding.
 
-The SR-6 consumer package was added explicitly to the release allowlist because signature permission alone would allow binding but the host package policy would correctly reject registration. Unit coverage now protects that exact release/debug split. The physical independently signed denial remains mandatory because deterministic policy review does not substitute for Android package-manager enforcement on device.
+Same-publisher fixtures can retain reviewed same-signer policy as an intentional test topology. They do not weaken or replace the independent-consumer path.
 
-## Independent-signer denial
+## Negative signer evidence
 
-Unless `--skip-negative` is used, the runner creates a short-lived PKCS12 key in a temporary directory, rebuilds only the consumer fixture with that independent identity, and verifies that its certificate digest differs from the still-installed host.
+The packaged fixture runner may still create a short-lived PKCS12 identity and rebuild only the fixture to prove that a mismatched signer cannot inherit a same-publisher allowlist entry. The expected result remains `PERMISSION_DENIED`, now due to Binder caller policy rather than a signature-level manifest permission.
 
-`SharedRuntimeInvalidSignerTest` must reach `PERMISSION_DENIED` before runtime negotiation. The temporary keystore and password are deleted when the runner exits and are never committed or copied into the evidence bundle.
+The independent-consumer path also requires denial before explicit authorization. A known package with a distinct source-observed signer does not become authorized merely because it declares `BIND_LOCAL_LLM` or is installed.
 
-Skipping this case leaves SR-6 incomplete.
+Temporary keystores/passwords are deleted when runners exit and are never committed or copied into evidence bundles.
 
 ## Evidence bundle
 
-Default output:
+The packaged physical runner keeps its existing default output:
 
 ```text
 build/shared-runtime-evidence/<UTC timestamp>/
 build/shared-runtime-evidence/<UTC timestamp>.tar.gz
 ```
 
-The bundle contains:
+Depending on the scenario, evidence includes:
 
-- `manifest.txt` — exact git commit, physical/emulator scope, package/version identities, signing-certificate digests, client SDK version, protocol version and pinned llama.cpp revision;
-- `device.txt` — manufacturer/model/codename, Android release/SDK and ABI, excluding adb serial;
-- `positive-instrumentation.log` — functional/cancellation/process-death test result;
-- `negative-instrumentation.log` — independent-signer denial result when enabled;
-- `metrics.txt` — privacy-safe `SR6_SHARED_RUNTIME` markers;
-- `filtered-logcat.txt` — only SR-6 markers and relevant Android runtime failures;
-- host `meminfo` and thermal snapshots before/after the run;
-- APK hashes;
-- a privacy/readme summary.
+- exact Harnex and consumer source revision identities;
+- Host/consumer package and version/build identities;
+- Host/consumer signing-certificate SHA-256 digest identities;
+- Consumer SDK and Binder protocol identity;
+- Harnex authorization transition markers for independent-consumer evidence;
+- device manufacturer/model/Android/ABI for physical evidence, excluding adb serial;
+- functional/cancellation/process-death/reconnect results where tested;
+- privacy-safe timing/token/memory/thermal markers where real runtime/device evidence is tested;
+- APK hashes and a privacy/readme summary.
 
-The bundle excludes:
+Evidence excludes:
 
 - prompts and generated output;
-- GGUF bytes and host-private model paths;
+- GGUF bytes and Host-private model paths;
 - Binder client tokens;
 - adb serial numbers;
 - keystores, signing passwords and full certificates.
 
 ## Acceptance
 
-A physical SR-6 record is reviewable only when:
+An evidence record is reviewable only when its scope matches the claim.
 
-1. `scope=PHYSICAL_RELEASE_EVIDENCE`;
-2. `result_positive=PASS`;
-3. `result_invalid_signer=PASS`;
-4. host/client/test positive certificate digests match;
-5. the negative client digest differs from the host digest;
-6. the repository checkout is clean and its exact commit is recorded;
-7. generation, cancellation and process-death markers are present;
-8. no prompt/output or signing material is persisted;
-9. applicable Q35 physical model/runtime evidence exists for the model/profile being claimed;
-10. the public API, security, versioning and release notes review is completed for the same candidate.
+For an independently signed consumer authorization claim:
 
-The evidence tooling can be merged before a physical run, but SR-6 remains **IN PROGRESS** until the physical record and release review satisfy all exit criteria.
+1. exact Harnex and consumer source revisions are recorded;
+2. Host and consumer APK signing digests are present and distinct;
+3. the consumer is denied before explicit Harnex authorization;
+4. authorization applies to the exact observed package + signer identity;
+5. authorized connect/disconnect/reconnect passes;
+6. an unknown/mismatched identity cannot inherit access;
+7. no signing key/password/full certificate or inference content is persisted.
+
+For a physical Play distribution claim, the installed Internal builds' actual Play App Signing digest identities are recorded and the user-visible authorization/connect flow succeeds on device.
+
+For a real-runtime/device claim, additionally require the exact curated model/runtime identity plus the applicable generation, cancellation, memory, JNI and thermal evidence. The public API/security/versioning/release-notes review must cover the same candidate.
+
+The evidence tooling and deterministic independent-signer E2E may merge before physical confirmation. Stable promotion remains blocked only on the REAL_ENVIRONMENT evidence that the exact promotion claim genuinely requires.
