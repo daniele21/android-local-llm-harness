@@ -12,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import io.github.daniele21.localllm.audit.InferenceAuditFailureCode
 
 internal fun NavGraphBuilder.installHarnessInferenceActivityGraph(navController: NavHostController) {
     composable(HarnessDestination.ACTIVITY.route) {
@@ -57,7 +58,12 @@ internal fun NavGraphBuilder.installHarnessInferenceActivityGraph(navController:
         }
         if (requestId == null) {
             HarnessInferenceActivityDetailScreen(
-                state = state.copy(detailLoading = false),
+                state = state.copy(
+                    selectedRequestId = "invalid",
+                    detailLoading = false,
+                    detail = null,
+                    detailErrorCode = InferenceAuditFailureCode.NOT_FOUND,
+                ),
                 requestId = "invalid",
                 onRetry = {},
             )
