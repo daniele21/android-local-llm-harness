@@ -143,7 +143,10 @@ internal class SharedRuntimeConnection(
     }
 
     private fun negotiate(service: SharedRuntimeRemoteService, epoch: Long) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         transitionForEpoch(epoch, SharedRuntimeConnectionState.NEGOTIATING)
         val negotiated = try {
             negotiateProtocol(service.protocolInfo(), clientHello)
@@ -161,7 +164,10 @@ internal class SharedRuntimeConnection(
     }
 
     private fun register(service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol, epoch: Long) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         try {
             service.registerClient(
                 hello = clientHello,
@@ -214,7 +220,10 @@ internal class SharedRuntimeConnection(
     }
 
     private fun failConnection(epoch: Long, state: SharedRuntimeConnectionState, detail: String?) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         binding.unbind()
         transitionForEpoch(epoch, state, detail = detail)
     }
@@ -240,10 +249,6 @@ internal class SharedRuntimeConnection(
         lost.endpoint?.let { endpoint -> invalidations.notify(endpoint.connectionEpoch, detail) }
         binding.unbind()
         runCatching { observer.onStateChanged(lost.snapshot) }
-    }
-
-    private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
-        epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
     }
 
     private fun transitionForEpoch(
