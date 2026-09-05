@@ -48,11 +48,12 @@ You can:
 - run local generation, streaming and cancellation;
 - bind applications and use cases to explicit model/runtime policies;
 - let consumer apps call the shared runtime through the Consumer Android SDK and Binder;
+- inspect durable local **Activity** history for who invoked inference, what executed, what was produced and how it performed;
 - inspect latency, throughput, memory, thermal state, logs and request timelines;
 - run health, integrity, generation and evaluation workflows;
-- keep prompts and generated content out of normal telemetry.
+- keep sensitive Activity content out of normal telemetry, structured logs and diagnostics export.
 
-The current product surfaces are **Overview, Playground, Applications, Performance, Models, Diagnostics and Settings**.
+The current product surfaces are **Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings**.
 
 ![Harnex model and runtime lifecycle](docs/assets/readme/harness-model-runtime-lifecycle.png)
 
@@ -87,11 +88,11 @@ Model binaries, credentials and signing material must not be committed to the re
 
 ### 3. Try local inference
 
-Open **Playground**, choose the configured use case and run a prompt. Harnex handles model preparation, execution, cancellation and runtime evidence.
+Open **Playground**, choose the configured use case and run a prompt. Harnex handles model preparation, execution, cancellation and runtime evidence. Open **Activity** to inspect the durable local record for accepted inference.
 
 ### 4. Use Harnex from another Android app
 
-Consumer apps integrate the versioned Consumer Android SDK and call Harnex over Binder. The app owns its product workflow; Harnex keeps model, runtime and residency ownership.
+Consumer apps integrate the versioned Consumer Android SDK and call Harnex over Binder. The app owns its product workflow; Harnex keeps model, runtime, residency and inference-audit ownership.
 
 See [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) for the current integration contract.
 
@@ -113,7 +114,8 @@ Harnex host
     |
     +--> model store / use-case policy
     +--> runtime scheduling / lifecycle
-    +--> observability / evaluation
+    +--> encrypted Activity audit/history
+    +--> privacy-safe observability / evaluation
     |
     v
 llama.cpp + local GGUF model
@@ -123,6 +125,7 @@ Harnex keeps a few boundaries explicit:
 
 - **Consumer apps own the workflow.** They should not own GGUF files, JNI or Harnex runtime internals.
 - **Harnex owns model and runtime policy.** Model resolution is explicit; there is no silent model substitution.
+- **Harnex owns inference audit truth.** Sensitive input/effective prompt/output may live in bounded encrypted local Activity storage, while normal telemetry and logs stay content-free.
 - **Model states stay separate.** Downloaded, installed, selected and resident do not mean the same thing.
 - **Runtime limits are visible.** Scheduling, cancellation, memory pressure and cleanup are first-class behavior.
 - **Evidence stays honest.** Emulator evidence is not presented as physical-device or production evidence.
@@ -152,6 +155,7 @@ Today:
 
 - the Android product and control plane are integrated;
 - shared runtime and Consumer/Binder boundaries are implemented and the API 35 cross-application lifecycle/fault/serialization matrix is green;
+- durable local inference Activity/audit is implemented with verified caller attribution, encrypted sensitive content, truthful terminal states and restart-safe history;
 - Consumer Android SDK `0.1.0-alpha.10` is published from the validated Harnex integration baseline;
 - the corresponding Harnex phone-test is published to Google Play Internal Testing;
 - the validated Harnex baseline has been promoted to the stable `main` line through the repository RELEASE/FULL path;
@@ -167,6 +171,7 @@ The exact integrated state and blockers live in [`docs/current-state.md`](docs/c
 | --- | --- |
 | Current state | [`docs/current-state.md`](docs/current-state.md) |
 | Architecture | [`docs/architecture.md`](docs/architecture.md) |
+| Local inference Activity/audit | [`docs/features/local-inference-activity-audit.md`](docs/features/local-inference-activity-audit.md) |
 | Consumer SDK | [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) |
 | Android build and run | [`docs/android-build-and-run.md`](docs/android-build-and-run.md) |
 | Physical-device testing | [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) |
