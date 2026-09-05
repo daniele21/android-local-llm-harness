@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 class HarnessSharedRuntimeManifestTest {
     @Suppress("DEPRECATION")
     @Test
-    fun `shared runtime service is exported behind the variant signature permission`() {
+    fun `shared runtime service uses normal opt-in permission while Binder owns signer trust`() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val packageManager = context.packageManager
         val serviceInfo = packageManager.getServiceInfo(
@@ -33,7 +33,7 @@ class HarnessSharedRuntimeManifestTest {
         assertEquals(context.packageName, serviceInfo.packageName)
         assertEquals(BuildConfig.SHARED_RUNTIME_PERMISSION, serviceInfo.permission)
         assertEquals(
-            PermissionInfo.PROTECTION_SIGNATURE,
+            PermissionInfo.PROTECTION_NORMAL,
             permissionInfo.protectionLevel and PermissionInfo.PROTECTION_MASK_BASE,
         )
     }
