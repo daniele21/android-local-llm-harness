@@ -4,7 +4,7 @@
 
 This guide applies to `apps/local-llm-phone-test/**` and supplements the repository-wide [`AGENTS.md`](../../AGENTS.md). It covers the connected Compose app, process-scoped runtime composition, local model distribution/management, Performance and Diagnostics presentation, the shared-runtime proof host and the Play-installed physical-device validation surface.
 
-The app orchestrates existing domain contracts. It must not become an alternate owner of runtime, model-installation, telemetry, evaluation, Binder protocol or benchmark policy.
+The app orchestrates existing domain contracts. It must not become an alternate owner of runtime, model-installation, telemetry, evaluation, Binder protocol, inference-audit persistence or benchmark policy.
 
 ## Navigation
 
@@ -14,6 +14,7 @@ Read the active product state before UI or orchestration work:
 - [`shared-runtime/roadmap.md`](../../docs/shared-runtime/roadmap.md), [`shared-runtime/workstreams/host-service.md`](../../docs/shared-runtime/workstreams/host-service.md) and ADR 0012 for proof-host service work;
 - [`harness-ux-ui-implementation-plan.md`](../../docs/harness-ux-ui-implementation-plan.md) and [`harness-ux-ui-implementation-progress.md`](../../docs/harness-ux-ui-implementation-progress.md) for Compose structure and remaining evidence;
 - [`model-evaluation/README.md`](../../docs/model-evaluation/README.md) for Performance evaluation contracts and sequencing;
+- [`features/local-inference-activity-audit.md`](../../docs/features/local-inference-activity-audit.md) and ADR 0017 for inference Activity/audit ownership, sensitive persistence and strict admission/terminal semantics;
 - [`design-system.md`](../../docs/design-system.md) and the shared `ui/design-system` sources for reusable UI;
 - [`model-management-phone.md`](../../docs/model-management-phone.md) and [`phone-model-distribution.md`](../../docs/phone-model-distribution.md) for model flows;
 - [`play-internal-phone-test.md`](../../docs/play-internal-phone-test.md) for release installation and manual validation.
@@ -22,13 +23,14 @@ Route by responsibility:
 
 | Concern | Start here | Owning dependency to inspect |
 | --- | --- | --- |
-| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control-plane store, transport, observability and design-system contracts |
+| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control-plane store, transport, observability, audit and design-system contracts |
 | Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, manifest/build variants | `integrations/android-service-host`, Binder contract and ADR 0012 |
 | Destinations and responsive shell | `HarnessDestination.kt`, Compose entry points | Shared navigation/components under `ui/design-system` |
 | Playground state and inference | `HarnessViewModel.kt`, `PhonePlaygroundController.kt` and related UI | `LocalLlmClient`, runtime lifecycle and generation contracts |
 | Performance evaluation UI | `PerformanceViewModel.kt`, `PerformanceScreen.kt`, presentation helpers | `evaluation/*` contracts, persistence/comparison and telemetry evidence |
 | Catalog/download/install UI | `PhoneModelDistributionController.kt`, actions and UI | The [`models` guide](../../models/AGENTS.md) and each stage's contracts |
 | Installed selection, verification and removal | `PhoneModelManagementControl.kt`, metadata store | ModelStore ownership and runtime loaded-model identity |
+| Inference Activity/history | Activity source/ViewModel/presentation | `InferenceAuditRepository`, runtime audit lifecycle and Host verified attribution |
 | Health, logs, resources and benchmarks | `HarnessViewModel.kt`, `Harness*Source.kt`, Diagnostics UI | The [`observability` guide](../../observability/AGENTS.md) |
 | Physical validation and report | `PhoneTestController.kt`, models and UI | Device/evidence docs and production runtime/backend |
 | Version, manifest, signing and packaging | `version.properties`, `build.gradle.kts`, manifest/resources | Release script and Play runbook |
@@ -37,7 +39,7 @@ Use focused searches before editing the large app surface:
 
 ```bash
 rg '<state-or-action>' apps/local-llm-phone-test/src/main apps/local-llm-phone-test/src/test
-rg 'RuntimeOrchestrator|ModelStore|TelemetryRepository|Executor' apps/local-llm-phone-test/src/main
+rg 'RuntimeOrchestrator|ModelStore|TelemetryRepository|InferenceAuditRepository|Executor' apps/local-llm-phone-test/src/main
 rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/src/test apps/local-llm-phone-test/src/androidTest
 ```
 
@@ -53,7 +55,7 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 - `HarnessRuntimeGraph` owns the single process-scoped control-plane Room store used by both the proof `Service` and Harness UI; neither surface opens or closes a parallel database owner.
 - Shared-runtime release and debug variants use deterministic, distinct signature-permission names. Caller package matching is exact; never strip application ID suffixes to authorize a caller.
 - Download, install, selection, verification, removal, health, benchmark, evaluation and validation are distinct explicit user actions.
-- Prompt and generated output stay bounded in process memory and out of saved state, Room, normal telemetry and shared reports.
+- Prompt and generated output remain out of saved state, normal telemetry, structured logs and shared reports. Persistent content is allowed only through the ADR-0017 Harnex-owned encrypted inference-audit store with bounded retention; no second UI/consumer content store is allowed.
 - Document URIs, signed/download URLs and private filesystem paths never appear in persisted metadata, UI diagnostics or shareable reports.
 - Every displayed value is source-backed or explicitly unavailable; illustrative mockup values must never appear as live data.
 - Model removal requires confirmation and must be blocked while the runtime owns the model. Failure must preserve valid store objects and metadata when possible.
@@ -65,10 +67,11 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 ## Change routing
 
 - Move reusable visual tokens/components to `ui/design-system`; keep app-specific composition and data mapping here.
-- Move runtime, model, telemetry, evaluation, health or benchmark policy to the owning module and expose the smallest neutral contract the app needs.
+- Move runtime, model, telemetry, audit, evaluation, health or benchmark policy to the owning module and expose the smallest neutral contract the app needs.
 - Keep shared-runtime Binder/AIDL, caller authorization and caller-owned ledgers in their transport/integration modules; the phone app owns only the concrete proof service and explicit host configuration.
+- Keep audit encryption/retention/transition policy behind `InferenceAuditRepository`; Compose may receive summaries/details but never ciphertext, Room entities, Keystore handles or raw Binder caller objects.
 - Keep UI models immutable and separate observation from mutating capabilities.
-- Preserve a single process-scoped runtime graph, including its control-plane store owner, across destinations and the proof service; do not create a runtime or control-plane database per screen, Activity recreation or Binder connection.
+- Preserve a single process-scoped runtime graph, including its control-plane and audit-store owners, across destinations and the proof service; do not create runtime or database owners per screen, Activity recreation or Binder connection.
 - For model flows, test progress plus success, cancellation, invalid state, source failure, cleanup and restart reconciliation.
 - For destructive actions, require explicit confirmation, active-resource protection and a privacy-safe terminal result.
 - For asynchronous Diagnostics actions, test success/failure plus stale-generation and lifecycle invalidation behavior.
@@ -104,7 +107,7 @@ When an emulator or physical device is available, run the applicable instrumenta
 Update this file in the same change when:
 
 - composition roots, screen state ownership, navigation or destination structure change;
-- model distribution/management, evaluation, observability or validation orchestration moves between classes;
+- model distribution/management, evaluation, observability, audit or validation orchestration moves between classes;
 - a new direct domain dependency or capability is introduced;
 - privacy, persistence, destructive-action or implicit-side-effect rules change;
 - design-system ownership or accessibility expectations change;

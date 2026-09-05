@@ -196,6 +196,7 @@ dependencies {
     implementation(project(":backends:llama-cpp"))
     implementation(project(":observability:contracts"))
     implementation(project(":observability:in-memory-store"))
+    implementation(project(":observability:room-store"))
     implementation(project(":observability:health-engine"))
     implementation(project(":observability:android-resource-probe"))
     implementation(project(":observability:benchmark-engine"))

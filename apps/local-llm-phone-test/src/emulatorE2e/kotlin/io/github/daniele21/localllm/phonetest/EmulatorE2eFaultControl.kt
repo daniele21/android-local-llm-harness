@@ -9,14 +9,34 @@ import android.os.SystemClock
 /** Emulator-only control surface used by cross-APK lifecycle tests. */
 internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        @Suppress("UNUSED_VARIABLE")
-        val unusedContext = context
+        if (intent.action == EmulatorE2eFaultActions.QUERY_ACTIVITY) {
+            val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
+            if (verifiedPackageName.isNullOrBlank()) {
+                resultCode = Activity.RESULT_CANCELED
+                resultData = "invalid_request"
+                return
+            }
+            resultCode = Activity.RESULT_OK
+            resultData = EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName)
+            return
+        }
+        if (intent.action == EmulatorE2eFaultActions.RUN_INTERNAL_ACTIVITY_PROBE) {
+            resultCode = Activity.RESULT_OK
+            resultData = EmulatorE2eInternalActivityProbe.run(context)
+            return
+        }
+
         when (intent.action) {
             EmulatorE2eFaultActions.PAUSE_GENERATION -> EmulatorE2eGenerationGate.pause()
 
             EmulatorE2eFaultActions.RELEASE_GENERATION -> EmulatorE2eGenerationGate.release()
 
-            EmulatorE2eFaultActions.RESET -> EmulatorE2eGenerationGate.reset()
+            EmulatorE2eFaultActions.FAIL_NEXT_GENERATION -> EmulatorE2eBackendFailureGate.arm()
+
+            EmulatorE2eFaultActions.RESET -> {
+                EmulatorE2eGenerationGate.reset()
+                EmulatorE2eBackendFailureGate.reset()
+            }
 
             EmulatorE2eFaultActions.QUERY -> Unit
 
@@ -34,8 +54,12 @@ internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
 internal object EmulatorE2eFaultActions {
     const val PAUSE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.PAUSE_GENERATION"
     const val RELEASE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION"
+    const val FAIL_NEXT_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.FAIL_NEXT_GENERATION"
+    const val RUN_INTERNAL_ACTIVITY_PROBE = "io.github.daniele21.localllm.phonetest.emulatorE2e.RUN_INTERNAL_ACTIVITY_PROBE"
     const val RESET = "io.github.daniele21.localllm.phonetest.emulatorE2e.RESET"
     const val QUERY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY"
+    const val QUERY_ACTIVITY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY"
+    const val EXTRA_VERIFIED_PACKAGE = "verified_package"
 }
 
 internal object EmulatorE2eGenerationGate {
@@ -90,4 +114,28 @@ internal object EmulatorE2eGenerationGate {
 
     private const val CANCEL_POLL_MILLIS = 100L
     private const val MAX_WAIT_MILLIS = 30_000L
+}
+
+/** One-shot emulator-only fault used to prove a genuine FAILED audit terminal without production hooks. */
+internal object EmulatorE2eBackendFailureGate {
+    private val monitor = Any()
+    private var armed = false
+
+    fun arm() {
+        synchronized(monitor) {
+            armed = true
+        }
+    }
+
+    fun consume(): Boolean = synchronized(monitor) {
+        val shouldFail = armed
+        armed = false
+        shouldFail
+    }
+
+    fun reset() {
+        synchronized(monitor) {
+            armed = false
+        }
+    }
 }

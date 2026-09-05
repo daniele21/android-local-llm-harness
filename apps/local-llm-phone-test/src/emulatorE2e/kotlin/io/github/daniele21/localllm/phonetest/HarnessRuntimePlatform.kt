@@ -101,6 +101,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     override fun shutdown() {
         cancelledRequestIds.clear()
         EmulatorE2eGenerationGate.reset()
+        EmulatorE2eBackendFailureGate.reset()
     }
 
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
@@ -151,6 +152,10 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
                     generationDurationMs = 0,
                 ),
             )
+        }
+
+        check(!EmulatorE2eBackendFailureGate.consume()) {
+            "Injected emulator E2E backend failure"
         }
 
         val output = EmulatorE2eAnalysisResponder.output(request.prompt)

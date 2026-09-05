@@ -10,6 +10,7 @@
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION" />
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RESET" />
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY" />
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY" />
             </intent-filter>
         </receiver>
     </application>

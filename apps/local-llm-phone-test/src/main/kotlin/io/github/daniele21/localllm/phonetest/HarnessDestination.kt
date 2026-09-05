@@ -48,6 +48,7 @@ internal enum class HarnessDestination(val route: String, val label: String, val
     OVERVIEW("overview", "Overview"),
     PLAYGROUND("playground", "Playground"),
     APPS("applications", "Apps"),
+    ACTIVITY("activity", "Activity"),
     PERFORMANCE("performance", "Performance", "Perf"),
     MODELS("models", "Models"),
     DIAGNOSTICS("diagnostics", "Diagnostics", "Diag"),
@@ -55,7 +56,7 @@ internal enum class HarnessDestination(val route: String, val label: String, val
     ;
 
     companion object {
-        val main = listOf(OVERVIEW, PLAYGROUND, APPS, PERFORMANCE, MODELS)
+        val main = listOf(OVERVIEW, PLAYGROUND, APPS, ACTIVITY, PERFORMANCE, MODELS)
 
         fun fromRoute(route: String?): HarnessDestination = entries.firstOrNull { it.route == route } ?: OVERVIEW
     }
@@ -266,6 +267,27 @@ private fun DrawScope.drawHarnessDestinationGlyph(destination: HarnessDestinatio
         }
 
         HarnessDestination.APPS -> drawAppsGlyph(color, stroke)
+
+        HarnessDestination.ACTIVITY -> {
+            drawCircle(
+                color = color,
+                radius = width * 0.34f,
+                center = Offset(width * 0.5f, height * 0.5f),
+                style = stroke,
+            )
+            drawLine(
+                color,
+                Offset(width * 0.5f, height * 0.5f),
+                Offset(width * 0.5f, height * 0.29f),
+                stroke.width,
+            )
+            drawLine(
+                color,
+                Offset(width * 0.5f, height * 0.5f),
+                Offset(width * 0.68f, height * 0.61f),
+                stroke.width,
+            )
+        }
 
         HarnessDestination.PERFORMANCE -> {
             drawLine(color, Offset(width * 0.14f, height * 0.78f), Offset(width * 0.14f, height * 0.28f), stroke.width)

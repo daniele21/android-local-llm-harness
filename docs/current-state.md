@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
 This is the operational ledger for integrated state, blockers and immediate work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail stays in its focused workstream/specification.
 
@@ -24,7 +24,7 @@ The repository has pinned `llama.cpp`, reproducible Android `arm64-v8a` packagin
 
 ### Android product and control plane
 
-`apps/local-llm-phone-test` exposes Overview, Playground, Applications, Performance, Models, Diagnostics and Settings over real repository sources. Public identity is **Harnex** — **“Your local AI harness for Android.”** Historical `Harness*`, package/Binder IDs and compatibility filenames remain technical identifiers.
+`apps/local-llm-phone-test` exposes Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings over real repository sources. Public identity is **Harnex** — **“Your local AI harness for Android.”** Historical `Harness*`, package/Binder IDs and compatibility filenames remain technical identifiers.
 
 Applications control-plane work is complete through ACUX-80 and CPREC-10..70. Startup reconciles mandatory built-ins before UI/Binder readers, preserves valid custom/default/disabled state and stays off the main thread. CPREC-80/90 and broader phone UX/runtime claims still require representative-device evidence. See [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
 
@@ -62,7 +62,9 @@ Model-evaluation contracts/evaluators and core dataset pipeline are integrated t
 
 ### Local inference activity and audit
 
-The [Local inference activity and audit workstream](workstreams/local-inference-activity-audit.md) is now active. It owns the next additive visibility/audit lane without changing the validated shared-runtime ownership boundary or reopening release-complete LAS behavior.
+Local inference Activity/audit is implemented as the Harnex-owned durable history for accepted local inference. Sensitive input, rendered effective prompt, answer/reasoning and metrics are persisted in bounded encrypted app-private storage; normal telemetry, structured logs and diagnostics export stay content-free. External records use verified Binder caller attribution, internal Playground generation uses `HARNEX_INTERNAL`, and restart reconciliation converts orphaned non-terminal records to truthful `INTERRUPTED` state.
+
+The API 35 exact-candidate acceptance matrix covers RedactGuard `COMPLETED` persistence across Host restart, explicit `CANCELLED`, deterministic backend `FAILED`, Host process-loss `INTERRUPTED / HOST_PROCESS_LOSS`, and a completed Harnex-internal generation. Cross-process evidence exports metadata and sensitive-field presence only, not sensitive values. Durable behavior is owned by [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md) and ADR 0017.
 
 ## Open blockers
 
@@ -81,8 +83,7 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 1. execute LAS-07 only for the representative physical claims it genuinely owns, retaining exact source/APK/model/device identity;
 2. continue OMB-6B and OMB-8 from the now-stable cross-repository baseline;
 3. continue model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP independently where ownership does not conflict;
-4. start the [Local inference activity and audit workstream](workstreams/local-inference-activity-audit.md) with LIA-00/LIA-05 contract convergence, then fan out the independent telemetry/runtime/Host/store/UI foundations in parallel;
-5. keep future release tags/artifacts tied to exact validated `main` commits and preserve the ADR 0008 `main -> dev` synchronization after promotions.
+4. keep future release tags/artifacts tied to exact validated `main` commits and preserve the ADR 0008 `main -> dev` synchronization after promotions.
 
 ## Source links
 
@@ -90,7 +91,7 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/config
 - Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
-- Local inference activity/audit: [`workstreams/local-inference-activity-audit.md`](workstreams/local-inference-activity-audit.md)
+- Local inference activity/audit: [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md), [`adr/0017-durable-local-inference-audit.md`](adr/0017-durable-local-inference-audit.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)

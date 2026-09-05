@@ -17,7 +17,6 @@ import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
-import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -71,7 +70,7 @@ internal class PhoneTestController(
             progress("Loading ${model.fileName} into memory")
             try {
                 val harness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
-                val prepared = harness.runtime.prepare(harness.applicationId, harness.useCaseId)
+                val prepared = harness.client.prepare(harness.applicationId, harness.useCaseId)
                 check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
 
                 persist(model)
@@ -165,26 +164,24 @@ internal class PhoneTestController(
 
     private fun runGeneration(model: ImportedPhoneModel, maxOutputTokens: Int): GenerationSummary {
         val harness = buildHarness(model)
-        val runtime = harness.runtime
-        val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
+        val prepared = harness.client.prepare(harness.applicationId, harness.useCaseId)
         check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
-        val session = runtime.createSession(harness.applicationId, harness.useCaseId)
-        val completed = generateAndAwait(runtime, harness, session, GENERATION_PROMPT, maxOutputTokens)
+        val session = harness.client.createSession(harness.applicationId, harness.useCaseId)
+        val completed = generateAndAwait(harness, session, GENERATION_PROMPT, maxOutputTokens)
         check(completed.output.isNotBlank()) { "Generation returned an empty output" }
-        closeSessionAndUnload(runtime, session)
+        closeSessionAndUnload(harness, session)
         return GenerationSummary.from(completed.metrics)
     }
 
     private fun runCancellation(model: ImportedPhoneModel) {
         val harness = buildHarness(model)
-        val runtime = harness.runtime
-        val prepared = runtime.prepare(harness.applicationId, harness.useCaseId)
+        val prepared = harness.client.prepare(harness.applicationId, harness.useCaseId)
         check(prepared.ready) { "Prepare failed: ${prepared.detail}" }
-        val session = runtime.createSession(harness.applicationId, harness.useCaseId)
+        val session = harness.client.createSession(harness.applicationId, harness.useCaseId)
         val firstDelta = CountDownLatch(1)
         val terminal = CountDownLatch(1)
         val terminalEvent = AtomicReference<GenerationEvent>()
-        val handle = runtime.generate(
+        val handle = harness.client.generate(
             request(harness, session, CANCELLATION_PROMPT, CANCELLATION_OUTPUT_TOKENS),
             GenerationListener { event ->
                 if (event is GenerationEvent.TextDelta) firstDelta.countDown()
@@ -205,7 +202,7 @@ internal class PhoneTestController(
         check(result is GenerationEvent.Failed && result.error is LocalLlmError.Cancelled) {
             "Expected a cancelled terminal event"
         }
-        closeSessionAndUnload(runtime, session)
+        closeSessionAndUnload(harness, session)
     }
 
     private fun runMemoryCycles(model: ImportedPhoneModel): MemorySummary {
@@ -228,7 +225,6 @@ internal class PhoneTestController(
         runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PHYSICAL_VALIDATION)
 
     private fun generateAndAwait(
-        runtime: RuntimeOrchestrator,
         harness: PhoneHarness,
         session: SessionId,
         prompt: String,
@@ -236,7 +232,7 @@ internal class PhoneTestController(
     ): GenerationEvent.Completed {
         val terminal = CountDownLatch(1)
         val terminalEvent = AtomicReference<GenerationEvent>()
-        runtime.generate(
+        harness.client.generate(
             request(harness, session, prompt, maxOutputTokens),
             GenerationListener { event ->
                 if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
@@ -265,12 +261,12 @@ internal class PhoneTestController(
             overrides = GenerationOverrides(maxOutputTokens = maxOutputTokens),
         )
 
-    private fun closeSessionAndUnload(runtime: RuntimeOrchestrator, session: SessionId) {
-        runtime.closeSession(session)
-        check(eventually { runtime.runtimeSnapshot().activeSessions == 0 }) {
+    private fun closeSessionAndUnload(harness: PhoneHarness, session: SessionId) {
+        harness.client.closeSession(session)
+        check(eventually { harness.runtime.runtimeSnapshot().activeSessions == 0 }) {
             "Session context was not released"
         }
-        check(runtime.unloadIdleModel()) { "Idle model was not unloaded" }
+        check(harness.runtime.unloadIdleModel()) { "Idle model was not unloaded" }
     }
 
     private fun eventually(condition: () -> Boolean): Boolean {
@@ -336,7 +332,7 @@ internal class PhoneTestController(
         appendLine("thermalStart=$startThermal")
         appendLine("thermalEnd=$endThermal")
         appendLine("validationDurationMs=$durationMs")
-        append("privacy=prompts-and-generated-output-not-recorded")
+        append("privacy=report-excludes-prompts-and-generated-output;local-inference-audit=enabled")
     }
 
     private fun buildFailureReport(model: ImportedPhoneModel?, detail: String): String = buildString {
@@ -349,7 +345,7 @@ internal class PhoneTestController(
             appendLine("quantization=${it.quantization}")
         }
         appendLine("error=$detail")
-        append("privacy=prompts-and-generated-output-not-recorded")
+        append("privacy=report-excludes-prompts-and-generated-output;local-inference-audit=enabled")
     }
 
     private fun deviceSummary(): String {

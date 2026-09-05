@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.ThinkingMode
@@ -47,7 +48,12 @@ data class ImportedPhoneModel(
     }
 }
 
-internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
+internal data class PhoneHarness(
+    val runtime: RuntimeOrchestrator,
+    val client: LocalLlmClient,
+    val applicationId: ApplicationId,
+    val useCaseId: UseCaseId,
+)
 
 internal enum class PlaygroundPhase {
     IDLE,
