@@ -29,19 +29,17 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AuthorizedLegacyRuntimeRoutingTest {
-    private val caller =
-        AuthorizedCaller(
-            uid = 42,
-            packageName = "io.redactguard",
-            applicationId = ApplicationId("redactguard"),
-            allowedUseCases = setOf(UseCaseId("redaction")),
-        )
+    private val caller = AuthorizedCaller(
+        uid = 42,
+        packageName = "io.redactguard",
+        applicationId = ApplicationId("redactguard"),
+        allowedUseCases = setOf(UseCaseId("redaction")),
+    )
 
     @Test
     fun `legacy Binder operations use the client created from the verified caller`() {
         val ledger = ClientConnectionLedger()
-        val token =
-            (ledger.register(caller, BinderProtocolV1.MINOR, emptySet()) as LedgerResult.Success).value
+        val token = (ledger.register(caller, BinderProtocolV1.MINOR, emptySet()) as LedgerResult.Success).value
         val tokenParcel = ClientTokenParcel(token.value)
         val resources = HostRuntimeResources()
         resources.attachCallbackDispatcher(
@@ -54,22 +52,19 @@ class AuthorizedLegacyRuntimeRoutingTest {
         val fallback = RoutingFakeClient("fallback")
         val scoped = RoutingFakeClient("scoped")
         val seenCallers = mutableListOf<AuthorizedCaller>()
-        val operations =
-            HostRuntimeOperations(
-                client = fallback,
-                ledger = ledger,
-                resources = resources,
-                controlExecutor =
-                    HostControlExecutor { task ->
-                        task()
-                        true
-                    },
-                authorizedRuntimeClientFactory =
-                    AuthorizedRuntimeClientFactory { verifiedCaller ->
-                        seenCallers += verifiedCaller
-                        scoped
-                    },
-            )
+        val operations = HostRuntimeOperations(
+            client = fallback,
+            ledger = ledger,
+            resources = resources,
+            controlExecutor = HostControlExecutor { task ->
+                task()
+                true
+            },
+            authorizedRuntimeClientFactory = AuthorizedRuntimeClientFactory { verifiedCaller ->
+                seenCallers += verifiedCaller
+                scoped
+            },
+        )
 
         var prepareError: String? = "not-called"
         operations.prepare(
@@ -111,16 +106,15 @@ class AuthorizedLegacyRuntimeRoutingTest {
         assertEquals(emptyList<SessionId>(), fallback.closedSessions)
     }
 
-    private fun generationRequest(token: ClientTokenParcel) =
-        GenerationRequestParcel(
-            clientToken = token,
-            externalRequestId = "external-request",
-            externalSessionId = "external-session",
-            useCaseId = "redaction",
-            input = GenerationInputParcel(WireTags.INPUT_TEXT, "secret", emptyList()),
-            overrides = GenerationOverridesParcel(null, null, null, null, null, null, null, null, null, null, null, null, null),
-            outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
-        )
+    private fun generationRequest(token: ClientTokenParcel) = GenerationRequestParcel(
+        clientToken = token,
+        externalRequestId = "external-request",
+        externalSessionId = "external-session",
+        useCaseId = "redaction",
+        input = GenerationInputParcel(WireTags.INPUT_TEXT, "secret", emptyList()),
+        overrides = GenerationOverridesParcel(null, null, null, null, null, null, null, null, null, null, null, null, null),
+        outputConstraint = OutputConstraintParcel(WireTags.CONSTRAINT_TEXT, null),
+    )
 
     private class RoutingFakeClient(private val name: String) : LocalLlmClient {
         var prepareCalls = 0
