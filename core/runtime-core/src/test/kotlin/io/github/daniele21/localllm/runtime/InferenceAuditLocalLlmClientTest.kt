@@ -178,8 +178,7 @@ class InferenceAuditLocalLlmClientTest {
 
         override fun runtimeSnapshot(): RuntimeSnapshot = RuntimeSnapshot(RuntimeState.READY, null, 1, 0)
 
-        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-            PrepareResult(true, null, "ready")
+        override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult = PrepareResult(true, null, "ready")
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId = SessionId("session-1")
 
