@@ -128,6 +128,5 @@ internal class HostRuntimeOperations(
         }
     }
 
-    private fun runtimeClient(caller: AuthorizedCaller): LocalLlmClient =
-        authorizedRuntimeClientFactory?.create(caller) ?: client
+    private fun runtimeClient(caller: AuthorizedCaller): LocalLlmClient = authorizedRuntimeClientFactory?.create(caller) ?: client
 }
