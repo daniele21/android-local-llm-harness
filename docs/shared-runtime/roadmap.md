@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime
 Canonical scope: shared-runtime.roadmap
 Read when: selecting a shared-runtime milestone, checking dependencies or defining a focused pull request
-Last reviewed: 2026-08-13
+Last reviewed: 2026-09-05
 
 This roadmap owns capability order and exit gates. Detailed behavior belongs in the linked workstreams; integrated repository priority and blockers remain in [`../current-state.md`](../current-state.md).
 
@@ -29,6 +29,8 @@ Q35 physical runtime evidence ----- release dependency -----^
 
 SR-2 and SR-3 may proceed independently only after SR-1 freezes the v1 fixtures and semantics. They must not invent separate wire DTOs or error mappings.
 
+ADR 0017 is the accepted trust amendment for independently signed consumers. It supersedes the same-signer/signature-permission portion of ADR 0012 without changing the Host-owned model/use-case or Binder protocol boundaries.
+
 ## SR-0 — Decision and scope
 
 State: **DONE**
@@ -37,10 +39,10 @@ Goal: convert the proposal into an accepted durable deployment decision.
 
 Required outputs:
 
-- ADR 0012 covering same-signer trust, bound-only lifecycle, explicit component binding, host-owned identity/model selection and protocol independence;
+- ADR 0012 covering the original shared-runtime boundary and ADR 0017 covering independently signed consumer authorization;
 - confirmed module ownership from [`architecture.md`](architecture.md);
 - explicit proof-host versus final-host decision boundary;
-- compatibility and privacy review of the proposed v1 surface;
+- compatibility and privacy review of the supported surface;
 - no service or empty Gradle modules before the decision is accepted.
 
 Exit gate: all decisions listed in [`target.md`](target.md) are accepted or the dependent plan is revised.
@@ -71,11 +73,12 @@ Owner: [`workstreams/host-service.md`](workstreams/host-service.md)
 
 Dependencies: SR-0 and SR-1.
 
-Progress: **SR-HOST-01 through SR-HOST-09 are implemented. The host now exposes the shared process-scoped runtime through the signature-protected proof service, resolves the external console only through exact host-owned bindings, and delegates Android memory/service lifecycle without duplicate runtime ownership.**
+Progress: **SR-HOST-01 through SR-HOST-10 are implemented. The host exposes the shared process-scoped runtime behind the `BIND_LOCAL_LLM` capability permission, performs exact Binder caller authorization through Harnex Control Plane policy, supports independently signed consumers without shared signing credentials, and delegates Android memory/service lifecycle without duplicate runtime ownership.**
 
 Exit gate:
 
-- exported service is protected by signature permission and explicit caller policy;
+- exported service uses the explicit bind capability while actual authority remains Binder UID/package/signer + Harnex Control Plane policy;
+- independently signed known consumers are source-observed pending and require explicit authorization; signer replacement fails closed;
 - Binder threads do no heavy runtime work;
 - client/session/request ownership is isolated and death-aware;
 - host resolves exact application/use-case/model binding without client model control;
@@ -91,34 +94,36 @@ Owner: [`workstreams/client-sdk.md`](workstreams/client-sdk.md)
 
 Dependencies: SR-0 and SR-1. SR-2 is complete for the proof host.
 
-Progress: **SR-CLIENT-01 through SR-CLIENT-08 are implemented. The client exposes a high-level `BinderLocalLlmClient` over exact binding, v1 negotiation, registered-client lifecycle, non-main prepare/session adaptation, ordered bounded streaming, idempotent cancellation and deterministic epoch/dead-object/timeout handling. The Console now has explicit shared-runtime connect/retry states and a remote inference target without conflating proof-host inference with console-local diagnostics. Packaged client/contract AAR consumption, consumer shrinker rules and client-AAR structure are repository-validated.**
+Progress: **SR-CLIENT-01 through SR-CLIENT-08 are implemented. The client exposes a high-level `BinderLocalLlmClient` over exact binding, v1 negotiation, registered-client lifecycle, non-main prepare/session adaptation, ordered bounded streaming, idempotent cancellation and deterministic epoch/dead-object/timeout handling. The Consumer SDK also supports reusable explicit disconnect/reconnect without turning transport lifetime into authorization state. Packaged client/contract AAR consumption, consumer shrinker rules and client-AAR structure are repository-validated.**
 
 Exit gate:
 
 - explicit bind and protocol handshake have typed connection states;
 - `BinderLocalLlmClient` preserves supported core semantics on non-main executors;
 - ordered callbacks reconstruct terminal core events without duplicate aggregate transfer;
-- disconnect, close and `DeadObjectException` paths are deterministic;
+- disconnect, reconnect, close and `DeadObjectException` paths are deterministic;
 - generated Binder implementation does not leak into consumer application code.
 
 ## SR-4 — Two-APK vertical slice
 
 State: **IN PROGRESS**
 
-Goal: prove the full path using existing repository applications.
+Goal: prove the full path using existing repository applications and real external consumers.
 
 Dependencies: SR-2 and SR-3.
 
 Integrated implementation:
 
-- `apps/local-llm-phone-test` exposes the proof host service and exact same-signer console binding;
+- `apps/local-llm-phone-test` exposes the proof Host service and exact Host-owned application/use-case policy;
+- same-publisher Console flows remain supported where intentionally configured;
+- independently signed consumers such as RedactGuard use source-observed package/signer identity and explicit Harnex authorization;
 - `apps/local-llm-console` contains a real Binder instrumentation flow for prepare, session, stream, complete, cancel and close;
-- `scripts/run-shared-runtime-device-e2e.sh` installs the two debug APKs and executes the cross-process preflight;
-- unavailable, denied, incompatible and disconnected states remain typed.
+- cross-repository RedactGuard evidence signs Host and consumer with distinct ephemeral identities and proves denial-before-approval plus authorized reconnect;
+- unavailable, pending, signer-changed, denied, incompatible and disconnected states remain typed.
 
-Remaining exit evidence: execute the repeatable two-APK preflight on an actual emulator/device with a curated Qwen3.5 model installed and selected in the host. Repository implementation alone does not satisfy this physical/execution gate.
+Remaining exit evidence depends on the exact claim: deterministic emulator evidence proves the cross-APK trust and lifecycle boundary; physical Play/Internal and real-GGUF/device evidence remain separate when release/distribution/runtime claims require them.
 
-Exit gate: a repeatable emulator/device preflight installs both APKs and completes the functional flow without bypassing runtime, store or authorization policy.
+Exit gate: repeatable cross-APK preflight completes the functional flow without bypassing runtime, store or authorization policy and uses the signing topology being claimed.
 
 ## SR-5 — Resilience and isolation
 
@@ -152,30 +157,32 @@ Exit gate:
 
 State: **IN PROGRESS**
 
-Goal: validate the exact two-APK distribution and decide whether the client artifact can be published.
+Goal: validate the exact supported distribution topology and decide whether the client artifact can be published/promoted.
 
 Owner: [`workstreams/validation-rollout.md`](workstreams/validation-rollout.md)
 Runbook: [`sr6-release-evidence.md`](sr6-release-evidence.md)
 
 Dependencies: SR-5 plus applicable Q35 runtime/device gates.
 
-Repository implementation in progress:
+Repository implementation/evidence includes:
 
 - packaged release Binder client/contract AAR consumer fixture;
-- same-signer release-like functional/cancellation/process-death instrumentation;
-- independently signed ephemeral negative fixture;
+- same-publisher release-like functional/cancellation/process-death instrumentation where that topology is still intentionally supported;
+- independently signed Host/consumer E2E for external consumers, including distinct certificate proof and explicit Harnex authorization;
+- negative unknown/mismatched signer evidence;
 - physical-device evidence capture with package/certificate/protocol/device/memory/thermal identity;
 - explicit evidence privacy boundary and archive format.
 
-Remaining exit evidence requires execution on representative physical hardware and completion of the public API/security/versioning/release review for the exact candidate. Q35 physical runtime evidence remains an independent release dependency.
+Remaining exit evidence requires completion of the public API/security/versioning/release review for the exact candidate plus the REAL_ENVIRONMENT evidence material to the distribution/runtime claim. Q35 physical runtime evidence remains an independent release dependency.
 
 Exit gate:
 
-- same-signer release-like host/client APKs pass the two-APK physical-device matrix;
-- an independently signed negative fixture is denied without committed signing material;
-- Binder overhead, memory, cancellation and process-death evidence is reviewable;
+- every claimed Host/client signing topology has production-shaped evidence;
+- independently distributed consumers prove distinct signers, denial before authorization and success only after explicit authorization of the exact observed identity;
+- unknown/mismatched signer fixtures remain denied without committed signing material;
+- Binder overhead, memory, cancellation and process-death evidence is reviewable where required;
 - public API, security, versioning, packaging and consumer sample review pass;
-- release notes bind host version, client SDK version, protocol version, runtime/backend and model evidence.
+- release notes bind host version, client SDK version, protocol version, signing identities, runtime/backend and model evidence.
 
 ## Pull-request slicing
 
@@ -186,7 +193,7 @@ Exit gate:
 | SR-1b | Core/wire mapping and compatibility tests | `dev` |
 | SR-2 | Host integration module with fake `LocalLlmClient` tests | `dev` |
 | SR-3 | Client adapter with fake Binder service tests | `dev` |
-| SR-4 | Phone host plus console client vertical slice | `dev` |
+| SR-4 | Phone host plus consumer vertical slices | `dev` |
 | SR-5 | Death, multi-client, backpressure and privacy hardening | `dev` |
 | SR-6 | Device runner, evidence and release packaging | `dev` |
 
@@ -194,7 +201,7 @@ Combine adjacent slices only when the intermediate state would not compile or te
 
 ## Branch and validation rule
 
-Ordinary work starts from the latest green `dev`. If `main` contains a promotion merge not yet synchronized back, complete the protected `main -> dev` synchronization first. Each shared-contract, Gradle, manifest or multi-app change runs the repository-wide gate in addition to focused workstream checks.
+Ordinary work starts from the latest green `dev`. If `main` contains a promotion merge not yet synchronized back, complete the protected `main -> dev` synchronization first. Each shared-contract, Gradle, manifest or multi-app change runs the repository selector with `profile=auto` in addition to focused workstream checks; security/Manifest/public-SDK/cross-app changes require the resulting strong/full gates without manual downgrades.
 
 ## State update rule
 
