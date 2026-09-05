@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
 This file tracks capability-level milestones and remaining outcomes. Active branch/PR state and the next implementation task belong in [`current-state.md`](current-state.md).
 
@@ -19,6 +19,7 @@ Broad device/runtime production claims still require representative physical-dev
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | llama.cpp runtime efficiency and hardware execution | Planned / baseline-first | Qualify upstream evolution, improve CPU efficiency, then evaluate measured accelerator lanes |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
+| Local inference Activity and audit | Implemented | Maintain bounded encrypted audit history, verified attribution and privacy separation as generation paths evolve |
 | Dataset-based model evaluation | In progress | Dataset packs, deterministic evaluators, execution, persistence/comparison UI and physical evidence |
 | Curated model distribution and installation | Implemented / device evidence pending | Remote download/install validation on representative phones |
 | Qwen3.5-only product transition | In progress / certification pending | Q35-6 physical tuning, Q35-7 validation and Q35-8 exact-artifact certification |
@@ -131,16 +132,17 @@ Qwen sequence and exit gates are owned by [`qwen35/roadmap.md`](qwen35/roadmap.m
 
 Implemented:
 
-- bounded in-memory and Room stores;
+- bounded in-memory and Room telemetry stores;
 - run lifecycle and request-correlated structured logs;
 - privacy-safe timelines and typed error codes;
 - queue, load, TTFT, prefill, decode, total, token and throughput metrics;
 - effective generation metadata;
+- durable local inference Activity/audit with bounded encrypted sensitive content, verified origin attribution, restart reconciliation and request correlation to privacy-safe diagnostics;
 - health-suite orchestration, model integrity and generation sanity;
 - Android memory and thermal snapshots;
 - cache health and targeted repair;
 - cold/warm benchmark keys, active baselines, retained immutable history and regression checks;
-- connected phone Diagnostics surfaces.
+- connected phone Diagnostics and Activity surfaces.
 
 Remaining:
 
@@ -157,13 +159,13 @@ Dataset-based semantic model evaluation remains separate. EVAL-1 provides determ
 
 Implemented:
 
-- Compose/Material 3 with Overview, Playground, Applications, Performance, Models, Diagnostics and Settings;
+- Compose/Material 3 with Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings;
 - compact and expanded navigation;
 - reproducible Harnex identity and shared design system;
 - shared process runtime graph;
 - real model management and Playground inference;
 - Playground and Models ViewModel/UDF boundaries;
-- typed Settings, request-timeline and model-detail routes;
+- typed Settings, request-timeline, Activity list/detail and model-detail routes;
 - privacy-safe model inventory, diagnostics and validation reports;
 - Google Play Internal Testing publication for the integrated candidate;
 - stable-line promotion of the validated current baseline.
@@ -192,7 +194,7 @@ These integrations must not duplicate runtime policy or create a second model st
 
 ## 7. Shared runtime, Consumer API and control plane
 
-Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries and the OMBRA reference flow.
+Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries, Harnex-owned inference Activity/audit and the OMBRA reference flow.
 
 Automated lifecycle convergence is complete: Harnex source `6b34fe9f...` publishes Consumer SDK `0.1.0-alpha.10`, RedactGuard consumes it, and the complete API 35 Two-APK lifecycle/fault/serialization matrix is green. The validated Harnex and RedactGuard baselines are now promoted to their stable `main` lines. A representative manual RedactGuard run confirms the practical real-device flow. Formal ARM64/JNI/GGUF/memory/thermal/OEM evidence remains separate.
 
