@@ -45,6 +45,7 @@ internal class HarnessObservedApplicationIdentityReconciler(
                     store.transact { latest ->
                         when (val result = reconciler.reconcile(latest, observedAtEpochMs)) {
                             is HarnessControlPlaneReconciliationResult.Success -> result.state
+
                             is HarnessControlPlaneReconciliationResult.Conflict ->
                                 throw HarnessControlPlaneStartupConflictException(result.code, result.identity)
                         }
