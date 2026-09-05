@@ -53,9 +53,9 @@ class HarnessObservedApplicationIdentityReconcilerTest {
         store.transact { current ->
             current.copy(
                 applications =
-                    current.applications.map { application ->
-                        application.copy(state = ApplicationRegistrationState.AUTHORIZED)
-                    },
+                current.applications.map { application ->
+                    application.copy(state = ApplicationRegistrationState.AUTHORIZED)
+                },
             )
         }
 
@@ -66,13 +66,12 @@ class HarnessObservedApplicationIdentityReconcilerTest {
         assertEquals(ApplicationRegistrationState.SIGNATURE_CHANGED, changed.state)
     }
 
-    private fun redactGuardPolicy(signer: String) =
-        AuthorizedClientPolicy(
-            packageName = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
-            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-            allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
-            acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(signer)),
-        )
+    private fun redactGuardPolicy(signer: String) = AuthorizedClientPolicy(
+        packageName = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
+        applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+        allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
+        acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(signer)),
+    )
 
     private companion object {
         const val SIGNER_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
