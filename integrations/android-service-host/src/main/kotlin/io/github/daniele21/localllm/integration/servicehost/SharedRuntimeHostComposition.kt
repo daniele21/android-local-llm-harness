@@ -12,11 +12,11 @@ class SharedRuntimeHostComposition(
     permissionName: String,
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
-    authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
     authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
     policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
+    authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) : AutoCloseable {
     private val consumerApiEnabled = authorizedConsumerClientFactory != null
     private val delegate = SharedRuntimeHostDelegate(
