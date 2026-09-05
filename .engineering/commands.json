@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": "0.6.0",
+  "contract_version": "0.6.1",
   "commands": {
     "setup": {"status": "required", "run": "bash bootstrap-wrapper.sh && git submodule update --init --recursive"},
     "doctor": {"status": "recommended", "run": "java -version && python3 --version && cmake --version && ./gradlew --version"},
@@ -31,14 +31,18 @@
       "full_diff_review_required": true,
       "durable_documentation_current_required": true,
       "remote_preflight_when_required_gates_unavailable_local": true,
-      "e2e_default": "affected_critical_journeys"
+      "e2e_default": "affected_critical_journeys",
+      "automated_e2e_required_when_affected": true,
+      "real_environment_blocking": false,
+      "real_environment_deferred_to_release": true
     },
     "release": {
       "exact_head_required": true,
       "full_diff_review_required": true,
       "durable_documentation_current_required": true,
       "full_validation_required": true,
-      "e2e_default": "release_critical_journeys"
+      "e2e_default": "release_critical_journeys",
+      "required_real_environment_blocking": true
     },
     "parallel_development_prefers_early_convergence": true,
     "stacked_publication_exception_only": true

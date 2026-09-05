@@ -18,6 +18,7 @@ REQUIRED = (
     "docs/architecture.md", "docs/current-state.md", "docs/features/README.md",
     "docs/adr/README.md", "docs/workstreams/README.md",
     "scripts/verify_operations.py", "scripts/verify_e2e.py",
+    "scripts/verify_stage_environment_policy.py",
     "scripts/verify_product_experience.py", "scripts/detect_ci_scope.py",
 )
 PR_TEMPLATES = (".github/PULL_REQUEST_TEMPLATE.md", ".github/pull_request_template.md")
@@ -38,7 +39,7 @@ def main() -> int:
         standard = baseline.get("standard", {})
         if baseline.get("schema_version") != 1: errors.append("baseline schema_version must be 1")
         if standard.get("source") != "daniele21/repo-template-sw": errors.append("baseline standard.source must identify daniele21/repo-template-sw")
-        if standard.get("version") != "0.9.1": errors.append("baseline standard.version must be 0.9.1")
+        if standard.get("version") != "0.9.2": errors.append("baseline standard.version must be 0.9.2")
         if baseline.get("target_level") not in {"L0", "L1", "L2"}: errors.append("target_level must be L0, L1 or L2")
         if not isinstance(baseline.get("profiles"), list): errors.append("profiles must be a list")
         skills = baseline.get("skills", {})

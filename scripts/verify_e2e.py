@@ -23,6 +23,7 @@ REAL_CONFIRMATION = {"required", "conditional", "not_required"}
 UI_EVIDENCE_MODES = ["assertions", "screenshots", "full_media"]
 UI_EVIDENCE_MODE_SET = set(UI_EVIDENCE_MODES)
 REQUIRED_FULL_MEDIA_TRIGGERS = {
+    "material_ui_integration_outcome",
     "motion_or_animation",
     "timing_or_progression",
     "navigation_or_transition_sequence",
@@ -121,14 +122,12 @@ def main() -> int:
         print("E2E environment fidelity contract check")
         print("FAIL: missing required file: .engineering/e2e.json")
         return 1
-
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         print("E2E environment fidelity contract check")
         print(f"FAIL: invalid .engineering/e2e.json: {exc}")
         return 1
-
     if not isinstance(data, dict):
         print("E2E environment fidelity contract check")
         print("FAIL: .engineering/e2e.json must contain a JSON object")
@@ -136,25 +135,22 @@ def main() -> int:
 
     if data.get("schema_version") != 1:
         errors.append("schema_version must be 1")
-    if data.get("contract_version") != "0.2.0":
-        errors.append("contract_version must be 0.2.0")
+    if data.get("contract_version") != "0.2.1":
+        errors.append("contract_version must be 0.2.1")
 
     applicability = data.get("applicability")
     if not isinstance(applicability, dict):
-        errors.append("applicability must be an object")
-        applicability = {}
+        errors.append("applicability must be an object"); applicability = {}
     status = applicability.get("status")
     if status not in APPLICABILITY:
         errors.append(f"applicability.status must be one of {sorted(APPLICABILITY)}")
     if not non_empty_string(applicability.get("reason")):
         errors.append("applicability.reason is required")
 
-    commands_path = root / ".engineering" / "commands.json"
-    commands_data = read_json(commands_path, ".engineering/commands.json", errors)
+    commands_data = read_json(root / ".engineering" / "commands.json", ".engineering/commands.json", errors)
     commands_section = commands_data.get("commands") if commands_data else None
     if commands_data and not isinstance(commands_section, dict):
-        errors.append("commands.json commands must be an object")
-        command_entry = None
+        errors.append("commands.json commands must be an object"); command_entry = None
     else:
         command_entry = commands_section.get("e2e") if isinstance(commands_section, dict) else None
     command_status = command_entry.get("status") if isinstance(command_entry, dict) else None
@@ -168,148 +164,97 @@ def main() -> int:
         errors.append("E2E applicability required requires commands.e2e.status = required")
 
     principles = data.get("principles")
-    if not isinstance(principles, dict):
-        errors.append("principles must be an object")
-        principles = {}
+    if not isinstance(principles, dict): errors.append("principles must be an object"); principles = {}
     for key in REQUIRED_PRINCIPLES:
-        if principles.get(key) is not True:
-            errors.append(f"principles.{key} must be true")
+        if principles.get(key) is not True: errors.append(f"principles.{key} must be true")
+
+    stage_policy = data.get("stage_policy")
+    if not isinstance(stage_policy, dict): errors.append("stage_policy must be an object"); stage_policy = {}
+    integration_policy = stage_policy.get("integration")
+    if not isinstance(integration_policy, dict): errors.append("stage_policy.integration must be an object"); integration_policy = {}
+    if integration_policy.get("automated_e2e_before_shared_integration") is not True: errors.append("stage_policy.integration.automated_e2e_before_shared_integration must be true")
+    if integration_policy.get("real_environment_blocking") is not False: errors.append("stage_policy.integration.real_environment_blocking must be false")
+    if integration_policy.get("real_environment_deferred_to_release") is not True: errors.append("stage_policy.integration.real_environment_deferred_to_release must be true")
+    if integration_policy.get("material_ui_journey_minimum_evidence_mode") != "full_media": errors.append("stage_policy.integration.material_ui_journey_minimum_evidence_mode must be full_media")
+    if integration_policy.get("incidental_ui_may_use_assertions") is not True: errors.append("stage_policy.integration.incidental_ui_may_use_assertions must be true")
+    release_policy = stage_policy.get("release")
+    if not isinstance(release_policy, dict): errors.append("stage_policy.release must be an object"); release_policy = {}
+    if release_policy.get("full_validation_required") is not True: errors.append("stage_policy.release.full_validation_required must be true")
+    if release_policy.get("release_critical_e2e_required") is not True: errors.append("stage_policy.release.release_critical_e2e_required must be true")
+    if release_policy.get("required_real_environment_blocking") is not True: errors.append("stage_policy.release.required_real_environment_blocking must be true")
 
     ui_evidence = data.get("ui_evidence")
-    if not isinstance(ui_evidence, dict):
-        errors.append("ui_evidence must be an object")
-        ui_evidence = {}
-    if ui_evidence.get("modes") != UI_EVIDENCE_MODES:
-        errors.append("ui_evidence.modes must be assertions, screenshots, full_media in that order")
-    if ui_evidence.get("default_mode") not in UI_EVIDENCE_MODE_SET:
-        errors.append("ui_evidence.default_mode must be a declared UI evidence mode")
-    if ui_evidence.get("assertions_allowed_when_ui_incidental") is not True:
-        errors.append("ui_evidence.assertions_allowed_when_ui_incidental must be true")
-    full_media_triggers = set(ui_evidence.get("full_media_triggers") or [])
-    missing_triggers = sorted(REQUIRED_FULL_MEDIA_TRIGGERS - full_media_triggers)
-    if missing_triggers:
-        errors.append("ui_evidence.full_media_triggers missing: " + ", ".join(missing_triggers))
+    if not isinstance(ui_evidence, dict): errors.append("ui_evidence must be an object"); ui_evidence = {}
+    if ui_evidence.get("modes") != UI_EVIDENCE_MODES: errors.append("ui_evidence.modes must be assertions, screenshots, full_media in that order")
+    if ui_evidence.get("default_mode") not in UI_EVIDENCE_MODE_SET: errors.append("ui_evidence.default_mode must be a declared UI evidence mode")
+    if ui_evidence.get("assertions_allowed_when_ui_incidental") is not True: errors.append("ui_evidence.assertions_allowed_when_ui_incidental must be true")
+    missing_triggers = sorted(REQUIRED_FULL_MEDIA_TRIGGERS - set(ui_evidence.get("full_media_triggers") or []))
+    if missing_triggers: errors.append("ui_evidence.full_media_triggers missing: " + ", ".join(missing_triggers))
 
-    if data.get("fidelity_order") != FIDELITY_ORDER:
-        errors.append("fidelity_order must match the canonical ordered fidelity classes")
-
-    targets_raw = data.get("target_environments")
-    executions_raw = data.get("execution_environments")
-    journeys_raw = data.get("critical_journeys")
-    if not isinstance(targets_raw, list):
-        errors.append("target_environments must be a list")
-        targets_raw = []
-    if not isinstance(executions_raw, list):
-        errors.append("execution_environments must be a list")
-        executions_raw = []
-    if not isinstance(journeys_raw, list):
-        errors.append("critical_journeys must be a list")
-        journeys_raw = []
-
-    targets = unique_ids(targets_raw, "target_environments", errors)
-    executions = unique_ids(executions_raw, "execution_environments", errors)
-    journeys = unique_ids(journeys_raw, "critical_journeys", errors)
-
+    if data.get("fidelity_order") != FIDELITY_ORDER: errors.append("fidelity_order must match the canonical ordered fidelity classes")
+    targets_raw = data.get("target_environments"); executions_raw = data.get("execution_environments"); journeys_raw = data.get("critical_journeys")
+    if not isinstance(targets_raw, list): errors.append("target_environments must be a list"); targets_raw=[]
+    if not isinstance(executions_raw, list): errors.append("execution_environments must be a list"); executions_raw=[]
+    if not isinstance(journeys_raw, list): errors.append("critical_journeys must be a list"); journeys_raw=[]
+    targets=unique_ids(targets_raw,"target_environments",errors); executions=unique_ids(executions_raw,"execution_environments",errors); journeys=unique_ids(journeys_raw,"critical_journeys",errors)
     if status == "n/a":
-        if targets_raw or executions_raw or journeys_raw:
-            errors.append("E2E marked n/a must not declare target/execution environments or critical journeys")
-    elif status in {"required", "recommended"}:
-        if not targets_raw:
-            errors.append("E2E-applicable repositories must declare at least one target environment")
-        if not executions_raw:
-            errors.append("E2E-applicable repositories must declare at least one execution environment")
-        if not journeys_raw:
-            errors.append("E2E-applicable repositories must declare at least one critical journey")
+        if targets_raw or executions_raw or journeys_raw: errors.append("E2E marked n/a must not declare target/execution environments or critical journeys")
+    elif status in {"required","recommended"}:
+        if not targets_raw: errors.append("E2E-applicable repositories must declare at least one target environment")
+        if not executions_raw: errors.append("E2E-applicable repositories must declare at least one execution environment")
+        if not journeys_raw: errors.append("E2E-applicable repositories must declare at least one critical journey")
 
-    for target_id, target in targets.items():
-        if not non_empty_string(target.get("platform")):
-            errors.append(f"target_environments.{target_id}.platform is required")
-        if not non_empty_string(target.get("description")):
-            errors.append(f"target_environments.{target_id}.description is required")
-        dimensions = target.get("material_dimensions")
-        if not list_of_strings(dimensions) or not dimensions:
-            errors.append(f"target_environments.{target_id}.material_dimensions must be a non-empty string list")
+    for target_id,target in targets.items():
+        if not non_empty_string(target.get("platform")): errors.append(f"target_environments.{target_id}.platform is required")
+        if not non_empty_string(target.get("description")): errors.append(f"target_environments.{target_id}.description is required")
+        dimensions=target.get("material_dimensions")
+        if not list_of_strings(dimensions) or not dimensions: errors.append(f"target_environments.{target_id}.material_dimensions must be a non-empty string list")
 
-    automated_ids: set[str] = set()
-    for environment_id, environment in executions.items():
-        fidelity = environment.get("fidelity_class")
-        if fidelity not in FIDELITY_CLASSES:
-            errors.append(f"execution_environments.{environment_id}.fidelity_class must be one of {FIDELITY_ORDER}")
-        automation = environment.get("automation")
-        if automation not in AUTOMATION:
-            errors.append(f"execution_environments.{environment_id}.automation must be one of {sorted(AUTOMATION)}")
-        elif automation == "automated":
-            automated_ids.add(environment_id)
-        if not non_empty_string(environment.get("platform")):
-            errors.append(f"execution_environments.{environment_id}.platform is required")
-        if not non_empty_string(environment.get("artifact_surface")):
-            errors.append(f"execution_environments.{environment_id}.artifact_surface is required")
-        validate_refs(environment.get("target_environment_refs"), set(targets), f"execution_environments.{environment_id}.target_environment_refs", errors)
-        gaps = environment.get("known_gaps")
-        if not isinstance(gaps, list) or not all(non_empty_string(gap) for gap in gaps):
-            errors.append(f"execution_environments.{environment_id}.known_gaps must be a string list")
+    automated_ids:set[str]=set()
+    for environment_id,environment in executions.items():
+        fidelity=environment.get("fidelity_class")
+        if fidelity not in FIDELITY_CLASSES: errors.append(f"execution_environments.{environment_id}.fidelity_class must be one of {FIDELITY_ORDER}")
+        automation=environment.get("automation")
+        if automation not in AUTOMATION: errors.append(f"execution_environments.{environment_id}.automation must be one of {sorted(AUTOMATION)}")
+        elif automation == "automated": automated_ids.add(environment_id)
+        if not non_empty_string(environment.get("platform")): errors.append(f"execution_environments.{environment_id}.platform is required")
+        if not non_empty_string(environment.get("artifact_surface")): errors.append(f"execution_environments.{environment_id}.artifact_surface is required")
+        validate_refs(environment.get("target_environment_refs"),set(targets),f"execution_environments.{environment_id}.target_environment_refs",errors)
+        gaps=environment.get("known_gaps")
+        if not isinstance(gaps,list) or not all(non_empty_string(gap) for gap in gaps): errors.append(f"execution_environments.{environment_id}.known_gaps must be a string list")
 
-    for journey_id, journey in journeys.items():
-        if not non_empty_string(journey.get("claim")):
-            errors.append(f"critical_journeys.{journey_id}.claim is required")
-
-        ui_surface = journey.get("ui_surface")
-        if not isinstance(ui_surface, bool):
-            errors.append(f"critical_journeys.{journey_id}.ui_surface must be boolean")
-
-        minimum_ui_evidence = journey.get("minimum_ui_evidence_mode")
-        if ui_surface is True and minimum_ui_evidence not in UI_EVIDENCE_MODE_SET:
-            errors.append(f"critical_journeys.{journey_id}.minimum_ui_evidence_mode must be one of {UI_EVIDENCE_MODES} for UI journeys")
-        elif ui_surface is False and minimum_ui_evidence not in {None, "assertions"}:
-            errors.append(f"critical_journeys.{journey_id}.minimum_ui_evidence_mode must be absent or assertions when ui_surface is false")
-
-        validate_refs(journey.get("target_environment_refs"), set(targets), f"critical_journeys.{journey_id}.target_environment_refs", errors)
-        automated_refs = validate_refs(journey.get("automated_environment_refs"), set(executions), f"critical_journeys.{journey_id}.automated_environment_refs", errors, allow_empty=True)
-        automated_fidelity_ranks: list[int] = []
+    for journey_id,journey in journeys.items():
+        if not non_empty_string(journey.get("claim")): errors.append(f"critical_journeys.{journey_id}.claim is required")
+        ui_surface=journey.get("ui_surface")
+        if not isinstance(ui_surface,bool): errors.append(f"critical_journeys.{journey_id}.ui_surface must be boolean")
+        minimum_ui_evidence=journey.get("minimum_ui_evidence_mode")
+        if ui_surface is True and minimum_ui_evidence not in UI_EVIDENCE_MODE_SET: errors.append(f"critical_journeys.{journey_id}.minimum_ui_evidence_mode must be one of {UI_EVIDENCE_MODES} for UI journeys")
+        elif ui_surface is False and minimum_ui_evidence not in {None,"assertions"}: errors.append(f"critical_journeys.{journey_id}.minimum_ui_evidence_mode must be absent or assertions when ui_surface is false")
+        validate_refs(journey.get("target_environment_refs"),set(targets),f"critical_journeys.{journey_id}.target_environment_refs",errors)
+        automated_refs=validate_refs(journey.get("automated_environment_refs"),set(executions),f"critical_journeys.{journey_id}.automated_environment_refs",errors,allow_empty=True)
+        ranks=[]
         for ref in automated_refs:
-            environment = executions.get(ref)
-            if environment and environment.get("automation") != "automated":
-                errors.append(f"critical_journeys.{journey_id}.automated_environment_refs must reference automated environments: {ref}")
-            if environment and environment.get("automation") == "automated":
-                fidelity = environment.get("fidelity_class")
-                if fidelity in FIDELITY_RANK:
-                    automated_fidelity_ranks.append(FIDELITY_RANK[fidelity])
-        minimum = journey.get("minimum_automated_fidelity")
-        if minimum not in FIDELITY_CLASSES:
-            errors.append(f"critical_journeys.{journey_id}.minimum_automated_fidelity must be one of {FIDELITY_ORDER}")
-        elif automated_refs and automated_fidelity_ranks and max(automated_fidelity_ranks) < FIDELITY_RANK[minimum]:
-            errors.append(f"critical_journeys.{journey_id} does not reach minimum_automated_fidelity {minimum}")
-        confirmation = journey.get("real_environment_confirmation")
-        if confirmation not in REAL_CONFIRMATION:
-            errors.append(f"critical_journeys.{journey_id}.real_environment_confirmation must be one of {sorted(REAL_CONFIRMATION)}")
-        residual = journey.get("residual_gaps")
-        if not isinstance(residual, list) or not all(non_empty_string(gap) for gap in residual):
-            errors.append(f"critical_journeys.{journey_id}.residual_gaps must be a string list")
-        gap_reason = journey.get("automation_gap_reason")
-        if not automated_refs and not non_empty_string(gap_reason):
-            errors.append(f"critical_journeys.{journey_id} needs automated_environment_refs or an explicit automation_gap_reason")
-        if automated_refs and not any(ref in automated_ids for ref in automated_refs):
-            errors.append(f"critical_journeys.{journey_id} has no valid automated execution environment")
-        if confirmation == "not_required" and residual:
-            warnings.append(f"critical_journeys.{journey_id} declares residual gaps but real_environment_confirmation is not_required")
+            environment=executions.get(ref)
+            if environment and environment.get("automation") != "automated": errors.append(f"critical_journeys.{journey_id}.automated_environment_refs must reference automated environments: {ref}")
+            if environment and environment.get("automation") == "automated" and environment.get("fidelity_class") in FIDELITY_RANK: ranks.append(FIDELITY_RANK[environment.get("fidelity_class")])
+        minimum=journey.get("minimum_automated_fidelity")
+        if minimum not in FIDELITY_CLASSES: errors.append(f"critical_journeys.{journey_id}.minimum_automated_fidelity must be one of {FIDELITY_ORDER}")
+        elif automated_refs and ranks and max(ranks) < FIDELITY_RANK[minimum]: errors.append(f"critical_journeys.{journey_id} does not reach minimum_automated_fidelity {minimum}")
+        confirmation=journey.get("real_environment_confirmation")
+        if confirmation not in REAL_CONFIRMATION: errors.append(f"critical_journeys.{journey_id}.real_environment_confirmation must be one of {sorted(REAL_CONFIRMATION)}")
+        residual=journey.get("residual_gaps")
+        if not isinstance(residual,list) or not all(non_empty_string(gap) for gap in residual): errors.append(f"critical_journeys.{journey_id}.residual_gaps must be a string list")
+        gap_reason=journey.get("automation_gap_reason")
+        if not automated_refs and not non_empty_string(gap_reason): errors.append(f"critical_journeys.{journey_id} needs automated_environment_refs or an explicit automation_gap_reason")
+        if automated_refs and not any(ref in automated_ids for ref in automated_refs): errors.append(f"critical_journeys.{journey_id} has no valid automated execution environment")
+        if confirmation == "not_required" and residual: warnings.append(f"critical_journeys.{journey_id} declares residual gaps but real_environment_confirmation is not_required")
 
-    if not args.template_mode and contains_placeholder(data):
-        errors.append("unresolved adopter placeholder in .engineering/e2e.json")
-
-    print("E2E environment fidelity contract check")
-    print(f"root: {root}")
-    print(f"applicability: {status}")
-    print(f"commands.e2e.status: {command_status}")
-    for warning in warnings:
-        print(f"WARN: {warning}")
-    for error in errors:
-        print(f"FAIL: {error}")
-    if errors:
-        print(f"RESULT: FAIL ({len(errors)} error(s), {len(warnings)} warning(s))")
-        return 1
-    print(f"RESULT: PASS ({len(warnings)} warning(s))")
-    return 0
-
+    if not args.template_mode and contains_placeholder(data): errors.append("unresolved adopter placeholder in .engineering/e2e.json")
+    print("E2E environment fidelity contract check"); print(f"root: {root}"); print(f"applicability: {status}"); print(f"commands.e2e.status: {command_status}")
+    for warning in warnings: print(f"WARN: {warning}")
+    for error in errors: print(f"FAIL: {error}")
+    if errors: print(f"RESULT: FAIL ({len(errors)} error(s), {len(warnings)} warning(s))"); return 1
+    print(f"RESULT: PASS ({len(warnings)} warning(s))"); return 0
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -21,6 +21,7 @@ COMMANDS = (
     "stop",
     "clean",
 )
+
 REQUIRED_NON_NA = {"setup", "check", "test", "build", "clean"}
 STATUSES = {"required", "recommended", "optional", "n/a"}
 PLACEHOLDER_MARKERS = ("<REPLACE_WITH_", "<PROJECT_")
@@ -44,8 +45,23 @@ REQUIRED_DELIVERY_STAGES = ["iteration", "integration", "release"]
 REQUIRED_UI_EVIDENCE_MODES = ["assertions", "screenshots", "full_media"]
 REQUIRED_EVIDENCE_IDENTITY_FIELDS = {"head", "target_base", "required_gates", "profile", "e2e_environment"}
 REQUIRED_VALIDATION_ECONOMICS = {"duration", "flake_rate", "unique_regression_signal", "overlap"}
-REQUIRED_CLEANUP_PATHS = {"success", "failure", "timeout", "cancellation", "interrupt", "partial-initialization"}
-REQUIRED_DELTA_DIMENSIONS = {"source", "dependencies", "toolchain", "configuration", "compatibility_migrations", "artifact_metrics", "validation"}
+REQUIRED_CLEANUP_PATHS = {
+    "success",
+    "failure",
+    "timeout",
+    "cancellation",
+    "interrupt",
+    "partial-initialization",
+}
+REQUIRED_DELTA_DIMENSIONS = {
+    "source",
+    "dependencies",
+    "toolchain",
+    "configuration",
+    "compatibility_migrations",
+    "artifact_metrics",
+    "validation",
+}
 REQUIRED_E2E_FLAGS = (
     "recommended_when_full_workflow_boundary_exists",
     "critical_journeys_prioritized",
@@ -91,6 +107,7 @@ def main() -> int:
         print("Project operating contract check")
         print("FAIL: missing required file: .engineering/commands.json")
         return 1
+
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
@@ -100,13 +117,14 @@ def main() -> int:
 
     if data.get("schema_version") != 1:
         errors.append("schema_version must be 1")
-    if data.get("contract_version") != "0.6.0":
-        errors.append("contract_version must be 0.6.0")
+    if data.get("contract_version") != "0.6.1":
+        errors.append("contract_version must be 0.6.1")
 
     commands = data.get("commands")
     if not isinstance(commands, dict):
         errors.append("commands must be an object")
         commands = {}
+
     for name in COMMANDS:
         entry = commands.get(name)
         if not isinstance(entry, dict):
@@ -159,6 +177,9 @@ def main() -> int:
     expect_true(integration, "remote_preflight_when_required_gates_unavailable_local", errors, "development_velocity.integration")
     if integration.get("e2e_default") != "affected_critical_journeys":
         errors.append("development_velocity.integration.e2e_default must be affected_critical_journeys")
+    expect_true(integration, "automated_e2e_required_when_affected", errors, "development_velocity.integration")
+    expect_false(integration, "real_environment_blocking", errors, "development_velocity.integration")
+    expect_true(integration, "real_environment_deferred_to_release", errors, "development_velocity.integration")
 
     release = velocity.get("release")
     if not isinstance(release, dict):
@@ -168,6 +189,7 @@ def main() -> int:
     expect_true(release, "full_diff_review_required", errors, "development_velocity.release")
     expect_true(release, "durable_documentation_current_required", errors, "development_velocity.release")
     expect_true(release, "full_validation_required", errors, "development_velocity.release")
+    expect_true(release, "required_real_environment_blocking", errors, "development_velocity.release")
     if release.get("e2e_default") != "release_critical_journeys":
         errors.append("development_velocity.release.e2e_default must be release_critical_journeys")
     expect_true(velocity, "parallel_development_prefers_early_convergence", errors, "development_velocity")
