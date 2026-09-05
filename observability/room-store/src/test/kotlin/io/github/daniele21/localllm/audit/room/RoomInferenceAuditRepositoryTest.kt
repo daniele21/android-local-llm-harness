@@ -81,6 +81,28 @@ class RoomInferenceAuditRepositoryTest {
     }
 
     @Test
+    fun `metadata list query applies inclusive lower and exclusive upper time bounds`() {
+        val dao = FakeInferenceAuditDao()
+        repository(dao).use { repository ->
+            assertSuccess(repository.admit(admission(RequestId("before"), 99L, "before")))
+            assertSuccess(repository.admit(admission(RequestId("lower"), 100L, "lower")))
+            assertSuccess(repository.admit(admission(RequestId("inside"), 149L, "inside")))
+            assertSuccess(repository.admit(admission(RequestId("upper"), 150L, "upper")))
+
+            val summaries = successValue(
+                repository.recent(
+                    InferenceAuditQuery(
+                        afterReceivedAtEpochMs = 100L,
+                        beforeReceivedAtEpochMs = 150L,
+                    ),
+                ),
+            )
+
+            assertEquals(listOf("inside", "lower"), summaries.map { it.requestId.value })
+        }
+    }
+
+    @Test
     fun `retention evicts oldest terminal records and protects active records`() {
         val dao = FakeInferenceAuditDao()
         repository(
@@ -199,11 +221,13 @@ private class FakeInferenceAuditDao : InferenceAuditDao {
         limit: Int,
         applicationId: String?,
         useCaseId: String?,
+        afterReceivedAtEpochMs: Long?,
         beforeReceivedAtEpochMs: Long?,
     ): List<InferenceAuditEntities.InferenceAuditEntity> = filtered(
         applicationId = applicationId,
         useCaseId = useCaseId,
         statuses = null,
+        afterReceivedAtEpochMs = afterReceivedAtEpochMs,
         beforeReceivedAtEpochMs = beforeReceivedAtEpochMs,
     ).take(limit)
 
@@ -212,11 +236,13 @@ private class FakeInferenceAuditDao : InferenceAuditDao {
         applicationId: String?,
         useCaseId: String?,
         statuses: List<String>,
+        afterReceivedAtEpochMs: Long?,
         beforeReceivedAtEpochMs: Long?,
     ): List<InferenceAuditEntities.InferenceAuditEntity> = filtered(
         applicationId = applicationId,
         useCaseId = useCaseId,
         statuses = statuses.toSet(),
+        afterReceivedAtEpochMs = afterReceivedAtEpochMs,
         beforeReceivedAtEpochMs = beforeReceivedAtEpochMs,
     ).take(limit)
 
@@ -258,12 +284,14 @@ private class FakeInferenceAuditDao : InferenceAuditDao {
         applicationId: String?,
         useCaseId: String?,
         statuses: Set<String>?,
+        afterReceivedAtEpochMs: Long?,
         beforeReceivedAtEpochMs: Long?,
     ): List<InferenceAuditEntities.InferenceAuditEntity> = records.values
         .asSequence()
         .filter { applicationId == null || it.applicationId == applicationId }
         .filter { useCaseId == null || it.useCaseId == useCaseId }
         .filter { statuses == null || it.status in statuses }
+        .filter { afterReceivedAtEpochMs == null || it.receivedAtEpochMs >= afterReceivedAtEpochMs }
         .filter { beforeReceivedAtEpochMs == null || it.receivedAtEpochMs < beforeReceivedAtEpochMs }
         .sortedWith(
             compareByDescending<InferenceAuditEntities.InferenceAuditEntity> { it.receivedAtEpochMs }
