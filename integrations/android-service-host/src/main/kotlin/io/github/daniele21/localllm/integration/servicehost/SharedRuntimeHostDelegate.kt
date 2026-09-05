@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.integration.servicehost
 
+import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
@@ -41,7 +42,7 @@ class SharedRuntimeHostDelegate private constructor(
     constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
-        consumerClientFactory: AuthorizedConsumerClientFactory? = null,
+        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
         consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
         ledger: ClientConnectionLedger = ClientConnectionLedger(),
@@ -52,7 +53,36 @@ class SharedRuntimeHostDelegate private constructor(
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
-        consumerClientFactory = consumerClientFactory,
+        consumerClientFactory = consumerClientFactory?.let { legacyFactory ->
+            AuthorizedConsumerClientFactory { caller -> legacyFactory(caller.applicationId) }
+        },
+        consumerControlPlaneHost = consumerControlPlaneHost,
+        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+        infrastructure =
+        SharedRuntimeHostInfrastructure(
+            ledger = ledger,
+            controlExecutor = controlExecutor,
+            readinessExecutor = readinessExecutor,
+            callbackDispatcherFactory = callbackDispatcherFactory,
+        ),
+        logicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
+    )
+
+    constructor(
+        client: LocalLlmClient,
+        protocolInfo: ProtocolInfoParcel,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory,
+        consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
+        consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
+        ledger: ClientConnectionLedger = ClientConnectionLedger(),
+        controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        callbackDispatcherFactory: HostCallbackDispatcherFactory =
+            HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+    ) : this(
+        client = client,
+        protocolInfo = protocolInfo,
+        consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -68,14 +98,14 @@ class SharedRuntimeHostDelegate private constructor(
     internal constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
-        consumerClientFactory: AuthorizedConsumerClientFactory?,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory?,
         consumerControlPlaneHost: ConsumerControlPlaneHost?,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
         logicalJobMetadataStore: HostLogicalJobMetadataStore,
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
-        consumerClientFactory = consumerClientFactory,
+        consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
