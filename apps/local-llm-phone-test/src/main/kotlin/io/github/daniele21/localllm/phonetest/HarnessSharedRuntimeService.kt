@@ -48,6 +48,7 @@ class HarnessSharedRuntimeService : Service() {
                 policies = policies,
                 policySource = runtimeGraph::liveAuthorizedClientPolicies,
                 hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
+                authorizedRuntimeClientFactory = runtimeGraph.legacyRuntimeClientFactory,
                 authorizedConsumerClientFactory = runtimeGraph.consumerClientFactory,
                 consumerControlPlaneHost = controlPlaneHost,
                 consumerRuntimeReadinessHost = runtimeReadinessHost,
