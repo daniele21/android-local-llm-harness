@@ -6,6 +6,4 @@ import io.github.daniele21.localllm.models.HostControlPlaneStore
 internal class HarnessPhoneControlPlaneAccess(
     store: HostControlPlaneStore,
     val applicationsRuntimeSource: HarnessApplicationsRuntimeSource,
-    val installedApplicationIdentitySource: HarnessInstalledApplicationIdentitySource =
-        NoHarnessInstalledApplicationIdentitySource,
 ) : HostControlPlaneStore by store
