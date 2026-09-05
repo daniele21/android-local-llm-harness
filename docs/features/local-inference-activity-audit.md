@@ -5,9 +5,9 @@ Document type: feature-specification
 Owner: runtime + android-service-host + apps/local-llm-phone-test
 Canonical scope: feature.local-inference-activity-audit
 Read when: changing inference attribution, audit persistence, Activity history, retention or correlation with diagnostics
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
-Architecture decision: [`../adr/0017-durable-local-inference-audit.md`](../adr/0017-durable-local-inference-audit.md). Temporary execution state: [`../workstreams/local-inference-activity-audit.md`](../workstreams/local-inference-activity-audit.md).
+Architecture decision: [`../adr/0017-durable-local-inference-audit.md`](../adr/0017-durable-local-inference-audit.md).
 
 ## Product outcome
 
