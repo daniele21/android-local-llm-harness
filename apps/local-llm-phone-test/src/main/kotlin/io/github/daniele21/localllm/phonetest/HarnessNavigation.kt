@@ -86,7 +86,7 @@ internal object HarnessRoutes {
             )
 
             route == HarnessInferenceActivityRoutes.DETAIL_PATTERN ||
-                route?.startsWith(ACTIVITY_DETAIL_PREFIX) == true && route != HarnessDestination.ACTIVITY.route -> HarnessShellState(
+                (route?.startsWith(ACTIVITY_DETAIL_PREFIX) == true && route != HarnessDestination.ACTIVITY.route) -> HarnessShellState(
                     destination = HarnessDestination.ACTIVITY,
                     detailTitle = "Inference activity",
                     detailSubtitle = "Sensitive local input, output and execution evidence",
