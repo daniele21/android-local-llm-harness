@@ -30,6 +30,10 @@ internal fun NavGraphBuilder.installHarnessInferenceActivityGraph(navController:
             onOpenDetail = { requestId ->
                 navController.navigate(HarnessInferenceActivityRoutes.detail(requestId))
             },
+            onSelectApplication = activityViewModel::selectApplication,
+            onSelectStatus = activityViewModel::selectStatus,
+            onSelectPeriod = activityViewModel::selectPeriod,
+            onSelectUseCase = activityViewModel::selectUseCase,
             onClearHistory = activityViewModel::clearTerminalHistory,
             onClearFeedback = activityViewModel::clearFeedback,
         )
