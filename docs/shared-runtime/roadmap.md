@@ -29,7 +29,7 @@ Q35 physical runtime evidence ----- release dependency -----^
 
 SR-2 and SR-3 may proceed independently only after SR-1 freezes the v1 fixtures and semantics. They must not invent separate wire DTOs or error mappings.
 
-ADR 0017 is the accepted trust amendment for independently signed consumers. It supersedes the same-signer/signature-permission portion of ADR 0012 without changing the Host-owned model/use-case or Binder protocol boundaries.
+ADR 0018 is the accepted trust amendment for independently signed consumers. It supersedes the same-signer/signature-permission portion of ADR 0012 without changing the Host-owned model/use-case or Binder protocol boundaries.
 
 ## SR-0 — Decision and scope
 
@@ -39,7 +39,7 @@ Goal: convert the proposal into an accepted durable deployment decision.
 
 Required outputs:
 
-- ADR 0012 covering the original shared-runtime boundary and ADR 0017 covering independently signed consumer authorization;
+- ADR 0012 covering the original shared-runtime boundary and ADR 0018 covering independently signed consumer authorization;
 - confirmed module ownership from [`architecture.md`](architecture.md);
 - explicit proof-host versus final-host decision boundary;
 - compatibility and privacy review of the supported surface;
