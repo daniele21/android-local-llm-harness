@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.models.HostControlPlaneState
 import io.github.daniele21.localllm.models.HostControlPlaneStore
 
@@ -12,19 +13,25 @@ import io.github.daniele21.localllm.models.HostControlPlaneStore
  * detects an actual state change, keeping the normal per-call authorization path read-only.
  */
 internal class HarnessObservedApplicationIdentityReconciler(
-    context: Context,
     private val store: HostControlPlaneStore,
+    private val observedPolicies: () -> List<AuthorizedClientPolicy>,
     private val epochClock: () -> Long = System::currentTimeMillis,
 ) {
-    private val appContext = context.applicationContext
+    constructor(
+        context: Context,
+        store: HostControlPlaneStore,
+        epochClock: () -> Long = System::currentTimeMillis,
+    ) : this(
+        store = store,
+        observedPolicies = { HarnessSharedRuntimePolicy.authorizedClients(context.applicationContext) },
+        epochClock = epochClock,
+    )
 
     fun reconcileIfNeeded(): HostControlPlaneState {
         val observedAtEpochMs = epochClock()
         val reconciler =
             HarnessControlPlaneReconciler(
-                HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(
-                    HarnessSharedRuntimePolicy.authorizedClients(appContext),
-                ),
+                HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(observedPolicies()),
             )
         val current = store.snapshot()
         return when (val preview = reconciler.reconcile(current, observedAtEpochMs)) {
