@@ -94,23 +94,20 @@ class InferenceAuditLocalLlmClientTest {
         assertFalse(delegate.generateCalled)
     }
 
-    private fun client(
-        repository: InMemoryInferenceAuditRepository,
-        delegate: AsyncGenerationClient,
-        clock: AtomicLong,
-    ) = InferenceAuditLocalLlmClient(
-        delegate = delegate,
-        auditRepository = repository,
-        originResolver = InferenceAuditOriginResolver { request ->
-            InferenceAuditOrigin(
-                kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-                applicationId = request.applicationId,
-                useCaseId = request.useCaseId,
-                verifiedPackageName = "io.redactguard",
-            )
-        },
-        epochClock = EpochClock { clock.getAndIncrement() },
-    )
+    private fun client(repository: InMemoryInferenceAuditRepository, delegate: AsyncGenerationClient, clock: AtomicLong) =
+        InferenceAuditLocalLlmClient(
+            delegate = delegate,
+            auditRepository = repository,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                    verifiedPackageName = "io.redactguard",
+                )
+            },
+            epochClock = EpochClock { clock.getAndIncrement() },
+        )
 
     private fun request() = GenerationRequest(
         requestId = requestId,
