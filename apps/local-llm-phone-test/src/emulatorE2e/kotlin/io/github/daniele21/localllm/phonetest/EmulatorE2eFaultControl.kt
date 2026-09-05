@@ -9,8 +9,18 @@ import android.os.SystemClock
 /** Emulator-only control surface used by cross-APK lifecycle tests. */
 internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        @Suppress("UNUSED_VARIABLE")
-        val unusedContext = context
+        if (intent.action == EmulatorE2eFaultActions.QUERY_ACTIVITY) {
+            val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
+            if (verifiedPackageName.isNullOrBlank()) {
+                resultCode = Activity.RESULT_CANCELED
+                resultData = "invalid_request"
+                return
+            }
+            resultCode = Activity.RESULT_OK
+            resultData = EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName)
+            return
+        }
+
         when (intent.action) {
             EmulatorE2eFaultActions.PAUSE_GENERATION -> EmulatorE2eGenerationGate.pause()
 
@@ -36,6 +46,8 @@ internal object EmulatorE2eFaultActions {
     const val RELEASE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION"
     const val RESET = "io.github.daniele21.localllm.phonetest.emulatorE2e.RESET"
     const val QUERY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY"
+    const val QUERY_ACTIVITY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY"
+    const val EXTRA_VERIFIED_PACKAGE = "verified_package"
 }
 
 internal object EmulatorE2eGenerationGate {
