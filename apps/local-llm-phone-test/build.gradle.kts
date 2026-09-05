@@ -19,8 +19,8 @@ val phoneTestUploadSigningPartiallyConfigured =
     phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
 val allowUnsignedRelease =
     System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
-val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
-val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM"
+val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.BIND_LOCAL_LLM"
+val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.BIND_LOCAL_LLM"
 
 gradle.taskGraph.whenReady {
     val packagesPhoneTestRelease =
