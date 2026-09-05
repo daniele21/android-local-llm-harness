@@ -29,14 +29,6 @@ internal object HarnessSharedRuntimePolicy {
                 acceptedSigningCertificates = acceptedSigningCertificates,
             )
         }
-        val redactGuardClients = HarnessSharedRuntimeBindings.redactGuardPackages(BuildConfig.DEBUG).map { packageName ->
-            AuthorizedClientPolicy(
-                packageName = packageName,
-                applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-                allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
-                acceptedSigningCertificates = acceptedSigningCertificates,
-            )
-        }
         val releaseEvidenceClient = if (BuildConfig.DEBUG) {
             emptyList()
         } else {
@@ -49,14 +41,17 @@ internal object HarnessSharedRuntimePolicy {
                 ),
             )
         }
-        return listOf(internal) + consoleClients + redactGuardClients + releaseEvidenceClient
+        // Independently distributed consumers such as RedactGuard are intentionally absent here. Their exact
+        // package + signing identity is persisted only after explicit Control Plane authorization and projected
+        // by liveAuthorizedClients(). This avoids treating the Harnex signer as the consumer signer.
+        return listOf(internal) + consoleClients + releaseEvidenceClient
     }
 
     /**
      * Projects the current persisted app-connection state into the Binder security boundary.
-     * Built-in package aliases keep their reviewed signing policy, while user-created applications use the exact
-     * package/signing identity persisted by the connection flow. Disabled apps disappear from authorization on
-     * the next Binder call without restarting the host service.
+     * Built-in package aliases keep their reviewed signing policy, while user-approved applications use the exact
+     * package/signing identity persisted by the connection flow. Disabled or unresolved apps disappear from
+     * authorization on the next Binder call without restarting the host service.
      */
     fun liveAuthorizedClients(
         basePolicies: Collection<AuthorizedClientPolicy>,
@@ -78,7 +73,7 @@ internal object HarnessSharedRuntimePolicy {
             .groupBy { it.bindingId }
             .mapValues { (_, revisions) -> revisions.maxBy { it.revision } }
             .values
-        val manual = enabledApplications.values
+        val approvedExternal = enabledApplications.values
             .filter { it.applicationId !in builtInApplicationIds }
             .mapNotNull { application ->
                 val allowed = latestBindings
@@ -96,15 +91,36 @@ internal object HarnessSharedRuntimePolicy {
                     )
                 }
             }
-        return (internal + enabledBuiltIns + manual).also { policies ->
+        return (internal + enabledBuiltIns + approvedExternal).also { policies ->
             require(policies.map(AuthorizedClientPolicy::packageName).distinct().size == policies.size) {
                 "Live application connections must have unique package names"
             }
         }
     }
 
-    fun builtInOmbraControlPlaneSpec(policies: Collection<AuthorizedClientPolicy>): HarnessBuiltInControlPlaneSpec {
-        val applications = policies
+    fun observedRedactGuardApplication(
+        identitySource: HarnessInstalledApplicationIdentitySource,
+        debugHost: Boolean,
+    ): HarnessBuiltInApplicationRequirement? {
+        val identities = HarnessSharedRuntimeBindings.redactGuardPackages(debugHost)
+            .mapNotNull(identitySource::resolve)
+        require(identities.size <= 1) { "Only one RedactGuard package may be observed for a Host variant" }
+        val identity = identities.singleOrNull() ?: return null
+        return HarnessBuiltInApplicationRequirement(
+            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            acceptedPackageNames = setOf(identity.packageName),
+            acceptedSignerSha256 = setOf(identity.signerSha256),
+            displayName = "RedactGuard",
+            initialState = ApplicationRegistrationState.PENDING,
+            allowObservedSignerChange = true,
+        )
+    }
+
+    fun builtInOmbraControlPlaneSpec(
+        policies: Collection<AuthorizedClientPolicy>,
+        observedExternalApplications: List<HarnessBuiltInApplicationRequirement> = emptyList(),
+    ): HarnessBuiltInControlPlaneSpec {
+        val builtIns = policies
             .filter { HarnessSharedRuntimeBindings.ombraUseCaseId in it.allowedUseCases }
             .groupBy(AuthorizedClientPolicy::applicationId)
             .map { (applicationId, applicationPolicies) ->
@@ -118,6 +134,10 @@ internal object HarnessSharedRuntimePolicy {
                     displayName = displayName(applicationId),
                 )
             }
+        val applications = (builtIns + observedExternalApplications).sortedBy { it.applicationId.value }
+        require(applications.distinctBy { it.applicationId }.size == applications.size) {
+            "Control Plane application requirements must be unique by application ID"
+        }
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
     }
 
