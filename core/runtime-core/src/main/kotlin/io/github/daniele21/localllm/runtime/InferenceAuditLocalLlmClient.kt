@@ -48,10 +48,8 @@ enum class InferenceAuditWritePhase {
 }
 
 /** Safe, typed failure used when strict local audit persistence cannot uphold its contract. */
-class InferenceAuditClientException(
-    val failureCode: InferenceAuditFailureCode,
-    val phase: InferenceAuditWritePhase,
-) : IllegalStateException("Inference audit ${phase.name.lowercase()} persistence failed (${failureCode.name})")
+class InferenceAuditClientException(val failureCode: InferenceAuditFailureCode, val phase: InferenceAuditWritePhase) :
+    IllegalStateException("Inference audit ${phase.name.lowercase()} persistence failed (${failureCode.name})")
 
 /**
  * LocalLlmClient decorator that makes the ADR-0017 audit ledger a correctness gate.
@@ -69,8 +67,7 @@ class InferenceAuditLocalLlmClient(
 ) : LocalLlmClient {
     override fun runtimeSnapshot(): RuntimeSnapshot = delegate.runtimeSnapshot()
 
-    override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult =
-        delegate.prepare(applicationId, useCaseId)
+    override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult = delegate.prepare(applicationId, useCaseId)
 
     override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId): SessionId =
         delegate.createSession(applicationId, useCaseId)
@@ -102,6 +99,7 @@ class InferenceAuditLocalLlmClient(
         require(origin.useCaseId == request.useCaseId) { "Audit origin use case does not match generation request" }
         when (val existing = auditRepository.find(request.requestId)) {
             is InferenceAuditResult.Failure -> throw InferenceAuditClientException(existing.code, InferenceAuditWritePhase.ADMISSION)
+
             is InferenceAuditResult.Success -> if (existing.value != null) {
                 throw InferenceAuditClientException(InferenceAuditFailureCode.INVALID_STATE, InferenceAuditWritePhase.ADMISSION)
             }
@@ -249,7 +247,9 @@ private class AuditGenerationListener(
 
 private fun GenerationInput.toAuditInput(): InferenceAuditInput = when (this) {
     is GenerationInput.Text -> InferenceAuditInput.Text(value)
+
     is GenerationInput.RawCompletion -> InferenceAuditInput.RawCompletion(value)
+
     is GenerationInput.Messages -> InferenceAuditInput.Messages(
         values.map { message -> InferenceAuditMessage(message.role, message.content) },
     )
