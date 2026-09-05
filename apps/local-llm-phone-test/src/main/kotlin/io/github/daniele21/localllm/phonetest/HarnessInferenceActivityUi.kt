@@ -147,6 +147,7 @@ internal fun HarnessInferenceActivityDetailScreen(
     state: HarnessInferenceActivityState,
     requestId: String,
     onRetry: () -> Unit,
+    onOpenTechnicalTimeline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -165,7 +166,7 @@ internal fun HarnessInferenceActivityDetailScreen(
             HarnessSecondaryButton("Retry", onClick = onRetry)
         }
 
-        else -> InferenceActivityDetailContent(state.detail, modifier)
+        else -> InferenceActivityDetailContent(state.detail, onOpenTechnicalTimeline, modifier)
     }
 }
 
@@ -218,7 +219,11 @@ private fun InferenceActivityRow(item: InferenceActivityListItem, onOpenDetail: 
 }
 
 @Composable
-private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, modifier: Modifier) {
+private fun InferenceActivityDetailContent(
+    detail: InferenceActivityDetail,
+    onOpenTechnicalTimeline: () -> Unit,
+    modifier: Modifier,
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("inference-activity-detail"),
         contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
@@ -313,6 +318,13 @@ private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, modi
                 ActivityMetric("Completed", detail.completedAtEpochMs?.let(::formatActivityTime))
                 ActivityMetric("Terminal code", detail.terminalCode)
             }
+        }
+        item {
+            HarnessSecondaryButton(
+                text = "Open technical timeline",
+                modifier = Modifier.fillMaxWidth().testTag("activity-open-technical-timeline"),
+                onClick = onOpenTechnicalTimeline,
+            )
         }
     }
 }
