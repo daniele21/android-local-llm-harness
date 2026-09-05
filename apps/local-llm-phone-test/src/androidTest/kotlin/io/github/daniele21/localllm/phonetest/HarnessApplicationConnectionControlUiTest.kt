@@ -36,15 +36,14 @@ class HarnessApplicationConnectionControlUiTest {
         }
     }
 
-    private fun pendingApplication() =
-        HarnessApplicationSummary(
-            applicationId = "redactguard",
-            displayName = "RedactGuard",
-            packageName = "io.github.daniele21.redactguard.debug",
-            signerSha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            status = HarnessApplicationStatus.PENDING,
-            firstSeenAtEpochMs = 1L,
-            lastSeenAtEpochMs = 1L,
-            assignments = emptyList(),
-        )
+    private fun pendingApplication() = HarnessApplicationSummary(
+        applicationId = "redactguard",
+        displayName = "RedactGuard",
+        packageName = "io.github.daniele21.redactguard.debug",
+        signerSha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        status = HarnessApplicationStatus.PENDING,
+        firstSeenAtEpochMs = 1L,
+        lastSeenAtEpochMs = 1L,
+        assignments = emptyList(),
+    )
 }
