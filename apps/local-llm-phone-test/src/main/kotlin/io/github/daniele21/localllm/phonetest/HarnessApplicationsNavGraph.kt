@@ -34,4 +34,5 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     installNewPresetRoute(navController, state, mutationState, callbacks)
     installTechnicalDetailsRoute(state, callbacks)
     installNewApplicationConnectionRoute(navController, state, mutationState, callbacks)
+    installHarnessInferenceActivityGraph(navController)
 }
