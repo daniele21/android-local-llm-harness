@@ -49,6 +49,26 @@ class InMemoryInferenceAuditRepositoryTest {
     }
 
     @Test
+    fun `recent query applies inclusive lower and exclusive upper time bounds`() {
+        val repository = InMemoryInferenceAuditRepository()
+        assertSuccess(repository.admit(admission(RequestId("before"), 99)))
+        assertSuccess(repository.admit(admission(RequestId("lower"), 100)))
+        assertSuccess(repository.admit(admission(RequestId("inside"), 149)))
+        assertSuccess(repository.admit(admission(RequestId("upper"), 150)))
+
+        val summaries = successValue(
+            repository.recent(
+                InferenceAuditQuery(
+                    afterReceivedAtEpochMs = 100,
+                    beforeReceivedAtEpochMs = 150,
+                ),
+            ),
+        )
+
+        assertEquals(listOf("inside", "lower"), summaries.map { it.requestId.value })
+    }
+
+    @Test
     fun `exact lifecycle retries are idempotent but conflicting transitions fail`() {
         val repository = InMemoryInferenceAuditRepository()
         val requestId = RequestId("request-1")
