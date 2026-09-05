@@ -6,19 +6,23 @@ import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
 
+class SharedRuntimeHostClientFactories(
+    val consumer: AuthorizedConsumerClientFactory? = null,
+    val legacyRuntime: AuthorizedRuntimeClientFactory? = null,
+)
+
 class SharedRuntimeHostComposition(
     context: Context,
     client: LocalLlmClient,
     permissionName: String,
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
-    authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
+    clientFactories: SharedRuntimeHostClientFactories = SharedRuntimeHostClientFactories(),
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
     policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
-    authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) : AutoCloseable {
-    private val consumerApiEnabled = authorizedConsumerClientFactory != null
+    private val consumerApiEnabled = clientFactories.consumer != null
     private val delegate = SharedRuntimeHostDelegate(
         client = client,
         protocolInfo = hostProtocolInfo(
@@ -27,8 +31,8 @@ class SharedRuntimeHostComposition(
             consumerControlPlaneEnabled = consumerControlPlaneHost != null,
             consumerRuntimeReadinessEnabled = consumerRuntimeReadinessHost != null,
         ),
-        authorizedRuntimeClientFactory = authorizedRuntimeClientFactory,
-        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
+        authorizedRuntimeClientFactory = clientFactories.legacyRuntime,
+        authorizedConsumerClientFactory = clientFactories.consumer,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         logicalJobMetadataStore = AndroidHostLogicalJobMetadataStore(context.applicationContext),
