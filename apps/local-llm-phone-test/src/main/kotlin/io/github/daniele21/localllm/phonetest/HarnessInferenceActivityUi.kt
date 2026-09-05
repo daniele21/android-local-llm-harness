@@ -47,21 +47,14 @@ internal fun HarnessInferenceActivityScreen(
     modifier: Modifier = Modifier,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
-    if (confirmClear) {
-        HarnessConfirmationDialog(
-            title = "Clear inference history?",
-            detail =
-            "Completed, failed, cancelled and interrupted local activity records will be deleted. " +
-                "Active inference records, models, app connections and diagnostics are not removed.",
-            confirmLabel = "Clear history",
-            dismissLabel = "Cancel",
-            onConfirm = {
-                confirmClear = false
-                onClearHistory()
-            },
-            onDismiss = { confirmClear = false },
-        )
-    }
+    InferenceActivityClearDialog(
+        visible = confirmClear,
+        onConfirm = {
+            confirmClear = false
+            onClearHistory()
+        },
+        onDismiss = { confirmClear = false },
+    )
 
     when {
         state.loading && state.items.isEmpty() -> HarnessLoadingState(
@@ -70,82 +63,148 @@ internal fun HarnessInferenceActivityScreen(
             modifier = modifier,
         )
 
-        state.listErrorCode != null && state.items.isEmpty() -> Column(modifier = modifier.fillMaxSize()) {
-            HarnessErrorState(
-                title = "Inference activity unavailable",
-                detail =
-                "The local audit store could not be read (${state.listErrorCode.name}). " +
-                    "Inference audit remains fail-closed while storage is degraded.",
-            )
-            HarnessSecondaryButton(
-                text = "Retry",
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onRefresh,
-            )
-        }
+        state.listErrorCode != null && state.items.isEmpty() -> InferenceActivityUnavailable(
+            state = state,
+            onRefresh = onRefresh,
+            modifier = modifier,
+        )
 
-        else -> LazyColumn(
-            modifier = modifier.fillMaxSize().testTag("inference-activity-list"),
-            contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
-            verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
-        ) {
+        else -> InferenceActivityList(
+            state = state,
+            onRefresh = onRefresh,
+            onOpenDetail = onOpenDetail,
+            onRequestClear = { confirmClear = true },
+            onClearFeedback = onClearFeedback,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun InferenceActivityClearDialog(visible: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    if (!visible) return
+    HarnessConfirmationDialog(
+        title = "Clear inference history?",
+        detail =
+        "Completed, failed, cancelled and interrupted local activity records will be deleted. " +
+            "Active inference records, models, app connections and diagnostics are not removed.",
+        confirmLabel = "Clear history",
+        dismissLabel = "Cancel",
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun InferenceActivityUnavailable(
+    state: HarnessInferenceActivityState,
+    onRefresh: () -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        HarnessErrorState(
+            title = "Inference activity unavailable",
+            detail =
+            "The local audit store could not be read (${state.listErrorCode?.name}). " +
+                "Inference audit remains fail-closed while storage is degraded.",
+        )
+        HarnessSecondaryButton(
+            text = "Retry",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onRefresh,
+        )
+    }
+}
+
+@Composable
+private fun InferenceActivityList(
+    state: HarnessInferenceActivityState,
+    onRefresh: () -> Unit,
+    onOpenDetail: (String) -> Unit,
+    onRequestClear: () -> Unit,
+    onClearFeedback: () -> Unit,
+    modifier: Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize().testTag("inference-activity-list"),
+        contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
+        verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
+    ) {
+        item {
+            InferenceActivityListHeader(
+                state = state,
+                onRefresh = onRefresh,
+                onRequestClear = onRequestClear,
+            )
+        }
+        state.feedback?.let { feedback ->
+            item { InferenceActivityFeedback(feedback, onClearFeedback) }
+        }
+        if (state.listErrorCode != null) {
+            item { InferenceActivityDegradedCard(state.listErrorCode.name) }
+        }
+        if (state.items.isEmpty()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
-                    Text("Activity", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Local inference history: caller, input, output and execution metrics. " +
-                            "Sensitive content stays in Harnex and is not part of Diagnostics exports.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HarnessSecondaryButton(
-                        text = "Refresh activity",
-                        enabled = !state.loading && !state.mutationInProgress,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onRefresh,
-                    )
-                    HarnessSecondaryButton(
-                        text = "Clear completed history",
-                        enabled = state.items.any { it.status.isTerminal } && !state.mutationInProgress,
-                        modifier = Modifier.fillMaxWidth().testTag("activity-clear-history"),
-                        onClick = { confirmClear = true },
-                    )
-                }
+                HarnessEmptyState(
+                    title = "No inference activity yet",
+                    detail =
+                    "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
+                        "and remain available after Harnex restarts.",
+                )
             }
-            state.feedback?.let { feedback ->
-                item {
-                    HarnessCard {
-                        Text(feedback, style = MaterialTheme.typography.bodyMedium)
-                        HarnessSecondaryButton("Dismiss", onClick = onClearFeedback)
-                    }
-                }
-            }
-            if (state.listErrorCode != null) {
-                item {
-                    HarnessCard {
-                        HarnessStatusBadge("AUDIT DEGRADED", HarnessStatusTone.ERROR)
-                        Text(
-                            "Some activity could not be loaded (${state.listErrorCode.name}).",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            if (state.items.isEmpty()) {
-                item {
-                    HarnessEmptyState(
-                        title = "No inference activity yet",
-                        detail =
-                        "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
-                            "and remain available after Harnex restarts.",
-                    )
-                }
-            } else {
-                items(items = state.items, key = InferenceActivityListItem::requestId) { item ->
-                    InferenceActivityRow(item = item, onOpenDetail = onOpenDetail)
-                }
+        } else {
+            items(items = state.items, key = InferenceActivityListItem::requestId) { item ->
+                InferenceActivityRow(item = item, onOpenDetail = onOpenDetail)
             }
         }
+    }
+}
+
+@Composable
+private fun InferenceActivityListHeader(
+    state: HarnessInferenceActivityState,
+    onRefresh: () -> Unit,
+    onRequestClear: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+        Text("Activity", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Local inference history: caller, input, output and execution metrics. " +
+                "Sensitive content stays in Harnex and is not part of Diagnostics exports.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HarnessSecondaryButton(
+            text = "Refresh activity",
+            enabled = !state.loading && !state.mutationInProgress,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onRefresh,
+        )
+        HarnessSecondaryButton(
+            text = "Clear completed history",
+            enabled = state.items.any { it.status.isTerminal } && !state.mutationInProgress,
+            modifier = Modifier.fillMaxWidth().testTag("activity-clear-history"),
+            onClick = onRequestClear,
+        )
+    }
+}
+
+@Composable
+private fun InferenceActivityFeedback(feedback: String, onClearFeedback: () -> Unit) {
+    HarnessCard {
+        Text(feedback, style = MaterialTheme.typography.bodyMedium)
+        HarnessSecondaryButton("Dismiss", onClick = onClearFeedback)
+    }
+}
+
+@Composable
+private fun InferenceActivityDegradedCard(errorCode: String) {
+    HarnessCard {
+        HarnessStatusBadge("AUDIT DEGRADED", HarnessStatusTone.ERROR)
+        Text(
+            "Some activity could not be loaded ($errorCode).",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -226,32 +285,17 @@ private fun InferenceActivityRow(item: InferenceActivityListItem, onOpenDetail: 
 }
 
 @Composable
-private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOpenTechnicalTimeline: () -> Unit, modifier: Modifier) {
+private fun InferenceActivityDetailContent(
+    detail: InferenceActivityDetail,
+    onOpenTechnicalTimeline: () -> Unit,
+    modifier: Modifier,
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("inference-activity-detail"),
         contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
         verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.medium),
     ) {
-        item {
-            HarnessCard(emphasized = true) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(detail.applicationLabel, style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            detail.verifiedPackageName ?: detail.applicationId,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(detail.useCaseId, style = MaterialTheme.typography.bodySmall)
-                    }
-                    HarnessStatusBadge(detail.status.displayLabel(), detail.status.tone())
-                }
-            }
-        }
+        item { InferenceActivityDetailHeader(detail) }
         item {
             SensitiveContentCard(
                 title = "Input",
@@ -260,13 +304,7 @@ private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOp
             )
         }
         detail.effectivePrompt?.let { effectivePrompt ->
-            item {
-                SensitiveContentCard(
-                    title = "Effective prompt",
-                    value = effectivePrompt,
-                    emptyLabel = "No effective prompt recorded.",
-                )
-            }
+            item { SensitiveContentCard("Effective prompt", effectivePrompt, "No effective prompt recorded.") }
         }
         item {
             SensitiveContentCard(
@@ -276,58 +314,10 @@ private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOp
             )
         }
         detail.reasoningOutput?.let { reasoning ->
-            item {
-                SensitiveContentCard(
-                    title = "Reasoning",
-                    value = reasoning,
-                    emptyLabel = "No reasoning output recorded.",
-                )
-            }
+            item { SensitiveContentCard("Reasoning", reasoning, "No reasoning output recorded.") }
         }
-        item {
-            HarnessCard {
-                Text("Inference metrics", style = MaterialTheme.typography.titleMedium)
-                ActivityMetric("Total", detail.totalMs?.let { "$it ms" })
-                ActivityMetric("Queue", detail.queueMs?.let { "$it ms" })
-                ActivityMetric("Model load", detail.modelLoadMs?.let { "$it ms" })
-                ActivityMetric("Time to first token", detail.timeToFirstTokenMs?.let { "$it ms" })
-                ActivityMetric("Time to first answer", detail.timeToFirstAnswerMs?.let { "$it ms" })
-                ActivityMetric("Prefill", detail.prefillMs?.let { "$it ms" })
-                ActivityMetric("Decode", detail.decodeMs?.let { "$it ms" })
-                ActivityMetric("Prompt planning", detail.promptPlanningMs?.let { "$it ms" })
-                ActivityMetric("Context creation", detail.contextCreationMs?.let { "$it ms" })
-                ActivityMetric("Input tokens", detail.inputTokens?.toString())
-                ActivityMetric("Output tokens", detail.outputTokens?.toString())
-                ActivityMetric("Reasoning tokens", detail.reasoningTokens?.toString())
-                ActivityMetric("Answer tokens", detail.answerTokens?.toString())
-                ActivityMetric(
-                    "Decode throughput",
-                    detail.decodeTokensPerSecond?.let { "${formatThroughput(it)} tok/s" },
-                )
-                ActivityMetric("Stop reason", detail.stopReason)
-            }
-        }
-        item {
-            HarnessCard {
-                Text("Execution identity", style = MaterialTheme.typography.titleMedium)
-                ActivityMetric("Request", detail.requestId)
-                ActivityMetric("Application ID", detail.applicationId)
-                ActivityMetric("Package", detail.verifiedPackageName)
-                ActivityMetric("Model", detail.modelDigest)
-                ActivityMetric("Model load", detail.modelLoadKind)
-                ActivityMetric(
-                    "Preset",
-                    detail.presetId?.let { id -> detail.presetVersion?.let { "$id v$it" } ?: id },
-                )
-                ActivityMetric("Backend", detail.backendId)
-                ActivityMetric("Backend revision", detail.backendRevision)
-                ActivityMetric("Backend fingerprint", detail.backendExecutionFingerprint)
-                ActivityMetric("Placement", detail.effectivePlacement)
-                ActivityMetric("Received", formatActivityTime(detail.receivedAtEpochMs))
-                ActivityMetric("Completed", detail.completedAtEpochMs?.let(::formatActivityTime))
-                ActivityMetric("Terminal code", detail.terminalCode)
-            }
-        }
+        item { InferenceActivityMetricsCard(detail) }
+        item { InferenceActivityExecutionCard(detail) }
         item {
             HarnessSecondaryButton(
                 text = "Open technical timeline",
@@ -335,6 +325,76 @@ private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOp
                 onClick = onOpenTechnicalTimeline,
             )
         }
+    }
+}
+
+@Composable
+private fun InferenceActivityDetailHeader(detail: InferenceActivityDetail) {
+    HarnessCard(emphasized = true) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(detail.applicationLabel, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    detail.verifiedPackageName ?: detail.applicationId,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(detail.useCaseId, style = MaterialTheme.typography.bodySmall)
+            }
+            HarnessStatusBadge(detail.status.displayLabel(), detail.status.tone())
+        }
+    }
+}
+
+@Composable
+private fun InferenceActivityMetricsCard(detail: InferenceActivityDetail) {
+    HarnessCard {
+        Text("Inference metrics", style = MaterialTheme.typography.titleMedium)
+        ActivityMetric("Total", detail.totalMs?.let { "$it ms" })
+        ActivityMetric("Queue", detail.queueMs?.let { "$it ms" })
+        ActivityMetric("Model load", detail.modelLoadMs?.let { "$it ms" })
+        ActivityMetric("Time to first token", detail.timeToFirstTokenMs?.let { "$it ms" })
+        ActivityMetric("Time to first answer", detail.timeToFirstAnswerMs?.let { "$it ms" })
+        ActivityMetric("Prefill", detail.prefillMs?.let { "$it ms" })
+        ActivityMetric("Decode", detail.decodeMs?.let { "$it ms" })
+        ActivityMetric("Prompt planning", detail.promptPlanningMs?.let { "$it ms" })
+        ActivityMetric("Context creation", detail.contextCreationMs?.let { "$it ms" })
+        ActivityMetric("Input tokens", detail.inputTokens?.toString())
+        ActivityMetric("Output tokens", detail.outputTokens?.toString())
+        ActivityMetric("Reasoning tokens", detail.reasoningTokens?.toString())
+        ActivityMetric("Answer tokens", detail.answerTokens?.toString())
+        ActivityMetric(
+            "Decode throughput",
+            detail.decodeTokensPerSecond?.let { "${formatThroughput(it)} tok/s" },
+        )
+        ActivityMetric("Stop reason", detail.stopReason)
+    }
+}
+
+@Composable
+private fun InferenceActivityExecutionCard(detail: InferenceActivityDetail) {
+    HarnessCard {
+        Text("Execution identity", style = MaterialTheme.typography.titleMedium)
+        ActivityMetric("Request", detail.requestId)
+        ActivityMetric("Application ID", detail.applicationId)
+        ActivityMetric("Package", detail.verifiedPackageName)
+        ActivityMetric("Model", detail.modelDigest)
+        ActivityMetric("Model load", detail.modelLoadKind)
+        ActivityMetric(
+            "Preset",
+            detail.presetId?.let { id -> detail.presetVersion?.let { "$id v$it" } ?: id },
+        )
+        ActivityMetric("Backend", detail.backendId)
+        ActivityMetric("Backend revision", detail.backendRevision)
+        ActivityMetric("Backend fingerprint", detail.backendExecutionFingerprint)
+        ActivityMetric("Placement", detail.effectivePlacement)
+        ActivityMetric("Received", formatActivityTime(detail.receivedAtEpochMs))
+        ActivityMetric("Completed", detail.completedAtEpochMs?.let(::formatActivityTime))
+        ActivityMetric("Terminal code", detail.terminalCode)
     }
 }
 
