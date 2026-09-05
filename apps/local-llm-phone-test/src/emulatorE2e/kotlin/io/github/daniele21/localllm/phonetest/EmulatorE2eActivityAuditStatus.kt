@@ -20,6 +20,7 @@ internal object EmulatorE2eActivityAuditStatus {
         val detail =
             when (val result = HarnessRuntimeGraph.from(context).inferenceActivitySource.detail(latest.requestId)) {
                 is InferenceActivityDetailResult.Available -> result.detail
+
                 is InferenceActivityDetailResult.Unavailable -> {
                     return "available=false;count=${matching.size};error=${result.errorCode?.name ?: "not_found"}"
                 }
