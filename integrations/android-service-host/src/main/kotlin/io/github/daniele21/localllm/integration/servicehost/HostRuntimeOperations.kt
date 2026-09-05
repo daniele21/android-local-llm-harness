@@ -17,7 +17,7 @@ internal class HostRuntimeOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
     private val controlExecutor: HostControlExecutor,
-    authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
+    private val authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) {
     private val generationOperations =
         HostGenerationOperations(
@@ -72,7 +72,7 @@ internal class HostRuntimeOperations(
             val token = HostClientToken(request.clientToken.value)
             val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull() ?: return@submitOrReject
             try {
-                client.closeSession(sessionId)
+                runtimeClient(caller).closeSession(sessionId)
                 ledger.removeSession(token, caller, request.externalSessionId)
             } catch (_: RuntimeException) {
                 // Preserve ownership so explicit close or death cleanup can retry.
@@ -89,7 +89,7 @@ internal class HostRuntimeOperations(
         }
         val result =
             try {
-                client.prepare(caller.applicationId, UseCaseId(request.useCaseId))
+                runtimeClient(caller).prepare(caller.applicationId, UseCaseId(request.useCaseId))
             } catch (_: RuntimeException) {
                 callback.onResult(prepareFailure(request.operationId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
                 return
@@ -108,9 +108,16 @@ internal class HostRuntimeOperations(
             callback.onResult(sessionFailure(request.operationId, connectionError))
             return
         }
+        val runtimeClient =
+            try {
+                runtimeClient(caller)
+            } catch (_: RuntimeException) {
+                callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
+                return
+            }
         val sessionId =
             try {
-                client.createSession(caller.applicationId, UseCaseId(request.useCaseId), request.options.toCore())
+                runtimeClient.createSession(caller.applicationId, UseCaseId(request.useCaseId), request.options.toCore())
             } catch (_: RuntimeException) {
                 callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
                 return
@@ -119,9 +126,12 @@ internal class HostRuntimeOperations(
             is LedgerResult.Success -> callback.onResult(sessionSuccess(request.operationId, request.externalSessionId))
 
             is LedgerResult.Failure -> {
-                runCatching { client.closeSession(sessionId) }
+                runCatching { runtimeClient.closeSession(sessionId) }
                 callback.onResult(sessionFailure(request.operationId, registered.reason.toHostWireError()))
             }
         }
     }
+
+    private fun runtimeClient(caller: AuthorizedCaller): LocalLlmClient =
+        authorizedRuntimeClientFactory?.create(caller) ?: client
 }
