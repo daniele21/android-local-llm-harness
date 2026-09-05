@@ -36,18 +36,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
 
-internal interface HarnessInferenceActivityActions {
-    fun refresh()
-
-    fun openDetail(requestId: String)
-
-    fun selectFilter(selection: InferenceActivityFilterSelection)
-
-    fun clearHistory()
-
-    fun clearFeedback()
-}
-
 @Composable
 internal fun HarnessInferenceActivityScreen(
     state: HarnessInferenceActivityState,
