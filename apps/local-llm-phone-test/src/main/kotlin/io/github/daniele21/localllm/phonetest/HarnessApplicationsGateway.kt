@@ -155,13 +155,26 @@ internal class StoreHarnessApplicationsGateway(
             } else {
                 ApplicationRegistrationState.DISABLED
             }
-        if (existing.state !in setOf(ApplicationRegistrationState.AUTHORIZED, ApplicationRegistrationState.DISABLED)) {
-            throw ControlPlaneMutationRejected("This application identity must be resolved before access can be changed")
+        val statesThatCanBeExplicitlyAuthorized =
+            setOf(
+                ApplicationRegistrationState.AUTHORIZED,
+                ApplicationRegistrationState.DISABLED,
+                ApplicationRegistrationState.PENDING,
+                ApplicationRegistrationState.SIGNATURE_CHANGED,
+            )
+        if (command.enabled && existing.state !in statesThatCanBeExplicitlyAuthorized) {
+            throw ControlPlaneMutationRejected("This application identity is unavailable and cannot be authorized")
+        }
+        if (!command.enabled && existing.state !in setOf(ApplicationRegistrationState.AUTHORIZED, ApplicationRegistrationState.DISABLED)) {
+            throw ControlPlaneMutationRejected("This application is not currently authorized")
         }
         copy(
             applications = applications.map { application ->
                 if (application.applicationId == applicationId) {
-                    application.copy(state = target)
+                    application.copy(
+                        state = target,
+                        lastSeenAtEpochMs = maxOf(application.lastSeenAtEpochMs, epochClock()),
+                    )
                 } else {
                     application
                 }
