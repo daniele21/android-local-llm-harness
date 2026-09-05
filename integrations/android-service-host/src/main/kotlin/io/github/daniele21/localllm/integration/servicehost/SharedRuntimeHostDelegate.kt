@@ -253,10 +253,15 @@ class SharedRuntimeHostDelegate private constructor(
         }
     }
 
-    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? = when {
-        authorizedConsumerClientFactory != null -> runCatching { authorizedConsumerClientFactory.create(caller) }.getOrNull()
-        consumerClientFactory != null -> runCatching { consumerClientFactory.invoke(caller.applicationId) }.getOrNull()
-        else -> null
+    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? {
+        val authorizedFactory = authorizedConsumerClientFactory
+        if (authorizedFactory != null) {
+            return runCatching { authorizedFactory.create(caller) }.getOrNull()
+        }
+        val legacyFactory = consumerClientFactory
+        return legacyFactory?.let { factory ->
+            runCatching { factory(caller.applicationId) }.getOrNull()
+        }
     }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
