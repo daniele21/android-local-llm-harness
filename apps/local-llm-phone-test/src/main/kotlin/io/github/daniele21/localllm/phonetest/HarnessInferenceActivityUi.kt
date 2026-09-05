@@ -36,17 +36,22 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 import io.github.daniele21.localllm.ui.designsystem.LocalHarnessSpacing
 
+internal interface HarnessInferenceActivityActions {
+    fun refresh()
+
+    fun openDetail(requestId: String)
+
+    fun selectFilter(selection: InferenceActivityFilterSelection)
+
+    fun clearHistory()
+
+    fun clearFeedback()
+}
+
 @Composable
 internal fun HarnessInferenceActivityScreen(
     state: HarnessInferenceActivityState,
-    onRefresh: () -> Unit,
-    onOpenDetail: (String) -> Unit,
-    onSelectApplication: (String?) -> Unit,
-    onSelectStatus: (InferenceAuditStatus?) -> Unit,
-    onSelectPeriod: (InferenceActivityPeriod) -> Unit,
-    onSelectUseCase: (String?) -> Unit,
-    onClearHistory: () -> Unit,
-    onClearFeedback: () -> Unit,
+    actions: HarnessInferenceActivityActions,
     modifier: Modifier = Modifier,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
@@ -54,7 +59,7 @@ internal fun HarnessInferenceActivityScreen(
         visible = confirmClear,
         onConfirm = {
             confirmClear = false
-            onClearHistory()
+            actions.clearHistory()
         },
         onDismiss = { confirmClear = false },
     )
@@ -68,20 +73,14 @@ internal fun HarnessInferenceActivityScreen(
 
         state.listErrorCode != null && state.items.isEmpty() -> InferenceActivityUnavailable(
             state = state,
-            onRefresh = onRefresh,
+            onRefresh = actions::refresh,
             modifier = modifier,
         )
 
         else -> InferenceActivityList(
             state = state,
-            onRefresh = onRefresh,
-            onOpenDetail = onOpenDetail,
-            onSelectApplication = onSelectApplication,
-            onSelectStatus = onSelectStatus,
-            onSelectPeriod = onSelectPeriod,
-            onSelectUseCase = onSelectUseCase,
+            actions = actions,
             onRequestClear = { confirmClear = true },
-            onClearFeedback = onClearFeedback,
             modifier = modifier,
         )
     }
@@ -122,14 +121,8 @@ private fun InferenceActivityUnavailable(state: HarnessInferenceActivityState, o
 @Composable
 private fun InferenceActivityList(
     state: HarnessInferenceActivityState,
-    onRefresh: () -> Unit,
-    onOpenDetail: (String) -> Unit,
-    onSelectApplication: (String?) -> Unit,
-    onSelectStatus: (InferenceAuditStatus?) -> Unit,
-    onSelectPeriod: (InferenceActivityPeriod) -> Unit,
-    onSelectUseCase: (String?) -> Unit,
+    actions: HarnessInferenceActivityActions,
     onRequestClear: () -> Unit,
-    onClearFeedback: () -> Unit,
     modifier: Modifier,
 ) {
     LazyColumn(
@@ -140,21 +133,29 @@ private fun InferenceActivityList(
         item {
             InferenceActivityListHeader(
                 state = state,
-                onRefresh = onRefresh,
+                onRefresh = actions::refresh,
                 onRequestClear = onRequestClear,
             )
         }
         item {
             InferenceActivityFilters(
                 state = state,
-                onSelectApplication = onSelectApplication,
-                onSelectStatus = onSelectStatus,
-                onSelectPeriod = onSelectPeriod,
-                onSelectUseCase = onSelectUseCase,
+                onSelectApplication = { applicationId ->
+                    actions.selectFilter(InferenceActivityFilterSelection.Application(applicationId))
+                },
+                onSelectStatus = { status ->
+                    actions.selectFilter(InferenceActivityFilterSelection.Status(status))
+                },
+                onSelectPeriod = { period ->
+                    actions.selectFilter(InferenceActivityFilterSelection.Period(period))
+                },
+                onSelectUseCase = { useCaseId ->
+                    actions.selectFilter(InferenceActivityFilterSelection.UseCase(useCaseId))
+                },
             )
         }
         state.feedback?.let { feedback ->
-            item { InferenceActivityFeedback(feedback, onClearFeedback) }
+            item { InferenceActivityFeedback(feedback, actions::clearFeedback) }
         }
         if (state.listErrorCode != null) {
             item { InferenceActivityDegradedCard(state.listErrorCode.name) }
@@ -174,7 +175,7 @@ private fun InferenceActivityList(
             }
         } else {
             items(items = state.items, key = InferenceActivityListItem::requestId) { item ->
-                InferenceActivityRow(item = item, onOpenDetail = onOpenDetail)
+                InferenceActivityRow(item = item, onOpenDetail = actions::openDetail)
             }
         }
     }
