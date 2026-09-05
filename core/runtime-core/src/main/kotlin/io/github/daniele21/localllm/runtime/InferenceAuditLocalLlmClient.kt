@@ -86,7 +86,7 @@ class OneShotInferenceAuditEffectivePromptBridge :
 
     override fun consume(requestId: RequestId): String? {
         if (expected.remove(requestId)) {
-            throw IllegalStateException("Runtime did not publish the effective prompt before Prepared")
+            error("Runtime did not publish the effective prompt before Prepared")
         }
         return prompts.remove(requestId)
     }
