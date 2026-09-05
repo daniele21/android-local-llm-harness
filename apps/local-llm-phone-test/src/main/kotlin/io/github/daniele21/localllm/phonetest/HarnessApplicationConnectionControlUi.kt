@@ -24,9 +24,13 @@ internal fun HarnessConnectionControlCard(
     saving: Boolean,
     onConnectionEnabledChanged: (Boolean) -> Unit,
 ) {
+    val authorizationPending =
+        application.status == HarnessApplicationStatus.PENDING ||
+            application.status == HarnessApplicationStatus.IDENTITY_CHANGED
     val toggleSupported =
         application.status == HarnessApplicationStatus.AUTHORIZED ||
-            application.status == HarnessApplicationStatus.DISABLED
+            application.status == HarnessApplicationStatus.DISABLED ||
+            authorizationPending
     val enabled = application.status == HarnessApplicationStatus.AUTHORIZED
     HarnessCard(modifier = Modifier.testTag("application-connection-control")) {
         Row(
@@ -40,17 +44,18 @@ internal fun HarnessConnectionControlCard(
             ) {
                 Text("Allow app connection", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    if (enabled) {
-                        "This app can authenticate to the shared runtime for its assigned use cases."
-                    } else {
-                        "Access is blocked at the Binder authorization boundary. Configuration is retained."
+                    when {
+                        enabled -> "This app can authenticate to the shared runtime for its assigned use cases."
+                        authorizationPending ->
+                            "Review the package and signer in Technical details, then enable access to authorize this exact app identity."
+                        else -> "Access is blocked at the Binder authorization boundary. Configuration is retained."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (!toggleSupported) {
                     Text(
-                        "Resolve the application identity state before changing access.",
+                        "The installed application identity is unavailable, so access cannot be authorized.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
