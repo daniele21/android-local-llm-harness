@@ -68,12 +68,14 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Build emulator host
+      - name: Build emulator host and Host-owned authorization instrumentation
         shell: bash
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-configuration-cache :apps:local-llm-phone-test:assembleEmulatorE2e
+          ./gradlew --no-configuration-cache \
+            :apps:local-llm-phone-test:assembleEmulatorE2e \
+            :apps:local-llm-phone-test:assembleDebugAndroidTest
 
       - name: Publish exact Consumer SDK candidate
         shell: bash
@@ -90,7 +92,9 @@ jobs:
         run: |
           set -euo pipefail
           host_apk="$(find apps/local-llm-phone-test/build/outputs/apk -type f -name '*.apk' -path '*emulatorE2e*' | head -n 1)"
+          host_test_apk="$(find apps/local-llm-phone-test/build/outputs/apk/androidTest -type f -name '*.apk' -path '*debug*' | head -n 1)"
           test -f "$host_apk"
+          test -f "$host_test_apk"
           test -d build/consumer-sdk-repository/io/github/daniele21/localllm
           test -s build/consumer-sdk-repository/build-manifest.txt
           test -s build/consumer-sdk-repository/SHA256SUMS
@@ -98,13 +102,16 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/harness-emulator-host"
           cp "$host_apk" "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk"
+          cp "$host_test_apk" "$RUNNER_TEMP/harness-emulator-host/harness-debug-androidTest.apk"
           cp "$RUNNER_TEMP/harness-source-revision.txt" "$RUNNER_TEMP/harness-emulator-host/source-revision.txt"
           cp "$RUNNER_TEMP/consumer-sdk-version.txt" "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-version.txt"
           cp "$RUNNER_TEMP/consumer-sdk-source-revision.txt" \
             "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-source-revision.txt"
           cp -R build/consumer-sdk-repository \
             "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-repository"
-          sha256sum "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk" \
+          sha256sum \
+            "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk" \
+            "$RUNNER_TEMP/harness-emulator-host/harness-debug-androidTest.apk" \
             > "$RUNNER_TEMP/harness-emulator-host/apk-sha256.txt"
 
       - name: Upload emulator candidate
