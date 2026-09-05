@@ -2,7 +2,7 @@
 
 Scope: `integrations/android-service-host`.
 
-Read `docs/shared-runtime/workstreams/host-service.md` and ADR 0012 before editing this module.
+Read `docs/shared-runtime/workstreams/host-service.md`, ADR 0012 and ADR 0018 before editing this module.
 
 ## Ownership
 
@@ -13,8 +13,10 @@ It must not instantiate `RuntimeOrchestrator`, choose/download/install models, o
 ## Security invariants
 
 - Capture Binder UID/PID before switching threads.
-- Verify the signature permission, exact package mapping and accepted signing certificate lineage on every entry point.
+- Treat the manifest bind permission as a capability gate, not sufficient authority. Verify the exact UID/package mapping, current installed signer and authoritative Host policy on every entry point.
+- When a dynamic policy source is configured, it is authoritative for that authorization attempt; never merge a stale/bootstrap policy back into live trust.
 - Never trust caller-supplied package, UID, application ID, certificate or model identity.
+- Independent-consumer authorization is pinned to the exact current installed signer approved by the Host. Historical signing lineage is accepted only where an explicit same-publisher policy owns that compatibility decision.
 - Scope every client token, session and request to one authenticated caller.
 - Fail closed for ambiguous UIDs, unknown packages, signer mismatch, unauthorized use cases, quota exhaustion and closing connections.
 - Keep control and callback queues bounded; Binder threads never load models or run generation.
