@@ -102,6 +102,15 @@ class InferenceAuditContractTest {
             InferenceAuditQuery(limit = MAX_AUDIT_QUERY_LIMIT + 1)
         }
         assertThrows(IllegalArgumentException::class.java) {
+            InferenceAuditQuery(afterReceivedAtEpochMs = -1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            InferenceAuditQuery(beforeReceivedAtEpochMs = -1)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            InferenceAuditQuery(afterReceivedAtEpochMs = 200, beforeReceivedAtEpochMs = 100)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
             InferenceAuditInput.Text("x".repeat(MAX_AUDIT_INPUT_CHARACTERS + 1))
         }
         assertThrows(IllegalArgumentException::class.java) {
