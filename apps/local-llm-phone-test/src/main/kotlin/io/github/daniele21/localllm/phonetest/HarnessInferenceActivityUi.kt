@@ -50,7 +50,9 @@ internal fun HarnessInferenceActivityScreen(
     if (confirmClear) {
         HarnessConfirmationDialog(
             title = "Clear inference history?",
-            detail = "Completed, failed, cancelled and interrupted local activity records will be deleted. Active inference records, models, app connections and diagnostics are not removed.",
+            detail =
+                "Completed, failed, cancelled and interrupted local activity records will be deleted. " +
+                    "Active inference records, models, app connections and diagnostics are not removed.",
             confirmLabel = "Clear history",
             dismissLabel = "Cancel",
             onConfirm = {
