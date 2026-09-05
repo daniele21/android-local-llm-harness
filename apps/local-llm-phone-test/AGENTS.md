@@ -11,7 +11,7 @@ The app orchestrates existing domain contracts. It must not become an alternate 
 Read the active product state before UI or orchestration work:
 
 - [`current-state.md`](../../docs/current-state.md) and the active [`dev-integration-and-harness-0.5-plan.md`](../../docs/dev-integration-and-harness-0.5-plan.md);
-- [`shared-runtime/roadmap.md`](../../docs/shared-runtime/roadmap.md), [`shared-runtime/workstreams/host-service.md`](../../docs/shared-runtime/workstreams/host-service.md) and ADR 0012 for proof-host service work;
+- [`shared-runtime/roadmap.md`](../../docs/shared-runtime/roadmap.md), [`shared-runtime/workstreams/host-service.md`](../../docs/shared-runtime/workstreams/host-service.md), ADR 0012 and ADR 0018 for proof-host service work and the current independent-consumer trust boundary;
 - [`harness-ux-ui-implementation-plan.md`](../../docs/harness-ux-ui-implementation-plan.md) and [`harness-ux-ui-implementation-progress.md`](../../docs/harness-ux-ui-implementation-progress.md) for Compose structure and remaining evidence;
 - [`model-evaluation/README.md`](../../docs/model-evaluation/README.md) for Performance evaluation contracts and sequencing;
 - [`features/local-inference-activity-audit.md`](../../docs/features/local-inference-activity-audit.md) and ADR 0017 for inference Activity/audit ownership, sensitive persistence and strict admission/terminal semantics;
@@ -24,7 +24,7 @@ Route by responsibility:
 | Concern | Start here | Owning dependency to inspect |
 | --- | --- | --- |
 | App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control-plane store, transport, observability, audit and design-system contracts |
-| Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, manifest/build variants | `integrations/android-service-host`, Binder contract and ADR 0012 |
+| Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, manifest/build variants | `integrations/android-service-host`, Binder contract, ADR 0012 and ADR 0018 |
 | Destinations and responsive shell | `HarnessDestination.kt`, Compose entry points | Shared navigation/components under `ui/design-system` |
 | Playground state and inference | `HarnessViewModel.kt`, `PhonePlaygroundController.kt` and related UI | `LocalLlmClient`, runtime lifecycle and generation contracts |
 | Performance evaluation UI | `PerformanceViewModel.kt`, `PerformanceScreen.kt`, presentation helpers | `evaluation/*` contracts, persistence/comparison and telemetry evidence |
@@ -53,7 +53,8 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 - Performance may present only source-backed evaluation state. It must not rank models/configurations while compatible aggregated latency, throughput, memory and quality evidence is unavailable.
 - The shared-runtime proof `Service` reuses `HarnessRuntimeGraph.from(...)`; binding/handshake must not create a second runtime, select a model or load a GGUF.
 - `HarnessRuntimeGraph` owns the single process-scoped control-plane Room store used by both the proof `Service` and Harness UI; neither surface opens or closes a parallel database owner.
-- Shared-runtime release and debug variants use deterministic, distinct signature-permission names. Caller package matching is exact; never strip application ID suffixes to authorize a caller.
+- Shared-runtime release/debug inference variants use deterministic `BIND_LOCAL_LLM` normal capability-permission names. That permission is not trust: Binder authorization must derive the calling UID, exact installed package, current signer, persisted Harnex authorization and enabled use case. Known independent consumers are source-observed as pending, signer replacement fails closed until explicit reauthorization, and caller package matching remains exact.
+- Emulator-only fault/control authority remains variant-scoped and separately signature-protected; never reuse the normal inference bind permission for test control.
 - Download, install, selection, verification, removal, health, benchmark, evaluation and validation are distinct explicit user actions.
 - Prompt and generated output remain out of saved state, normal telemetry, structured logs and shared reports. Persistent content is allowed only through the ADR-0017 Harnex-owned encrypted inference-audit store with bounded retention; no second UI/consumer content store is allowed.
 - Document URIs, signed/download URLs and private filesystem paths never appear in persisted metadata, UI diagnostics or shareable reports.
@@ -62,13 +63,13 @@ rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/s
 - Storage Access Framework input streams into private staging/content-addressed storage; never treat a document URI as durable model identity.
 - UI state covers loading, empty, populated, unavailable, warning, failure, cancellation and recovery where applicable.
 - Shared design tokens/components and accessibility semantics belong in `ui/design-system`, not duplicated locally.
-- Emulator and host results are preflight only. Only a Play-installed or ADB-captured physical-device run supports device evidence, and only for its exact matrix entry.
+- Emulator and host results are preflight only for facts requiring the real distribution/device environment. Distinct-signer emulator E2E is valid deterministic evidence for Binder authorization semantics, while actual Play App Signing identity and representative physical runtime/resource behavior remain REAL_ENVIRONMENT evidence.
 
 ## Change routing
 
 - Move reusable visual tokens/components to `ui/design-system`; keep app-specific composition and data mapping here.
 - Move runtime, model, telemetry, audit, evaluation, health or benchmark policy to the owning module and expose the smallest neutral contract the app needs.
-- Keep shared-runtime Binder/AIDL, caller authorization and caller-owned ledgers in their transport/integration modules; the phone app owns only the concrete proof service and explicit host configuration.
+- Keep shared-runtime Binder/AIDL, generic caller authorization and caller-owned ledgers in their transport/integration modules; the phone app owns concrete proof-service composition, source-backed known-consumer discovery and explicit Harnex Control Plane authorization policy.
 - Keep audit encryption/retention/transition policy behind `InferenceAuditRepository`; Compose may receive summaries/details but never ciphertext, Room entities, Keystore handles or raw Binder caller objects.
 - Keep UI models immutable and separate observation from mutating capabilities.
 - Preserve a single process-scoped runtime graph, including its control-plane and audit-store owners, across destinations and the proof service; do not create runtime or database owners per screen, Activity recreation or Binder connection.
@@ -100,7 +101,7 @@ LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true \
 python3 scripts/verify-android-packaging.py
 ```
 
-When an emulator or physical device is available, run the applicable instrumentation/visual check. A signed Play build and representative physical GGUF evidence remain separate release gates; never infer them from successful assembly or emulator tests.
+When an emulator or physical device is available, run the applicable instrumentation/visual check. A signed Play build and representative physical GGUF evidence remain separate release gates for facts that require them; never infer Play signing identity, physical resource behavior or real-device runtime evidence from successful assembly alone.
 
 ## Maintaining this guide
 
@@ -110,6 +111,7 @@ Update this file in the same change when:
 - model distribution/management, evaluation, observability, audit or validation orchestration moves between classes;
 - a new direct domain dependency or capability is introduced;
 - privacy, persistence, destructive-action or implicit-side-effect rules change;
+- shared-runtime trust, manifest permissions or source-backed caller identity rules change;
 - design-system ownership or accessibility expectations change;
 - app unit, instrumentation, lint, bundle, signing or evidence commands change.
 
