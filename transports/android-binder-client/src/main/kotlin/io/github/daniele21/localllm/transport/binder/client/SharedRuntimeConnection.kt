@@ -99,18 +99,39 @@ internal class SharedRuntimeConnection(
         }
     }
 
+    /**
+     * Releases the current Binder registration without closing this connection owner. A later [connect]
+     * starts a fresh connection epoch and re-authenticates the caller against the Host policy.
+     */
+    fun disconnect() {
+        releaseConnection(
+            targetState = SharedRuntimeConnectionState.DISCONNECTED,
+            invalidationReason = "Shared-runtime client disconnected",
+        )
+    }
+
     override fun close() {
+        releaseConnection(
+            targetState = SharedRuntimeConnectionState.CLOSED,
+            invalidationReason = "Shared-runtime client connection closed",
+        )
+    }
+
+    private fun releaseConnection(targetState: SharedRuntimeConnectionState, invalidationReason: String) {
         val registered = synchronized(lock) {
             if (current.state == SharedRuntimeConnectionState.CLOSED) return
+            if (targetState == SharedRuntimeConnectionState.DISCONNECTED && current.state == SharedRuntimeConnectionState.DISCONNECTED) {
+                return
+            }
             connectionEpoch += 1
             registeredEndpoint.also { registeredEndpoint = null }
         }
         registered?.let { endpoint ->
             runCatching { endpoint.service.unregisterClient(endpoint.clientToken) }
-            invalidations.notify(endpoint.connectionEpoch, "Shared-runtime client connection closed")
+            invalidations.notify(endpoint.connectionEpoch, invalidationReason)
         }
         binding.unbind()
-        transition(SharedRuntimeConnectionState.CLOSED)
+        transition(targetState)
     }
 
     private fun negotiate(service: SharedRuntimeRemoteService, epoch: Long) {
