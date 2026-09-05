@@ -24,6 +24,7 @@ import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.PrepareResult
+import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.RuntimeSnapshot
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionOptions
@@ -38,6 +39,11 @@ import java.util.concurrent.atomic.AtomicReference
 /** Resolves trusted audit attribution at the composition boundary before generation is admitted. */
 fun interface InferenceAuditOriginResolver {
     fun resolve(request: GenerationRequest): InferenceAuditOrigin
+}
+
+/** Consumes the runtime-owned rendered prompt exactly when the Prepared event reaches the audit gate. */
+fun interface InferenceAuditEffectivePromptResolver {
+    fun consume(requestId: RequestId): String?
 }
 
 enum class InferenceAuditWritePhase {
@@ -63,6 +69,7 @@ class InferenceAuditLocalLlmClient(
     private val auditRepository: InferenceAuditRepository,
     private val originResolver: InferenceAuditOriginResolver,
     private val telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
+    private val effectivePromptResolver: InferenceAuditEffectivePromptResolver = InferenceAuditEffectivePromptResolver { null },
     private val epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
 ) : LocalLlmClient {
     override fun runtimeSnapshot(): RuntimeSnapshot = delegate.runtimeSnapshot()
@@ -82,6 +89,7 @@ class InferenceAuditLocalLlmClient(
             delegate = listener,
             auditRepository = auditRepository,
             telemetryRepository = telemetryRepository,
+            effectivePromptResolver = effectivePromptResolver,
             epochClock = epochClock,
         )
         val handle = delegate.generate(request, auditListener)
@@ -119,6 +127,7 @@ private class AuditGenerationListener(
     private val delegate: GenerationListener,
     private val auditRepository: InferenceAuditRepository,
     private val telemetryRepository: TelemetryRepository,
+    private val effectivePromptResolver: InferenceAuditEffectivePromptResolver,
     private val epochClock: EpochClock,
 ) : GenerationListener {
     private val handle = AtomicReference<GenerationHandle?>()
@@ -147,11 +156,15 @@ private class AuditGenerationListener(
     }
 
     private fun onPrepared(event: GenerationEvent.Prepared) {
+        val effectivePrompt = runCatching { effectivePromptResolver.consume(event.requestId) }.getOrElse {
+            failBeforeDecode(InferenceAuditFailureCode.INVALID_STATE, InferenceAuditWritePhase.PREPARED)
+            return
+        }
         val technicalRun = runCatching { telemetryRepository.findRun(event.requestId) }.getOrNull()
         val prepared = InferenceAuditPrepared(
             requestId = event.requestId,
             preparedAtEpochMs = epochClock.nowEpochMs(),
-            effectivePrompt = null,
+            effectivePrompt = effectivePrompt,
             execution = InferenceAuditExecutionIdentity(
                 modelDigest = event.modelDigest,
                 modelLoadKind = technicalRun?.modelLoadKind ?: io.github.daniele21.localllm.contracts.ModelLoadKind.UNKNOWN,
