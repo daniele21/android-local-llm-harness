@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSh
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
 import io.github.daniele21.localllm.models.InMemoryHostControlPlaneStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,7 +13,7 @@ class HarnessObservedApplicationIdentityReconcilerTest {
     @Test
     fun `consumer installed after process startup is observed pending before authorization`() {
         val store = InMemoryHostControlPlaneStore()
-        var policies = emptyList<AuthorizedClientPolicy>()
+        var policies = listOf(consolePolicy())
         val reconciler =
             HarnessObservedApplicationIdentityReconciler(
                 store = store,
@@ -20,14 +21,26 @@ class HarnessObservedApplicationIdentityReconcilerTest {
                 epochClock = { 100L },
             )
 
-        reconciler.reconcileIfNeeded()
-        assertTrue(store.snapshot().applications.isEmpty())
+        val beforeInstall = reconciler.reconcileIfNeeded()
+        assertFalse(
+            beforeInstall.applications.any {
+                it.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
+            },
+        )
+        assertTrue(
+            beforeInstall.applications.any {
+                it.applicationId == HarnessSharedRuntimeBindings.consoleApplicationId &&
+                    it.state == ApplicationRegistrationState.AUTHORIZED
+            },
+        )
 
-        policies = listOf(redactGuardPolicy(SIGNER_A))
+        policies = listOf(consolePolicy(), redactGuardPolicy(SIGNER_A))
         val observed = reconciler.reconcileIfNeeded()
 
-        val application = observed.applications.single()
-        assertEquals(HarnessSharedRuntimeBindings.redactGuardApplicationId, application.applicationId)
+        val application =
+            observed.applications.single {
+                it.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
+            }
         assertEquals(HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE, application.packageName)
         assertEquals(SIGNER_A, application.signerSha256)
         assertEquals(ApplicationRegistrationState.PENDING, application.state)
@@ -46,25 +59,39 @@ class HarnessObservedApplicationIdentityReconcilerTest {
         val reconciler =
             HarnessObservedApplicationIdentityReconciler(
                 store = store,
-                observedPolicies = { listOf(redactGuardPolicy(signer)) },
+                observedPolicies = { listOf(consolePolicy(), redactGuardPolicy(signer)) },
                 epochClock = { 200L },
             )
         reconciler.reconcileIfNeeded()
         store.transact { current ->
             current.copy(
                 applications =
-                current.applications.map { application ->
-                    application.copy(state = ApplicationRegistrationState.AUTHORIZED)
-                },
+                    current.applications.map { application ->
+                        if (application.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId) {
+                            application.copy(state = ApplicationRegistrationState.AUTHORIZED)
+                        } else {
+                            application
+                        }
+                    },
             )
         }
 
         signer = SIGNER_B
-        val changed = reconciler.reconcileIfNeeded().applications.single()
+        val changed =
+            reconciler.reconcileIfNeeded().applications.single {
+                it.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
+            }
 
         assertEquals(SIGNER_B, changed.signerSha256)
         assertEquals(ApplicationRegistrationState.SIGNATURE_CHANGED, changed.state)
     }
+
+    private fun consolePolicy() = AuthorizedClientPolicy(
+        packageName = HarnessSharedRuntimeBindings.CONSOLE_DEBUG_PACKAGE,
+        applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+        allowedUseCases = HarnessSharedRuntimeBindings.consoleUseCases,
+        acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(HOST_SIGNER)),
+    )
 
     private fun redactGuardPolicy(signer: String) = AuthorizedClientPolicy(
         packageName = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
@@ -74,6 +101,7 @@ class HarnessObservedApplicationIdentityReconcilerTest {
     )
 
     private companion object {
+        const val HOST_SIGNER = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
         const val SIGNER_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
         const val SIGNER_B = "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"
     }
