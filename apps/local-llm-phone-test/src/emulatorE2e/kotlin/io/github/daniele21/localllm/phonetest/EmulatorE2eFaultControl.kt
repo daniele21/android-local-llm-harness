@@ -20,6 +20,11 @@ internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
             resultData = EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName)
             return
         }
+        if (intent.action == EmulatorE2eFaultActions.RUN_INTERNAL_ACTIVITY_PROBE) {
+            resultCode = Activity.RESULT_OK
+            resultData = EmulatorE2eInternalActivityProbe.run(context)
+            return
+        }
 
         when (intent.action) {
             EmulatorE2eFaultActions.PAUSE_GENERATION -> EmulatorE2eGenerationGate.pause()
@@ -50,6 +55,7 @@ internal object EmulatorE2eFaultActions {
     const val PAUSE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.PAUSE_GENERATION"
     const val RELEASE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION"
     const val FAIL_NEXT_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.FAIL_NEXT_GENERATION"
+    const val RUN_INTERNAL_ACTIVITY_PROBE = "io.github.daniele21.localllm.phonetest.emulatorE2e.RUN_INTERNAL_ACTIVITY_PROBE"
     const val RESET = "io.github.daniele21.localllm.phonetest.emulatorE2e.RESET"
     const val QUERY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY"
     const val QUERY_ACTIVITY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY"
