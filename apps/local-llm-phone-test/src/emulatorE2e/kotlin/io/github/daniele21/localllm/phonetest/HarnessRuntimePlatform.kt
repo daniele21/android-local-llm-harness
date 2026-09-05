@@ -101,6 +101,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     override fun shutdown() {
         cancelledRequestIds.clear()
         EmulatorE2eGenerationGate.reset()
+        EmulatorE2EBackendFailureGate.reset()
     }
 
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle =
@@ -153,7 +154,11 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
             )
         }
 
-        val output = EmulatorE2eAnalysisResponder.output(request.prompt)
+        check(!EmulatorE2EBackendFailureGate.consume()) {
+            "Injected emulator E2E backend failure"
+        }
+
+        val output = EmulatorE2EAnalysisResponder.output(request.prompt)
         val midpoint = (output.length / 2).coerceAtLeast(1)
         val chunks = listOf(output.substring(0, midpoint), output.substring(midpoint)).filter(String::isNotEmpty)
         var emitted = 0
@@ -186,7 +191,7 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
     override fun cancel(requestId: String): Boolean = cancelledRequestIds.add(requestId)
 }
 
-private object EmulatorE2eAnalysisResponder {
+private object EmulatorE2EAnalysisResponder {
     private const val TEST_SURFACE = "Ada Lovelace"
     private val selectedType = Regex("\\\"selectedTypeIds\\\"\\s*:\\s*\\[\\s*\\\"([^\\\"]+)\\\"")
     private val segmentId = Regex("\\\"segmentId\\\"\\s*:\\s*\\\"(p[0-9]{4}-b[0-9]{4}(?:-f[0-9]{4})?)\\\"")
