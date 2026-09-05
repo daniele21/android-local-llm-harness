@@ -8,7 +8,7 @@
 
 ADR 0012 deliberately chose a bound-only v1 shared runtime: Binder client death, explicit unbind or unregister cancels caller-owned work and closes caller-owned sessions. That made initial cleanup deterministic, but it couples transport lifetime to inference lifetime. A consumer moving to the background, losing its Binder connection, recreating UI, or being killed by Android can therefore terminate otherwise-valid local inference. The host can also discard a resident model because demand was inferred from connection lifetime rather than semantic work and residency policy.
 
-The current product requires a stronger lifecycle contract. User-visible inference must continue independently from Activity/Compose lifecycle and transient Binder connectivity, while preserving exact caller authorization defined by ADR 0017, host-owned model authority, bounded resources, explicit cancellation, privacy-safe evidence and Android background-execution rules.
+The current product requires a stronger lifecycle contract. User-visible inference must continue independently from Activity/Compose lifecycle and transient Binder connectivity, while preserving exact caller authorization defined by ADR 0018, host-owned model authority, bounded resources, explicit cancellation, privacy-safe evidence and Android background-execution rules.
 
 ADR 0015 already establishes the complementary ownership rule: product activation/residency is distinct from Binder connection/session lifetime. This ADR changes lifecycle only for an explicit durable-job capability; ordinary connection-scoped prepare/session/generate calls keep ADR 0012 cleanup semantics.
 
@@ -86,7 +86,7 @@ For RedactGuard, the application owns an `AnalysisJobId` for the document-analys
 
 ### Security boundary retained
 
-ADR 0017 is authoritative for Binder UID/package/signer verification, independently signed consumer authorization, the `BIND_LOCAL_LLM` capability permission and signing-identity reauthorization. ADR 0012 remains authoritative for the non-superseded Host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
+ADR 0018 is authoritative for Binder UID/package/signer verification, independently signed consumer authorization, the `BIND_LOCAL_LLM` capability permission and signing-identity reauthorization. ADR 0012 remains authoritative for the non-superseded Host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
 
 ## Failure semantics
 
