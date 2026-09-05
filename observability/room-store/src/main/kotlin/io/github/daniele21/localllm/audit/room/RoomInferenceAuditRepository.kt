@@ -109,13 +109,20 @@ class RoomInferenceAuditRepository internal constructor(
         val applicationId = query.applicationId?.value
         val useCaseId = query.useCaseId?.value
         val entities = if (query.statuses.isEmpty()) {
-            dao.recent(query.limit, applicationId, useCaseId, query.beforeReceivedAtEpochMs)
+            dao.recent(
+                query.limit,
+                applicationId,
+                useCaseId,
+                query.afterReceivedAtEpochMs,
+                query.beforeReceivedAtEpochMs,
+            )
         } else {
             dao.recentWithStatuses(
                 query.limit,
                 applicationId,
                 useCaseId,
                 query.statuses.map(InferenceAuditStatus::name),
+                query.afterReceivedAtEpochMs,
                 query.beforeReceivedAtEpochMs,
             )
         }
