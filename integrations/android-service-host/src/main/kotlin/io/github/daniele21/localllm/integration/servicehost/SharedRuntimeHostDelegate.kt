@@ -33,6 +33,7 @@ private class SharedRuntimeHostInfrastructure(
 class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
+    private val runtimeClientFactory: AuthorizedRuntimeClientFactory?,
     private val consumerClientFactory: AuthorizedConsumerClientFactory?,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
@@ -53,6 +54,7 @@ class SharedRuntimeHostDelegate private constructor(
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
+        runtimeClientFactory = null,
         consumerClientFactory = consumerClientFactory?.let { legacyFactory ->
             AuthorizedConsumerClientFactory { caller -> legacyFactory(caller.applicationId) }
         },
@@ -82,6 +84,7 @@ class SharedRuntimeHostDelegate private constructor(
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
+        runtimeClientFactory = null,
         consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
@@ -98,6 +101,7 @@ class SharedRuntimeHostDelegate private constructor(
     internal constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
+        authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory?,
         authorizedConsumerClientFactory: AuthorizedConsumerClientFactory?,
         consumerControlPlaneHost: ConsumerControlPlaneHost?,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
@@ -105,6 +109,7 @@ class SharedRuntimeHostDelegate private constructor(
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
+        runtimeClientFactory = authorizedRuntimeClientFactory,
         consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
@@ -136,7 +141,13 @@ class SharedRuntimeHostDelegate private constructor(
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
-    internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
+    internal val runtimeOperations = HostRuntimeOperations(
+        client = client,
+        ledger = ledger,
+        resources = resources,
+        controlExecutor = controlExecutor,
+        authorizedRuntimeClientFactory = runtimeClientFactory,
+    )
     internal val consumerOperations =
         ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
     internal val logicalJobOperations =
