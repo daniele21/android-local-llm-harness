@@ -92,7 +92,9 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
             )
 
             is InferenceActivityFilterSelection.Status -> current.copy(status = selection.status)
+
             is InferenceActivityFilterSelection.Period -> current.copy(period = selection.period)
+
             is InferenceActivityFilterSelection.UseCase -> current.copy(useCaseId = selection.useCaseId)
         }
         updateFilter(updated)
