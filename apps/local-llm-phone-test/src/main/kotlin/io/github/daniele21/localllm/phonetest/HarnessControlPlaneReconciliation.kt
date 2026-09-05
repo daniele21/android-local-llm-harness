@@ -154,33 +154,32 @@ internal sealed interface HarnessControlPlaneReconciliationResult {
 /**
  * Conservatively reconciles mandatory Host state into an already-valid HostControlPlaneState.
  * Same-signer built-ins remain immutable. Source-observed external signers fail closed into SIGNATURE_CHANGED and
- * require an explicit user re-authorization before they re-enter the live Binder policy.
+ * require explicit user re-authorization before they re-enter the live Binder policy.
  */
 internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInControlPlaneSpec) {
     fun reconcile(current: HostControlPlaneState, observedAtEpochMs: Long): HarnessControlPlaneReconciliationResult {
-        val applications = current.applications.toMutableList()
-        val applicationConflict = reconcileApplications(applications, observedAtEpochMs)
-        if (applicationConflict != null) return applicationConflict
+        require(observedAtEpochMs >= 0) { "Reconciliation timestamp must not be negative" }
+        val canonicalCurrent = current.canonical()
+        val applications = canonicalCurrent.applications.toMutableList()
+        val useCases = canonicalCurrent.useCases.toMutableList()
+        val presets = canonicalCurrent.presets.toMutableList()
+        val bindings = canonicalCurrent.bindings.toMutableList()
+        val exposures = canonicalCurrent.exposures.toMutableList()
 
-        val useCases = current.useCases.toMutableList()
-        val useCaseConflict = reconcileUseCase(useCases)
-        if (useCaseConflict != null) return useCaseConflict
+        var reconciliationConflict = reconcileApplications(applications, observedAtEpochMs)
+        if (reconciliationConflict == null) reconciliationConflict = reconcileUseCase(useCases)
+        if (reconciliationConflict == null) reconciliationConflict = reconcilePreset(presets)
+        if (reconciliationConflict == null) reconciliationConflict = reconcileBindings(bindings, exposures)
+        if (reconciliationConflict != null) return reconciliationConflict
 
-        val presets = current.presets.toMutableList()
-        val presetConflict = reconcilePreset(presets)
-        if (presetConflict != null) return presetConflict
-
-        val bindings = current.bindings.toMutableList()
-        val bindingConflict = reconcileBindings(bindings)
-        if (bindingConflict != null) return bindingConflict
-
-        val reconciled = current.copy(
+        val next = HostControlPlaneState(
             applications = applications,
             useCases = useCases,
             presets = presets,
             bindings = bindings,
-        )
-        return HarnessControlPlaneReconciliationResult.Success(reconciled, reconciled != current)
+            exposures = exposures,
+        ).canonical()
+        return HarnessControlPlaneReconciliationResult.Success(next, changed = next != canonicalCurrent)
     }
 
     private fun reconcileApplications(
@@ -202,112 +201,125 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
     }
 
     private fun reconcileUseCase(useCases: MutableList<UseCaseDefinition>): HarnessControlPlaneReconciliationResult.Conflict? {
-        val existing = useCases.filter { it.useCaseId == spec.useCase.useCaseId }
-        if (existing.isEmpty()) {
-            useCases += spec.useCase
-            return null
-        }
-        val latest = existing.maxBy { it.revision }
-        if (latest.revision > spec.useCase.revision) {
+        val matching = useCases.filter { it.useCaseId == spec.useCase.useCaseId }
+        if (matching.any { it.revision > spec.useCase.revision }) {
             return conflict(HarnessControlPlaneConflictCode.USE_CASE_REVISION_AHEAD, spec.useCase.useCaseId.value)
         }
-        if (latest.revision == spec.useCase.revision && latest != spec.useCase) {
-            return conflict(HarnessControlPlaneConflictCode.USE_CASE_DEFINITION, spec.useCase.useCaseId.value)
-        }
-        if (latest.revision < spec.useCase.revision) {
+        val sameRevision = matching.singleOrNull { it.revision == spec.useCase.revision }
+        if (sameRevision == null) {
             useCases += spec.useCase
+        } else if (sameRevision != spec.useCase) {
+            return conflict(HarnessControlPlaneConflictCode.USE_CASE_DEFINITION, spec.useCase.useCaseId.value)
         }
         return null
     }
 
     private fun reconcilePreset(presets: MutableList<UseCasePresetDefinition>): HarnessControlPlaneReconciliationResult.Conflict? {
-        val existing = presets.filter { it.presetId == spec.preset.presetId }
-        if (existing.isEmpty()) {
+        val matching = presets.filter {
+            it.useCaseId == spec.preset.useCaseId && it.metadata.presetId == spec.preset.metadata.presetId
+        }
+        if (matching.any { it.metadata.revision > spec.preset.metadata.revision }) {
+            return conflict(HarnessControlPlaneConflictCode.PRESET_REVISION_AHEAD, spec.preset.metadata.presetId)
+        }
+        val sameRevision = matching.singleOrNull { it.metadata.revision == spec.preset.metadata.revision }
+        if (sameRevision == null) {
             presets += spec.preset
-            return null
-        }
-        val latest = existing.maxBy { it.revision }
-        if (latest.revision > spec.preset.revision) {
-            return conflict(HarnessControlPlaneConflictCode.PRESET_REVISION_AHEAD, spec.preset.presetId.value)
-        }
-        if (latest.revision == spec.preset.revision && latest != spec.preset) {
-            return conflict(HarnessControlPlaneConflictCode.PRESET_DEFINITION, spec.preset.presetId.value)
-        }
-        if (latest.revision < spec.preset.revision) {
-            presets += spec.preset
+        } else if (sameRevision != spec.preset) {
+            return conflict(HarnessControlPlaneConflictCode.PRESET_DEFINITION, spec.preset.metadata.presetId)
         }
         return null
     }
 
-    private fun reconcileBindings(bindings: MutableList<ApplicationUseCaseBinding>): HarnessControlPlaneReconciliationResult.Conflict? {
+    private fun reconcileBindings(
+        bindings: MutableList<ApplicationUseCaseBinding>,
+        exposures: MutableList<StoredPresetExposure>,
+    ): HarnessControlPlaneReconciliationResult.Conflict? {
         for (requirement in spec.applications) {
-            val expected = spec.bindingFor(requirement.applicationId)
-            val revisions = bindings.filter { it.bindingId == expected.bindingId }
-            if (revisions.isEmpty()) {
-                bindings += expected
-                continue
+            val canonicalBinding = spec.bindingFor(requirement.applicationId)
+            val assignmentBindings = bindings.filter {
+                it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
             }
-            val latest = revisions.maxBy { it.revision }
-            if (latest.applicationId != expected.applicationId || latest.useCaseId != expected.useCaseId) {
-                return conflict(HarnessControlPlaneConflictCode.BINDING_IDENTITY, expected.bindingId)
+            if (assignmentBindings.any { it.bindingId != canonicalBinding.bindingId }) {
+                return conflict(HarnessControlPlaneConflictCode.BINDING_IDENTITY, requirement.applicationId.value)
             }
-            if (latest.revision < expected.revision) {
-                bindings += expected
-            } else if (latest.revision == expected.revision && latest != expected) {
-                return conflict(HarnessControlPlaneConflictCode.BINDING_BASELINE, expected.bindingId)
+            val baseline = assignmentBindings.singleOrNull { it.revision == BUILT_IN_BINDING_REVISION }
+            if (baseline == null) {
+                bindings += canonicalBinding
+            } else if (baseline != canonicalBinding) {
+                return conflict(HarnessControlPlaneConflictCode.BINDING_BASELINE, canonicalBinding.bindingId)
             }
+
+            val currentBinding = (
+                bindings.filter {
+                    it.applicationId == requirement.applicationId && it.useCaseId == spec.useCase.useCaseId
+                }.maxByOrNull(ApplicationUseCaseBinding::revision)
+                ) ?: canonicalBinding
+            reconcileExposure(currentBinding, exposures)
         }
         return null
+    }
+
+    private fun reconcileExposure(binding: ApplicationUseCaseBinding, exposures: MutableList<StoredPresetExposure>) {
+        val bindingExposures = exposures.filter {
+            it.bindingId == binding.bindingId && it.bindingRevision == binding.revision
+        }
+        val required = bindingExposures.singleOrNull {
+            it.presetId == spec.preset.metadata.presetId && it.presetRevision == spec.preset.metadata.revision
+        }
+        if (required != null) return
+        exposures += StoredPresetExposure(
+            bindingId = binding.bindingId,
+            bindingRevision = binding.revision,
+            presetId = spec.preset.metadata.presetId,
+            presetRevision = spec.preset.metadata.revision,
+            isDefault = binding.enabled && bindingExposures.none(StoredPresetExposure::isDefault),
+        )
     }
 
     private fun conflict(code: HarnessControlPlaneConflictCode, identity: String) =
-        HarnessControlPlaneReconciliationResult.Conflict(code, identity)
+        HarnessControlPlaneReconciliationResult.Conflict(code = code, identity = identity)
 }
 
-internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "builtin:${applicationId.value}:$useCaseId"
+internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String =
+    "seed-${applicationId.value}-$useCaseId"
 
-internal fun builtInOmbraUseCase(): UseCaseDefinition = UseCaseDefinition(
+internal fun builtInOmbraUseCase() = UseCaseDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
     displayName = "Document PII detection",
-    description = "Structured local document analysis for RedactGuard.",
+    description = "Detect configured PII locally from document text",
     requirements = UseCaseRequirements(
-        outputMode = OutputMode.STRUCTURED_JSON,
+        outputMode = OutputMode.JSON_SCHEMA,
         sessionKind = SessionKind.STATELESS,
-        requiresStreaming = false,
+        reasoningSupported = false,
         minimumContextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
+        maxInputCharacters = OMBRA_MAX_INPUT_CHARACTERS,
+        maxJsonSchemaCharacters = OMBRA_MAX_SCHEMA_CHARACTERS,
     ),
     state = UseCaseDefinitionState.ACTIVE,
-    revision = HarnessSharedRuntimeBindings.OMBRA_USE_CASE_REVISION,
+    revision = 1,
 )
 
-internal fun builtInOmbraPreset(): UseCasePresetDefinition = UseCasePresetDefinition(
-    presetId = HarnessSharedRuntimeBindings.ombraDefaultPresetId,
+internal fun builtInOmbraPreset() = UseCasePresetDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-    displayName = "Balanced",
-    description = "Default balanced preset for RedactGuard document PII detection.",
-    modelProfileId = HarnessSharedRuntimeBindings.ombraModelProfileId,
-    modelProfileRevision = HarnessSharedRuntimeBindings.OMBRA_MODEL_PROFILE_REVISION,
-    executionPolicy = PresetExecutionPolicy(
-        maxTokens = HarnessSharedRuntimeBindings.OMBRA_MAX_TOKENS,
-        temperature = HarnessSharedRuntimeBindings.OMBRA_TEMPERATURE,
-        topP = HarnessSharedRuntimeBindings.OMBRA_TOP_P,
-        topK = HarnessSharedRuntimeBindings.OMBRA_TOP_K,
-        seed = HarnessSharedRuntimeBindings.OMBRA_SEED,
+    metadata = PresetConsumerMetadata(
+        presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
+        revision = HarnessSharedRuntimeBindings.ombraDefaultPreset.version,
+        displayName = "Balanced local PII",
+        description = "Automatic local Qwen3.5 selection for structured PII detection",
+    ),
+    creationSource = PresetCreationSource.SUGGESTED,
+    state = PresetLifecycleState.PUBLISHED,
+    execution = PresetExecutionPolicy(
+        modelProfileId = null,
+        inferencePreset = HarnessSharedRuntimeBindings.ombraDefaultPreset,
+        contextTokens = OMBRA_MINIMUM_CONTEXT_TOKENS,
         cachePolicy = UseCaseCachePolicy(
-            reusePolicy = HarnessSharedRuntimeBindings.OMBRA_REUSE_POLICY,
-            warmRetentionMs = OMBRA_WARM_RETENTION_MS,
+            retainModelWarmMs = OMBRA_WARM_RETENTION_MS,
+            reuseStatelessContext = false,
+            enablePrefixSnapshot = false,
+            enableDeterministicResultCache = false,
         ),
     ),
-    consumerMetadata = PresetConsumerMetadata(
-        maxInputCharacters = OMBRA_MAX_INPUT_CHARACTERS,
-        maxSchemaCharacters = OMBRA_MAX_SCHEMA_CHARACTERS,
-        recommendedChunkCharacters = HarnessSharedRuntimeBindings.OMBRA_RECOMMENDED_CHUNK_CHARACTERS,
-        executionHints = emptyList(),
-    ),
-    exposure = StoredPresetExposure.PUBLIC,
-    creationSource = PresetCreationSource.BUILT_IN,
-    lifecycleState = PresetLifecycleState.ACTIVE,
-    revision = HarnessSharedRuntimeBindings.OMBRA_PRESET_REVISION,
 )
 
-private val SIGNER_SHA256 = Regex("^[0-9a-fA-F]{64}$")
+private val SIGNER_SHA256 = Regex("[0-9a-fA-F]{64}")
