@@ -14,20 +14,30 @@ import java.security.MessageDigest
 /** Exact package/use-case policy for the proof host and external clients registered in the control plane. */
 internal object HarnessSharedRuntimePolicy {
     fun authorizedClients(context: Context): List<AuthorizedClientPolicy> {
-        val acceptedSigningCertificates = currentPackageSigningCertificates(context)
+        val hostSigningCertificates = currentPackageSigningCertificates(context, context.packageName, includeHistory = true)
         val internal = AuthorizedClientPolicy(
             packageName = context.packageName,
             applicationId = HarnessRuntimeGraph.APPLICATION_ID,
             allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
-            acceptedSigningCertificates = acceptedSigningCertificates,
+            acceptedSigningCertificates = hostSigningCertificates,
         )
         val consoleClients = HarnessSharedRuntimeBindings.consolePackages(BuildConfig.DEBUG).map { packageName ->
             AuthorizedClientPolicy(
                 packageName = packageName,
                 applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
                 allowedUseCases = HarnessSharedRuntimeBindings.consoleUseCases,
-                acceptedSigningCertificates = acceptedSigningCertificates,
+                acceptedSigningCertificates = hostSigningCertificates,
             )
+        }
+        val redactGuardClients = HarnessSharedRuntimeBindings.redactGuardPackages(BuildConfig.DEBUG).mapNotNull { packageName ->
+            installedCurrentSigningCertificates(context, packageName)?.let { signingCertificates ->
+                AuthorizedClientPolicy(
+                    packageName = packageName,
+                    applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+                    allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
+                    acceptedSigningCertificates = signingCertificates,
+                )
+            }
         }
         val releaseEvidenceClient = if (BuildConfig.DEBUG) {
             emptyList()
@@ -37,37 +47,37 @@ internal object HarnessSharedRuntimePolicy {
                     packageName = HarnessSharedRuntimeBindings.SR6_RELEASE_CONSUMER_PACKAGE,
                     applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
                     allowedUseCases = HarnessSharedRuntimeBindings.consoleUseCases,
-                    acceptedSigningCertificates = acceptedSigningCertificates,
+                    acceptedSigningCertificates = hostSigningCertificates,
                 ),
             )
         }
-        // Independently distributed consumers such as RedactGuard are intentionally absent here. Their exact
-        // package + signing identity is persisted only after explicit Control Plane authorization and projected
-        // by liveAuthorizedClients(). This avoids treating the Harnex signer as the consumer signer.
-        return listOf(internal) + consoleClients + releaseEvidenceClient
+        // RedactGuard appears in this bootstrap list only so startup reconciliation can observe its source-backed
+        // package/signer identity. It is deliberately excluded from static live trust below until the user has
+        // explicitly authorized the persisted Control Plane registration.
+        return listOf(internal) + consoleClients + redactGuardClients + releaseEvidenceClient
     }
 
     /**
      * Projects the current persisted app-connection state into the Binder security boundary.
-     * Built-in package aliases keep their reviewed signing policy, while user-approved applications use the exact
-     * package/signing identity persisted by the connection flow. Disabled or unresolved apps disappear from
-     * authorization on the next Binder call without restarting the host service.
+     * Same-publisher built-ins keep their reviewed signing policy. Independently signed consumers such as
+     * RedactGuard use the exact package/signing identity persisted after explicit user authorization.
      */
     fun liveAuthorizedClients(
         basePolicies: Collection<AuthorizedClientPolicy>,
         state: HostControlPlaneState,
     ): List<AuthorizedClientPolicy> {
         val internal = basePolicies.filter { it.applicationId == HarnessRuntimeGraph.APPLICATION_ID }
+        val controlPlaneSignerApplicationIds = setOf(HarnessSharedRuntimeBindings.redactGuardApplicationId)
         val builtInApplicationIds = basePolicies
             .asSequence()
             .map(AuthorizedClientPolicy::applicationId)
-            .filter { it != HarnessRuntimeGraph.APPLICATION_ID }
+            .filter { it != HarnessRuntimeGraph.APPLICATION_ID && it !in controlPlaneSignerApplicationIds }
             .toSet()
         val enabledApplications = state.applications
             .filter { it.state == ApplicationRegistrationState.AUTHORIZED }
             .associateBy { it.applicationId }
         val enabledBuiltIns = basePolicies.filter { policy ->
-            policy.applicationId != HarnessRuntimeGraph.APPLICATION_ID && enabledApplications.containsKey(policy.applicationId)
+            policy.applicationId in builtInApplicationIds && enabledApplications.containsKey(policy.applicationId)
         }
         val latestBindings = state.bindings
             .groupBy { it.bindingId }
@@ -98,32 +108,12 @@ internal object HarnessSharedRuntimePolicy {
         }
     }
 
-    fun observedRedactGuardApplication(
-        identitySource: HarnessInstalledApplicationIdentitySource,
-        debugHost: Boolean,
-    ): HarnessBuiltInApplicationRequirement? {
-        val identities = HarnessSharedRuntimeBindings.redactGuardPackages(debugHost)
-            .mapNotNull(identitySource::resolve)
-        require(identities.size <= 1) { "Only one RedactGuard package may be observed for a Host variant" }
-        val identity = identities.singleOrNull() ?: return null
-        return HarnessBuiltInApplicationRequirement(
-            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-            acceptedPackageNames = setOf(identity.packageName),
-            acceptedSignerSha256 = setOf(identity.signerSha256),
-            displayName = "RedactGuard",
-            initialState = ApplicationRegistrationState.PENDING,
-            allowObservedSignerChange = true,
-        )
-    }
-
-    fun builtInOmbraControlPlaneSpec(
-        policies: Collection<AuthorizedClientPolicy>,
-        observedExternalApplications: List<HarnessBuiltInApplicationRequirement> = emptyList(),
-    ): HarnessBuiltInControlPlaneSpec {
-        val builtIns = policies
+    fun builtInOmbraControlPlaneSpec(policies: Collection<AuthorizedClientPolicy>): HarnessBuiltInControlPlaneSpec {
+        val applications = policies
             .filter { HarnessSharedRuntimeBindings.ombraUseCaseId in it.allowedUseCases }
             .groupBy(AuthorizedClientPolicy::applicationId)
             .map { (applicationId, applicationPolicies) ->
+                val independentlySigned = applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
                 HarnessBuiltInApplicationRequirement(
                     applicationId = applicationId,
                     acceptedPackageNames = applicationPolicies.map(AuthorizedClientPolicy::packageName).toSet(),
@@ -132,35 +122,48 @@ internal object HarnessSharedRuntimePolicy {
                         .map(SigningCertificateSha256::hex)
                         .toSet(),
                     displayName = displayName(applicationId),
+                    initialState = if (independentlySigned) {
+                        ApplicationRegistrationState.PENDING
+                    } else {
+                        ApplicationRegistrationState.AUTHORIZED
+                    },
+                    allowObservedSignerChange = independentlySigned,
                 )
             }
-        val applications = (builtIns + observedExternalApplications).sortedBy { it.applicationId.value }
-        require(applications.distinctBy { it.applicationId }.size == applications.size) {
-            "Control Plane application requirements must be unique by application ID"
-        }
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
     }
 
+    private fun installedCurrentSigningCertificates(
+        context: Context,
+        packageName: String,
+    ): Set<SigningCertificateSha256>? = runCatching {
+        currentPackageSigningCertificates(context, packageName, includeHistory = false)
+    }.getOrNull()
+
     @Suppress("DEPRECATION")
-    private fun currentPackageSigningCertificates(context: Context): Set<SigningCertificateSha256> {
+    private fun currentPackageSigningCertificates(
+        context: Context,
+        packageName: String,
+        includeHistory: Boolean,
+    ): Set<SigningCertificateSha256> {
         val packageManager = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             PackageManager.GET_SIGNING_CERTIFICATES
         } else {
             PackageManager.GET_SIGNATURES
         }
-        val packageInfo = packageManager.getPackageInfo(context.packageName, flags)
+        val packageInfo = packageManager.getPackageInfo(packageName, flags)
         val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = requireNotNull(packageInfo.signingInfo) { "Host signing information is unavailable" }
-            if (signingInfo.hasMultipleSigners()) {
-                signingInfo.apkContentsSigners.orEmpty().toList()
-            } else {
+            val signingInfo = requireNotNull(packageInfo.signingInfo) { "Package signing information is unavailable" }
+            if (includeHistory && !signingInfo.hasMultipleSigners()) {
                 signingInfo.signingCertificateHistory.orEmpty().toList()
+            } else {
+                signingInfo.apkContentsSigners.orEmpty().toList()
             }
         } else {
             packageInfo.signatures.orEmpty().toList()
         }
-        check(signatures.isNotEmpty()) { "Host signing certificate is unavailable" }
+        check(signatures.isNotEmpty()) { "Package signing certificate is unavailable" }
         return signatures.map(::sha256).toSet()
     }
 
