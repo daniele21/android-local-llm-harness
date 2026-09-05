@@ -69,6 +69,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         context = appContext,
         databaseName = INFERENCE_AUDIT_DATABASE_NAME,
     )
+    val inferenceActivitySource = HarnessInferenceActivitySource(inferenceAuditRepositoryOwner)
+    val auditStartupState = inferenceActivitySource.reconcileInterrupted(System.currentTimeMillis())
 
     init {
         HarnessControlPlaneStartup(
