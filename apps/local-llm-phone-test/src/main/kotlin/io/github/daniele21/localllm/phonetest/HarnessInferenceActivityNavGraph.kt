@@ -20,22 +20,28 @@ internal fun NavGraphBuilder.installHarnessInferenceActivityGraph(navController:
         val source = remember(context) { HarnessRuntimeGraph.from(context).inferenceActivitySource }
         val activityViewModel: HarnessInferenceActivityViewModel = viewModel()
         val state by activityViewModel.state.collectAsStateWithLifecycle()
+        val actions = remember(activityViewModel, navController) {
+            object : HarnessInferenceActivityActions {
+                override fun refresh() = activityViewModel.refresh()
+
+                override fun openDetail(requestId: String) {
+                    navController.navigate(HarnessInferenceActivityRoutes.detail(requestId))
+                }
+
+                override fun selectFilter(selection: InferenceActivityFilterSelection) = activityViewModel.selectFilter(selection)
+
+                override fun clearHistory() = activityViewModel.clearTerminalHistory()
+
+                override fun clearFeedback() = activityViewModel.clearFeedback()
+            }
+        }
         DisposableEffect(source) {
             activityViewModel.attach(source)
             onDispose { activityViewModel.detach(source) }
         }
         HarnessInferenceActivityScreen(
             state = state,
-            onRefresh = activityViewModel::refresh,
-            onOpenDetail = { requestId ->
-                navController.navigate(HarnessInferenceActivityRoutes.detail(requestId))
-            },
-            onSelectApplication = activityViewModel::selectApplication,
-            onSelectStatus = activityViewModel::selectStatus,
-            onSelectPeriod = activityViewModel::selectPeriod,
-            onSelectUseCase = activityViewModel::selectUseCase,
-            onClearHistory = activityViewModel::clearTerminalHistory,
-            onClearFeedback = activityViewModel::clearFeedback,
+            actions = actions,
         )
     }
     composable(
