@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 class HarnessSharedRuntimeManifestTest {
     @Suppress("DEPRECATION")
     @Test
-    fun `shared runtime service uses normal opt-in permission while Binder owns signer trust`() {
+    fun sharedRuntimeServiceUsesNormalOptInPermissionWhileBinderOwnsSignerTrust() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val packageManager = context.packageManager
         val serviceInfo = packageManager.getServiceInfo(
@@ -39,7 +39,7 @@ class HarnessSharedRuntimeManifestTest {
     }
 
     @Test
-    fun `binding proof service does not create a runtime`() {
+    fun bindingProofServiceDoesNotCreateRuntime() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val graph = HarnessRuntimeGraph.from(context)
         graph.close()
