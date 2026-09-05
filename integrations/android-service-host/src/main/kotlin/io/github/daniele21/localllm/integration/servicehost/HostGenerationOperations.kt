@@ -7,11 +7,16 @@ import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
 import io.github.daniele21.localllm.transport.binder.contract.toCore
 
+fun interface AuthorizedRuntimeClientFactory {
+    fun create(caller: AuthorizedCaller): LocalLlmClient
+}
+
 internal class HostGenerationOperations(
     private val client: LocalLlmClient,
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
     private val controlExecutor: HostControlExecutor,
+    private val authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) {
     fun generate(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) {
         val validationError = validateGeneration(caller, request)
@@ -51,9 +56,16 @@ internal class HostGenerationOperations(
                 callback.onEvent(generationFailure(request.externalRequestId, error.toHostWireError()))
                 return
             }
+        val generationClient = try {
+            authorizedRuntimeClientFactory?.create(caller) ?: client
+        } catch (_: RuntimeException) {
+            ledger.removeRequest(token, caller, request.externalRequestId)
+            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
+            return
+        }
         val forwarder = generationForwarder(token, caller, request.externalRequestId, requestId, callback, dispatcher)
         try {
-            val handle = client.generate(coreRequest, forwarder::onEvent)
+            val handle = generationClient.generate(coreRequest, forwarder::onEvent)
             resources.attachHandle(requestId, handle)
             reconcileSynchronousTerminal(token, caller, request.externalRequestId, requestId, forwarder)
         } catch (_: RuntimeException) {
