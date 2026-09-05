@@ -14,12 +14,13 @@ import io.github.daniele21.localllm.models.UseCaseDefinition
 import io.github.daniele21.localllm.models.UseCaseDefinitionState
 import io.github.daniele21.localllm.models.UseCaseRequirements
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HarnessSharedRuntimePolicyTest {
     @Test
-    fun ombraSpecCollapsesPackageAliasesIntoSingleApplicationRequirement() {
+    fun ombraSpecCollapsesPackageAliasesIntoSinglePendingExternalRequirement() {
         val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
         val policies = listOf(
             policy("io.github.daniele21.redactguard", applicationId, SIGNER_A),
@@ -35,6 +36,8 @@ class HarnessSharedRuntimePolicyTest {
         )
         assertEquals(setOf(SIGNER_A, SIGNER_B), requirement.acceptedSignerSha256)
         assertEquals("RedactGuard", requirement.displayName)
+        assertEquals(ApplicationRegistrationState.PENDING, requirement.initialState)
+        assertTrue(requirement.allowObservedSignerChange)
     }
 
     @Test
@@ -58,6 +61,33 @@ class HarnessSharedRuntimePolicyTest {
     }
 
     @Test
+    fun `live policy uses persisted RedactGuard signer instead of bootstrap signer`() {
+        val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
+        val useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId
+        val bootstrap = policy(HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE, applicationId, SIGNER_A)
+        val application = RegisteredApplication(
+            applicationId = applicationId,
+            packageName = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
+            signerSha256 = SIGNER_B,
+            displayName = "RedactGuard",
+            state = ApplicationRegistrationState.AUTHORIZED,
+            firstSeenAtEpochMs = 1,
+            lastSeenAtEpochMs = 2,
+        )
+        val state = HostControlPlaneState(
+            applications = listOf(application),
+            useCases = listOf(activeUseCase(useCaseId)),
+            bindings = listOf(ApplicationUseCaseBinding("rg-binding", applicationId, useCaseId, 1, enabled = true)),
+        )
+
+        val live = HarnessSharedRuntimePolicy.liveAuthorizedClients(listOf(bootstrap), state).single()
+
+        assertEquals(application.packageName, live.packageName)
+        assertEquals(setOf(SIGNER_B), live.acceptedSigningCertificates.map { it.hex }.toSet())
+        assertFalse(SIGNER_A in live.acceptedSigningCertificates.map { it.hex })
+    }
+
+    @Test
     fun `live policy exposes manual authorized connection and removes it when disabled`() {
         val applicationId = ApplicationId("manual-consumer")
         val useCaseId = UseCaseId("manual-use-case")
@@ -70,14 +100,7 @@ class HarnessSharedRuntimePolicyTest {
             firstSeenAtEpochMs = 1,
             lastSeenAtEpochMs = 1,
         )
-        val useCase = UseCaseDefinition(
-            useCaseId = useCaseId,
-            displayName = "Manual use case",
-            description = "Test use case",
-            requirements = UseCaseRequirements(OutputMode.TEXT, SessionKind.STATELESS, false, 1),
-            state = UseCaseDefinitionState.ACTIVE,
-            revision = 1,
-        )
+        val useCase = activeUseCase(useCaseId)
         val binding = ApplicationUseCaseBinding("manual-binding", applicationId, useCaseId, 1, enabled = true)
         val enabledState = HostControlPlaneState(
             applications = listOf(application),
@@ -95,6 +118,15 @@ class HarnessSharedRuntimePolicyTest {
         )
         assertTrue(HarnessSharedRuntimePolicy.liveAuthorizedClients(emptyList(), disabledState).isEmpty())
     }
+
+    private fun activeUseCase(useCaseId: UseCaseId) = UseCaseDefinition(
+        useCaseId = useCaseId,
+        displayName = "Use case",
+        description = "Test use case",
+        requirements = UseCaseRequirements(OutputMode.TEXT, SessionKind.STATELESS, false, 1),
+        state = UseCaseDefinitionState.ACTIVE,
+        revision = 1,
+    )
 
     private fun policy(packageName: String, applicationId: ApplicationId, signer: String) = AuthorizedClientPolicy(
         packageName = packageName,
