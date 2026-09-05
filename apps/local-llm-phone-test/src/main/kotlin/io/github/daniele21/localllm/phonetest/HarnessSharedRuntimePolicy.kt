@@ -133,10 +133,7 @@ internal object HarnessSharedRuntimePolicy {
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
     }
 
-    private fun installedCurrentSigningCertificates(
-        context: Context,
-        packageName: String,
-    ): Set<SigningCertificateSha256>? = runCatching {
+    private fun installedCurrentSigningCertificates(context: Context, packageName: String): Set<SigningCertificateSha256>? = runCatching {
         currentPackageSigningCertificates(context, packageName, includeHistory = false)
     }.getOrNull()
 
