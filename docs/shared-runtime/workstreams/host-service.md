@@ -13,7 +13,7 @@ Expose one existing host-owned `LocalLlmClient` data plane through an explicitly
 
 ## Dependencies
 
-- ADR 0017 accepted trust boundary; ADR 0012 remains authoritative for the non-superseded shared-runtime rules.
+- ADR 0018 accepted trust boundary; ADR 0012 remains authoritative for the non-superseded shared-runtime rules.
 - SR-1 frozen protocol fixtures and wire mappers.
 - Existing runtime lifecycle, model binding and phone host composition.
 
