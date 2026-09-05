@@ -31,6 +31,7 @@ import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -95,7 +96,27 @@ class InferenceAuditLocalLlmClientTest {
         assertFalse(delegate.generateCalled)
     }
 
-    private fun client(repository: InMemoryInferenceAuditRepository, delegate: AsyncGenerationClient, clock: AtomicLong) =
+    @Test
+    fun `synchronous delegate failure is terminalized before the original error escapes`() {
+        val repository = InMemoryInferenceAuditRepository()
+        val expected = IllegalStateException("delegate rejected generation")
+        val delegate = ThrowingGenerationClient(expected)
+        val client = client(repository, delegate, AtomicLong(2_000L))
+
+        val failure = runCatching {
+            client.generate(request(), GenerationListener {})
+        }.exceptionOrNull()
+
+        assertSame(expected, failure)
+        val record = (repository.find(requestId) as InferenceAuditResult.Success).value
+        assertNotNull(record)
+        requireNotNull(record)
+        assertEquals(InferenceAuditStatus.FAILED, record.status)
+        assertEquals("GENERATION_START_FAILED", record.terminal?.terminalCode?.value)
+        assertEquals(2_001L, record.terminal?.completedAtEpochMs)
+    }
+
+    private fun client(repository: InMemoryInferenceAuditRepository, delegate: LocalLlmClient, clock: AtomicLong) =
         InferenceAuditLocalLlmClient(
             delegate = delegate,
             auditRepository = repository,
@@ -173,11 +194,7 @@ class InferenceAuditLocalLlmClientTest {
         )
     }
 
-    private class AsyncGenerationClient(private val emit: (GenerationListener) -> Unit) : LocalLlmClient {
-        val startEvents = CountDownLatch(1)
-        var generateCalled: Boolean = false
-            private set
-
+    private open class BaseFakeClient : LocalLlmClient {
         override fun runtimeSnapshot(): RuntimeSnapshot = RuntimeSnapshot(RuntimeState.READY, null, 1, 0)
 
         override fun prepare(applicationId: ApplicationId, useCaseId: UseCaseId): PrepareResult = PrepareResult(true, null, "ready")
@@ -186,6 +203,17 @@ class InferenceAuditLocalLlmClientTest {
 
         override fun createSession(applicationId: ApplicationId, useCaseId: UseCaseId, options: SessionOptions): SessionId =
             createSession(applicationId, useCaseId)
+
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle =
+            error("Generation behavior must be provided by the test fake")
+
+        override fun closeSession(sessionId: SessionId) = Unit
+    }
+
+    private class AsyncGenerationClient(private val emit: (GenerationListener) -> Unit) : BaseFakeClient() {
+        val startEvents = CountDownLatch(1)
+        var generateCalled: Boolean = false
+            private set
 
         override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle {
             generateCalled = true
@@ -199,7 +227,9 @@ class InferenceAuditLocalLlmClientTest {
             }.apply { isDaemon = true }.start()
             return handle
         }
+    }
 
-        override fun closeSession(sessionId: SessionId) = Unit
+    private class ThrowingGenerationClient(private val failure: RuntimeException) : BaseFakeClient() {
+        override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle = throw failure
     }
 }
