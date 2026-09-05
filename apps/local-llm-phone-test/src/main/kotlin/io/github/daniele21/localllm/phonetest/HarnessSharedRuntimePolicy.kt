@@ -114,13 +114,18 @@ internal object HarnessSharedRuntimePolicy {
             .groupBy(AuthorizedClientPolicy::applicationId)
             .map { (applicationId, applicationPolicies) ->
                 val independentlySigned = applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
+                val signersByPackage = applicationPolicies
+                    .groupBy(AuthorizedClientPolicy::packageName)
+                    .mapValues { (_, packagePolicies) ->
+                        packagePolicies
+                            .flatMap(AuthorizedClientPolicy::acceptedSigningCertificates)
+                            .map(SigningCertificateSha256::hex)
+                            .toSet()
+                    }
                 HarnessBuiltInApplicationRequirement(
                     applicationId = applicationId,
-                    acceptedPackageNames = applicationPolicies.map(AuthorizedClientPolicy::packageName).toSet(),
-                    acceptedSignerSha256 = applicationPolicies
-                        .flatMap(AuthorizedClientPolicy::acceptedSigningCertificates)
-                        .map(SigningCertificateSha256::hex)
-                        .toSet(),
+                    acceptedPackageNames = signersByPackage.keys,
+                    acceptedSignerSha256 = signersByPackage.values.flatten().toSet(),
                     displayName = displayName(applicationId),
                     initialState = if (independentlySigned) {
                         ApplicationRegistrationState.PENDING
@@ -128,6 +133,7 @@ internal object HarnessSharedRuntimePolicy {
                         ApplicationRegistrationState.AUTHORIZED
                     },
                     allowObservedSignerChange = independentlySigned,
+                    acceptedSignerSha256ByPackage = signersByPackage,
                 )
             }
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
