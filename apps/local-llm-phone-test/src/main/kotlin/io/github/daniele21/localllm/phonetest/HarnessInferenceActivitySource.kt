@@ -89,7 +89,7 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
         }
 
     fun detail(requestId: String): InferenceActivityDetailResult {
-        val id = runCatching(::RequestId).getOrNull() ?: return InferenceActivityDetailResult.Unavailable(null)
+        val id = runCatching { RequestId(requestId) }.getOrNull() ?: return InferenceActivityDetailResult.Unavailable(null)
         return when (val result = repository.find(id)) {
             is InferenceAuditResult.Success -> {
                 val record = result.value ?: return InferenceActivityDetailResult.Unavailable(null)
