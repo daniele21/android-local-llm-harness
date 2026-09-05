@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostClientFactories
 import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
 import io.github.daniele21.localllm.runtime.ActivityManagerLowMemoryProbe
 import io.github.daniele21.localllm.runtime.AndroidMemoryPressureCallbacks
@@ -48,8 +49,11 @@ class HarnessSharedRuntimeService : Service() {
                 policies = policies,
                 policySource = runtimeGraph::liveAuthorizedClientPolicies,
                 hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
-                authorizedRuntimeClientFactory = runtimeGraph.legacyRuntimeClientFactory,
-                authorizedConsumerClientFactory = runtimeGraph.consumerClientFactory,
+                clientFactories =
+                    SharedRuntimeHostClientFactories(
+                        consumer = runtimeGraph.consumerClientFactory,
+                        legacyRuntime = runtimeGraph.legacyRuntimeClientFactory,
+                    ),
                 consumerControlPlaneHost = controlPlaneHost,
                 consumerRuntimeReadinessHost = runtimeReadinessHost,
             )
