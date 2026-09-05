@@ -11,7 +11,7 @@ Last reviewed: 2026-09-05
 
 SR-6 validates the exact deployment boundary being claimed for a consumer: a separately installed Harnex Host, a packaged Consumer SDK, Android Binder caller authorization and the real signing topology of the participating applications.
 
-ADR 0017 supersedes the original assumption that every production consumer shares the Host signing identity. Harnex and external consumers such as RedactGuard may use distinct Play App Signing identities. The manifest `BIND_LOCAL_LLM` permission is only a bind capability; Binder UID/package/signer verification plus explicit Harnex Control Plane authorization is the trust boundary.
+ADR 0018 supersedes the original assumption that every production consumer shares the Host signing identity. Harnex and external consumers such as RedactGuard may use distinct Play App Signing identities. The manifest `BIND_LOCAL_LLM` permission is only a bind capability; Binder UID/package/signer verification plus explicit Harnex Control Plane authorization is the trust boundary.
 
 Deterministic emulator E2E can prove the Binder authorization state machine with distinct ephemeral identities. Physical/Play evidence remains required when the claim depends on actual Play App Signing identity, representative hardware or real GGUF/runtime behavior.
 
