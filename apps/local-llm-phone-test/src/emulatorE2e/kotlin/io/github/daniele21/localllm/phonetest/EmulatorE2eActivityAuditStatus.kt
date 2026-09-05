@@ -34,10 +34,15 @@ internal object EmulatorE2eActivityAuditStatus {
             append(";application_id=${detail.applicationId}")
             append(";use_case_id=${detail.useCaseId}")
             append(";verified_package=${detail.verifiedPackageName.orEmpty()}")
+            append(";terminal_code=${detail.terminalCode ?: "none"}")
             append(";input_present=${detail.input.isNotBlank()}")
             append(";effective_prompt_present=${!detail.effectivePrompt.isNullOrBlank()}")
             append(";answer_present=${!detail.answerOutput.isNullOrBlank()}")
             append(";reasoning_present=${!detail.reasoningOutput.isNullOrBlank()}")
+            append(";model_digest_present=${!detail.modelDigest.isNullOrBlank()}")
+            append(";total_ms_present=${detail.totalMs != null}")
+            append(";output_tokens_present=${detail.outputTokens != null}")
+            append(";decode_tps_present=${detail.decodeTokensPerSecond != null}")
         }
     }
 }
