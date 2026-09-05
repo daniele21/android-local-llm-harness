@@ -51,8 +51,8 @@ internal fun HarnessInferenceActivityScreen(
         HarnessConfirmationDialog(
             title = "Clear inference history?",
             detail =
-                "Completed, failed, cancelled and interrupted local activity records will be deleted. " +
-                    "Active inference records, models, app connections and diagnostics are not removed.",
+            "Completed, failed, cancelled and interrupted local activity records will be deleted. " +
+                "Active inference records, models, app connections and diagnostics are not removed.",
             confirmLabel = "Clear history",
             dismissLabel = "Cancel",
             onConfirm = {
@@ -74,8 +74,8 @@ internal fun HarnessInferenceActivityScreen(
             HarnessErrorState(
                 title = "Inference activity unavailable",
                 detail =
-                    "The local audit store could not be read (${state.listErrorCode.name}). " +
-                        "Inference audit remains fail-closed while storage is degraded.",
+                "The local audit store could not be read (${state.listErrorCode.name}). " +
+                    "Inference audit remains fail-closed while storage is degraded.",
             )
             HarnessSecondaryButton(
                 text = "Retry",
@@ -136,8 +136,8 @@ internal fun HarnessInferenceActivityScreen(
                     HarnessEmptyState(
                         title = "No inference activity yet",
                         detail =
-                            "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
-                                "and remain available after Harnex restarts.",
+                        "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
+                            "and remain available after Harnex restarts.",
                     )
                 }
             } else {
@@ -213,7 +213,7 @@ private fun InferenceActivityRow(item: InferenceActivityListItem, onOpenDetail: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val metrics = listOfNotNull(
-                    item.totalMs?.let { "${it} ms" },
+                    item.totalMs?.let { "$it ms" },
                     item.decodeTokensPerSecond?.let { "${formatThroughput(it)} tok/s" },
                     item.modelDigest?.take(10)?.let { "model $it…" },
                 ).joinToString(" · ")
@@ -226,11 +226,7 @@ private fun InferenceActivityRow(item: InferenceActivityListItem, onOpenDetail: 
 }
 
 @Composable
-private fun InferenceActivityDetailContent(
-    detail: InferenceActivityDetail,
-    onOpenTechnicalTimeline: () -> Unit,
-    modifier: Modifier,
-) {
+private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOpenTechnicalTimeline: () -> Unit, modifier: Modifier) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("inference-activity-detail"),
         contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
