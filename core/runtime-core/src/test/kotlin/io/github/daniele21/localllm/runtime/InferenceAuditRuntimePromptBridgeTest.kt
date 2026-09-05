@@ -40,28 +40,26 @@ class InferenceAuditRuntimePromptBridgeTest {
         val bridge = OneShotInferenceAuditEffectivePromptBridge()
         val repository = InMemoryInferenceAuditRepository()
         val fixture = PromptBridgeRuntimeFixture(bridge)
-        val client =
-            InferenceAuditLocalLlmClient(
-                delegate = fixture.runtime,
-                auditRepository = repository,
-                effectivePromptResolver = bridge,
-                originResolver = InferenceAuditOriginResolver { request ->
-                    InferenceAuditOrigin(
-                        kind = InferenceAuditOriginKind.HARNEX_INTERNAL,
-                        applicationId = request.applicationId,
-                        useCaseId = request.useCaseId,
-                    )
-                },
-            )
+        val client = InferenceAuditLocalLlmClient(
+            delegate = fixture.runtime,
+            auditRepository = repository,
+            effectivePromptResolver = bridge,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.HARNEX_INTERNAL,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                )
+            },
+        )
         val sessionId = client.createSession(fixture.applicationId, fixture.useCaseId)
-        val request =
-            GenerationRequest(
-                requestId = RequestId("prompt-bridge-request"),
-                sessionId = sessionId,
-                applicationId = fixture.applicationId,
-                useCaseId = fixture.useCaseId,
-                input = "user secret",
-            )
+        val request = GenerationRequest(
+            requestId = RequestId("prompt-bridge-request"),
+            sessionId = sessionId,
+            applicationId = fixture.applicationId,
+            useCaseId = fixture.useCaseId,
+            input = "user secret",
+        )
         val terminal = CountDownLatch(1)
         val preparedWasDurable = AtomicBoolean(false)
 
@@ -107,29 +105,26 @@ private class PromptBridgeRuntimeFixture(bridge: InferenceAuditEffectivePromptSi
     val applicationId = ApplicationId("prompt-bridge-app")
     val useCaseId = UseCaseId("prompt-bridge-use-case")
     private val digest = ModelDigest("d".repeat(64))
-    private val modelFile =
-        File.createTempFile("prompt-bridge-model", ".gguf").apply {
-            writeText("model")
-            deleteOnExit()
-        }
+    private val modelFile = File.createTempFile("prompt-bridge-model", ".gguf").apply {
+        writeText("model")
+        deleteOnExit()
+    }
     private val resolved = resolvedUseCase()
-    private val registry =
-        object : ModelProfileRegistry {
-            override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-                require(applicationId == this@PromptBridgeRuntimeFixture.applicationId)
-                require(useCaseId == this@PromptBridgeRuntimeFixture.useCaseId)
-                return resolved
-            }
+    private val registry = object : ModelProfileRegistry {
+        override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
+            require(applicationId == this@PromptBridgeRuntimeFixture.applicationId)
+            require(useCaseId == this@PromptBridgeRuntimeFixture.useCaseId)
+            return resolved
         }
+    }
     private val store = PromptBridgeModelStore(modelFile, digest)
     val backend = PromptBridgeInferenceBackend()
-    val runtime =
-        RuntimeOrchestrator(
-            registry = registry,
-            modelStore = store,
-            backend = backend,
-            effectivePromptSink = bridge,
-        )
+    val runtime = RuntimeOrchestrator(
+        registry = registry,
+        modelStore = store,
+        backend = backend,
+        effectivePromptSink = bridge,
+    )
 
     fun close() {
         runtime.close()
@@ -137,42 +132,38 @@ private class PromptBridgeRuntimeFixture(bridge: InferenceAuditEffectivePromptSi
     }
 
     private fun resolvedUseCase(): ResolvedUseCase {
-        val model =
-            GgufModelProfile(
-                id = "prompt-bridge-model",
-                artifact =
-                    GgufArtifact(
-                        digest = digest,
-                        fileName = "prompt-bridge.gguf",
-                        sizeBytes = modelFile.length(),
-                        architecture = "qwen2",
-                        quantization = "Q4_K_M",
-                        source = ArtifactSource.Imported("prompt-bridge-test"),
-                    ),
-                contextSize = 512,
-                batchSize = 128,
-                microBatchSize = 64,
-                cpuThreads = 2,
-                batchThreads = 2,
-                gpuLayers = 0,
-            )
-        val useCase =
-            UseCaseProfile(
-                id = "prompt-bridge-use-case-profile",
-                modelProfileId = model.id,
-                systemPromptVersion = "v1",
-                generationDefaults =
-                    GenerationDefaults(
-                        maxOutputTokens = 8,
-                        temperature = 0f,
-                        topP = 1f,
-                        topK = 0,
-                        seed = 42,
-                    ),
-                outputMode = OutputMode.TEXT,
-                cachePolicy = UseCaseCachePolicy(0, false, false, false),
-                healthSuiteId = "health",
-            )
+        val model = GgufModelProfile(
+            id = "prompt-bridge-model",
+            artifact = GgufArtifact(
+                digest = digest,
+                fileName = "prompt-bridge.gguf",
+                sizeBytes = modelFile.length(),
+                architecture = "qwen2",
+                quantization = "Q4_K_M",
+                source = ArtifactSource.Imported("prompt-bridge-test"),
+            ),
+            contextSize = 512,
+            batchSize = 128,
+            microBatchSize = 64,
+            cpuThreads = 2,
+            batchThreads = 2,
+            gpuLayers = 0,
+        )
+        val useCase = UseCaseProfile(
+            id = "prompt-bridge-use-case-profile",
+            modelProfileId = model.id,
+            systemPromptVersion = "v1",
+            generationDefaults = GenerationDefaults(
+                maxOutputTokens = 8,
+                temperature = 0f,
+                topP = 1f,
+                topK = 0,
+                seed = 42,
+            ),
+            outputMode = OutputMode.TEXT,
+            cachePolicy = UseCaseCachePolicy(0, false, false, false),
+            healthSuiteId = "health",
+        )
         return ResolvedUseCase(
             binding = AppModelBinding(applicationId, useCaseId, useCase.id),
             useCase = useCase,
