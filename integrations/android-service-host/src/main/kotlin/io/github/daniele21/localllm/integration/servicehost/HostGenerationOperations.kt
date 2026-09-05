@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.transport.binder.contract.GenerationRequestParcel
 import io.github.daniele21.localllm.transport.binder.contract.WireErrorCodes
 import io.github.daniele21.localllm.transport.binder.contract.WireProtocolException
@@ -33,16 +34,7 @@ internal class HostGenerationOperations(
 
     private fun runGeneration(caller: AuthorizedCaller, request: GenerationRequestParcel, callback: HostEventCallback) {
         val token = HostClientToken(request.clientToken.value)
-        val dispatcher = resources.callbackDispatcher(token)
-        if (dispatcher == null) {
-            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
-            return
-        }
-        val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull()
-        if (sessionId == null) {
-            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
-            return
-        }
+        val startContext = resolveStartContext(token, caller, request, callback) ?: return
         val requestId = ledger.allocateRequest(token, caller, request.externalRequestId).successOrNull()
         if (requestId == null) {
             callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_BACKPRESSURE)))
@@ -50,7 +42,7 @@ internal class HostGenerationOperations(
         }
         val coreRequest =
             try {
-                request.toCore(caller.applicationId, sessionId, requestId)
+                request.toCore(caller.applicationId, startContext.sessionId, requestId)
             } catch (error: WireProtocolException) {
                 ledger.removeRequest(token, caller, request.externalRequestId)
                 callback.onEvent(generationFailure(request.externalRequestId, error.toHostWireError()))
@@ -63,7 +55,14 @@ internal class HostGenerationOperations(
             callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
             return
         }
-        val forwarder = generationForwarder(token, caller, request.externalRequestId, requestId, callback, dispatcher)
+        val forwarder = generationForwarder(
+            token,
+            caller,
+            request.externalRequestId,
+            requestId,
+            callback,
+            startContext.dispatcher,
+        )
         try {
             val handle = generationClient.generate(coreRequest, forwarder::onEvent)
             resources.attachHandle(requestId, handle)
@@ -72,6 +71,25 @@ internal class HostGenerationOperations(
             ledger.removeRequest(token, caller, request.externalRequestId)
             callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
         }
+    }
+
+    private fun resolveStartContext(
+        token: HostClientToken,
+        caller: AuthorizedCaller,
+        request: GenerationRequestParcel,
+        callback: HostEventCallback,
+    ): GenerationStartContext? {
+        val dispatcher = resources.callbackDispatcher(token)
+        if (dispatcher == null) {
+            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.CLIENT_DISCONNECTED)))
+            return null
+        }
+        val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull()
+        if (sessionId == null) {
+            callback.onEvent(generationFailure(request.externalRequestId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
+            return null
+        }
+        return GenerationStartContext(dispatcher, sessionId)
     }
 
     private fun generationForwarder(
@@ -121,4 +139,9 @@ internal class HostGenerationOperations(
         if (ledger.requestId(token, caller, externalRequestId).successOrNull() != null) return
         resources.removeHandle(requestId)
     }
+
+    private data class GenerationStartContext(
+        val dispatcher: HostCallbackDispatcher,
+        val sessionId: SessionId,
+    )
 }
