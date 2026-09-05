@@ -19,6 +19,10 @@ import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
+fun interface AuthorizedConsumerClientFactory {
+    fun create(caller: AuthorizedCaller): ConsumerLocalLlmClient
+}
+
 private class SharedRuntimeHostInfrastructure(
     val ledger: ClientConnectionLedger,
     val controlExecutor: HostControlExecutor,
@@ -30,6 +34,7 @@ class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
     private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+    private val authorizedConsumerClientFactory: AuthorizedConsumerClientFactory?,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
     infrastructure: SharedRuntimeHostInfrastructure,
@@ -39,6 +44,7 @@ class SharedRuntimeHostDelegate private constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
         consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
         consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
         ledger: ClientConnectionLedger = ClientConnectionLedger(),
@@ -50,6 +56,7 @@ class SharedRuntimeHostDelegate private constructor(
         client = client,
         protocolInfo = protocolInfo,
         consumerClientFactory = consumerClientFactory,
+        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -69,10 +76,12 @@ class SharedRuntimeHostDelegate private constructor(
         consumerControlPlaneHost: ConsumerControlPlaneHost?,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
         logicalJobMetadataStore: HostLogicalJobMetadataStore,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
         consumerClientFactory = consumerClientFactory,
+        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -84,6 +93,12 @@ class SharedRuntimeHostDelegate private constructor(
         ),
         logicalJobMetadataStore = logicalJobMetadataStore,
     )
+
+    init {
+        require(consumerClientFactory == null || authorizedConsumerClientFactory == null) {
+            "Configure either legacy or authorized consumer factory, not both"
+        }
+    }
 
     private val ledger = infrastructure.ledger
     private val controlExecutor = infrastructure.controlExecutor
@@ -214,11 +229,8 @@ class SharedRuntimeHostDelegate private constructor(
             return
         }
         resources.attachCallbackDispatcher(token, dispatcher)
-        val consumer =
-            consumerClientFactory?.let { factory ->
-                runCatching { factory(caller.applicationId) }.getOrNull()
-            }
-        if (consumerClientFactory != null && consumer == null) {
+        val consumer = createConsumerClient(caller)
+        if ((consumerClientFactory != null || authorizedConsumerClientFactory != null) && consumer == null) {
             cleanupConnection(token, caller)
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
             return
@@ -239,6 +251,12 @@ class SharedRuntimeHostDelegate private constructor(
             resources.attachDeathLink(token, deathLink)
             callback.onResult(registrationSuccess(token, negotiatedMinor, enabledFeatures))
         }
+    }
+
+    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? = when {
+        authorizedConsumerClientFactory != null -> runCatching { authorizedConsumerClientFactory.create(caller) }.getOrNull()
+        consumerClientFactory != null -> runCatching { consumerClientFactory.invoke(caller.applicationId) }.getOrNull()
+        else -> null
     }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
