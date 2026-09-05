@@ -1,5 +1,5 @@
 # Consumer Android SDK supported ABI baseline
 # Generated from the scoped CI dump produced by scripts/dump-consumer-sdk-abi.sh.
 # The full javap dump remains a bounded CI evidence artifact; this repository freezes its SHA-256 identity.
-# Version: 0.1.0-alpha.9
-sha256=4a7ac38c59c3306a27f7ebe54edd4a20f3c6e143833c68c56fff8097eb543dfe
+# Version: 0.1.0-alpha.10
+sha256=f80a89931b279222392c21b1de2f54c79c41c0a1f47b4fc1da8c5ce6d3c89ada
