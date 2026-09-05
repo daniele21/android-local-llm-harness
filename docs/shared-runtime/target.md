@@ -46,7 +46,7 @@ Model absence, pending/disabled authorization, signer replacement, incompatible 
 
 ## Product contract
 
-ADR 0017 defines the current trust boundary. Host and consumer APKs may be independently signed. The exported service uses the variant-specific `BIND_LOCAL_LLM` normal permission only as an explicit binding capability; actual authority is revalidated inside the Binder service from Android-derived caller identity and Harnex Control Plane policy.
+ADR 0018 defines the current trust boundary. Host and consumer APKs may be independently signed. The exported service uses the variant-specific `BIND_LOCAL_LLM` normal permission only as an explicit binding capability; actual authority is revalidated inside the Binder service from Android-derived caller identity and Harnex Control Plane policy.
 
 The client may provide:
 
@@ -119,7 +119,7 @@ Changes to these assumptions require an ADR update before dependent implementati
 
 Implementation may proceed when:
 
-- ADR 0010, ADR 0011 and ADR 0017 remain satisfied;
+- ADR 0010, ADR 0011 and ADR 0018 remain satisfied;
 - the intended `dev` base is green and synchronized according to `BRANCHING.md`;
 - no competing PR owns the same transport or service responsibility;
 - the selected slice does not claim consumer or production readiness without the required cross-app evidence.
