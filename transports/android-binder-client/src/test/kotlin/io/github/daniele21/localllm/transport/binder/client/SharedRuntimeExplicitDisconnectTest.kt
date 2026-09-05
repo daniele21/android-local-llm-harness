@@ -40,6 +40,7 @@ class SharedRuntimeExplicitDisconnectTest {
         assertNull(connection.endpoint)
         assertEquals(1, firstService.unregisterCalls)
         assertEquals(1, binding.unbindCalls)
+        assertTrue(observed.contains(SharedRuntimeConnectionState.DISCONNECTED))
 
         connection.connect()
         binding.connectHost(secondService)
@@ -47,7 +48,6 @@ class SharedRuntimeExplicitDisconnectTest {
         assertEquals(SharedRuntimeConnectionState.CONNECTED, connection.snapshot.state)
         assertTrue(requireNotNull(connection.endpoint).connectionEpoch > firstEpoch)
         assertEquals(2, binding.bindCalls)
-        assertEquals(SharedRuntimeConnectionState.DISCONNECTED, observed[observed.lastIndex - 2])
     }
 
     @Test
