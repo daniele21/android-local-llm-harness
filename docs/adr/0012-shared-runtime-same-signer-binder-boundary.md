@@ -1,7 +1,8 @@
 # ADR 0012: Same-signer bound-service shared runtime
 
-- Status: Accepted; trust and exported-service permission portions superseded by ADR 0018
+- Status: Accepted
 - Date: 2026-08-11
+- Superseded in part by: ADR 0018 for trust and exported-service permission; ADR 0016 for explicit durable-job lifecycle
 
 ## Context
 
