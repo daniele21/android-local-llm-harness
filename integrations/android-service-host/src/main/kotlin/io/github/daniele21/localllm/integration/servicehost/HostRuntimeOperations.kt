@@ -17,6 +17,7 @@ internal class HostRuntimeOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
     private val controlExecutor: HostControlExecutor,
+    authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) {
     private val generationOperations =
         HostGenerationOperations(
@@ -24,6 +25,7 @@ internal class HostRuntimeOperations(
             ledger = ledger,
             resources = resources,
             controlExecutor = controlExecutor,
+            authorizedRuntimeClientFactory = authorizedRuntimeClientFactory,
         )
 
     fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) {
