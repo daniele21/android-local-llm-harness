@@ -75,10 +75,7 @@ internal sealed interface InferenceActivityDetailResult {
     data class Unavailable(val errorCode: InferenceAuditFailureCode?) : InferenceActivityDetailResult
 }
 
-internal data class InferenceAuditStartupState(
-    val interruptedRecords: Int = 0,
-    val errorCode: InferenceAuditFailureCode? = null,
-)
+internal data class InferenceAuditStartupState(val interruptedRecords: Int = 0, val errorCode: InferenceAuditFailureCode? = null)
 
 /** Read-only presentation adapter plus explicit lifecycle recovery operations for the local audit ledger. */
 internal class HarnessInferenceActivitySource(private val repository: InferenceAuditRepository) {
@@ -198,7 +195,9 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
 
 private fun InferenceAuditInput.displayText(): String = when (this) {
     is InferenceAuditInput.Text -> value
+
     is InferenceAuditInput.RawCompletion -> value
+
     is InferenceAuditInput.Messages -> values.joinToString(separator = "\n\n") { message ->
         "${message.role.name.lowercase()}: ${message.content}"
     }
