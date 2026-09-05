@@ -137,8 +137,7 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
         mutableState.value = mutableState.value.copy(feedback = null)
     }
 
-    private fun isCurrent(token: Long, attached: HarnessInferenceActivitySource): Boolean =
-        generation.get() == token && source === attached
+    private fun isCurrent(token: Long, attached: HarnessInferenceActivitySource): Boolean = generation.get() == token && source === attached
 
     override fun onCleared() {
         generation.incrementAndGet()
