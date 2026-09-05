@@ -117,7 +117,7 @@ internal object EmulatorE2eGenerationGate {
 }
 
 /** One-shot emulator-only fault used to prove a genuine FAILED audit terminal without production hooks. */
-internal object EmulatorE2EBackendFailureGate {
+internal object EmulatorE2eBackendFailureGate {
     private val monitor = Any()
     private var armed = false
 
