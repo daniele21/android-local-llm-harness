@@ -41,9 +41,10 @@ class AndroidCallerEnvironment(context: Context) : CallerEnvironment {
     @Suppress("DEPRECATION")
     private fun currentSigningCertificates(packageName: String): List<Signature> = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val packageInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-            requireNotNull(packageInfo.signingInfo) { "Package signing information is unavailable" }
-                .apkContentsSigners
+            packageManager
+                .getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                .signingInfo
+                ?.apkContentsSigners
                 .orEmpty()
                 .toList()
         } else {
