@@ -30,6 +30,21 @@ class CallerAuthorizationTest {
     }
 
     @Test
+    fun dynamicPolicySourceReplacesStaticBootstrapPolicy() {
+        val environment = FakeCallerEnvironment(packages = listOf(policy.packageName), acceptedCertificate = digest)
+        val result =
+            CallerAuthorizer(
+                permissionName = "io.example.permission.BIND_LOCAL_LLM",
+                policies = listOf(policy),
+                environment = environment,
+                policySource = { emptyList() },
+            ).authorize(CallingProcess(uid = 10001, pid = 123), useCase)
+
+        assertDenied(AuthorizationFailure.PACKAGE_NOT_AUTHORIZED, result)
+        assertEquals(0, environment.signerLookupCount)
+    }
+
+    @Test
     fun onewayCallerWithUnavailablePidStillUsesAuthorizedUidPolicy() {
         val environment = FakeCallerEnvironment(packages = listOf(policy.packageName), acceptedCertificate = digest)
         val result = authorizer(environment).authorize(CallingProcess(uid = 10001, pid = 0), useCase)
@@ -103,7 +118,7 @@ class CallerAuthorizationTest {
     }
 
     private fun authorizer(environment: FakeCallerEnvironment) = CallerAuthorizer(
-        permissionName = "io.example.permission.USE_LOCAL_LLM",
+        permissionName = "io.example.permission.BIND_LOCAL_LLM",
         policies = listOf(policy),
         environment = environment,
     )
