@@ -89,12 +89,14 @@ class InMemoryInferenceAuditRepository(private val retention: InferenceAuditRete
 
     override fun recent(query: InferenceAuditQuery): InferenceAuditResult<List<InferenceAuditSummary>> = synchronized(lock) {
         if (closed.get()) return@synchronized closedFailure()
-        val cutoff = query.beforeReceivedAtEpochMs
+        val after = query.afterReceivedAtEpochMs
+        val before = query.beforeReceivedAtEpochMs
         val summaries = records.values.asSequence()
             .filter { record -> query.applicationId == null || record.admission.origin.applicationId == query.applicationId }
             .filter { record -> query.useCaseId == null || record.admission.origin.useCaseId == query.useCaseId }
             .filter { record -> query.statuses.isEmpty() || record.status in query.statuses }
-            .filter { record -> cutoff == null || record.admission.receivedAtEpochMs < cutoff }
+            .filter { record -> after == null || record.admission.receivedAtEpochMs >= after }
+            .filter { record -> before == null || record.admission.receivedAtEpochMs < before }
             .sortedByDescending { it.admission.receivedAtEpochMs }
             .take(query.limit)
             .map(::summary)
