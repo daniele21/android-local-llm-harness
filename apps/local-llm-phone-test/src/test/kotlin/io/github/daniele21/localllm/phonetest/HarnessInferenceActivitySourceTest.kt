@@ -19,6 +19,7 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.StopReason
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -81,6 +82,7 @@ class HarnessInferenceActivitySourceTest {
         assertEquals("io.github.daniele21.redactguard", list.items.single().verifiedPackageName)
         assertEquals(InferenceAuditStatus.COMPLETED, list.items.single().status)
         assertEquals(50L, list.items.single().totalMs)
+        assertTrue(list.hasTerminalHistory)
 
         val detail = source.detail(requestId.value)
         assertTrue(detail is InferenceActivityDetailResult.Available)
@@ -91,6 +93,46 @@ class HarnessInferenceActivitySourceTest {
         assertEquals("reasoning", value.reasoningOutput)
         assertEquals("qwen35-json", value.presetId)
         assertEquals(14.5, value.decodeTokensPerSecond ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun `Activity filters are source backed across application status period and use case`() {
+        val now = 10L * 24L * 60L * 60L * 1_000L
+        val recentRedactGuard = RequestId("recent-redactguard")
+        val oldRedactGuard = RequestId("old-redactguard")
+        val console = RequestId("console")
+        assertSuccess(repository.admit(admission(oldRedactGuard, now - TWO_DAYS_MS)))
+        assertSuccess(repository.admit(admission(recentRedactGuard, now - ONE_HOUR_MS)))
+        assertSuccess(
+            repository.admit(
+                admission(
+                    id = console,
+                    receivedAt = now - 30L * 60L * 1_000L,
+                    applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
+                    useCaseId = HarnessSharedRuntimeBindings.consoleUseCaseId,
+                    verifiedPackageName = HarnessSharedRuntimeBindings.CONSOLE_RELEASE_PACKAGE,
+                ),
+            ),
+        )
+
+        val state = source.snapshot(
+            filter = InferenceActivityFilter(
+                applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId.value,
+                status = InferenceAuditStatus.ADMITTED,
+                period = InferenceActivityPeriod.LAST_24_HOURS,
+                useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId.value,
+            ),
+            nowEpochMs = now,
+        )
+
+        assertNull(state.errorCode)
+        assertEquals(listOf(recentRedactGuard.value), state.items.map(InferenceActivityListItem::requestId))
+        assertEquals(
+            setOf("OMBRA Console", "RedactGuard"),
+            state.filterOptions.applications.map(InferenceActivityFilterOption::label).toSet(),
+        )
+        assertEquals(listOf("Document PII detection"), state.filterOptions.useCases.map(InferenceActivityFilterOption::label))
+        assertFalse(state.hasTerminalHistory)
     }
 
     @Test
@@ -106,13 +148,19 @@ class HarnessInferenceActivitySourceTest {
         assertEquals("HOST_PROCESS_LOSS", record?.terminal?.terminalCode?.value)
     }
 
-    private fun admission(id: RequestId, receivedAt: Long) = InferenceAuditAdmission(
+    private fun admission(
+        id: RequestId,
+        receivedAt: Long,
+        applicationId: ApplicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+        useCaseId: UseCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
+        verifiedPackageName: String = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
+    ) = InferenceAuditAdmission(
         requestId = id,
         origin = InferenceAuditOrigin(
             kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-            useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
-            verifiedPackageName = HarnessSharedRuntimeBindings.REDACTGUARD_RELEASE_PACKAGE,
+            applicationId = applicationId,
+            useCaseId = useCaseId,
+            verifiedPackageName = verifiedPackageName,
         ),
         receivedAtEpochMs = receivedAt,
         input = InferenceAuditInput.Text("user secret"),
@@ -120,5 +168,10 @@ class HarnessInferenceActivitySourceTest {
 
     private fun assertSuccess(result: InferenceAuditResult<Unit>) {
         assertTrue(result is InferenceAuditResult.Success)
+    }
+
+    private companion object {
+        const val ONE_HOUR_MS = 60L * 60L * 1_000L
+        const val TWO_DAYS_MS = 2L * 24L * 60L * 60L * 1_000L
     }
 }
