@@ -66,12 +66,16 @@ internal fun NavGraphBuilder.installHarnessInferenceActivityGraph(navController:
                 ),
                 requestId = "invalid",
                 onRetry = {},
+                onOpenTechnicalTimeline = {},
             )
         } else {
             HarnessInferenceActivityDetailScreen(
                 state = state,
                 requestId = requestId,
                 onRetry = { activityViewModel.openDetail(requestId) },
+                onOpenTechnicalTimeline = {
+                    navController.navigate(HarnessRoutes.requestTimeline(requestId))
+                },
             )
         }
     }
