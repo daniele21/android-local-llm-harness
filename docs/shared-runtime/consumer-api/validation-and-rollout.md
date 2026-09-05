@@ -81,7 +81,7 @@ Use fake clocks/token accounting where practical for deterministic semantics. Ph
 
 ## Security review
 
-The API must preserve the ADR 0017 trust boundary for independently signed consumers.
+The API must preserve the ADR 0018 trust boundary for independently signed consumers.
 
 Review:
 
@@ -245,7 +245,7 @@ When comparing configurations:
 
 Before consumer release:
 
-- accepted target/boundary is reflected in ADR 0017 and the shared-runtime target/architecture;
+- accepted target/boundary is reflected in ADR 0018 and the shared-runtime target/architecture;
 - API reference documents the supported public surface and examples;
 - compatibility policy identifies SDK/protocol/capability versioning;
 - release notes bind host version, client SDK version, protocol version, Host/consumer signing digest identities and capability revision policy;
@@ -264,7 +264,7 @@ Before consumer release:
 | CA-VAL-04 | PLANNED | Enforce packaged client public-surface dependency boundary. |
 | CA-VAL-05 | PLANNED | Validate a pure/reference consumer and its connection/authorization UI states. |
 | CA-VAL-06 | IN PROGRESS | Prove two-APK independent-signer authorization and reconnect behavior. |
-| CA-VAL-07 | IN PROGRESS | Complete security/public-API/versioning review for ADR 0017. |
+| CA-VAL-07 | IN PROGRESS | Complete security/public-API/versioning review for ADR 0018. |
 | CA-VAL-08 | PLANNED | Capture applicable physical evidence and close release gate. |
 
 ## Completion criteria
