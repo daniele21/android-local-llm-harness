@@ -201,8 +201,21 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         registry.selectedModel = model
         ensureRuntime()
         val resolved = registry.resolve(APPLICATION_ID, purpose.useCaseId)
+        val auditedClient = InferenceAuditLocalLlmClient(
+            delegate = requireNotNull(runtimeClient),
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.HARNEX_INTERNAL,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                )
+            },
+        )
         PhoneHarness(
             runtime = requireNotNull(runtime),
+            client = auditedClient,
             applicationId = resolved.binding.applicationId,
             useCaseId = resolved.binding.useCaseId,
         )
