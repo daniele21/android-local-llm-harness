@@ -73,7 +73,9 @@ internal fun HarnessInferenceActivityScreen(
         state.listErrorCode != null && state.items.isEmpty() -> Column(modifier = modifier.fillMaxSize()) {
             HarnessErrorState(
                 title = "Inference activity unavailable",
-                detail = "The local audit store could not be read (${state.listErrorCode.name}). Inference audit remains fail-closed while storage is degraded.",
+                detail =
+                    "The local audit store could not be read (${state.listErrorCode.name}). " +
+                        "Inference audit remains fail-closed while storage is degraded.",
             )
             HarnessSecondaryButton(
                 text = "Retry",
@@ -91,7 +93,8 @@ internal fun HarnessInferenceActivityScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
                     Text("Activity", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "Local inference history: caller, input, output and execution metrics. Sensitive content stays in Harnex and is not part of Diagnostics exports.",
+                        "Local inference history: caller, input, output and execution metrics. " +
+                            "Sensitive content stays in Harnex and is not part of Diagnostics exports.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -132,7 +135,9 @@ internal fun HarnessInferenceActivityScreen(
                 item {
                     HarnessEmptyState(
                         title = "No inference activity yet",
-                        detail = "Use an authorized app such as RedactGuard. Accepted inference will appear here and remain available after Harnex restarts.",
+                        detail =
+                            "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
+                                "and remain available after Harnex restarts.",
                     )
                 }
             } else {
@@ -299,7 +304,10 @@ private fun InferenceActivityDetailContent(
                 ActivityMetric("Output tokens", detail.outputTokens?.toString())
                 ActivityMetric("Reasoning tokens", detail.reasoningTokens?.toString())
                 ActivityMetric("Answer tokens", detail.answerTokens?.toString())
-                ActivityMetric("Decode throughput", detail.decodeTokensPerSecond?.let { "${formatThroughput(it)} tok/s" })
+                ActivityMetric(
+                    "Decode throughput",
+                    detail.decodeTokensPerSecond?.let { "${formatThroughput(it)} tok/s" },
+                )
                 ActivityMetric("Stop reason", detail.stopReason)
             }
         }
@@ -311,7 +319,10 @@ private fun InferenceActivityDetailContent(
                 ActivityMetric("Package", detail.verifiedPackageName)
                 ActivityMetric("Model", detail.modelDigest)
                 ActivityMetric("Model load", detail.modelLoadKind)
-                ActivityMetric("Preset", detail.presetId?.let { id -> detail.presetVersion?.let { "$id v$it" } ?: id })
+                ActivityMetric(
+                    "Preset",
+                    detail.presetId?.let { id -> detail.presetVersion?.let { "$id v$it" } ?: id },
+                )
                 ActivityMetric("Backend", detail.backendId)
                 ActivityMetric("Backend revision", detail.backendRevision)
                 ActivityMetric("Backend fingerprint", detail.backendExecutionFingerprint)
@@ -360,7 +371,11 @@ private fun SensitiveContentCard(title: String, value: String?, emptyLabel: Stri
 private fun ActivityMetric(label: String, value: String?) {
     if (value.isNullOrBlank()) return
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         SelectionContainer { Text(value, style = MaterialTheme.typography.bodySmall) }
     }
 }
@@ -380,6 +395,7 @@ private fun InferenceAuditStatus.tone(): HarnessStatusTone = when (this) {
     -> HarnessStatusTone.INFO
 }
 
-private fun formatActivityTime(epochMs: Long): String = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(epochMs))
+private fun formatActivityTime(epochMs: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(epochMs))
 
 private fun formatThroughput(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
