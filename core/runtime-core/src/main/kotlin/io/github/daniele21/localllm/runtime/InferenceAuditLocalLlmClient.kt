@@ -31,6 +31,7 @@ import io.github.daniele21.localllm.contracts.SessionOptions
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.observability.NoOpTelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRepository
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -44,6 +45,61 @@ fun interface InferenceAuditOriginResolver {
 /** Consumes the runtime-owned rendered prompt exactly when the Prepared event reaches the audit gate. */
 fun interface InferenceAuditEffectivePromptResolver {
     fun consume(requestId: RequestId): String?
+
+    fun expect(requestId: RequestId) = Unit
+
+    fun discard(requestId: RequestId) {
+        consume(requestId)
+    }
+}
+
+/** Runtime-private sink. Prompt content must never be forwarded to public events, logs, or telemetry. */
+fun interface InferenceAuditEffectivePromptSink {
+    fun publish(requestId: RequestId, prompt: String)
+}
+
+/**
+ * One-shot bridge between runtime prompt planning and the strict Activity audit gate.
+ *
+ * Audit admission arms a request before it enters the runtime. The runtime may publish only for an
+ * armed request, and Prepared consumes/removes the value exactly once. Non-audited requests are
+ * ignored so this bridge cannot become an accidental secondary prompt store.
+ */
+class OneShotInferenceAuditEffectivePromptBridge :
+    InferenceAuditEffectivePromptResolver,
+    InferenceAuditEffectivePromptSink {
+    private val expected = ConcurrentHashMap.newKeySet<RequestId>()
+    private val prompts = ConcurrentHashMap<RequestId, String>()
+
+    override fun expect(requestId: RequestId) {
+        check(!prompts.containsKey(requestId) && expected.add(requestId)) {
+            "Effective prompt bridge request is already armed"
+        }
+    }
+
+    override fun publish(requestId: RequestId, prompt: String) {
+        if (!expected.remove(requestId)) return
+        check(prompts.putIfAbsent(requestId, prompt) == null) {
+            "Effective prompt bridge already contains a prompt for this request"
+        }
+    }
+
+    override fun consume(requestId: RequestId): String? {
+        if (expected.remove(requestId)) {
+            throw IllegalStateException("Runtime did not publish the effective prompt before Prepared")
+        }
+        return prompts.remove(requestId)
+    }
+
+    override fun discard(requestId: RequestId) {
+        expected.remove(requestId)
+        prompts.remove(requestId)
+    }
+
+    fun clear() {
+        expected.clear()
+        prompts.clear()
+    }
 }
 
 enum class InferenceAuditWritePhase {
@@ -84,6 +140,7 @@ class InferenceAuditLocalLlmClient(
 
     override fun generate(request: GenerationRequest, listener: GenerationListener): GenerationHandle {
         admit(request)
+        effectivePromptResolver.expect(request.requestId)
         val auditListener = AuditGenerationListener(
             request = request,
             delegate = listener,
@@ -95,6 +152,7 @@ class InferenceAuditLocalLlmClient(
         val handle = try {
             delegate.generate(request, auditListener)
         } catch (error: Throwable) {
+            effectivePromptResolver.discard(request.requestId)
             if (!auditListener.isTerminal()) {
                 terminalizeSynchronousFailure(request.requestId)
             }
@@ -211,6 +269,7 @@ private class AuditGenerationListener(
     }
 
     private fun onCompleted(event: GenerationEvent.Completed) {
+        effectivePromptResolver.discard(event.requestId)
         val terminal = InferenceAuditTerminal(
             requestId = event.requestId,
             status = InferenceAuditStatus.COMPLETED,
@@ -232,6 +291,7 @@ private class AuditGenerationListener(
     }
 
     private fun onFailed(event: GenerationEvent.Failed) {
+        effectivePromptResolver.discard(event.requestId)
         val status = if (event.error is LocalLlmError.Cancelled) {
             InferenceAuditStatus.CANCELLED
         } else {
@@ -254,6 +314,7 @@ private class AuditGenerationListener(
     }
 
     private fun failBeforeDecode(code: InferenceAuditFailureCode, phase: InferenceAuditWritePhase) {
+        effectivePromptResolver.discard(request.requestId)
         if (!auditTerminal.compareAndSet(false, true)) return
         cancelOnAttach.set(true)
         if (handleReady.await(HANDLE_ATTACH_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
@@ -263,6 +324,7 @@ private class AuditGenerationListener(
     }
 
     private fun failTerminal(code: InferenceAuditFailureCode) {
+        effectivePromptResolver.discard(request.requestId)
         if (!auditTerminal.compareAndSet(false, true)) return
         delegate.onEvent(
             GenerationEvent.Failed(
