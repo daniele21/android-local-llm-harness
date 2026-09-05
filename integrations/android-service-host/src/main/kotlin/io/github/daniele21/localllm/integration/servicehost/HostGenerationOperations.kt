@@ -140,8 +140,5 @@ internal class HostGenerationOperations(
         resources.removeHandle(requestId)
     }
 
-    private data class GenerationStartContext(
-        val dispatcher: HostCallbackDispatcher,
-        val sessionId: SessionId,
-    )
+    private data class GenerationStartContext(val dispatcher: HostCallbackDispatcher, val sessionId: SessionId)
 }
