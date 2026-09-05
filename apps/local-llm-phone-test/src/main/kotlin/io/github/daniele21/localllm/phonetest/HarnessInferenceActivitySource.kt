@@ -180,10 +180,7 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
         return InferenceAuditStartupState(interruptedRecords = interrupted)
     }
 
-    private fun filterOptions(
-        summaries: List<InferenceAuditSummary>,
-        selectedApplicationId: String?,
-    ): InferenceActivityFilterOptions {
+    private fun filterOptions(summaries: List<InferenceAuditSummary>, selectedApplicationId: String?): InferenceActivityFilterOptions {
         val applications = summaries
             .distinctBy { it.origin.applicationId.value }
             .map { summary ->
