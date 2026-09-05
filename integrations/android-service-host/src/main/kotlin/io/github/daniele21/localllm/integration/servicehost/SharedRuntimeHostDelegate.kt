@@ -271,10 +271,9 @@ class SharedRuntimeHostDelegate private constructor(
         }
     }
 
-    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? =
-        consumerClientFactory?.let { factory ->
-            runCatching { factory.create(caller) }.getOrNull()
-        }
+    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? = consumerClientFactory?.let { factory ->
+        runCatching { factory.create(caller) }.getOrNull()
+    }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
         val closing = ledger.beginClose(token, caller).successOrNull() ?: return
