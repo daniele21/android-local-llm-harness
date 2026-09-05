@@ -113,11 +113,14 @@ private class PromptBridgeRuntimeFixture(bridge: InferenceAuditEffectivePromptSi
             deleteOnExit()
         }
     private val resolved = resolvedUseCase()
-    private val registry = ModelProfileRegistry { applicationId, useCaseId ->
-        require(applicationId == this.applicationId)
-        require(useCaseId == this.useCaseId)
-        resolved
-    }
+    private val registry =
+        object : ModelProfileRegistry {
+            override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
+                require(applicationId == this@PromptBridgeRuntimeFixture.applicationId)
+                require(useCaseId == this@PromptBridgeRuntimeFixture.useCaseId)
+                return resolved
+            }
+        }
     private val store = PromptBridgeModelStore(modelFile, digest)
     val backend = PromptBridgeInferenceBackend()
     val runtime =
