@@ -50,22 +50,27 @@ class HarnessIndependentConsumerAuthorizationInstrumentationTest {
         return instrumentation.targetContext to arguments.observedIdentity()
     }
 
-    private fun Bundle.observedIdentity() = ObservedIdentity(
-        packageName =
-        requireNotNull(getString(ARG_CONSUMER_PACKAGE)) {
-            "Missing $ARG_CONSUMER_PACKAGE instrumentation argument"
-        },
-        signerSha256 =
-        requireNotNull(getString(ARG_CONSUMER_SIGNER_SHA256)) {
-            "Missing $ARG_CONSUMER_SIGNER_SHA256 instrumentation argument"
-        }.lowercase(),
-    )
+    private fun Bundle.observedIdentity(): ObservedIdentity {
+        val packageName =
+            requireNotNull(getString(ARG_CONSUMER_PACKAGE)) {
+                "Missing $ARG_CONSUMER_PACKAGE instrumentation argument"
+            }
+        val signerSha256 =
+            requireNotNull(getString(ARG_CONSUMER_SIGNER_SHA256)) {
+                "Missing $ARG_CONSUMER_SIGNER_SHA256 instrumentation argument"
+            }.lowercase()
+        return ObservedIdentity(packageName, signerSha256)
+    }
 
-    private fun gateway(context: Context) = StoreHarnessApplicationsGateway(
-        HarnessRuntimeGraph.from(context).controlPlaneStore,
-    )
+    private fun gateway(context: Context): StoreHarnessApplicationsGateway =
+        StoreHarnessApplicationsGateway(
+            HarnessRuntimeGraph.from(context).controlPlaneStore,
+        )
 
-    private data class ObservedIdentity(val packageName: String, val signerSha256: String)
+    private data class ObservedIdentity(
+        val packageName: String,
+        val signerSha256: String,
+    )
 
     private companion object {
         const val ARG_CONSUMER_PACKAGE = "consumerPackage"
