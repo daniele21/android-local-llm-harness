@@ -66,13 +66,13 @@ class HarnessObservedApplicationIdentityReconcilerTest {
         store.transact { current ->
             current.copy(
                 applications =
-                    current.applications.map { application ->
-                        if (application.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId) {
-                            application.copy(state = ApplicationRegistrationState.AUTHORIZED)
-                        } else {
-                            application
-                        }
-                    },
+                current.applications.map { application ->
+                    if (application.applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId) {
+                        application.copy(state = ApplicationRegistrationState.AUTHORIZED)
+                    } else {
+                        application
+                    }
+                },
             )
         }
 
