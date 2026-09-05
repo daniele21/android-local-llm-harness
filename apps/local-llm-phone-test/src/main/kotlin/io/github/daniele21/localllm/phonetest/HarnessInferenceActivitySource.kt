@@ -10,7 +10,10 @@ import io.github.daniele21.localllm.audit.InferenceAuditStatus
 import io.github.daniele21.localllm.audit.InferenceAuditSummary
 import io.github.daniele21.localllm.audit.InferenceAuditTerminal
 import io.github.daniele21.localllm.audit.InferenceAuditTerminalCode
+import io.github.daniele21.localllm.audit.MAX_AUDIT_QUERY_LIMIT
+import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.RequestId
+import io.github.daniele21.localllm.contracts.UseCaseId
 
 internal data class InferenceActivityListItem(
     val requestId: String,
@@ -65,8 +68,37 @@ internal data class InferenceActivityDetail(
     val terminalCode: String?,
 )
 
+internal enum class InferenceActivityPeriod(val displayLabel: String, private val windowMs: Long?) {
+    ALL("All time", null),
+    LAST_24_HOURS("24 hours", 24L * 60L * 60L * 1_000L),
+    LAST_7_DAYS("7 days", 7L * 24L * 60L * 60L * 1_000L),
+    LAST_30_DAYS("30 days", 30L * 24L * 60L * 60L * 1_000L),
+    ;
+
+    fun lowerBound(nowEpochMs: Long): Long? = windowMs?.let { (nowEpochMs - it).coerceAtLeast(0L) }
+}
+
+internal data class InferenceActivityFilter(
+    val applicationId: String? = null,
+    val status: InferenceAuditStatus? = null,
+    val period: InferenceActivityPeriod = InferenceActivityPeriod.ALL,
+    val useCaseId: String? = null,
+) {
+    val isDefault: Boolean
+        get() = applicationId == null && status == null && period == InferenceActivityPeriod.ALL && useCaseId == null
+}
+
+internal data class InferenceActivityFilterOption(val id: String, val label: String)
+
+internal data class InferenceActivityFilterOptions(
+    val applications: List<InferenceActivityFilterOption> = emptyList(),
+    val useCases: List<InferenceActivityFilterOption> = emptyList(),
+)
+
 internal data class InferenceActivityUiState(
     val items: List<InferenceActivityListItem> = emptyList(),
+    val filterOptions: InferenceActivityFilterOptions = InferenceActivityFilterOptions(),
+    val hasTerminalHistory: Boolean = false,
     val errorCode: InferenceAuditFailureCode? = null,
 )
 
@@ -79,11 +111,38 @@ internal data class InferenceAuditStartupState(val interruptedRecords: Int = 0, 
 
 /** Read-only presentation adapter plus explicit lifecycle recovery operations for the local audit ledger. */
 internal class HarnessInferenceActivitySource(private val repository: InferenceAuditRepository) {
-    fun snapshot(limit: Int = DEFAULT_ACTIVITY_LIMIT): InferenceActivityUiState =
-        when (val result = repository.recent(InferenceAuditQuery(limit = limit))) {
-            is InferenceAuditResult.Success -> InferenceActivityUiState(items = result.value.map(::listItem))
-            is InferenceAuditResult.Failure -> InferenceActivityUiState(errorCode = result.code)
+    fun snapshot(
+        filter: InferenceActivityFilter = InferenceActivityFilter(),
+        nowEpochMs: Long = System.currentTimeMillis(),
+        limit: Int = DEFAULT_ACTIVITY_LIMIT,
+    ): InferenceActivityUiState {
+        require(nowEpochMs >= 0) { "Activity snapshot timestamp must not be negative" }
+        val metadata = when (val result = repository.recent(InferenceAuditQuery(limit = MAX_AUDIT_QUERY_LIMIT))) {
+            is InferenceAuditResult.Success -> result.value
+            is InferenceAuditResult.Failure -> return InferenceActivityUiState(errorCode = result.code)
         }
+        val options = filterOptions(metadata, filter.applicationId)
+        val query = InferenceAuditQuery(
+            limit = limit,
+            applicationId = filter.applicationId?.let(::ApplicationId),
+            useCaseId = filter.useCaseId?.let(::UseCaseId),
+            statuses = filter.status?.let(::setOf).orEmpty(),
+            afterReceivedAtEpochMs = filter.period.lowerBound(nowEpochMs),
+        )
+        return when (val result = repository.recent(query)) {
+            is InferenceAuditResult.Success -> InferenceActivityUiState(
+                items = result.value.map(::listItem),
+                filterOptions = options,
+                hasTerminalHistory = metadata.any { it.status.isTerminal },
+            )
+
+            is InferenceAuditResult.Failure -> InferenceActivityUiState(
+                filterOptions = options,
+                hasTerminalHistory = metadata.any { it.status.isTerminal },
+                errorCode = result.code,
+            )
+        }
+    }
 
     fun detail(requestId: String): InferenceActivityDetailResult {
         val id = runCatching { RequestId(requestId) }.getOrNull() ?: return InferenceActivityDetailResult.Unavailable(null)
@@ -119,6 +178,31 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
             }
         }
         return InferenceAuditStartupState(interruptedRecords = interrupted)
+    }
+
+    private fun filterOptions(
+        summaries: List<InferenceAuditSummary>,
+        selectedApplicationId: String?,
+    ): InferenceActivityFilterOptions {
+        val applications = summaries
+            .distinctBy { it.origin.applicationId.value }
+            .map { summary ->
+                InferenceActivityFilterOption(
+                    id = summary.origin.applicationId.value,
+                    label = applicationLabel(summary.origin.applicationId.value),
+                )
+            }.sortedBy(InferenceActivityFilterOption::label)
+        val useCases = summaries.asSequence()
+            .filter { selectedApplicationId == null || it.origin.applicationId.value == selectedApplicationId }
+            .distinctBy { it.origin.useCaseId.value }
+            .map { summary ->
+                InferenceActivityFilterOption(
+                    id = summary.origin.useCaseId.value,
+                    label = useCaseLabel(summary.origin.useCaseId.value),
+                )
+            }.sortedBy(InferenceActivityFilterOption::label)
+            .toList()
+        return InferenceActivityFilterOptions(applications = applications, useCases = useCases)
     }
 
     private fun listItem(summary: InferenceAuditSummary): InferenceActivityListItem = InferenceActivityListItem(
@@ -183,7 +267,13 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
         HarnessSharedRuntimeBindings.redactGuardApplicationId.value -> "RedactGuard"
         HarnessSharedRuntimeBindings.consoleApplicationId.value -> "OMBRA Console"
         HarnessRuntimeGraph.APPLICATION_ID.value -> "Harnex"
-        else -> applicationId
+        else -> humanizeIdentifier(applicationId)
+    }
+
+    private fun useCaseLabel(useCaseId: String): String = when (useCaseId) {
+        HarnessSharedRuntimeBindings.ombraUseCaseId.value -> "Document PII detection"
+        HarnessSharedRuntimeBindings.consoleUseCaseId.value -> "Console inference"
+        else -> humanizeIdentifier(useCaseId)
     }
 
     private companion object {
@@ -192,6 +282,12 @@ internal class HarnessInferenceActivitySource(private val repository: InferenceA
         const val HOST_PROCESS_LOSS_CODE = "HOST_PROCESS_LOSS"
     }
 }
+
+private fun humanizeIdentifier(value: String): String = value
+    .split('-', '_')
+    .filter(String::isNotBlank)
+    .joinToString(" ") { token -> token.replaceFirstChar(Char::uppercase) }
+    .ifBlank { value }
 
 private fun InferenceAuditInput.displayText(): String = when (this) {
     is InferenceAuditInput.Text -> value
