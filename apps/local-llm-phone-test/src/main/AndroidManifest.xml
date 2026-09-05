@@ -5,9 +5,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="${sharedRuntimePermission}" />
 
+    <!--
+      This normal permission is an explicit opt-in to the Binder surface, not the trust boundary.
+      Every transaction still verifies Binder UID -> exact package -> accepted signing certificate -> use case.
+    -->
     <permission
         android:name="${sharedRuntimePermission}"
-        android:protectionLevel="signature" />
+        android:protectionLevel="normal" />
+
+    <queries>
+        <package android:name="io.github.daniele21.redactguard" />
+        <package android:name="io.github.daniele21.redactguard.debug" />
+    </queries>
 
     <application
         android:allowBackup="false"
