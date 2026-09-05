@@ -51,6 +51,7 @@ internal object HarnessRoutes {
 
     private const val REQUEST_TIMELINE_PREFIX = "runs/"
     private const val MODEL_DETAIL_PREFIX = "models/"
+    private const val ACTIVITY_DETAIL_PREFIX = "activity/"
 
     fun requestTimeline(requestId: String): String = REQUEST_TIMELINE_PREFIX + encode(requestId, "requestId")
 
@@ -83,6 +84,13 @@ internal object HarnessRoutes {
                 detailTitle = "Model details",
                 detailSubtitle = "Compatibility, integrity and runtime ownership",
             )
+
+            route == HarnessInferenceActivityRoutes.DETAIL_PATTERN ||
+                route?.startsWith(ACTIVITY_DETAIL_PREFIX) == true && route != HarnessDestination.ACTIVITY.route -> HarnessShellState(
+                    destination = HarnessDestination.ACTIVITY,
+                    detailTitle = "Inference activity",
+                    detailSubtitle = "Sensitive local input, output and execution evidence",
+                )
 
             applicationDetail != null -> applicationDetail
 
