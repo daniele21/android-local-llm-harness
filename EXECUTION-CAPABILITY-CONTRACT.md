@@ -1,14 +1,14 @@
 # Validation Execution Capability Contract
 
-Version: 0.3.1
+Version: 0.3.2
 
-Harnex adopts the repo-template-sw 0.9.1 delivery model: **delivery stage**, **validation depth**, **execution capability** and **environment fidelity** are separate axes.
+Harnex adopts the repo-template-sw 0.9.2 delivery model: **delivery stage**, **validation depth**, **execution capability** and **environment fidelity** are separate axes.
 
 ## Governing rules
 
 > Automation executes automatable work; the user is not the fallback runner because an agent lacks Android/native tooling.
 
-> Optimize for sufficient confidence per feedback time: cheap falsification at ITERATION, risk-based proof at INTEGRATION, reference-grade proof at RELEASE.
+> Optimize for sufficient confidence per feedback time: cheap falsification at ITERATION, automated risk-based proof at INTEGRATION, reference-grade proof plus required real-environment acceptance at RELEASE.
 
 > Reuse trusted equivalent evidence before starting another expensive run.
 
@@ -23,10 +23,10 @@ Gradle, Kotlin compilation, lint, unit tests, AndroidTest assembly, R8/package a
 ## Delivery stages
 
 - `ITERATION` — fast falsification; exact-head/full-diff/docs/preflight/release E2E are not defaults.
-- `INTEGRATION` — coherent observable outcome ready for `dev`; exact head/base, full diff, affected docs, selected risk gates and affected critical E2E.
-- `RELEASE` — `main`/release candidate; FULL plus release-critical and residual environment evidence.
+- `INTEGRATION` — coherent observable outcome ready for `dev`; exact head/base, full diff, affected docs, selected risk gates and affected critical automated E2E. Required `REAL_ENVIRONMENT` evidence is recorded but does not block integration; it is `DEFERRED_TO_RELEASE`.
+- `RELEASE` — `main`/release candidate; FULL plus release-critical E2E/artifact evidence and every required residual real/target-environment gate passing.
 
-A draft collaboration PR may remain ITERATION. A ready PR to `dev` is INTEGRATION.
+A draft collaboration PR may remain ITERATION. A ready PR to `dev` is INTEGRATION. Physical ARM64/device evidence may run earlier for diagnosis, but it is not the normal feature-to-dev blocker.
 
 ## Risk -> gates -> profile
 
@@ -55,9 +55,17 @@ This distinction is especially important in Harnex: if `dev` advances before mer
 
 RELEASE remains exact-candidate/reference-grade.
 
+## E2E and real-environment routing
+
+At INTEGRATION, use the smallest affected automated critical journey at the cheapest sufficient declared fidelity. Emulator evidence may prove Binder/process/orchestration behavior but must not be promoted into ARM64 JNI, real GGUF, memory, thermal or OEM claims.
+
+At RELEASE, every critical journey whose `.engineering/e2e.json` entry says `real_environment_confirmation: required` must have passing real/target-environment evidence before release readiness. Conditional physical evidence is required only when the release claim or changed risk depends on its residual gap.
+
 ## Remote preflight
 
 `/preflight auto` is the default; stronger overrides may increase evidence. It searches exact-head evidence first and runs only missing/stale/insufficient deterministic gates. Post-merge tree reuse is owned by integration-branch CI, not by weakening the candidate preflight.
+
+`AUTOMATED_PREFLIGHT_CONFIRMED` is sufficient for integration when all required automated evidence passes and real-environment items are explicitly deferred. It is not `RELEASE_READY` while a required real-environment gate remains pending.
 
 ## Security
 
