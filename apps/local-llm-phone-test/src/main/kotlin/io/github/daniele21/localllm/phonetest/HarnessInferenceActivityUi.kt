@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import io.github.daniele21.localllm.audit.InferenceAuditStatus
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessConfirmationDialog
 import io.github.daniele21.localllm.ui.designsystem.HarnessEmptyState
@@ -38,6 +41,10 @@ internal fun HarnessInferenceActivityScreen(
     state: HarnessInferenceActivityState,
     onRefresh: () -> Unit,
     onOpenDetail: (String) -> Unit,
+    onSelectApplication: (String?) -> Unit,
+    onSelectStatus: (InferenceAuditStatus?) -> Unit,
+    onSelectPeriod: (InferenceActivityPeriod) -> Unit,
+    onSelectUseCase: (String?) -> Unit,
     onClearHistory: () -> Unit,
     onClearFeedback: () -> Unit,
     modifier: Modifier = Modifier,
@@ -69,6 +76,10 @@ internal fun HarnessInferenceActivityScreen(
             state = state,
             onRefresh = onRefresh,
             onOpenDetail = onOpenDetail,
+            onSelectApplication = onSelectApplication,
+            onSelectStatus = onSelectStatus,
+            onSelectPeriod = onSelectPeriod,
+            onSelectUseCase = onSelectUseCase,
             onRequestClear = { confirmClear = true },
             onClearFeedback = onClearFeedback,
             modifier = modifier,
@@ -113,6 +124,10 @@ private fun InferenceActivityList(
     state: HarnessInferenceActivityState,
     onRefresh: () -> Unit,
     onOpenDetail: (String) -> Unit,
+    onSelectApplication: (String?) -> Unit,
+    onSelectStatus: (InferenceAuditStatus?) -> Unit,
+    onSelectPeriod: (InferenceActivityPeriod) -> Unit,
+    onSelectUseCase: (String?) -> Unit,
     onRequestClear: () -> Unit,
     onClearFeedback: () -> Unit,
     modifier: Modifier,
@@ -129,6 +144,15 @@ private fun InferenceActivityList(
                 onRequestClear = onRequestClear,
             )
         }
+        item {
+            InferenceActivityFilters(
+                state = state,
+                onSelectApplication = onSelectApplication,
+                onSelectStatus = onSelectStatus,
+                onSelectPeriod = onSelectPeriod,
+                onSelectUseCase = onSelectUseCase,
+            )
+        }
         state.feedback?.let { feedback ->
             item { InferenceActivityFeedback(feedback, onClearFeedback) }
         }
@@ -137,11 +161,15 @@ private fun InferenceActivityList(
         }
         if (state.items.isEmpty()) {
             item {
+                val filtered = !state.filter.isDefault
                 HarnessEmptyState(
-                    title = "No inference activity yet",
-                    detail =
-                    "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
-                        "and remain available after Harnex restarts.",
+                    title = if (filtered) "No activity matches these filters" else "No inference activity yet",
+                    detail = if (filtered) {
+                        "Change or clear a filter to see other local inference activity."
+                    } else {
+                        "Use an authorized app such as RedactGuard. Accepted inference will appear here " +
+                            "and remain available after Harnex restarts."
+                    },
                 )
             }
         } else {
@@ -170,11 +198,107 @@ private fun InferenceActivityListHeader(state: HarnessInferenceActivityState, on
         )
         HarnessSecondaryButton(
             text = "Clear completed history",
-            enabled = state.items.any { it.status.isTerminal } && !state.mutationInProgress,
+            enabled = state.hasTerminalHistory && !state.mutationInProgress,
             modifier = Modifier.fillMaxWidth().testTag("activity-clear-history"),
             onClick = onRequestClear,
         )
     }
+}
+
+@Composable
+private fun InferenceActivityFilters(
+    state: HarnessInferenceActivityState,
+    onSelectApplication: (String?) -> Unit,
+    onSelectStatus: (InferenceAuditStatus?) -> Unit,
+    onSelectPeriod: (InferenceActivityPeriod) -> Unit,
+    onSelectUseCase: (String?) -> Unit,
+) {
+    val enabled = !state.loading && !state.mutationInProgress
+    HarnessCard(modifier = Modifier.fillMaxWidth().testTag("activity-filters")) {
+        Text("Filters", style = MaterialTheme.typography.titleMedium)
+        ActivityFilterLabel("Application")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+            item {
+                FilterChip(
+                    selected = state.filter.applicationId == null,
+                    enabled = enabled,
+                    onClick = { onSelectApplication(null) },
+                    label = { Text("All") },
+                )
+            }
+            items(state.filterOptions.applications, key = InferenceActivityFilterOption::id) { option ->
+                FilterChip(
+                    selected = state.filter.applicationId == option.id,
+                    enabled = enabled,
+                    onClick = { onSelectApplication(option.id) },
+                    label = { Text(option.label) },
+                )
+            }
+        }
+
+        ActivityFilterLabel("Status")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+            item {
+                FilterChip(
+                    selected = state.filter.status == null,
+                    enabled = enabled,
+                    onClick = { onSelectStatus(null) },
+                    label = { Text("All") },
+                )
+            }
+            items(InferenceAuditStatus.entries, key = InferenceAuditStatus::name) { status ->
+                FilterChip(
+                    selected = state.filter.status == status,
+                    enabled = enabled,
+                    onClick = { onSelectStatus(status) },
+                    label = { Text(status.activityDisplayLabel()) },
+                )
+            }
+        }
+
+        ActivityFilterLabel("Period")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+            items(InferenceActivityPeriod.entries, key = InferenceActivityPeriod::name) { period ->
+                FilterChip(
+                    selected = state.filter.period == period,
+                    enabled = enabled,
+                    onClick = { onSelectPeriod(period) },
+                    label = { Text(period.displayLabel) },
+                )
+            }
+        }
+
+        if (state.filterOptions.useCases.isNotEmpty()) {
+            ActivityFilterLabel("Use case")
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
+                item {
+                    FilterChip(
+                        selected = state.filter.useCaseId == null,
+                        enabled = enabled,
+                        onClick = { onSelectUseCase(null) },
+                        label = { Text("All") },
+                    )
+                }
+                items(state.filterOptions.useCases, key = InferenceActivityFilterOption::id) { option ->
+                    FilterChip(
+                        selected = state.filter.useCaseId == option.id,
+                        enabled = enabled,
+                        onClick = { onSelectUseCase(option.id) },
+                        label = { Text(option.label) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityFilterLabel(value: String) {
+    Text(
+        value,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
