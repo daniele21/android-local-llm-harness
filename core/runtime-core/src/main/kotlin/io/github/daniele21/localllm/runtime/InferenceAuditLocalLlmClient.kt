@@ -92,7 +92,14 @@ class InferenceAuditLocalLlmClient(
             effectivePromptResolver = effectivePromptResolver,
             epochClock = epochClock,
         )
-        val handle = delegate.generate(request, auditListener)
+        val handle = try {
+            delegate.generate(request, auditListener)
+        } catch (error: Throwable) {
+            if (!auditListener.isTerminal()) {
+                terminalizeSynchronousFailure(request.requestId)
+            }
+            throw error
+        }
         auditListener.attachHandle(handle)
         return handle
     }
@@ -120,6 +127,16 @@ class InferenceAuditLocalLlmClient(
         )
         requireAuditSuccess(auditRepository.admit(admission), InferenceAuditWritePhase.ADMISSION)
     }
+
+    private fun terminalizeSynchronousFailure(requestId: RequestId) {
+        val terminal = InferenceAuditTerminal(
+            requestId = requestId,
+            status = InferenceAuditStatus.FAILED,
+            completedAtEpochMs = epochClock.nowEpochMs(),
+            terminalCode = InferenceAuditTerminalCode("GENERATION_START_FAILED"),
+        )
+        requireAuditSuccess(auditRepository.recordTerminal(terminal), InferenceAuditWritePhase.TERMINAL)
+    }
 }
 
 private class AuditGenerationListener(
@@ -142,6 +159,8 @@ private class AuditGenerationListener(
             runCatching(value::cancel)
         }
     }
+
+    fun isTerminal(): Boolean = auditTerminal.get()
 
     override fun onEvent(event: GenerationEvent) {
         if (auditTerminal.get()) return
