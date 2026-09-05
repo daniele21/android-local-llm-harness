@@ -73,6 +73,7 @@ class InferenceAuditLocalLlmClientTest {
         assertEquals(InferenceAuditStatus.COMPLETED, record.status)
         assertEquals("io.redactguard", record.admission.origin.verifiedPackageName)
         assertEquals("secret input", (record.admission.input as InferenceAuditInput.Text).value)
+        assertEquals("rendered secret prompt", record.prepared?.effectivePrompt)
         assertEquals("final answer", record.terminal?.content?.answerOutput)
         assertEquals("private reasoning", record.terminal?.content?.reasoningOutput)
         assertEquals(24L, record.terminal?.metrics?.totalMs)
@@ -106,6 +107,7 @@ class InferenceAuditLocalLlmClientTest {
                     verifiedPackageName = "io.redactguard",
                 )
             },
+            effectivePromptResolver = InferenceAuditEffectivePromptResolver { "rendered secret prompt" },
             epochClock = EpochClock { clock.getAndIncrement() },
         )
 
