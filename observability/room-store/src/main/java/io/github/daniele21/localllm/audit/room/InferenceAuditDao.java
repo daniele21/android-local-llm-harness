@@ -20,12 +20,14 @@ public interface InferenceAuditDao {
             "SELECT * FROM inference_audit_records "
                     + "WHERE (:applicationId IS NULL OR application_id = :applicationId) "
                     + "AND (:useCaseId IS NULL OR use_case_id = :useCaseId) "
+                    + "AND (:afterReceivedAtEpochMs IS NULL OR received_at_epoch_ms >= :afterReceivedAtEpochMs) "
                     + "AND (:beforeReceivedAtEpochMs IS NULL OR received_at_epoch_ms < :beforeReceivedAtEpochMs) "
                     + "ORDER BY received_at_epoch_ms DESC, request_id DESC LIMIT :limit")
     List<InferenceAuditEntities.InferenceAuditEntity> recent(
             int limit,
             @Nullable String applicationId,
             @Nullable String useCaseId,
+            @Nullable Long afterReceivedAtEpochMs,
             @Nullable Long beforeReceivedAtEpochMs);
 
     @Query(
@@ -33,6 +35,7 @@ public interface InferenceAuditDao {
                     + "WHERE (:applicationId IS NULL OR application_id = :applicationId) "
                     + "AND (:useCaseId IS NULL OR use_case_id = :useCaseId) "
                     + "AND status IN (:statuses) "
+                    + "AND (:afterReceivedAtEpochMs IS NULL OR received_at_epoch_ms >= :afterReceivedAtEpochMs) "
                     + "AND (:beforeReceivedAtEpochMs IS NULL OR received_at_epoch_ms < :beforeReceivedAtEpochMs) "
                     + "ORDER BY received_at_epoch_ms DESC, request_id DESC LIMIT :limit")
     List<InferenceAuditEntities.InferenceAuditEntity> recentWithStatuses(
@@ -40,6 +43,7 @@ public interface InferenceAuditDao {
             @Nullable String applicationId,
             @Nullable String useCaseId,
             List<String> statuses,
+            @Nullable Long afterReceivedAtEpochMs,
             @Nullable Long beforeReceivedAtEpochMs);
 
     @Query(
