@@ -27,6 +27,16 @@ internal data class HarnessInferenceActivityState(
     val feedback: String? = null,
 )
 
+internal sealed interface InferenceActivityFilterSelection {
+    data class Application(val applicationId: String?) : InferenceActivityFilterSelection
+
+    data class Status(val status: InferenceAuditStatus?) : InferenceActivityFilterSelection
+
+    data class Period(val period: InferenceActivityPeriod) : InferenceActivityFilterSelection
+
+    data class UseCase(val useCaseId: String?) : InferenceActivityFilterSelection
+}
+
 internal class HarnessInferenceActivityViewModel : ViewModel() {
     private val mutableState = MutableStateFlow(HarnessInferenceActivityState())
     private val generation = AtomicLong(0)
@@ -73,25 +83,19 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
         }
     }
 
-    fun selectApplication(applicationId: String?) {
+    fun selectFilter(selection: InferenceActivityFilterSelection) {
         val current = mutableState.value.filter
-        val updated = current.copy(
-            applicationId = applicationId,
-            useCaseId = if (applicationId == current.applicationId) current.useCaseId else null,
-        )
+        val updated = when (selection) {
+            is InferenceActivityFilterSelection.Application -> current.copy(
+                applicationId = selection.applicationId,
+                useCaseId = if (selection.applicationId == current.applicationId) current.useCaseId else null,
+            )
+
+            is InferenceActivityFilterSelection.Status -> current.copy(status = selection.status)
+            is InferenceActivityFilterSelection.Period -> current.copy(period = selection.period)
+            is InferenceActivityFilterSelection.UseCase -> current.copy(useCaseId = selection.useCaseId)
+        }
         updateFilter(updated)
-    }
-
-    fun selectStatus(status: InferenceAuditStatus?) {
-        updateFilter(mutableState.value.filter.copy(status = status))
-    }
-
-    fun selectPeriod(period: InferenceActivityPeriod) {
-        updateFilter(mutableState.value.filter.copy(period = period))
-    }
-
-    fun selectUseCase(useCaseId: String?) {
-        updateFilter(mutableState.value.filter.copy(useCaseId = useCaseId))
     }
 
     fun openDetail(requestId: String) {
