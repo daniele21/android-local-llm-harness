@@ -62,15 +62,11 @@ class HarnessIndependentConsumerAuthorizationInstrumentationTest {
         return ObservedIdentity(packageName, signerSha256)
     }
 
-    private fun gateway(context: Context): StoreHarnessApplicationsGateway =
-        StoreHarnessApplicationsGateway(
-            HarnessRuntimeGraph.from(context).controlPlaneStore,
-        )
-
-    private data class ObservedIdentity(
-        val packageName: String,
-        val signerSha256: String,
+    private fun gateway(context: Context): StoreHarnessApplicationsGateway = StoreHarnessApplicationsGateway(
+        HarnessRuntimeGraph.from(context).controlPlaneStore,
     )
+
+    private data class ObservedIdentity(val packageName: String, val signerSha256: String)
 
     private companion object {
         const val ARG_CONSUMER_PACKAGE = "consumerPackage"
