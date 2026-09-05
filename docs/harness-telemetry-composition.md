@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: apps/local-llm-phone-test
 Canonical scope: phone.diagnostics.telemetry
 Read when: changing connected-app telemetry assembly, retention or timeline presentation
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-05
 
 ## Decision
 
@@ -13,11 +13,11 @@ Harnex uses one process-scoped `RoomTelemetryRepository` owned by `HarnessRuntim
 
 The same repository is injected into the single shared `RuntimeOrchestrator` used by Playground, authenticated Consumer execution and physical-device validation. Diagnostics reads through `HarnessDiagnosticsSource`; it does not create a parallel runtime, model store, telemetry store or registry.
 
-This is distinct from the sensitive inference-audit domain defined by [ADR 0017](adr/0017-durable-local-inference-audit.md). Prompt, effective prompt, reasoning and generated output remain forbidden from normal telemetry even though the new audit ledger may persist them under its separate encryption/failure policy.
+This is distinct from the sensitive inference-audit domain defined by [ADR 0017](adr/0017-durable-local-inference-audit.md). Prompt, effective prompt, reasoning and generated output remain forbidden from normal telemetry even though the audit ledger persists them under its separate encryption/failure policy.
 
 ## Rationale
 
-Persistent normal telemetry is now required because runtime evidence must remain available after ordinary Harnex UI recreation and process restart. The existing `RoomTelemetryRepository` already owns the required behavior:
+Persistent normal telemetry is required because runtime evidence must remain available after ordinary Harnex UI recreation and process restart. The existing `RoomTelemetryRepository` owns the required behavior:
 
 - stable `TelemetryRepository` contracts;
 - serialized off-main-thread writes and ordered query barriers;
@@ -26,7 +26,7 @@ Persistent normal telemetry is now required because runtime evidence must remain
 - Room migrations and schema validation;
 - best-effort write isolation from inference behavior.
 
-The app keeps `observability:in-memory-store` as a test/fake dependency; it is no longer the production runtime-graph telemetry owner.
+The app keeps `observability:in-memory-store` as a test/fake dependency; it is not the production runtime-graph telemetry owner.
 
 ## Retention
 
@@ -63,8 +63,8 @@ It excludes:
 
 The Diagnostics UI maps only source-backed safe identifiers, digest prefixes and numeric metrics.
 
-Normal telemetry remains best-effort: lifecycle write failures inside `RoomTelemetryRepository` are isolated from inference success/cancellation. This is deliberately weaker than ADR-0017 audit persistence, which becomes a correctness gate for accepted/normal-success inference once its production composition is integrated.
+Normal telemetry remains best-effort: lifecycle write failures inside `RoomTelemetryRepository` are isolated from inference success/cancellation. This is deliberately weaker than ADR-0017 audit persistence, which is a correctness gate for accepted/normal-success inference in the production Harnex composition.
 
 ## Verification
 
-Changes to this composition require the existing Room repository unit/migration coverage plus phone-test compile/unit/lint/package checks selected by repository scope. Cross-restart product evidence belongs to the local-inference Activity/audit workstream when the complete runtime + audit + UI path is composed; this document does not promote emulator evidence into physical performance or hardware claims.
+Changes to this composition require the existing Room repository unit/migration coverage plus phone-test compile/unit/lint/package checks selected by repository scope. Cross-restart inference-history behavior is owned by the durable [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md) contract and its affected cross-APK acceptance evidence; emulator evidence is not promoted into physical performance or hardware claims.
