@@ -14,8 +14,10 @@ import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedCaller
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedConsumerClientFactory
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedRuntimeClientFactory
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
@@ -32,6 +34,7 @@ import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistry
 import io.github.daniele21.localllm.runtime.InferenceAuditLocalLlmClient
 import io.github.daniele21.localllm.runtime.InferenceAuditOriginResolver
+import io.github.daniele21.localllm.runtime.OneShotInferenceAuditEffectivePromptBridge
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
@@ -69,6 +72,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         context = appContext,
         databaseName = INFERENCE_AUDIT_DATABASE_NAME,
     )
+    private val effectivePromptBridge = OneShotInferenceAuditEffectivePromptBridge()
     val inferenceActivitySource = HarnessInferenceActivitySource(inferenceAuditRepositoryOwner)
     val auditStartupState = inferenceActivitySource.reconcileInterrupted(System.currentTimeMillis())
 
@@ -117,6 +121,10 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
+
+    val legacyRuntimeClientFactory = AuthorizedRuntimeClientFactory { caller ->
+        externalAuditedRuntimeClient(caller)
+    }
 
     val consumerClientFactory = AuthorizedConsumerClientFactory { caller ->
         val applicationId = caller.applicationId
@@ -167,20 +175,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                     fallback = fallbackPolicyRegistry,
                 ),
             )
-        val auditedRuntimeClient = InferenceAuditLocalLlmClient(
-            delegate = sharedRuntimeClientFacade,
-            auditRepository = inferenceAuditRepository,
-            telemetryRepository = telemetryRepository,
-            originResolver = InferenceAuditOriginResolver { request ->
-                InferenceAuditOrigin(
-                    kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-                    applicationId = request.applicationId,
-                    useCaseId = request.useCaseId,
-                    verifiedPackageName = caller.packageName,
-                )
-            },
-        )
-        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, auditedRuntimeClient)
+        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, externalAuditedRuntimeClient(caller))
     }
 
     fun installActivationBinding(
@@ -205,6 +200,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             delegate = requireNotNull(runtimeClient),
             auditRepository = inferenceAuditRepository,
             telemetryRepository = telemetryRepository,
+            effectivePromptResolver = effectivePromptBridge,
             originResolver = InferenceAuditOriginResolver { request ->
                 InferenceAuditOrigin(
                     kind = InferenceAuditOriginKind.HARNEX_INTERNAL,
@@ -252,6 +248,22 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         controlPlaneStoreOwner.close()
     }
 
+    private fun externalAuditedRuntimeClient(caller: AuthorizedCaller): LocalLlmClient =
+        InferenceAuditLocalLlmClient(
+            delegate = sharedRuntimeClientFacade,
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            effectivePromptResolver = effectivePromptBridge,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                    verifiedPackageName = caller.packageName,
+                )
+            },
+        )
+
     private fun ensureRuntime() {
         if (runtime != null) return
 
@@ -261,6 +273,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             modelStore = modelStore,
             backend = backend,
             telemetryRepository = telemetryRepository,
+            effectivePromptSink = effectivePromptBridge,
         )
         runtime = orchestrator
         runtimeClient = InProcessLocalLlmClient(orchestrator)
@@ -268,6 +281,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     private fun closeRuntimeLocked() {
         runtime?.close()
+        effectivePromptBridge.clear()
         runtime = null
         runtimeClient = null
     }
