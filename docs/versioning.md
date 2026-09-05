@@ -55,7 +55,7 @@ Android device/version/ABI for physical evidence
 
 The Binder protocol remains independently versioned from host/client packaging. Major incompatibility fails before registration; compatible minor differences negotiate the common feature set. The protocol fixture policy is owned by the shared-runtime contract documentation rather than Semantic Versioning of either APK.
 
-Signing certificate digests are evidence/security identities, not product versions. Independently distributed Host and consumer applications are not required to share a signing identity; authorization follows ADR 0017. Full certificates, private keys and passwords are never release metadata.
+Signing certificate digests are evidence/security identities, not product versions. Independently distributed Host and consumer applications are not required to share a signing identity; authorization follows ADR 0018. Full certificates, private keys and passwords are never release metadata.
 
 ## Integration and release lines
 
