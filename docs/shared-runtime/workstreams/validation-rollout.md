@@ -15,7 +15,7 @@ This workstream does not certify model quality. It consumes exact Qwen3.5 runtim
 
 ## Dependencies
 
-- ADR 0017 independently signed consumer trust boundary.
+- ADR 0018 independently signed consumer trust boundary.
 - SR-1 protocol fixtures.
 - SR-2 host and SR-3 client deterministic tests.
 - SR-4 two-APK vertical slice.
