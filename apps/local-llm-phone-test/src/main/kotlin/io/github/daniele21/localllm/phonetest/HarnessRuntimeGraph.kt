@@ -1,6 +1,10 @@
 package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
+import io.github.daniele21.localllm.audit.InferenceAuditOrigin
+import io.github.daniele21.localllm.audit.InferenceAuditOriginKind
+import io.github.daniele21.localllm.audit.InferenceAuditRepository
+import io.github.daniele21.localllm.audit.room.RoomInferenceAuditRepository
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLimits
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
@@ -11,6 +15,7 @@ import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedConsumerClientFactory
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
@@ -25,6 +30,8 @@ import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
 import io.github.daniele21.localllm.runtime.ConsumerLocalLlmFacade
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistry
+import io.github.daniele21.localllm.runtime.InferenceAuditLocalLlmClient
+import io.github.daniele21.localllm.runtime.InferenceAuditOriginResolver
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
@@ -58,6 +65,10 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             maxResourceSnapshots = MAX_RETAINED_RESOURCE_SNAPSHOTS,
         ),
     )
+    private val inferenceAuditRepositoryOwner = RoomInferenceAuditRepository.open(
+        context = appContext,
+        databaseName = INFERENCE_AUDIT_DATABASE_NAME,
+    )
 
     init {
         HarnessControlPlaneStartup(
@@ -79,6 +90,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         ),
     )
     val telemetryRepository: TelemetryRepository = telemetryRepositoryOwner
+    val inferenceAuditRepository: InferenceAuditRepository = inferenceAuditRepositoryOwner
 
     val loadedModelDigest: ModelDigest?
         get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
@@ -104,7 +116,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
-    val consumerClientFactory: (ApplicationId) -> ConsumerLocalLlmClient = { applicationId ->
+    val consumerClientFactory = AuthorizedConsumerClientFactory { caller ->
+        val applicationId = caller.applicationId
         val policies =
             when (applicationId) {
                 HarnessSharedRuntimeBindings.consoleApplicationId -> {
@@ -152,7 +165,20 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                     fallback = fallbackPolicyRegistry,
                 ),
             )
-        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
+        val auditedRuntimeClient = InferenceAuditLocalLlmClient(
+            delegate = sharedRuntimeClientFacade,
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                    verifiedPackageName = caller.packageName,
+                )
+            },
+        )
+        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, auditedRuntimeClient)
     }
 
     fun installActivationBinding(
@@ -206,6 +232,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             registry.clearActivationBindings()
             registry.selectedModel = null
         }
+        inferenceAuditRepositoryOwner.close()
         telemetryRepositoryOwner.close()
         controlPlaneStoreOwner.close()
     }
@@ -233,6 +260,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     companion object {
         private const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
         private const val TELEMETRY_DATABASE_NAME = "harnex-telemetry.db"
+        private const val INFERENCE_AUDIT_DATABASE_NAME = "harnex-inference-audit.db"
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
