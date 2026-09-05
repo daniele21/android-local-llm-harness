@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HarnessIndependentConsumerAuthorizationInstrumentationTest {
     @Test
-    fun `authorize exact observed consumer identity`() {
+    fun authorizeExactObservedConsumerIdentity() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val arguments = InstrumentationRegistry.getArguments()
