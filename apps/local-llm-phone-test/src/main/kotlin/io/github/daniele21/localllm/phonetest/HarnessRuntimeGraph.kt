@@ -123,7 +123,13 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         get() = sharedRuntimeClientFacade
 
     val legacyRuntimeClientFactory = AuthorizedRuntimeClientFactory { caller ->
-        externalAuditedRuntimeClient(caller)
+        externalAuditedRuntimeClient(
+            caller = caller,
+            delegate = sharedRuntimeClientFacade,
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            effectivePromptBridge = effectivePromptBridge,
+        )
     }
 
     val consumerClientFactory = AuthorizedConsumerClientFactory { caller ->
@@ -175,7 +181,17 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                     fallback = fallbackPolicyRegistry,
                 ),
             )
-        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, externalAuditedRuntimeClient(caller))
+        ConsumerLocalLlmFacade(
+            applicationId,
+            capabilityPolicy,
+            externalAuditedRuntimeClient(
+                caller = caller,
+                delegate = sharedRuntimeClientFacade,
+                auditRepository = inferenceAuditRepository,
+                telemetryRepository = telemetryRepository,
+                effectivePromptBridge = effectivePromptBridge,
+            ),
+        )
     }
 
     fun installActivationBinding(
@@ -248,21 +264,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         controlPlaneStoreOwner.close()
     }
 
-    private fun externalAuditedRuntimeClient(caller: AuthorizedCaller): LocalLlmClient = InferenceAuditLocalLlmClient(
-        delegate = sharedRuntimeClientFacade,
-        auditRepository = inferenceAuditRepository,
-        telemetryRepository = telemetryRepository,
-        effectivePromptResolver = effectivePromptBridge,
-        originResolver = InferenceAuditOriginResolver { request ->
-            InferenceAuditOrigin(
-                kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-                applicationId = request.applicationId,
-                useCaseId = request.useCaseId,
-                verifiedPackageName = caller.packageName,
-            )
-        },
-    )
-
     private fun ensureRuntime() {
         if (runtime != null) return
 
@@ -302,6 +303,27 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         }
     }
 }
+
+private fun externalAuditedRuntimeClient(
+    caller: AuthorizedCaller,
+    delegate: LocalLlmClient,
+    auditRepository: InferenceAuditRepository,
+    telemetryRepository: TelemetryRepository,
+    effectivePromptBridge: OneShotInferenceAuditEffectivePromptBridge,
+): LocalLlmClient = InferenceAuditLocalLlmClient(
+    delegate = delegate,
+    auditRepository = auditRepository,
+    telemetryRepository = telemetryRepository,
+    effectivePromptResolver = effectivePromptBridge,
+    originResolver = InferenceAuditOriginResolver { request ->
+        InferenceAuditOrigin(
+            kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+            applicationId = request.applicationId,
+            useCaseId = request.useCaseId,
+            verifiedPackageName = caller.packageName,
+        )
+    },
+)
 
 internal fun HarnessRuntimeGraph.recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> =
     telemetryRepository.recentRuns(limit)
