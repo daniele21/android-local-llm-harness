@@ -301,12 +301,19 @@ data class InferenceAuditQuery(
     val applicationId: ApplicationId? = null,
     val useCaseId: UseCaseId? = null,
     val statuses: Set<InferenceAuditStatus> = emptySet(),
+    val afterReceivedAtEpochMs: Long? = null,
     val beforeReceivedAtEpochMs: Long? = null,
 ) {
     init {
         require(limit in 1..MAX_AUDIT_QUERY_LIMIT) { "Audit query limit must be in 1..$MAX_AUDIT_QUERY_LIMIT" }
+        require(afterReceivedAtEpochMs == null || afterReceivedAtEpochMs >= 0) {
+            "Audit query lower timestamp must not be negative"
+        }
         require(beforeReceivedAtEpochMs == null || beforeReceivedAtEpochMs >= 0) {
-            "Audit query timestamp must not be negative"
+            "Audit query upper timestamp must not be negative"
+        }
+        require(afterReceivedAtEpochMs == null || beforeReceivedAtEpochMs == null || afterReceivedAtEpochMs <= beforeReceivedAtEpochMs) {
+            "Audit query lower timestamp must not exceed upper timestamp"
         }
     }
 }
