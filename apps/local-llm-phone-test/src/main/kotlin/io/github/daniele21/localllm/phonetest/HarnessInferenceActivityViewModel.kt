@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.daniele21.localllm.audit.InferenceAuditFailureCode
 import io.github.daniele21.localllm.audit.InferenceAuditResult
+import io.github.daniele21.localllm.audit.InferenceAuditStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,9 @@ import java.util.concurrent.atomic.AtomicLong
 internal data class HarnessInferenceActivityState(
     val loading: Boolean = true,
     val items: List<InferenceActivityListItem> = emptyList(),
+    val filter: InferenceActivityFilter = InferenceActivityFilter(),
+    val filterOptions: InferenceActivityFilterOptions = InferenceActivityFilterOptions(),
+    val hasTerminalHistory: Boolean = false,
     val listErrorCode: InferenceAuditFailureCode? = null,
     val selectedRequestId: String? = null,
     val detailLoading: Boolean = false,
@@ -51,19 +55,43 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
             )
             return
         }
+        val filter = mutableState.value.filter
         val token = generation.incrementAndGet()
         mutableState.value = mutableState.value.copy(loading = true, listErrorCode = null, feedback = null)
         viewModelScope.launch(Dispatchers.IO) {
-            val snapshot = runCatching(attached::snapshot).getOrElse {
+            val snapshot = runCatching { attached.snapshot(filter = filter) }.getOrElse {
                 InferenceActivityUiState(errorCode = InferenceAuditFailureCode.STORAGE_FAILURE)
             }
             if (!isCurrent(token, attached)) return@launch
             mutableState.value = mutableState.value.copy(
                 loading = false,
                 items = snapshot.items,
+                filterOptions = snapshot.filterOptions,
+                hasTerminalHistory = snapshot.hasTerminalHistory,
                 listErrorCode = snapshot.errorCode,
             )
         }
+    }
+
+    fun selectApplication(applicationId: String?) {
+        val current = mutableState.value.filter
+        val updated = current.copy(
+            applicationId = applicationId,
+            useCaseId = if (applicationId == current.applicationId) current.useCaseId else null,
+        )
+        updateFilter(updated)
+    }
+
+    fun selectStatus(status: InferenceAuditStatus?) {
+        updateFilter(mutableState.value.filter.copy(status = status))
+    }
+
+    fun selectPeriod(period: InferenceActivityPeriod) {
+        updateFilter(mutableState.value.filter.copy(period = period))
+    }
+
+    fun selectUseCase(useCaseId: String?) {
+        updateFilter(mutableState.value.filter.copy(useCaseId = useCaseId))
     }
 
     fun openDetail(requestId: String) {
@@ -99,6 +127,7 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
 
     fun clearTerminalHistory() {
         val attached = source ?: return
+        val filter = mutableState.value.filter
         val token = generation.incrementAndGet()
         mutableState.value = mutableState.value.copy(mutationInProgress = true, feedback = null)
         viewModelScope.launch(Dispatchers.IO) {
@@ -106,7 +135,7 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
                 InferenceAuditResult.Failure(InferenceAuditFailureCode.STORAGE_FAILURE)
             }
             val snapshot = if (result is InferenceAuditResult.Success) {
-                runCatching(attached::snapshot).getOrElse {
+                runCatching { attached.snapshot(filter = filter) }.getOrElse {
                     InferenceActivityUiState(errorCode = InferenceAuditFailureCode.STORAGE_FAILURE)
                 }
             } else {
@@ -117,6 +146,8 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
                 is InferenceAuditResult.Success -> mutableState.value.copy(
                     loading = false,
                     items = snapshot?.items.orEmpty(),
+                    filterOptions = snapshot?.filterOptions ?: InferenceActivityFilterOptions(),
+                    hasTerminalHistory = snapshot?.hasTerminalHistory == true,
                     listErrorCode = snapshot?.errorCode,
                     mutationInProgress = false,
                     selectedRequestId = null,
@@ -135,6 +166,12 @@ internal class HarnessInferenceActivityViewModel : ViewModel() {
 
     fun clearFeedback() {
         mutableState.value = mutableState.value.copy(feedback = null)
+    }
+
+    private fun updateFilter(filter: InferenceActivityFilter) {
+        if (mutableState.value.filter == filter) return
+        mutableState.value = mutableState.value.copy(filter = filter, feedback = null)
+        refresh()
     }
 
     private fun isCurrent(token: Long, attached: HarnessInferenceActivitySource): Boolean = generation.get() == token && source === attached
