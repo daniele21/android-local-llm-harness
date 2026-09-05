@@ -96,11 +96,7 @@ private fun InferenceActivityClearDialog(visible: Boolean, onConfirm: () -> Unit
 }
 
 @Composable
-private fun InferenceActivityUnavailable(
-    state: HarnessInferenceActivityState,
-    onRefresh: () -> Unit,
-    modifier: Modifier,
-) {
+private fun InferenceActivityUnavailable(state: HarnessInferenceActivityState, onRefresh: () -> Unit, modifier: Modifier) {
     Column(modifier = modifier.fillMaxSize()) {
         HarnessErrorState(
             title = "Inference activity unavailable",
@@ -161,11 +157,7 @@ private fun InferenceActivityList(
 }
 
 @Composable
-private fun InferenceActivityListHeader(
-    state: HarnessInferenceActivityState,
-    onRefresh: () -> Unit,
-    onRequestClear: () -> Unit,
-) {
+private fun InferenceActivityListHeader(state: HarnessInferenceActivityState, onRefresh: () -> Unit, onRequestClear: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(LocalHarnessSpacing.current.small)) {
         Text("Activity", style = MaterialTheme.typography.headlineSmall)
         Text(
@@ -285,11 +277,7 @@ private fun InferenceActivityRow(item: InferenceActivityListItem, onOpenDetail: 
 }
 
 @Composable
-private fun InferenceActivityDetailContent(
-    detail: InferenceActivityDetail,
-    onOpenTechnicalTimeline: () -> Unit,
-    modifier: Modifier,
-) {
+private fun InferenceActivityDetailContent(detail: InferenceActivityDetail, onOpenTechnicalTimeline: () -> Unit, modifier: Modifier) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("inference-activity-detail"),
         contentPadding = PaddingValues(LocalHarnessSpacing.current.large),
