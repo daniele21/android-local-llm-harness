@@ -280,8 +280,7 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         HarnessControlPlaneReconciliationResult.Conflict(code = code, identity = identity)
 }
 
-internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String =
-    "seed-${applicationId.value}-$useCaseId"
+internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "seed-${applicationId.value}-$useCaseId"
 
 internal fun builtInOmbraUseCase() = UseCaseDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
