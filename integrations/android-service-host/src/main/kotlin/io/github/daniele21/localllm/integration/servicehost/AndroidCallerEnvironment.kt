@@ -54,6 +54,5 @@ class AndroidCallerEnvironment(context: Context) : CallerEnvironment {
         emptyList()
     }
 
-    private fun sha256(signature: Signature): ByteArray =
-        MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
+    private fun sha256(signature: Signature): ByteArray = MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
 }
