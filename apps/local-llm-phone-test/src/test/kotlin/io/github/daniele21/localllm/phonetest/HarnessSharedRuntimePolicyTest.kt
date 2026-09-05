@@ -35,9 +35,37 @@ class HarnessSharedRuntimePolicyTest {
             requirement.acceptedPackageNames,
         )
         assertEquals(setOf(SIGNER_A, SIGNER_B), requirement.acceptedSignerSha256)
+        assertEquals(
+            mapOf(
+                "io.github.daniele21.redactguard" to setOf(SIGNER_A),
+                "io.github.daniele21.redactguard.debug" to setOf(SIGNER_B),
+            ),
+            requirement.acceptedSignerSha256ByPackage,
+        )
         assertEquals("RedactGuard", requirement.displayName)
         assertEquals(ApplicationRegistrationState.PENDING, requirement.initialState)
         assertTrue(requirement.allowObservedSignerChange)
+    }
+
+    @Test
+    fun ombraSpecRejectsSignerFromDifferentPackageAlias() {
+        val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
+        val requirement = HarnessSharedRuntimePolicy
+            .builtInOmbraControlPlaneSpec(
+                listOf(
+                    policy("io.github.daniele21.redactguard", applicationId, SIGNER_A),
+                    policy("io.github.daniele21.redactguard.debug", applicationId, SIGNER_B),
+                ),
+            ).applications
+            .single()
+
+        val mismatched = registration("io.github.daniele21.redactguard", applicationId, SIGNER_B)
+        assertFalse(requirement.accepts(mismatched))
+
+        val reconciled = requireNotNull(requirement.identityChange(mismatched, observedAtEpochMs = 3))
+        assertEquals("io.github.daniele21.redactguard", reconciled.packageName)
+        assertEquals(SIGNER_A, reconciled.signerSha256)
+        assertEquals(ApplicationRegistrationState.SIGNATURE_CHANGED, reconciled.state)
     }
 
     @Test
@@ -133,6 +161,16 @@ class HarnessSharedRuntimePolicyTest {
         applicationId = applicationId,
         allowedUseCases = setOf(HarnessSharedRuntimeBindings.ombraUseCaseId),
         acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(signer)),
+    )
+
+    private fun registration(packageName: String, applicationId: ApplicationId, signer: String) = RegisteredApplication(
+        applicationId = applicationId,
+        packageName = packageName,
+        signerSha256 = signer,
+        displayName = "RedactGuard",
+        state = ApplicationRegistrationState.PENDING,
+        firstSeenAtEpochMs = 1,
+        lastSeenAtEpochMs = 2,
     )
 
     private companion object {
