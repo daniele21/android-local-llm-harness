@@ -2,8 +2,6 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import android.content.Context
 import android.os.IBinder
-import io.github.daniele21.localllm.contracts.ApplicationId
-import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.transport.binder.contract.BinderProtocolV1
 import io.github.daniele21.localllm.transport.binder.contract.ProtocolInfoParcel
@@ -14,13 +12,12 @@ class SharedRuntimeHostComposition(
     permissionName: String,
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
-    consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
-    authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
+    consumerClientFactory: AuthorizedConsumerClientFactory? = null,
     consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
     consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
     policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
 ) : AutoCloseable {
-    private val consumerApiEnabled = consumerClientFactory != null || authorizedConsumerClientFactory != null
+    private val consumerApiEnabled = consumerClientFactory != null
     private val delegate = SharedRuntimeHostDelegate(
         client = client,
         protocolInfo = hostProtocolInfo(
@@ -30,7 +27,6 @@ class SharedRuntimeHostComposition(
             consumerRuntimeReadinessEnabled = consumerRuntimeReadinessHost != null,
         ),
         consumerClientFactory = consumerClientFactory,
-        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         logicalJobMetadataStore = AndroidHostLogicalJobMetadataStore(context.applicationContext),
