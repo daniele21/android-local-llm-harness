@@ -380,7 +380,9 @@ private fun InferenceAuditStatus.displayLabel(): String = name.replace('_', ' ')
 
 private fun InferenceAuditStatus.tone(): HarnessStatusTone = when (this) {
     InferenceAuditStatus.COMPLETED -> HarnessStatusTone.SUCCESS
+
     InferenceAuditStatus.FAILED -> HarnessStatusTone.ERROR
+
     InferenceAuditStatus.CANCELLED,
     InferenceAuditStatus.INTERRUPTED,
     -> HarnessStatusTone.WARNING
