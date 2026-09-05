@@ -1,6 +1,5 @@
 package io.github.daniele21.localllm.integration.servicehost
 
-import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.transport.binder.contract.CancelRequestParcel
@@ -33,8 +32,7 @@ private class SharedRuntimeHostInfrastructure(
 class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
-    private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
-    private val authorizedConsumerClientFactory: AuthorizedConsumerClientFactory?,
+    private val consumerClientFactory: AuthorizedConsumerClientFactory?,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
     infrastructure: SharedRuntimeHostInfrastructure,
@@ -43,8 +41,7 @@ class SharedRuntimeHostDelegate private constructor(
     constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
-        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)? = null,
-        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
+        consumerClientFactory: AuthorizedConsumerClientFactory? = null,
         consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
         ledger: ClientConnectionLedger = ClientConnectionLedger(),
@@ -56,7 +53,6 @@ class SharedRuntimeHostDelegate private constructor(
         client = client,
         protocolInfo = protocolInfo,
         consumerClientFactory = consumerClientFactory,
-        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -72,16 +68,14 @@ class SharedRuntimeHostDelegate private constructor(
     internal constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
-        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+        consumerClientFactory: AuthorizedConsumerClientFactory?,
         consumerControlPlaneHost: ConsumerControlPlaneHost?,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
         logicalJobMetadataStore: HostLogicalJobMetadataStore,
-        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory? = null,
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
         consumerClientFactory = consumerClientFactory,
-        authorizedConsumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -93,12 +87,6 @@ class SharedRuntimeHostDelegate private constructor(
         ),
         logicalJobMetadataStore = logicalJobMetadataStore,
     )
-
-    init {
-        require(consumerClientFactory == null || authorizedConsumerClientFactory == null) {
-            "Configure either legacy or authorized consumer factory, not both"
-        }
-    }
 
     private val ledger = infrastructure.ledger
     private val controlExecutor = infrastructure.controlExecutor
@@ -230,7 +218,7 @@ class SharedRuntimeHostDelegate private constructor(
         }
         resources.attachCallbackDispatcher(token, dispatcher)
         val consumer = createConsumerClient(caller)
-        if ((consumerClientFactory != null || authorizedConsumerClientFactory != null) && consumer == null) {
+        if (consumerClientFactory != null && consumer == null) {
             cleanupConnection(token, caller)
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
             return
@@ -253,16 +241,10 @@ class SharedRuntimeHostDelegate private constructor(
         }
     }
 
-    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? {
-        val authorizedFactory = authorizedConsumerClientFactory
-        if (authorizedFactory != null) {
-            return runCatching { authorizedFactory.create(caller) }.getOrNull()
+    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? =
+        consumerClientFactory?.let { factory ->
+            runCatching { factory.create(caller) }.getOrNull()
         }
-        val legacyFactory = consumerClientFactory
-        return legacyFactory?.let { factory ->
-            runCatching { factory(caller.applicationId) }.getOrNull()
-        }
-    }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {
         val closing = ledger.beginClose(token, caller).successOrNull() ?: return
