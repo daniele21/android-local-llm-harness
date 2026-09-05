@@ -191,10 +191,7 @@ private data class PromptBridgeModelHandle(
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 
-private data class PromptBridgeContextHandle(
-    override val model: BackendModelHandle,
-    override val contextSize: Int,
-) : BackendContextHandle
+private data class PromptBridgeContextHandle(override val model: BackendModelHandle, override val contextSize: Int) : BackendContextHandle
 
 private class PromptBridgeInferenceBackend : InferenceBackend {
     override val id: String = "prompt-bridge-fake"
