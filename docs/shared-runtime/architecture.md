@@ -89,7 +89,7 @@ The host captures `Binder.getCallingUid()` before dispatching work away from the
 
 ## Authorization model
 
-ADR 0017 supersedes the same-signer/exported-permission portion of ADR 0012. Inference access now has two deliberately different layers:
+ADR 0018 supersedes the same-signer/exported-permission portion of ADR 0012. Inference access now has two deliberately different layers:
 
 - a variant-specific manifest `BIND_LOCAL_LLM` permission with `normal` protection level, used only as an explicit capability opt-in for binding;
 - service-level Binder UID -> exact package -> installed signer verification projected through Harnex Control Plane authorization and enabled use-case bindings.
