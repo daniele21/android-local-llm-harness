@@ -1,11 +1,11 @@
 [versions]
-agp = "9.3.1"
+agp = "9.4.0"
 compileSdk = "36"
 minSdk = "26"
 targetSdk = "36"
 buildTools = "36.0.0"
 ndk = "28.2.13676358"
-spotless = "8.9.0"
+spotless = "8.10.1"
 detekt = "1.23.8"
 junit4 = "4.13.2"
 androidxTestCore = "1.7.0"
