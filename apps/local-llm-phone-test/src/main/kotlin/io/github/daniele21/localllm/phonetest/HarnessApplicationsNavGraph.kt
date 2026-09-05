@@ -4,7 +4,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import io.github.daniele21.localllm.models.PresetGenerationOverrides
 
-internal fun NavGraphBuilder.installHarnessApplicationsGraph(
+internal fun NavGraphBuilder.installHarnessApplicationsFeatureGraph(
     navController: NavHostController,
     state: HarnessApplicationsReadState,
     mutationState: HarnessApplicationsMutationState,
@@ -34,5 +34,4 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     installNewPresetRoute(navController, state, mutationState, callbacks)
     installTechnicalDetailsRoute(state, callbacks)
     installNewApplicationConnectionRoute(navController, state, mutationState, callbacks)
-    installHarnessInferenceActivityGraph(navController)
 }
