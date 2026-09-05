@@ -2,6 +2,7 @@ package io.github.daniele21.localllm.integration.servicehost
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.os.Build
 import java.security.MessageDigest
 
@@ -27,24 +28,31 @@ class AndroidCallerEnvironment(context: Context) : CallerEnvironment {
 
     override fun packagesForUid(uid: Int): List<String> = packageManager.getPackagesForUid(uid)?.toList().orEmpty()
 
+    /**
+     * Matches only certificates signing the currently installed APK. Do not use PackageManager.hasSigningCertificate
+     * here: that API may accept historical signing-lineage certificates, while independent-consumer authorization
+     * is pinned to the exact current signer observed and approved by the Harnex Control Plane.
+     */
     override fun hasSigningCertificate(packageName: String, certificate: SigningCertificateSha256): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageManager.hasSigningCertificate(
-                packageName,
-                certificate.bytes,
-                PackageManager.CERT_INPUT_SHA256,
-            )
-        } else {
-            hasLegacySigningCertificate(packageName, certificate)
+        currentSigningCertificates(packageName).any { signature ->
+            sha256(signature).contentEquals(certificate.bytes)
         }
 
     @Suppress("DEPRECATION")
-    private fun hasLegacySigningCertificate(packageName: String, certificate: SigningCertificateSha256): Boolean = try {
-        val signatures = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures.orEmpty()
-        signatures.any { signature ->
-            MessageDigest.getInstance("SHA-256").digest(signature.toByteArray()).contentEquals(certificate.bytes)
+    private fun currentSigningCertificates(packageName: String): List<Signature> = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val packageInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            requireNotNull(packageInfo.signingInfo) { "Package signing information is unavailable" }
+                .apkContentsSigners
+                .orEmpty()
+                .toList()
+        } else {
+            packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures.orEmpty().toList()
         }
     } catch (_: PackageManager.NameNotFoundException) {
-        false
+        emptyList()
     }
+
+    private fun sha256(signature: Signature): ByteArray =
+        MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
 }
