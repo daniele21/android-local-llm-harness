@@ -1,6 +1,6 @@
 # ADR 0012: Same-signer bound-service shared runtime
 
-- Status: Accepted
+- Status: Accepted; trust and exported-service permission portions superseded by ADR 0017
 - Date: 2026-08-11
 
 ## Context
@@ -15,11 +15,13 @@ Android IPC also introduces a security boundary that does not exist in the embed
 
 ### Trust boundary
 
-V1 supports only host and client APKs controlled by the same publisher and signed by an accepted signing lineage.
+This subsection records the original v1 decision. ADR 0017 supersedes the same-signer requirement and signature-level inference permission while retaining Binder-derived caller verification and Host-owned authorization.
 
-The exported host service is protected by a signature-level permission and also revalidates the calling UID, resolved package and accepted signing lineage inside the service before authorizing any operation. A Binder token is scoped to the authenticated connection but never replaces per-call caller verification.
+V1 originally supported only host and client APKs controlled by the same publisher and signed by an accepted signing lineage.
 
-Arbitrary third-party publishers, user-granted runtime permission and implicit trust based on package name are out of scope for v1. Supporting them requires a new security and product ADR.
+The exported host service was protected by a signature-level permission and also revalidated the calling UID, resolved package and accepted signing lineage inside the service before authorizing any operation. A Binder token was scoped to the authenticated connection but never replaced per-call caller verification.
+
+Arbitrary third-party publishers, user-granted runtime permission and implicit trust based on package name were out of scope for the original v1. ADR 0017 now permits independently signed consumers through a normal bind-capability permission plus exact Binder UID/package/signer verification and explicit Harnex Control Plane authorization.
 
 ### Host identity and proof application
 
@@ -34,6 +36,8 @@ V1 uses an explicitly bound service. It is not a generic background-generation o
 Client death, lifecycle Binder death, explicit unbind or unregister cancels caller-owned queued/running work and closes caller-owned sessions through idempotent cleanup. Host process death is surfaced as disconnection; requests and sessions are not automatically replayed after reconnect.
 
 The existing runtime residency policy remains authoritative while the host process is alive. Binder connection lifetime must not silently redefine model residency.
+
+ADR 0016 later supersedes these connection-lifetime semantics for explicit durable logical jobs only.
 
 ### Public API ownership
 
@@ -104,11 +108,11 @@ Modules are created only with their first implementation and tests. `settings.gr
 ## Consequences
 
 - The embedded and shared deployments reuse the same runtime semantics instead of maintaining two inference engines.
-- Same-signer distribution makes the first security model intentionally narrow and reviewable.
+- The original same-signer distribution made the first security model intentionally narrow and reviewable; ADR 0017 supersedes that distribution constraint.
 - Host-owned identity and model selection prevent clients from escalating model/storage authority through IPC.
 - Core contracts remain portable and testable without Android transport dependencies.
 - AIDL can evolve under an explicit protocol compatibility policy without forcing core domain objects to become wire ABI.
-- Bound-only lifecycle gives deterministic cleanup and avoids an accidental background-compute product.
+- Bound-only lifecycle gives deterministic cleanup for ordinary connection-scoped work and avoids an accidental background-compute product.
 - The proof host can change later without invalidating the protocol/client architecture.
 - Cross-app diagnostics can evolve independently with a stricter read/control permission model.
 
@@ -124,7 +128,7 @@ Rejected because it would leak Android transport mechanics into applications, ma
 
 ### Run generation as a persistent foreground/background service in v1
 
-Rejected because it changes lifecycle, user-visible execution policy and process-death semantics beyond the current product goal. V1 is bound-only.
+Rejected because it changes lifecycle, user-visible execution policy and process-death semantics beyond the current product goal. ADR 0016 later adds explicit durable jobs without authorizing an always-on service.
 
 ### Put the service in a dedicated `:llm` process immediately
 
@@ -136,4 +140,4 @@ Rejected because inference callers do not automatically need control-plane visib
 
 ## Implementation gate
 
-With this ADR accepted, SR-0 is complete and SR-1 may create `transports/android-binder-contract` with the first AIDL/DTO implementation and tests. Any change to trust, exported-component protection, background lifetime, process deployment, public SDK ownership, model authority, diagnostics separation or protocol versioning requires this ADR (or a successor ADR) to be reviewed before dependent implementation changes.
+SR-0 established the initial Binder boundary. Changes to trust, exported-component protection, background lifetime, process deployment, public SDK ownership, model authority, diagnostics separation or protocol versioning require this ADR or a successor ADR to be reviewed before dependent implementation changes. ADR 0017 is the authoritative successor for independently signed consumer trust and inference binding permission.

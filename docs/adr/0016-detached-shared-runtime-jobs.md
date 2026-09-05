@@ -8,7 +8,7 @@
 
 ADR 0012 deliberately chose a bound-only v1 shared runtime: Binder client death, explicit unbind or unregister cancels caller-owned work and closes caller-owned sessions. That made initial cleanup deterministic, but it couples transport lifetime to inference lifetime. A consumer moving to the background, losing its Binder connection, recreating UI, or being killed by Android can therefore terminate otherwise-valid local inference. The host can also discard a resident model because demand was inferred from connection lifetime rather than semantic work and residency policy.
 
-The current product requires a stronger lifecycle contract. User-visible inference must continue independently from Activity/Compose lifecycle and transient Binder connectivity, while preserving same-signer authorization, host-owned model authority, bounded resources, explicit cancellation, privacy-safe evidence and Android background-execution rules.
+The current product requires a stronger lifecycle contract. User-visible inference must continue independently from Activity/Compose lifecycle and transient Binder connectivity, while preserving exact caller authorization defined by ADR 0017, host-owned model authority, bounded resources, explicit cancellation, privacy-safe evidence and Android background-execution rules.
 
 ADR 0015 already establishes the complementary ownership rule: product activation/residency is distinct from Binder connection/session lifetime. This ADR changes lifecycle only for an explicit durable-job capability; ordinary connection-scoped prepare/session/generate calls keep ADR 0012 cleanup semantics.
 
@@ -86,7 +86,7 @@ For RedactGuard, the application owns an `AnalysisJobId` for the document-analys
 
 ### Security boundary retained
 
-ADR 0012 remains authoritative for same-signer trust, signature permission, per-call caller verification, host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
+ADR 0017 is authoritative for Binder UID/package/signer verification, independently signed consumer authorization, the `BIND_LOCAL_LLM` capability permission and signing-identity reauthorization. ADR 0012 remains authoritative for the non-superseded Host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
 
 ## Failure semantics
 
@@ -151,8 +151,8 @@ Deterministic two-APK emulator evidence must cover:
 6. model conflict and critical-memory fault injection remain fail-closed;
 7. persisted metadata/logs contain no prompt, document or generated-output content.
 
-Representative same-signer ARM64/JNI/GGUF model residency, OEM process policy and thermal/resource behavior remain REAL_ENVIRONMENT evidence.
+Representative independently signed distribution evidence is required when a claim depends on cross-publisher authorization. ARM64/JNI/GGUF model residency, OEM process policy and thermal/resource behavior remain separate REAL_ENVIRONMENT evidence.
 
 ## Implementation gate
 
-Implementation proceeds in vertical slices: logical job/state primitives and tests; host registry/idempotency; Binder protocol + Consumer SDK query/observe/cancel; transport-death cleanup separation; started/bound host execution; RedactGuard reconciliation; emulator fault-injection E2E with screenshot artifacts; then representative same-signer two-APK + real-GGUF evidence. Shared-contract, Binder, persistence, service/manifest and packaging changes require STRONG validation.
+Implementation proceeds in vertical slices: logical job/state primitives and tests; host registry/idempotency; Binder protocol + Consumer SDK query/observe/cancel; transport-death cleanup separation; started/bound host execution; RedactGuard reconciliation; emulator fault-injection E2E with screenshot artifacts; then representative independently signed two-APK + real-GGUF evidence where the release claim requires it. Shared-contract, Binder, persistence, service/manifest and packaging changes require STRONG validation.
