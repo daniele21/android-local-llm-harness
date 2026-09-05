@@ -248,21 +248,20 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         controlPlaneStoreOwner.close()
     }
 
-    private fun externalAuditedRuntimeClient(caller: AuthorizedCaller): LocalLlmClient =
-        InferenceAuditLocalLlmClient(
-            delegate = sharedRuntimeClientFacade,
-            auditRepository = inferenceAuditRepository,
-            telemetryRepository = telemetryRepository,
-            effectivePromptResolver = effectivePromptBridge,
-            originResolver = InferenceAuditOriginResolver { request ->
-                InferenceAuditOrigin(
-                    kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
-                    applicationId = request.applicationId,
-                    useCaseId = request.useCaseId,
-                    verifiedPackageName = caller.packageName,
-                )
-            },
-        )
+    private fun externalAuditedRuntimeClient(caller: AuthorizedCaller): LocalLlmClient = InferenceAuditLocalLlmClient(
+        delegate = sharedRuntimeClientFacade,
+        auditRepository = inferenceAuditRepository,
+        telemetryRepository = telemetryRepository,
+        effectivePromptResolver = effectivePromptBridge,
+        originResolver = InferenceAuditOriginResolver { request ->
+            InferenceAuditOrigin(
+                kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+                applicationId = request.applicationId,
+                useCaseId = request.useCaseId,
+                verifiedPackageName = caller.packageName,
+            )
+        },
+    )
 
     private fun ensureRuntime() {
         if (runtime != null) return
