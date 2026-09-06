@@ -271,16 +271,23 @@ internal object HarnessUiReducer {
             modelRecoveryConfirmation = null,
         )
 
-        is HarnessUiEvent.ModelChanged -> state.copy(
-            importedModel = event.model,
-            modelInventory = HarnessModelInventoryReconciler.reconcile(
-                distribution = state.modelDistribution,
-                selectedModel = event.model,
-                loadedDigest = state.modelInventory.loadedDigest,
-            ),
-            removalConfirmationPending = false,
-            modelRecoveryConfirmation = null,
-        )
+        is HarnessUiEvent.ModelChanged -> {
+            val updated = state.copy(
+                importedModel = event.model,
+                modelInventory = HarnessModelInventoryReconciler.reconcile(
+                    distribution = state.modelDistribution,
+                    selectedModel = event.model,
+                    loadedDigest = state.modelInventory.loadedDigest,
+                ),
+                removalConfirmationPending = false,
+                modelRecoveryConfirmation = null,
+            )
+            if (updated.playgroundPreset.isNotBlank()) {
+                updated.applyPreset(updated.playgroundPreset)
+            } else {
+                updated
+            }
+        }
 
         is HarnessUiEvent.LoadedModelChanged -> state.copy(
             modelInventory = HarnessModelInventoryReconciler.reconcile(
@@ -339,10 +346,8 @@ internal object HarnessUiReducer {
         return Qwen35GenerationProfiles.forTier(tier).single { it.id == profileId }.defaults
     }
 
-    private fun qwen35Tier(model: ImportedPhoneModel): Qwen35ModelTier {
-        val stableId = Qwen35PhoneModelPolicy.requireCurated(model).id.modelId.value
-        return if (stableId.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
-    }
+    private fun qwen35Tier(model: ImportedPhoneModel): Qwen35ModelTier =
+        Qwen35PhoneModelPolicy.tierFor(Qwen35PhoneModelPolicy.requireCurated(model))
 
     private fun Float.toControlValue(): String = toString().removeSuffix(".0")
 

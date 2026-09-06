@@ -44,7 +44,7 @@ class HarnessModelsCatalogPresentationTest {
 
         assertEquals("INSTALLED", modelCardStatusLabel(installed, loading = false))
         assertEquals("SELECTED", modelCardStatusLabel(selected, loading = false))
-        assertEquals("LOADED", modelCardStatusLabel(loaded, loading = false))
+        assertEquals("IN MEMORY", modelCardStatusLabel(loaded, loading = false))
         assertEquals("LOADING", modelCardStatusLabel(installed, loading = true))
     }
 

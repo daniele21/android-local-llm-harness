@@ -22,10 +22,12 @@ internal object Qwen35PhoneModelPolicy {
 
     fun tierFor(release: CatalogModelRelease): Qwen35ModelTier {
         requireSupported(release)
-        return if (release.id.modelId.value.startsWith(QWEN35_08B_MODEL_PREFIX)) {
-            Qwen35ModelTier.B0_8
-        } else {
-            Qwen35ModelTier.B2
+        val modelId = release.id.modelId.value
+        return when {
+            modelId.startsWith(QWEN35_08B_MODEL_PREFIX) -> Qwen35ModelTier.B0_8
+            modelId.startsWith(QWEN35_2B_MODEL_PREFIX) -> Qwen35ModelTier.B2
+            modelId.startsWith(QWEN35_4B_MODEL_PREFIX) -> Qwen35ModelTier.B4
+            else -> error("Unsupported curated Qwen3.5 model tier: $modelId")
         }
     }
 
@@ -37,4 +39,6 @@ internal object Qwen35PhoneModelPolicy {
 
     private const val QWEN35_ARCHITECTURE = "qwen35"
     private const val QWEN35_08B_MODEL_PREFIX = "qwen35-08b-"
+    private const val QWEN35_2B_MODEL_PREFIX = "qwen35-2b-"
+    private const val QWEN35_4B_MODEL_PREFIX = "qwen35-4b-"
 }

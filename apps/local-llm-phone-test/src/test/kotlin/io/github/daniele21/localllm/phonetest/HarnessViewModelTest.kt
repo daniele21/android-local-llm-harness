@@ -29,6 +29,37 @@ class HarnessViewModelTest {
     }
 
     @Test
+    fun selectingFourBReappliesActivePresetWithUnslothDefaults() {
+        val viewModel = HarnessViewModel()
+        viewModel.updatePlaygroundPreset("qwen35-text-quality")
+
+        viewModel.dispatch(HarnessUiEvent.ModelChanged(fourBitFourBModel()))
+
+        assertEquals("qwen35-text-quality", viewModel.uiState.value.playgroundPreset)
+        assertEquals("1", viewModel.uiState.value.playgroundTemperature)
+        assertEquals("0.95", viewModel.uiState.value.playgroundTopP)
+        assertEquals("20", viewModel.uiState.value.playgroundTopK)
+        assertEquals("0", viewModel.uiState.value.playgroundMinP)
+        assertEquals("1.5", viewModel.uiState.value.playgroundPresencePenalty)
+        assertEquals("1", viewModel.uiState.value.playgroundRepeatPenalty)
+    }
+
+    @Test
+    fun selectingFourBDoesNotOverwriteManualSamplingOverrides() {
+        val viewModel = HarnessViewModel()
+        viewModel.updatePlaygroundPreset("qwen35-text-fast")
+        viewModel.updatePlaygroundTemperature("0.3")
+        viewModel.updatePlaygroundTopP("0.6")
+
+        viewModel.dispatch(HarnessUiEvent.ModelChanged(fourBitFourBModel()))
+
+        assertEquals("", viewModel.uiState.value.playgroundPreset)
+        assertEquals("qwen35-text-fast", viewModel.uiState.value.playgroundBasePreset)
+        assertEquals("0.3", viewModel.uiState.value.playgroundTemperature)
+        assertEquals("0.6", viewModel.uiState.value.playgroundTopP)
+    }
+
+    @Test
     fun distributionUpdatesOperationStatusAndBusyState() {
         val viewModel = HarnessViewModel()
         val distribution = PhoneModelDistributionState(
@@ -271,8 +302,12 @@ class HarnessViewModelTest {
         assertEquals("96", viewModel.uiState.value.playgroundRepeatLastN)
     }
 
-    private fun testModel(): ImportedPhoneModel {
-        val artifact = CuratedModelCatalog.releases.first().artifact
+    private fun testModel(): ImportedPhoneModel = importedModel(CuratedModelCatalog.releases.first().id.modelId.value)
+
+    private fun fourBitFourBModel(): ImportedPhoneModel = importedModel("qwen35-4b-ud-q4-k-xl")
+
+    private fun importedModel(modelId: String): ImportedPhoneModel {
+        val artifact = CuratedModelCatalog.releases.single { it.id.modelId.value == modelId }.artifact
         return ImportedPhoneModel(
             digest = artifact.digest,
             fileName = artifact.fileName,

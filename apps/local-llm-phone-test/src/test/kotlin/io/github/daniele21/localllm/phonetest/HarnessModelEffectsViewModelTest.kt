@@ -1,6 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
-import io.github.daniele21.localllm.contracts.ModelDigest
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -10,7 +10,7 @@ import org.junit.Test
 class HarnessModelEffectsViewModelTest {
     @Test
     fun attachingEffectsPublishesDistributionSelectionAndRuntimeOwnership() {
-        val selected = testModel("1")
+        val selected = testModel(0)
         val distribution = PhoneModelDistributionState(message = "catalog ready")
         val effects = FakeModelEffects(
             current = ModelEffectsSnapshot(
@@ -53,7 +53,7 @@ class HarnessModelEffectsViewModelTest {
 
     @Test
     fun selectedModelCommandsRespectBusyState() {
-        val selected = testModel("2")
+        val selected = testModel(1)
         val effects = FakeModelEffects()
         val viewModel = HarnessViewModel(
             HarnessUiState(importedModel = selected, controllerBusy = true),
@@ -67,7 +67,7 @@ class HarnessModelEffectsViewModelTest {
 
     @Test
     fun selectedRemovalRequiresConfirmationAndClearsItWhenAccepted() {
-        val selected = testModel("3")
+        val selected = testModel(2)
         val effects = FakeModelEffects(
             current = ModelEffectsSnapshot(
                 distribution = PhoneModelDistributionState(),
@@ -87,8 +87,8 @@ class HarnessModelEffectsViewModelTest {
 
     @Test
     fun installedSelectionAndSelectedVerificationDelegate() {
-        val selected = testModel("4")
-        val metadata = testMetadata("5")
+        val selected = testModel(3)
+        val metadata = testMetadata(4)
         val effects = FakeModelEffects(
             current = ModelEffectsSnapshot(
                 distribution = PhoneModelDistributionState(),
@@ -136,8 +136,8 @@ class HarnessModelEffectsViewModelTest {
 
     @Test
     fun knownMismatchCanAdoptLoadedCatalogSelectionWithoutConfirmation() {
-        val loadedMetadata = testMetadata("6")
-        val selectedMetadata = testMetadata("8")
+        val loadedMetadata = testMetadata(5)
+        val selectedMetadata = testMetadata(6)
         val distribution = PhoneModelDistributionState(
             models = listOf(
                 catalogModel("loaded-release", loadedMetadata),
@@ -147,7 +147,7 @@ class HarnessModelEffectsViewModelTest {
         val effects = FakeModelEffects(
             current = ModelEffectsSnapshot(
                 distribution = distribution,
-                selectedModel = testModel("8"),
+                selectedModel = testModel(6),
                 loadedDigest = loadedMetadata.digest.sha256,
             ),
         )
@@ -207,28 +207,16 @@ class HarnessModelEffectsViewModelTest {
         assertFalse(viewModel.models.executeCatalog(ModelCatalogCommand.Download("release")))
     }
 
-    private fun testModel(seed: String): ImportedPhoneModel = ImportedPhoneModel(
-        digest = ModelDigest(seed.repeat(64)),
-        fileName = "model-$seed.gguf",
-        sizeBytes = 1_024L,
-        architecture = "qwen35",
-        quantization = "Q4_K_M",
-    )
+    private fun testModel(index: Int): ImportedPhoneModel = testMetadata(index).asImportedPhoneModel()
 
-    private fun testMetadata(seed: String): InstalledCatalogModelMetadata = InstalledCatalogModelMetadata(
-        digest = ModelDigest(seed.repeat(64)),
-        modelId = "model-$seed",
-        version = "1.0.0",
-        displayName = "Model $seed",
-        profileKey = "profile-$seed",
-        applicationId = "play-internal-phone-test",
-        useCaseId = "manual-inference-playground",
-        fileName = "model-$seed.gguf",
-        sizeBytes = 2_048L,
-        architecture = "qwen35",
-        quantization = "Q4_K_M",
-        installedAtEpochMs = 1L,
-    )
+    private fun testMetadata(index: Int): InstalledCatalogModelMetadata {
+        val release = CuratedModelCatalog.releases[index]
+        return InstalledCatalogModelMetadata.from(
+            release = release,
+            target = release.allowedTargets.first(),
+            installedAtEpochMs = 1L,
+        )
+    }
 
     private fun catalogModel(stableId: String, metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi = PhoneCatalogModelUi(
         stableId = stableId,
