@@ -238,7 +238,7 @@ internal fun resolvedPhoneUseCase(
     contextSize: Int = 2_048,
 ): ResolvedUseCase {
     val release = Qwen35PhoneModelPolicy.requireCurated(model)
-    val tier = if (release.id.modelId.value.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
+    val tier = Qwen35PhoneModelPolicy.tierFor(release)
     val applicationId = ApplicationId("play-internal-phone-test")
     val useCaseId = UseCaseId(useCaseValue)
     val modelProfileId = "${release.profileKey.value}-$profileSuffix"
@@ -260,7 +260,6 @@ internal fun resolvedPhoneUseCase(
         flashAttention = runtimeTuning.flashAttention,
         chatTemplatePolicy = ChatTemplatePolicy(),
         runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
-
     )
     val useCase = UseCaseProfile(
         id = useCaseProfileId,
