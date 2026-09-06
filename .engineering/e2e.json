@@ -112,7 +112,7 @@
     },
     {
       "id": "shared-runtime-consumer-roundtrip",
-      "claim": "A separately installed same-signer Consumer can discover the real Harnex HarnessSharedRuntimeService, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, release and recover across Host restart without a fake Consumer runtime.",
+      "claim": "An independently signed Consumer, including Consumer-before-Host install order, can explicitly bind the real Harnex HarnessSharedRuntimeService, start fail-closed while its exact Android-derived package/signer identity is pending, become usable only after explicit Harnex authorization, negotiate Binder, resolve its assigned use case and published preset, activate from production-shaped model inventory, prepare through RuntimeOrchestrator, generate, disconnect/reconnect, release and recover across Host restart without a fake Consumer runtime; an unapproved replacement signer cannot inherit access.",
       "ui_surface": false,
       "minimum_ui_evidence_mode": "assertions",
       "target_environment_refs": ["android-arm64-device"],
