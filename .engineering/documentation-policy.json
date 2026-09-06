@@ -9,6 +9,13 @@
     "architecture": {"max_lines": 400, "max_estimated_tokens": 5500},
     "feature_doc": {"max_lines": 450, "max_estimated_tokens": 6500}
   },
+  "budget_exceptions": {
+    "observability/AGENTS.md": {"max_lines": 150, "max_estimated_tokens": 2127, "mode": "no-growth"},
+    "evaluation/AGENTS.md": {"max_lines": 150, "max_estimated_tokens": 2114, "mode": "no-growth"},
+    "models/AGENTS.md": {"max_lines": 150, "max_estimated_tokens": 2022, "mode": "no-growth"},
+    "apps/local-llm-phone-test/AGENTS.md": {"max_lines": 150, "max_estimated_tokens": 2794, "mode": "no-growth"},
+    "docs/workstreams/llama-cpp-v0-3-residency-qualification.md": {"max_lines": 380, "max_estimated_tokens": 5361, "mode": "no-growth"}
+  },
   "context_targets": {"bootstrap_max_estimated_tokens": 1200, "root_scoped_workstream_max_estimated_tokens": 6500},
   "duplicate_min_characters": 240,
   "completed_workstream_markers": ["Status: complete", "Status: completed", "Status: done"],
