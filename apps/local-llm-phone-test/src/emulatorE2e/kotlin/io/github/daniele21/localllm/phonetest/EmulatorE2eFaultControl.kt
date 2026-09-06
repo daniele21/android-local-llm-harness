@@ -9,21 +9,59 @@ import android.os.SystemClock
 /** Emulator-only control surface used by cross-APK lifecycle tests. */
 internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        applyResult(EmulatorE2eFaultCommandHandler.handle(context, intent))
+    }
+
+    private fun applyResult(result: EmulatorE2eFaultCommandResult) {
+        resultCode = result.code
+        resultData = result.data
+    }
+}
+
+/**
+ * Shell-only emulator bridge for independently signed Consumer E2E.
+ *
+ * This receiver lives in the Host emulatorE2e APK, is reachable only to callers holding the
+ * platform DUMP permission, and exposes only the same bounded test commands owned by
+ * [EmulatorE2eFaultCommandHandler]. Keeping the bridge in the Host process avoids a nested ordered
+ * broadcast from the androidTest APK while the outer shell broadcast is still being delivered.
+ */
+internal class HarnessEmulatorE2eShellBridgeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action !in EmulatorE2eFaultActions.SHELL_ALLOWED_ACTIONS) {
+            resultCode = Activity.RESULT_CANCELED
+            resultData = "unsupported"
+            return
+        }
+        val result = EmulatorE2eFaultCommandHandler.handle(context, intent)
+        resultCode = result.code
+        resultData = result.data
+    }
+}
+
+internal data class EmulatorE2eFaultCommandResult(
+    val code: Int,
+    val data: String?,
+)
+
+/** Canonical emulator-only command owner shared by the protected receiver and shell bridge. */
+internal object EmulatorE2eFaultCommandHandler {
+    fun handle(context: Context, intent: Intent): EmulatorE2eFaultCommandResult {
         if (intent.action == EmulatorE2eFaultActions.QUERY_ACTIVITY) {
             val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
             if (verifiedPackageName.isNullOrBlank()) {
-                resultCode = Activity.RESULT_CANCELED
-                resultData = "invalid_request"
-                return
+                return EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "invalid_request")
             }
-            resultCode = Activity.RESULT_OK
-            resultData = EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName)
-            return
+            return EmulatorE2eFaultCommandResult(
+                Activity.RESULT_OK,
+                EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName),
+            )
         }
         if (intent.action == EmulatorE2eFaultActions.RUN_INTERNAL_ACTIVITY_PROBE) {
-            resultCode = Activity.RESULT_OK
-            resultData = EmulatorE2eInternalActivityProbe.run(context)
-            return
+            return EmulatorE2eFaultCommandResult(
+                Activity.RESULT_OK,
+                EmulatorE2eInternalActivityProbe.run(context),
+            )
         }
 
         when (intent.action) {
@@ -40,14 +78,12 @@ internal class EmulatorE2eFaultReceiver : BroadcastReceiver() {
 
             EmulatorE2eFaultActions.QUERY -> Unit
 
-            else -> {
-                resultCode = Activity.RESULT_CANCELED
-                resultData = "unsupported"
-                return
-            }
+            else -> return EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
         }
-        resultCode = Activity.RESULT_OK
-        resultData = EmulatorE2eGenerationGate.status()
+        return EmulatorE2eFaultCommandResult(
+            Activity.RESULT_OK,
+            EmulatorE2eGenerationGate.status(),
+        )
     }
 }
 
@@ -60,6 +96,17 @@ internal object EmulatorE2eFaultActions {
     const val QUERY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY"
     const val QUERY_ACTIVITY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY"
     const val EXTRA_VERIFIED_PACKAGE = "verified_package"
+
+    val SHELL_ALLOWED_ACTIONS =
+        setOf(
+            PAUSE_GENERATION,
+            RELEASE_GENERATION,
+            FAIL_NEXT_GENERATION,
+            RUN_INTERNAL_ACTIVITY_PROBE,
+            RESET,
+            QUERY,
+            QUERY_ACTIVITY,
+        )
 }
 
 internal object EmulatorE2eGenerationGate {
