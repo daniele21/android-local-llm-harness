@@ -25,7 +25,7 @@ Report the issue privately to the repository owner through GitHub's private vuln
 - GGUF artifacts must be integrity-checked before loading.
 - Model binaries are not committed to this repository.
 - Native handles remain private to the backend module.
-- Shared-runtime inference binding uses the `BIND_LOCAL_LLM` normal permission only as an explicit capability opt-in; possessing it does not grant runtime access.
-- Shared-runtime Consumer authorization is fail-closed on Binder calling UID -> exact installed package -> signing certificate -> Harnex Control Plane authorization -> enabled use case. Caller-supplied identity fields never grant authority.
+- The public shared-runtime Service deliberately does not use a custom bind permission: Android does not retroactively grant an unknown custom permission when a Consumer was installed before Harnex, so install order must not decide reachability.
+- Shared-runtime Consumer authorization is fail-closed on Binder calling UID -> exact installed package -> current signing certificate -> Harnex Control Plane authorization -> enabled use case. Caller-supplied identity fields never grant authority.
 - Known independently signed consumers are source-observed as `PENDING`; signing identity replacement becomes `SIGNATURE_CHANGED`; both require explicit Harnex authorization before live access.
 - Emulator-only fault controls and broader diagnostics/control surfaces remain separate from inference binding and retain their own stricter authorization boundary.
