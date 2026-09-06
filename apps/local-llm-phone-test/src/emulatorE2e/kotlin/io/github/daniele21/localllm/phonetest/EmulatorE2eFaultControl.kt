@@ -43,45 +43,57 @@ internal data class EmulatorE2eFaultCommandResult(val code: Int, val data: Strin
 
 /** Canonical emulator-only command owner shared by the protected receiver and shell bridge. */
 internal object EmulatorE2eFaultCommandHandler {
-    fun handle(context: Context, intent: Intent): EmulatorE2eFaultCommandResult {
-        if (intent.action == EmulatorE2eFaultActions.QUERY_ACTIVITY) {
-            val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
-            if (verifiedPackageName.isNullOrBlank()) {
-                return EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "invalid_request")
-            }
-            return EmulatorE2eFaultCommandResult(
-                Activity.RESULT_OK,
-                EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName),
-            )
-        }
-        if (intent.action == EmulatorE2eFaultActions.RUN_INTERNAL_ACTIVITY_PROBE) {
-            return EmulatorE2eFaultCommandResult(
-                Activity.RESULT_OK,
-                EmulatorE2eInternalActivityProbe.run(context),
-            )
-        }
-
+    fun handle(context: Context, intent: Intent): EmulatorE2eFaultCommandResult =
         when (intent.action) {
-            EmulatorE2eFaultActions.PAUSE_GENERATION -> EmulatorE2eGenerationGate.pause()
+            EmulatorE2eFaultActions.QUERY_ACTIVITY -> {
+                val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
+                if (verifiedPackageName.isNullOrBlank()) {
+                    EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "invalid_request")
+                } else {
+                    EmulatorE2eFaultCommandResult(
+                        Activity.RESULT_OK,
+                        EmulatorE2eActivityAuditStatus.query(context, verifiedPackageName),
+                    )
+                }
+            }
 
-            EmulatorE2eFaultActions.RELEASE_GENERATION -> EmulatorE2eGenerationGate.release()
+            EmulatorE2eFaultActions.RUN_INTERNAL_ACTIVITY_PROBE ->
+                EmulatorE2eFaultCommandResult(
+                    Activity.RESULT_OK,
+                    EmulatorE2eInternalActivityProbe.run(context),
+                )
 
-            EmulatorE2eFaultActions.FAIL_NEXT_GENERATION -> EmulatorE2eBackendFailureGate.arm()
+            EmulatorE2eFaultActions.PAUSE_GENERATION -> {
+                EmulatorE2eGenerationGate.pause()
+                gateStatusResult()
+            }
+
+            EmulatorE2eFaultActions.RELEASE_GENERATION -> {
+                EmulatorE2eGenerationGate.release()
+                gateStatusResult()
+            }
+
+            EmulatorE2eFaultActions.FAIL_NEXT_GENERATION -> {
+                EmulatorE2eBackendFailureGate.arm()
+                gateStatusResult()
+            }
 
             EmulatorE2eFaultActions.RESET -> {
                 EmulatorE2eGenerationGate.reset()
                 EmulatorE2eBackendFailureGate.reset()
+                gateStatusResult()
             }
 
-            EmulatorE2eFaultActions.QUERY -> Unit
+            EmulatorE2eFaultActions.QUERY -> gateStatusResult()
 
-            else -> return EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
+            else -> EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
         }
-        return EmulatorE2eFaultCommandResult(
+
+    private fun gateStatusResult() =
+        EmulatorE2eFaultCommandResult(
             Activity.RESULT_OK,
             EmulatorE2eGenerationGate.status(),
         )
-    }
 }
 
 internal object EmulatorE2eFaultActions {
