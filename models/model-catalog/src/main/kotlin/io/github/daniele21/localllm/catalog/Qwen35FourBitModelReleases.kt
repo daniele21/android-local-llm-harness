@@ -60,11 +60,12 @@ internal object Qwen35FourBitModelReleases {
         recommended: Boolean = false,
     ): CatalogModelRelease {
         val fileName = "Qwen3.5-4B-$quantization.gguf"
-        val recommendation = if (recommended) {
-            " Variante 4-bit raccomandata da Unsloth negli esempi llama.cpp e default Harnex per il tier 4B."
-        } else {
-            " Variante 4-bit alternativa per confrontare qualità, memoria e velocità sul dispositivo."
-        }
+        val recommendation =
+            if (recommended) {
+                " Variante 4-bit raccomandata da Unsloth negli esempi llama.cpp e preferita per la validazione Harnex."
+            } else {
+                " Variante 4-bit alternativa per confrontare qualità, memoria e velocità sul dispositivo."
+            }
         return CuratedModelReleaseFactory.release(
             modelId = "qwen35-4b-$idSuffix",
             displayName = "Qwen 3.5 4B $quantization",
