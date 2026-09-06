@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="io.github.daniele21.localllm.debug.permission.CONTROL_LOCAL_LLM_E2E" />
+
+    <application>
+        <!--
+          Shell-only instrumentation bridge. The real emulator fault receiver remains protected by
+          Harnex's signature permission; this receiver only lets adb shell ask the co-signed
+          androidTest APK to relay bounded E2E commands during cross-signer tests.
+        -->
+        <receiver
+            android:name="io.github.daniele21.localllm.phonetest.HarnessEmulatorE2eFaultBridgeReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>
