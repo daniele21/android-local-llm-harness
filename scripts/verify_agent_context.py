@@ -27,7 +27,11 @@ def main():
             dirs[:]=[x for x in dirs if x not in excluded]
             if 'AGENTS.md' in files and Path(d)!=root: scoped.append((Path(d)/'AGENTS.md').resolve())
         affected=[inside(root,x) for x in a.path]
-        scope={g for g in scoped if not affected or any(g.parent==p or g.parent in p.parents for p in affected)}
+        # Without an affected path there is no truthful scoped-guide selection: measure the
+        # route bootstrap only. With --path, include only guides whose directory owns/contains
+        # an affected path. This keeps repository-health representative instead of summing the
+        # entire monorepo instruction graph.
+        scope={g for g in scoped if affected and any(g.parent==p or g.parent in p.parents for p in affected)}
         work=None
         if a.workstream:
             work=inside(root,a.workstream)
