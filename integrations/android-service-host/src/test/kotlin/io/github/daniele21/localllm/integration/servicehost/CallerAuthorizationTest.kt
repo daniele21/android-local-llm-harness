@@ -3,6 +3,7 @@ package io.github.daniele21.localllm.integration.servicehost
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.UseCaseId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,6 +28,45 @@ class CallerAuthorizationTest {
         assertEquals(policy.applicationId, caller.applicationId)
         assertEquals(policy.packageName, caller.packageName)
         assertTrue(caller.allows(useCase))
+    }
+
+    @Test
+    fun permissionlessBoundaryStillRequiresExactHostPolicyAndSigner() {
+        val environment =
+            FakeCallerEnvironment(
+                permissionGranted = false,
+                packages = listOf(policy.packageName),
+                acceptedCertificate = digest,
+            )
+        val result =
+            CallerAuthorizer(
+                permissionName = null,
+                policies = listOf(policy),
+                environment = environment,
+            ).authorize(CallingProcess(uid = 10001, pid = 123), useCase)
+
+        assertTrue(result is AuthorizationResult.Allowed)
+        assertNull(environment.lastPermissionProcess)
+        assertEquals(1, environment.packageLookupCount)
+        assertEquals(1, environment.signerLookupCount)
+    }
+
+    @Test
+    fun permissionlessBoundaryStillFailsClosedForUnapprovedSigner() {
+        val environment =
+            FakeCallerEnvironment(
+                permissionGranted = false,
+                packages = listOf(policy.packageName),
+            )
+        val result =
+            CallerAuthorizer(
+                permissionName = null,
+                policies = listOf(policy),
+                environment = environment,
+            ).authorize(CallingProcess(uid = 10001, pid = 123), useCase)
+
+        assertDenied(AuthorizationFailure.SIGNATURE_MISMATCH, result)
+        assertNull(environment.lastPermissionProcess)
     }
 
     @Test
@@ -55,7 +95,7 @@ class CallerAuthorizationTest {
     }
 
     @Test
-    fun onewayCallerWithUnavailablePidStillRequiresPermission() {
+    fun onewayCallerWithUnavailablePidStillRequiresPermissionWhenConfigured() {
         val environment =
             FakeCallerEnvironment(
                 permissionGranted = false,
@@ -72,7 +112,7 @@ class CallerAuthorizationTest {
     }
 
     @Test
-    fun permissionDenialFailsBeforePackageOrSignerLookup() {
+    fun permissionDenialFailsBeforePackageOrSignerLookupWhenConfigured() {
         val environment = FakeCallerEnvironment(permissionGranted = false, packages = listOf(policy.packageName))
 
         assertDenied(
