@@ -30,7 +30,7 @@ Long-running Consumer work opts into an additive durable-job capability. Existin
 
 A durable logical job has a stable opaque public `ConsumerInferenceJobId`, a caller-provided idempotency key (`clientRequestId`), monotonic `revision`, `attempt`, terminal/non-terminal status and a process-session identity. Host-internal job identity may use a transport/private representation, but the supported Consumer API must not expose host storage or runtime handles.
 
-The job pins the authenticated application, use case and exact accepted Harness-owned configuration revisions needed for execution, including use-case, binding and preset revision identity. A reconnect must never silently resolve the same logical job against newer configuration.
+The job pins the authenticated application, use case and exact accepted Harnex-owned configuration revisions needed for execution, including use-case, binding and preset revision identity. A reconnect must never silently resolve the same logical job against newer configuration.
 
 The host may keep transient prompt/output material in bounded process memory only as required to finish or reconcile that job; it must not persist prompt, document text, generated output or other model content in normal storage, telemetry or evidence.
 
@@ -80,13 +80,13 @@ Durable job metadata, when needed, is restricted to privacy-safe identity/state 
 
 ### Consumer product ownership stays separate
 
-Harness owns `ConsumerInferenceJobId`, execution, session/runtime coordination and model residency. Consumer applications own their product workflow identity and state machine.
+Harnex owns `ConsumerInferenceJobId`, execution, session/runtime coordination and model residency. Consumer applications own their product workflow identity and state machine.
 
-For RedactGuard, the application owns an `AnalysisJobId` for the document-analysis workflow and maps it to the Harness `ConsumerInferenceJobId`. RedactGuard does not reconstruct or own Harness model/session/residency state. A multi-step or multi-chunk analysis may use one durable Harness job as its execution lifecycle while product progress/review semantics remain RedactGuard-owned.
+For RedactGuard, the application owns an `AnalysisJobId` for the document-analysis workflow and maps it to the Harnex `ConsumerInferenceJobId`. RedactGuard does not reconstruct or own Harnex model/session/residency state. A multi-step or multi-chunk analysis may use one durable Harnex job as its execution lifecycle while product progress/review semantics remain RedactGuard-owned.
 
 ### Security boundary retained
 
-ADR 0018 is authoritative for Binder UID/package/signer verification, independently signed consumer authorization, the `BIND_LOCAL_LLM` capability permission and signing-identity reauthorization. ADR 0012 remains authoritative for the non-superseded Host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
+ADR 0018 is authoritative for install-order-safe explicit binding, Binder UID/package/current-signer verification, independently signed consumer authorization and signing-identity reauthorization. ADR 0012 remains authoritative for the non-superseded Host-owned application/use-case/model authority, protocol compatibility, diagnostics separation and bounded wire payloads. Reattachment never weakens caller isolation.
 
 ## Failure semantics
 
@@ -96,7 +96,7 @@ The supported durable-job boundary must distinguish at least:
 - host/runtime failure;
 - model or configuration conflict before execution;
 - consumer authorization loss;
-- Harness service/process interruption;
+- Harnex service/process interruption;
 - critical-memory interruption when continuation is impossible.
 
 Observer loss, Activity recreation, ordinary app backgrounding and temporary Binder detach are not semantic failures.
@@ -151,7 +151,7 @@ Deterministic two-APK emulator evidence must cover:
 6. model conflict and critical-memory fault injection remain fail-closed;
 7. persisted metadata/logs contain no prompt, document or generated-output content.
 
-Representative independently signed distribution evidence is required when a claim depends on cross-publisher authorization. ARM64/JNI/GGUF model residency, OEM process policy and thermal/resource behavior remain separate REAL_ENVIRONMENT evidence.
+Representative independently signed distribution evidence is required when a claim depends on cross-publisher authorization. That evidence must use the real install/signing topology being claimed; Consumer-before-Host reachability cannot depend on Consumer reinstall. ARM64/JNI/GGUF model residency, OEM process policy and thermal/resource behavior remain separate REAL_ENVIRONMENT evidence.
 
 ## Implementation gate
 
