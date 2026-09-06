@@ -50,7 +50,7 @@ class HarnessSharedRuntimeService : Service() {
             SharedRuntimeHostComposition(
                 context = this,
                 client = runtimeGraph.sharedRuntimeClient,
-                permissionName = BuildConfig.SHARED_RUNTIME_PERMISSION,
+                permissionName = null,
                 policies = policies,
                 policySource = {
                     observedIdentityReconciler.reconcileIfNeeded()
