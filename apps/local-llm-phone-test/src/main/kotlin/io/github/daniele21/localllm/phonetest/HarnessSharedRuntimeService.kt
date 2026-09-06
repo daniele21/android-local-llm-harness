@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostClientFactories
 import io.github.daniele21.localllm.integration.servicehost.SharedRuntimeHostComposition
 import io.github.daniele21.localllm.runtime.ActivityManagerLowMemoryProbe
 import io.github.daniele21.localllm.runtime.AndroidMemoryPressureCallbacks
@@ -24,6 +25,11 @@ class HarnessSharedRuntimeService : Service() {
         runtimeGraph = HarnessRuntimeGraph.from(this)
         val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(runtimeGraph)
         val policies = runtimeGraph.authorizedClientPolicies
+        val observedIdentityReconciler =
+            HarnessObservedApplicationIdentityReconciler(
+                context = this,
+                store = runtimeGraph.controlPlaneStore,
+            )
         val controlPlaneHost =
             HarnessWarmRetentionAwareControlPlaneHost(
                 delegate =
@@ -44,11 +50,18 @@ class HarnessSharedRuntimeService : Service() {
             SharedRuntimeHostComposition(
                 context = this,
                 client = runtimeGraph.sharedRuntimeClient,
-                permissionName = BuildConfig.SHARED_RUNTIME_PERMISSION,
+                permissionName = null,
                 policies = policies,
-                policySource = runtimeGraph::liveAuthorizedClientPolicies,
+                policySource = {
+                    observedIdentityReconciler.reconcileIfNeeded()
+                    runtimeGraph.liveAuthorizedClientPolicies()
+                },
                 hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",
-                consumerClientFactory = runtimeGraph.consumerClientFactory,
+                clientFactories =
+                SharedRuntimeHostClientFactories(
+                    consumer = runtimeGraph.consumerClientFactory,
+                    legacyRuntime = runtimeGraph.legacyRuntimeClientFactory,
+                ),
                 consumerControlPlaneHost = controlPlaneHost,
                 consumerRuntimeReadinessHost = runtimeReadinessHost,
             )

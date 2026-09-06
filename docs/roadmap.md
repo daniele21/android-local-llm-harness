@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-06
 
 This file tracks capability-level milestones and remaining outcomes. Active branch/PR state and the next implementation task belong in [`current-state.md`](current-state.md).
 
@@ -19,6 +19,7 @@ Broad device/runtime production claims still require representative physical-dev
 | Functional embedded GGUF runtime | Implemented / device evidence pending | Representative device lifecycle, memory and JNI evidence |
 | llama.cpp runtime efficiency and hardware execution | Planned / baseline-first | Qualify upstream evolution, improve CPU efficiency, then evaluate measured accelerator lanes |
 | Telemetry, health, resources and benchmarks | Implemented / hardening pending | Device evidence and richer connected presentation |
+| Local inference Activity and audit | Implemented | Maintain bounded encrypted audit history, verified attribution and privacy separation as generation paths evolve |
 | Dataset-based model evaluation | In progress | Dataset packs, deterministic evaluators, execution, persistence/comparison UI and physical evidence |
 | Curated model distribution and installation | Implemented / device evidence pending | Remote download/install validation on representative phones |
 | Qwen3.5-only product transition | In progress / certification pending | Q35-6 physical tuning, Q35-7 validation and Q35-8 exact-artifact certification |
@@ -33,7 +34,7 @@ Broad device/runtime production claims still require representative physical-dev
 
 ## Priority order across active plans
 
-- **P0 — evidence/certification lane:** complete the remaining representative physical gates: LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 release evidence. The validated Harnex and RedactGuard baselines are already promoted to `main`. A new llama.cpp pin may preempt only for correctness/security.
+- **P0 — evidence/certification lane:** complete the remaining representative physical gates: focused Play signer/install-order confirmation, LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 release evidence. The current Harnex/RedactGuard alpha.11 candidates are integrated on `dev` and published to Play Internal; stable promotion waits on the applicable release evidence. A new llama.cpp pin may preempt only for correctness/security.
 - **P1 — safe parallel hardening:** upstream qualification, backend capability/effective-plan telemetry, prompt-token reuse and bounded CPU measurements may proceed with disjoint ownership. RA-4/5/7/9/10 and model evaluation remain separate owners.
 - **P2 — post-CPU-evidence execution expansion:** Adreno OpenCL, kernel caching, K/V cache experiments, evaluation-only multi-sequence execution and deterministic device-plan evolution start after the CPU baseline is evidence-stable or on an explicit experimental lane.
 - **P3 — research:** Hexagon/HTP and broader heterogeneous execution remain deferred until CPU/OpenCL ownership, packaging and evidence are understood.
@@ -51,7 +52,8 @@ Implemented:
 - scoped PR validation, cumulative `dev` validation and complete promotion validation;
 - protected promotion, hotfix and forward-port rules in ADR 0008;
 - reproducible Android packaging and launcher assets;
-- 2026-09-04 validated Harnex/RedactGuard release promotion with `main -> dev` ancestry synchronization completed.
+- `repo-template-sw` `0.10.0` governance baseline with preserved Harnex-specific customizations;
+- prior stable Harnex/RedactGuard release promotion history with explicit `main -> dev` ancestry synchronization.
 
 Remaining:
 
@@ -131,16 +133,17 @@ Qwen sequence and exit gates are owned by [`qwen35/roadmap.md`](qwen35/roadmap.m
 
 Implemented:
 
-- bounded in-memory and Room stores;
+- bounded in-memory and Room telemetry stores;
 - run lifecycle and request-correlated structured logs;
 - privacy-safe timelines and typed error codes;
 - queue, load, TTFT, prefill, decode, total, token and throughput metrics;
 - effective generation metadata;
+- durable local inference Activity/audit with bounded encrypted sensitive content, verified origin attribution, restart reconciliation and request correlation to privacy-safe diagnostics;
 - health-suite orchestration, model integrity and generation sanity;
 - Android memory and thermal snapshots;
 - cache health and targeted repair;
 - cold/warm benchmark keys, active baselines, retained immutable history and regression checks;
-- connected phone Diagnostics surfaces.
+- connected phone Diagnostics and Activity surfaces.
 
 Remaining:
 
@@ -157,19 +160,20 @@ Dataset-based semantic model evaluation remains separate. EVAL-1 provides determ
 
 Implemented:
 
-- Compose/Material 3 with Overview, Playground, Applications, Performance, Models, Diagnostics and Settings;
+- Compose/Material 3 with Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings;
 - compact and expanded navigation;
 - reproducible Harnex identity and shared design system;
 - shared process runtime graph;
 - real model management and Playground inference;
 - Playground and Models ViewModel/UDF boundaries;
-- typed Settings, request-timeline and model-detail routes;
+- typed Settings, request-timeline, Activity list/detail and model-detail routes;
 - privacy-safe model inventory, diagnostics and validation reports;
-- Google Play Internal Testing publication for the integrated candidate;
-- stable-line promotion of the validated current baseline.
+- Google Play Internal Testing publication for the current integrated candidate;
+- independently signed Consumer authorization and install-order-safe Host binding.
 
 Remaining:
 
+- focused physical Play signer/install-order confirmation for the current release candidate;
 - migrate remaining Overview, Diagnostics and Settings state/effects from `MainActivity` where still owned there;
 - complete process recreation, state restoration and Back-stack evidence;
 - complete Compose state, screenshot, accessibility, large-font, landscape and expanded-layout matrices;
@@ -192,13 +196,14 @@ These integrations must not duplicate runtime policy or create a second model st
 
 ## 7. Shared runtime, Consumer API and control plane
 
-Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries and the OMBRA reference flow.
+Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries, Harnex-owned inference Activity/audit and the OMBRA reference flow.
 
-Automated lifecycle convergence is complete: Harnex source `6b34fe9f...` publishes Consumer SDK `0.1.0-alpha.10`, RedactGuard consumes it, and the complete API 35 Two-APK lifecycle/fault/serialization matrix is green. The validated Harnex and RedactGuard baselines are now promoted to their stable `main` lines. A representative manual RedactGuard run confirms the practical real-device flow. Formal ARM64/JNI/GGUF/memory/thermal/OEM evidence remains separate.
+Automated lifecycle convergence is complete for the current topology: Consumer SDK `0.1.0-alpha.11` is publicly published, RedactGuard consumes it, Harnex and RedactGuard are independently signed in E2E, Consumer-first installation is covered, `PENDING`/explicit authorization is fail-closed, Connect / Disconnect / Reconnect is exercised, signer replacement is denied, and the complete API 35 Two-APK lifecycle/fault matrix is green. Both current candidates are published to Google Play Internal Testing.
 
 Remaining:
 
-- SR-6/LAS-07 formal physical same-signer/ARM64/model/resource evidence where required;
+- focused physical Play App Signing identity plus Consumer-first/install-order/authorization confirmation for the current candidate;
+- SR-6/LAS-07 formal physical ARM64/model/resource evidence where required;
 - OMB-6B identity/launcher closure;
 - OMB-8 exact-model quality and representative physical document-workflow evidence;
 - signature-protected cross-application diagnostics only if separately justified;
@@ -238,4 +243,4 @@ Deferred until the CPU embedded path and release evidence are stable:
 
 ## Release boundary
 
-The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The Harnex/RedactGuard automated integration baseline is now on the stable `main` lines; emulator/manual product acceptance still does not replace the remaining formal physical-device production evidence.
+The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The current Harnex/RedactGuard alpha.11 integration baseline is validated on `dev` and published to Play Internal; RELEASE/FULL promotion to stable `main` remains gated by the applicable focused physical Play signer/install-order evidence plus any broader representative physical claims explicitly required by the release checklist.

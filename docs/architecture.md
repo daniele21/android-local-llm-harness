@@ -5,9 +5,9 @@ Document type: architecture
 Owner: repository
 Canonical scope: architecture.repository
 Read when: changing module boundaries, dependency direction, deployment shape or ownership
-Last reviewed: 2026-08-18
+Last reviewed: 2026-09-05
 
-![Detailed Android Local LLM Harness architecture showing the product control plane, embedded data plane, runtime and model boundaries, observability, and future shared host](assets/architecture.png)
+![Detailed Android Local LLM Harness architecture showing the product control plane, embedded and shared data planes, runtime and model boundaries, and observability](assets/architecture.png)
 
 ## Data plane
 
@@ -37,9 +37,9 @@ Native app / Capacitor plugin
           JNI / C++ ---> GGUF
 ```
 
-The embedded runtime and the future shared service must execute the same data plane. Only the transport and model-store ownership change. The future deployment and workstream routing are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
+The embedded/in-process path and the shared Binder Host execute the same runtime data plane. Transport and composition ownership differ, while model/runtime policy stays Harnex-owned. Shared-runtime deployment and ownership are specified in [`shared-runtime/README.md`](shared-runtime/README.md).
 
-Runtime orchestration depends on `core:backend-spi` for backend-neutral execution operations and on `observability/contracts` for telemetry. It does not depend on a concrete inference backend. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
+Runtime orchestration depends on `core:backend-spi` for backend-neutral execution operations and on `observability/contracts` for telemetry and inference-audit contracts. It does not depend on a concrete inference backend or Android persistence implementation. Android Room remains isolated in `observability/room-store`; deterministic tests and ephemeral integrations may use `observability/in-memory-store` instead.
 
 The Harness Host Control Plane follows the same isolation rule: platform-neutral application/use-case/preset/binding contracts live in `models/model-profile`, while durable Android persistence lives in `models/control-plane-room-store`. Runtime/model-loading code consumes resolved control-plane identity through contracts and does not depend directly on Room.
 
@@ -67,7 +67,7 @@ GenerationRequest
       bounded memory     Room database
 ```
 
-The persistent schema owns three separate domains:
+The telemetry schema owns three separate domains:
 
 1. generation run records, keyed by request ID;
 2. append-only structured logs with request correlation;
@@ -85,6 +85,18 @@ Normal telemetry may contain:
 - bounded structured metadata fields.
 
 Normal telemetry must not contain prompts, generated output, arbitrary exception messages or model bytes. Telemetry persistence is best-effort: a database or diagnostic failure must never fail, cancel or corrupt inference.
+
+## Durable inference Activity audit
+
+Inference Activity is a separate persistence domain from normal telemetry. `observability/contracts` owns `InferenceAuditRepository` and the bounded audit model; `observability/in-memory-store` provides deterministic test support; `observability/room-store` owns Android Room persistence plus AES-GCM sensitive-content encryption using an app-scoped Android Keystore key.
+
+`core/runtime-core` owns the canonical audited client boundary. `InferenceAuditLocalLlmClient` wraps accepted generation so durable admission exists before execution, the runtime-private one-shot prompt bridge records the actual rendered effective prompt before decode, and terminal content/metrics commit before normal completion is forwarded. The effective prompt does not transit public generation events, normal Logs or Telemetry.
+
+The shared Host resolves external audit identity from authorized Binder caller state rather than trusting caller-supplied package labels. The phone Playground reaches the same audited client with `HARNEX_INTERNAL` origin. The resulting Activity record carries stable application/use-case/request identity and truthful `COMPLETED`, `FAILED`, `CANCELLED` or `INTERRUPTED` terminal state.
+
+Sensitive input, effective prompt, answer and reasoning remain local to the bounded encrypted audit store. Metadata needed for list/filter/restart reconciliation remains minimal. Startup reconciliation converts orphaned non-terminal audit rows to `INTERRUPTED`; clear-history and retention operate on Activity history without mutating runtime jobs, models, control-plane state or normal telemetry.
+
+`apps/local-llm-phone-test` owns the Activity list/detail/filter product surface. `requestId` correlates Activity with privacy-safe technical Runs/Logs without merging their storage or privacy semantics. The durable feature contract and rationale are [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md) and [ADR 0017](adr/0017-durable-local-inference-audit.md).
 
 ## Control plane
 
@@ -170,12 +182,13 @@ The initial implementation only defines artifact and in-memory lifecycle contrac
 - One loaded model and one active decode by default.
 - No undeclared model substitution.
 - Every generation has stable application, use-case, session and request identifiers.
-- Prompt/output persistence is disabled by default.
+- Sensitive prompt/output persistence is confined to the bounded encrypted Activity audit store; normal telemetry, structured logs and diagnostics export remain content-free.
+- Audit persistence required for accepted inference is strict; audit storage/encryption failure must not silently fall back to unaudited execution or plaintext.
 - Telemetry failures are non-fatal to inference.
 - Native handles are never exposed outside the backend module.
 - Runtime core never selects or imports a concrete backend implementation.
 - Backend implementations never own model-store integrity, installation or selection policy.
-- Large payloads will not cross the future Binder boundary inline.
+- Large payloads must not cross Binder inline when the established contract uses bounded/streamed or Host-owned representations.
 - Physical backend operations and lifecycle transitions are serialized by `RuntimeOrchestrator`; lifecycle-specific state/handle ownership remains with the explicit owner below.
 - Per-session request admission, close intent and release reservation are owned by `SessionLifecycle`; the session descriptor is the single context-handle owner and `RuntimeOrchestrator` serializes physical context creation/release.
 - Per-generation cancellation intent and terminal-once delivery are owned by `GenerationLifecycle`; `SingleDecodeScheduler` remains authoritative for queued and active decode state.
@@ -229,7 +242,7 @@ core/backend-spi
 core/runtime-core
     orchestration, model verification/adaptation, sessions, scheduling,
     explicit session/generation/model-residency lifecycle ownership,
-    recovery policy and telemetry emission
+    recovery policy, telemetry emission and canonical inference-audit client integration
 
 models/model-profile
     model, use-case and application binding configuration plus the
@@ -246,22 +259,24 @@ backends/llama-cpp
     InferenceBackend implementation plus Kotlin/JNI/C++ llama.cpp adaptation
 
 observability/contracts
-    stable telemetry, log, health, retention and query contracts
+    stable telemetry, log, health, retention/query and inference-audit contracts
 
 observability/in-memory-store
-    bounded ephemeral implementation and deterministic test double
+    bounded ephemeral telemetry/audit implementation and deterministic test doubles
 
 observability/room-store
-    Android Room schema, persistence, retention and database lifecycle
+    Android Room telemetry/audit schemas, audit encryption, persistence, retention
+    and database lifecycle
 
 transports
     in-process and Binder communication; no runtime policy ownership
 
 integrations
-    thin native Android and Capacitor adapters
+    thin native Android/Host/Capacitor adapters; Host authorization owns verified
+    external caller attribution before runtime/audit composition
 
 apps
-    composition roots, developer surfaces and isolated device validation
+    composition roots, Activity/developer surfaces and isolated device validation
 ```
 
 A new module is justified only when it owns a real responsibility, creates a necessary dependency boundary, provides actual reuse, isolates a platform or third-party dependency, or needs an independent testing/release boundary.

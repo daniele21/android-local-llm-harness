@@ -1,6 +1,10 @@
 package io.github.daniele21.localllm.phonetest
 
 import android.content.Context
+import io.github.daniele21.localllm.audit.InferenceAuditOrigin
+import io.github.daniele21.localllm.audit.InferenceAuditOriginKind
+import io.github.daniele21.localllm.audit.InferenceAuditRepository
+import io.github.daniele21.localllm.audit.room.RoomInferenceAuditRepository
 import io.github.daniele21.localllm.contracts.ApplicationId
 import io.github.daniele21.localllm.contracts.ConsumerLimits
 import io.github.daniele21.localllm.contracts.ConsumerLocalLlmClient
@@ -10,7 +14,10 @@ import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedCaller
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedConsumerClientFactory
+import io.github.daniele21.localllm.integration.servicehost.AuthorizedRuntimeClientFactory
 import io.github.daniele21.localllm.models.ModelProfileRegistry
 import io.github.daniele21.localllm.models.ResolvedUseCase
 import io.github.daniele21.localllm.models.controlplane.room.RoomHostControlPlaneStoreOwner
@@ -18,13 +25,16 @@ import io.github.daniele21.localllm.observability.GenerationRunRecord
 import io.github.daniele21.localllm.observability.StructuredLog
 import io.github.daniele21.localllm.observability.TelemetryRepository
 import io.github.daniele21.localllm.observability.TelemetryRetentionPolicy
-import io.github.daniele21.localllm.observability.store.InMemoryTelemetryRepository
+import io.github.daniele21.localllm.observability.room.RoomTelemetryRepository
 import io.github.daniele21.localllm.runtime.ActivationIdFactory
 import io.github.daniele21.localllm.runtime.ActivationResidencyCoordinator
 import io.github.daniele21.localllm.runtime.ConsumerCapabilityPolicyService
 import io.github.daniele21.localllm.runtime.ConsumerLocalLlmFacade
 import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 import io.github.daniele21.localllm.runtime.InMemoryConsumerUseCasePolicyRegistry
+import io.github.daniele21.localllm.runtime.InferenceAuditLocalLlmClient
+import io.github.daniele21.localllm.runtime.InferenceAuditOriginResolver
+import io.github.daniele21.localllm.runtime.OneShotInferenceAuditEffectivePromptBridge
 import io.github.daniele21.localllm.runtime.RuntimeMemoryPressure
 import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import io.github.daniele21.localllm.runtime.UseCaseActivationId
@@ -49,6 +59,22 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     private val controlPlaneStoreOwner =
         RoomHostControlPlaneStoreOwner.open(appContext, CONTROL_PLANE_DATABASE_NAME)
+    private val telemetryRepositoryOwner = RoomTelemetryRepository.open(
+        context = appContext,
+        databaseName = TELEMETRY_DATABASE_NAME,
+        retention = TelemetryRetentionPolicy(
+            maxRuns = MAX_RETAINED_RUNS,
+            maxLogs = MAX_RETAINED_LOGS,
+            maxResourceSnapshots = MAX_RETAINED_RESOURCE_SNAPSHOTS,
+        ),
+    )
+    private val inferenceAuditRepositoryOwner = RoomInferenceAuditRepository.open(
+        context = appContext,
+        databaseName = INFERENCE_AUDIT_DATABASE_NAME,
+    )
+    private val effectivePromptBridge = OneShotInferenceAuditEffectivePromptBridge()
+    val inferenceActivitySource = HarnessInferenceActivitySource(inferenceAuditRepositoryOwner)
+    val auditStartupState = inferenceActivitySource.reconcileInterrupted(System.currentTimeMillis())
 
     init {
         HarnessControlPlaneStartup(
@@ -69,14 +95,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             runtimeSnapshot = ::runtimeSnapshot,
         ),
     )
-
-    val telemetryRepository: TelemetryRepository = InMemoryTelemetryRepository(
-        TelemetryRetentionPolicy(
-            maxRuns = MAX_RETAINED_RUNS,
-            maxLogs = MAX_RETAINED_LOGS,
-            maxResourceSnapshots = MAX_RETAINED_RESOURCE_SNAPSHOTS,
-        ),
-    )
+    val telemetryRepository: TelemetryRepository = telemetryRepositoryOwner
+    val inferenceAuditRepository: InferenceAuditRepository = inferenceAuditRepositoryOwner
 
     val loadedModelDigest: ModelDigest?
         get() = synchronized(lock) { runtime?.runtimeSnapshot()?.loadedModel }
@@ -102,7 +122,18 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val sharedRuntimeClient: LocalLlmClient
         get() = sharedRuntimeClientFacade
 
-    val consumerClientFactory: (ApplicationId) -> ConsumerLocalLlmClient = { applicationId ->
+    val legacyRuntimeClientFactory = AuthorizedRuntimeClientFactory { caller ->
+        externalAuditedRuntimeClient(
+            caller = caller,
+            delegate = sharedRuntimeClientFacade,
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            effectivePromptBridge = effectivePromptBridge,
+        )
+    }
+
+    val consumerClientFactory = AuthorizedConsumerClientFactory { caller ->
+        val applicationId = caller.applicationId
         val policies =
             when (applicationId) {
                 HarnessSharedRuntimeBindings.consoleApplicationId -> {
@@ -150,7 +181,17 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                     fallback = fallbackPolicyRegistry,
                 ),
             )
-        ConsumerLocalLlmFacade(applicationId, capabilityPolicy, sharedRuntimeClientFacade)
+        ConsumerLocalLlmFacade(
+            applicationId,
+            capabilityPolicy,
+            externalAuditedRuntimeClient(
+                caller = caller,
+                delegate = sharedRuntimeClientFacade,
+                auditRepository = inferenceAuditRepository,
+                telemetryRepository = telemetryRepository,
+                effectivePromptBridge = effectivePromptBridge,
+            ),
+        )
     }
 
     fun installActivationBinding(
@@ -171,8 +212,22 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         registry.selectedModel = model
         ensureRuntime()
         val resolved = registry.resolve(APPLICATION_ID, purpose.useCaseId)
+        val auditedClient = InferenceAuditLocalLlmClient(
+            delegate = requireNotNull(runtimeClient),
+            auditRepository = inferenceAuditRepository,
+            telemetryRepository = telemetryRepository,
+            effectivePromptResolver = effectivePromptBridge,
+            originResolver = InferenceAuditOriginResolver { request ->
+                InferenceAuditOrigin(
+                    kind = InferenceAuditOriginKind.HARNEX_INTERNAL,
+                    applicationId = request.applicationId,
+                    useCaseId = request.useCaseId,
+                )
+            },
+        )
         PhoneHarness(
             runtime = requireNotNull(runtime),
+            client = auditedClient,
             applicationId = resolved.binding.applicationId,
             useCaseId = resolved.binding.useCaseId,
         )
@@ -204,6 +259,8 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             registry.clearActivationBindings()
             registry.selectedModel = null
         }
+        inferenceAuditRepositoryOwner.close()
+        telemetryRepositoryOwner.close()
         controlPlaneStoreOwner.close()
     }
 
@@ -216,6 +273,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             modelStore = modelStore,
             backend = backend,
             telemetryRepository = telemetryRepository,
+            effectivePromptSink = effectivePromptBridge,
         )
         runtime = orchestrator
         runtimeClient = InProcessLocalLlmClient(orchestrator)
@@ -223,12 +281,15 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
     private fun closeRuntimeLocked() {
         runtime?.close()
+        effectivePromptBridge.clear()
         runtime = null
         runtimeClient = null
     }
 
     companion object {
         private const val CONTROL_PLANE_DATABASE_NAME = "harness-control-plane.db"
+        private const val TELEMETRY_DATABASE_NAME = "harnex-telemetry.db"
+        private const val INFERENCE_AUDIT_DATABASE_NAME = "harnex-inference-audit.db"
         private const val MAX_RETAINED_RUNS = 200
         private const val MAX_RETAINED_LOGS = 1_000
         private const val MAX_RETAINED_RESOURCE_SNAPSHOTS = 200
@@ -242,6 +303,27 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
         }
     }
 }
+
+private fun externalAuditedRuntimeClient(
+    caller: AuthorizedCaller,
+    delegate: LocalLlmClient,
+    auditRepository: InferenceAuditRepository,
+    telemetryRepository: TelemetryRepository,
+    effectivePromptBridge: OneShotInferenceAuditEffectivePromptBridge,
+): LocalLlmClient = InferenceAuditLocalLlmClient(
+    delegate = delegate,
+    auditRepository = auditRepository,
+    telemetryRepository = telemetryRepository,
+    effectivePromptResolver = effectivePromptBridge,
+    originResolver = InferenceAuditOriginResolver { request ->
+        InferenceAuditOrigin(
+            kind = InferenceAuditOriginKind.EXTERNAL_CONSUMER,
+            applicationId = request.applicationId,
+            useCaseId = request.useCaseId,
+            verifiedPackageName = caller.packageName,
+        )
+    },
+)
 
 internal fun HarnessRuntimeGraph.recentRuns(limit: Int = DEFAULT_RUN_LIMIT): List<GenerationRunRecord> =
     telemetryRepository.recentRuns(limit)

@@ -5,7 +5,7 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.workstreams
 Read when: creating, locating, updating or finalizing a bounded implementation workstream
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-05
 
 This directory is the canonical home for repository-level **temporary implementation workstreams** that must preserve dependency, sequencing or handoff state across pull requests or coding agents.
 

@@ -19,8 +19,6 @@ val phoneTestUploadSigningPartiallyConfigured =
     phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
 val allowUnsignedRelease =
     System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
-val sharedRuntimeReleasePermission = "io.github.daniele21.localllm.permission.USE_LOCAL_LLM"
-val sharedRuntimeDebugPermission = "io.github.daniele21.localllm.debug.permission.USE_LOCAL_LLM"
 
 gradle.taskGraph.whenReady {
     val packagesPhoneTestRelease =
@@ -101,8 +99,6 @@ android {
         versionCode = effectiveVersionCode
         versionName = effectiveVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
-        buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
     }
 
     signingConfigs {
@@ -121,8 +117,6 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeDebugPermission
-            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeDebugPermission\"")
             ndk {
                 abiFilters += "arm64-v8a"
             }
@@ -130,8 +124,6 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
-            manifestPlaceholders["sharedRuntimePermission"] = sharedRuntimeReleasePermission
-            buildConfigField("String", "SHARED_RUNTIME_PERMISSION", "\"$sharedRuntimeReleasePermission\"")
             ndk {
                 abiFilters += "arm64-v8a"
             }
@@ -196,6 +188,7 @@ dependencies {
     implementation(project(":backends:llama-cpp"))
     implementation(project(":observability:contracts"))
     implementation(project(":observability:in-memory-store"))
+    implementation(project(":observability:room-store"))
     implementation(project(":observability:health-engine"))
     implementation(project(":observability:android-resource-probe"))
     implementation(project(":observability:benchmark-engine"))

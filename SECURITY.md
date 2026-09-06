@@ -6,7 +6,7 @@ The project is pre-1.0. Security fixes are applied to the latest development lin
 
 ## Reporting a vulnerability
 
-Do not open a public issue for vulnerabilities involving model import, file access, native memory safety, diagnostics permissions, prompt disclosure or future Binder access control.
+Do not open a public issue for vulnerabilities involving model import, file access, native memory safety, diagnostics permissions, prompt disclosure or Binder access control.
 
 Report the issue privately to the repository owner through GitHub's private vulnerability reporting feature when enabled. Include:
 
@@ -19,9 +19,13 @@ Report the issue privately to the repository owner through GitHub's private vuln
 
 ## Security defaults
 
-- Prompt and output persistence is disabled by default.
+- Sensitive inference input, effective prompt, output and reasoning may persist only in the bounded app-private Activity audit store, encrypted before Room persistence with an app-scoped Android Keystore key.
+- Normal telemetry, structured logs and diagnostics export remain content-free and must not carry decrypted Activity content.
+- Audit storage or encryption failure never falls back to plaintext or silently permits unaudited inference.
 - GGUF artifacts must be integrity-checked before loading.
 - Model binaries are not committed to this repository.
 - Native handles remain private to the backend module.
-- Diagnostics access will be protected by signature permission.
-- The future shared runtime will isolate sessions and caches by calling application.
+- The public shared-runtime Service deliberately does not use a custom bind permission: Android does not retroactively grant an unknown custom permission when a Consumer was installed before Harnex, so install order must not decide reachability.
+- Shared-runtime Consumer authorization is fail-closed on Binder calling UID -> exact installed package -> current signing certificate -> Harnex Control Plane authorization -> enabled use case. Caller-supplied identity fields never grant authority.
+- Known independently signed consumers are source-observed as `PENDING`; signing identity replacement becomes `SIGNATURE_CHANGED`; both require explicit Harnex authorization before live access.
+- Emulator-only fault controls and broader diagnostics/control surfaces remain separate from inference binding and retain their own stricter authorization boundary.

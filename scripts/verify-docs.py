@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Canonical documentation validator entry point using the 0.4 engineering policy owner."""
+"""Canonical documentation validator with repo-template-sw schema-2 support."""
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
+import math
 from pathlib import Path
 import sys
 
@@ -20,5 +23,189 @@ for _name in dir(_IMPL):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_IMPL, _name)
 
+
+def _measure(path: Path, chars_per_token: int) -> tuple[int, int]:
+    text = path.read_text(encoding="utf-8")
+    return len(text.splitlines()), math.ceil(len(text) / chars_per_token)
+
+
+def _effective_budget(
+    path: Path,
+    root: Path,
+    default_budget: dict[str, int],
+    exceptions: dict[str, object],
+) -> dict[str, int]:
+    relative = path.resolve().relative_to(root).as_posix()
+    exception = exceptions.get(relative)
+    if not isinstance(exception, dict):
+        return default_budget
+    if exception.get("mode") != "no-growth":
+        raise ValueError(f"unsupported documentation budget exception mode: {relative}")
+    return {
+        "max_lines": int(exception.get("max_lines", default_budget["max_lines"])),
+        "max_estimated_tokens": int(
+            exception.get("max_estimated_tokens", default_budget["max_estimated_tokens"])
+        ),
+    }
+
+
+def _check_budget(
+    path: Path,
+    root: Path,
+    label: str,
+    default_budget: dict[str, int],
+    exceptions: dict[str, object],
+    chars_per_token: int,
+    errors: list[str],
+) -> None:
+    if not path.is_file():
+        return
+    budget = _effective_budget(path, root, default_budget, exceptions)
+    lines, tokens = _measure(path, chars_per_token)
+    if lines > int(budget["max_lines"]):
+        errors.append(f"{label} too long: {lines} > {budget['max_lines']} ({path})")
+    if tokens > int(budget["max_estimated_tokens"]):
+        errors.append(
+            f"{label} too expensive: ~{tokens} > {budget['max_estimated_tokens']} ({path})"
+        )
+
+
+def _schema2_main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", default=".")
+    parser.add_argument("--base")
+    parser.add_argument("--template-mode", action="store_true")
+    args = parser.parse_args()
+
+    root = Path(args.root).resolve()
+    policy_path = root / ".engineering/documentation-policy.json"
+    if not policy_path.is_file():
+        print("FAIL: missing .engineering/documentation-policy.json")
+        return 1
+
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    if policy.get("schema_version") != 2:
+        return _IMPL.main()
+
+    budgets = policy.get("budgets", {})
+    exceptions = policy.get("budget_exceptions", {})
+    if not isinstance(exceptions, dict):
+        print("FAIL: budget_exceptions must be an object")
+        return 1
+    chars_per_token = int(policy.get("estimated_token_characters", 4))
+    errors: list[str] = []
+
+    required_budgets = {
+        "root_agents",
+        "scoped_agents",
+        "current_state",
+        "active_workstream",
+        "architecture",
+        "feature_doc",
+    }
+    missing = required_budgets - set(budgets)
+    if missing:
+        errors.append(f"documentation policy missing budgets: {sorted(missing)}")
+    else:
+        _check_budget(
+            root / "AGENTS.md",
+            root,
+            "root AGENTS",
+            budgets["root_agents"],
+            exceptions,
+            chars_per_token,
+            errors,
+        )
+        _check_budget(
+            root / "docs/current-state.md",
+            root,
+            "current state",
+            budgets["current_state"],
+            exceptions,
+            chars_per_token,
+            errors,
+        )
+        _check_budget(
+            root / "docs/architecture.md",
+            root,
+            "architecture",
+            budgets["architecture"],
+            exceptions,
+            chars_per_token,
+            errors,
+        )
+
+        excluded = set(policy.get("context_exclude_directories", []))
+        for guide in root.rglob("AGENTS.md"):
+            if guide == root / "AGENTS.md" or any(
+                part in excluded for part in guide.relative_to(root).parts
+            ):
+                continue
+            _check_budget(
+                guide,
+                root,
+                "scoped AGENTS",
+                budgets["scoped_agents"],
+                exceptions,
+                chars_per_token,
+                errors,
+            )
+
+        feature_root = root / "docs/features"
+        if feature_root.is_dir():
+            for path in feature_root.glob("*.md"):
+                if path.name != "README.md":
+                    _check_budget(
+                        path,
+                        root,
+                        "feature doc",
+                        budgets["feature_doc"],
+                        exceptions,
+                        chars_per_token,
+                        errors,
+                    )
+
+        workstream_root = root / "docs/workstreams"
+        completed_markers = tuple(
+            marker.lower() for marker in policy.get("completed_workstream_markers", [])
+        )
+        active_count = 0
+        if workstream_root.is_dir():
+            for path in workstream_root.glob("*.md"):
+                if path.name == "README.md" or path.name.startswith("_"):
+                    continue
+                active_count += 1
+                _check_budget(
+                    path,
+                    root,
+                    "active workstream",
+                    budgets["active_workstream"],
+                    exceptions,
+                    chars_per_token,
+                    errors,
+                )
+                text = path.read_text(encoding="utf-8").lower()
+                if any(marker in text for marker in completed_markers):
+                    errors.append(
+                        f"completed workstream kept active: {path.relative_to(root)}; finalize/delete by default"
+                    )
+        else:
+            active_count = 0
+
+    print("Documentation health")
+    print(f"active workstreams: {locals().get('active_count', 0)}")
+    for error in errors:
+        print(f"FAIL: {error}")
+    print("RESULT:", "FAIL" if errors else "PASS")
+    return 1 if errors else 0
+
+
 if __name__ == "__main__":
+    policy_path = Path(".engineering/documentation-policy.json")
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        policy = {}
+    if policy.get("schema_version") == 2:
+        raise SystemExit(_schema2_main())
     raise SystemExit(_IMPL.main())

@@ -104,6 +104,7 @@ object Qwen35RuntimeTuningProfiles {
         id = when (tier) {
             Qwen35ModelTier.B0_8 -> "qwen35-08b-android-candidate"
             Qwen35ModelTier.B2 -> "qwen35-2b-android-candidate"
+            Qwen35ModelTier.B4 -> "qwen35-4b-android-candidate"
         },
         version = VERSION,
         tier = tier,

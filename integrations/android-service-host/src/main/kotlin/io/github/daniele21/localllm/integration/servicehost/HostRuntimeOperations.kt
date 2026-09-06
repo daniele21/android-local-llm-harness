@@ -17,14 +17,15 @@ internal class HostRuntimeOperations(
     private val ledger: ClientConnectionLedger,
     private val resources: HostRuntimeResources,
     private val controlExecutor: HostControlExecutor,
+    private val authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory? = null,
 ) {
-    private val generationOperations =
-        HostGenerationOperations(
-            client = client,
-            ledger = ledger,
-            resources = resources,
-            controlExecutor = controlExecutor,
-        )
+    private val generationOperations = HostGenerationOperations(
+        client = client,
+        ledger = ledger,
+        resources = resources,
+        controlExecutor = controlExecutor,
+        authorizedRuntimeClientFactory = authorizedRuntimeClientFactory,
+    )
 
     fun prepare(caller: AuthorizedCaller, request: PrepareRequestParcel, callback: HostResultCallback<PrepareResultParcel>) {
         val validationError = validatePrepare(caller, request)
@@ -70,7 +71,7 @@ internal class HostRuntimeOperations(
             val token = HostClientToken(request.clientToken.value)
             val sessionId = ledger.sessionId(token, caller, request.externalSessionId).successOrNull() ?: return@submitOrReject
             try {
-                client.closeSession(sessionId)
+                runtimeClient(caller).closeSession(sessionId)
                 ledger.removeSession(token, caller, request.externalSessionId)
             } catch (_: RuntimeException) {
                 // Preserve ownership so explicit close or death cleanup can retry.
@@ -85,13 +86,12 @@ internal class HostRuntimeOperations(
             callback.onResult(prepareFailure(request.operationId, connectionError))
             return
         }
-        val result =
-            try {
-                client.prepare(caller.applicationId, UseCaseId(request.useCaseId))
-            } catch (_: RuntimeException) {
-                callback.onResult(prepareFailure(request.operationId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
-                return
-            }
+        val result = try {
+            runtimeClient(caller).prepare(caller.applicationId, UseCaseId(request.useCaseId))
+        } catch (_: RuntimeException) {
+            callback.onResult(prepareFailure(request.operationId, wireError(WireErrorCodes.RUNTIME_FAILURE)))
+            return
+        }
         callback.onResult(prepareResult(request.operationId, result))
     }
 
@@ -106,20 +106,27 @@ internal class HostRuntimeOperations(
             callback.onResult(sessionFailure(request.operationId, connectionError))
             return
         }
-        val sessionId =
-            try {
-                client.createSession(caller.applicationId, UseCaseId(request.useCaseId), request.options.toCore())
-            } catch (_: RuntimeException) {
-                callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
-                return
-            }
+        val runtimeClient = try {
+            runtimeClient(caller)
+        } catch (_: RuntimeException) {
+            callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
+            return
+        }
+        val sessionId = try {
+            runtimeClient.createSession(caller.applicationId, UseCaseId(request.useCaseId), request.options.toCore())
+        } catch (_: RuntimeException) {
+            callback.onResult(sessionFailure(request.operationId, wireError(WireErrorCodes.SESSION_UNAVAILABLE)))
+            return
+        }
         when (val registered = ledger.registerSession(token, caller, request.externalSessionId, sessionId)) {
             is LedgerResult.Success -> callback.onResult(sessionSuccess(request.operationId, request.externalSessionId))
 
             is LedgerResult.Failure -> {
-                runCatching { client.closeSession(sessionId) }
+                runCatching { runtimeClient.closeSession(sessionId) }
                 callback.onResult(sessionFailure(request.operationId, registered.reason.toHostWireError()))
             }
         }
     }
+
+    private fun runtimeClient(caller: AuthorizedCaller): LocalLlmClient = authorizedRuntimeClientFactory?.create(caller) ?: client
 }

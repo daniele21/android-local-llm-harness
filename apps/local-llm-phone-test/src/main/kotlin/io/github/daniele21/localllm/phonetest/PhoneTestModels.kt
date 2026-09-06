@@ -5,6 +5,7 @@ import io.github.daniele21.localllm.contracts.EffectiveGenerationMetadata
 import io.github.daniele21.localllm.contracts.GenerationMetrics
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.ModelDigest
 import io.github.daniele21.localllm.contracts.SeedPolicy
 import io.github.daniele21.localllm.contracts.ThinkingMode
@@ -47,7 +48,12 @@ data class ImportedPhoneModel(
     }
 }
 
-internal data class PhoneHarness(val runtime: RuntimeOrchestrator, val applicationId: ApplicationId, val useCaseId: UseCaseId)
+internal data class PhoneHarness(
+    val runtime: RuntimeOrchestrator,
+    val client: LocalLlmClient,
+    val applicationId: ApplicationId,
+    val useCaseId: UseCaseId,
+)
 
 internal enum class PlaygroundPhase {
     IDLE,
@@ -232,7 +238,7 @@ internal fun resolvedPhoneUseCase(
     contextSize: Int = 2_048,
 ): ResolvedUseCase {
     val release = Qwen35PhoneModelPolicy.requireCurated(model)
-    val tier = if (release.id.modelId.value.startsWith("qwen35-08b-")) Qwen35ModelTier.B0_8 else Qwen35ModelTier.B2
+    val tier = Qwen35PhoneModelPolicy.tierFor(release)
     val applicationId = ApplicationId("play-internal-phone-test")
     val useCaseId = UseCaseId(useCaseValue)
     val modelProfileId = "${release.profileKey.value}-$profileSuffix"
@@ -254,7 +260,6 @@ internal fun resolvedPhoneUseCase(
         flashAttention = runtimeTuning.flashAttention,
         chatTemplatePolicy = ChatTemplatePolicy(),
         runtimeCapabilities = runtimeProfile.runtimeCapabilities(),
-
     )
     val useCase = UseCaseProfile(
         id = useCaseProfileId,

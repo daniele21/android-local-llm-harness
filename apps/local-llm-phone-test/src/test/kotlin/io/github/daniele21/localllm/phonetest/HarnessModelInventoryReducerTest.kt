@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import io.github.daniele21.localllm.catalog.CuratedModelCatalog
 import io.github.daniele21.localllm.contracts.ModelDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,8 +11,8 @@ import org.junit.Test
 class HarnessModelInventoryReducerTest {
     @Test
     fun `distribution and selection events converge on one inventory`() {
-        val digest = ModelDigest("a".repeat(64))
-        val metadata = metadata(digest)
+        val metadata = curatedMetadata(0)
+        val digest = metadata.digest
         val distribution = PhoneModelDistributionState(
             catalogStatus = PhoneCatalogLoadStatus.READY,
             models = listOf(catalogModel(metadata)),
@@ -86,6 +87,15 @@ class HarnessModelInventoryReducerTest {
         assertEquals(loadedDigest.sha256, reduced.modelInventory.loadedDigest)
         assertEquals(HarnessModelLifecycle.DEGRADED, reduced.modelInventory.items.single().lifecycle)
         assertFalse(reduced.removalConfirmationPending)
+    }
+
+    private fun curatedMetadata(index: Int): InstalledCatalogModelMetadata {
+        val release = CuratedModelCatalog.releases[index]
+        return InstalledCatalogModelMetadata.from(
+            release = release,
+            target = release.allowedTargets.first(),
+            installedAtEpochMs = 1L,
+        )
     }
 
     private fun catalogModel(metadata: InstalledCatalogModelMetadata): PhoneCatalogModelUi = PhoneCatalogModelUi(

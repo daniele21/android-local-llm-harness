@@ -65,7 +65,7 @@ internal fun harnessPresetConfigurationSummary(
     val option = requireNotNull(inference.option)
     val modelOptions = harnessPresetModelOptions(useCaseId)
     val tiers = if (selectedModelProfileId == null) {
-        listOf(Qwen35ModelTier.B0_8, Qwen35ModelTier.B2)
+        listOf(Qwen35ModelTier.B0_8, Qwen35ModelTier.B2, Qwen35ModelTier.B4)
     } else {
         val selected = modelOptions.singleOrNull { it.modelProfileId == selectedModelProfileId }
             ?: return unavailableSummary("Selected model target is not available in the curated runtime catalog.")
@@ -157,6 +157,7 @@ private fun profileRow(
 private fun Qwen35ModelTier.label(): String = when (this) {
     Qwen35ModelTier.B0_8 -> "0.8B"
     Qwen35ModelTier.B2 -> "2B"
+    Qwen35ModelTier.B4 -> "4B"
 }
 
 private fun Long?.toDurationLabel(): String = when {

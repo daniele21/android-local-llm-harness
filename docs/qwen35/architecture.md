@@ -5,7 +5,7 @@ Document type: architecture
 Owner: qwen35
 Canonical scope: qwen35.architecture
 Read when: changing Qwen3.5 module ownership, curated model handling, generation planning or backend/runtime boundaries
-Last reviewed: 2026-08-08
+Last reviewed: 2026-09-06
 
 This document defines only the Qwen3.5 policy delta. Repository dependency direction and generic execution mechanics remain owned by [`../architecture.md`](../architecture.md).
 
@@ -57,7 +57,7 @@ Do not introduce `ModelFamilyAdapter`, sibling family adapters or another runtim
 
 ### Qwen3.5 policy owns
 
-- curated tier declaration (`0.8B`, `2B`);
+- curated tier declaration (`0.8B`, `2B`, and reviewed `4B` 4-bit-only under ADR 0019);
 - reviewed generation and runtime profile mapping for exact catalog artifacts;
 - translation of neutral thinking intent into Qwen3.5 template semantics;
 - chat-template kwargs required by Qwen3.5;
@@ -103,9 +103,19 @@ catalog release id
   -> backend compatibility evidence
 ```
 
+For 4B, the policy boundary is stricter than a generic parameter-count match. A release is product-eligible only if it is one of the exact Unsloth artifacts admitted by ADR 0019 and its quantization is in the reviewed 4-bit set. `Qwen35ModelTier.B4` is a distinct policy/evidence identity; it must never fall through to the 2B tier.
+
 The catalog does not make runtime proof unnecessary. SHA-256, GGUF integrity and the pinned backend must still be validated for the exact artifact. Those checks protect the known product path from corruption or backend regressions; they are not a generic arbitrary-model admission system.
 
 Developer validation tools may inject exact test artifacts into isolated test applications. This capability must not appear in consumer contracts or connected product UI.
+
+## Generation-policy boundary
+
+Consumer APIs stay neutral. Qwen3.5-specific sampler values are resolved by Harnex after model/use-case selection.
+
+For the 4B tier, the existing Harnex presets map to Unsloth's Qwen3.5 guidance rather than reusing 2B defaults. The model's upstream thinking default is not relied upon: Harnex resolves an explicit `ThinkingMode` and translates it to typed `enable_thinking` chat-template kwargs.
+
+Changing the selected model while a built-in preset is active re-resolves that preset for the new tier. Manual overrides remain explicit custom configuration and are not silently discarded. This prevents stale lower-tier sampler values from masking B4 policy.
 
 ## Hybrid/recurrent capability boundary
 
@@ -122,6 +132,8 @@ optimization requested
 ```
 
 The initial safe state is conservative: ordinary context lifecycle is allowed; snapshot/restore or prefix-cache optimizations stay disabled until validated against the exact backend build and curated artifact.
+
+The new 4B tier starts with its own `CANDIDATE` runtime tuning identity and the same bounded Harnex context tiers used for controlled Android measurement. Model-advertised maximum context is not a runtime authorization signal.
 
 ## Artifact and evidence boundaries
 
@@ -151,6 +163,6 @@ data class Qwen35CompatibilityEvidence(
 )
 ```
 
-Certification is a separate record keyed by the exact artifact, backend, profiles and device envelope. It is not implied by catalog availability.
+Certification is a separate record keyed by the exact artifact, backend, profiles and device envelope. It is not implied by catalog availability, tier membership or another quantization's evidence.
 
 Upstream evidence is only a design input. Compatibility and risky runtime capabilities require proof against the repository's exact backend build; the owning checks are in [`workstreams/model-compatibility.md`](workstreams/model-compatibility.md) and [`workstreams/runtime-tuning.md`](workstreams/runtime-tuning.md).

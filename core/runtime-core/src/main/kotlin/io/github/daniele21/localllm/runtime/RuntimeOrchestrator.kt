@@ -62,6 +62,7 @@ class RuntimeOrchestrator(
     seedSource: SeedSource = SeedSource { ThreadLocalRandom.current().nextLong(MAX_SEED_EXCLUSIVE) },
     telemetryRepository: TelemetryRepository = NoOpTelemetryRepository,
     epochClock: EpochClock = EpochClock { System.currentTimeMillis() },
+    private val effectivePromptSink: InferenceAuditEffectivePromptSink = InferenceAuditEffectivePromptSink { _, _ -> },
 ) : LocalLlmClient,
     RuntimeEvaluationBatchClient,
     AutoCloseable {
@@ -428,6 +429,7 @@ class RuntimeOrchestrator(
                 systemPromptVersion = resolved.systemPromptVersion,
                 thinkingMode = resolved.thinkingMode,
             )
+            effectivePromptSink.publish(request.requestId, promptPlan.prompt)
             runtimeTelemetry.prepared(
                 requestId = request.requestId,
                 configuration = effective,

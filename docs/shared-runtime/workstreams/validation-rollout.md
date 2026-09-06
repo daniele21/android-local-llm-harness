@@ -5,20 +5,21 @@ Document type: feature-specification
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.validation-rollout
 Read when: adding shared-runtime tests, two-APK device execution, evidence, compatibility matrices or release gates
-Last reviewed: 2026-08-13
+Last reviewed: 2026-09-06
 
 ## Goal
 
-Prove that the Binder boundary preserves functional behavior, authorization, isolation, cleanup, privacy and acceptable device overhead before any client SDK or host capability is distributed.
+Prove that the Binder boundary preserves functional behavior, authorization, isolation, cleanup, privacy and acceptable device overhead before any client SDK or host capability is promoted as release-ready.
 
 This workstream does not certify model quality. It consumes exact Qwen3.5 runtime evidence and adds cross-process transport/deployment evidence.
 
 ## Dependencies
 
+- ADR 0018 independently signed consumer trust boundary.
 - SR-1 protocol fixtures.
 - SR-2 host and SR-3 client deterministic tests.
 - SR-4 two-APK vertical slice.
-- Applicable Q35 tuning/validation evidence before consumer release.
+- Applicable Q35 tuning/validation evidence before a release claim that includes real model execution.
 
 ## Inspect before editing
 
@@ -38,101 +39,98 @@ Read backend/native evidence sources only for cases that exercise JNI/model life
 wire unit/parcel tests
   -> host/client deterministic tests with fakes
   -> same-APK separate-process Binder instrumentation where useful
-  -> two separately installed APK emulator preflight
-  -> two separately installed APK physical-device evidence
+  -> production-shaped two-APK emulator preflight with the claimed signing + install-order topology
+  -> applicable two-APK physical/Play evidence
   -> packaged AAR consumer and release compatibility review
 ```
 
-Passing a lower layer never substitutes for a higher required layer. Emulator results are preflight only.
+Passing a lower layer never substitutes for a higher layer when that higher layer supplies unique evidence. Emulator evidence can fully satisfy deterministic Binder/authorization/install-order behavior, but it cannot substitute for Play App Signing identity, representative hardware/runtime or other REAL_ENVIRONMENT evidence when those are part of the claim.
 
 ## Test applications
 
-Primary development/preflight path:
+Same-publisher development path:
 
 - host: `apps/local-llm-phone-test`;
 - client: `apps/local-llm-console`;
-- debug variants signed by the common Android debug signing identity;
-- exact host component and permission names supplied to the client build.
+- debug variants may share the common Android debug signing identity where same-publisher behavior is the intended topology;
+- the client binds to the exact configured Host component.
 
-Primary SR-6 release-like path:
+Independent-consumer path:
 
-- host: release `apps/local-llm-phone-test` APK;
-- client: release `apps/shared-runtime-client-consumer-fixture` APK consuming packaged release Binder AARs;
-- host/client/test APKs signed by the accepted common external signing identity;
-- exact package, version and certificate digests recorded before execution.
+- host: `apps/local-llm-phone-test`;
+- consumer: a separately developed application such as RedactGuard using the packaged/source-built exact Consumer SDK candidate;
+- Host and consumer/test APKs use distinct signing identities;
+- the Consumer is installed before the Host in the install-order proof and must reach the explicit exported service afterward without Consumer reinstall;
+- the public inference service has no custom bind permission;
+- Harnex observes the exact installed consumer package/current signer as `PENDING`;
+- consumer is denied by Binder/Control Plane policy before explicit Harnex authorization;
+- Host-owned authorization promotes only that exact observed identity;
+- authorized connect -> disconnect -> reconnect is exercised without sharing signing credentials;
+- a replacement signer cannot inherit prior authorization.
 
-Negative authorization path:
+Packaged SR-6 fixture path remains useful for same-publisher packaged-AAR and invalid-signer denial evidence. It is not, by itself, evidence that an independently distributed consumer works.
 
-- rebuild only the consumer fixture with an ephemeral independent PKCS12 key generated outside source control;
-- attempt explicit binding and verify `PERMISSION_DENIED` before protocol/runtime information;
-- delete the key and password with the runner temporary workspace;
-- never commit keystores, passwords or exported signing material.
+Negative authorization paths include unknown/mismatched package/signer identities using ephemeral signing material generated outside source control. Keys/passwords are deleted with the runner temporary workspace and are never committed.
 
-Do not use `sharedUserId`. Do not weaken the service permission to simplify instrumentation.
+Do not use `sharedUserId`. Do not weaken Binder caller verification. Emulator fault/control surfaces remain separate from the public inference bind surface and retain their stricter test-only authorization.
 
-## Device runners
+## Device and CI runners
 
-SR-4 debug/emulator/device functional preflight:
+SR-4 same-publisher debug emulator/device functional preflight:
 
 ```text
 scripts/run-shared-runtime-device-e2e.sh
 ```
 
-SR-6 release-like evidence capture:
+SR-6 packaged release-like evidence capture:
 
 ```text
 scripts/capture-shared-runtime-release-evidence.sh
 ```
 
-The SR-6 runner:
+Cross-repository independent-signer CI owns the production-topology Binder authorization proof for external consumers. Its evidence must record exact Harnex/consumer source revisions, distinct APK signer digests, Consumer-before-Host reachability and the deny -> explicit authorize -> connect/disconnect/reconnect -> replacement signer denied sequence.
 
-1. requires an explicit device or exactly one connected device;
-2. rejects emulators by default and labels `--allow-emulator` execution as preflight only;
-3. requires a clean checkout and records the exact git commit;
-4. builds same-signer release host/client/test APKs using external signing material;
-5. verifies APK signing-certificate SHA-256 digests before installation;
-6. installs/upgrades the host while preserving its selected curated-model state;
-7. executes packaged-AAR prepare/session/stream/complete/cancel/close tests;
-8. terminates/restarts the host and verifies typed disconnect/reconnect behavior;
-9. captures privacy-safe timing/token/cancellation markers plus memory/thermal snapshots;
-10. generates a temporary independent signing identity and verifies denial;
-11. archives reviewable evidence without prompts, outputs, keys, Binder tokens, GGUF bytes, adb serials or host-private paths.
-
-Use `--host-only` to install/launch the correctly signed release host for first-time curated-model setup. The runner never downloads arbitrary models or reaches into host-private model storage.
+The SR-6 physical runner remains appropriate for runtime/device evidence and same-publisher packaged fixture scenarios. For an independently distributed Play consumer, Play Internal installation and physical confirmation record the actual Host/consumer Play App Signing identities rather than pretending local external signing keys are equivalent to Play.
 
 ## Functional matrix
 
 | Case | Expected result | Evidence owner |
 | --- | --- | --- |
-| Host absent | Typed host-not-installed state; no retry loop. | SR-3 deterministic / SR-4 preflight |
-| Host present, model absent | Bind succeeds; prepare fails explicitly without download. | SR-4/SR-6 device |
-| Valid same-signer client | Register, prepare, stream, complete and close. | SR-4 debug + SR-6 release-like |
-| Invalid signer | Bind/authorization denied before runtime information. | SR-6 release-like |
+| Host absent | Typed host-not-installed state; no retry loop. | SR-3 deterministic / consumer UI preflight |
+| Consumer installed before Host | After Host install, explicit service binding is reachable without Consumer reinstall; authorization still starts fail-closed. | independent-signer E2E |
+| Host present, model absent | Bind/auth can succeed; prepare fails explicitly without download. | SR-4/SR-6 |
+| Known independent consumer first observed | Persisted pending; Binder runtime access denied. | Host tests + independent-signer E2E |
+| Explicitly authorized independent consumer | Exact package/current signer can register only for enabled use cases. | independent-signer E2E |
+| Consumer signer replaced | Fail closed as signature-changed until explicit reauthorization. | Host tests + replacement evidence where required |
+| Unknown/mismatched signer | Authorization denied before runtime information. | deterministic/E2E negative |
+| Valid same-publisher client | Register, prepare, stream, complete and close when intentionally configured. | SR-4 + packaged fixture |
 | Unauthorized use case | Typed denial; no model load. | SR-2/SR-5 deterministic |
 | Protocol major mismatch | Incompatible before registration/prepare. | SR-1 fixtures |
 | Compatible minor mismatch | Negotiated common feature set. | SR-1 fixtures |
+| Explicit disconnect/reconnect | Registration releases; same reusable client can establish a fresh authorized epoch. | Consumer SDK tests + independent-signer E2E |
 | Cancel while queued | One cancelled terminal event and released mapping. | SR-5 deterministic |
-| Cancel during decode | Cooperative backend cancellation and reusable runtime. | SR-6 physical |
-| Client killed | Host cancels/closes only that client's resources. | SR-5 deterministic / device review |
-| Host killed | Client receives one disconnect outcome; reconnect starts clean. | SR-5 deterministic + SR-6 physical |
+| Cancel during decode | Cooperative backend cancellation and reusable runtime. | SR-6 physical when real runtime claimed |
+| Client killed | Host cancels/closes only that client's connection-scoped resources. | SR-5 deterministic / device review |
+| Host killed | Client receives one disconnect outcome; reconnect starts clean. | SR-5 deterministic + applicable E2E |
 | Two clients | Existing scheduler serializes decode; ownership remains isolated. | SR-5 deterministic |
 | Same external IDs | Host internal IDs remain collision-free across clients. | SR-5 deterministic |
 | Slow callback | Bounded backpressure cancellation; no unbounded growth. | SR-5 deterministic |
-| Unbind/rebind | Old sessions invalid; new registration works. | SR-5 deterministic / SR-6 device |
 
 ## Lifecycle and resource matrix
 
-Measure or assert:
+Measure or assert as applicable:
 
 - service create/bind/unbind/destroy counts where instrumentation exposes them safely;
 - active client/session/request ledger cleanup through deterministic host tests;
 - Binder death-recipient registration/removal through deterministic host tests;
+- reusable Consumer SDK disconnect/reconnect creates fresh connection epochs;
 - runtime loaded-model and scheduler state after client death;
 - model remains installed and selected after service/client cleanup;
 - host UI recreation does not duplicate runtime/service graph;
-- process PSS before and after the release-like evidence sequence;
+- pure bind/handshake and unauthorized requests do not create a parallel runtime, select a model or load GGUF;
+- process PSS before and after release-like real-runtime evidence;
 - cancellation latency and generation timing metrics;
-- thermal snapshots before and after the evidence sequence;
+- thermal snapshots before and after real-runtime evidence;
 - no sustained callback/executor/thread growth over repeated runs when the matrix is extended.
 
 Transport overhead is compared with an equivalent in-process run only when execution identity, model state and device conditions are comparable. Do not attribute model performance changes to Binder without matching evidence.
@@ -143,23 +141,26 @@ Use unique non-sensitive sentinel strings in deterministic tests and assert abse
 
 - normal host/client structured telemetry;
 - Room databases or exported reports;
-- filtered logcat captured by the runner;
+- filtered logcat captured by runners;
 - saved instance state and app-private preference/database projections;
 - failure messages and evidence files.
 
-The release-like instrumentation may hold bounded generated output in memory only long enough to reconstruct the core terminal event. Shared artifacts omit prompt, reasoning and answer text.
+Release-like instrumentation may hold bounded generated output in memory only long enough to reconstruct the core terminal event. Shared artifacts omit prompt, reasoning and answer text.
 
 Security review covers:
 
-- exported service and permission ownership;
-- explicit component binding;
-- calling UID/package/signing verification;
+- exported explicit-component inference service with no custom bind permission;
+- Consumer-before-Host reachability without reinstall;
+- Binder calling UID -> exact installed package -> current signing certificate verification;
+- Harnex Control Plane pending/authorized/disabled/signature-changed state projection;
+- explicit authorization of source-observed identity rather than caller-supplied identity;
+- authorization before model resolution/expensive work;
 - token entropy and cross-UID rejection;
 - use-case allowlist and absence of client model control;
 - request/session quota enforcement;
-- independently signed client denial without information leakage;
+- unknown/mismatched/replacement signer denial without information leakage;
 - no path, Binder token, key/password or full-certificate disclosure;
-- no unintended diagnostics/control-plane access.
+- emulator fault/control and diagnostics permissions remain separate from inference binding.
 
 ## Compatibility matrix
 
@@ -167,27 +168,32 @@ Maintain fixtures and device/package coverage for:
 
 | Client | Host | Expected |
 | --- | --- | --- |
-| v1.0 | v1.0 | Full v1 baseline. |
+| compatible current client | compatible current host | Explicit component bind succeeds; common protocol features negotiate after caller authorization. |
+| Consumer installed before current Host | current permissionless-bind Host | Reachable after Host install without Consumer reinstall; pending/authorized state still enforced by Binder policy. |
 | older compatible minor | newer minor | Common negotiated features. |
 | newer compatible minor | older minor | Client avoids unavailable optional features. |
-| v1 | future incompatible major | Fail before registration. |
+| legacy client expecting historical custom bind permission | current Host | No false security/compatibility assumption; supported SDK migration is explicit. |
+| current client | legacy signature-permission host | No false compatibility claim; migration/unavailability is explicit. |
+| v1 | future incompatible major | Fail before runtime preparation. |
 | current SDK | host missing required feature | Typed incompatibility. |
 
-Upgrade tests cover host replacement while the client is installed and client replacement while the host/model state remains. No upgrade test assumes live sessions survive process/package replacement.
+Upgrade tests cover host replacement while the client is installed and consumer replacement while the host/model state remains. A signer replacement must never inherit authorization silently. No upgrade test assumes live sessions survive process/package replacement.
 
 ## Evidence identity
 
-Every physical evidence record includes:
+Every cross-APK evidence record includes the fields material to the scenario:
 
 ```text
-harness git commit
+harnex git commit
 host package/version/build type/signing certificate digest
-client package/version/build type/signing certificate digest
+consumer package/version/build type/signing certificate digest
 client SDK version
 Binder protocol major/minor and negotiated features where available
-Android device model/version/ABI
-exact host-selected model artifact identity from the prepare/runtime evidence
-llama.cpp revision
+install order where material
+Harnex authorization state transition where tested
+Android device model/version/ABI for physical evidence
+exact host-selected model artifact identity when runtime execution is tested
+llama.cpp revision when native execution is tested
 scenario and cold/warm classification where applicable
 terminal code/stop reason
 timing, token, memory and thermal fields applicable to the scenario
@@ -201,43 +207,48 @@ It excludes GGUF bytes, prompt/output/schema text, app-private paths, Binder tok
 | --- | --- | --- |
 | SR-VAL-01 | DONE | Shared-runtime fixtures, matrices and evidence identity are defined. |
 | SR-VAL-02 | DONE | Host/client deterministic coverage and real two-APK Binder instrumentation exist. |
-| SR-VAL-03 | DONE | Repeatable SR-4 two-APK debug emulator/device preflight runner is integrated. |
-| SR-VAL-04 | IN PROGRESS | Ephemeral independently signed denial fixture and runner are implemented; physical execution is pending. |
+| SR-VAL-03 | DONE | Repeatable same-publisher two-APK debug emulator/device preflight runner is integrated. |
+| SR-VAL-04 | DONE | Independent signer negative authorization path is deterministic. |
 | SR-VAL-05 | DONE | Multi-client, ID collision, death and bounded-backpressure matrices are deterministic and green. |
 | SR-VAL-06 | DONE | Binder-boundary runtime-detail/sentinel privacy assertions are deterministic and green. |
-| SR-VAL-07 | IN PROGRESS | Protocol fixtures are complete; package upgrade/replacement device evidence remains pending. |
-| SR-VAL-08 | IN PROGRESS | Physical release-like functional/lifecycle runner is implemented; representative device evidence is pending. |
+| SR-VAL-07 | IN PROGRESS | Protocol fixtures are complete; package/signing replacement evidence remains claim-dependent. |
+| SR-VAL-08 | IN PROGRESS | Physical release-like functional/lifecycle runner is implemented; representative device evidence remains claim-dependent. |
 | SR-VAL-09 | PLANNED | Compare Binder overhead against matching in-process evidence on the same device/model/profile identity. |
 | SR-VAL-10 | IN PROGRESS | Packaged release AAR consumer is executable; final security/public-API/versioning/release review remains pending. |
+| SR-VAL-11 | IN PROGRESS | Distinct-signer external consumer Consumer-before-Host -> deny -> authorize -> disconnect/reconnect -> replacement-denied E2E is integrated and awaits exact-head confirmation. |
 
 ## Merge gate
 
-Each implementation PR runs the narrowest deterministic checks for its owner. SR-4 and later additionally require:
+Each implementation PR runs the narrowest sufficient selector-driven deterministic checks for its blast radius. Security/Manifest/Binder/public-SDK/cross-app changes are STRONG or stronger as selected and include, as applicable:
 
-- both application unit/lint/assembly checks;
-- binder contract/client/host checks;
+- affected application unit/lint/assembly checks;
+- Binder contract/client/host checks;
 - packaged consumer-fixture compilation;
+- Consumer SDK ABI/external-consumer validation;
 - repository formatting, Detekt and model-artifact guard;
-- repository-wide Android checks for shared contracts/Gradle/manifests;
-- packaging verification;
-- documentation and agent-navigation guards.
+- Android manifest/packaging verification;
+- distinct-signer cross-APK authorization/install-order E2E for independent-consumer trust changes;
+- documentation, ADR and agent-navigation guards.
 
-Physical runner execution is mandatory for the SR-6 exit gate, but it is not fabricated in generic GitHub-hosted CI when no representative Android device, selected model or signing identity is available.
+An automatable deterministic gate remains REMOTE_AUTOMATED when the agent lacks the local Android environment; it is not delegated to a human. REAL_ENVIRONMENT evidence is reserved for facts automation cannot establish, such as actual Play App Signing identities on installed Internal builds, representative hardware/runtime behavior and human UX/accessibility judgement where required.
 
 ## Consumer-release gate
 
-Do not publish the client AAR or describe the host as application-consumable until:
+Do not describe the Host/Consumer combination as release-ready until:
 
-- SR-1 through SR-5 are integrated and their deterministic gates pass;
-- physical two-APK evidence passes for supported release-like variants;
-- applicable Q35 artifact/runtime physical evidence is complete;
-- cancellation, death, memory and thermal behavior is reviewable;
-- invalid-signer and incompatible-version cases pass;
+- SR-1 through SR-5 applicable deterministic gates pass on the exact candidate;
+- the claimed Host/consumer signing and install-order topology is represented by exact deterministic evidence;
+- independently distributed consumers prove distinct signers, Consumer-before-Host reachability without reinstall, denial before explicit authorization and success after authorizing the exact observed identity;
+- replacement/unknown/mismatched signer cases remain denied;
+- applicable Play/physical confirmation passes when actual distribution identity is material;
+- applicable Q35 artifact/runtime physical evidence is complete for model/runtime claims;
+- cancellation, death, memory and thermal behavior is reviewable where material;
+- incompatible-version cases pass;
 - public API and protocol compatibility policies are accepted;
 - the consumer sample executes against the packaged release AAR;
-- release notes bind host/client/protocol/runtime/backend/model identities;
-- release artifacts are built from an exact validated `main` commit.
+- release notes bind host/consumer/client-SDK/protocol/signing/runtime/backend/model identities as applicable;
+- stable release artifacts are built from an exact validated promotion commit.
 
 ## Completion criteria
 
-SR-5 completes when isolation, death, bounded transport and privacy matrices pass deterministically. SR-6 completes only when physical evidence and release review support the exact distribution claim. Host/client emulator success or repository CI alone cannot close SR-6.
+SR-5 completes when isolation, death, bounded transport and privacy matrices pass deterministically. SR-6 completes only when deterministic automation plus the genuinely required REAL_ENVIRONMENT evidence support the exact distribution/runtime claim. Repository CI is sufficient for deterministic Binder authorization/install-order claims; it cannot fabricate Play App Signing or representative physical-runtime evidence.
