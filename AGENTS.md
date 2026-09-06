@@ -5,7 +5,7 @@ Harnex is the Android local-AI harness: it owns runtime lifecycle, policy, Binde
 ## Durable invariants
 
 - Model/runtime/Binder state has one canonical owner; UI and adapters translate, they do not duplicate policy.
-- JNI handles, jobs, models, processes and temporary evidence are bounded, cancellable and cleaned on every applicable exit path.
+- JNI handles, jobs, models, processes and temporary evidence are bounded, cancellable and cleaned on every exit path.
 - Public Binder/Consumer changes require direct-consumer compatibility evidence.
 - Emulator proof never implies ARM64 JNI/llama.cpp, real GGUF, physical memory/thermal or OEM behavior.
 - Build/package identity and immutable successful artifact semantics remain truthful.
@@ -40,7 +40,7 @@ Read architecture/features/ADRs only for concrete questions. Upstream adoption/u
 ## Delivery boundaries
 
 - **ITERATION**: owner-local falsification; no exact-head/full-diff/docs/publication ceremony after each edit.
-- **INTEGRATION**: coherent outcome ready for `dev`; current affected docs, exact candidate/base, required automated gates and affected critical E2E. Material UI/UX integration journeys require `FULL_MEDIA`. Residual physical confirmation is `DEFERRED_TO_RELEASE`.
+- **INTEGRATION**: coherent outcome ready for `dev`; affected docs, exact candidate/base, required automated gates and affected critical E2E. Material UI/UX integration journeys require `FULL_MEDIA`. Residual physical confirmation is `DEFERRED_TO_RELEASE`.
 - **RELEASE**: `FULL` release evidence plus every applicable blocking real-environment confirmation.
 
 Stage and validation depth are independent. Resolve risk dimensions into required gates; unknown executable scope fails safe stronger. Missing local tooling does not make the user the Gradle/native runner. Reuse only provably equivalent trusted evidence. Prefer early convergence; stacked publication is exception-only.
