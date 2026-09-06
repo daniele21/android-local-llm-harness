@@ -11,24 +11,32 @@ README = ROOT / "README.md"
 SETTINGS = ROOT / "settings.gradle.kts"
 IGNORED_PARTS = {".git", ".gradle", ".idea", "build", "third_party"}
 REQUIRED_HEADINGS = {
-    "## Read only what the task requires",
     "## Durable invariants",
-    "## Ownership routing",
-    "## Delivery model",
-    "## Validation model",
-    "## Evidence reuse",
-    "## E2E / fidelity",
-    "## Parallel development",
-    "## Documentation",
-    "## Failure discipline",
+    "## Ownership",
+    "## Read by task",
+    "## Delivery boundaries",
+    "## Context, diagnosis and completion",
 }
 REQUIRED_ROUTING_TARGETS = {
     ".engineering/commands.json",
     ".engineering/e2e.json",
+    ".engineering/documentation-policy.json",
+    "skills/structured-change/SKILL.md",
     "skills/validate-change/SKILL.md",
     "skills/preflight-change/SKILL.md",
     "skills/remote-preflight/SKILL.md",
+    "skills/plan-workstream/SKILL.md",
+    "skills/finalize-workstream/SKILL.md",
     "docs/current-state.md",
+}
+REQUIRED_DELIVERY_PRINCIPLES = {
+    "ITERATION",
+    "INTEGRATION",
+    "RELEASE",
+    "risk dimensions",
+    "required gates",
+    "stacked publication",
+    "DEFERRED_TO_RELEASE",
 }
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 GRADLE_MODULE = re.compile(r'"(:[^"\n]+)"')
@@ -56,11 +64,11 @@ def validate_root_guide(errors: list[str]) -> None:
     if not ROOT_GUIDE.is_file(): errors.append("missing root AGENTS.md"); return
     text = ROOT_GUIDE.read_text(encoding="utf-8")
     for heading in sorted(REQUIRED_HEADINGS):
-        if heading not in text: errors.append(f"AGENTS.md: missing required heading: {heading}")
+        if heading not in text: errors.append(f"AGENTS.md: missing required 0.10 heading: {heading}")
     for target in sorted(REQUIRED_ROUTING_TARGETS):
         if target not in text: errors.append(f"AGENTS.md: missing canonical routing target: {target}")
-    for principle in ("ITERATION", "INTEGRATION", "RELEASE", "risk dimensions", "required gates", "stacked publication"):
-        if principle not in text: errors.append(f"AGENTS.md: missing 0.9 delivery principle: {principle}")
+    for principle in sorted(REQUIRED_DELIVERY_PRINCIPLES):
+        if principle not in text: errors.append(f"AGENTS.md: missing 0.10 delivery principle: {principle}")
 
 def validate_module_discoverability(guides: list[Path], errors: list[str]) -> None:
     if not SETTINGS.is_file(): errors.append("missing settings.gradle.kts"); return
@@ -90,7 +98,7 @@ def main() -> int:
         print("Agent navigation validation failed:", file=sys.stderr)
         for error in errors: print(f"- {error}", file=sys.stderr)
         return 1
-    print(f"Agent navigation is valid: {len(guides)} guide(s), all configured modules discoverable.")
+    print(f"Agent navigation is valid for repo-template-sw 0.10: {len(guides)} guide(s), all configured modules discoverable.")
     return 0
 
 if __name__ == "__main__": raise SystemExit(main())
