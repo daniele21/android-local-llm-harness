@@ -155,13 +155,14 @@ Today:
 
 - the Android product and control plane are integrated;
 - shared runtime and Consumer/Binder boundaries are implemented and the API 35 cross-application lifecycle/fault/serialization matrix is green;
+- independently signed consumer apps are supported with install-order-safe explicit binding and Harnex-owned Binder UID/package/signer/Control Plane authorization;
 - durable local inference Activity/audit is implemented with verified caller attribution, encrypted sensitive content, truthful terminal states and restart-safe history;
-- Consumer Android SDK `0.1.0-alpha.10` is published from the validated Harnex integration baseline;
-- the corresponding Harnex phone-test is published to Google Play Internal Testing;
-- the validated Harnex baseline has been promoted to the stable `main` line through the repository RELEASE/FULL path;
-- RedactGuard consumes alpha.10, has also been promoted to its stable `main`, has green cross-repository automated evidence and has been manually confirmed working end to end on a real Android device;
+- Consumer Android SDK `0.1.0-alpha.11` is published from the current validated Harnex baseline and includes reversible `disconnect()`;
+- the corresponding Harnex phone-test candidate is published to Google Play Internal Testing;
+- RedactGuard consumes alpha.11, is published to Play Internal Testing, and its Consumer-first/PENDING/authorize/Connect/Disconnect/Reconnect/signer-replacement evidence is green with a distinct signer;
+- repository governance is aligned to `repo-template-sw` `0.10.0` while preserving Harnex-specific Android/local-AI/product-UI customizations;
 - product support is currently curated around Qwen3.5 dense 0.8B and 2B;
-- representative physical-device evidence is still required for formal ARM64/JNI/GGUF, memory, thermal, OEM and selected release claims.
+- actual Play App Signing identity confirmation plus representative physical ARM64/JNI/GGUF, memory, thermal, OEM and selected release evidence remain separate real-environment gates.
 
 The exact integrated state and blockers live in [`docs/current-state.md`](docs/current-state.md).
 
