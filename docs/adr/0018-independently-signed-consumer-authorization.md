@@ -68,7 +68,11 @@ A consumer may explicitly connect, disconnect and reconnect. `disconnect()` rele
 
 ### Emulator-only control remains separate
 
-Test-only fault/control surfaces are not part of the public inference bind surface. Emulator E2E controls remain variant-scoped and separately signature-protected so install-order-safe inference reachability does not broaden test-control authority.
+Test-only fault/control surfaces are not part of the public inference bind surface. The primary emulator fault receiver remains variant-scoped and protected by Harnex's separate signature-level test permission.
+
+For independently signed cross-application CI, the `emulatorE2e` Host variant also exposes a distinct Host-process shell bridge protected by the platform `android.permission.DUMP` permission. The bridge accepts only the bounded emulator E2E action allowlist and invokes the same canonical test-only command handler as the signature-protected receiver. The production-shaped Consumer neither receives the signature test permission nor holds `DUMP`, and the bridge is absent from production variants.
+
+Keeping this bridge in the Host process is intentional: shell control must not depend on a nested ordered-broadcast relay through the androidTest APK, whose result delivery can be blocked behind the outer ordered broadcast.
 
 ## Consequences
 
@@ -80,6 +84,7 @@ Test-only fault/control surfaces are not part of the public inference bind surfa
 - Signing identity changes fail closed and require reauthorization.
 - Cross-APK validation must use distinct Host and consumer signing keys, include Consumer-before-Host installation, and include an unauthorized-before-approval negative proof.
 - Same-signer-only or Host-first-only evidence is insufficient for production readiness of independently distributed consumers.
+- Cross-signer emulator fault injection remains test-only: ordinary test control is signature-protected, while the separate Host-process CI bridge is `DUMP`-protected and allowlisted.
 
 ## Compatibility
 
@@ -103,7 +108,8 @@ Deterministic evidence must prove at least:
 - the authorized consumer can connect, disconnect and reconnect without destroying the client;
 - an unapproved replacement signer cannot inherit access;
 - binding/handshake does not load a model or create a parallel runtime;
-- emulator-only control surfaces remain absent from production variants or separately protected.
+- production variants do not expose emulator-only control surfaces;
+- cross-signer emulator control reaches only the `emulatorE2e` Host's bounded `DUMP`-protected shell bridge, while the ordinary fault receiver remains separately signature-protected.
 
 Physical Play Internal testing remains required before a stable promotion claim because Play App Signing identity is the real distribution environment that exposed the original assumption gap.
 
