@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: shared-runtime
 Canonical scope: shared-runtime.target
 Read when: deciding the shared-runtime product boundary, trust model, user flow, goals or non-goals
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 ## Problem
 
@@ -13,26 +13,26 @@ An Android application should be able to request local LLM generation from a sep
 
 The host centralizes model bytes and RAM residency while preserving the repository's explicit application/use-case binding, single-decode default, privacy rules and backend-neutral public lifecycle.
 
-The distributed product cannot require Host and consumer APKs to share one signing key. Harnex and independently developed consumers may use distinct Play App Signing identities, so caller trust must be derived from Binder/Android identity and explicit Harnex authorization rather than co-signing.
+The distributed product cannot require Host and consumer APKs to share one signing key, nor can it require a Consumer reinstall merely because the Host was installed later. Harnex and independently developed consumers may use distinct Play App Signing identities and independent install order, so caller trust must be derived from Binder/Android identity and explicit Harnex authorization rather than co-signing or a late-defined custom permission.
 
 ## Actors
 
 | Actor | Responsibility |
 | --- | --- |
-| Host application | Installs and selects reviewed models, owns runtime state, application authorization and the protected service. |
-| Client application | Declares the bind capability, connects, chooses an authorized use case, submits bounded input and consumes typed events. |
+| Host application | Installs and selects reviewed models, owns runtime state, application authorization and the exported Binder service. |
+| Client application | Connects to the exact Host component, chooses an authorized use case, submits bounded input and consumes typed events. |
 | Host operator/user | Installs/selects models and explicitly controls whether an observed consumer identity may use Harnex. |
 | Android platform | Isolates processes, supplies Binder caller identity/package/signing information and carries Binder transactions. |
 
 ## Target user flow
 
 ```text
-install Harnex and an independently signed consumer
+install Harnex and an independently signed consumer in either order
   -> Harnex observes the consumer package + current signing certificate
   -> consumer remains pending until the user explicitly authorizes it in Harnex
   -> user installs/selects a curated model in the host
-  -> client binds with an explicit ComponentName and BIND_LOCAL_LLM capability permission
-  -> host verifies Binder UID -> exact package -> signer -> Control Plane authorization
+  -> client binds with an explicit ComponentName
+  -> host verifies Binder UID -> exact package -> current signer -> Control Plane authorization
   -> host verifies protocol compatibility and requested use case
   -> client prepares an allowlisted use case
   -> host resolves caller ApplicationId + UseCaseId to one exact model profile
@@ -46,7 +46,7 @@ Model absence, pending/disabled authorization, signer replacement, incompatible 
 
 ## Product contract
 
-ADR 0018 defines the current trust boundary. Host and consumer APKs may be independently signed. The exported service uses the variant-specific `BIND_LOCAL_LLM` normal permission only as an explicit binding capability; actual authority is revalidated inside the Binder service from Android-derived caller identity and Harnex Control Plane policy.
+ADR 0018 defines the current trust boundary. Host and consumer APKs may be independently signed and independently installed. The exported Harnex service has no custom bind permission; actual authority is revalidated inside the Binder service from Android-derived caller identity and Harnex Control Plane policy before privileged or expensive work.
 
 The client may provide:
 
@@ -75,7 +75,7 @@ The host derives application identity from the verified Binder caller. Known ind
 
 - Reuse the existing runtime data plane without duplicating generation policy.
 - Deduplicate installed model bytes and loaded model memory across authorized clients.
-- Support independently signed Android consumers without sharing Harnex signing credentials.
+- Support independently signed Android consumers without sharing Harnex signing credentials or depending on install order.
 - Preserve exact Binder UID/package/signer verification and explicit Harnex application authorization.
 - Preserve explicit `ApplicationId + UseCaseId` resolution and exact artifact identity.
 - Make streaming, cancellation, terminal outcomes and cleanup deterministic across transport/process changes.
@@ -87,7 +87,7 @@ The host derives application identity from the verified Binder caller. Known ind
 
 ## Non-goals
 
-- Treating `BIND_LOCAL_LLM` possession as authorization.
+- Treating service reachability as authorization.
 - Trusting caller-supplied package/signing/application identity.
 - Automatically authorizing an app merely because it is installed or known by package name.
 - Silently carrying authorization across an unreviewed signing identity change.
@@ -95,7 +95,7 @@ The host derives application identity from the verified Binder caller. Known ind
 - Sharing private file paths, model bytes, native handles or Room databases.
 - Cross-device or network inference.
 - A generic always-on foreground-service background execution product.
-- Folding emulator fault controls or diagnostics/control-plane administration into the inference bind permission.
+- Folding emulator fault controls or diagnostics/control-plane administration into the public inference bind surface.
 - Changing core lifecycle contracts to Android parcelables.
 
 ADR 0016 separately allows explicit durable logical jobs to outlive transient Binder transport loss; ordinary connection-scoped operations keep their published cleanup semantics.
@@ -104,14 +104,14 @@ ADR 0016 separately allows explicit durable logical jobs to outlive transient Bi
 
 The accepted architecture resolves:
 
-1. **Trust:** exact Binder UID -> installed package -> signing certificate -> Harnex Control Plane authorization; no co-signing requirement for independent consumers.
-2. **Binding capability:** `BIND_LOCAL_LLM` is a normal manifest permission and not a security grant.
+1. **Trust:** exact Binder UID -> installed package -> current signing certificate -> Harnex Control Plane authorization; no co-signing requirement for independent consumers.
+2. **Binding reachability:** the public Harnex service uses explicit-component binding with no custom bind permission, so Consumer-before-Host and Host-before-Consumer installation orders converge on the same authorization boundary.
 3. **Authorization UX:** observation is `PENDING`; signer replacement is `SIGNATURE_CHANGED`; both require explicit Harnex approval before live access.
 4. **Host identity:** `apps/local-llm-phone-test` is the proof Host, not automatically the final distributed Host product.
 5. **API ownership:** generated AIDL is an internal transport detail; the Consumer AAR is the supported consumer surface.
 6. **Compatibility:** protocol major/minor and feature negotiation fail closed before model preparation.
 7. **Model control:** the client chooses an authorized use case, while the Host owns exact model binding and readiness.
-8. **Diagnostics:** inference, emulator fault controls and broader diagnostics remain separate capabilities/permissions.
+8. **Diagnostics:** inference, emulator fault controls and broader diagnostics remain separate capabilities and authorization boundaries.
 
 Changes to these assumptions require an ADR update before dependent implementation changes.
 
@@ -131,7 +131,8 @@ Consumer distribution additionally requires the applicable physical Qwen3.5 runt
 The shared runtime succeeds when separately installed, independently signed Host and authorized consumer APKs can complete:
 
 ```text
-observe pending identity -> explicit authorize -> bind -> negotiate -> prepare -> open session -> stream -> complete -> disconnect -> reconnect
+consumer-before-host or host-before-consumer
+  -> observe pending identity -> explicit authorize -> bind -> negotiate -> prepare -> open session -> stream -> complete -> disconnect -> reconnect
 ```
 
 and can safely recover or fail closed for:
@@ -158,8 +159,9 @@ Publishing the Consumer AAR or presenting Harnex as application-consumable requi
 - security and public API review;
 - compatibility policy and consumer sample/evidence;
 - deterministic cross-APK evidence using distinct Host and consumer signing identities for independent-consumer claims;
+- Consumer-before-Host reachability without reinstalling the Consumer;
 - an unauthorized-before-approval negative proof;
 - exact release notes for Host, Consumer SDK and protocol versions;
 - physical Play Internal confirmation before stable promotion when Play App Signing identity is material.
 
-Same-key emulator evidence is not sufficient to prove independently signed distribution compatibility.
+Same-key or Host-first-only emulator evidence is not sufficient to prove independently signed distribution compatibility.
