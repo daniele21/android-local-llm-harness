@@ -5,7 +5,7 @@ Document type: architecture
 Owner: shared-runtime
 Canonical scope: shared-runtime.architecture
 Read when: changing shared-runtime deployment, module ownership, dependency direction, identity, threading or lifecycle
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 ## Deployment shape
 
@@ -15,8 +15,8 @@ Client APK process
     -> BinderLocalLlmClient
       -> explicit bind + AIDL proxy
         == Binder boundary ==
-          -> exported Service behind BIND_LOCAL_LLM capability permission
-            -> Binder UID/package/signer authorization and wire mapping
+          -> exported explicit-component Service
+            -> Binder UID/package/current-signer authorization and wire mapping
               -> Harnex Control Plane application/use-case policy
                 -> LocalLlmClient / RuntimeOrchestrator
                   -> explicit model binding
@@ -37,7 +37,7 @@ The proof service runs in the host application's existing process so it can reus
 | `transports/android-binder-client` | Binding state machine, proxy, event ordering and `LocalLlmClient` adapter | Host model state, service implementation or generated content persistence |
 | `integrations/android-service-host` | Service delegate, caller identity, client resource ownership and core/wire mapping | Product model selection, Compose or backend implementation |
 | `apps/local-llm-phone-test` | Proof service entry point, Host Control Plane composition and process graph | Parallel runtime, transport policy or client SDK logic |
-| `apps/local-llm-console` | First same-publisher client composition and presentation | AIDL parsing, host storage or model management |
+| `apps/local-llm-console` | Same-publisher client composition and presentation | AIDL parsing, host storage or model management |
 
 Create a module only when its first vertical slice has implementation and tests. `settings.gradle.kts` remains the authoritative module list.
 
@@ -79,7 +79,7 @@ Unknown wire tags and unsupported feature combinations fail explicitly. They are
 
 Identity exists at three levels:
 
-1. **Android caller identity:** calling UID, exact installed package and signing certificate.
+1. **Android caller identity:** calling UID, exact installed package and current signing certificate.
 2. **Product binding identity:** host-owned `ApplicationId + UseCaseId` mapping and authorization state.
 3. **Runtime correlation identity:** host-generated internal session/request identifiers.
 
@@ -89,18 +89,29 @@ The host captures `Binder.getCallingUid()` before dispatching work away from the
 
 ## Authorization model
 
-ADR 0018 supersedes the same-signer/exported-permission portion of ADR 0012. Inference access now has two deliberately different layers:
+ADR 0018 supersedes the same-signer/exported-permission portion of ADR 0012. The public Harnex inference service is exported for explicit-component binding and deliberately has no custom bind permission.
 
-- a variant-specific manifest `BIND_LOCAL_LLM` permission with `normal` protection level, used only as an explicit capability opt-in for binding;
-- service-level Binder UID -> exact package -> installed signer verification projected through Harnex Control Plane authorization and enabled use-case bindings.
+This is required for independently distributed applications. API 35 cross-APK evidence showed that a Consumer installed before a Host that later declares a custom `normal` permission may remain denied after Host installation. Permission grant timing therefore cannot be part of public reachability.
 
-The manifest permission is not the trust boundary. An independently signed app that declares it can reach the bind surface but cannot perform an authorized operation unless its exact Android-derived identity is authorized by Harnex.
+Actual authority is service-level and fail-closed:
+
+```text
+Binder calling UID
+  -> exact installed package
+  -> exact current signer
+  -> persisted Harnex Control Plane authorization
+  -> enabled Host-owned use-case binding
+```
+
+An independently signed app may reach the Binder object, but it cannot perform an authorized operation unless its exact Android-derived identity is authorized by Harnex. Authorization is checked before model resolution or expensive work. Pure binding/handshake cannot select a model, create a second runtime or load GGUF data.
 
 Known independently signed consumers may be discovered from `PackageManager`. First observation is persisted as `PENDING`; signer replacement is persisted as `SIGNATURE_CHANGED`. Neither state is live-authorized. The user must explicitly approve the exact observed identity in the Harnex Control Plane. Disabling an authorized app removes it from live Binder policy. Same-publisher built-ins may retain an intentional reviewed Host signing lineage.
 
 Binding uses an explicit component. No service intent filter, implicit host selection or caller-provided identity fallback is part of the contract. Build variants declare exact Host/client package mappings; debug convenience cannot weaken release authorization.
 
-Authorization is checked before model resolution or expensive work. Denial returns no runtime snapshot, model identity or other client information.
+The reusable `integrations/android-service-host` authorizer may accept an optional platform permission prefilter for another deployment, but Harnex public composition sets no permission and never treats such a prefilter as sufficient authority.
+
+Denial returns no runtime snapshot, model identity or other client information.
 
 ## Model and use-case resolution
 
@@ -136,6 +147,7 @@ Per-request event order is stable even when core events originate on different t
 Ordinary Consumer calls remain connection-scoped; ADR 0016 separately defines explicit durable jobs. For the reusable Binder client:
 
 - the first client bind creates the service as needed;
+- Consumer-before-Host and Host-before-Consumer install order converge on the same Binder authorization path without Consumer reinstall;
 - the service may coexist with the host UI in the same process;
 - each client registers a Binder lifecycle token or callback used with `linkToDeath`;
 - client death cancels its connection-scoped active/queued requests and closes its sessions;
@@ -180,8 +192,8 @@ The host necessarily processes client prompt and output in memory. Neither side 
 
 Privacy-safe telemetry may include authenticated application/use-case identity, protocol/SDK/host version, request lifecycle, queue/load/timing/token metrics, model digest and typed terminal outcome. It excludes prompt, reasoning, answer, JSON schema text, private paths, Binder tokens and certificate material.
 
-Cross-application diagnostics remains a separate read/control protocol with its own permission and redaction policy. Emulator-only fault controls are variant-scoped and separately signature-protected; the normal inference bind permission never grants control-plane or fault-injection authority.
+Cross-application diagnostics remains a separate read/control protocol with its own permission and redaction policy. Emulator-only fault controls are variant-scoped and separately signature-protected; public inference reachability never grants control-plane or fault-injection authority.
 
 ## Architectural gates
 
-An implementation change requires an ADR update when it changes the trust model, exported component, background lifetime, process deployment, public SDK compatibility, model ownership or protocol versioning rule. Public wire changes require compatibility tests and version-policy updates in the same slice. Production-readiness evidence for an independently distributed consumer must use distinct Host/consumer signing identities; same-key emulator evidence is not sufficient.
+An implementation change requires an ADR update when it changes the trust model, exported component, background lifetime, process deployment, public SDK compatibility, model ownership or protocol versioning rule. Public wire changes require compatibility tests and version-policy updates in the same slice. Production-readiness evidence for an independently distributed consumer must use distinct Host/consumer signing identities and Consumer-before-Host installation; same-key or Host-first-only emulator evidence is not sufficient.
