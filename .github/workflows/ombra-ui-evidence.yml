@@ -98,25 +98,54 @@ jobs:
           echo "Error: OMBRA UI emulator did not finish booting." >&2
           exit 1
 
+      - name: Prepare deterministic emulator rotation helper
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/rotate-emulator.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          serial="${ANDROID_SERIAL:-emulator-5554}"
+          target="${1:?rotation target required}"
+
+          current_rotation() {
+            adb -s "$serial" shell dumpsys window \
+              | sed -n 's/.*mRotation=\([0-3]\) mDeferredRotationPauseCount=.*/\1/p' \
+              | head -n 1 \
+              | tr -d '\r'
+          }
+
+          for turn in 0 1 2 3; do
+            before="$(current_rotation)"
+            if [[ "$before" == "$target" ]]; then
+              exit 0
+            fi
+
+            adb -s "$serial" emu rotate >/dev/null
+            for settle in $(seq 1 10); do
+              sleep 1
+              after="$(current_rotation)"
+              if [[ "$after" == "$target" ]]; then
+                exit 0
+              fi
+              if [[ -n "$after" && "$after" != "$before" ]]; then
+                break
+              fi
+            done
+          done
+
+          adb -s "$serial" shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
+          echo "Error: emulator display did not reach rotation $target." >&2
+          exit 1
+          EOF
+          chmod +x "$RUNNER_TEMP/rotate-emulator.sh"
+
       - name: Run OMB-7 review state evidence in portrait
         env:
           ANDROID_SERIAL: emulator-5554
         shell: bash
         run: |
           set -o pipefail
-          adb shell settings put system accelerometer_rotation 0
-          adb shell settings put system user_rotation 0
-          for attempt in $(seq 1 30); do
-            if adb shell dumpsys window | grep -Eq 'mRotation=(ROTATION_0|0)( |$)'; then
-              break
-            fi
-            if [[ "$attempt" == "30" ]]; then
-              adb shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
-              echo "Error: portrait rotation did not settle before OMBRA UI instrumentation." >&2
-              exit 1
-            fi
-            sleep 1
-          done
+          "$RUNNER_TEMP/rotate-emulator.sh" 0
           ./gradlew \
             :apps:local-llm-console:connectedDebugAndroidTest \
             -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
@@ -128,19 +157,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          adb shell settings put system accelerometer_rotation 0
-          adb shell settings put system user_rotation 1
-          for attempt in $(seq 1 30); do
-            if adb shell dumpsys window | grep -Eq 'mRotation=(ROTATION_90|1)( |$)'; then
-              break
-            fi
-            if [[ "$attempt" == "30" ]]; then
-              adb shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
-              echo "Error: landscape rotation did not settle before OMBRA UI instrumentation." >&2
-              exit 1
-            fi
-            sleep 1
-          done
+          "$RUNNER_TEMP/rotate-emulator.sh" 1
           ./gradlew \
             :apps:local-llm-console:connectedDebugAndroidTest \
             -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
@@ -165,40 +182,16 @@ jobs:
           fi
           adb shell pm clear "$package_name" >/dev/null
 
-          adb shell settings put system accelerometer_rotation 0
-          adb shell settings put system user_rotation 0
-          for attempt in $(seq 1 30); do
-            if adb shell dumpsys window | grep -Eq 'mRotation=(ROTATION_0|0)( |$)'; then
-              break
-            fi
-            if [[ "$attempt" == "30" ]]; then
-              adb shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
-              echo "Error: portrait rotation did not settle before OMBRA screenshot capture." >&2
-              exit 1
-            fi
-            sleep 1
-          done
+          "$RUNNER_TEMP/rotate-emulator.sh" 0
           adb shell am start -W -S -n "$package_name/$main_activity" >/dev/null
           adb shell pidof "$package_name" >/dev/null
           sleep 2
           adb exec-out screencap -p > "$evidence_dir/import-portrait.png"
 
-          adb shell settings put system user_rotation 1
-          for attempt in $(seq 1 30); do
-            if adb shell dumpsys window | grep -Eq 'mRotation=(ROTATION_90|1)( |$)'; then
-              break
-            fi
-            if [[ "$attempt" == "30" ]]; then
-              adb shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
-              echo "Error: landscape rotation did not settle before OMBRA screenshot capture." >&2
-              exit 1
-            fi
-            sleep 1
-          done
+          "$RUNNER_TEMP/rotate-emulator.sh" 1
           adb exec-out screencap -p > "$evidence_dir/import-landscape.png"
+          "$RUNNER_TEMP/rotate-emulator.sh" 0
 
-          adb shell settings put system user_rotation 0
-          adb shell settings put system accelerometer_rotation 1
           test -s "$evidence_dir/import-portrait.png"
           test -s "$evidence_dir/import-landscape.png"
           file "$evidence_dir/import-portrait.png" | grep -q 'PNG image data'
