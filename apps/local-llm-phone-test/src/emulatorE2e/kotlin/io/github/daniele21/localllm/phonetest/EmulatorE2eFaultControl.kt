@@ -88,11 +88,10 @@ internal object EmulatorE2eFaultCommandHandler {
         else -> EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
     }
 
-    private fun gateStatusResult() =
-        EmulatorE2eFaultCommandResult(
-            Activity.RESULT_OK,
-            EmulatorE2eGenerationGate.status(),
-        )
+    private fun gateStatusResult() = EmulatorE2eFaultCommandResult(
+        Activity.RESULT_OK,
+        EmulatorE2eGenerationGate.status(),
+    )
 }
 
 internal object EmulatorE2eFaultActions {
