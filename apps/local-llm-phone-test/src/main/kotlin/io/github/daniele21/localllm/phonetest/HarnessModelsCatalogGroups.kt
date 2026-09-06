@@ -30,10 +30,7 @@ internal data class ModelsCatalogGroupEnvironment(
 )
 
 @Composable
-internal fun ModelsCatalogGroups(
-    environment: ModelsCatalogGroupEnvironment,
-    visibleItems: List<HarnessModelInventoryItem>,
-) {
+internal fun ModelsCatalogGroups(environment: ModelsCatalogGroupEnvironment, visibleItems: List<HarnessModelInventoryItem>) {
     var expandedB08 by rememberSaveable { mutableStateOf(false) }
     var expandedB2 by rememberSaveable { mutableStateOf(false) }
     var expandedB4 by rememberSaveable { mutableStateOf(false) }

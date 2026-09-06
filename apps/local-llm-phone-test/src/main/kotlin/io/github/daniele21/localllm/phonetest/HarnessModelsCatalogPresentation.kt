@@ -23,12 +23,10 @@ internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean 
     ModelsSizeFilter.B4 -> item.stableId.startsWith("qwen35-4b-")
 }
 
-internal fun orderGroupItems(
-    group: ModelsSizeFilter,
-    items: List<HarnessModelInventoryItem>,
-): List<HarnessModelInventoryItem> = items.sortedBy { item ->
-    if (item.stableId == group.suggestedModelId) 0 else 1
-}
+internal fun orderGroupItems(group: ModelsSizeFilter, items: List<HarnessModelInventoryItem>): List<HarnessModelInventoryItem> =
+    items.sortedBy { item ->
+        if (item.stableId == group.suggestedModelId) 0 else 1
+    }
 
 internal fun modelsEmptyStateDetail(
     availabilityFilter: ModelsAvailabilityFilter,
