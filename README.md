@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://daniele21.github.io/">Mission</a> ·
   <a href="#why-harnex-exists">Why</a> ·
+  <a href="#why-this-is-more-than-a-llamacpp-wrapper">Why it is different</a> ·
   <a href="#what-you-can-do-today">Today</a> ·
   <a href="#how-to-use-it">How to use it</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -36,7 +37,22 @@ Harnex tackles the Android side of that question:
 
 Without a shared layer, each app has to deal with models, GGUF files, JNI, runtime lifecycle, memory, cancellation and diagnostics on its own.
 
-Harnex puts those concerns behind one Android-owned boundary.
+Harnex moves those concerns behind one Android-owned boundary. Consumer apps keep their product workflow; Harnex owns model resolution, runtime policy, model residency, execution lifecycle and runtime evidence.
+
+## Why this is more than a llama.cpp wrapper
+
+Harnex is an Android **local-AI control plane and shared runtime**. `llama.cpp` is the current execution backend, not the architecture.
+
+Four properties matter most:
+
+- **One governed runtime, not one native stack per app.** Consumer apps use the versioned SDK and Binder boundary. Harnex owns model selection, residency, sessions, generation and cleanup, so those concerns are not reimplemented inside every consumer.
+- **Authorization starts from Android identity.** The Host derives trust from Binder calling UID → installed package → signing certificate → persisted Harnex authorization → enabled use case. Caller-declared identity is not the trust anchor.
+- **Lifecycle is explicit.** Model residency, session admission and generation each have dedicated ownership. Physical model/context operations are serialized, cancellation is first-class, and partial failures are expected to leave the runtime recoverable.
+- **Runtime decisions have evidence.** Latency, TTFT, throughput, memory, thermal state, health and evaluation data are part of the system. Sensitive inference Activity is kept in a separate encrypted local audit domain instead of leaking into normal telemetry or logs.
+
+There is also a deliberate backend boundary: runtime core depends on a backend-neutral SPI, while `llama.cpp`, JNI and native handles stay inside the backend implementation. That keeps model/runtime policy independent from the current inference engine.
+
+See [`docs/architecture.md`](docs/architecture.md) and [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) for the concrete ownership and trust boundaries.
 
 ## What you can do today
 
@@ -101,33 +117,53 @@ For build, emulator, signing and device details, see [`docs/android-build-and-ru
 ## How it works
 
 ```text
-Android app
-    |
-    v
+Consumer Android app
+        |
+        v
 Consumer Android SDK
-    |
-    v
-Binder
-    |
-    v
-Harnex host
-    |
-    +--> model store / use-case policy
-    +--> runtime scheduling / lifecycle
-    +--> encrypted Activity audit/history
-    +--> privacy-safe observability / evaluation
-    |
-    v
-llama.cpp + local GGUF model
+        |
+        v
+Binder IPC
+        |
+        v
++--------------------------------------------+
+|                   HARNEX                   |
+|                                            |
+|  Control Plane                             |
+|  - caller identity / authorization         |
+|  - application + use-case policy           |
+|  - model resolution / capability state     |
+|                                            |
+|  Runtime orchestration                     |
+|  - model residency                         |
+|  - session + generation lifecycle          |
+|  - scheduling / cancellation / cleanup     |
+|                                            |
+|  Evidence                                  |
+|  - telemetry / health / evaluation         |
+|  - encrypted local inference Activity      |
++---------------------+----------------------+
+                      |
+                      v
+              backend-neutral SPI
+                      |
+                      v
+              llama.cpp adapter
+                / JNI / C++
+                      |
+                      v
+                local GGUF model
 ```
 
-Harnex keeps a few boundaries explicit:
+The important ownership boundaries are simple:
 
-- **Consumer apps own the workflow.** They should not own GGUF files, JNI or Harnex runtime internals.
+- **Consumer apps own the workflow.** They do not own GGUF files, JNI or Harnex runtime internals.
 - **Harnex owns model and runtime policy.** Model resolution is explicit; there is no silent model substitution.
+- **Harnex owns runtime lifecycle.** Model residency, sessions, generation, cancellation and cleanup are explicit runtime concerns rather than incidental backend calls.
+- **Harnex owns the shared trust boundary.** External access is authorized from Binder caller identity and Harnex policy, not a package name supplied by the caller.
+- **The backend owns execution, not policy.** Runtime core talks to a backend-neutral SPI; the `llama.cpp` adapter owns the Kotlin/JNI/C++ integration and native handles stay inside that backend boundary.
 - **Harnex owns inference audit truth.** Sensitive input/effective prompt/output may live in bounded encrypted local Activity storage, while normal telemetry and logs stay content-free.
 - **Model states stay separate.** Downloaded, installed, selected and resident do not mean the same thing.
-- **Runtime limits are visible.** Scheduling, cancellation, memory pressure and cleanup are first-class behavior.
 - **Evidence stays honest.** Emulator evidence is not presented as physical-device or production evidence.
 
 For the full architecture, see [`docs/architecture.md`](docs/architecture.md) and the accepted [`docs/adr/README.md`](docs/adr/README.md).
