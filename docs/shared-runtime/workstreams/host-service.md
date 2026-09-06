@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-host
 Canonical scope: shared-runtime.host-service
 Read when: implementing or reviewing the exported service, caller authorization, runtime delegation or caller-owned cleanup
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 ## Goal
 
@@ -25,24 +25,23 @@ Expose one existing host-owned `LocalLlmClient` data plane through an explicitly
 
 ## Manifest and caller boundary
 
-The proof Host is exported behind a variant-specific normal capability permission:
+The public proof Host is exported for explicit-component binding and deliberately has **no custom bind permission**. Consumers likewise do not request a Harnex bind permission.
 
-- release: `io.github.daniele21.localllm.permission.BIND_LOCAL_LLM`;
-- debug: `io.github.daniele21.localllm.debug.permission.BIND_LOCAL_LLM`.
+This removes install-order coupling from reachability. API 35 cross-APK evidence showed that a Consumer installed before Harnex did not receive a later-declared custom `normal` permission when Harnex was installed afterward. A public Consumer contract cannot depend on reinstalling the Consumer just to make Android re-evaluate a permission that did not exist at its original install time.
 
-This permission is only an explicit opt-in to the bind surface. It is not an authorization grant. The service has no intent filter and clients bind with an explicit component.
-
-Every privileged Binder operation revalidates the Android-derived caller boundary before Host policy or runtime work:
+The service has no intent filter and clients bind with an explicit component. Reachability is not authorization: every privileged Binder operation revalidates the Android-derived caller boundary before Host policy or runtime work:
 
 ```text
 Binder calling UID
   -> exact installed package
-  -> exact signing certificate
+  -> exact current signing certificate
   -> Harnex Control Plane authorization state
   -> enabled Host-owned use-case binding
 ```
 
 Caller-supplied package, application ID, certificate digest or UID never determines authorization. Ambiguous UID/package resolution, unknown package, signer mismatch, pending/disabled state, signer replacement and unauthorized use case fail closed before model resolution.
+
+Because an arbitrary app can reach the Binder object, pre-authorization work remains intentionally bounded. Pure binding/registration/handshake cannot create a parallel runtime, select a model or load GGUF data, and unauthorized calls fail before expensive runtime work. `integrations/android-service-host` may support an optional permission prefilter for another Host deployment, but Harnex public authorization never depends on it.
 
 Same-publisher Console registrations retain the reviewed Host signing lineage. Independently signed consumers such as RedactGuard are observed from `PackageManager`, persisted as `PENDING` on first observation and require explicit user authorization in Harnex. A later observed signer replacement becomes `SIGNATURE_CHANGED` and requires explicit reauthorization before the new signer enters live policy.
 
@@ -121,6 +120,7 @@ Android onTrimMemory/onLowMemory
 ## Lifecycle behavior
 
 - Pure bind, registration, handshake and snapshot do not create a runtime or load a model.
+- Consumer-before-Host and Host-before-Consumer installation orders converge on the same Binder authorization behavior.
 - Explicit prepare remains inert while no host model is selected.
 - Control-plane activation resolves and binds execution identity but does not import, verify or load model bytes.
 - A public custom preset remains the same preset identity across activation, Consumer API capability validation and runtime generation while its tuning stays host-owned.
@@ -150,13 +150,15 @@ The host never exposes exception classes/stacks, native or model-store paths, si
 | SR-HOST-07 | DONE | Implement proof Host service manifest and app composition. |
 | SR-HOST-08 | DONE | Extend one host binding registry for authorized external use cases. |
 | SR-HOST-09 | DONE | Add memory-pressure/service-destroy integration without duplicate runtime ownership. |
-| SR-HOST-10 | DONE | Separate bind capability from independent-consumer authorization and require explicit approval of observed signer identity. |
+| SR-HOST-10 | DONE | Make public binding install-order safe while keeping independent-consumer authority on exact Binder package/signer plus explicit Harnex approval. |
 
 ## Deterministic coverage
 
 Coverage includes:
 
 - authorized caller, unknown package, invalid signature and ambiguous UID mapping;
+- optional permission-prefilter denial when a deployment configures one;
+- permissionless public Host authorization still requiring exact package/signer policy;
 - same-publisher Console package registration;
 - independently signed RedactGuard observation as pending and explicit authorization of its exact signer;
 - signer replacement becoming fail-closed until explicit reauthorization;
@@ -173,15 +175,15 @@ Coverage includes:
 - callback backpressure/failure and privacy-safe error mapping;
 - service close cancelling handles, closing sessions, unlinking lifecycle resources and closing service-owned executors;
 - registration rejection after service close;
-- manifest normal bind-capability boundary plus Binder-owned signer trust;
+- public Host manifest exposing no custom bind permission and Consumer-before-Host install order reaching Binder authorization;
 - emulator-only fault controls remaining separately signature-protected;
 - runtime-core memory-pressure policy and integration coverage.
 
-Cross-APK integration evidence for an independent consumer must sign Host and consumer with distinct keys, prove the identities differ, prove the consumer is denied before explicit Harnex authorization, then prove authorized connect/disconnect/reconnect. Same-key emulator evidence is insufficient for this trust claim.
+Cross-APK integration evidence for an independent consumer must sign Host and consumer with distinct keys, prove the identities differ, install the Consumer before the Host in at least one critical path, prove the consumer is denied by Binder/Control Plane policy before explicit Harnex authorization, then prove authorized connect/disconnect/reconnect and fail-closed signer replacement. Same-key or Host-first-only emulator evidence is insufficient for this trust claim.
 
 ## Acceptance criteria
 
-- Declaring `BIND_LOCAL_LLM` alone never grants runtime access.
+- Consumer-before-Host installation does not require Consumer reinstall or a permission refresh to reach Binder authorization.
 - Unauthorized, pending, disabled or signer-changed callers cannot obtain runtime access.
 - Authorized callers can access only exact registered use cases.
 - An independently signed consumer can be explicitly authorized by exact source-observed package/signer identity without sharing Harnex signing credentials.
