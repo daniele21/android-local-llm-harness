@@ -17,7 +17,7 @@ Harnex is the Android local-AI harness: it owns model/runtime lifecycle, policy,
 | --- | --- | --- |
 | Public/runtime contracts | `core/contracts`, `core/backend-spi`, `core/runtime-core` | adapters, fakes, owner tests |
 | Model/lifecycle truth | `models/model-store`, control-plane stores | runtime/control-plane tests |
-| Binder protocol/client | `transports/android-binder-*` | service host + consumer fixture |
+| Binder protocol/client | `transports/android-binder-*` | `apps/shared-runtime-client-consumer-fixture`, service host, consumer tests |
 | Host/process boundary | `integrations/android-service-host` | two-APK journeys |
 | Native execution | `backends/llama-cpp`, `third_party/llama.cpp` | JNI/native/package gates |
 | Product UI | `apps/local-llm-console`, phone surfaces, `design/ux-contract.json` | design-system tests + journeys |
@@ -33,7 +33,7 @@ Follow applicable scoped `AGENTS.md`. Extend the owner before adding parallel st
 | Material product UI | above + `skills/design-product-experience/SKILL.md` and relevant `design/*` |
 | Integration/release | `skills/preflight-change/SKILL.md`, commands and affected `.engineering/e2e.json` |
 | Missing deterministic remote gate | `skills/remote-preflight/SKILL.md` |
-| Persistent multi-session work | `skills/plan-workstream/SKILL.md` + active plan; finalize with `skills/finalize-workstream/SKILL.md` |
+| Persistent multi-session work | `skills/plan-workstream/SKILL.md` + active plan; `docs/current-state.md` carries repository-level integrated/blocker/next truth; finalize with `skills/finalize-workstream/SKILL.md` |
 
 Read architecture/features/ADRs only for concrete questions. Upstream adoption/update guidance applies only to explicit standard migrations.
 
@@ -43,7 +43,7 @@ Read architecture/features/ADRs only for concrete questions. Upstream adoption/u
 - **INTEGRATION**: coherent outcome ready for `dev`; current affected docs, exact candidate/base, required automated gates and affected critical E2E. Material UI/UX integration journeys require `FULL_MEDIA`. Residual physical confirmation is `DEFERRED_TO_RELEASE`.
 - **RELEASE**: `FULL` release evidence plus every applicable blocking real-environment confirmation.
 
-Stage and validation depth are independent. Unknown executable scope fails safe stronger. Missing local tooling does not make the user the Gradle/native runner. Reuse only provably equivalent trusted evidence.
+Stage and validation depth are independent. Resolve risk dimensions into required gates; unknown executable scope fails safe stronger. Missing local tooling does not make the user the Gradle/native runner. Reuse only provably equivalent trusted evidence. Prefer early convergence; stacked publication is exception-only.
 
 ## Context, diagnosis and completion
 
