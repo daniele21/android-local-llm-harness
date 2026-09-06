@@ -5,6 +5,12 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.HandlerThread
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Shell-only bridge for cross-signer emulator E2E.
@@ -12,6 +18,11 @@ import android.content.Intent
  * The production-shaped consumer must never receive Harnex's signature-only fault-control
  * permission. Instead adb shell reaches this receiver in the co-signed androidTest APK, which then
  * relays only the bounded emulator actions to the real signature-protected Harnex receiver.
+ *
+ * The outer `am broadcast` expects the final ordered-broadcast result synchronously. The relay's
+ * final receiver therefore runs on a dedicated HandlerThread while this receiver waits for the
+ * bounded result; relying on `goAsync()` here can let ActivityManager complete the outer shell
+ * broadcast before the nested result code/data are observable.
  */
 class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -22,7 +33,6 @@ class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
             return
         }
 
-        val pendingResult = goAsync()
         val forwarded =
             Intent(action)
                 .setComponent(ComponentName(HOST_PACKAGE, HOST_FAULT_RECEIVER))
@@ -31,28 +41,40 @@ class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
                         putExtra(EXTRA_VERIFIED_PACKAGE, verifiedPackage)
                     }
                 }
+        val completed = CountDownLatch(1)
+        val forwardedResultCode = AtomicInteger(Activity.RESULT_CANCELED)
+        val forwardedResultData = AtomicReference<String?>(null)
+        val callbackThread = HandlerThread("harnex-emulator-e2e-fault-bridge").apply { start() }
 
-        runCatching {
+        try {
             @Suppress("DEPRECATION")
             context.sendOrderedBroadcast(
                 forwarded,
                 null,
                 object : BroadcastReceiver() {
                     override fun onReceive(context: Context?, intent: Intent?) {
-                        pendingResult.setResultCode(resultCode)
-                        pendingResult.setResultData(resultData)
-                        pendingResult.finish()
+                        forwardedResultCode.set(resultCode)
+                        forwardedResultData.set(resultData)
+                        completed.countDown()
                     }
                 },
-                null,
+                Handler(callbackThread.looper),
                 Activity.RESULT_CANCELED,
                 null,
                 null,
             )
-        }.onFailure { failure ->
-            pendingResult.setResultCode(Activity.RESULT_CANCELED)
-            pendingResult.setResultData("bridge_error=${failure.javaClass.simpleName}")
-            pendingResult.finish()
+            if (!completed.await(BRIDGE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                resultCode = Activity.RESULT_CANCELED
+                resultData = "bridge_timeout"
+                return
+            }
+            resultCode = forwardedResultCode.get()
+            resultData = forwardedResultData.get()
+        } catch (failure: RuntimeException) {
+            resultCode = Activity.RESULT_CANCELED
+            resultData = "bridge_error=${failure.javaClass.simpleName}"
+        } finally {
+            callbackThread.quitSafely()
         }
     }
 
@@ -60,6 +82,7 @@ class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
         const val HOST_PACKAGE = "io.github.daniele21.localllm.phonetest.debug"
         const val HOST_FAULT_RECEIVER = "io.github.daniele21.localllm.phonetest.EmulatorE2eFaultReceiver"
         const val EXTRA_VERIFIED_PACKAGE = "verified_package"
+        const val BRIDGE_TIMEOUT_SECONDS = 3L
 
         val ALLOWED_ACTIONS =
             setOf(
