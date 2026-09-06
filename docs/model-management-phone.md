@@ -54,7 +54,7 @@ Curated starting points are source-backed product policy, not runtime ranking:
 
 A **Recommended start** label means "start with this reviewed artifact for this size tier". It does not claim measured superiority, certification or device performance. Compatibility, certification and measured performance remain separate source-backed evidence.
 
-Cards keep source-backed identity, quantization, size, current status and the one valid lifecycle action visible. **Details** is directly discoverable. Maintenance and destructive controls do not compete with the primary journey: Verify integrity and Remove from device stay in the installed-model overflow menu. Download cancellation is visible while a download is active because it is part of the current operation rather than a maintenance action.
+Cards keep source-backed identity, quantization, size, current status and the one valid lifecycle action visible. **Details** is directly discoverable both from the visible action and the card header; neither route performs a lifecycle mutation. Maintenance and destructive controls do not compete with the primary journey: Verify integrity and Remove from device stay in the installed-model overflow menu. Download cancellation is visible while a download is active because it is part of the current operation rather than a maintenance action.
 
 Technical catalog source/revision, digest, architecture and recovery evidence do not dominate the default list. Per-model technical identity belongs on the model detail route; diagnostics remain the owner of deeper execution evidence.
 
