@@ -1,6 +1,6 @@
 # Harnex — Coding Agent Guide
 
-Harnex is the Android local-AI harness: it owns model/runtime lifecycle, policy, Binder sharing and local inference orchestration. Keep inference local by default and never add silent cloud fallback or content logging.
+Harnex is the Android local-AI harness: it owns runtime lifecycle, policy, Binder sharing and inference orchestration. Keep inference local; never add silent cloud fallback or content logging.
 
 ## Durable invariants
 
