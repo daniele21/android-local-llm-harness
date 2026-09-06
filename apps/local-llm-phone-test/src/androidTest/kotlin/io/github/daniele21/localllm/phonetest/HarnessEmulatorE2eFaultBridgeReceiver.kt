@@ -14,10 +14,7 @@ import android.content.Intent
  * relays only the bounded emulator actions to the real signature-protected Harnex receiver.
  */
 class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action !in ALLOWED_ACTIONS) {
             resultCode = Activity.RESULT_CANCELED
@@ -41,10 +38,7 @@ class HarnessEmulatorE2eFaultBridgeReceiver : BroadcastReceiver() {
                 forwarded,
                 null,
                 object : BroadcastReceiver() {
-                    override fun onReceive(
-                        context: Context?,
-                        intent: Intent?,
-                    ) {
+                    override fun onReceive(context: Context?, intent: Intent?) {
                         pendingResult.setResultCode(resultCode)
                         pendingResult.setResultData(resultData)
                         pendingResult.finish()
