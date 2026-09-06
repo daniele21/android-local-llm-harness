@@ -52,7 +52,7 @@ rg -n 'project\(' models backends apps --glob 'build.gradle.kts'
 ## Local invariants
 
 - SHA-256 is the immutable physical identity; URLs, filenames, catalog IDs and profile IDs are not substitutes.
-- Product eligibility is limited to Qwen3.5 dense 0.8B/2B plus the reviewed 4B **4-bit-only** set under [`ADR 0011`](../docs/adr/0011-qwen35-only-product-support.md) as extended by [`ADR 0019`](../docs/adr/0019-qwen35-4b-four-bit-product-support.md); keep the underlying model contracts neutral, treat import labels as untrusted and retain unsupported installed bytes until explicit user removal.
+- Product eligibility follows [`ADR 0019`](../docs/adr/0019-qwen35-4b-four-bit-product-support.md): Qwen3.5 0.8B/2B plus reviewed 4B 4-bit only; keep model contracts neutral, import labels untrusted and unsupported bytes until explicit removal.
 - `models/model-profile` describes configuration and binding; it does not own filesystem, Room or network behavior.
 - `models/control-plane-room-store` is the Android persistence adapter for Host Control Plane configuration. It preserves immutable revision identity, referential integrity and transactional replacement without owning runtime/model loading.
 - `models/model-store` owns installed artifacts. Imports stream through staging, publish atomically and never expose a partial artifact as ready.
