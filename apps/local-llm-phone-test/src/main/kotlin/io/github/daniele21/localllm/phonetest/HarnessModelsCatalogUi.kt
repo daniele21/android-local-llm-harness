@@ -30,7 +30,6 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
-import java.util.Locale
 
 internal data class UnifiedModelsActions(
     val catalog: PhoneModelDistributionActions,
@@ -63,9 +62,6 @@ internal fun UnifiedModelsCatalog(
 ) {
     var availabilityFilter by rememberSaveable { mutableStateOf(ModelsAvailabilityFilter.ALL) }
     var sizeFilter by rememberSaveable { mutableStateOf(ModelsSizeFilter.ALL) }
-    var expandedB08 by rememberSaveable { mutableStateOf(false) }
-    var expandedB2 by rememberSaveable { mutableStateOf(false) }
-    var expandedB4 by rememberSaveable { mutableStateOf(false) }
     val feedback by ModelActionFeedbackStore.state.collectAsState()
     val catalogItems = state.modelInventory.items.filter { it.origin == HarnessModelOrigin.CATALOG }
     val distributionByStableId = state.modelDistribution.models.associateBy(PhoneCatalogModelUi::stableId)
@@ -82,6 +78,14 @@ internal fun UnifiedModelsCatalog(
         !item.loaded && availabilityFilter.matches(item) && sizeFilter.matches(item)
     }
     val explicitFilterActive = availabilityFilter != ModelsAvailabilityFilter.ALL || sizeFilter != ModelsSizeFilter.ALL
+    val groupEnvironment = ModelsCatalogGroupEnvironment(
+        state = state,
+        actions = actions,
+        distributionByStableId = distributionByStableId,
+        loadingStableId = loadingStableId,
+        progressivelyDisclose = !explicitFilterActive,
+        onOpenModelDetails = onOpenModelDetails,
+    )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ModelsLibrarySummary(state, catalogItems.size)
@@ -103,36 +107,10 @@ internal fun UnifiedModelsCatalog(
             onAvailabilityChanged = { availabilityFilter = it },
             onSizeChanged = { sizeFilter = it },
         )
-        listOf(ModelsSizeFilter.B08, ModelsSizeFilter.B2, ModelsSizeFilter.B4).forEach { group ->
-            val groupItems = orderGroupItems(group, visibleItems.filter(group::matches))
-            if (groupItems.isNotEmpty()) {
-                val expanded = when (group) {
-                    ModelsSizeFilter.B08 -> expandedB08
-                    ModelsSizeFilter.B2 -> expandedB2
-                    ModelsSizeFilter.B4 -> expandedB4
-                    ModelsSizeFilter.ALL -> true
-                }
-                ModelsGroupSection(
-                    state = state,
-                    actions = actions,
-                    group = group,
-                    items = groupItems,
-                    distributionByStableId = distributionByStableId,
-                    loadingStableId = loadingStableId,
-                    progressivelyDisclose = !explicitFilterActive,
-                    expanded = expanded,
-                    onExpandedChanged = { value ->
-                        when (group) {
-                            ModelsSizeFilter.B08 -> expandedB08 = value
-                            ModelsSizeFilter.B2 -> expandedB2 = value
-                            ModelsSizeFilter.B4 -> expandedB4 = value
-                            ModelsSizeFilter.ALL -> Unit
-                        }
-                    },
-                    onOpenModelDetails = onOpenModelDetails,
-                )
-            }
-        }
+        ModelsCatalogGroups(
+            environment = groupEnvironment,
+            visibleItems = visibleItems,
+        )
         if (visibleItems.isEmpty()) {
             HarnessEmptyState(
                 title = "No matching models",
@@ -169,75 +147,6 @@ private fun EmptyCatalogState(state: HarnessUiState, actions: UnifiedModelsActio
                 detail = "The current curated catalog has no models for this device and target.",
             )
         }
-    }
-}
-
-@Composable
-private fun ModelsGroupSection(
-    state: HarnessUiState,
-    actions: UnifiedModelsActions,
-    group: ModelsSizeFilter,
-    items: List<HarnessModelInventoryItem>,
-    distributionByStableId: Map<String, PhoneCatalogModelUi>,
-    loadingStableId: String?,
-    progressivelyDisclose: Boolean,
-    expanded: Boolean,
-    onExpandedChanged: (Boolean) -> Unit,
-    onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
-) {
-    val collapseAlternatives = progressivelyDisclose && items.size > 1
-    val shownItems = if (collapseAlternatives && !expanded) items.take(1) else items
-    val hiddenCount = items.size - shownItems.size
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ModelsGroupHeader(group, items.size)
-        shownItems.forEach { item ->
-            val model = distributionByStableId[item.stableId] ?: return@forEach
-            UnifiedModelCard(
-                state = state,
-                item = item,
-                model = model,
-                actions = actions,
-                onOpenModelDetails = onOpenModelDetails,
-                loading = loadingStableId == item.stableId,
-                suggested = item.stableId == group.suggestedModelId,
-            )
-        }
-        if (collapseAlternatives) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(
-                    onClick = { onExpandedChanged(!expanded) },
-                    modifier = Modifier.heightIn(min = HarnessMinimumTouchTarget),
-                ) {
-                    Text(
-                        if (expanded) {
-                            "Show fewer"
-                        } else {
-                            "Show $hiddenCount alternative${if (hiddenCount == 1) "" else "s"}"
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelsGroupHeader(group: ModelsSizeFilter, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(requireNotNull(group.groupLabel), style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = "$count option${if (count == 1) "" else "s"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -371,71 +280,4 @@ private fun ModelsCatalogFooter(state: HarnessUiState, actions: UnifiedModelsAct
             Text("Refresh")
         }
     }
-}
-
-internal fun loadingStableId(state: HarnessUiState, feedback: ModelActionFeedbackState): String? {
-    if (!state.controllerBusy) return null
-    return state.modelDistribution.models
-        .firstOrNull { feedback.latest == "Loading ${it.fileName} into memory" }
-        ?.stableId
-}
-
-internal fun ModelsAvailabilityFilter.matches(item: HarnessModelInventoryItem): Boolean = when (this) {
-    ModelsAvailabilityFilter.ALL -> true
-    ModelsAvailabilityFilter.INSTALLED -> item.installed
-    ModelsAvailabilityFilter.AVAILABLE -> !item.installed
-}
-
-internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean = when (this) {
-    ModelsSizeFilter.ALL -> true
-    ModelsSizeFilter.B08 -> item.stableId.startsWith("qwen35-08b-")
-    ModelsSizeFilter.B2 -> item.stableId.startsWith("qwen35-2b-")
-    ModelsSizeFilter.B4 -> item.stableId.startsWith("qwen35-4b-")
-}
-
-internal fun orderGroupItems(group: ModelsSizeFilter, items: List<HarnessModelInventoryItem>): List<HarnessModelInventoryItem> =
-    items.sortedBy { item -> if (item.stableId == group.suggestedModelId) 0 else 1 }
-
-internal fun modelsEmptyStateDetail(
-    availabilityFilter: ModelsAvailabilityFilter,
-    sizeFilter: ModelsSizeFilter,
-    activeModelPresent: Boolean,
-): String {
-    val prefix = if (activeModelPresent) "No other" else "No"
-    val size = sizeFilter.takeIf { it != ModelsSizeFilter.ALL }?.label?.let { " $it" }.orEmpty()
-    return when (availabilityFilter) {
-        ModelsAvailabilityFilter.INSTALLED -> "$prefix$size installed models match this filter."
-        ModelsAvailabilityFilter.AVAILABLE -> "$prefix$size not-installed models match this filter."
-        ModelsAvailabilityFilter.ALL -> "$prefix$size models match this filter."
-    }
-}
-
-internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
-    HarnessModelLifecycle.LOADED -> HarnessStatusTone.SUCCESS
-
-    HarnessModelLifecycle.SELECTED,
-    HarnessModelLifecycle.DOWNLOADING,
-    HarnessModelLifecycle.INSTALLING,
-    HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL,
-    -> HarnessStatusTone.INFO
-
-    HarnessModelLifecycle.DEGRADED,
-    HarnessModelLifecycle.INCOMPATIBLE,
-    -> HarnessStatusTone.WARNING
-
-    HarnessModelLifecycle.FAILED -> HarnessStatusTone.ERROR
-
-    HarnessModelLifecycle.INSTALLED,
-    HarnessModelLifecycle.READY_TO_DOWNLOAD,
-    HarnessModelLifecycle.CANCELLED,
-    -> HarnessStatusTone.NEUTRAL
-}
-
-internal fun formatModelBytes(bytes: Long): String {
-    if (bytes < 1_024L) return "$bytes B"
-    val kib = bytes / 1_024.0
-    if (kib < 1_024.0) return "%.1f KiB".format(Locale.US, kib)
-    val mib = kib / 1_024.0
-    if (mib < 1_024.0) return "%.1f MiB".format(Locale.US, mib)
-    return "%.2f GiB".format(Locale.US, mib / 1_024.0)
 }
