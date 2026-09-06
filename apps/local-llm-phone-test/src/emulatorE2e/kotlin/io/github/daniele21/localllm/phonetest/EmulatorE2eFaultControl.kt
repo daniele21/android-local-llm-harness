@@ -39,10 +39,7 @@ internal class HarnessEmulatorE2eShellBridgeReceiver : BroadcastReceiver() {
     }
 }
 
-internal data class EmulatorE2eFaultCommandResult(
-    val code: Int,
-    val data: String?,
-)
+internal data class EmulatorE2eFaultCommandResult(val code: Int, val data: String?)
 
 /** Canonical emulator-only command owner shared by the protected receiver and shell bridge. */
 internal object EmulatorE2eFaultCommandHandler {
