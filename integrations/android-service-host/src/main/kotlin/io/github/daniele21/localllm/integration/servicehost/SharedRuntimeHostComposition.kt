@@ -14,7 +14,7 @@ class SharedRuntimeHostClientFactories(
 class SharedRuntimeHostComposition(
     context: Context,
     client: LocalLlmClient,
-    permissionName: String,
+    permissionName: String?,
     policies: Collection<AuthorizedClientPolicy>,
     hostBuildId: String,
     clientFactories: SharedRuntimeHostClientFactories = SharedRuntimeHostClientFactories(),
