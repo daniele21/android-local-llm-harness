@@ -46,6 +46,7 @@ internal enum class ModelsSizeFilter(val label: String, val groupLabel: String?)
     ALL("All sizes", null),
     B08("0.8B", "Qwen3.5 · 0.8B"),
     B2("2B", "Qwen3.5 · 2B"),
+    B4("4B", "Qwen3.5 · 4B · 4-bit only"),
 }
 
 @Composable
@@ -85,7 +86,7 @@ internal fun UnifiedModelsCatalog(
             onAvailabilityChanged = { availabilityFilter = it },
             onSizeChanged = { sizeFilter = it },
         )
-        listOf(ModelsSizeFilter.B08, ModelsSizeFilter.B2).forEach { group ->
+        listOf(ModelsSizeFilter.B08, ModelsSizeFilter.B2, ModelsSizeFilter.B4).forEach { group ->
             val groupItems = visibleItems.filter(group::matches)
             if (groupItems.isNotEmpty()) {
                 Text(requireNotNull(group.groupLabel), style = MaterialTheme.typography.titleLarge)
@@ -245,6 +246,7 @@ internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean 
     ModelsSizeFilter.ALL -> true
     ModelsSizeFilter.B08 -> item.stableId.startsWith("qwen35-08b-")
     ModelsSizeFilter.B2 -> item.stableId.startsWith("qwen35-2b-")
+    ModelsSizeFilter.B4 -> item.stableId.startsWith("qwen35-4b-")
 }
 
 internal fun HarnessModelLifecycle.statusTone(): HarnessStatusTone = when (this) {
