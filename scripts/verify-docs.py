@@ -29,15 +29,38 @@ def _measure(path: Path, chars_per_token: int) -> tuple[int, int]:
     return len(text.splitlines()), math.ceil(len(text) / chars_per_token)
 
 
+def _effective_budget(
+    path: Path,
+    root: Path,
+    default_budget: dict[str, int],
+    exceptions: dict[str, object],
+) -> dict[str, int]:
+    relative = path.resolve().relative_to(root).as_posix()
+    exception = exceptions.get(relative)
+    if not isinstance(exception, dict):
+        return default_budget
+    if exception.get("mode") != "no-growth":
+        raise ValueError(f"unsupported documentation budget exception mode: {relative}")
+    return {
+        "max_lines": int(exception.get("max_lines", default_budget["max_lines"])),
+        "max_estimated_tokens": int(
+            exception.get("max_estimated_tokens", default_budget["max_estimated_tokens"])
+        ),
+    }
+
+
 def _check_budget(
     path: Path,
+    root: Path,
     label: str,
-    budget: dict[str, int],
+    default_budget: dict[str, int],
+    exceptions: dict[str, object],
     chars_per_token: int,
     errors: list[str],
 ) -> None:
     if not path.is_file():
         return
+    budget = _effective_budget(path, root, default_budget, exceptions)
     lines, tokens = _measure(path, chars_per_token)
     if lines > int(budget["max_lines"]):
         errors.append(f"{label} too long: {lines} > {budget['max_lines']} ({path})")
@@ -50,7 +73,7 @@ def _check_budget(
 def _schema2_main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
-    parser.add_argument("--base")  # accepted for workflow compatibility; schema 2 is state-based
+    parser.add_argument("--base")
     parser.add_argument("--template-mode", action="store_true")
     args = parser.parse_args()
 
@@ -65,6 +88,10 @@ def _schema2_main() -> int:
         return _IMPL.main()
 
     budgets = policy.get("budgets", {})
+    exceptions = policy.get("budget_exceptions", {})
+    if not isinstance(exceptions, dict):
+        print("FAIL: budget_exceptions must be an object")
+        return 1
     chars_per_token = int(policy.get("estimated_token_characters", 4))
     errors: list[str] = []
 
@@ -82,34 +109,44 @@ def _schema2_main() -> int:
     else:
         _check_budget(
             root / "AGENTS.md",
+            root,
             "root AGENTS",
             budgets["root_agents"],
+            exceptions,
             chars_per_token,
             errors,
         )
         _check_budget(
             root / "docs/current-state.md",
+            root,
             "current state",
             budgets["current_state"],
+            exceptions,
             chars_per_token,
             errors,
         )
         _check_budget(
             root / "docs/architecture.md",
+            root,
             "architecture",
             budgets["architecture"],
+            exceptions,
             chars_per_token,
             errors,
         )
 
         excluded = set(policy.get("context_exclude_directories", []))
         for guide in root.rglob("AGENTS.md"):
-            if guide == root / "AGENTS.md" or any(part in excluded for part in guide.relative_to(root).parts):
+            if guide == root / "AGENTS.md" or any(
+                part in excluded for part in guide.relative_to(root).parts
+            ):
                 continue
             _check_budget(
                 guide,
+                root,
                 "scoped AGENTS",
                 budgets["scoped_agents"],
+                exceptions,
                 chars_per_token,
                 errors,
             )
@@ -120,8 +157,10 @@ def _schema2_main() -> int:
                 if path.name != "README.md":
                     _check_budget(
                         path,
+                        root,
                         "feature doc",
                         budgets["feature_doc"],
+                        exceptions,
                         chars_per_token,
                         errors,
                     )
@@ -138,8 +177,10 @@ def _schema2_main() -> int:
                 active_count += 1
                 _check_budget(
                     path,
+                    root,
                     "active workstream",
                     budgets["active_workstream"],
+                    exceptions,
                     chars_per_token,
                     errors,
                 )
