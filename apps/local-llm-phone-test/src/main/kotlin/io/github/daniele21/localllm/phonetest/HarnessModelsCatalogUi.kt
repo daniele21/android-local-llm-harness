@@ -41,6 +41,15 @@ internal data class UnifiedModelsActions(
     val refresh: () -> Unit,
 )
 
+internal data class ModelsCatalogGroupEnvironment(
+    val state: HarnessUiState,
+    val actions: UnifiedModelsActions,
+    val distributionByStableId: Map<String, PhoneCatalogModelUi>,
+    val loadingStableId: String?,
+    val progressivelyDisclose: Boolean,
+    val onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
+)
+
 internal enum class ModelsAvailabilityFilter(val label: String) {
     ALL("All models"),
     INSTALLED("Installed"),

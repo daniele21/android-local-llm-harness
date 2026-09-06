@@ -20,15 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 
-internal data class ModelsCatalogGroupEnvironment(
-    val state: HarnessUiState,
-    val actions: UnifiedModelsActions,
-    val distributionByStableId: Map<String, PhoneCatalogModelUi>,
-    val loadingStableId: String?,
-    val progressivelyDisclose: Boolean,
-    val onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
-)
-
 @Composable
 internal fun ModelsCatalogGroups(environment: ModelsCatalogGroupEnvironment, visibleItems: List<HarnessModelInventoryItem>) {
     var expandedB08 by rememberSaveable { mutableStateOf(false) }
