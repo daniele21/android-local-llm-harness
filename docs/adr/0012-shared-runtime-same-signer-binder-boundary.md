@@ -22,7 +22,7 @@ V1 originally supported only host and client APKs controlled by the same publish
 
 The exported host service was protected by a signature-level permission and also revalidated the calling UID, resolved package and accepted signing lineage inside the service before authorizing any operation. A Binder token was scoped to the authenticated connection but never replaced per-call caller verification.
 
-Arbitrary third-party publishers, user-granted runtime permission and implicit trust based on package name were out of scope for the original v1. ADR 0018 now permits independently signed consumers through a normal bind-capability permission plus exact Binder UID/package/signer verification and explicit Harnex Control Plane authorization.
+Arbitrary third-party publishers, user-granted runtime permission and implicit trust based on package name were out of scope for the original v1. ADR 0018 now permits independently signed consumers through install-order-safe explicit binding with no custom bind permission, plus exact Binder UID/package/current-signer verification and explicit Harnex Control Plane authorization.
 
 ### Host identity and proof application
 
