@@ -14,7 +14,8 @@ This is the operational ledger for integrated state, blockers and immediate work
 - `dev` is the canonical base/target for ordinary work and Internal Testing candidates.
 - `main` is the stable/release line.
 - New work starts from the latest green `dev` unless explicitly hotfixed.
-- The 2026-09-04 stable promotion is synchronized back into `dev` per ADR 0008.
+- Stable promotions preserve `main` ancestry in `dev` before the next `dev -> main` release cycle, per ADR 0008.
+- Repository governance is aligned to `repo-template-sw` `0.10.0` with the local Android/local-AI/product-UI customizations recorded in `.engineering/baseline.json`.
 
 ## Integrated baseline
 
@@ -26,17 +27,24 @@ Harnex has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, verif
 
 ### Shared runtime and Consumer boundary
 
-SR-0..5 and repository-side SR-6 tooling are integrated. The currently published Consumer SDK is `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.10`, whose distribution baseline still reflects the original ADR 0012 same-signer trust shape.
+SR-0..5 and repository-side SR-6 tooling are integrated. The public Consumer SDK is now `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.11`; publication from the integrated Harnex candidate completed successfully, including unauthenticated downstream consumption from the public Maven repository.
 
-ADR 0018 defines the candidate correction for independently distributed consumers. The public Harnex service is explicitly bindable with no custom bind permission so Consumer-before-Host installation cannot permanently block reachability. Authority remains fail-closed Binder UID -> exact installed package -> current signer -> Harnex Control Plane authorization -> enabled use case. Known external consumers are source-observed as `PENDING`; signer replacement becomes `SIGNATURE_CHANGED`; both require explicit user authorization. Emulator fault/control authority remains separately signature-protected.
+ADR 0018 is the active production trust boundary for independently distributed consumers. The public Harnex service is explicitly bindable with no custom bind permission so Consumer-before-Host installation cannot permanently block reachability. Reachability is not authorization: authority remains fail-closed Binder UID -> exact installed package -> current signer -> Harnex Control Plane authorization -> enabled use case. Known external consumers are source-observed as `PENDING`; signer replacement becomes `SIGNATURE_CHANGED`; both require explicit user authorization.
 
-The correction also adds reusable Consumer SDK `disconnect()` and is versioned as candidate `0.1.0-alpha.11`. It is not published until exact validated `dev` publication succeeds. Durable logical jobs and Host background/process lifecycle remain owned by ADR 0016 and the integrated background-lifecycle workstream.
+Consumer SDK `disconnect()` is part of alpha.11 and supports reversible Settings-owned disconnect/reconnect without weakening Harnex authority. Emulator-only fault/control authority remains separate from production inference authority: the ordinary fault receiver is signature protected and the bounded shell bridge exists only in the Harnex `emulatorE2e` Host process.
 
 ### Cross-repository RedactGuard evidence
 
-The integrated RedactGuard baseline consumes alpha.10. Earlier same-key emulator E2E was valid for that topology but did not represent separate Play App Signing identities; a physical Play Internal run exposed the mismatch when independently signed Harnex and RedactGuard were installed.
+RedactGuard now consumes immutable Consumer SDK `0.1.0-alpha.11`. Its integrated `dev` baseline is independently signed from Harnex and exposes explicit Connect / Disconnect / Retry behavior in Settings while leaving authorization Harnex-owned.
 
-The correction therefore requires exact-candidate distinct-signer automation: build Harnex + Consumer SDK and RedactGuard from recorded revisions, install the Consumer before the Host in the install-order path, sign Host and consumer with different identities, prove Binder/Control Plane denial while RedactGuard is pending, authorize the exact source-observed identity through Harnex-owned authority, then prove connect/disconnect/reconnect and fail-closed replacement signing identity. Actual Play signer confirmation remains separate REAL_ENVIRONMENT evidence.
+Exact automated evidence is green for both cross-app paths:
+
+- Consumer-first install -> Host absent -> later Harnex install without RedactGuard reinstall -> `PENDING` -> exact Harnex authorization -> Connect / Disconnect / Reconnect -> replacement signer denied as `SIGNATURE_CHANGED`;
+- the complete Two-APK product/lifecycle/fault matrix, including ViewModel/Home continuity and Binder cancellation/process-loss/critical-pressure handling.
+
+The tested Harnex source candidate is tree-equivalent to the integrated Harnex `dev` merge commit. RedactGuard's normal FULL validation also resolves the public alpha.11 artifact rather than relying on a source-candidate override.
+
+Both current Harnex and RedactGuard candidates have been published successfully to Google Play Internal Testing. Actual Play App Signing identity confirmation and the focused install-order/authorization/connectivity retest remain REAL_ENVIRONMENT evidence and are not inferred from emulator CI or successful upload alone.
 
 ### Consumer API, OMBRA, evaluation and audit
 
@@ -46,11 +54,9 @@ Local inference Activity/audit is integrated under ADR 0017: accepted inference 
 
 ## Open blockers
 
-### 1. Independent Play signing topology
+### 1. Physical Play signer and install-order confirmation
 
-Integration readiness requires exact deterministic Harnex gates plus distinct-signer RedactGuard E2E covering Consumer-before-Host reachability, pending denial, exact identity approval, reusable reconnect and signer-replacement denial. After Harnex alpha.11 publication, RedactGuard must consume that immutable artifact and pass its own exact-head validation.
-
-Stable promotion additionally requires a focused physical Play Internal retest with the actual Harnex and RedactGuard Play App Signing identities.
+Automated independent-signer and Two-APK evidence is complete. Stable release promotion still requires the focused physical Play Internal retest with the actual Harnex and RedactGuard Play App Signing identities: install RedactGuard first, install Harnex later without reinstalling RedactGuard, confirm `PENDING`, authorize the observed identity in Harnex, then verify Connect / Disconnect / Reconnect and fail-closed signer identity behavior where practical.
 
 ### 2. Representative Android runtime evidence
 
@@ -62,10 +68,9 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 
 ## Immediate next block
 
-1. close ADR 0018 implementation with exact Harnex validation and distinct-signer RedactGuard E2E;
-2. publish validated Consumer SDK alpha.11 from `dev`, repin RedactGuard and validate/merge its Harnex connection UX;
-3. publish Internal Testing candidates and perform the focused physical Play authorization/connectivity retest before any `dev -> main` promotion;
-4. continue the independent physical/runtime/evaluation workstreams.
+1. run the focused physical Play Internal independent-signer/install-order authorization retest against the published Harnex and RedactGuard candidates;
+2. once that release evidence is recorded, run RELEASE/FULL promotion validation and promote reconciled `dev` to stable `main`;
+3. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator evidence as physical proof.
 
 ## Source links
 
