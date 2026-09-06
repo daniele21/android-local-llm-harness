@@ -3,15 +3,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="${sharedRuntimePermission}" />
-
-    <!--
-      This normal permission is an explicit opt-in to the Binder surface, not the trust boundary.
-      Every transaction still verifies Binder UID -> exact package -> accepted signing certificate -> use case.
-    -->
-    <permission
-        android:name="${sharedRuntimePermission}"
-        android:protectionLevel="normal" />
 
     <queries>
         <package android:name="io.github.daniele21.redactguard" />
@@ -35,11 +26,15 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The service is deliberately reachable without an install-order-sensitive custom permission.
+          Every Binder transaction still derives the caller from Android and verifies exact package,
+          current signing certificate, persisted Harnex authorization and enabled use case before work.
+        -->
         <service
             android:name=".HarnessSharedRuntimeService"
             android:exported="true"
-            android:foregroundServiceType="specialUse"
-            android:permission="${sharedRuntimePermission}">
+            android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="user_initiated_on_device_local_ai_inference" />
