@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: shared-runtime
 Canonical scope: shared-runtime.roadmap
 Read when: selecting a shared-runtime milestone, checking dependencies or defining a focused pull request
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 This roadmap owns capability order and exit gates. Detailed behavior belongs in the linked workstreams; integrated repository priority and blockers remain in [`../current-state.md`](../current-state.md).
 
@@ -29,7 +29,7 @@ Q35 physical runtime evidence ----- release dependency -----^
 
 SR-2 and SR-3 may proceed independently only after SR-1 freezes the v1 fixtures and semantics. They must not invent separate wire DTOs or error mappings.
 
-ADR 0018 is the accepted trust amendment for independently signed consumers. It supersedes the same-signer/signature-permission portion of ADR 0012 without changing the Host-owned model/use-case or Binder protocol boundaries.
+ADR 0018 is the accepted trust amendment for independently signed consumers. It supersedes the same-signer/signature-permission portion of ADR 0012. Its current form also removes the short-lived normal bind-permission candidate because Consumer-before-Host installation proved Android permission grant timing would otherwise make public reachability install-order dependent. Host-owned model/use-case and Binder protocol boundaries remain unchanged.
 
 ## SR-0 — Decision and scope
 
@@ -73,13 +73,14 @@ Owner: [`workstreams/host-service.md`](workstreams/host-service.md)
 
 Dependencies: SR-0 and SR-1.
 
-Progress: **SR-HOST-01 through SR-HOST-10 are implemented. The host exposes the shared process-scoped runtime behind the `BIND_LOCAL_LLM` capability permission, performs exact Binder caller authorization through Harnex Control Plane policy, supports independently signed consumers without shared signing credentials, and delegates Android memory/service lifecycle without duplicate runtime ownership.**
+Progress: **SR-HOST-01 through SR-HOST-10 are implemented. The host exposes the shared process-scoped runtime through an exported explicit-component service, performs exact Binder caller authorization through Harnex Control Plane policy, supports independently signed consumers and both install orders without shared signing credentials or Consumer reinstall, and delegates Android memory/service lifecycle without duplicate runtime ownership.**
 
 Exit gate:
 
-- exported service uses the explicit bind capability while actual authority remains Binder UID/package/signer + Harnex Control Plane policy;
+- exported service is explicitly bindable without a custom permission while actual authority remains Binder UID/package/current-signer + Harnex Control Plane policy;
+- Consumer-before-Host and Host-before-Consumer installation orders converge on the same authorization boundary;
 - independently signed known consumers are source-observed pending and require explicit authorization; signer replacement fails closed;
-- Binder threads do no heavy runtime work;
+- Binder threads do no heavy runtime work and pre-authorization bind/handshake does not load a model;
 - client/session/request ownership is isolated and death-aware;
 - host resolves exact application/use-case/model binding without client model control;
 - service delegate tests cover denial, cancellation, death, teardown and idempotent cleanup.
@@ -116,14 +117,14 @@ Integrated implementation:
 
 - `apps/local-llm-phone-test` exposes the proof Host service and exact Host-owned application/use-case policy;
 - same-publisher Console flows remain supported where intentionally configured;
-- independently signed consumers such as RedactGuard use source-observed package/signer identity and explicit Harnex authorization;
+- independently signed consumers such as RedactGuard use source-observed package/current-signer identity and explicit Harnex authorization;
 - `apps/local-llm-console` contains a real Binder instrumentation flow for prepare, session, stream, complete, cancel and close;
-- cross-repository RedactGuard evidence signs Host and consumer with distinct ephemeral identities and proves denial-before-approval plus authorized reconnect;
+- cross-repository RedactGuard evidence signs Host and consumer with distinct ephemeral identities, installs the Consumer before the Host in the install-order path, proves denial-before-approval and then authorized reconnect;
 - unavailable, pending, signer-changed, denied, incompatible and disconnected states remain typed.
 
-Remaining exit evidence depends on the exact claim: deterministic emulator evidence proves the cross-APK trust and lifecycle boundary; physical Play/Internal and real-GGUF/device evidence remain separate when release/distribution/runtime claims require them.
+Remaining exit evidence depends on the exact claim: deterministic emulator evidence proves the cross-APK trust, install-order and lifecycle boundary; physical Play/Internal and real-GGUF/device evidence remain separate when release/distribution/runtime claims require them.
 
-Exit gate: repeatable cross-APK preflight completes the functional flow without bypassing runtime, store or authorization policy and uses the signing topology being claimed.
+Exit gate: repeatable cross-APK preflight completes the functional flow without bypassing runtime, store or authorization policy and uses both the signing topology and install-order behavior being claimed.
 
 ## SR-5 — Resilience and isolation
 
@@ -168,8 +169,8 @@ Repository implementation/evidence includes:
 
 - packaged release Binder client/contract AAR consumer fixture;
 - same-publisher release-like functional/cancellation/process-death instrumentation where that topology is still intentionally supported;
-- independently signed Host/consumer E2E for external consumers, including distinct certificate proof and explicit Harnex authorization;
-- negative unknown/mismatched signer evidence;
+- independently signed Host/consumer E2E for external consumers, including distinct certificate proof, Consumer-before-Host reachability and explicit Harnex authorization;
+- negative unknown/mismatched/replacement signer evidence;
 - physical-device evidence capture with package/certificate/protocol/device/memory/thermal identity;
 - explicit evidence privacy boundary and archive format.
 
@@ -178,8 +179,8 @@ Remaining exit evidence requires completion of the public API/security/versionin
 Exit gate:
 
 - every claimed Host/client signing topology has production-shaped evidence;
-- independently distributed consumers prove distinct signers, denial before authorization and success only after explicit authorization of the exact observed identity;
-- unknown/mismatched signer fixtures remain denied without committed signing material;
+- independently distributed consumers prove distinct signers, Consumer-before-Host reachability without reinstall, denial before authorization and success only after explicit authorization of the exact observed identity;
+- unknown/mismatched/replacement signer fixtures remain denied without committed signing material;
 - Binder overhead, memory, cancellation and process-death evidence is reviewable where required;
 - public API, security, versioning, packaging and consumer sample review pass;
 - release notes bind host version, client SDK version, protocol version, signing identities, runtime/backend and model evidence.
