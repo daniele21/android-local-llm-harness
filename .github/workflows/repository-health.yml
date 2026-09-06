@@ -29,6 +29,10 @@ jobs:
         run: python3 scripts/verify_operations.py
       - name: Verify E2E environment contract
         run: python3 scripts/verify_e2e.py
+      - name: Verify integration/release environment policy
+        run: python3 scripts/verify_stage_environment_policy.py
+      - name: Verify agent context routes
+        run: python3 scripts/verify_agent_context.py
       - name: Verify product experience contract
         run: python3 scripts/verify_product_experience.py
       - name: Verify Harness agent navigation
