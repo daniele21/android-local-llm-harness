@@ -114,27 +114,26 @@ jobs:
               | tr -d '\r'
           }
 
-          for turn in 0 1 2 3; do
-            before="$(current_rotation)"
-            if [[ "$before" == "$target" ]]; then
+          if ! adb -s "$serial" shell wm help 2>&1 | grep -q 'fixed-to-user-rotation'; then
+            echo "Error: emulator WindowManager does not expose fixed-to-user-rotation." >&2
+            exit 1
+          fi
+
+          # API 35 may keep the launcher/test host's requested portrait orientation even when
+          # user rotation is locked. Force WindowManager to honor user rotation for this
+          # emulator-only adaptive evidence, then lock the exact target rotation.
+          adb -s "$serial" shell wm fixed-to-user-rotation enabled >/dev/null
+          adb -s "$serial" shell wm user-rotation lock "$target" >/dev/null
+
+          for settle in $(seq 1 15); do
+            if [[ "$(current_rotation)" == "$target" ]]; then
               exit 0
             fi
-
-            adb -s "$serial" emu rotate >/dev/null
-            for settle in $(seq 1 10); do
-              sleep 1
-              after="$(current_rotation)"
-              if [[ "$after" == "$target" ]]; then
-                exit 0
-              fi
-              if [[ -n "$after" && "$after" != "$before" ]]; then
-                break
-              fi
-            done
+            sleep 1
           done
 
           adb -s "$serial" shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
-          echo "Error: emulator display did not reach rotation $target." >&2
+          echo "Error: emulator display did not reach forced user rotation $target." >&2
           exit 1
           EOF
           chmod +x "$RUNNER_TEMP/rotate-emulator.sh"
@@ -191,6 +190,8 @@ jobs:
           "$RUNNER_TEMP/rotate-emulator.sh" 1
           adb exec-out screencap -p > "$evidence_dir/import-landscape.png"
           "$RUNNER_TEMP/rotate-emulator.sh" 0
+          adb shell wm user-rotation free >/dev/null
+          adb shell wm fixed-to-user-rotation default >/dev/null
 
           test -s "$evidence_dir/import-portrait.png"
           test -s "$evidence_dir/import-landscape.png"
