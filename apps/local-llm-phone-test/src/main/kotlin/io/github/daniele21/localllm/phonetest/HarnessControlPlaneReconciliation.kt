@@ -30,6 +30,9 @@ internal data class HarnessBuiltInApplicationRequirement(
     val acceptedPackageNames: Set<String>,
     val acceptedSignerSha256: Set<String>,
     val displayName: String,
+    val initialState: ApplicationRegistrationState = ApplicationRegistrationState.AUTHORIZED,
+    val allowObservedSignerChange: Boolean = false,
+    val acceptedSignerSha256ByPackage: Map<String, Set<String>> = emptyMap(),
 ) {
     init {
         require(acceptedPackageNames.isNotEmpty()) { "Built-in application must accept at least one package" }
@@ -39,21 +42,64 @@ internal data class HarnessBuiltInApplicationRequirement(
             "Built-in application signer identity must be SHA-256"
         }
         require(displayName.isNotBlank()) { "Built-in application display name must not be blank" }
+        if (acceptedSignerSha256ByPackage.isNotEmpty()) {
+            require(acceptedSignerSha256ByPackage.keys == acceptedPackageNames) {
+                "Exact signer policy must cover every accepted package"
+            }
+            require(
+                acceptedSignerSha256ByPackage.values.all { signers ->
+                    signers.isNotEmpty() && signers.all { SIGNER_SHA256.matches(it) }
+                },
+            ) {
+                "Exact package signer identity must contain valid SHA-256 signers"
+            }
+            require(acceptedSignerSha256ByPackage.values.flatten().toSet() == acceptedSignerSha256) {
+                "Aggregate and package-specific signer identities must match"
+            }
+        }
+        require(
+            !allowObservedSignerChange ||
+                if (acceptedSignerSha256ByPackage.isEmpty()) {
+                    acceptedSignerSha256.size == 1
+                } else {
+                    acceptedSignerSha256ByPackage.values.all { it.size == 1 }
+                },
+        ) {
+            "Observed signer reconciliation requires exactly one current signer per package"
+        }
     }
 
-    fun newRegistration(observedAtEpochMs: Long): RegisteredApplication = RegisteredApplication(
-        applicationId = applicationId,
-        packageName = acceptedPackageNames.minOrNull().orEmpty(),
-        signerSha256 = acceptedSignerSha256.minOrNull().orEmpty(),
-        displayName = displayName,
-        state = ApplicationRegistrationState.AUTHORIZED,
-        firstSeenAtEpochMs = observedAtEpochMs,
-        lastSeenAtEpochMs = observedAtEpochMs,
-    )
+    fun newRegistration(observedAtEpochMs: Long): RegisteredApplication {
+        val packageName = acceptedPackageNames.minOrNull().orEmpty()
+        val signerSha256 =
+            (acceptedSignerSha256ByPackage[packageName] ?: acceptedSignerSha256).minOrNull().orEmpty()
+        return RegisteredApplication(
+            applicationId = applicationId,
+            packageName = packageName,
+            signerSha256 = signerSha256,
+            displayName = displayName,
+            state = initialState,
+            firstSeenAtEpochMs = observedAtEpochMs,
+            lastSeenAtEpochMs = observedAtEpochMs,
+        )
+    }
 
-    fun accepts(application: RegisteredApplication): Boolean = application.applicationId == applicationId &&
-        application.packageName in acceptedPackageNames &&
-        application.signerSha256.lowercase() in acceptedSignerSha256.map(String::lowercase).toSet()
+    fun accepts(application: RegisteredApplication): Boolean {
+        if (application.applicationId != applicationId || application.packageName !in acceptedPackageNames) return false
+        val acceptedSigners = acceptedSignerSha256ByPackage[application.packageName] ?: acceptedSignerSha256
+        return application.signerSha256.lowercase() in acceptedSigners.map(String::lowercase).toSet()
+    }
+
+    fun identityChange(application: RegisteredApplication, observedAtEpochMs: Long): RegisteredApplication? {
+        if (!allowObservedSignerChange || application.packageName !in acceptedPackageNames) return null
+        val signers = acceptedSignerSha256ByPackage[application.packageName] ?: acceptedSignerSha256
+        val signer = signers.single().lowercase()
+        return application.copy(
+            signerSha256 = signer,
+            state = ApplicationRegistrationState.SIGNATURE_CHANGED,
+            lastSeenAtEpochMs = maxOf(application.lastSeenAtEpochMs, observedAtEpochMs),
+        )
+    }
 }
 
 /** Canonical app-owned built-in graph. It contains no Room, Android, Binder or transport types. */
@@ -106,8 +152,9 @@ internal sealed interface HarnessControlPlaneReconciliationResult {
 }
 
 /**
- * Conservatively reconciles mandatory built-in state into an already-valid HostControlPlaneState.
- * Existing user-owned revisions/defaults/disabled state are preserved; incompatible built-in identity fails closed.
+ * Conservatively reconciles mandatory Host state into an already-valid HostControlPlaneState.
+ * Same-signer built-ins remain immutable. Source-observed external signers fail closed into SIGNATURE_CHANGED and
+ * require explicit user re-authorization before they re-enter the live Binder policy.
  */
 internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInControlPlaneSpec) {
     fun reconcile(current: HostControlPlaneState, observedAtEpochMs: Long): HarnessControlPlaneReconciliationResult {
@@ -140,11 +187,14 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         observedAtEpochMs: Long,
     ): HarnessControlPlaneReconciliationResult.Conflict? {
         for (requirement in spec.applications) {
-            val existing = applications.singleOrNull { it.applicationId == requirement.applicationId }
+            val index = applications.indexOfFirst { it.applicationId == requirement.applicationId }
+            val existing = applications.getOrNull(index)
             if (existing == null) {
                 applications += requirement.newRegistration(observedAtEpochMs)
             } else if (!requirement.accepts(existing)) {
-                return conflict(HarnessControlPlaneConflictCode.APPLICATION_IDENTITY, requirement.applicationId.value)
+                val changed = requirement.identityChange(existing, observedAtEpochMs)
+                    ?: return conflict(HarnessControlPlaneConflictCode.APPLICATION_IDENTITY, requirement.applicationId.value)
+                applications[index] = changed
             }
         }
         return null
@@ -230,7 +280,9 @@ internal class HarnessControlPlaneReconciler(private val spec: HarnessBuiltInCon
         HarnessControlPlaneReconciliationResult.Conflict(code = code, identity = identity)
 }
 
-private fun builtInOmbraUseCase() = UseCaseDefinition(
+internal fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "seed-${applicationId.value}-$useCaseId"
+
+internal fun builtInOmbraUseCase() = UseCaseDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
     displayName = "Document PII detection",
     description = "Detect configured PII locally from document text",
@@ -246,7 +298,7 @@ private fun builtInOmbraUseCase() = UseCaseDefinition(
     revision = 1,
 )
 
-private fun builtInOmbraPreset() = UseCasePresetDefinition(
+internal fun builtInOmbraPreset() = UseCasePresetDefinition(
     useCaseId = HarnessSharedRuntimeBindings.ombraUseCaseId,
     metadata = PresetConsumerMetadata(
         presetId = HarnessSharedRuntimeBindings.ombraDefaultPreset.id.value,
@@ -268,7 +320,5 @@ private fun builtInOmbraPreset() = UseCasePresetDefinition(
         ),
     ),
 )
-
-private fun builtInBindingId(applicationId: ApplicationId, useCaseId: String): String = "seed-${applicationId.value}-$useCaseId"
 
 private val SIGNER_SHA256 = Regex("[0-9a-fA-F]{64}")

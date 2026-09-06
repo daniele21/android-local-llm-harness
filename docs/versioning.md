@@ -5,7 +5,7 @@ Document type: release-policy
 Owner: repository
 Canonical scope: release.versioning
 Read when: changing versions, compatibility promises, promotion or release artifacts
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-06
 
 ## SDK versions
 
@@ -19,10 +19,11 @@ The shared-runtime Android client artifact has its own SDK identity. Development
 
 The following identities are versioned or recorded separately from the SDK release:
 
-- Harness repository/version identity;
+- Harnex repository/version identity;
 - shared-runtime host application version/build identity;
 - shared-runtime Android client SDK version;
 - shared-runtime Binder protocol major/minor and negotiated feature set;
+- Host and consumer package/signing-certificate identities;
 - GGUF artifact digest;
 - model load profile schema;
 - use-case profile schema;
@@ -39,12 +40,14 @@ Changing an SDK version must never implicitly change an application's configured
 A shared-runtime release or physical evidence record must identify at least:
 
 ```text
-harness git commit
+harnex git commit
 host package + version/build
+consumer package + version/build when a concrete app is under test
 client SDK version
 Binder protocol major/minor
 negotiated protocol minor/features when execution evidence exists
-host/client signing-certificate digest identity
+host signing-certificate digest identity
+consumer signing-certificate digest identity
 selected curated model digest
 pinned llama.cpp revision
 Android device/version/ABI for physical evidence
@@ -52,7 +55,7 @@ Android device/version/ABI for physical evidence
 
 The Binder protocol remains independently versioned from host/client packaging. Major incompatibility fails before registration; compatible minor differences negotiate the common feature set. The protocol fixture policy is owned by the shared-runtime contract documentation rather than Semantic Versioning of either APK.
 
-Signing certificate digests are evidence/security identities, not product versions. Full certificates, private keys and passwords are never release metadata.
+Signing certificate digests are evidence/security identities, not product versions. Independently distributed Host and consumer applications are not required to share a signing identity; authorization follows ADR 0018. Full certificates, private keys and passwords are never release metadata.
 
 ## Integration and release lines
 
@@ -91,16 +94,19 @@ A release requires:
 
 For a shared-runtime client/host distribution, the release gate additionally requires:
 
-- same-signer physical two-APK evidence for the exact candidate identity;
-- independently signed client denial;
+- production-shaped two-APK evidence for every claimed trust topology;
+- for independently distributed consumers, distinct Host/consumer signer evidence, Consumer-before-Host reachability without Consumer reinstall, denial before explicit Harnex authorization and success after exact identity authorization;
+- negative unknown/mismatched/replacement signer evidence without committed signing material;
 - packaged release client-AAR consumer execution;
-- cancellation, host-death/reconnect, memory and thermal evidence;
+- cancellation, host-death/reconnect, memory and thermal evidence where material to the release claim;
 - protocol compatibility fixtures and applicable package replacement/upgrade evidence;
-- release notes binding host version, client SDK version, protocol identity, runtime/backend identity and selected model evidence;
-- a security review of exported service, signature permission, caller identity policy and privacy boundary.
+- release notes binding host version, client SDK version, protocol identity, runtime/backend identity, Host/consumer signing identities and selected model evidence;
+- a security review of the exported explicit-component Binder service, exact Binder caller identity policy, Harnex Control Plane authorization, bounded pre-authorization behavior and privacy boundary.
+
+Same-key or Host-first-only emulator evidence does not satisfy an independently signed distribution claim. Physical Play Internal confirmation remains required before stable promotion when Play App Signing identity is material.
 
 ## Development versions
 
-Development builds on `dev` use snapshot semantics and are not releases. Harness `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. The shared-runtime client currently carries snapshot identity until its physical/release gates close.
+Development builds on `dev` use snapshot semantics and are not releases. Harnex `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. The shared-runtime client currently carries snapshot identity until its physical/release gates close.
 
-Harness 0.5.0 and the shared runtime must not be described as production-ready until representative physical-device Qwen3.5 lifecycle, cancellation, memory, JNI-loading, thermal and cross-process release evidence is complete.
+Harnex 0.5.0 and the shared runtime must not be described as production-ready until representative physical-device Qwen3.5 lifecycle, cancellation, memory, JNI-loading, thermal and cross-process release evidence is complete.

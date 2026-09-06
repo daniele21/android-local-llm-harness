@@ -104,11 +104,10 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          adb shell settings put system accelerometer_rotation 0
-          adb shell settings put system user_rotation 0
           ./gradlew \
             :apps:local-llm-console:connectedDebugAndroidTest \
             -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
+            -Pandroid.testInstrumentationRunnerArguments.orientation=portrait \
             2>&1 | tee "$RUNNER_TEMP/ombra-ui-evidence-portrait.log"
 
       - name: Run OMB-7 review state evidence in landscape
@@ -117,11 +116,10 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          adb shell settings put system accelerometer_rotation 0
-          adb shell settings put system user_rotation 1
           ./gradlew \
             :apps:local-llm-console:connectedDebugAndroidTest \
             -Pandroid.testInstrumentationRunnerArguments.class=io.github.daniele21.localllm.console.ombra.OmbraReviewScreenInstrumentedTest \
+            -Pandroid.testInstrumentationRunnerArguments.orientation=landscape \
             2>&1 | tee "$RUNNER_TEMP/ombra-ui-evidence-landscape.log"
 
       - name: Capture privacy-safe code-owned screenshots
@@ -143,15 +141,38 @@ jobs:
           fi
           adb shell pm clear "$package_name" >/dev/null
 
+          current_rotation() {
+            adb shell dumpsys window \
+              | sed -n 's/.*mRotation=\([0-3]\) mDeferredRotationPauseCount=.*/\1/p' \
+              | head -n 1 \
+              | tr -d '\r'
+          }
+          await_rotation() {
+            local target="$1"
+            for attempt in $(seq 1 15); do
+              if [[ "$(current_rotation)" == "$target" ]]; then
+                return 0
+              fi
+              sleep 1
+            done
+            adb shell dumpsys window | grep -E 'mRotation=|mUserRotation' >&2 || true
+            echo "Error: foreground OMBRA app did not reach rotation $target." >&2
+            return 1
+          }
+
           adb shell settings put system accelerometer_rotation 0
           adb shell settings put system user_rotation 0
           adb shell am start -W -S -n "$package_name/$main_activity" >/dev/null
           adb shell pidof "$package_name" >/dev/null
-          sleep 2
+          await_rotation 0
+          sleep 1
           adb exec-out screencap -p > "$evidence_dir/import-portrait.png"
 
+          # MainActivity is foreground and has no fixed screenOrientation. Lock user rotation
+          # only now, so the product Activity owns a real landscape configuration before capture.
           adb shell settings put system user_rotation 1
-          sleep 2
+          await_rotation 1
+          sleep 1
           adb exec-out screencap -p > "$evidence_dir/import-landscape.png"
 
           adb shell settings put system user_rotation 0

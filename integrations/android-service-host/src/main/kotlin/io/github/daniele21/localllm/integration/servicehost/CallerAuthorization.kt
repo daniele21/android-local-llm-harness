@@ -76,7 +76,7 @@ sealed interface AuthorizationResult {
 }
 
 class CallerAuthorizer(
-    private val permissionName: String,
+    private val permissionName: String?,
     policies: Collection<AuthorizedClientPolicy>,
     private val environment: CallerEnvironment,
     private val policySource: (() -> Collection<AuthorizedClientPolicy>)? = null,
@@ -84,14 +84,17 @@ class CallerAuthorizer(
     private val staticPolicies: List<AuthorizedClientPolicy> = policies.toList()
 
     init {
-        require(permissionName.isNotBlank()) { "Permission name must not be blank" }
+        require(permissionName == null || permissionName.isNotBlank()) { "Permission name must not be blank" }
         validatedPoliciesByPackage(staticPolicies)
     }
 
-    fun authorize(callingProcess: CallingProcess): AuthorizationResult = if (environment.hasPermission(permissionName, callingProcess)) {
-        authorizePermittedCaller(callingProcess)
-    } else {
-        AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
+    fun authorize(callingProcess: CallingProcess): AuthorizationResult {
+        val permission = permissionName
+        return if (permission == null || environment.hasPermission(permission, callingProcess)) {
+            authorizePermittedCaller(callingProcess)
+        } else {
+            AuthorizationResult.Denied(AuthorizationFailure.PERMISSION_DENIED)
+        }
     }
 
     fun authorize(callingProcess: CallingProcess, useCaseId: UseCaseId): AuthorizationResult =

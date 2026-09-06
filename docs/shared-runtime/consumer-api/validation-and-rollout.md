@@ -5,11 +5,11 @@ Document type: feature-specification
 Owner: shared-runtime-consumer-api-validation
 Canonical scope: shared-runtime.consumer-api.validation-rollout
 Read when: adding consumer API tests, compatibility/security review, reference-app validation or release gates
-Last reviewed: 2026-08-13
+Last reviewed: 2026-09-06
 
 ## Goal
 
-Prove that the public consumer API is smaller than the internal runtime surface, correctly policy-scoped, compatible across supported host/client versions and usable by a real external app without embedding Harness infrastructure.
+Prove that the public consumer API is smaller than the internal runtime surface, correctly policy-scoped, compatible across supported host/client versions and usable by a real external app without embedding Harnex infrastructure.
 
 This workstream extends—not replaces—the shared-runtime SR-5/SR-6 security, lifecycle and physical-device evidence.
 
@@ -20,8 +20,8 @@ contract/unit semantics
   -> host policy resolution with fakes
   -> Binder wire mapping/compatibility fixtures
   -> packaged client SDK consumer compilation
-  -> OMBRA reference-consumer two-APK behavior
-  -> physical same-signer host/client evidence
+  -> independent-signer + install-order two-APK authorization/lifecycle behavior
+  -> applicable physical Host/consumer/runtime evidence
   -> public API/security/versioning review
 ```
 
@@ -81,22 +81,27 @@ Use fake clocks/token accounting where practical for deterministic semantics. Ph
 
 ## Security review
 
-The API must preserve the accepted same-signer/shared-runtime trust boundary.
+The API must preserve the ADR 0018 trust boundary for independently signed consumers.
 
 Review:
 
-- signature permission and explicit component binding remain intact;
-- application identity remains derived from the verified caller;
+- the public Harnex inference service is explicitly bindable with no custom bind permission;
+- Consumer-before-Host installation reaches the service after Host installation without Consumer reinstall;
+- explicit component binding remains intact;
+- application identity remains derived from Binder calling UID, exact installed package and current signing certificate;
+- source-observed independent consumers remain pending until explicit Harnex authorization;
+- signing identity replacement fails closed until explicit reauthorization;
+- authorization completes before model resolution or expensive work;
 - capability discovery authenticates before returning policy information;
 - model/preset selection is an allowlist selector, not arbitrary model control;
-- request/session ownership remains UID/client scoped;
+- request/session ownership remains authenticated-caller/client scoped;
 - one client cannot enumerate or control another client's capability/session/request state;
 - typed errors do not reveal private paths, signing data or unrelated model inventory;
 - capability/result payload sizes are bounded;
 - schema/input payloads retain transport validation limits;
-- no diagnostics/control-plane permission is implicitly granted by inference access.
+- no diagnostics/control-plane or emulator-fault authority is implicitly granted by public inference reachability.
 
-Any proposal to support third-party publishers requires a separate trust/product decision and is outside this rollout.
+Same-publisher consumers may retain a reviewed signing policy where intentional, but external-consumer release claims must use the signing topology actually distributed. Same-key or Host-first-only evidence cannot establish independent-signer compatibility.
 
 ## Compatibility strategy
 
@@ -125,7 +130,7 @@ These may fit a protocol minor/feature negotiation only if an older peer can saf
 
 ### Incompatible semantic change
 
-If external logical model choice invalidates the accepted v1 invariant that the host alone selects one exact model for the use case, update the durable decision/compatibility boundary explicitly. Do not hide an incompatible semantic change behind a nullable parcel field.
+If external logical model choice invalidates the accepted invariant that the host alone selects one exact model for the use case, update the durable decision/compatibility boundary explicitly. Do not hide an incompatible semantic change behind a nullable parcel field.
 
 ## Compatibility matrix
 
@@ -133,8 +138,10 @@ Maintain at least:
 
 | Client | Host | Expected |
 | --- | --- | --- |
-| Old client | New host | Existing fixed-use-case flow remains valid. |
-| New client, defaults only | Old compatible host | Works only when required discovery/selection features are not required; otherwise typed incompatibility. |
+| Current compatible client | Current compatible host | Explicit component bind; Binder caller authorization; common negotiated features. |
+| Consumer installed before current Host | Current Host | Reachable after Host installation without Consumer reinstall; pending/authorized state remains Host-owned. |
+| Old client | New host | Existing fixed-use-case flow remains valid only when its published binding contract is still compatible and its exact caller identity remains authorized. |
+| New client, defaults only | Old compatible host | Works only when required discovery/selection/binding semantics are supported; otherwise typed incompatibility/unavailability. |
 | New client using optional selection | Host supports feature | Capability -> prepare -> generate succeeds. |
 | New client using unsupported feature | Older host | Fails before model preparation with typed incompatibility. |
 | Compatible minor versions | Compatible peer | Common feature set is negotiated. |
@@ -144,7 +151,7 @@ Exact version numbers are assigned during implementation/release planning, not i
 
 ## Reference consumer requirement
 
-`apps/local-llm-console` should become the OMBRA reference consumer, not a second Harness control plane. Product-specific PDF, PII, review, export and visual acceptance belongs to [`pii-redactor/`](pii-redactor/); this source retains the generic SDK boundary.
+A reference consumer must remain a consumer, not a second Harnex control plane. Product-specific PDF, PII, review, export and visual acceptance belongs to the consuming product; this source retains the generic SDK boundary.
 
 Its success criteria:
 
@@ -152,23 +159,24 @@ Its success criteria:
 - contains no llama.cpp/JNI runtime;
 - contains no GGUF model store/download/install pipeline;
 - contains no independent runtime tuning engine;
-- does not recreate Harness-wide health/cache/thermal/benchmark controls;
+- does not recreate Harnex-wide health/cache/thermal/benchmark controls;
 - discovers authorized use-case/output/default capabilities from the host;
-- runs bounded text -> structured answer stream -> terminal result;
+- runs bounded input -> structured answer stream -> terminal result;
 - shows only public metrics/request details;
-- handles unavailable/denied/incompatible/disconnected states clearly.
+- handles host unavailable, pending authorization, signer change, denied, incompatible and disconnected states clearly.
 
-Any remaining Console-local diagnostics must be justified as consumer-SDK diagnostics rather than duplicated host control-plane behavior.
+Any remaining consumer-local diagnostics must be justified as Consumer SDK diagnostics rather than duplicated Host control-plane behavior.
 
 OMBRA intentionally uses deterministic defaults, requires structured output and does not surface model/preset alternatives or reasoning in its primary product UI. Generic optional-capability, alternate-selection, surfaced-reasoning and disallowed-selection scenarios remain covered by contract tests, Binder fixtures and the packaged `apps/shared-runtime-client-consumer-fixture`; they must not be added to OMBRA merely to satisfy protocol coverage.
 
 ## Generic reference UI acceptance
 
-The packaged reference consumer should use progressive disclosure. Exact OMBRA screens and brand mapping are defined in [`pii-redactor/ux-and-brand.md`](pii-redactor/ux-and-brand.md).
+The packaged reference consumer should use progressive disclosure. Exact product screens and brand mapping remain consumer-owned.
 
 ### Primary
 
 - connection state;
+- authorization-required state when applicable;
 - product-owned bounded input/task state;
 - allowed model/preset selectors only when more than one useful choice exists;
 - reasoning toggle only when surfaced reasoning is available;
@@ -184,6 +192,7 @@ The packaged reference consumer should use progressive disclosure. Exact OMBRA s
 
 ### Not present as normal consumer UI
 
+- signing-certificate administration;
 - model download/remove/import;
 - raw runtime knobs;
 - global logs;
@@ -202,6 +211,7 @@ Before release, inspect the packaged client AAR public surface and enforce:
 - no host model-store/path types;
 - no internal `GenerationOverrides` leakage unless explicitly accepted;
 - public enums/codes documented for compatibility;
+- reversible `disconnect()` versus terminal `close()` semantics documented and compatibility-tested;
 - nullability/default semantics documented;
 - consumer ProGuard/R8 rules validated.
 
@@ -209,19 +219,19 @@ A binary/API compatibility tool may be added if/when the client artifact becomes
 
 ## Evidence scenarios
 
-On the reference physical device/model matrix, capture privacy-safe evidence for:
+For independent-consumer integration, capture privacy-safe deterministic evidence for:
 
-1. capability discovery with one default model/preset;
-2. explicit allowed model/preset selection where supported;
-3. answer-only generation;
-4. surfaced reasoning + answer where supported;
-5. cancellation;
-6. invalid/disallowed model or preset;
-7. host process death/reconnect;
-8. package upgrade/replacement as required by SR-6;
-9. client-observed wall time versus host public metrics for transport sanity.
+1. Host and consumer APK signing digests are distinct;
+2. the Consumer is installed before the Host and can reach the explicit service afterward without reinstall;
+3. source-observed consumer identity begins pending/denied;
+4. explicit Harnex authorization promotes the exact observed package/current signer;
+5. authorized connect -> disconnect -> reconnect succeeds with a reusable client;
+6. unknown or mismatched signer remains denied;
+7. capability discovery returns only the authorized use case;
+8. cancellation and host process death/reconnect retain their typed semantics;
+9. package/signer replacement fails closed until explicit reauthorization.
 
-Do not store prompt/reasoning/answer text in evidence archives.
+On the applicable physical device/model matrix, additionally capture runtime/model/performance evidence required by the release claim. Do not store prompt/reasoning/answer text or certificate material beyond privacy-safe digest identity in evidence archives.
 
 ## Performance boundary
 
@@ -240,13 +250,14 @@ When comparing configurations:
 
 Before consumer release:
 
-- accepted target/boundary is reflected in the relevant ADR/shared-runtime target;
+- accepted target/boundary is reflected in ADR 0018 and the shared-runtime target/architecture;
 - API reference documents the supported public surface and examples;
 - compatibility policy identifies SDK/protocol/capability versioning;
-- release notes bind host version, client SDK version, protocol version and capability revision policy;
+- release notes bind host version, client SDK version, protocol version, Host/consumer signing digest identities and capability revision policy;
 - reference consumer uses the packaged candidate artifact;
+- independently signed distribution claims have exact-topology deterministic evidence including install-order independence and applicable Play/physical confirmation;
 - supported model/preset claims point to applicable device evidence;
-- private signing/model/prompt/output information remains excluded.
+- private signing keys/certificates, model paths and prompt/output information remain excluded.
 
 ## Task ledger
 
@@ -256,11 +267,11 @@ Before consumer release:
 | CA-VAL-02 | PLANNED | Add reasoning/answer/result projection and metric-semantics tests. |
 | CA-VAL-03 | PLANNED | Add protocol mapping/feature-negotiation compatibility fixtures. |
 | CA-VAL-04 | PLANNED | Enforce packaged client public-surface dependency boundary. |
-| CA-VAL-05 | PLANNED | Simplify Console into a pure/reference consumer and validate UI states. |
-| CA-VAL-06 | PLANNED | Extend two-APK device flow for capability/model/preset/result scenarios. |
-| CA-VAL-07 | PLANNED | Complete security/public-API/versioning review. |
+| CA-VAL-05 | PLANNED | Validate a pure/reference consumer and its connection/authorization UI states. |
+| CA-VAL-06 | IN PROGRESS | Prove two-APK independent-signer, Consumer-before-Host authorization and reconnect behavior. |
+| CA-VAL-07 | IN PROGRESS | Complete security/public-API/versioning review for ADR 0018. |
 | CA-VAL-08 | PLANNED | Capture applicable physical evidence and close release gate. |
 
 ## Completion criteria
 
-This workstream is complete only when the reference external APK proves the accepted consumer contract through packaged client artifacts, policy/security tests are deterministic, compatibility behavior is explicit, and applicable physical-device evidence supports the distribution claim.
+This workstream is complete only when a real external APK proves the accepted consumer contract through packaged client artifacts, policy/security tests are deterministic, compatibility behavior is explicit, the distributed signing/install-order topology is represented truthfully, and applicable physical-device evidence supports the release claim.
