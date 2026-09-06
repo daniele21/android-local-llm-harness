@@ -13,7 +13,8 @@ It must not instantiate `RuntimeOrchestrator`, choose/download/install models, o
 ## Security invariants
 
 - Capture Binder UID/PID before switching threads.
-- Treat the manifest bind permission as a capability gate, not sufficient authority. Verify the exact UID/package mapping, current installed signer and authoritative Host policy on every entry point.
+- A manifest/service permission, when a host chooses to configure one, is only an optional platform prefilter and never sufficient authority. The public Harnex Host deliberately omits a custom bind permission because Android does not retroactively grant an unknown custom permission when a Consumer was installed before the Host; install order must not decide reachability.
+- Every privileged Binder entry point verifies the exact UID/package mapping, current installed signer and authoritative Host policy. A permissionless bind surface must still fail closed before model resolution or expensive work.
 - When a dynamic policy source is configured, it is authoritative for that authorization attempt; never merge a stale/bootstrap policy back into live trust.
 - Never trust caller-supplied package, UID, application ID, certificate or model identity.
 - Independent-consumer authorization is pinned to the exact current installed signer approved by the Host. Historical signing lineage is accepted only where an explicit same-publisher policy owns that compatibility decision.
