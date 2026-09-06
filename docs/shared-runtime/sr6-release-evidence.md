@@ -5,15 +5,15 @@ Document type: evidence-runbook
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.sr6-release-evidence
 Read when: preparing or reviewing the physical/two-APK release gate
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 ## Goal
 
 SR-6 validates the exact deployment boundary being claimed for a consumer: a separately installed Harnex Host, a packaged Consumer SDK, Android Binder caller authorization and the real signing topology of the participating applications.
 
-ADR 0018 supersedes the original assumption that every production consumer shares the Host signing identity. Harnex and external consumers such as RedactGuard may use distinct Play App Signing identities. The manifest `BIND_LOCAL_LLM` permission is only a bind capability; Binder UID/package/signer verification plus explicit Harnex Control Plane authorization is the trust boundary.
+ADR 0018 supersedes the original assumption that every production consumer shares the Host signing identity. Harnex and external consumers such as RedactGuard may use distinct Play App Signing identities and may be installed in either order. The public Harnex service therefore has no custom bind permission; Binder UID/package/current-signer verification plus explicit Harnex Control Plane authorization is the trust boundary.
 
-Deterministic emulator E2E can prove the Binder authorization state machine with distinct ephemeral identities. Physical/Play evidence remains required when the claim depends on actual Play App Signing identity, representative hardware or real GGUF/runtime behavior.
+Deterministic emulator E2E can prove the Binder authorization state machine with distinct ephemeral identities and Consumer-before-Host installation. Physical/Play evidence remains required when the claim depends on actual Play App Signing identity, representative hardware or real GGUF/runtime behavior.
 
 ## Evidence paths
 
@@ -50,11 +50,12 @@ For RedactGuard or another separately distributed consumer, exact-head automatio
 2. build the exact consumer against that SDK candidate;
 3. sign Host/Host-owned test APKs with identity A and consumer/consumer-test APKs with identity B;
 4. prove A != B from APK certificate digests;
-5. install both applications;
-6. prove the consumer is denied while its observed identity is pending;
+5. install the Consumer before the Host in the install-order path and prove the exported explicit Host service is reachable without a custom permission;
+6. prove the consumer is denied by Binder/Control Plane policy while its observed identity is pending;
 7. use Host-owned instrumentation/UI authority to authorize the exact observed package + signer;
 8. prove authorized connect -> disconnect -> reconnect;
-9. preserve bounded source/signing/result evidence and delete ephemeral private keys.
+9. replace the consumer signer and prove the unapproved identity cannot inherit authorization;
+10. preserve bounded source/signing/result evidence and delete ephemeral private keys.
 
 For a Play-distributed candidate, physical confirmation installs the actual Internal Testing builds and records the Host and consumer Play App Signing digest identities. Local ephemeral signing is not presented as evidence of the real Play identity.
 
@@ -98,25 +99,26 @@ The instrumentation test does not print prompt or generated output content.
 
 ## Repository authorization review
 
-The current security boundary is deliberately stronger than possession of an Android permission:
+The current security boundary is deliberately independent of manifest permission grant timing:
 
-- the exported Host service requires the variant-specific normal `BIND_LOCAL_LLM` capability permission;
+- the public exported Host service has no custom bind permission and is reached by explicit component;
 - Host authorization captures Binder calling UID before dispatch and resolves the exact installed package;
 - empty or ambiguous UID/package mappings fail closed;
-- the installed package signing certificate must match the exact live Host policy;
+- the installed package current signing certificate must match the exact live Host policy;
 - for independently signed consumers, live policy comes from explicitly authorized Harnex Control Plane state for the source-observed package + signer;
 - newly observed independent consumers are `PENDING` and denied;
 - signing identity replacement is `SIGNATURE_CHANGED` and denied until explicit reauthorization;
 - the Host owns `ApplicationId`, allowed `UseCaseId` and model binding rather than accepting client-selected authority;
+- pure bind/handshake remains bounded and cannot load a model before authorization;
 - emulator fault/control and broader diagnostics remain separate from inference binding.
 
 Same-publisher fixtures can retain reviewed same-signer policy as an intentional test topology. They do not weaken or replace the independent-consumer path.
 
 ## Negative signer evidence
 
-The packaged fixture runner may still create a short-lived PKCS12 identity and rebuild only the fixture to prove that a mismatched signer cannot inherit a same-publisher allowlist entry. The expected result remains `PERMISSION_DENIED`, now due to Binder caller policy rather than a signature-level manifest permission.
+The packaged fixture runner may still create a short-lived PKCS12 identity and rebuild only the fixture to prove that a mismatched signer cannot inherit a same-publisher allowlist entry. The expected result remains `PERMISSION_DENIED`, now due to Binder caller policy rather than a manifest permission.
 
-The independent-consumer path also requires denial before explicit authorization. A known package with a distinct source-observed signer does not become authorized merely because it declares `BIND_LOCAL_LLM` or is installed.
+The independent-consumer path also requires denial before explicit authorization. A known package with a distinct source-observed signer does not become authorized merely because it is installed or can bind the exported service.
 
 Temporary keystores/passwords are deleted when runners exit and are never committed or copied into evidence bundles.
 
@@ -157,11 +159,12 @@ For an independently signed consumer authorization claim:
 
 1. exact Harnex and consumer source revisions are recorded;
 2. Host and consumer APK signing digests are present and distinct;
-3. the consumer is denied before explicit Harnex authorization;
-4. authorization applies to the exact observed package + signer identity;
-5. authorized connect/disconnect/reconnect passes;
-6. an unknown/mismatched identity cannot inherit access;
-7. no signing key/password/full certificate or inference content is persisted.
+3. Consumer-before-Host installation reaches the explicit Binder service without reinstalling the Consumer;
+4. the consumer is denied before explicit Harnex authorization;
+5. authorization applies to the exact observed package + signer identity;
+6. authorized connect/disconnect/reconnect passes;
+7. an unknown, mismatched or replacement identity cannot inherit access;
+8. no signing key/password/full certificate or inference content is persisted.
 
 For a physical Play distribution claim, the installed Internal builds' actual Play App Signing digest identities are recorded and the user-visible authorization/connect flow succeeds on device.
 
