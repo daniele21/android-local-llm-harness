@@ -82,13 +82,13 @@ internal object Qwen35FourBitModelReleases {
             licenseId = "Apache-2.0",
             sourceUrl = SOURCE_URL,
             useCases =
-                setOf(
-                    "transaction-classification",
-                    "structured-extraction",
-                    "summarization",
-                    "local-assistant",
-                    "local-rag",
-                ),
+            setOf(
+                "transaction-classification",
+                "structured-extraction",
+                "summarization",
+                "local-assistant",
+                "local-rag",
+            ),
         )
     }
 }

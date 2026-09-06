@@ -265,11 +265,7 @@ private fun ModelLifecycleActions(
 }
 
 @Composable
-private fun DownloadingActions(
-    model: PhoneCatalogModelUi,
-    actions: UnifiedModelsActions,
-    onOpenModelDetails: () -> Unit,
-) {
+private fun DownloadingActions(model: PhoneCatalogModelUi, actions: UnifiedModelsActions, onOpenModelDetails: () -> Unit) {
     val expected = model.expectedBytes.coerceAtLeast(1L)
     val progress = (model.bytesDownloaded.toDouble() / expected.toDouble()).coerceIn(0.0, 1.0)
     LinearProgressIndicator(progress = { progress.toFloat() }, modifier = Modifier.fillMaxWidth())
@@ -338,10 +334,7 @@ private fun InstalledLifecycleActions(
 }
 
 @Composable
-private fun ModelActionLayout(
-    primary: @Composable RowScope.() -> Unit,
-    contextual: @Composable RowScope.() -> Unit,
-) {
+private fun ModelActionLayout(primary: @Composable RowScope.() -> Unit, contextual: @Composable RowScope.() -> Unit) {
     if (currentHarnessAdaptivePolicy().stackDenseContent) {
         Column(
             modifier = Modifier.fillMaxWidth(),

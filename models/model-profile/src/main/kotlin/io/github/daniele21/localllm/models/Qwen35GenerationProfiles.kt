@@ -23,7 +23,9 @@ object Qwen35GenerationGuardPolicies {
 
     fun forTier(tier: Qwen35ModelTier): GenerationGuardPolicy = when (tier) {
         Qwen35ModelTier.B0_8 -> policy(thinkingBudget = 192, answerReserve = 256, activationTokens = 64)
+
         Qwen35ModelTier.B2 -> policy(thinkingBudget = 384, answerReserve = 512, activationTokens = 96)
+
         // Keep the unmeasured 4B tier bounded like 2B until physical-device evidence justifies wider budgets.
         Qwen35ModelTier.B4 -> policy(thinkingBudget = 384, answerReserve = 512, activationTokens = 96)
     }
@@ -44,12 +46,11 @@ object Qwen35GenerationGuardPolicies {
 object Qwen35GenerationProfiles {
     const val VERSION = 4
 
-    fun forTier(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> =
-        if (tier == Qwen35ModelTier.B4) {
-            unslothFourBProfiles()
-        } else {
-            legacyMobileProfiles(tier)
-        }
+    fun forTier(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> = if (tier == Qwen35ModelTier.B4) {
+        unslothFourBProfiles()
+    } else {
+        legacyMobileProfiles(tier)
+    }
 
     fun defaultForTier(tier: Qwen35ModelTier): GenerationDefaults =
         forTier(tier).single { it.id == Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY }.defaults
@@ -62,14 +63,13 @@ object Qwen35GenerationProfiles {
      * THINKING         -> thinking general
      * PRECISE          -> thinking precise/coding
      */
-    private fun unslothFourBProfiles(): List<Qwen35GenerationProfile> =
-        listOf(
-            profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_TEXT_FAST, 256, ThinkingMode.DISABLED, 0.7f, 0.8f, 1.5f),
-            profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY, 768, ThinkingMode.DISABLED, 1f, 0.95f, 1.5f),
-            profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_THINKING, 1_024, ThinkingMode.ENABLED, 1f, 0.95f, 1.5f),
-            profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_PRECISE, 1_024, ThinkingMode.ENABLED, 0.6f, 0.95f, 0f),
-            profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_JSON, 512, ThinkingMode.DISABLED, 0.7f, 0.8f, 1.5f),
-        )
+    private fun unslothFourBProfiles(): List<Qwen35GenerationProfile> = listOf(
+        profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_TEXT_FAST, 256, ThinkingMode.DISABLED, 0.7f, 0.8f, 1.5f),
+        profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY, 768, ThinkingMode.DISABLED, 1f, 0.95f, 1.5f),
+        profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_THINKING, 1_024, ThinkingMode.ENABLED, 1f, 0.95f, 1.5f),
+        profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_PRECISE, 1_024, ThinkingMode.ENABLED, 0.6f, 0.95f, 0f),
+        profile(Qwen35ModelTier.B4, Qwen35GenerationProfileId.QWEN35_JSON, 512, ThinkingMode.DISABLED, 0.7f, 0.8f, 1.5f),
+    )
 
     private fun legacyMobileProfiles(tier: Qwen35ModelTier): List<Qwen35GenerationProfile> {
         val qualityTokens = if (tier == Qwen35ModelTier.B0_8) 512 else 768

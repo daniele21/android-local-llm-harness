@@ -48,11 +48,7 @@ internal enum class ModelsAvailabilityFilter(val label: String) {
     AVAILABLE("Not installed"),
 }
 
-internal enum class ModelsSizeFilter(
-    val label: String,
-    val groupLabel: String?,
-    val suggestedModelId: String? = null,
-) {
+internal enum class ModelsSizeFilter(val label: String, val groupLabel: String?, val suggestedModelId: String? = null) {
     ALL("Any size", null),
     B08("0.8B", "Qwen3.5 · 0.8B", "qwen35-08b-q4-k-m"),
     B2("2B", "Qwen3.5 · 2B", "qwen35-2b-q4-k-m"),
@@ -290,7 +286,9 @@ private fun ModelsLibrarySummary(state: HarnessUiState, catalogCount: Int) {
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = "${state.modelInventory.installedCount} installed · ${formatModelBytes(state.modelInventory.installedBytes)} on device",
+                    text = "${state.modelInventory.installedCount} installed · ${formatModelBytes(
+                        state.modelInventory.installedBytes,
+                    )} on device",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
