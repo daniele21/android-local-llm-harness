@@ -1,57 +1,31 @@
 # E2E Environment Fidelity Contract
 
-Version: 0.2.0
+Version: 0.2.1
 
-Harnex separates **executor**, **environment fidelity** and **UI evidence mode**. `.engineering/e2e.json` owns the concrete target/execution environments and critical journeys.
+Harnex separates **executor**, **environment fidelity** and **UI evidence mode**. `.engineering/e2e.json` owns concrete target/execution environments, critical journeys and stage policy.
 
 ## Governing rules
 
-> Final physical/device validation confirms residual ARM64/native/model/resource claims; it should not be the first complete-system test.
+> Automated integration proves the coherent feature before `dev`; residual physical/device validation is deferred to release and confirms ARM64/native/model/resource deltas.
 
 > Use the cheapest automated environment sufficient for the changed claim and escalate fidelity only when a material target dimension requires it.
 
-> UI presence alone does not force video.
+> UI presence alone does not force video, but a material UI/UX critical journey entering shared development requires `FULL_MEDIA`.
 
-## Fidelity
+## Fidelity and journeys
 
-Canonical order:
+Canonical order: `host_or_fake` → `simulated_or_emulated` → `representative_virtual` → `representative_physical` → `target_environment`.
 
-1. `host_or_fake`
-2. `simulated_or_emulated`
-3. `representative_virtual`
-4. `representative_physical`
-5. `target_environment`
+A GitHub Android emulator remains `simulated_or_emulated`; it does not establish ARM64 JNI/llama.cpp, real GGUF loading, physical memory, thermal or OEM behavior. Lower-level tests own deterministic invariants; E2E owns assembled outcomes. Each journey declares target/automated environments, minimum fidelity, residual gaps and real-environment confirmation.
 
-A GitHub Android emulator remains `simulated_or_emulated`; it does not establish ARM64 JNI/llama.cpp, real GGUF loading, physical memory, thermal or OEM behavior.
+## Stage policy
 
-## Critical journeys
+- **ITERATION**: E2E only when it is the cheapest useful falsifier.
+- **INTEGRATION**: affected automated critical journeys must pass before `dev`; real-environment evidence is non-blocking and retained as `DEFERRED_TO_RELEASE`.
+- **RELEASE**: release-critical E2E plus every required real-environment confirmation must PASS.
 
-Keep E2E small. Lower-level tests own deterministic invariants; E2E owns assembled outcomes.
+UI evidence modes are `ASSERTIONS`, `SCREENSHOTS`, `FULL_MEDIA`. `FULL_MEDIA` means bounded screenshots plus one continuous journey video for material UI integration outcomes or claims about motion, timing/progression, navigation/transitions, lifecycle visibility or release acceptance. Missing required evidence is `E2E_EVIDENCE_INCOMPLETE`, never permission to downgrade.
 
-For every journey declare target environments, automated environments, minimum automated fidelity, residual gaps and real-environment confirmation. Execute against built/package surfaces when package/install behavior is part of the claim.
+Harnex mapping remains: Binder/shared-runtime system journeys use assertions; `phone-cold-start` normally uses screenshots unless the UI/UX journey itself is the integration claim; production local-inference lifecycle retains explicit physical ARM64/GGUF/resource release evidence.
 
-## UI evidence modes
-
-- `ASSERTIONS` — UI is incidental and deterministic system behavior is the changed claim.
-- `SCREENSHOTS` — stable visible layout/hierarchy/copy/state/recovery/adaptive semantics must be inspected.
-- `FULL_MEDIA` — sequence over time matters: motion, timing/progression, navigation/transitions, lifecycle visibility or release/product acceptance.
-
-The selected mode is a **minimum**. A workflow may retain stronger evidence when useful, but stronger media should not be required solely because a journey traverses UI.
-
-Harnex mapping:
-
-- Binder serialization and shared-runtime roundtrip: assertions;
-- `phone-cold-start`: screenshots normally suffice;
-- production local-inference lifecycle: lower-level automation plus explicit physical ARM64/GGUF/resource evidence.
-
-If required evidence for the selected mode is missing, report `E2E_EVIDENCE_INCOMPLETE` rather than overclaiming PASS.
-
-## Evidence identity and lifecycle
-
-Evidence must identify journey, source/build/run, execution environment/fidelity and selected UI evidence mode. Logs/screenshots/videos remain privacy-safe bounded artifacts, not durable design truth.
-
-E2E owns cleanup of project processes/listeners, emulator/device run state, temporary model/test data and generated evidence on success/failure/timeout/cancellation.
-
-## Escalation
-
-During ITERATION, do not run E2E by default unless a cheap journey is the fastest useful falsifier. At INTEGRATION run only affected critical journeys. At RELEASE add release-critical and residual environment evidence required by the claim.
+Evidence identifies journey, source/build/run, execution environment/fidelity and selected UI mode, remains privacy-safe and bounded, and is cleaned with owned temporary state on every exit path.
