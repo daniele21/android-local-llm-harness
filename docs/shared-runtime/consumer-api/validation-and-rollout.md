@@ -5,11 +5,11 @@ Document type: feature-specification
 Owner: shared-runtime-consumer-api-validation
 Canonical scope: shared-runtime.consumer-api.validation-rollout
 Read when: adding consumer API tests, compatibility/security review, reference-app validation or release gates
-Last reviewed: 2026-09-05
+Last reviewed: 2026-09-06
 
 ## Goal
 
-Prove that the public consumer API is smaller than the internal runtime surface, correctly policy-scoped, compatible across supported host/client versions and usable by a real external app without embedding Harness infrastructure.
+Prove that the public consumer API is smaller than the internal runtime surface, correctly policy-scoped, compatible across supported host/client versions and usable by a real external app without embedding Harnex infrastructure.
 
 This workstream extends—not replaces—the shared-runtime SR-5/SR-6 security, lifecycle and physical-device evidence.
 
@@ -20,7 +20,7 @@ contract/unit semantics
   -> host policy resolution with fakes
   -> Binder wire mapping/compatibility fixtures
   -> packaged client SDK consumer compilation
-  -> independent-signer two-APK authorization/lifecycle behavior
+  -> independent-signer + install-order two-APK authorization/lifecycle behavior
   -> applicable physical Host/consumer/runtime evidence
   -> public API/security/versioning review
 ```
@@ -85,11 +85,13 @@ The API must preserve the ADR 0018 trust boundary for independently signed consu
 
 Review:
 
-- `BIND_LOCAL_LLM` remains a normal capability permission and is never treated as an authorization grant;
+- the public Harnex inference service is explicitly bindable with no custom bind permission;
+- Consumer-before-Host installation reaches the service after Host installation without Consumer reinstall;
 - explicit component binding remains intact;
-- application identity remains derived from Binder calling UID, exact installed package and signing certificate;
+- application identity remains derived from Binder calling UID, exact installed package and current signing certificate;
 - source-observed independent consumers remain pending until explicit Harnex authorization;
 - signing identity replacement fails closed until explicit reauthorization;
+- authorization completes before model resolution or expensive work;
 - capability discovery authenticates before returning policy information;
 - model/preset selection is an allowlist selector, not arbitrary model control;
 - request/session ownership remains authenticated-caller/client scoped;
@@ -97,9 +99,9 @@ Review:
 - typed errors do not reveal private paths, signing data or unrelated model inventory;
 - capability/result payload sizes are bounded;
 - schema/input payloads retain transport validation limits;
-- no diagnostics/control-plane or emulator-fault permission is implicitly granted by inference access.
+- no diagnostics/control-plane or emulator-fault authority is implicitly granted by public inference reachability.
 
-Same-publisher consumers may retain a reviewed signing policy where intentional, but external-consumer release claims must use the signing topology actually distributed. Same-key evidence cannot establish independent-signer compatibility.
+Same-publisher consumers may retain a reviewed signing policy where intentional, but external-consumer release claims must use the signing topology actually distributed. Same-key or Host-first-only evidence cannot establish independent-signer compatibility.
 
 ## Compatibility strategy
 
@@ -136,8 +138,10 @@ Maintain at least:
 
 | Client | Host | Expected |
 | --- | --- | --- |
-| Old client | New host | Existing fixed-use-case flow remains valid when the client declares a compatible binding permission and its caller identity remains authorized. |
-| New client, defaults only | Old compatible host | Works only when required discovery/selection features and bind-permission contract are supported; otherwise typed incompatibility/unavailability. |
+| Current compatible client | Current compatible host | Explicit component bind; Binder caller authorization; common negotiated features. |
+| Consumer installed before current Host | Current Host | Reachable after Host installation without Consumer reinstall; pending/authorized state remains Host-owned. |
+| Old client | New host | Existing fixed-use-case flow remains valid only when its published binding contract is still compatible and its exact caller identity remains authorized. |
+| New client, defaults only | Old compatible host | Works only when required discovery/selection/binding semantics are supported; otherwise typed incompatibility/unavailability. |
 | New client using optional selection | Host supports feature | Capability -> prepare -> generate succeeds. |
 | New client using unsupported feature | Older host | Fails before model preparation with typed incompatibility. |
 | Compatible minor versions | Compatible peer | Common feature set is negotiated. |
@@ -147,7 +151,7 @@ Exact version numbers are assigned during implementation/release planning, not i
 
 ## Reference consumer requirement
 
-A reference consumer must remain a consumer, not a second Harness control plane. Product-specific PDF, PII, review, export and visual acceptance belongs to the consuming product; this source retains the generic SDK boundary.
+A reference consumer must remain a consumer, not a second Harnex control plane. Product-specific PDF, PII, review, export and visual acceptance belongs to the consuming product; this source retains the generic SDK boundary.
 
 Its success criteria:
 
@@ -155,7 +159,7 @@ Its success criteria:
 - contains no llama.cpp/JNI runtime;
 - contains no GGUF model store/download/install pipeline;
 - contains no independent runtime tuning engine;
-- does not recreate Harness-wide health/cache/thermal/benchmark controls;
+- does not recreate Harnex-wide health/cache/thermal/benchmark controls;
 - discovers authorized use-case/output/default capabilities from the host;
 - runs bounded input -> structured answer stream -> terminal result;
 - shows only public metrics/request details;
@@ -218,13 +222,14 @@ A binary/API compatibility tool may be added if/when the client artifact becomes
 For independent-consumer integration, capture privacy-safe deterministic evidence for:
 
 1. Host and consumer APK signing digests are distinct;
-2. source-observed consumer identity begins pending/denied;
-3. explicit Harnex authorization promotes the exact observed package/signer;
-4. authorized connect -> disconnect -> reconnect succeeds with a reusable client;
-5. unknown or mismatched signer remains denied;
-6. capability discovery returns only the authorized use case;
-7. cancellation and host process death/reconnect retain their typed semantics;
-8. package/signer replacement fails closed until explicit reauthorization.
+2. the Consumer is installed before the Host and can reach the explicit service afterward without reinstall;
+3. source-observed consumer identity begins pending/denied;
+4. explicit Harnex authorization promotes the exact observed package/current signer;
+5. authorized connect -> disconnect -> reconnect succeeds with a reusable client;
+6. unknown or mismatched signer remains denied;
+7. capability discovery returns only the authorized use case;
+8. cancellation and host process death/reconnect retain their typed semantics;
+9. package/signer replacement fails closed until explicit reauthorization.
 
 On the applicable physical device/model matrix, additionally capture runtime/model/performance evidence required by the release claim. Do not store prompt/reasoning/answer text or certificate material beyond privacy-safe digest identity in evidence archives.
 
@@ -250,7 +255,7 @@ Before consumer release:
 - compatibility policy identifies SDK/protocol/capability versioning;
 - release notes bind host version, client SDK version, protocol version, Host/consumer signing digest identities and capability revision policy;
 - reference consumer uses the packaged candidate artifact;
-- independently signed distribution claims have exact-topology deterministic evidence and applicable Play/physical confirmation;
+- independently signed distribution claims have exact-topology deterministic evidence including install-order independence and applicable Play/physical confirmation;
 - supported model/preset claims point to applicable device evidence;
 - private signing keys/certificates, model paths and prompt/output information remain excluded.
 
@@ -263,10 +268,10 @@ Before consumer release:
 | CA-VAL-03 | PLANNED | Add protocol mapping/feature-negotiation compatibility fixtures. |
 | CA-VAL-04 | PLANNED | Enforce packaged client public-surface dependency boundary. |
 | CA-VAL-05 | PLANNED | Validate a pure/reference consumer and its connection/authorization UI states. |
-| CA-VAL-06 | IN PROGRESS | Prove two-APK independent-signer authorization and reconnect behavior. |
+| CA-VAL-06 | IN PROGRESS | Prove two-APK independent-signer, Consumer-before-Host authorization and reconnect behavior. |
 | CA-VAL-07 | IN PROGRESS | Complete security/public-API/versioning review for ADR 0018. |
 | CA-VAL-08 | PLANNED | Capture applicable physical evidence and close release gate. |
 
 ## Completion criteria
 
-This workstream is complete only when a real external APK proves the accepted consumer contract through packaged client artifacts, policy/security tests are deterministic, compatibility behavior is explicit, the distributed signing topology is represented truthfully, and applicable physical-device evidence supports the release claim.
+This workstream is complete only when a real external APK proves the accepted consumer contract through packaged client artifacts, policy/security tests are deterministic, compatibility behavior is explicit, the distributed signing/install-order topology is represented truthfully, and applicable physical-device evidence supports the release claim.
