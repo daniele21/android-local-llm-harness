@@ -49,7 +49,9 @@ internal object PhoneCatalogCompatibilityPresentation {
             "The required Harnex model profile is unavailable for this app and use case."
 
         CatalogCompatibilityReason.INSUFFICIENT_RAM -> insufficientRamMessage(release, device)
+
         CatalogCompatibilityReason.INSUFFICIENT_STORAGE -> insufficientStorageMessage(result, device)
+
         CatalogCompatibilityReason.STORAGE_REQUIREMENT_OVERFLOW ->
             "The required free-storage amount could not be evaluated safely."
     }
