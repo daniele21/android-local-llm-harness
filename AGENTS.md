@@ -19,7 +19,7 @@ Harnex is the Android local-AI harness/control plane. Consumer apps own product 
 | Product mission/users/outcomes/principles | `docs/product.md`, `.engineering/product.json` |
 | Public/runtime contracts | `core/contracts`, `core/backend-spi`, `core/runtime-core`; adapters/fakes/tests |
 | Model/lifecycle truth | `models/model-store`, control-plane stores; runtime/control-plane tests |
-| Binder/client/Host | `transports/android-binder-*`, `integrations/android-service-host`; consumer/two-APK evidence |
+| Binder/client/Host | `transports/android-binder-*`, `integrations/android-service-host`, `apps/shared-runtime-client-consumer-fixture`; consumer/two-APK evidence |
 | Native execution | `backends/llama-cpp`, `third_party/llama.cpp`; JNI/native/package gates |
 | Product experience | phone/console surfaces + `design/*`; design-system/journey evidence |
 
@@ -31,13 +31,13 @@ Follow applicable scoped `AGENTS.md`; extend the canonical owner before adding p
 | --- | --- |
 | Docs/copy | affected owner; `docs/README.md` if routing is unclear |
 | Product capability/behavior/strategy shaping | `.engineering/product.json`, `docs/product.md`, `skills/shape-product-change/SKILL.md` |
-| Behavior/bug/contract | `skills/structured-change/SKILL.md`, `skills/validate-change/SKILL.md`, relevant commands |
+| Behavior/bug/contract | `.engineering/commands.json`, `skills/structured-change/SKILL.md`, `skills/validate-change/SKILL.md` |
 | Material UI | above + `skills/design-product-experience/SKILL.md`, relevant `design/*` |
-| Integration/release | `skills/preflight-change/SKILL.md`, commands, `.engineering/e2e.json` |
+| Integration/release | `skills/preflight-change/SKILL.md`, `.engineering/commands.json`, `.engineering/e2e.json` |
 | Missing deterministic remote gate | `skills/remote-preflight/SKILL.md` |
-| Persistent work | `skills/plan-workstream/SKILL.md` + active plan; finalize via `skills/finalize-workstream/SKILL.md` |
+| Persistent work | `skills/plan-workstream/SKILL.md` + active plan; repository state in `docs/current-state.md`; finalize via `skills/finalize-workstream/SKILL.md` |
 
-## Product and delivery boundaries
+## Delivery boundaries
 
 Product depth, delivery stage and validation depth are independent.
 
@@ -47,12 +47,12 @@ Product depth, delivery stage and validation depth are independent.
 - `INTEGRATION`: coherent outcome ready for `dev`; current docs, exact candidate/base, required automated gates and affected E2E. Material UI/UX journeys use `FULL_MEDIA`; residual physical proof is `DEFERRED_TO_RELEASE`.
 - `RELEASE`: `FULL` release evidence plus applicable blocking real-environment confirmation.
 
-`SHIPPED` proves delivery, not product impact. Define post-release learning only when real use must answer something material; telemetry is not mandatory.
+`SHIPPED` proves delivery, not product impact. Resolve risk dimensions into required gates; stacked publication is exception-only. Define post-release learning only when real use must answer something material; telemetry is not mandatory.
 
 ## Context, diagnosis and completion
 
 `.engineering/documentation-policy.json` owns bounded context routes; use `--route product` for material shaping and `--route bug` for implementation. Routes never authorize omitting relevant owners/source.
 
-Resolve risks into gates; missing local tooling is `REMOTE_AUTOMATED`, not user-run work. Reuse only provably equivalent trusted evidence. On failure classify before patching; after two failed repairs with the same signature, change diagnostic strategy and gather discriminating evidence.
+Missing local tooling is `REMOTE_AUTOMATED`, not user-run work. Reuse only provably equivalent trusted evidence. On failure classify before patching; after two failed repairs with the same signature, change diagnostic strategy and gather discriminating evidence.
 
 Before integration update affected canonical docs. Transfer durable truth and deferred release obligations before deleting completed plans. Never suppress legitimate tests, hide failed/pending gates, leak sensitive content or downgrade evidence merely to obtain PASS.
