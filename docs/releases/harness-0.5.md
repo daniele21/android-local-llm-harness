@@ -5,7 +5,7 @@ Document type: release-checklist
 Owner: repository
 Canonical scope: release.harness-0.5
 Read when: preparing, validating or promoting the Harness 0.5.0 release candidate
-Last reviewed: 2026-08-13
+Last reviewed: 2026-09-07
 
 This file owns only the remaining release gates for Harness 0.5.0. Historical integration sequencing is retained through Git history and the archived integration summary; current implementation status belongs in [`../current-state.md`](../current-state.md).
 
@@ -28,6 +28,15 @@ Harness 0.5.0 currently includes:
 - shared-runtime Binder protocol v1, authenticated host service and lifecycle-safe Android client SDK;
 - two-APK debug Binder instrumentation and deterministic multi-client/death/backpressure/privacy hardening;
 - SR-6 release-like physical evidence tooling, packaged release client-AAR consumer and independent-signer denial fixture.
+
+## Recorded partial physical evidence
+
+These records are durable inputs to the final release decision but are **not** sufficient by themselves to satisfy the exact-release-candidate gates below:
+
+- [`../evidence/play-internal-2026-09-07.md`](../evidence/play-internal-2026-09-07.md): current Play Internal Harnex/RedactGuard topology physically passed Consumer-first install order, `PENDING`, explicit authorization, Connect / Disconnect / Reconnect and real inference. Both current Play applications report the same App Signing SHA-256 digest, so this is not physical distinct-signer proof; deterministic release-identity E2E owns that boundary.
+- [`../qwen35/evidence/2026-09-07-sm-a566b-qwen35-2b-q4-k-m-physical-acceptance.md`](../qwen35/evidence/2026-09-07-sm-a566b-qwen35-2b-q4-k-m-physical-acceptance.md): Samsung `SM-A566B` physically passed exact Qwen3.5 2B `Q4_K_M` generation, cancellation, five load/generate/unload cycles, bounded PSS growth and thermal capture through the Harnex-owned validation path. The one-token sanity output is not a sustained-throughput baseline.
+
+The final release candidate must still be identity-bound to the installed release artifact, and unchecked gates below remain open unless a later exact-candidate record explicitly closes them.
 
 ## Open product gates
 
@@ -107,4 +116,4 @@ Certificate digests are recorded only as identity evidence. Full certificates, p
 
 ## Release decision
 
-Harness 0.5.0 must not be described as production-ready until the physical-device Qwen3.5 lifecycle, JNI loading, cancellation, memory/performance/thermal evidence and applicable shared-runtime SR-6 release evidence are complete. Host tests, Android assembly, repository CI and emulator execution remain merge evidence, not physical-device release evidence.
+Harness 0.5.0 must not be described as production-ready until the physical-device Qwen3.5 lifecycle, JNI loading, cancellation, memory/performance/thermal evidence and applicable shared-runtime SR-6 release evidence are complete for the exact release candidate. Host tests, Android assembly, repository CI and emulator execution remain merge evidence, not physical-device release evidence.
