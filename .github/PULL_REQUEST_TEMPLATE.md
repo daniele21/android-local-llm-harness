@@ -2,9 +2,15 @@
 
 <!-- Observable user/system outcome delivered by this vertical slice. -->
 
+## Product impact
+
+- Depth: `PRODUCT_NONE|PRODUCT_LOCAL|PRODUCT_FEATURE|PRODUCT_STRATEGIC`
+
+<!-- For FEATURE/STRATEGIC: compact user/problem/outcome, material product risks/assumptions, decision and success. For NONE/LOCAL keep this terse; do not create PRD ceremony. -->
+
 ## Scope / risk
 
-<!-- Changed owners plus material contract/privacy/lifecycle/native/package/UI risks. -->
+<!-- Changed owners plus material contract/privacy/lifecycle/native/package/UI risks. Product depth and engineering validation depth are independent. -->
 
 ## What changed
 
@@ -26,11 +32,11 @@
 
 ## Documentation
 
-<!-- At INTEGRATION/RELEASE list affected durable owners updated. During ITERATION this may be pending. -->
+<!-- At INTEGRATION/RELEASE list affected durable owners, including docs/product.md only if durable product truth changed. -->
 
 ## Remaining gaps
 
-<!-- REAL_ENVIRONMENT or follow-up gaps only; do not call automatable deterministic gates manual. -->
+<!-- REAL_ENVIRONMENT, post-release product question, or follow-up gaps only; do not call automatable deterministic gates manual. -->
 
 ## Safety / privacy
 
