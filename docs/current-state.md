@@ -29,7 +29,7 @@ Harnex has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, verif
 
 SR-0..5 and repository-side SR-6 tooling are integrated. The public Consumer SDK is now `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.11`; publication from the integrated Harnex candidate completed successfully, including unauthenticated downstream consumption from the public Maven repository.
 
-ADR 0018 is the active trust boundary for independently distributed consumers. The public Harnex service is explicitly bindable with no custom bind permission so Consumer-before-Host installation cannot permanently block reachability. Reachability is not authorization: authority remains fail-closed Binder UID -> exact installed package -> current signer -> Harnex Control Plane authorization -> enabled use case. Known external consumers are source-observed as `PENDING`; signer replacement becomes `SIGNATURE_CHANGED`; both require explicit user authorization.
+ADR 0018 is the active trust boundary for consumer applications regardless of whether a particular first-party pair currently shares a signing lineage. The public Harnex service is explicitly bindable with no custom bind permission so Consumer-before-Host installation cannot permanently block reachability. Reachability is not authorization: authority remains fail-closed Binder UID -> exact installed package -> current signer -> Harnex Control Plane authorization -> enabled use case. Known external consumers are source-observed as `PENDING`; signer replacement becomes `SIGNATURE_CHANGED`; both require explicit user authorization.
 
 Consumer SDK `disconnect()` is part of alpha.11 and supports reversible Settings-owned disconnect/reconnect without weakening Harnex authority. Emulator-only fault/control authority remains separate from production inference authority: the ordinary fault receiver is signature protected and the bounded shell bridge exists only in the Harnex `emulatorE2e` Host process.
 
@@ -39,14 +39,14 @@ RedactGuard now consumes immutable Consumer SDK `0.1.0-alpha.11` and exposes exp
 
 Exact automated evidence is green for both cross-app paths:
 
-- Consumer-first install -> Host absent -> later Harnex install without RedactGuard reinstall -> `PENDING` -> exact Harnex authorization -> Connect / Disconnect / Reconnect -> replacement signer denied as `SIGNATURE_CHANGED`;
+- distinct-signer Consumer-first install -> Host absent -> later Harnex install without RedactGuard reinstall -> `PENDING` -> exact Harnex authorization -> Connect / Disconnect / Reconnect -> replacement signer denied as `SIGNATURE_CHANGED`;
 - the complete Two-APK product/lifecycle/fault matrix, including ViewModel/Home continuity and Binder cancellation/process-loss/critical-pressure handling.
 
-The focused physical Play Internal run also confirms the real current distribution journey: RedactGuard-first, Harnex-later without reinstall, source-observed `PENDING`, exact authorization, Connect / Disconnect / Reconnect and representative production Consumer SDK/Binder/local-inference execution all work on device.
+The focused physical Play Internal run confirms the real current pre-release distribution journey: RedactGuard-first, Harnex-later without reinstall, source-observed `PENDING`, exact authorization, Connect / Disconnect / Reconnect and representative production Consumer SDK/Binder/local-inference execution all work on device.
 
-However, the Play signing metadata collected for that physical run reports the **same current Play App Signing SHA-256 digest for Harnex and RedactGuard**. The physical run therefore proves the actual same-signer Play topology; it does not prove the repository-declared distinct-signer REAL_ENVIRONMENT topology. Dedicated deterministic emulator lanes continue to prove cross-signer authorization semantics, but emulator evidence must not be relabeled as the required physical signer confirmation.
+The Play signing metadata collected for that physical run reports the **same current Play App Signing SHA-256 digest for Harnex and RedactGuard**. Under ADR 0018 this is acceptable for the current pre-release first-party stable repository promotion because the topology is recorded truthfully and distinct-signer authorization remains covered by deterministic release-identity evidence. This physical run must not be described as distinct-signer Play qualification.
 
-The commits added after the published/runtime-qualified candidates are limited to documentation, repository governance, verification scripts and workflow-policy surfaces; no Harnex app/runtime source or Android build configuration changed. This preserves the applicability of the functional physical journey but does not close the signer-fidelity gap above.
+The commits added after the published/runtime-qualified candidates are limited to documentation, repository governance, verification scripts and workflow-policy surfaces; no Harnex app/runtime source or Android build configuration changed. The physical journey therefore remains applicable to the current runtime/product tree.
 
 ### Consumer API, OMBRA, evaluation and audit
 
@@ -54,31 +54,30 @@ CA-0..4 are integrated; RedactGuard remains a pure Consumer SDK client and concr
 
 Local inference Activity/audit is integrated under ADR 0017: accepted inference history uses bounded encrypted app-private storage, verified Binder caller attribution and truthful restart reconciliation; normal telemetry/diagnostics stay content-free.
 
-## Open blockers
+## Release evidence state
 
-### 1. Play distinct-signer release topology
+### Pre-release stable promotion
 
-The current physical Play pair uses the same signing certificate, while the current release/evidence contract declares a distinct-signer production confirmation as blocking. Stable promotion must not silently reinterpret that requirement.
+The focused Play install-order/authorization/runtime evidence is complete for the current pre-release topology. The same-signer first-party Play pair is explicitly recorded and is not used as the Binder authorization mechanism. Distinct-signer support remains proven deterministically. Therefore signer topology is **not a blocker for this pre-release `dev -> main` promotion** once the resulting exact HEAD/base passes required RELEASE/FULL automated validation.
 
-Close this in one of two legitimate ways:
+### Deferred public-release signer obligation
 
-- configure/obtain distinct Play App Signing identities for the two applications and rerun the focused physical journey; or
-- if same-signer first-party distribution is intentionally the product topology, deliberately reshape the product/security/evidence contract and affected ADR/E2E/runbook claims before promotion, while retaining deterministic proof that third-party/distinct-signer Consumers remain supported and fail closed correctly.
+Before the first public release that depends on independently signed application distribution, or before claiming physical distinct-signer Play qualification, rerun the focused physical journey with distinct observed Play signing identities. This obligation is deferred to that public-release milestone; it must not be silently dropped or misrepresented as already proven.
 
-### 2. Representative Android runtime evidence
+### Representative Android runtime evidence
 
-LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence.
+LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence. These claim-specific gaps do not become proven merely because the stable repository line advances.
 
-### 3. OMBRA and follow-on work
+### OMBRA and follow-on work
 
 OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration identities against policy v1. Model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP continue independently where ownership does not conflict.
 
 ## Immediate next block
 
-1. resolve the Play signer-topology decision above without weakening or reinterpreting the current blocking release contract merely to promote;
-2. once the applicable signer evidence/contract is truthful and complete, rerun RELEASE/FULL on the resulting exact `dev` HEAD against live `main`;
-3. promote reconciled `dev` to stable `main` only with all applicable blocking release evidence complete;
-4. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator evidence as physical proof.
+1. run RELEASE/FULL on the exact current `dev` HEAD against live `main` after the evidence-contract amendment;
+2. promote reconciled `dev` to stable `main` when those required automated gates are green;
+3. retain the distinct-signer physical Play confirmation as a blocking obligation for the first applicable public release / physical distinct-signer readiness claim;
+4. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator or focused Play evidence as broader physical proof.
 
 ## Source links
 
