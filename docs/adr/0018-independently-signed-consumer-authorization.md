@@ -2,14 +2,16 @@
 
 - Status: Accepted
 - Date: 2026-09-05
-- Amended: 2026-09-06
+- Amended: 2026-09-07
 - Supersedes: trust and exported-service permission portions of ADR 0012
 
 ## Context
 
-ADR 0012 intentionally limited the first shared-runtime deployment to same-publisher, same-signing-lineage APKs protected by a signature-level Android permission. That assumption was useful for the initial Binder proof but does not match the distributed product topology: Harnex and independently developed consumer applications such as RedactGuard are separate Play applications with independent Play App Signing identities.
+ADR 0012 intentionally limited the first shared-runtime deployment to same-publisher, same-signing-lineage APKs protected by a signature-level Android permission. That assumption was useful for the initial Binder proof but does not match the intended public capability: Harnex must support independently developed consumer applications that may use signing identities unrelated to the Host.
 
-A production-shaped physical-device test exposed the mismatch. The earlier emulator cross-APK evidence had signed Host and consumer with one ephemeral key, so it proved the same-signer design rather than the independently signed distribution topology.
+RedactGuard is a separately distributed Play application and is used as the current reference consumer. The physical Play Internal evidence recorded on 2026-09-07 shows that the current Harnex and RedactGuard builds report the same Play App Signing SHA-256 identity. RedactGuard therefore proves the real Play install-order and authorization flow for the current deployment, but it is not current physical proof of a distinct-Play-signer topology. Distinct-signer semantics are validated separately with deterministic cross-application evidence and require a Play-delivered consumer with a different App Signing identity before making that physical distribution claim.
+
+A production-shaped physical-device test exposed the original permission mismatch. The earlier emulator cross-APK evidence had signed Host and consumer with one ephemeral key, so it proved the same-signer design rather than the independently signed distribution topology.
 
 The security properties that matter are not co-signing. Harnex must derive caller identity from Binder/Android, bind it to the exact installed package and signing certificate, map that identity to a Host-owned application/use-case policy, and fail closed when the identity is unknown or changes.
 
@@ -48,9 +50,9 @@ Ambiguous UID/package resolution, unknown packages, signer mismatch, disabled/pe
 
 ### Source-backed discovery and explicit user authorization
 
-For a known independently signed consumer such as RedactGuard, Harnex may observe the package and current signing certificate from Android `PackageManager`. Observation is not authorization.
+For a known external consumer such as RedactGuard, Harnex may observe the package and current signing certificate from Android `PackageManager`. Observation is not authorization, regardless of whether that consumer currently shares or differs from the Host signing identity.
 
-A newly observed independent consumer is persisted as `PENDING`. The user must explicitly enable that exact observed application identity in the Harnex Control Plane before it enters the live Binder authorization policy.
+A newly observed external consumer is persisted as `PENDING`. The user must explicitly enable that exact observed application identity in the Harnex Control Plane before it enters the live Binder authorization policy.
 
 If the installed signing identity later changes, reconciliation records the new source-backed identity as `SIGNATURE_CHANGED` and removes effective access until the user explicitly authorizes it again. Harnex never silently carries authorization across an unreviewed signer replacement.
 
@@ -58,7 +60,7 @@ Same-publisher built-ins may continue to use their reviewed Host signing lineage
 
 ### Live policy is Control-Plane-owned
 
-The live Binder policy for independently signed consumers is projected from authorized persisted Control Plane state: exact package, exact signer and enabled use-case bindings. Disabling the application removes it from the live policy without changing model ownership or consumer configuration.
+The live Binder policy for external consumers is projected from authorized persisted Control Plane state: exact package, exact signer and enabled use-case bindings. Disabling the application removes it from the live policy without changing model ownership or consumer configuration.
 
 Manual application registration, where supported, remains an explicit advanced Control Plane operation and does not weaken Binder-derived per-call verification.
 
@@ -82,8 +84,8 @@ Keeping this bridge in the Host process is intentional: shell control must not d
 - An arbitrary app may reach the exported Binder object, so every privileged entry point must authenticate before expensive work and the Host binding path must remain bounded.
 - User authorization is explicit and reviewable, while package/signing identity is source-backed rather than manually asserted for known consumers.
 - Signing identity changes fail closed and require reauthorization.
-- Cross-APK validation must use distinct Host and consumer signing keys, include Consumer-before-Host installation, and include an unauthorized-before-approval negative proof.
-- Same-signer-only or Host-first-only evidence is insufficient for production readiness of independently distributed consumers.
+- Cross-APK validation of the independent-signer capability must use distinct Host and consumer signing keys, include Consumer-before-Host installation, and include an unauthorized-before-approval negative proof.
+- Same-signer Play evidence is valid for the same-signer deployment actually tested, but is insufficient for a physical claim about independently signed Play applications.
 - Cross-signer emulator fault injection remains test-only: ordinary test control is signature-protected, while the separate Host-process CI bridge is `DUMP`-protected and allowlisted.
 
 ## Compatibility
@@ -96,7 +98,7 @@ The Consumer Android SDK adds reversible `disconnect()` as an additive lifecycle
 
 ## Validation requirements
 
-Deterministic evidence must prove at least:
+Deterministic evidence for the independent-signer capability must prove at least:
 
 - the public service is exported for explicit binding and has no custom bind permission;
 - the Consumer does not require a custom Harnex permission;
@@ -111,7 +113,7 @@ Deterministic evidence must prove at least:
 - production variants do not expose emulator-only control surfaces;
 - cross-signer emulator control reaches only the `emulatorE2e` Host's bounded `DUMP`-protected shell bridge, while the ordinary fault receiver remains separately signature-protected.
 
-Physical Play Internal testing remains required before a stable promotion claim because Play App Signing identity is the real distribution environment that exposed the original assumption gap.
+Physical Play Internal testing remains required for the Play distribution topology being claimed. The current same-signer Harnex/RedactGuard Play run validates that actual topology and its Consumer-first authorization flow. A physical claim for independently signed Play applications additionally requires Host and consumer Play App Signing digests to be distinct.
 
 ## Relationship to earlier ADRs
 
