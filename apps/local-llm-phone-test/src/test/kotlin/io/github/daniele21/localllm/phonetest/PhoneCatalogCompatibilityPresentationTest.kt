@@ -26,10 +26,10 @@ class PhoneCatalogCompatibilityPresentationTest {
                 compatible = false,
                 requiredStorageBytes = 5_500_000_000,
                 reasons =
-                    listOf(
-                        CatalogCompatibilityReason.INSUFFICIENT_RAM,
-                        CatalogCompatibilityReason.INSUFFICIENT_STORAGE,
-                    ),
+                listOf(
+                    CatalogCompatibilityReason.INSUFFICIENT_RAM,
+                    CatalogCompatibilityReason.INSUFFICIENT_STORAGE,
+                ),
                 warnings = emptyList(),
             )
 
