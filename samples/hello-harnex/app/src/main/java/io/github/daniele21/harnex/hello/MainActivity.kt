@@ -46,7 +46,6 @@ class MainActivity : Activity() {
     }
 
     private fun buildContent(): View {
-        val signer = currentSignerSha256()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(24), dp(24), dp(40))
@@ -55,7 +54,13 @@ class MainActivity : Activity() {
         root.addView(space(6))
         root.addView(label("One external Android app. One Harnex host. One local inference.", 16f))
         root.addView(space(24))
+        addAuthorizationSection(root, currentSignerSha256())
+        addConnectionSection(root)
+        addInferenceSection(root)
+        return ScrollView(this).apply { addView(root) }
+    }
 
+    private fun addAuthorizationSection(root: LinearLayout, signer: String) {
         root.addView(section("1 · Authorize this app in Harnex"))
         root.addView(label("Open Harnex → Apps → New app connection and use these exact values:", 15f))
         root.addView(space(12))
@@ -76,8 +81,10 @@ class MainActivity : Activity() {
                 }
             },
         )
-
         root.addView(space(24))
+    }
+
+    private fun addConnectionSection(root: LinearLayout) {
         root.addView(section("2 · Connect"))
         root.addView(keyValue("Configured Harnex package", BuildConfig.HARNEX_HOST_PACKAGE))
         connectionValue = label("DISCONNECTED", 15f, Typeface.BOLD)
@@ -107,8 +114,10 @@ class MainActivity : Activity() {
         connectionActions.addView(connectButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         connectionActions.addView(disconnectButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(connectionActions, matchWidth())
-
         root.addView(space(24))
+    }
+
+    private fun addInferenceSection(root: LinearLayout) {
         root.addView(section("3 · Run local inference"))
         root.addView(label("The sample asks the host-owned PII use case to find the exact email address in this text.", 15f))
         input = EditText(this).apply {
@@ -140,8 +149,8 @@ class MainActivity : Activity() {
         actions.addView(runButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         actions.addView(cancelButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(actions, matchWidth())
-
         root.addView(space(16))
+
         statusValue = label("Authorize the app in Harnex, then connect.", 14f)
         root.addView(statusValue)
         root.addView(space(16))
@@ -150,7 +159,6 @@ class MainActivity : Activity() {
         root.addView(output)
         metrics = label("", 13f)
         root.addView(metrics)
-
         root.addView(space(28))
         root.addView(label("What this proves", 16f, Typeface.BOLD))
         root.addView(
@@ -159,8 +167,6 @@ class MainActivity : Activity() {
                 14f,
             ),
         )
-
-        return ScrollView(this).apply { addView(root) }
     }
 
     private fun runInference() {
@@ -222,35 +228,6 @@ class MainActivity : Activity() {
         statusValue.text = "Failed: ${error.message ?: error::class.java.simpleName}"
     }
 
-    private fun section(text: String): TextView = label(text, 20f, Typeface.BOLD).apply {
-        setPadding(0, 0, 0, dp(10))
-    }
-
-    private fun keyValue(key: String, value: String, selectable: Boolean = false): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(0, dp(4), 0, dp(8))
-        addView(label(key, 12f, Typeface.BOLD))
-        addView(label(value, 14f).apply { setTextIsSelectable(selectable) })
-    }
-
-    private fun label(text: String, sizeSp: Float, style: Int = Typeface.NORMAL): TextView = TextView(this).apply {
-        this.text = text
-        textSize = sizeSp
-        setTypeface(typeface, style)
-        setLineSpacing(0f, 1.12f)
-    }
-
-    private fun space(heightDp: Int): View = View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(1, dp(heightDp))
-    }
-
-    private fun matchWidth() = LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        LinearLayout.LayoutParams.WRAP_CONTENT,
-    )
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
     @Suppress("DEPRECATION")
     private fun currentSignerSha256(): String {
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -278,3 +255,32 @@ class MainActivity : Activity() {
         )
     }
 }
+
+private fun Context.section(text: String): TextView = label(text, 20f, Typeface.BOLD).apply {
+    setPadding(0, 0, 0, dp(10))
+}
+
+private fun Context.keyValue(key: String, value: String, selectable: Boolean = false): LinearLayout = LinearLayout(this).apply {
+    orientation = LinearLayout.VERTICAL
+    setPadding(0, dp(4), 0, dp(8))
+    addView(label(key, 12f, Typeface.BOLD))
+    addView(label(value, 14f).apply { setTextIsSelectable(selectable) })
+}
+
+private fun Context.label(text: String, sizeSp: Float, style: Int = Typeface.NORMAL): TextView = TextView(this).apply {
+    this.text = text
+    textSize = sizeSp
+    setTypeface(typeface, style)
+    setLineSpacing(0f, 1.12f)
+}
+
+private fun Context.space(heightDp: Int): View = View(this).apply {
+    layoutParams = LinearLayout.LayoutParams(1, dp(heightDp))
+}
+
+private fun Context.matchWidth() = LinearLayout.LayoutParams(
+    LinearLayout.LayoutParams.MATCH_PARENT,
+    LinearLayout.LayoutParams.WRAP_CONTENT,
+)
+
+private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
