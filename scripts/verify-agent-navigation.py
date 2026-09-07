@@ -18,6 +18,9 @@ REQUIRED_HEADINGS = {
     "## Context, diagnosis and completion",
 }
 REQUIRED_ROUTING_TARGETS = {
+    ".engineering/product.json",
+    "docs/product.md",
+    "skills/shape-product-change/SKILL.md",
     ".engineering/commands.json",
     ".engineering/e2e.json",
     ".engineering/documentation-policy.json",
@@ -30,6 +33,8 @@ REQUIRED_ROUTING_TARGETS = {
     "docs/current-state.md",
 }
 REQUIRED_DELIVERY_PRINCIPLES = {
+    "PRODUCT_NONE",
+    "PRODUCT_FEATURE",
     "ITERATION",
     "INTEGRATION",
     "RELEASE",
@@ -64,11 +69,11 @@ def validate_root_guide(errors: list[str]) -> None:
     if not ROOT_GUIDE.is_file(): errors.append("missing root AGENTS.md"); return
     text = ROOT_GUIDE.read_text(encoding="utf-8")
     for heading in sorted(REQUIRED_HEADINGS):
-        if heading not in text: errors.append(f"AGENTS.md: missing required 0.10 heading: {heading}")
+        if heading not in text: errors.append(f"AGENTS.md: missing required 0.11 heading: {heading}")
     for target in sorted(REQUIRED_ROUTING_TARGETS):
         if target not in text: errors.append(f"AGENTS.md: missing canonical routing target: {target}")
     for principle in sorted(REQUIRED_DELIVERY_PRINCIPLES):
-        if principle not in text: errors.append(f"AGENTS.md: missing 0.10 delivery principle: {principle}")
+        if principle not in text: errors.append(f"AGENTS.md: missing 0.11 product/delivery principle: {principle}")
 
 def validate_module_discoverability(guides: list[Path], errors: list[str]) -> None:
     if not SETTINGS.is_file(): errors.append("missing settings.gradle.kts"); return
@@ -98,7 +103,7 @@ def main() -> int:
         print("Agent navigation validation failed:", file=sys.stderr)
         for error in errors: print(f"- {error}", file=sys.stderr)
         return 1
-    print(f"Agent navigation is valid for repo-template-sw 0.10: {len(guides)} guide(s), all configured modules discoverable.")
+    print(f"Agent navigation is valid for repo-template-sw 0.11: {len(guides)} guide(s), all configured modules discoverable.")
     return 0
 
 if __name__ == "__main__": raise SystemExit(main())
