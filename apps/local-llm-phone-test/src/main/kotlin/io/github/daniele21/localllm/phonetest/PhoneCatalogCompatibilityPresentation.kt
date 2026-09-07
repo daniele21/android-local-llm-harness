@@ -10,11 +10,7 @@ internal object PhoneCatalogCompatibilityPresentation {
     private const val BYTES_PER_DECIMAL_GB = 1_000_000_000.0
     private const val BYTES_PER_GIB = 1024.0 * 1024.0 * 1024.0
 
-    fun detail(
-        release: CatalogModelRelease,
-        result: CatalogCompatibilityResult,
-        device: CatalogDeviceProfile,
-    ): String? = result.reasons
+    fun detail(release: CatalogModelRelease, result: CatalogCompatibilityResult, device: CatalogDeviceProfile): String? = result.reasons
         .takeIf { it.isNotEmpty() }
         ?.joinToString(separator = "\n") { reason -> reason.message(release, result, device) }
 
@@ -81,9 +77,7 @@ internal object PhoneCatalogCompatibilityPresentation {
             "The required free-storage amount could not be evaluated safely."
     }
 
-    private fun formatDecimalGigabytes(bytes: Long): String =
-        String.format(Locale.US, "%.1f", bytes / BYTES_PER_DECIMAL_GB)
+    private fun formatDecimalGigabytes(bytes: Long): String = String.format(Locale.US, "%.1f", bytes / BYTES_PER_DECIMAL_GB)
 
-    private fun formatGibibytes(bytes: Long): String =
-        String.format(Locale.US, "%.1f", bytes / BYTES_PER_GIB)
+    private fun formatGibibytes(bytes: Long): String = String.format(Locale.US, "%.1f", bytes / BYTES_PER_GIB)
 }
