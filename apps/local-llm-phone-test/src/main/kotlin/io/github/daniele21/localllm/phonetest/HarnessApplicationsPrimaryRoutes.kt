@@ -144,7 +144,7 @@ private fun harnessObservedIdentityRefreshEffect(viewModel: HarnessApplicationsR
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshObservedIdentity()
+                viewModel.refresh(HarnessApplicationsRefreshMode.OBSERVED_IDENTITY)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
