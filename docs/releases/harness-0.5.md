@@ -13,7 +13,7 @@ This file owns only the remaining release gates for Harness 0.5.0. Historical in
 
 Harness 0.5.0 currently includes:
 
-- protected `dev` integration and validated `dev -> main` promotion workflows;
+- `dev` integration and validated `dev -> main` promotion workflows; repository branch/ruleset protection remains an explicit release gate below;
 - the embedded Android GGUF runtime over the pinned `llama.cpp` backend;
 - content-addressed model storage, integrity verification and curated Qwen3.5 remote distribution boundaries;
 - the connected Compose phone application with Overview, Playground, Models, Diagnostics and Settings;
@@ -40,7 +40,7 @@ The final release candidate must still be identity-bound to the installed releas
 
 ## Open product gates
 
-- [ ] Complete the remaining Overview, Diagnostics and Settings state/effect migration out of `MainActivity`.
+- [x] Complete the repository-side Overview/Diagnostics/Settings state/effect realignment while retaining `MainActivity` only as the Android lifecycle/result/effect root. The canonical phone UX tracker records this boundary as integrated; representative lifecycle/accessibility evidence remains separately open below.
 - [ ] Complete deterministic navigation restoration and process-recreation behavior.
 - [ ] Implement configurable monotonic warm-idle TTL eviction with race, pinning and unload-reason coverage.
 - [ ] Complete compact, expanded, landscape and large-font Compose validation.
