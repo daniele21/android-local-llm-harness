@@ -26,24 +26,39 @@ class HarnessModelsCatalogUiTest {
     }
 
     @Test
-    fun suggestedModelIsPresentedBeforeQuantizationAlternatives() {
+    fun suggestedModelIsPresentedBeforeQuantizationAlternativesAcrossVersionedReleaseIds() {
         val alternatives = listOf(
-            item("qwen35-4b-q4-k-m"),
-            item("qwen35-4b-ud-q4-k-xl"),
-            item("qwen35-4b-iq4-xs"),
+            item("qwen35-4b-q4-k-m@1.0.0"),
+            item("qwen35-4b-ud-q4-k-xl@1.0.0"),
+            item("qwen35-4b-iq4-xs@1.0.0"),
         )
 
         val ordered = orderGroupItems(ModelsSizeFilter.B4, alternatives)
 
-        assertEquals("qwen35-4b-ud-q4-k-xl", ordered.first().stableId)
+        assertEquals("qwen35-4b-ud-q4-k-xl@1.0.0", ordered.first().stableId)
+        assertTrue(ordered.first().matchesSuggestedModel(ModelsSizeFilter.B4))
         assertEquals(alternatives.map { it.stableId }.toSet(), ordered.map { it.stableId }.toSet())
     }
 
     @Test
+    fun runtimeOwnedIdentityCannotBePromotedAsCuratedStartingPoint() {
+        val runtimeItem = HarnessModelInventoryItem(
+            stableId = "qwen35-4b-ud-q4-k-xl@1.0.0",
+            displayName = "Runtime model",
+            origin = HarnessModelOrigin.RUNTIME,
+            lifecycle = HarnessModelLifecycle.LOADED,
+            loaded = true,
+        )
+
+        assertFalse(runtimeItem.matchesSuggestedModel(ModelsSizeFilter.B4))
+        assertFalse(ModelsSizeFilter.B4.matches(runtimeItem))
+    }
+
+    @Test
     fun sizeFiltersMatchOnlyTheirQwen35ParameterGroup() {
-        val compact = item("qwen35-08b-q4-k-m")
-        val capable = item("qwen35-2b-q4-k-m")
-        val fourB = item("qwen35-4b-ud-q4-k-xl")
+        val compact = item("qwen35-08b-q4-k-m@1.0.0")
+        val capable = item("qwen35-2b-q4-k-m@1.0.0")
+        val fourB = item("qwen35-4b-ud-q4-k-xl@1.0.0")
 
         assertTrue(ModelsSizeFilter.B08.matches(compact))
         assertFalse(ModelsSizeFilter.B08.matches(capable))
@@ -61,8 +76,8 @@ class HarnessModelsCatalogUiTest {
 
     @Test
     fun availabilityFiltersSeparateInstalledAndNotInstalledModels() {
-        val installed = item("qwen35-08b-q4-k-m", installed = true)
-        val available = item("qwen35-2b-q4-k-m", installed = false)
+        val installed = item("qwen35-08b-q4-k-m@1.0.0", installed = true)
+        val available = item("qwen35-2b-q4-k-m@1.0.0", installed = false)
 
         assertTrue(ModelsAvailabilityFilter.INSTALLED.matches(installed))
         assertFalse(ModelsAvailabilityFilter.INSTALLED.matches(available))
@@ -87,9 +102,9 @@ class HarnessModelsCatalogUiTest {
         )
 
         expected.forEach { (lifecycle, label) ->
-            assertEquals(label, modelVariantStatusLabel(item("model", lifecycle = lifecycle), loading = false))
+            assertEquals(label, modelVariantStatusLabel(item("model@1.0.0", lifecycle = lifecycle), loading = false))
         }
-        assertEquals("Loading", modelVariantStatusLabel(item("model"), loading = true))
+        assertEquals("Loading", modelVariantStatusLabel(item("model@1.0.0"), loading = true))
     }
 
     @Test
