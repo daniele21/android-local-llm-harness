@@ -232,6 +232,7 @@ private fun InstalledVariantAction(
     val installed = model.installedModel ?: return
     when {
         loading -> HarnessInlinePrimaryButton(text = "Loading…", enabled = false, onClick = {})
+
         item.loaded -> HarnessInlineSecondaryButton(
             text = "Unload",
             enabled = !state.busy,
