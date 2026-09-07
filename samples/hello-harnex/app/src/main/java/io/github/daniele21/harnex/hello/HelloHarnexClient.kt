@@ -72,120 +72,7 @@ internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedR
             onResult(Result.failure(IllegalStateException("An inference request is already running")))
             return
         }
-        executor.execute {
-            runCatching {
-                onStatus("Discovering the Harnex assignment…")
-                val assignment = when (val result = client.assignedUseCases()) {
-                    is ConsumerAssignedUseCasesResult.Available ->
-                        result.assignments.singleOrNull { it.useCaseId == USE_CASE_ID }
-                            ?: error("The Document PII detection use case is not assigned to this app")
-
-                    is ConsumerAssignedUseCasesResult.Rejected ->
-                        error("${result.failure.code}: ${result.failure.message}")
-                }
-                val published = when (val result = client.publishedPresets(USE_CASE_ID)) {
-                    is ConsumerPublishedPresetsResult.Available -> result
-
-                    is ConsumerPublishedPresetsResult.Rejected ->
-                        error("${result.failure.code}: ${result.failure.message}")
-                }
-                val preset = published.presets.singleOrNull { it.isDefault }
-                    ?: error("The assigned use case has no default published preset")
-
-                onStatus("Activating the host-owned local execution…")
-                val activation = when (
-                    val result = client.activate(
-                        ConsumerActivationRequest(
-                            useCaseId = USE_CASE_ID,
-                            useCaseRevision = assignment.useCaseRevision,
-                            bindingRevision = assignment.bindingRevision,
-                            preset = preset.preset,
-                        ),
-                    )
-                ) {
-                    is ConsumerActivationResult.Activated -> result.activation
-
-                    is ConsumerActivationResult.Rejected ->
-                        error("${result.failure.code}: ${result.failure.message}")
-                }
-                activeActivation = activation.activationId
-
-                onStatus("Preparing the exact execution capability…")
-                val prepared = when (val result = client.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
-                    is ConsumerPrepareResult.Prepared -> result.selection
-                    is ConsumerPrepareResult.Rejected -> error("${result.failure.code}: ${result.failure.message}")
-                }
-
-                val sessionId = when (val result = client.createSession(prepared.preparedId)) {
-                    is ConsumerSessionResult.Created -> result.sessionId
-                    is ConsumerSessionResult.Rejected -> error("${result.failure.code}: ${result.failure.message}")
-                }
-                activeSession = sessionId
-                val terminal = AtomicBoolean(false)
-                val requestId = RequestId("hello-${UUID.randomUUID()}")
-                val request =
-                    ConsumerGenerationRequest(
-                        requestId = requestId,
-                        sessionId = sessionId,
-                        input = ConsumerGenerationInput.Text(piiPrompt(text)),
-                        outputConstraint = ConsumerOutputConstraint.JsonSchema(OUTPUT_SCHEMA),
-                    )
-                val start =
-                    client.generate(
-                        request,
-                        ConsumerGenerationListener { event ->
-                            if (event.requestId != requestId || terminal.get()) return@ConsumerGenerationListener
-                            when (event) {
-                                is ConsumerGenerationEvent.Queued -> onStatus("Queued in the shared runtime…")
-
-                                is ConsumerGenerationEvent.Prepared -> onStatus("Exact execution prepared…")
-
-                                is ConsumerGenerationEvent.Started -> onStatus("Generating locally on device…")
-
-                                is ConsumerGenerationEvent.ContentDelta -> {
-                                    if (event.contentType == ConsumerContentType.ANSWER) onAnswerDelta(event.text)
-                                }
-
-                                is ConsumerGenerationEvent.Completed -> {
-                                    if (terminal.compareAndSet(false, true)) {
-                                        finishAsync(
-                                            Result.success(
-                                                HelloInferenceResult(
-                                                    answer = event.answer,
-                                                    metrics = formatMetrics(event.metrics),
-                                                ),
-                                            ),
-                                            onResult,
-                                        )
-                                    }
-                                }
-
-                                is ConsumerGenerationEvent.Failed -> {
-                                    if (terminal.compareAndSet(false, true)) {
-                                        finishAsync(
-                                            Result.failure(
-                                                IllegalStateException("${event.failure.code}: ${event.failure.message}"),
-                                            ),
-                                            onResult,
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                    )
-                when (start) {
-                    is ConsumerGenerationStartResult.Accepted -> activeHandle = start.handle
-
-                    is ConsumerGenerationStartResult.Rejected -> {
-                        terminal.set(true)
-                        finishOnExecutor(
-                            Result.failure(IllegalStateException("${start.failure.code}: ${start.failure.message}")),
-                            onResult,
-                        )
-                    }
-                }
-            }.onFailure { failure -> finishOnExecutor(Result.failure(failure), onResult) }
-        }
+        executor.execute { executeRun(text, onStatus, onAnswerDelta, onResult) }
     }
 
     fun cancel() {
@@ -200,6 +87,109 @@ internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedR
             client.close()
         }
         executor.shutdown()
+    }
+
+    private fun executeRun(
+        text: String,
+        onStatus: (String) -> Unit,
+        onAnswerDelta: (String) -> Unit,
+        onResult: (Result<HelloInferenceResult>) -> Unit,
+    ) {
+        runCatching {
+            val sessionId = prepareSession(onStatus)
+            startGeneration(sessionId, text, onStatus, onAnswerDelta, onResult)
+        }.onFailure { failure -> finishOnExecutor(Result.failure(failure), onResult) }
+    }
+
+    private fun prepareSession(onStatus: (String) -> Unit): SessionId {
+        onStatus("Discovering the Harnex assignment…")
+        val assignment = when (val result = client.assignedUseCases()) {
+            is ConsumerAssignedUseCasesResult.Available ->
+                result.assignments.singleOrNull { it.useCaseId == USE_CASE_ID }
+                    ?: error("The Document PII detection use case is not assigned to this app")
+
+            is ConsumerAssignedUseCasesResult.Rejected ->
+                error("${result.failure.code}: ${result.failure.message}")
+        }
+        val published = when (val result = client.publishedPresets(USE_CASE_ID)) {
+            is ConsumerPublishedPresetsResult.Available -> result
+
+            is ConsumerPublishedPresetsResult.Rejected ->
+                error("${result.failure.code}: ${result.failure.message}")
+        }
+        val preset = published.presets.singleOrNull { it.isDefault }
+            ?: error("The assigned use case has no default published preset")
+
+        onStatus("Activating the host-owned local execution…")
+        val activation = when (
+            val result = client.activate(
+                ConsumerActivationRequest(
+                    useCaseId = USE_CASE_ID,
+                    useCaseRevision = assignment.useCaseRevision,
+                    bindingRevision = assignment.bindingRevision,
+                    preset = preset.preset,
+                ),
+            )
+        ) {
+            is ConsumerActivationResult.Activated -> result.activation
+
+            is ConsumerActivationResult.Rejected ->
+                error("${result.failure.code}: ${result.failure.message}")
+        }
+        activeActivation = activation.activationId
+
+        onStatus("Preparing the exact execution capability…")
+        val prepared = when (val result = client.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
+            is ConsumerPrepareResult.Prepared -> result.selection
+            is ConsumerPrepareResult.Rejected -> error("${result.failure.code}: ${result.failure.message}")
+        }
+        return when (val result = client.createSession(prepared.preparedId)) {
+            is ConsumerSessionResult.Created -> result.sessionId.also { activeSession = it }
+            is ConsumerSessionResult.Rejected -> error("${result.failure.code}: ${result.failure.message}")
+        }
+    }
+
+    private fun startGeneration(
+        sessionId: SessionId,
+        text: String,
+        onStatus: (String) -> Unit,
+        onAnswerDelta: (String) -> Unit,
+        onResult: (Result<HelloInferenceResult>) -> Unit,
+    ) {
+        val terminal = AtomicBoolean(false)
+        val requestId = RequestId("hello-${UUID.randomUUID()}")
+        val request =
+            ConsumerGenerationRequest(
+                requestId = requestId,
+                sessionId = sessionId,
+                input = ConsumerGenerationInput.Text(piiPrompt(text)),
+                outputConstraint = ConsumerOutputConstraint.JsonSchema(OUTPUT_SCHEMA),
+            )
+        val start =
+            client.generate(
+                request,
+                ConsumerGenerationListener { event ->
+                    handleGenerationEvent(
+                        event = event,
+                        requestId = requestId,
+                        terminal = terminal,
+                        onStatus = onStatus,
+                        onAnswerDelta = onAnswerDelta,
+                        onTerminal = { result -> finishAsync(result, onResult) },
+                    )
+                },
+            )
+        when (start) {
+            is ConsumerGenerationStartResult.Accepted -> activeHandle = start.handle
+
+            is ConsumerGenerationStartResult.Rejected -> {
+                terminal.set(true)
+                finishOnExecutor(
+                    Result.failure(IllegalStateException("${start.failure.code}: ${start.failure.message}")),
+                    onResult,
+                )
+            }
+        }
     }
 
     private fun finishAsync(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
@@ -222,6 +212,47 @@ internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedR
 }
 
 internal data class HelloInferenceResult(val answer: String, val metrics: String)
+
+private fun handleGenerationEvent(
+    event: ConsumerGenerationEvent,
+    requestId: RequestId,
+    terminal: AtomicBoolean,
+    onStatus: (String) -> Unit,
+    onAnswerDelta: (String) -> Unit,
+    onTerminal: (Result<HelloInferenceResult>) -> Unit,
+) {
+    if (event.requestId != requestId || terminal.get()) return
+    when (event) {
+        is ConsumerGenerationEvent.Queued -> onStatus("Queued in the shared runtime…")
+
+        is ConsumerGenerationEvent.Prepared -> onStatus("Exact execution prepared…")
+
+        is ConsumerGenerationEvent.Started -> onStatus("Generating locally on device…")
+
+        is ConsumerGenerationEvent.ContentDelta -> {
+            if (event.contentType == ConsumerContentType.ANSWER) onAnswerDelta(event.text)
+        }
+
+        is ConsumerGenerationEvent.Completed -> {
+            if (terminal.compareAndSet(false, true)) {
+                onTerminal(
+                    Result.success(
+                        HelloInferenceResult(
+                            answer = event.answer,
+                            metrics = formatMetrics(event.metrics),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        is ConsumerGenerationEvent.Failed -> {
+            if (terminal.compareAndSet(false, true)) {
+                onTerminal(Result.failure(IllegalStateException("${event.failure.code}: ${event.failure.message}")))
+            }
+        }
+    }
+}
 
 private val USE_CASE_ID = UseCaseId("document-pii-detection")
 private const val HARNEX_HOST_SERVICE = "io.github.daniele21.localllm.phonetest.HarnessSharedRuntimeService"
