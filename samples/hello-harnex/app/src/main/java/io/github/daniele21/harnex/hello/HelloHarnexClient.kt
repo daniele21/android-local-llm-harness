@@ -1,6 +1,10 @@
 package io.github.daniele21.harnex.hello
 
 import android.content.Context
+import io.github.daniele21.localllm.contracts.ConsumerActivationId
+import io.github.daniele21.localllm.contracts.ConsumerActivationRequest
+import io.github.daniele21.localllm.contracts.ConsumerActivationResult
+import io.github.daniele21.localllm.contracts.ConsumerAssignedUseCasesResult
 import io.github.daniele21.localllm.contracts.ConsumerContentType
 import io.github.daniele21.localllm.contracts.ConsumerGenerationEvent
 import io.github.daniele21.localllm.contracts.ConsumerGenerationHandle
@@ -11,6 +15,7 @@ import io.github.daniele21.localllm.contracts.ConsumerGenerationStartResult
 import io.github.daniele21.localllm.contracts.ConsumerOutputConstraint
 import io.github.daniele21.localllm.contracts.ConsumerPrepareRequest
 import io.github.daniele21.localllm.contracts.ConsumerPrepareResult
+import io.github.daniele21.localllm.contracts.ConsumerPublishedPresetsResult
 import io.github.daniele21.localllm.contracts.ConsumerSessionResult
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
@@ -41,7 +46,7 @@ internal class HelloHarnexClient(
                     HARNEX_HOST_SERVICE,
                 ),
             clientBuildId = "hello-harnex-${BuildConfig.VERSION_NAME}",
-            observer = SharedRuntimeConnectionObserver(onConnectionChanged),
+            observer = SharedRuntimeConnectionObserver { snapshot -> onConnectionChanged(snapshot) },
         )
 
     @Volatile
@@ -49,6 +54,9 @@ internal class HelloHarnexClient(
 
     @Volatile
     private var activeSession: SessionId? = null
+
+    @Volatile
+    private var activeActivation: ConsumerActivationId? = null
 
     fun connect() {
         check(!closed.get()) { "Hello Harnex client is closed" }
@@ -68,7 +76,40 @@ internal class HelloHarnexClient(
         }
         executor.execute {
             runCatching {
-                onStatus("Preparing the authorized Harnex use case…")
+                onStatus("Discovering the Harnex assignment…")
+                val assignment = when (val result = client.assignedUseCases()) {
+                    is ConsumerAssignedUseCasesResult.Available ->
+                        result.assignments.singleOrNull { it.useCaseId == USE_CASE_ID }
+                            ?: error("The Document PII detection use case is not assigned to this app")
+                    is ConsumerAssignedUseCasesResult.Rejected ->
+                        error("${result.failure.code}: ${result.failure.message}")
+                }
+                val published = when (val result = client.publishedPresets(USE_CASE_ID)) {
+                    is ConsumerPublishedPresetsResult.Available -> result
+                    is ConsumerPublishedPresetsResult.Rejected ->
+                        error("${result.failure.code}: ${result.failure.message}")
+                }
+                val preset = published.presets.singleOrNull { it.isDefault }
+                    ?: error("The assigned use case has no default published preset")
+
+                onStatus("Activating the host-owned local execution…")
+                val activation = when (
+                    val result = client.activate(
+                        ConsumerActivationRequest(
+                            useCaseId = USE_CASE_ID,
+                            useCaseRevision = assignment.useCaseRevision,
+                            bindingRevision = assignment.bindingRevision,
+                            preset = preset.preset,
+                        ),
+                    )
+                ) {
+                    is ConsumerActivationResult.Activated -> result.activation
+                    is ConsumerActivationResult.Rejected ->
+                        error("${result.failure.code}: ${result.failure.message}")
+                }
+                activeActivation = activation.activationId
+
+                onStatus("Preparing the exact execution capability…")
                 val prepared = when (val result = client.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
                     is ConsumerPrepareResult.Prepared -> result.selection
                     is ConsumerPrepareResult.Rejected -> error("${result.failure.code}: ${result.failure.message}")
@@ -103,7 +144,6 @@ internal class HelloHarnexClient(
                                 is ConsumerGenerationEvent.Completed -> {
                                     if (terminal.compareAndSet(false, true)) {
                                         finishAsync(
-                                            sessionId,
                                             Result.success(
                                                 HelloInferenceResult(
                                                     answer = event.answer,
@@ -117,7 +157,6 @@ internal class HelloHarnexClient(
                                 is ConsumerGenerationEvent.Failed -> {
                                     if (terminal.compareAndSet(false, true)) {
                                         finishAsync(
-                                            sessionId,
                                             Result.failure(
                                                 IllegalStateException("${event.failure.code}: ${event.failure.message}"),
                                             ),
@@ -133,21 +172,12 @@ internal class HelloHarnexClient(
                     is ConsumerGenerationStartResult.Rejected -> {
                         terminal.set(true)
                         finishOnExecutor(
-                            sessionId,
                             Result.failure(IllegalStateException("${start.failure.code}: ${start.failure.message}")),
                             onResult,
                         )
                     }
                 }
-            }.onFailure { failure ->
-                val sessionId = activeSession
-                if (sessionId == null) {
-                    running.set(false)
-                    onResult(Result.failure(failure))
-                } else {
-                    finishOnExecutor(sessionId, Result.failure(failure), onResult)
-                }
-            }
+            }.onFailure { failure -> finishOnExecutor(Result.failure(failure), onResult) }
         }
     }
 
@@ -159,32 +189,34 @@ internal class HelloHarnexClient(
         if (!closed.compareAndSet(false, true)) return
         activeHandle?.cancel()
         executor.execute {
-            activeSession?.let { runCatching { client.closeSession(it) } }
-            activeSession = null
-            activeHandle = null
+            cleanupOnExecutor()
             client.close()
         }
         executor.shutdown()
     }
 
     private fun finishAsync(
-        sessionId: SessionId,
         result: Result<HelloInferenceResult>,
         onResult: (Result<HelloInferenceResult>) -> Unit,
     ) {
-        executor.execute { finishOnExecutor(sessionId, result, onResult) }
+        executor.execute { finishOnExecutor(result, onResult) }
     }
 
     private fun finishOnExecutor(
-        sessionId: SessionId,
         result: Result<HelloInferenceResult>,
         onResult: (Result<HelloInferenceResult>) -> Unit,
     ) {
-        runCatching { client.closeSession(sessionId) }
-        if (activeSession == sessionId) activeSession = null
-        activeHandle = null
+        cleanupOnExecutor()
         running.set(false)
         onResult(result)
+    }
+
+    private fun cleanupOnExecutor() {
+        activeSession?.let { runCatching { client.closeSession(it) } }
+        activeSession = null
+        activeHandle = null
+        activeActivation?.let { runCatching { client.deactivate(it) } }
+        activeActivation = null
     }
 }
 
