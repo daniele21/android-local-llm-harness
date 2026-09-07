@@ -5,25 +5,29 @@ Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
 Read when: locating documentation ownership or changing documentation governance
-Last reviewed: 2026-09-01
+Last reviewed: 2026-09-07
 
 Use progressive disclosure: root guide -> closest scoped guide -> focused owner. One fact has one canonical owner. Machine policy: [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
 
-## README ownership
+## Product and README ownership
 
-Treat the root README as two semantic owners rather than one document that must be rewritten as a unit.
+[`product.md`](product.md) owns durable decision truth: primary users/consumers, owned problems/jobs, value/differentiation, core outcomes, non-goals, product principles and material quality promises. Update it only when those durable truths change; temporary discovery reasoning stays in the issue/workstream/task.
 
-- **README identity** — project title/summary, `Why this exists`, primary audience/outcome, mission/vision and stable positioning. Update only when those claims materially change. A feature, implementation, command, configuration or runtime change does not by itself justify rewriting them.
-- **README usage** — prerequisites, setup/run, public configuration, public API/UI integration and copy-paste examples. Update in the same change whenever the current instructions would otherwise become incomplete, wrong, removed, newly mandatory or misleading.
+Treat the root README as two semantic owners rather than one document rewritten as a unit.
 
-A normal feature/operational change may therefore report `README_IDENTITY: N/A` and `README_USAGE: UPDATED`.
+- **README identity** — public project title/summary, `Why this exists`, primary audience/outcome, mission/vision and stable positioning. Update only when those claims materially change.
+- **README usage** — prerequisites, setup/run, public configuration, public API/UI integration and copy-paste examples. Update whenever current instructions would otherwise become incomplete, wrong or misleading.
+
+A normal feature/operational change may therefore report `PRODUCT_SOURCE: N/A`, `README_IDENTITY: N/A` and `README_USAGE: UPDATED`.
 
 ## Canonical sources
 
 | Question | Canonical source |
 | --- | --- |
-| What is Harnex and why does it exist? | root README identity sections |
+| What durable product intent governs Harnex decisions? | [`product.md`](product.md) |
+| What is Harnex and why does it exist publicly? | root README identity sections |
 | How does a person set up/run/configure/use Harnex now? | root README usage sections plus focused runbooks/API docs |
+| How does product-change shaping route? | [`.engineering/product.json`](../.engineering/product.json) + `skills/shape-product-change/SKILL.md` |
 | Integrated state/blockers | [`current-state.md`](current-state.md) |
 | Capability milestones | [`roadmap.md`](roadmap.md) |
 | Repository target | [`implementation-plan.md`](implementation-plan.md) |
@@ -43,8 +47,9 @@ A normal feature/operational change may therefore report `README_IDENTITY: N/A` 
 
 Code and durable documentation ship together. A meaningful change is not complete until every affected canonical owner describes the exact behavior being published.
 
-During `preflight-change`, assess impact from observable behavior rather than filenames and classify at least:
+During `preflight-change`, assess impact from observable behavior rather than filenames and classify plausible owners including:
 
+- `PRODUCT_SOURCE`;
 - `README_IDENTITY`;
 - `README_USAGE`;
 - `FEATURE_DOCS`;
@@ -63,8 +68,9 @@ E2E target/environment/fidelity changes are durable contract changes and update 
 
 ## Active source index
 
-### Architecture, delivery and API
+### Product, architecture, delivery and API
 
+- [`product.md`](product.md)
 - [`implementation-plan.md`](implementation-plan.md)
 - [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md)
 - [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md)
@@ -143,7 +149,7 @@ Completed workstreams are **deleted by default** after durable transfer. `archiv
 
 1. Assess documentation impact from observable behavior.
 2. Search `Canonical scope` and this index.
-3. Update an existing owner when possible; for README changes touch only the affected identity/usage sections.
+3. Update an existing owner when possible; for README changes touch only affected identity/usage sections.
 4. Create only a durable independent owner or a genuinely necessary bounded workstream.
 5. Set supported type, owner, unique canonical scope and precise `Read when`.
 6. Link it from this or the closest domain index.
@@ -172,12 +178,13 @@ CI enforces [`.engineering/documentation-policy.json`](../.engineering/documenta
 
 ## Precedence
 
-Executable contracts/tests -> accepted ADRs -> architecture -> focused specifications -> target overview -> current state -> roadmap -> README/agent guides -> retained history. Correct the owning source rather than silently reconciling behavioral contradictions.
+Executable contracts/tests -> accepted ADRs -> architecture -> focused specifications -> product target -> current state -> roadmap -> README/agent guides -> retained history. Correct the owning source rather than silently reconciling behavioral contradictions.
 
 ## Validation
 
 ```bash
 python3 scripts/verify-docs.py --base <target-branch-commit>
+python3 scripts/verify_product_development.py
 python3 scripts/verify_e2e.py
 python3 scripts/verify-agent-navigation.py
 python3 -m py_compile scripts/*.py
