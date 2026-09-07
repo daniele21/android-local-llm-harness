@@ -465,6 +465,11 @@ internal class PhoneModelDistributionController(
             pendingDownloads.containsKey(stableId) -> PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL
             else -> PhoneCatalogModelStatus.READY_TO_DOWNLOAD
         }
+        val compatibilityDetail = PhoneCatalogCompatibilityPresentation.detail(
+            release = release,
+            result = result,
+            device = deviceProfile,
+        )
         return PhoneCatalogModelUi(
             stableId = stableId,
             displayName = release.displayName,
@@ -481,7 +486,7 @@ internal class PhoneModelDistributionController(
             compatibilityWarnings = result.warnings.map { it.name },
             bytesDownloaded = runtime?.bytesDownloaded ?: 0L,
             expectedBytes = runtime?.expectedBytes ?: release.artifact.sizeBytes,
-            detail = managementDetails[stableId] ?: runtime?.detail,
+            detail = managementDetails[stableId] ?: runtime?.detail ?: compatibilityDetail,
             installedModel = installedMetadata,
             removalConfirmationPending = pendingRemovalStableId == stableId,
         )
