@@ -28,8 +28,7 @@ internal class HarnessObservedApplicationIdentityReconciler(
     )
 
     /** Returns the source-observed identity projection without mutating the persisted Control Plane. */
-    fun previewCurrentState(): HostControlPlaneState =
-        reconcile(store.snapshot(), epochClock()).state
+    fun previewCurrentState(): HostControlPlaneState = reconcile(store.snapshot(), epochClock()).state
 
     fun reconcileIfNeeded(): HostControlPlaneState {
         val observedAtEpochMs = epochClock()
@@ -49,16 +48,14 @@ internal class HarnessObservedApplicationIdentityReconciler(
         reconciler: HarnessControlPlaneReconciler,
         current: HostControlPlaneState,
         observedAtEpochMs: Long,
-    ): HarnessControlPlaneReconciliationResult.Success =
-        when (val result = reconciler.reconcile(current, observedAtEpochMs)) {
-            is HarnessControlPlaneReconciliationResult.Success -> result
-            is HarnessControlPlaneReconciliationResult.Conflict -> throw conflict(result)
-        }
+    ): HarnessControlPlaneReconciliationResult.Success = when (val result = reconciler.reconcile(current, observedAtEpochMs)) {
+        is HarnessControlPlaneReconciliationResult.Success -> result
+        is HarnessControlPlaneReconciliationResult.Conflict -> throw conflict(result)
+    }
 
-    private fun reconciler(): HarnessControlPlaneReconciler =
-        HarnessControlPlaneReconciler(
-            HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(observedPolicies()),
-        )
+    private fun reconciler(): HarnessControlPlaneReconciler = HarnessControlPlaneReconciler(
+        HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(observedPolicies()),
+    )
 
     private fun conflict(result: HarnessControlPlaneReconciliationResult.Conflict) =
         HarnessControlPlaneStartupConflictException(result.code, result.identity)
