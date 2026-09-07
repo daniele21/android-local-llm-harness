@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: models/model-catalog
 Canonical scope: models.catalog
 Read when: changing curated releases, compatibility targeting or application-reviewed model profiles
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-07
 
 The repository uses an administrator-curated GGUF catalog through `CuratedModelCatalog` in `models/model-catalog`.
 
@@ -28,13 +28,13 @@ The executable bootstrap contains fourteen reviewed Qwen3.5 releases: seven esta
 | `qwen35-2b-q4-k-m` | `Qwen3.5-2B-Q4_K_M.gguf` | `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223` | 1,280,835,840 | `qwen35` | 6,000,000,000 | 8,000,000,000 | `qwen35-2b-q4-k-m-ctx4096` |
 | `qwen35-2b-q5-k-m` | `Qwen3.5-2B-Q5_K_M.gguf` | `1885b3a9195f8cc09da9a7a7a75afdc1e8d5cbf9fc4a499c3961dddea37098ac` | 1,435,238,656 | `qwen35` | 6,000,000,000 | 8,000,000,000 | `qwen35-2b-q5-k-m-ctx4096` |
 | `qwen35-2b-ud-iq2-xxs` | `Qwen3.5-2B-UD-IQ2_XXS.gguf` | `43aedbd2b03a3c2cc39f49ccf74fcd3c394ed0b2a1ede8a30ee652ee9cfc27ef` | 768,270,592 | `qwen35` | 4,000,000,000 | 6,000,000,000 | `qwen35-2b-ud-iq2-xxs-ctx2048` |
-| `qwen35-4b-ud-q4-k-xl` | `Qwen3.5-4B-UD-Q4_K_XL.gguf` | `b252c5610a42ca82d20fe2a12813e9d069eed89292907e26c783eeb0bc961bc7` | 2,912,109,728 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-ud-q4-k-xl-ctx4096` |
-| `qwen35-4b-q4-k-m` | `Qwen3.5-4B-Q4_K_M.gguf` | `00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4` | 2,740,937,888 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-k-m-ctx4096` |
-| `qwen35-4b-q4-k-s` | `Qwen3.5-4B-Q4_K_S.gguf` | `27caeb0e4b999d92ce0a9fdbdd1a7ba5112908d9de125645883732274be2ea77` | 2,590,430,368 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-k-s-ctx4096` |
-| `qwen35-4b-iq4-xs` | `Qwen3.5-4B-IQ4_XS.gguf` | `658a9e7e406deb06d0179755e3c14f6a82915a4be4962a2f92a64d948d2e572f` | 2,477,053,088 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-iq4-xs-ctx4096` |
-| `qwen35-4b-iq4-nl` | `Qwen3.5-4B-IQ4_NL.gguf` | `ff5c3e9740a5aa53f04fdf3b0b8cc75da556bf8948cdb19d61c512d3a43465d9` | 2,579,944,608 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-iq4-nl-ctx4096` |
-| `qwen35-4b-q4-0` | `Qwen3.5-4B-Q4_0.gguf` | `298fcb5fe7a77ccc79745ae24751560c5ac56874caff4bb39b1f2055bd72b8bb` | 2,583,221,408 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-0-ctx4096` |
-| `qwen35-4b-q4-1` | `Qwen3.5-4B-Q4_1.gguf` | `af1fa652b5c78980b105a2ffef954bfa724bc4d69d2d44463e27c4f3c2953bbd` | 2,784,416,928 | `qwen35` | 8,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-1-ctx4096` |
+| `qwen35-4b-ud-q4-k-xl` | `Qwen3.5-4B-UD-Q4_K_XL.gguf` | `b252c5610a42ca82d20fe2a12813e9d069eed89292907e26c783eeb0bc961bc7` | 2,912,109,728 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-ud-q4-k-xl-ctx4096` |
+| `qwen35-4b-q4-k-m` | `Qwen3.5-4B-Q4_K_M.gguf` | `00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4` | 2,740,937,888 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-k-m-ctx4096` |
+| `qwen35-4b-q4-k-s` | `Qwen3.5-4B-Q4_K_S.gguf` | `27caeb0e4b999d92ce0a9fdbdd1a7ba5112908d9de125645883732274be2ea77` | 2,590,430,368 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-k-s-ctx4096` |
+| `qwen35-4b-iq4-xs` | `Qwen3.5-4B-IQ4_XS.gguf` | `658a9e7e406deb06d0179755e3c14f6a82915a4be4962a2f92a64d948d2e572f` | 2,477,053,088 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-iq4-xs-ctx4096` |
+| `qwen35-4b-iq4-nl` | `Qwen3.5-4B-IQ4_NL.gguf` | `ff5c3e9740a5aa53f04fdf3b0b8cc75da556bf8948cdb19d61c512d3a43465d9` | 2,579,944,608 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-iq4-nl-ctx4096` |
+| `qwen35-4b-q4-0` | `Qwen3.5-4B-Q4_0.gguf` | `298fcb5fe7a77ccc79745ae24751560c5ac56874caff4bb39b1f2055bd72b8bb` | 2,583,221,408 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-0-ctx4096` |
+| `qwen35-4b-q4-1` | `Qwen3.5-4B-Q4_1.gguf` | `af1fa652b5c78980b105a2ffef954bfa724bc4d69d2d44463e27c4f3c2953bbd` | 2,784,416,928 | `qwen35` | 7,000,000,000 | 12,000,000,000 | `qwen35-4b-q4-1-ctx4096` |
 
 All releases require Android API 26 or later, `arm64-v8a`, and the `llama.cpp` backend.
 
@@ -60,7 +60,7 @@ Catalog availability is an administrator lifecycle axis. It does not imply backe
 
 Certification is separate evidence keyed by exact artifact SHA-256, quantization, backend build and validated device/runtime envelope. A quantization cannot inherit certification from another artifact.
 
-For the new 4B tier, the 8 GB minimum and 12 GB recommended RAM values are deliberately conservative Harnex product thresholds informed by Unsloth's approximately 5.5 GB combined-memory estimate for Qwen3.5 4B at 4-bit. They are admission policy, not a claim that every 8 GB phone is production-safe.
+For the 4B tier, Harnex uses a **7,000,000,000-byte Android-reported total-memory floor** and keeps **12,000,000,000 bytes recommended**. The hard floor is intentionally expressed in the same `ActivityManager.MemoryInfo.totalMem` measurement used by the phone compatibility evaluator rather than treating an “8 GB” retail device label as an exact byte count. This avoids rejecting nominal 8 GB devices solely because Android reports less memory after platform reservations, while retaining headroom above Unsloth's approximately 5.5 GB combined-memory estimate for Qwen3.5 4B at 4-bit. The threshold remains admission policy, not production certification.
 
 ## Target mapping
 
