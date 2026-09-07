@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
@@ -46,14 +47,17 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("how much is the earth radius?").assertIsDisplayed()
 
         composeRule.onNodeWithTag("nav-models").performClick()
-        composeRule.onNodeWithText("Status").assertIsDisplayed()
-        composeRule.onNodeWithText("Model size").assertIsDisplayed()
-        composeRule.onNodeWithText("All sizes").assertIsDisplayed()
+        awaitText("Choose a model")
+        composeRule.onNodeWithText("Choose a model").assertIsDisplayed()
+        composeRule.onNodeWithText("All").assertIsDisplayed()
         composeRule.onNodeWithText("0.8B").assertIsDisplayed()
         composeRule.onNodeWithText("2B").assertIsDisplayed()
+        composeRule.onNodeWithText("4B").assertIsDisplayed()
+        composeRule.onNodeWithText("Filter").assertIsDisplayed()
         assertTextAbsent("Inventory")
         assertTextAbsent("Model catalog")
         assertTextAbsent("Import model")
+        assertTextAbsent("Model size")
 
         composeRule.onNodeWithTag("nav-diagnostics").performClick()
         composeRule.onNodeWithText("Diagnostics").assertIsDisplayed()
@@ -63,6 +67,28 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("APPEARANCE").assertIsDisplayed()
         composeRule.onNodeWithText("PRIVACY").assertIsDisplayed()
         assertTextAbsent("Brand palette")
+    }
+
+    @Test
+    fun modelsTierProgressivelyDisclosesQuantizationVariants() {
+        composeRule.onNodeWithTag("nav-models").performClick()
+        awaitText("Choose a model")
+
+        composeRule.onNodeWithText("4B").performClick()
+        awaitText("6 other variants")
+        composeRule.onNodeWithText("Qwen3.5 · 4B").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("UD-Q4_K_XL").assertIsDisplayed()
+        composeRule.onNodeWithText("Recommended").assertIsDisplayed()
+        composeRule.onNodeWithText("6 other variants").performScrollTo().assertIsDisplayed()
+        assertTextAbsent("Q4_K_M")
+
+        composeRule.onNodeWithText("6 other variants").performClick()
+        composeRule.onNodeWithText("Q4_K_M").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Show fewer").performScrollTo().assertIsDisplayed()
+
+        composeRule.onNodeWithText("Show fewer").performClick()
+        awaitText("6 other variants")
+        assertTextAbsent("Q4_K_M")
     }
 
     @Test
@@ -113,6 +139,12 @@ class MainActivityUiTest {
             "No supported choice yet",
             "Recorded runs are not enough to rank choices",
         )
+    }
+
+    private fun awaitText(text: String) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun assertTextAbsent(text: String) {
