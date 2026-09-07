@@ -18,8 +18,15 @@ rm -rf "$REPO_DIR"
   -PconsumerSdkVersion="$SDK_VERSION" \
   :consumer:assembleDebug
 
-if grep -R --line-number -E 'project\(|includeBuild\(|android-local-llm-harness' samples/external-consumer-android --include='*.gradle.kts'; then
-  echo "External consumer fixture contains a forbidden source/build coupling" >&2
+./gradlew -p samples/hello-harnex \
+  -PconsumerSdkVersion="$SDK_VERSION" \
+  -PconsumerSdkRepositoryUrl="$REPO_DIR" \
+  :app:assembleDebug
+
+if grep -R --line-number -E 'project\(|includeBuild\(|android-local-llm-harness' \
+  samples/external-consumer-android samples/hello-harnex \
+  --include='*.gradle.kts'; then
+  echo "External Consumer SDK samples contain a forbidden source/build coupling" >&2
   exit 1
 fi
 
