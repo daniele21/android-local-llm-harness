@@ -2,109 +2,64 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_ID="io.github.daniele21.localllm.devicetest.debug"
-BACKEND_REVISION="aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3"
+APP_ID="io.github.daniele21.localllm.phonetest"
+MAIN_ACTIVITY="$APP_ID/.MainActivity"
 EXPECTED_2B_SHA="0af96165ea615bea39a04118d63f0b6d35908aea850ee4a51aa6151d851b8b35"
 EXPECTED_4B_SHA="b252c5610a42ca82d20fe2a12813e9d069eed89292907e26c783eeb0bc961bc7"
 QUANTIZATION="UD-Q4_K_XL"
-
-MODEL_2B=""
-MODEL_4B=""
 DEVICE=""
 OUTPUT_DIR="$ROOT_DIR/build/q35-ud-q4-k-xl-physical-acceptance"
-THERMAL_START_MAX=1
-TIMEOUT_SECONDS=1200
-MEMORY_REPEAT_COUNT=3
-MAX_PSS_GROWTH_KB=131072
-CONTEXT_TOKENS=2048
-BATCH_SIZE=128
-MICRO_BATCH_SIZE=64
 ADB_BIN="${ADB:-adb}"
 
 usage() {
     cat <<'EOF'
 Usage:
-  bash scripts/run-qwen35-ud-q4-k-xl-physical-acceptance.sh \
-    --model-2b /path/Qwen3.5-2B-UD-Q4_K_XL.gguf \
-    --model-4b /path/Qwen3.5-4B-UD-Q4_K_XL.gguf \
-    [--device SERIAL] [options]
+  bash scripts/run-qwen35-ud-q4-k-xl-physical-acceptance.sh [options]
 
-Runs a provenance-gated physical Android acceptance lane for the exact Unsloth
-Qwen3.5 2B and 4B UD-Q4_K_XL artifacts. Each model runs the real JNI/llama.cpp
-path through generation, active cancellation and repeated load/generate/unload
-memory checks. Evidence is device-bound and never promotes a runtime profile
-automatically.
+Coordinates physical acceptance for the exact Qwen3.5 2B and 4B UD-Q4_K_XL
+models already installed in Harnex on the connected Android device.
+
+The script deliberately does NOT:
+  - require GGUF paths on the Mac;
+  - copy models to another app;
+  - rebuild or reinstall Harnex;
+  - expose a test-only control endpoint in the Harnex release app.
+
+Instead, Harnex performs its existing host-owned Physical-device validation
+against its selected ModelStore artifact. After each run, this script captures
+the privacy-safe report from the visible UI through ADB accessibility metadata,
+checks the exact model digest/quantization, and stores report + screenshot +
+device provenance on the Mac.
 
 Options:
-  --device SERIAL                ADB device serial.
-  --output-dir PATH              Evidence root.
-  --thermal-start-max N          Maximum thermal status before each model, 0..6 (default: 1).
-  --timeout-seconds N            Instrumentation timeout (default: 1200).
-  --memory-repeat N              Load/generate/unload repetitions, >=2 (default: 3).
-  --max-pss-growth-kb N          Maximum repeated-cycle PSS growth (default: 131072).
-  --context-tokens N             Context size (default: 2048).
-  --batch-size N                 Batch size (default: 128).
-  --micro-batch-size N           Micro-batch size (default: 64).
-  --help                         Show this help.
-
-This lane does not replace the separate LOW_MEMORY/cross-model-switch gate.
+  --device SERIAL       ADB device serial (alias: --serial).
+  --output-dir PATH     Evidence root.
+  --help                Show this help.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --model-2b) MODEL_2B="${2:-}"; shift 2 ;;
-        --model-4b) MODEL_4B="${2:-}"; shift 2 ;;
-        --device) DEVICE="${2:-}"; shift 2 ;;
-        --output-dir) OUTPUT_DIR="${2:-}"; shift 2 ;;
-        --thermal-start-max) THERMAL_START_MAX="${2:-}"; shift 2 ;;
-        --timeout-seconds) TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
-        --memory-repeat) MEMORY_REPEAT_COUNT="${2:-}"; shift 2 ;;
-        --max-pss-growth-kb) MAX_PSS_GROWTH_KB="${2:-}"; shift 2 ;;
-        --context-tokens) CONTEXT_TOKENS="${2:-}"; shift 2 ;;
-        --batch-size) BATCH_SIZE="${2:-}"; shift 2 ;;
-        --micro-batch-size) MICRO_BATCH_SIZE="${2:-}"; shift 2 ;;
-        --help|-h) usage; exit 0 ;;
-        *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+        --device|--serial)
+            DEVICE="${2:-}"
+            shift 2
+            ;;
+        --output-dir)
+            OUTPUT_DIR="${2:-}"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 2
+            ;;
     esac
 done
 
-for pair in "2B:$MODEL_2B" "4B:$MODEL_4B"; do
-    tier="${pair%%:*}"
-    model="${pair#*:}"
-    if [[ -z "$model" || ! -f "$model" || ! -r "$model" ]]; then
-        echo "--model-${tier,,} must point to a readable GGUF file" >&2
-        exit 2
-    fi
-done
-
-for pair in \
-    "thermal:$THERMAL_START_MAX" \
-    "timeout:$TIMEOUT_SECONDS" \
-    "memory-repeat:$MEMORY_REPEAT_COUNT" \
-    "max-pss-growth-kb:$MAX_PSS_GROWTH_KB" \
-    "context:$CONTEXT_TOKENS" \
-    "batch:$BATCH_SIZE" \
-    "micro-batch:$MICRO_BATCH_SIZE"; do
-    name="${pair%%:*}"
-    value="${pair#*:}"
-    if [[ ! "$value" =~ ^[0-9]+$ ]]; then
-        echo "$name must be a non-negative integer" >&2
-        exit 2
-    fi
-done
-if (( THERMAL_START_MAX > 6 )); then
-    echo "--thermal-start-max must be 0..6" >&2
-    exit 2
-fi
-if (( TIMEOUT_SECONDS < 1 || MEMORY_REPEAT_COUNT < 2 || CONTEXT_TOKENS < 1 || BATCH_SIZE < 1 || MICRO_BATCH_SIZE < 1 )); then
-    echo "timeout/context/batch sizes must be positive and --memory-repeat must be >=2" >&2
-    exit 2
-fi
-if (( MICRO_BATCH_SIZE > BATCH_SIZE )); then
-    echo "--micro-batch-size cannot exceed --batch-size" >&2
-    exit 2
-fi
 if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
     echo "adb is required" >&2
     exit 2
@@ -114,312 +69,252 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 2
 fi
 
-sha256_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{print $1}'
-    elif command -v openssl >/dev/null 2>&1; then
-        openssl dgst -sha256 "$1" | awk '{print $NF}'
-    else
-        echo "A SHA-256 utility is required" >&2
-        exit 2
-    fi
-}
-
-require_clean_tracked_worktree() {
-    stage="$1"
-    status="$(git status --short --untracked-files=no --ignore-submodules=dirty)"
-    if [[ -n "$status" ]]; then
-        echo "Tracked Harnex worktree must be clean $stage:" >&2
-        printf '%s\n' "$status" >&2
-        exit 1
-    fi
-}
-
-require_pinned_backend() {
-    stage="$1"
-    if [[ ! -e third_party/llama.cpp/.git ]]; then
-        echo "llama.cpp submodule is not initialized $stage" >&2
-        exit 1
-    fi
-    backend_status="$(git -C third_party/llama.cpp status --short)"
-    if [[ -n "$backend_status" ]]; then
-        echo "llama.cpp submodule must be clean $stage" >&2
-        printf '%s\n' "$backend_status" >&2
-        exit 1
-    fi
-    backend_head="$(git -C third_party/llama.cpp rev-parse HEAD)"
-    if [[ "$backend_head" != "$BACKEND_REVISION" ]]; then
-        echo "llama.cpp revision mismatch $stage: $backend_head" >&2
-        exit 1
-    fi
-}
-
-cd "$ROOT_DIR"
-require_clean_tracked_worktree "before physical acceptance"
-require_pinned_backend "before physical acceptance"
-HARNEX_COMMIT="$(git rev-parse HEAD)"
-
-ACTUAL_2B_SHA="$(sha256_file "$MODEL_2B" | tr '[:upper:]' '[:lower:]')"
-ACTUAL_4B_SHA="$(sha256_file "$MODEL_4B" | tr '[:upper:]' '[:lower:]')"
-[[ "$ACTUAL_2B_SHA" == "$EXPECTED_2B_SHA" ]] || {
-    echo "2B model does not match the pinned Unsloth UD-Q4_K_XL identity" >&2
-    exit 2
-}
-[[ "$ACTUAL_4B_SHA" == "$EXPECTED_4B_SHA" ]] || {
-    echo "4B model does not match the pinned Unsloth UD-Q4_K_XL identity" >&2
-    exit 2
-}
-
 ADB_CMD=("$ADB_BIN")
 if [[ -n "$DEVICE" ]]; then
     ADB_CMD+=("-s" "$DEVICE")
 fi
-"${ADB_CMD[@]}" get-state >/dev/null
 
-DEVICE_MANUFACTURER="$("${ADB_CMD[@]}" shell getprop ro.product.manufacturer | tr -d '\r')"
-DEVICE_MODEL="$("${ADB_CMD[@]}" shell getprop ro.product.model | tr -d '\r')"
-DEVICE_RELEASE="$("${ADB_CMD[@]}" shell getprop ro.build.version.release | tr -d '\r')"
-DEVICE_SDK="$("${ADB_CMD[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
-DEVICE_ABI="$("${ADB_CMD[@]}" shell getprop ro.product.cpu.abi | tr -d '\r')"
-DEVICE_RAM_KB="$("${ADB_CMD[@]}" shell cat /proc/meminfo | tr -d '\r' | awk '/^MemTotal:/ {print $2; exit}')"
-[[ "$DEVICE_ABI" == arm64-v8a* ]] || {
-    echo "Physical acceptance requires arm64-v8a" >&2
-    exit 2
+adb_shell() {
+    "${ADB_CMD[@]}" shell "$@"
 }
 
-RUN_DIR="$OUTPUT_DIR/$DEVICE_MODEL/$HARNEX_COMMIT"
+"${ADB_CMD[@]}" get-state >/dev/null
+
+if ! adb_shell pm path "$APP_ID" 2>/dev/null | grep -q '^package:'; then
+    echo "Harnex ($APP_ID) is not installed on the selected device." >&2
+    echo "Install/open the Harnex build that already owns the 2B and 4B models, then rerun." >&2
+    exit 2
+fi
+
+DEVICE_MANUFACTURER="$(adb_shell getprop ro.product.manufacturer | tr -d '\r')"
+DEVICE_MODEL="$(adb_shell getprop ro.product.model | tr -d '\r')"
+DEVICE_RELEASE="$(adb_shell getprop ro.build.version.release | tr -d '\r')"
+DEVICE_SDK="$(adb_shell getprop ro.build.version.sdk | tr -d '\r')"
+DEVICE_ABI="$(adb_shell getprop ro.product.cpu.abi | tr -d '\r')"
+DEVICE_SERIAL="${DEVICE:-$("${ADB_CMD[@]}" get-serialno | tr -d '\r')}"
+DEVICE_RAM_KB="$(adb_shell cat /proc/meminfo | tr -d '\r' | awk '/^MemTotal:/ {print $2; exit}')"
+
+if [[ "$DEVICE_ABI" != arm64-v8a* ]]; then
+    echo "Physical acceptance requires an arm64-v8a device; found: $DEVICE_ABI" >&2
+    exit 2
+fi
+
+PACKAGE_DUMP="$(adb_shell dumpsys package "$APP_ID" | tr -d '\r')"
+APP_VERSION_NAME="$(printf '%s\n' "$PACKAGE_DUMP" | sed -n 's/^[[:space:]]*versionName=//p' | head -n 1)"
+APP_VERSION_CODE="$(printf '%s\n' "$PACKAGE_DUMP" | sed -n 's/^[[:space:]]*versionCode=\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+
+cd "$ROOT_DIR"
+RUNNER_COMMIT="$(git rev-parse HEAD 2>/dev/null || printf 'unknown')"
+TRACKED_STATUS="$(git status --short --untracked-files=no 2>/dev/null || true)"
+RUN_STAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
+SAFE_MODEL="$(printf '%s' "$DEVICE_MODEL" | tr ' /:' '___')"
+RUN_DIR="$OUTPUT_DIR/$SAFE_MODEL/$RUN_STAMP"
 mkdir -p "$RUN_DIR"
 
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/harnex-q35-acceptance.XXXXXX")"
 cleanup() {
-    "${ADB_CMD[@]}" shell run-as "$APP_ID" rm -f \
-        files/e2e/qwen35-2b-ud-q4-k-xl.gguf \
-        files/e2e/qwen35-4b-ud-q4-k-xl.gguf >/dev/null 2>&1 || true
-    require_clean_tracked_worktree "after physical acceptance"
-    require_pinned_backend "after physical acceptance"
+    rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
 
-./gradlew :apps:device-test-runner:assembleDebug :apps:device-test-runner:assembleDebugAndroidTest
-APP_APK="$(find apps/device-test-runner/build/outputs/apk/debug -type f -name '*.apk' | sort | tail -n 1)"
-TEST_APK="$(find apps/device-test-runner/build/outputs/apk/androidTest/debug -type f -name '*.apk' | sort | tail -n 1)"
-[[ -n "$APP_APK" && -n "$TEST_APK" ]] || {
-    echo "Unable to locate device-test APKs" >&2
-    exit 1
+{
+    echo "deviceSerial=$DEVICE_SERIAL"
+    echo "manufacturer=$DEVICE_MANUFACTURER"
+    echo "model=$DEVICE_MODEL"
+    echo "android=$DEVICE_RELEASE"
+    echo "api=$DEVICE_SDK"
+    echo "abi=$DEVICE_ABI"
+    echo "ramKb=$DEVICE_RAM_KB"
+    echo "harnexVersionName=${APP_VERSION_NAME:-unknown}"
+    echo "harnexVersionCode=${APP_VERSION_CODE:-unknown}"
+    echo "runnerCommit=$RUNNER_COMMIT"
+    if [[ -n "$TRACKED_STATUS" ]]; then
+        echo "runnerWorktree=dirty"
+        printf '%s\n' "$TRACKED_STATUS" | sed 's/^/runnerTrackedChange=/'
+    else
+        echo "runnerWorktree=clean"
+    fi
+} > "$RUN_DIR/device-and-runner.txt"
+
+extract_visible_report() {
+    xml_file="$1"
+    report_file="$2"
+    python3 - "$xml_file" "$report_file" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+xml_path = Path(sys.argv[1])
+report_path = Path(sys.argv[2])
+root = ET.parse(xml_path).getroot()
+texts = [node.attrib.get("text", "") for node in root.iter()]
+texts = [text for text in texts if text]
+
+prefix = "LOCAL_LLM_PHONE_TEST result="
+candidates = [text for text in texts if prefix in text]
+if candidates:
+    report = max(candidates, key=len)
+else:
+    combined = "\n".join(texts)
+    start = combined.find(prefix)
+    if start < 0:
+        raise SystemExit(
+            "Could not find LOCAL_LLM_PHONE_TEST in the visible UI. "
+            "Keep Diagnostics > Validation with the report visible, then retry."
+        )
+    report = combined[start:]
+
+report = report.replace("\r\n", "\n").replace("\r", "\n").strip()
+report_path.write_text(report + "\n", encoding="utf-8")
+PY
 }
 
-"${ADB_CMD[@]}" install -r -t "$APP_APK"
-"${ADB_CMD[@]}" install -r -t "$TEST_APK"
-"${ADB_CMD[@]}" shell run-as "$APP_ID" mkdir -p files/e2e
-"${ADB_CMD[@]}" shell -T run-as "$APP_ID" dd of=files/e2e/qwen35-2b-ud-q4-k-xl.gguf bs=1048576 < "$MODEL_2B" >/dev/null
-"${ADB_CMD[@]}" shell -T run-as "$APP_ID" dd of=files/e2e/qwen35-4b-ud-q4-k-xl.gguf bs=1048576 < "$MODEL_4B" >/dev/null
-
-RUNNER="$(
-    "${ADB_CMD[@]}" shell pm list instrumentation \
-        | tr -d '\r' \
-        | grep -F "(target=$APP_ID)" \
-        | head -n 1 \
-        | sed -E 's/^instrumentation:([^ ]+).*/\1/' \
-        || true
-)"
-[[ -n "$RUNNER" ]] || {
-    echo "Unable to discover AndroidJUnitRunner" >&2
-    exit 1
-}
-
-read_thermal_status() {
-    set +e
-    output="$("${ADB_CMD[@]}" shell am instrument -w -r \
-        -e class io.github.daniele21.localllm.devicetest.Qwen35TuningInstrumentedTest#reportsThermalStatus \
-        "$RUNNER" 2>&1)"
-    status=$?
-    set -e
-    output="${output//$'\r'/}"
-    (( status == 0 )) || {
-        printf '%s\n' "$output" >&2
-        return 1
-    }
-    value="$(printf '%s\n' "$output" | sed -n 's/^.*LOCAL_LLM_THERMAL_STATUS //p' | tail -n 1)"
-    [[ "$value" =~ ^[0-9]+$ ]] || {
-        echo "Unable to parse thermal status" >&2
-        return 1
-    }
-    printf '%s\n' "$value"
-}
-
-wait_for_thermal_gate() {
-    while true; do
-        thermal="$(read_thermal_status)"
-        if (( thermal <= THERMAL_START_MAX )); then
-            printf '%s\n' "$thermal"
-            return 0
-        fi
-        echo "Thermal status=$thermal; cooling before the next serialized suite" >&2
-        sleep 30
-    done
-}
-
-run_model_suite() {
+capture_report() {
     tier="$1"
-    relative_path="$2"
-    sha="$3"
-    threads="$4"
-    log="$RUN_DIR/${tier}-e2e.log"
-    thermal_file="$RUN_DIR/${tier}-thermal.txt"
+    expected_sha="$2"
+    tier_dir="$RUN_DIR/$tier"
+    xml_remote="/sdcard/harnex-${tier}-validation.xml"
+    xml_local="$tier_dir/ui.xml"
+    report_file="$tier_dir/report.txt"
+    screenshot_file="$tier_dir/screenshot.png"
 
-    thermal_before="$(wait_for_thermal_gate)"
-    echo "Thermal gate satisfied for $tier: status=$thermal_before <= $THERMAL_START_MAX"
+    mkdir -p "$tier_dir"
 
-    set +e
-    output="$("${ADB_CMD[@]}" shell am instrument -w -r \
-        -e class io.github.daniele21.localllm.devicetest.LocalLlmDeviceE2eTest \
-        -e modelRelativePath "$relative_path" \
-        -e modelSha256 "$sha" \
-        -e modelArchitecture qwen35 \
-        -e modelQuantization "$QUANTIZATION" \
-        -e contextSize "$CONTEXT_TOKENS" \
-        -e batchSize "$BATCH_SIZE" \
-        -e microBatchSize "$MICRO_BATCH_SIZE" \
-        -e cpuThreads "$threads" \
-        -e cancellationEnabled true \
-        -e memoryRepeatCount "$MEMORY_REPEAT_COUNT" \
-        -e maxPssGrowthKb "$MAX_PSS_GROWTH_KB" \
-        -e timeoutSeconds "$TIMEOUT_SECONDS" \
-        "$RUNNER" 2>&1)"
-    status=$?
-    set -e
+    echo
+    echo "=== Qwen3.5 $tier $QUANTIZATION ==="
+    echo "Sul telefono:"
+    echo "  1. Harnex > Models: seleziona Qwen 3.5 $tier $QUANTIZATION già installato."
+    echo "  2. Harnex > Diagnostics > Validation."
+    echo "  3. Tocca 'Run full validation'."
+    echo "  4. Attendi 'Validation completed' e lascia visibile il report."
+    echo
+    printf "Quando il report è visibile, premi INVIO qui... "
+    IFS= read -r _
 
-    output="${output//$'\r'/}"
-    printf '%s\n' "$output" | tee "$log"
+    "${ADB_CMD[@]}" exec-out screencap -p > "$screenshot_file"
+    adb_shell uiautomator dump "$xml_remote" >/dev/null
+    "${ADB_CMD[@]}" pull "$xml_remote" "$xml_local" >/dev/null
+    adb_shell rm -f "$xml_remote" >/dev/null 2>&1 || true
 
-    if (( status != 0 )) || printf '%s\n' "$output" | grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg='; then
-        echo "$tier physical acceptance failed" >&2
+    if ! extract_visible_report "$xml_local" "$report_file"; then
+        echo "Impossibile estrarre il report $tier dalla UI." >&2
+        echo "Screenshot salvato in: $screenshot_file" >&2
         exit 1
     fi
-    printf '%s\n' "$output" | grep -Eq '^OK \(' || {
-        echo "$tier missing JUnit success marker" >&2
-        exit 1
-    }
-    printf '%s\n' "$output" | grep -Eq '^INSTRUMENTATION_CODE: -1$' || {
-        echo "$tier missing instrumentation success marker" >&2
-        exit 1
-    }
-    grep -Fq 'LOCAL_LLM_E2E generation ' "$log" || {
-        echo "$tier missing generation evidence" >&2
-        exit 1
-    }
-    grep -Fq 'LOCAL_LLM_E2E cancellation terminal=cancelled' "$log" || {
-        echo "$tier missing cancellation evidence" >&2
-        exit 1
-    }
-    grep -Fq 'LOCAL_LLM_E2E memory pssSamplesKb=' "$log" || {
-        echo "$tier missing repeated-memory evidence" >&2
-        exit 1
-    }
 
-    thermal_after="$(read_thermal_status)"
-    {
-        echo "before=$thermal_before"
-        echo "after=$thermal_after"
-    } > "$thermal_file"
+    if ! grep -Fq 'LOCAL_LLM_PHONE_TEST result=PASS' "$report_file"; then
+        echo "$tier validation did not report PASS:" >&2
+        cat "$report_file" >&2
+        exit 1
+    fi
+    if ! grep -Fq "modelDigest=$expected_sha" "$report_file"; then
+        echo "$tier report is not bound to the expected UD-Q4_K_XL artifact digest." >&2
+        echo "Expected: $expected_sha" >&2
+        cat "$report_file" >&2
+        exit 1
+    fi
+    if ! grep -Fq 'architecture=qwen35' "$report_file"; then
+        echo "$tier report does not identify qwen35 architecture." >&2
+        exit 1
+    fi
+    if ! grep -Fq "quantization=$QUANTIZATION" "$report_file"; then
+        echo "$tier report does not identify quantization=$QUANTIZATION." >&2
+        exit 1
+    fi
+    for marker in \
+        'ttftMs=' \
+        'totalMs=' \
+        'decodeTokensPerSecond=' \
+        'cancellation=cancelled' \
+        'pssSamplesKb=' \
+        'pssGrowthKb=' \
+        'thermalStart=' \
+        'thermalEnd='; do
+        if ! grep -Fq "$marker" "$report_file"; then
+            echo "$tier report is missing required evidence marker: $marker" >&2
+            exit 1
+        fi
+    done
+
+    echo "$tier PASS — report: $report_file"
 }
 
-run_model_suite "2b" files/e2e/qwen35-2b-ud-q4-k-xl.gguf "$ACTUAL_2B_SHA" 4
-run_model_suite "4b" files/e2e/qwen35-4b-ud-q4-k-xl.gguf "$ACTUAL_4B_SHA" 4
+# Launch only. We intentionally do not rebuild/reinstall the app because the Play
+# install owns the existing private ModelStore artifacts and must remain intact.
+adb_shell am start -n "$MAIN_ACTIVITY" >/dev/null
 
-MANIFEST="$RUN_DIR/manifest.json"
+cat <<EOF
+Harnex physical acceptance
+Device: $DEVICE_MANUFACTURER $DEVICE_MODEL · Android $DEVICE_RELEASE · $DEVICE_ABI
+Installed Harnex: ${APP_VERSION_NAME:-unknown} (${APP_VERSION_CODE:-unknown})
+Evidence directory: $RUN_DIR
+
+No GGUF will be read from or copied from the Mac.
+Harnex itself will execute its existing host-owned Physical-device validation.
+EOF
+
+capture_report "2B" "$EXPECTED_2B_SHA"
+capture_report "4B" "$EXPECTED_4B_SHA"
+
 python3 - \
-    "$MANIFEST" \
-    "$HARNEX_COMMIT" \
-    "$BACKEND_REVISION" \
-    "$DEVICE_MANUFACTURER" \
-    "$DEVICE_MODEL" \
-    "$DEVICE_RELEASE" \
-    "$DEVICE_SDK" \
-    "$DEVICE_ABI" \
-    "$DEVICE_RAM_KB" \
-    "$ACTUAL_2B_SHA" \
-    "$ACTUAL_4B_SHA" \
-    "$QUANTIZATION" \
-    "$THERMAL_START_MAX" \
-    "$MEMORY_REPEAT_COUNT" \
-    "$MAX_PSS_GROWTH_KB" \
-    "$TIMEOUT_SECONDS" \
-    "$CONTEXT_TOKENS" \
-    "$BATCH_SIZE" \
-    "$MICRO_BATCH_SIZE" \
-    "$RUN_DIR" <<'PY'
+    "$RUN_DIR/manifest.json" \
+    "$RUN_DIR/2B/report.txt" \
+    "$RUN_DIR/4B/report.txt" \
+    "$RUN_DIR/device-and-runner.txt" \
+    "$RUN_STAMP" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
-manifest = Path(sys.argv[1])
-run_dir = Path(sys.argv[20])
+manifest_path = Path(sys.argv[1])
+report_2b = Path(sys.argv[2])
+report_4b = Path(sys.argv[3])
+provenance_path = Path(sys.argv[4])
+run_stamp = sys.argv[5]
 
-def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-def thermal(path: Path) -> dict[str, int]:
-    values: dict[str, int] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        key, value = line.split("=", 1)
-        values[key] = int(value)
+def parse_report(path: Path):
+    values = {}
+    first = True
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if first and line.startswith("LOCAL_LLM_PHONE_TEST "):
+            first = False
+            for part in line.split()[1:]:
+                if "=" in part:
+                    key, value = part.split("=", 1)
+                    values[key] = value
+            continue
+        first = False
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = value
     return values
+
+def sha256(path: Path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 payload = {
     "schemaVersion": 1,
-    "evidenceType": "Q35_UD_Q4_K_XL_PHYSICAL_ACCEPTANCE",
-    "harnexCommit": sys.argv[2],
-    "backendRevision": sys.argv[3],
-    "deviceManufacturer": sys.argv[4],
-    "deviceModel": sys.argv[5],
-    "androidRelease": sys.argv[6],
-    "sdkInt": int(sys.argv[7]),
-    "abi": sys.argv[8],
-    "deviceRamKb": int(sys.argv[9]),
-    "models": {
-        "2b": {
-            "digest": sys.argv[10],
-            "quantization": sys.argv[12],
-            "threads": 4,
-            "logSha256": digest(run_dir / "2b-e2e.log"),
-            "thermal": thermal(run_dir / "2b-thermal.txt"),
-        },
-        "4b": {
-            "digest": sys.argv[11],
-            "quantization": sys.argv[12],
-            "threads": 4,
-            "logSha256": digest(run_dir / "4b-e2e.log"),
-            "thermal": thermal(run_dir / "4b-thermal.txt"),
-        },
+    "lane": "qwen35-2b-4b-ud-q4-k-xl-host-owned-physical-acceptance",
+    "capturedAtUtc": run_stamp,
+    "modelSource": "existing Harnex private ModelStore; no Mac-side GGUF transfer",
+    "validationOwner": "Harnex PhoneTestController.runFullValidation",
+    "reports": {
+        "2B": parse_report(report_2b),
+        "4B": parse_report(report_4b),
     },
-    "thermalStartMax": int(sys.argv[13]),
-    "memoryRepeatCount": int(sys.argv[14]),
-    "maxPssGrowthKb": int(sys.argv[15]),
-    "timeoutSeconds": int(sys.argv[16]),
-    "contextTokens": int(sys.argv[17]),
-    "batchSize": int(sys.argv[18]),
-    "microBatchSize": int(sys.argv[19]),
-    "checks": [
-        "real_jni_generation",
-        "active_generation_cancellation",
-        "repeated_load_generate_unload_pss",
-        "thermal_before_after",
-    ],
-    "scopeBoundary": {
-        "lowMemoryPressure": False,
-        "crossModelSwitch": False,
-        "automaticProfilePromotion": False,
+    "artifacts": {
+        "2BReportSha256": sha256(report_2b),
+        "4BReportSha256": sha256(report_4b),
+        "deviceAndRunnerSha256": sha256(provenance_path),
     },
 }
-
-manifest.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-print(f"Physical acceptance manifest: {manifest}")
-print(f"Manifest SHA-256: {digest(manifest)}")
+manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+print(f"Manifest: {manifest_path}")
+print(f"Manifest SHA-256: {sha256(manifest_path)}")
 PY
 
-require_clean_tracked_worktree "after evidence capture"
-require_pinned_backend "after evidence capture"
-echo "Q35 UD-Q4_K_XL 2B/4B physical acceptance completed; no runtime profile was promoted automatically."
+echo
+echo "Physical acceptance PASS for both exact UD-Q4_K_XL artifacts."
+echo "Evidence: $RUN_DIR"
