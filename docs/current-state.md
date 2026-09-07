@@ -15,7 +15,7 @@ This is the operational ledger for integrated state, blockers and immediate work
 - `main` is the stable/release line.
 - New work starts from the latest green `dev` unless explicitly hotfixed.
 - Stable promotions preserve `main` ancestry in `dev` before the next `dev -> main` release cycle, per ADR 0008.
-- Repository governance is aligned to `repo-template-sw` `0.10.0` with the local Android/local-AI/product-UI customizations recorded in `.engineering/baseline.json`.
+- Repository governance is aligned to `repo-template-sw` `0.11.0` with proportional product-development routing plus the local Android/local-AI/product-UI customizations recorded in `.engineering/baseline.json`.
 
 ## Integrated baseline
 
@@ -74,6 +74,7 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 
 ## Source links
 
+- Product strategy / decision boundaries: [`product.md`](product.md)
 - Consumer SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Independent consumer authorization: [`adr/0018-independently-signed-consumer-authorization.md`](adr/0018-independently-signed-consumer-authorization.md)

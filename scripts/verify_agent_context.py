@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse, json, math, os, sys
 from pathlib import Path
-REQ={'docs','bug','contract','ui','integration','release','resume'}
+REQ={'docs','bug','product','contract','ui','integration','release','resume'}
 
 def inside(root, rel):
     p=(root/rel).resolve()
@@ -27,10 +27,6 @@ def main():
             dirs[:]=[x for x in dirs if x not in excluded]
             if 'AGENTS.md' in files and Path(d)!=root: scoped.append((Path(d)/'AGENTS.md').resolve())
         affected=[inside(root,x) for x in a.path]
-        # Without an affected path there is no truthful scoped-guide selection: measure the
-        # route bootstrap only. With --path, include only guides whose directory owns/contains
-        # an affected path. This keeps repository-health representative instead of summing the
-        # entire monorepo instruction graph.
         scope={g for g in scoped if affected and any(g.parent==p or g.parent in p.parents for p in affected)}
         work=None
         if a.workstream:
@@ -55,7 +51,7 @@ def main():
     except Exception as exc: out={'errors':[str(exc)],'result':'FAIL'}
     if a.format=='json': print(json.dumps(out,indent=2))
     else:
-        print('Agent context health');
+        print('Agent context health')
         for r in out.get('routes',[]): print(f"{r['route']}: ~{r['estimated_tokens']} / {r['budget']}")
         for x in out.get('errors',[]): print('FAIL:',x)
         print('RESULT:',out['result'])

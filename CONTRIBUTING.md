@@ -16,6 +16,19 @@ If you are not sure where a change belongs, open a [GitHub Discussion](https://g
 
 For substantial new capabilities, prefer an issue/discussion first so ownership and evidence requirements are clear.
 
+## Product-impact routing
+
+Product depth is independent from delivery stage and validation depth. Classify the change by product impact, not file count or coding effort:
+
+- `PRODUCT_NONE` — implementation-only work such as a bug fix, refactor or internal engineering change with no material supported-product change;
+- `PRODUCT_LOCAL` — settled small behavior/copy/interaction change; state affected user/consumer, expected outcome and observable acceptance;
+- `PRODUCT_FEATURE` — new capability or meaningful supported workflow/behavior change;
+- `PRODUCT_STRATEGIC` — material change to target user, product boundary, value proposition, trust model, platform or another broad hard-to-reverse product decision.
+
+For `PRODUCT_FEATURE` or `PRODUCT_STRATEGIC`, read [`.engineering/product.json`](.engineering/product.json), [`docs/product.md`](docs/product.md) and [`skills/shape-product-change/SKILL.md`](skills/shape-product-change/SKILL.md) before substantial implementation. Establish user/problem/outcome, material value/usability/feasibility/viability risks and assumptions, non-goals, quality constraints and success evidence. Discovery may validly narrow the scope, choose an alternative or conclude `DO_NOT_BUILD`.
+
+Keep this reasoning compact in the existing issue/workstream/PR; do not create parallel PRD/progress documents solely for process compliance. Shipping proves delivery, not confirmed product impact.
+
 ## Development setup
 
 Prerequisites:

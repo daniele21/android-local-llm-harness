@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "applicable": true,
+  "strategy_source": "docs/product.md",
+  "change_depths": [
+    "product_none",
+    "product_local",
+    "product_feature",
+    "product_strategic"
+  ],
+  "default_depth": "product_none",
+  "meaningful_product_change_depths": [
+    "product_feature",
+    "product_strategic"
+  ],
+  "risk_dimensions": [
+    "value",
+    "usability",
+    "feasibility",
+    "viability"
+  ],
+  "principles": {
+    "outcomes_before_output": true,
+    "evidence_before_commitment": true,
+    "proportional_product_reasoning": true,
+    "smallest_sufficient_solution_preferred": true,
+    "discovery_may_conclude_do_not_build": true,
+    "shipping_is_not_product_success": true
+  },
+  "success_layers": [
+    "acceptance",
+    "outcome",
+    "product_impact"
+  ],
+  "evidence": {
+    "least_invasive_sufficient_evidence": true,
+    "privacy_preserving_by_default": true,
+    "material_assumptions_distinguished_from_facts": true
+  },
+  "handoffs": {
+    "product_experience_skill": "skills/design-product-experience/SKILL.md",
+    "product_shaping_skill": "skills/shape-product-change/SKILL.md",
+    "engineering_workstream_skill": "skills/plan-workstream/SKILL.md"
+  },
+  "post_release_learning": {
+    "required_when_material": true,
+    "default_for_depths": [
+      "product_feature",
+      "product_strategic"
+    ]
+  }
+}
