@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-06
+- Amended: 2026-09-07
 
 ## Context
 
@@ -38,7 +39,13 @@ Harnex owns tier-aware sampling defaults. For the 4B tier it maps the existing p
 
 Thinking is enabled through the typed Qwen3.5 chat-template argument, not prompt-string hacks. Existing 0.8B and 2B generation behavior is not changed by admitting 4B.
 
-The initial Android resource policy is deliberately conservative: 8 GB total device RAM is the catalog minimum and 12 GB is recommended. Runtime tuning remains a separate unmeasured 4B candidate with bounded Harnex context tiers; model-advertised maximum context does not override Android resource policy.
+The initial Android resource policy used 8 GB total device RAM as the catalog minimum and 12 GB as recommended. Runtime tuning remains a separate unmeasured 4B candidate with bounded Harnex context tiers; model-advertised maximum context does not override Android resource policy.
+
+### 2026-09-07 RAM admission amendment
+
+The 4B hard admission threshold is changed from an exact `8_000_000_000`-byte comparison to a **`7_000_000_000`-byte Android-reported `totalMem` floor**. The recommended threshold remains `12_000_000_000` bytes.
+
+The phone compatibility evaluator receives `ActivityManager.MemoryInfo.totalMem`, which can be lower than a device's nominal retail RAM because of platform reservations. Treating an “8 GB” device label as an exact `8_000_000_000`-byte runtime observation therefore created false incompatibility for otherwise intended 8 GB-class candidates. A 7 GB measured floor keeps explicit headroom above the approximately 5.5 GB combined-memory estimate used for the original 4B policy, still rejects 6 GB-class devices, and does not claim certification. Exact-artifact physical-device evidence remains required before any 4B release can be promoted from `CANDIDATE`.
 
 ## Consequences
 
@@ -47,6 +54,7 @@ The initial Android resource policy is deliberately conservative: 8 GB total dev
 - Consumers still select from Harnex-reviewed model/profile policy rather than supplying raw model URLs or sampling configuration as product authority.
 - The 4B tier can use the existing `llama.cpp` generation path; no new native sampling primitive is introduced.
 - Catalog compatibility can reject low-memory devices before a 4B download/load attempt.
+- Nominal 8 GB devices are not rejected merely because Android reports slightly less than 8,000,000,000 bytes of total memory.
 - 4B certification is not inherited from 0.8B/2B or between quantizations. Physical-device latency, memory, thermal and output-quality evidence remains required per exact artifact.
 
 ## Alternatives considered
