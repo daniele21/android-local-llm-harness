@@ -1,49 +1,110 @@
-# Documentation map
+# Harnex documentation
 
 Status: active
 Document type: documentation-governance
 Owner: repository
 Canonical scope: documentation.routing
-Read when: locating documentation ownership or changing documentation governance
-Last reviewed: 2026-09-01
+Read when: locating Harnex documentation ownership, choosing the right guide or changing documentation governance
+Last reviewed: 2026-09-07
 
-Use progressive disclosure: root guide -> closest scoped guide -> focused owner. One fact has one canonical owner. Machine policy: [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by `Repository health`.
+This is the documentation entry point for users, integrators and contributors. Start from the task you are trying to complete; repository/agent governance is documented later on this page.
 
-## README ownership
+## Choose your path
 
-Treat the root README as two semantic owners rather than one document that must be rewritten as a unit.
+| I want to… | Start here | Then |
+| --- | --- | --- |
+| Run Harnex on Android | [`android-build-and-run.md`](android-build-and-run.md) | [`device-e2e-testing.md`](device-e2e-testing.md) for physical-device validation |
+| Integrate Harnex into another Android app | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) | [`shared-runtime/README.md`](shared-runtime/README.md) for the Host/Consumer model |
+| Understand the architecture | [`architecture.md`](architecture.md) | [`adr/README.md`](adr/README.md) for durable decisions |
+| Understand model support | [`qwen35/README.md`](qwen35/README.md) | [`curated-model-catalog.md`](curated-model-catalog.md) and model lifecycle docs |
+| Understand security/privacy boundaries | [`architecture.md`](architecture.md) | [`../SECURITY.md`](../SECURITY.md), ADRs and Activity/audit docs |
+| Work on runtime performance | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) | [`benchmark-engine.md`](benchmark-engine.md), [`resource-observability.md`](resource-observability.md) |
+| Validate real-device behavior | [`device-e2e-testing.md`](device-e2e-testing.md) | [`device-e2e-evidence.md`](device-e2e-evidence.md) |
+| See what is implemented right now | [`current-state.md`](current-state.md) | [`roadmap.md`](roadmap.md) for what comes next |
+| Contribute code or docs | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | [`../AGENTS.md`](../AGENTS.md) for repository engineering invariants |
 
-- **README identity** — project title/summary, `Why this exists`, primary audience/outcome, mission/vision and stable positioning. Update only when those claims materially change. A feature, implementation, command, configuration or runtime change does not by itself justify rewriting them.
-- **README usage** — prerequisites, setup/run, public configuration, public API/UI integration and copy-paste examples. Update in the same change whenever the current instructions would otherwise become incomplete, wrong, removed, newly mandatory or misleading.
+## Core documentation
 
-A normal feature/operational change may therefore report `README_IDENTITY: N/A` and `README_USAGE: UPDATED`.
+### Architecture and public boundaries
 
-## Canonical sources
+- [`architecture.md`](architecture.md) — system ownership, runtime/control-plane/backend boundaries.
+- [`adr/README.md`](adr/README.md) — accepted architecture decisions.
+- [`shared-runtime/README.md`](shared-runtime/README.md) — shared Host/Consumer runtime model.
+- [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) — public Android Consumer SDK and Maven contract.
+- [`api-usage.md`](api-usage.md) — embedded/local runtime API reference.
+- [`features/README.md`](features/README.md) — feature-level specifications.
+
+### Models and generation
+
+- [`qwen35/README.md`](qwen35/README.md) — Qwen3.5 product/runtime support.
+- [`curated-model-catalog.md`](curated-model-catalog.md) — reviewed model catalog.
+- [`secure-model-download.md`](secure-model-download.md) — download trust and integrity.
+- [`model-installation.md`](model-installation.md) — installation lifecycle.
+- [`harness-model-inventory-state.md`](harness-model-inventory-state.md) — installed/selected/resident state model.
+- [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md) — generation configuration and prompt ownership.
+
+### Observability, evidence and evaluation
+
+- [`console-observability.md`](console-observability.md) — observability model.
+- [`health-engine.md`](health-engine.md) — health checks.
+- [`resource-observability.md`](resource-observability.md) — memory/thermal/resource evidence.
+- [`benchmark-engine.md`](benchmark-engine.md) — benchmark identity and comparison.
+- [`model-evaluation/README.md`](model-evaluation/README.md) — semantic model evaluation.
+- [`device-e2e-testing.md`](device-e2e-testing.md) — physical Android test procedure.
+- [`device-e2e-evidence.md`](device-e2e-evidence.md) — evidence format and privacy boundary.
+
+### Android product and UX
+
+- [`features/phone-app-architecture.md`](features/phone-app-architecture.md) — phone app architecture.
+- [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md) — target product behavior.
+- [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md) — current UX implementation state.
+- [`design-system.md`](design-system.md) — design system.
+- [`harnex-brand-guidelines.md`](harnex-brand-guidelines.md) — Harnex brand rules.
+
+### Build, release and repository state
+
+- [`android-build-and-run.md`](android-build-and-run.md) — build and run.
+- [`play-internal-phone-test.md`](play-internal-phone-test.md) — Google Play Internal Testing workflow.
+- [`definition-of-done.md`](definition-of-done.md) — completion/evidence boundary.
+- [`versioning.md`](versioning.md) — version and release identity.
+- [`releases/harness-0.5.md`](releases/harness-0.5.md) — active Harness 0.5 release checklist.
+- [`current-state.md`](current-state.md) — exact integrated state, blockers and immediate next action.
+- [`roadmap.md`](roadmap.md) — capability roadmap.
+
+## Documentation principles
+
+Harnex uses progressive disclosure and single ownership: **one durable fact has one canonical owner**. The root README explains what Harnex is and provides the shortest usable path; focused documents own the detailed contract.
+
+Machine policy is [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json). [`documentation-policy.json`](documentation-policy.json) is a compatibility mirror kept byte-identical to the `.engineering` owner by Repository health.
+
+### README ownership
+
+Treat the root README as two semantic owners:
+
+- **README identity** — title, summary, target audience/outcome, stable differentiation and mission. Change only when those claims materially change.
+- **README usage** — setup, run, public integration and copy-paste examples. Update whenever current instructions would otherwise become incomplete or misleading.
+
+A normal operational change may therefore report `README_IDENTITY: N/A` and `README_USAGE: UPDATED`.
+
+## Canonical ownership
 
 | Question | Canonical source |
 | --- | --- |
-| What is Harnex and why does it exist? | root README identity sections |
-| How does a person set up/run/configure/use Harnex now? | root README usage sections plus focused runbooks/API docs |
-| Integrated state/blockers | [`current-state.md`](current-state.md) |
+| What is Harnex and why should I care? | root README identity sections |
+| How do I run/use/integrate Harnex? | root README usage + focused runbooks/API docs |
+| Integrated state and blockers | [`current-state.md`](current-state.md) |
 | Capability milestones | [`roadmap.md`](roadmap.md) |
 | Repository target | [`implementation-plan.md`](implementation-plan.md) |
-| Active bounded repository work | [`workstreams/`](workstreams/README.md) when needed |
+| Active bounded work | [`workstreams/`](workstreams/README.md) when needed |
 | Durable feature behavior | [`features/`](features/README.md) |
-| Architecture hardening | [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md), [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md) |
-| llama.cpp optimization | [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md) |
-| Memory management | [`memory-management/README.md`](memory-management/README.md) |
-| Qwen3.5 | [`qwen35/README.md`](qwen35/README.md) |
-| Model evaluation | [`model-evaluation/README.md`](model-evaluation/README.md) |
-| Architecture/decisions | [`architecture.md`](architecture.md), [`adr/`](adr/) |
-| E2E target/execution environments, fidelity and residual gaps | [`.engineering/e2e.json`](../.engineering/e2e.json) |
+| Architecture and decisions | [`architecture.md`](architecture.md), [`adr/`](adr/) |
+| E2E environments/fidelity/residual gaps | [`.engineering/e2e.json`](../.engineering/e2e.json) |
 | Merge/release completion | [`definition-of-done.md`](definition-of-done.md), [`releases/harness-0.5.md`](releases/harness-0.5.md) |
 | Historical exception material | [`archive/`](archive/) |
 
 ## Documentation impact contract
 
-Code and durable documentation ship together. A meaningful change is not complete until every affected canonical owner describes the exact behavior being published.
-
-During `preflight-change`, assess impact from observable behavior rather than filenames and classify at least:
+Code and durable documentation ship together. During `preflight-change`, classify the affected documentation surfaces from observable behavior, not filenames:
 
 - `README_IDENTITY`;
 - `README_USAGE`;
@@ -55,101 +116,17 @@ During `preflight-change`, assess impact from observable behavior rather than fi
 - `PRODUCT_EXPERIENCE`;
 - `CURRENT_STATE`.
 
-Use `UPDATED` or `N/A`; give a short reason when impact was plausible but `N/A`. Publication readiness requires `DOCS_CURRENT_WITH_IMPLEMENTATION: PASS`.
+Use `UPDATED` or `N/A`. Publication readiness requires `DOCS_CURRENT_WITH_IMPLEMENTATION: PASS`.
 
-Existing feature documentation must update in the same change when the durable behavior it describes changes. Create a new feature document only when durable non-obvious behavior is not sufficiently discoverable from public contracts, tests, code, architecture or an existing focused owner. Do not create documentation merely because a PR or task completed.
+Update an existing canonical owner when behavior changes. Create a new document only for durable, non-obvious behavior that is not already discoverable from a public contract, test, architecture owner or focused specification. Do not create documentation merely because a PR or task completed.
 
-E2E target/environment/fidelity changes are durable contract changes and update `.engineering/e2e.json`; evidence artifacts such as logs/screenshots/reports remain bounded evidence, not durable documentation.
-
-## Active source index
-
-### Architecture, delivery and API
-
-- [`implementation-plan.md`](implementation-plan.md)
-- [`reference-architecture-hardening-plan.md`](reference-architecture-hardening-plan.md)
-- [`reference-architecture-hardening-progress.md`](reference-architecture-hardening-progress.md)
-- [`llama-cpp-runtime-optimization-plan.md`](llama-cpp-runtime-optimization-plan.md)
-- [`memory-management/README.md`](memory-management/README.md)
-- [`workstreams/README.md`](workstreams/README.md)
-- [`features/README.md`](features/README.md)
-- [`architecture.md`](architecture.md)
-- [`adr/README.md`](adr/README.md)
-- [`api-usage.md`](api-usage.md)
-- [`shared-runtime/README.md`](shared-runtime/README.md)
-- [`shared-runtime/consumer-api/pii-redactor/README.md`](shared-runtime/consumer-api/pii-redactor/README.md)
-- [`definition-of-done.md`](definition-of-done.md)
-- [`versioning.md`](versioning.md)
-- [`releases/harness-0.5.md`](releases/harness-0.5.md)
-
-### Model lifecycle and generation
-
-- [`qwen35/README.md`](qwen35/README.md)
-- [`model-catalog-download-plan.md`](model-catalog-download-plan.md)
-- [`curated-model-catalog.md`](curated-model-catalog.md)
-- [`secure-model-download.md`](secure-model-download.md)
-- [`model-installation.md`](model-installation.md)
-- [`phone-model-distribution.md`](phone-model-distribution.md)
-- [`model-management-phone.md`](model-management-phone.md)
-- [`harness-model-inventory-state.md`](harness-model-inventory-state.md)
-- [`generation-configuration-and-prompting-plan.md`](generation-configuration-and-prompting-plan.md)
-
-### Observability, diagnostics and evaluation
-
-- [`console-observability.md`](console-observability.md)
-- [`health-engine.md`](health-engine.md)
-- [`resource-observability.md`](resource-observability.md)
-- [`benchmark-engine.md`](benchmark-engine.md)
-- [`model-evaluation/README.md`](model-evaluation/README.md)
-- [`harness-telemetry-composition.md`](harness-telemetry-composition.md)
-- [`harness-logs-composition.md`](harness-logs-composition.md)
-- [`harness-health-composition.md`](harness-health-composition.md)
-- [`harness-resource-composition.md`](harness-resource-composition.md)
-- [`harness-benchmark-composition.md`](harness-benchmark-composition.md)
-
-### Applications, UX and brand
-
-- [`features/README.md`](features/README.md)
-- [`features/phone-app-architecture.md`](features/phone-app-architecture.md)
-- [`harness-ux-ui-implementation-plan.md`](harness-ux-ui-implementation-plan.md)
-- [`harness-ux-ui-implementation-progress.md`](harness-ux-ui-implementation-progress.md)
-- [`phone-inference-playground.md`](phone-inference-playground.md)
-- [`console-inference-playground.md`](console-inference-playground.md)
-- [`design-system.md`](design-system.md)
-- [`harnex-brand-guidelines.md`](harnex-brand-guidelines.md)
-- [`android-brand-assets.md`](android-brand-assets.md)
-- [`assets/brand/README.md`](assets/brand/README.md)
-- [`assets/brand/master/README.md`](assets/brand/master/README.md)
-- [`assets/brand/reference/hbridge-core/README.md`](assets/brand/reference/hbridge-core/README.md)
-- [`shared-runtime/consumer-api/assets/README.md`](shared-runtime/consumer-api/assets/README.md)
-
-### Build, distribution and evidence
-
-- [`android-build-and-run.md`](android-build-and-run.md)
-- [`android-upload-key.md`](android-upload-key.md)
-- [`device-e2e-testing.md`](device-e2e-testing.md)
-- [`device-e2e-evidence.md`](device-e2e-evidence.md)
-- [`play-internal-phone-test.md`](play-internal-phone-test.md)
-- [`emulator-e2e-results.md`](emulator-e2e-results.md)
+E2E target/environment/fidelity changes update `.engineering/e2e.json`; logs, screenshots and reports are bounded evidence rather than new durable documentation owners.
 
 ## Document lifecycle
 
-Durable types: `roadmap`, `target-specification`, `feature-index`, `feature-specification`, `architecture`, `adr-index`, `api-reference`, runbooks/evidence, release/completion policy and design/asset owners. `current-state` is the single repository operational ledger.
+Durable types include roadmaps, target/feature specifications, architecture, ADRs, API references, runbooks/evidence, release/completion policy and design/asset owners. `current-state.md` is the single repository operational ledger.
 
-`workstream-state` is temporary. New repository-level workstreams live under [`workstreams/`](workstreams/README.md). Existing legacy plan/progress sources remain valid until intentionally consolidated; do not create new paired status files.
-
-Completed workstreams are **deleted by default** after durable transfer. `archive/` is exception-only for independent audit, regulatory, release-evidence or historical value. Git history owns normal implementation history.
-
-## Before creating or updating documentation
-
-1. Assess documentation impact from observable behavior.
-2. Search `Canonical scope` and this index.
-3. Update an existing owner when possible; for README changes touch only the affected identity/usage sections.
-4. Create only a durable independent owner or a genuinely necessary bounded workstream.
-5. Set supported type, owner, unique canonical scope and precise `Read when`.
-6. Link it from this or the closest domain index.
-7. Finalize temporary work by transferring durable knowledge and deleting it; archive only under the exception rule.
-
-Do not create documentation merely to record a branch, PR or isolated implementation completion.
+`workstream-state` is temporary. New repository-level workstreams live under [`workstreams/`](workstreams/README.md). Completed workstreams are deleted by default after durable knowledge is transferred; `archive/` is exception-only. Git history owns normal implementation history.
 
 ## Required metadata
 
@@ -168,11 +145,13 @@ ADRs keep ADR status/date format. Archived documents use `Status: historical`.
 
 ## Reading and writing budgets
 
-CI enforces [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json): budgets, reachability, unique canonical scopes, duplicate detection and agent-guide limits. Baselined oversized documents may only shrink.
+CI enforces [`.engineering/documentation-policy.json`](../.engineering/documentation-policy.json): context budgets, reachability, unique canonical scopes, duplicate detection and agent-guide limits. Baselined oversized documents may only shrink.
 
 ## Precedence
 
-Executable contracts/tests -> accepted ADRs -> architecture -> focused specifications -> target overview -> current state -> roadmap -> README/agent guides -> retained history. Correct the owning source rather than silently reconciling behavioral contradictions.
+Executable contracts/tests → accepted ADRs → architecture → focused specifications → target overview → current state → roadmap → README/agent guides → retained history.
+
+When two documents disagree, correct the canonical owner rather than adding another reconciliation layer.
 
 ## Validation
 
