@@ -14,6 +14,7 @@ This is the documentation entry point for users, integrators and contributors. S
 | I want to… | Start here | Then |
 | --- | --- | --- |
 | Run Harnex on Android | [`android-build-and-run.md`](android-build-and-run.md) | [`device-e2e-testing.md`](device-e2e-testing.md) for physical-device validation |
+| Try Harnex from another Android app | [`../samples/hello-harnex`](../samples/hello-harnex/README.md) | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) for the full public contract |
 | Integrate Harnex into another Android app | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) | [`shared-runtime/README.md`](shared-runtime/README.md) for the Host/Consumer model |
 | Understand the architecture | [`architecture.md`](architecture.md) | [`adr/README.md`](adr/README.md) for durable decisions |
 | Understand model support | [`qwen35/README.md`](qwen35/README.md) | [`curated-model-catalog.md`](curated-model-catalog.md) and model lifecycle docs |
@@ -31,6 +32,7 @@ This is the documentation entry point for users, integrators and contributors. S
 - [`adr/README.md`](adr/README.md) — accepted architecture decisions.
 - [`shared-runtime/README.md`](shared-runtime/README.md) — shared Host/Consumer runtime model.
 - [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) — public Android Consumer SDK and Maven contract.
+- [`../samples/hello-harnex`](../samples/hello-harnex/README.md) — runnable standalone external-app onboarding sample.
 - [`api-usage.md`](api-usage.md) — embedded/local runtime API reference.
 - [`features/README.md`](features/README.md) — feature-level specifications.
 
