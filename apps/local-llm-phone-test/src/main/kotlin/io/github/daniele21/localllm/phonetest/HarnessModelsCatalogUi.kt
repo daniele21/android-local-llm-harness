@@ -3,12 +3,15 @@
 package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,17 +20,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 import io.github.daniele21.localllm.ui.designsystem.HarnessEmptyState
 import io.github.daniele21.localllm.ui.designsystem.HarnessErrorState
+import io.github.daniele21.localllm.ui.designsystem.HarnessInlineSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessLoadingState
 import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
-import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
 import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
 
@@ -46,7 +49,6 @@ internal data class ModelsCatalogGroupEnvironment(
     val actions: UnifiedModelsActions,
     val distributionByStableId: Map<String, PhoneCatalogModelUi>,
     val loadingStableId: String?,
-    val progressivelyDisclose: Boolean,
     val onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
 )
 
@@ -56,11 +58,16 @@ internal enum class ModelsAvailabilityFilter(val label: String) {
     AVAILABLE("Not installed"),
 }
 
-internal enum class ModelsSizeFilter(val label: String, val groupLabel: String?, val suggestedModelId: String? = null) {
-    ALL("Any size", null),
-    B08("0.8B", "Qwen3.5 · 0.8B", "qwen35-08b-q4-k-m"),
-    B2("2B", "Qwen3.5 · 2B", "qwen35-2b-q4-k-m"),
-    B4("4B", "Qwen3.5 · 4B · 4-bit only", "qwen35-4b-ud-q4-k-xl"),
+internal enum class ModelsSizeFilter(
+    val label: String,
+    val groupLabel: String?,
+    val groupSupportingText: String? = null,
+    val suggestedModelId: String? = null,
+) {
+    ALL("All", null),
+    B08("0.8B", "Qwen3.5 · 0.8B", null, "qwen35-08b-q4-k-m"),
+    B2("2B", "Qwen3.5 · 2B", null, "qwen35-2b-q4-k-m"),
+    B4("4B", "Qwen3.5 · 4B", "4-bit variants only", "qwen35-4b-ud-q4-k-xl"),
 }
 
 @Composable
@@ -86,17 +93,15 @@ internal fun UnifiedModelsCatalog(
     val visibleItems = catalogItems.filter { item ->
         !item.loaded && availabilityFilter.matches(item) && sizeFilter.matches(item)
     }
-    val explicitFilterActive = availabilityFilter != ModelsAvailabilityFilter.ALL || sizeFilter != ModelsSizeFilter.ALL
     val groupEnvironment = ModelsCatalogGroupEnvironment(
         state = state,
         actions = actions,
         distributionByStableId = distributionByStableId,
         loadingStableId = loadingStableId,
-        progressivelyDisclose = !explicitFilterActive,
         onOpenModelDetails = onOpenModelDetails,
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         ModelsLibrarySummary(state, catalogItems.size)
         if (loadedItem != null && loadedModel != null) {
             ActiveModelCard(
@@ -110,7 +115,7 @@ internal fun UnifiedModelsCatalog(
         if (feedback.history.isNotEmpty()) {
             ModelActionStatus(feedback)
         }
-        ModelsCatalogFilters(
+        ModelsCatalogControls(
             availabilityFilter = availabilityFilter,
             sizeFilter = sizeFilter,
             onAvailabilityChanged = { availabilityFilter = it },
@@ -144,7 +149,7 @@ private fun EmptyCatalogState(state: HarnessUiState, actions: UnifiedModelsActio
                     title = "Models unavailable",
                     detail = state.modelDistribution.message,
                 )
-                HarnessSecondaryButton(
+                HarnessInlineSecondaryButton(
                     text = "Try again",
                     enabled = !state.busy,
                     onClick = actions.refresh,
@@ -193,61 +198,29 @@ private fun ModelActionStatus(feedback: ModelActionFeedbackState) {
 
 @Composable
 private fun ModelsLibrarySummary(state: HarnessUiState, catalogCount: Int) {
-    HarnessCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = "${state.modelInventory.installedCount} installed · ${formatModelBytes(
-                        state.modelInventory.installedBytes,
-                    )} on device",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = "$catalogCount curated models available",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (state.modelDistribution.catalogStatus != PhoneCatalogLoadStatus.READY) {
-                HarnessStatusBadge(
-                    label = if (state.modelDistribution.catalogStatus == PhoneCatalogLoadStatus.LOADING) "REFRESHING" else "CATALOG ISSUE",
-                    tone = if (state.modelDistribution.catalogStatus == PhoneCatalogLoadStatus.LOADING) {
-                        HarnessStatusTone.INFO
-                    } else {
-                        HarnessStatusTone.WARNING
-                    },
-                )
-            }
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "${state.modelInventory.installedCount} installed · ${formatModelBytes(state.modelInventory.installedBytes)} on device",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = "$catalogCount reviewed models in the local catalog",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
-private fun ModelsCatalogFilters(
+private fun ModelsCatalogControls(
     availabilityFilter: ModelsAvailabilityFilter,
     sizeFilter: ModelsSizeFilter,
     onAvailabilityChanged: (ModelsAvailabilityFilter) -> Unit,
     onSizeChanged: (ModelsSizeFilter) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Availability", style = MaterialTheme.typography.labelLarge)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(ModelsAvailabilityFilter.entries) { filter ->
-                FilterChip(
-                    selected = availabilityFilter == filter,
-                    onClick = { onAvailabilityChanged(filter) },
-                    label = { Text(filter.label) },
-                )
-            }
-        }
-        Text("Model size", style = MaterialTheme.typography.labelLarge)
+    var availabilityMenuExpanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Choose a model", style = MaterialTheme.typography.titleLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(ModelsSizeFilter.entries) { filter ->
                 FilterChip(
@@ -255,6 +228,37 @@ private fun ModelsCatalogFilters(
                     onClick = { onSizeChanged(filter) },
                     label = { Text(filter.label) },
                 )
+            }
+            item {
+                Box {
+                    FilterChip(
+                        selected = availabilityFilter != ModelsAvailabilityFilter.ALL,
+                        onClick = { availabilityMenuExpanded = true },
+                        label = {
+                            Text(
+                                if (availabilityFilter == ModelsAvailabilityFilter.ALL) {
+                                    "Filter"
+                                } else {
+                                    availabilityFilter.label
+                                },
+                            )
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = availabilityMenuExpanded,
+                        onDismissRequest = { availabilityMenuExpanded = false },
+                    ) {
+                        ModelsAvailabilityFilter.entries.forEach { filter ->
+                            DropdownMenuItem(
+                                text = { Text(filter.label) },
+                                onClick = {
+                                    availabilityMenuExpanded = false
+                                    onAvailabilityChanged(filter)
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

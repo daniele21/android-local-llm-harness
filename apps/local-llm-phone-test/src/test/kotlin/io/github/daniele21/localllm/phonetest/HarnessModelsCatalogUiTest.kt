@@ -10,9 +10,11 @@ class HarnessModelsCatalogUiTest {
     @Test
     fun catalogExposesTheThreeSupportedQwen35SizeGroups() {
         assertEquals(
-            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B", "Qwen3.5 · 4B · 4-bit only"),
+            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B", "Qwen3.5 · 4B"),
             ModelsSizeFilter.entries.mapNotNull(ModelsSizeFilter::groupLabel),
         )
+        assertEquals("All", ModelsSizeFilter.ALL.label)
+        assertEquals("4-bit variants only", ModelsSizeFilter.B4.groupSupportingText)
     }
 
     @Test
@@ -24,24 +26,39 @@ class HarnessModelsCatalogUiTest {
     }
 
     @Test
-    fun suggestedModelIsPresentedBeforeQuantizationAlternatives() {
+    fun suggestedModelIsPresentedBeforeQuantizationAlternativesAcrossVersionedReleaseIds() {
         val alternatives = listOf(
-            item("qwen35-4b-q4-k-m"),
-            item("qwen35-4b-ud-q4-k-xl"),
-            item("qwen35-4b-iq4-xs"),
+            item("qwen35-4b-q4-k-m@1.0.0"),
+            item("qwen35-4b-ud-q4-k-xl@1.0.0"),
+            item("qwen35-4b-iq4-xs@1.0.0"),
         )
 
         val ordered = orderGroupItems(ModelsSizeFilter.B4, alternatives)
 
-        assertEquals("qwen35-4b-ud-q4-k-xl", ordered.first().stableId)
+        assertEquals("qwen35-4b-ud-q4-k-xl@1.0.0", ordered.first().stableId)
+        assertTrue(ordered.first().matchesSuggestedModel(ModelsSizeFilter.B4))
         assertEquals(alternatives.map { it.stableId }.toSet(), ordered.map { it.stableId }.toSet())
     }
 
     @Test
+    fun runtimeOwnedIdentityCannotBePromotedAsCuratedStartingPoint() {
+        val runtimeItem = HarnessModelInventoryItem(
+            stableId = "qwen35-4b-ud-q4-k-xl@1.0.0",
+            displayName = "Runtime model",
+            origin = HarnessModelOrigin.RUNTIME,
+            lifecycle = HarnessModelLifecycle.LOADED,
+            loaded = true,
+        )
+
+        assertFalse(runtimeItem.matchesSuggestedModel(ModelsSizeFilter.B4))
+        assertFalse(ModelsSizeFilter.B4.matches(runtimeItem))
+    }
+
+    @Test
     fun sizeFiltersMatchOnlyTheirQwen35ParameterGroup() {
-        val compact = item("qwen35-08b-q4-k-m")
-        val capable = item("qwen35-2b-q4-k-m")
-        val fourB = item("qwen35-4b-ud-q4-k-xl")
+        val compact = item("qwen35-08b-q4-k-m@1.0.0")
+        val capable = item("qwen35-2b-q4-k-m@1.0.0")
+        val fourB = item("qwen35-4b-ud-q4-k-xl@1.0.0")
 
         assertTrue(ModelsSizeFilter.B08.matches(compact))
         assertFalse(ModelsSizeFilter.B08.matches(capable))
@@ -59,8 +76,8 @@ class HarnessModelsCatalogUiTest {
 
     @Test
     fun availabilityFiltersSeparateInstalledAndNotInstalledModels() {
-        val installed = item("qwen35-08b-q4-k-m", installed = true)
-        val available = item("qwen35-2b-q4-k-m", installed = false)
+        val installed = item("qwen35-08b-q4-k-m@1.0.0", installed = true)
+        val available = item("qwen35-2b-q4-k-m@1.0.0", installed = false)
 
         assertTrue(ModelsAvailabilityFilter.INSTALLED.matches(installed))
         assertFalse(ModelsAvailabilityFilter.INSTALLED.matches(available))
@@ -71,23 +88,23 @@ class HarnessModelsCatalogUiTest {
     }
 
     @Test
-    fun modelStatusLabelsDescribeUserFacingLifecycleState() {
+    fun variantStatusLabelsUseCompactSentenceCaseLifecycleLanguage() {
         val expected = mapOf(
-            HarnessModelLifecycle.READY_TO_DOWNLOAD to "AVAILABLE",
-            HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL to "READY TO INSTALL",
-            HarnessModelLifecycle.INSTALLED to "INSTALLED",
-            HarnessModelLifecycle.SELECTED to "SELECTED",
-            HarnessModelLifecycle.LOADED to "IN MEMORY",
-            HarnessModelLifecycle.CANCELLED to "DOWNLOAD STOPPED",
-            HarnessModelLifecycle.FAILED to "NEEDS ATTENTION",
-            HarnessModelLifecycle.DEGRADED to "NEEDS RECOVERY",
-            HarnessModelLifecycle.INCOMPATIBLE to "NOT COMPATIBLE",
+            HarnessModelLifecycle.READY_TO_DOWNLOAD to "Available",
+            HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL to "Ready to install",
+            HarnessModelLifecycle.INSTALLED to "Installed",
+            HarnessModelLifecycle.SELECTED to "Selected",
+            HarnessModelLifecycle.LOADED to "In memory",
+            HarnessModelLifecycle.CANCELLED to "Download stopped",
+            HarnessModelLifecycle.FAILED to "Needs attention",
+            HarnessModelLifecycle.DEGRADED to "Needs recovery",
+            HarnessModelLifecycle.INCOMPATIBLE to "Unavailable",
         )
 
         expected.forEach { (lifecycle, label) ->
-            assertEquals(label, modelCardStatusLabel(item("model", lifecycle = lifecycle), loading = false))
+            assertEquals(label, modelVariantStatusLabel(item("model@1.0.0", lifecycle = lifecycle), loading = false))
         }
-        assertEquals("LOADING", modelCardStatusLabel(item("model"), loading = true))
+        assertEquals("Loading", modelVariantStatusLabel(item("model@1.0.0"), loading = true))
     }
 
     @Test

@@ -42,6 +42,33 @@ fun HarnessSecondaryButton(text: String, enabled: Boolean = true, modifier: Modi
 }
 
 @Composable
+fun HarnessInlinePrimaryButton(text: String, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = HarnessMinimumTouchTarget),
+        colors =
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
+fun HarnessInlineSecondaryButton(text: String, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = HarnessMinimumTouchTarget),
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
 fun HarnessConfirmationDialog(
     title: String,
     detail: String,
