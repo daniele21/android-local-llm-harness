@@ -2,14 +2,16 @@
 
 - Status: Accepted
 - Date: 2026-09-05
-- Amended: 2026-09-06
+- Amended: 2026-09-07
 - Supersedes: trust and exported-service permission portions of ADR 0012
 
 ## Context
 
-ADR 0012 intentionally limited the first shared-runtime deployment to same-publisher, same-signing-lineage APKs protected by a signature-level Android permission. That assumption was useful for the initial Binder proof but does not match the distributed product topology: Harnex and independently developed consumer applications such as RedactGuard are separate Play applications with independent Play App Signing identities.
+ADR 0012 intentionally limited the first shared-runtime deployment to same-publisher, same-signing-lineage APKs protected by a signature-level Android permission. That assumption was useful for the initial Binder proof but does not match the intended distributed product topology: Harnex and independently developed consumer applications such as RedactGuard are separate Play applications and must remain secure even when their installed signing identities differ.
 
-A production-shaped physical-device test exposed the mismatch. The earlier emulator cross-APK evidence had signed Host and consumer with one ephemeral key, so it proved the same-signer design rather than the independently signed distribution topology.
+Deterministic release-identity integration evidence now exercises Harnex and RedactGuard with distinct signing identities. Physical Google Play Internal Testing on 2026-09-07 additionally confirmed the real current distribution topology: the Play-delivered Harnex and RedactGuard builds both report the same Play App Signing SHA-256 digest. That physical run therefore proves Consumer-first install-order reachability, explicit authorization, reconnect and real inference for the current Play topology; it does not claim distinct-signer Play evidence. The authorization design must support both topologies without relying on co-signing.
+
+A production-shaped physical-device test exposed the original permission mismatch. The earlier emulator cross-APK evidence had signed Host and consumer with one ephemeral key, so it proved the same-signer design rather than the independently signed distribution topology.
 
 The security properties that matter are not co-signing. Harnex must derive caller identity from Binder/Android, bind it to the exact installed package and signing certificate, map that identity to a Host-owned application/use-case policy, and fail closed when the identity is unknown or changes.
 
@@ -76,14 +78,14 @@ Keeping this bridge in the Host process is intentional: shell control must not d
 
 ## Consequences
 
-- Harnex and consumer APKs can be independently signed, independently installed and distributed through separate Play App Signing identities.
+- Harnex and consumer APKs can be independently signed, independently installed and distributed through separate Play applications; authorization does not depend on a shared signer.
 - Consumer-before-Host and Host-before-Consumer installation orders converge on the same Binder authorization semantics.
 - The Android manifest no longer pretends to be an authorization layer for the public inference service; exact Binder caller verification plus Harnex Control Plane policy is the security boundary.
 - An arbitrary app may reach the exported Binder object, so every privileged entry point must authenticate before expensive work and the Host binding path must remain bounded.
 - User authorization is explicit and reviewable, while package/signing identity is source-backed rather than manually asserted for known consumers.
 - Signing identity changes fail closed and require reauthorization.
-- Cross-APK validation must use distinct Host and consumer signing keys, include Consumer-before-Host installation, and include an unauthorized-before-approval negative proof.
-- Same-signer-only or Host-first-only evidence is insufficient for production readiness of independently distributed consumers.
+- Cross-APK validation must include distinct Host and consumer signing keys, Consumer-before-Host installation, and an unauthorized-before-approval negative proof.
+- Same-signer-only or Host-first-only evidence is insufficient to prove the distinct-signer authorization boundary, although same-signer Play evidence remains valid for the actual Play topology it exercised.
 - Cross-signer emulator fault injection remains test-only: ordinary test control is signature-protected, while the separate Host-process CI bridge is `DUMP`-protected and allowlisted.
 
 ## Compatibility
@@ -101,7 +103,7 @@ Deterministic evidence must prove at least:
 - the public service is exported for explicit binding and has no custom bind permission;
 - the Consumer does not require a custom Harnex permission;
 - a Consumer installed before Harnex can reach the Binder boundary after Harnex installation;
-- independently signed Host and consumer APKs have different certificate digests;
+- independently signed Host and consumer APKs have different certificate digests in the distinct-signer validation lane;
 - the independent consumer is denied by Binder/Control Plane authorization before explicit Harnex authorization;
 - Harnex observes the exact installed consumer signer and persists it as pending;
 - explicit authorization promotes that exact identity and enables its reviewed use case;
@@ -111,7 +113,7 @@ Deterministic evidence must prove at least:
 - production variants do not expose emulator-only control surfaces;
 - cross-signer emulator control reaches only the `emulatorE2e` Host's bounded `DUMP`-protected shell bridge, while the ordinary fault receiver remains separately signature-protected.
 
-Physical Play Internal testing remains required before a stable promotion claim because Play App Signing identity is the real distribution environment that exposed the original assumption gap.
+Physical Play Internal testing remains required before a stable promotion claim because Play App Signing is the real distribution environment that exposed the original assumption gap. The 2026-09-07 physical run satisfies the install-order/authorization/connectivity/runtime check for the current Play-delivered topology and records its actual signing identities. It does not substitute for deterministic distinct-signer coverage or other exact-release-candidate physical gates.
 
 ## Relationship to earlier ADRs
 
