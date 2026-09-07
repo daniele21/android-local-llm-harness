@@ -21,7 +21,9 @@ This is the operational ledger for integrated state, blockers and immediate work
 
 ### Runtime, product and control plane
 
-Harnex has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, verified GGUF installation, model/generation lifecycle, cancellation, scheduling, memory-pressure handling, model-aware planning, output constraints and presets. Product support is curated Qwen3.5 dense 0.8B/2B plus the reviewed 4B **4-bit-only** candidate tier; the 4B artifacts remain `CANDIDATE` pending exact-artifact representative-device runtime, memory, thermal and output-quality evidence. Q35-6 still needs representative-device tuning evidence.
+Harnex has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, verified GGUF installation, model/generation lifecycle, cancellation, scheduling, memory-pressure handling, model-aware planning, output constraints and presets. Product support is curated Qwen3.5 dense 0.8B/2B plus the reviewed 4B **4-bit-only** candidate tier; the 4B artifacts remain `CANDIDATE` pending exact-artifact representative-device runtime, memory, thermal and output-quality evidence.
+
+A host-owned physical acceptance run on Samsung `SM-A566B` now proves the exact curated Qwen3.5 2B `Q4_K_M` artifact through the production Android/JNI/backend path with generation, active cancellation, five load/generate/unload cycles, bounded PSS growth and thermal capture. The run recorded TTFT `779 ms`, PSS growth `1,516 KB` and thermal `0 -> 0`. Its one-token sanity completion is not treated as representative decode-throughput evidence. Broader Q35-6 tuning, sustained performance, memory-pressure/switching and the 4B candidate tier remain open where separately required.
 
 `apps/local-llm-phone-test` exposes Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings. Applications control-plane work is complete through ACUX-80 and CPREC-10..70; broader representative-device UX/runtime evidence remains.
 
@@ -42,9 +44,9 @@ Exact automated evidence is green for both cross-app paths:
 - Consumer-first install -> Host absent -> later Harnex install without RedactGuard reinstall -> `PENDING` -> exact Harnex authorization -> Connect / Disconnect / Reconnect -> replacement signer denied as `SIGNATURE_CHANGED`;
 - the complete Two-APK product/lifecycle/fault matrix, including ViewModel/Home continuity and Binder cancellation/process-loss/critical-pressure handling.
 
-The tested Harnex source candidate is tree-equivalent to the integrated Harnex `dev` merge commit. RedactGuard's normal FULL validation also resolves the public alpha.11 artifact rather than relying on a source-candidate override.
+The release-package topology lane additionally exercises the production Harnex package identity with a distinct-signer consumer and proves fail-closed authorization plus observed signer replacement under deterministic emulator control. Applications and Application detail re-project source-observed package/signer identity on foreground resume so stale persisted authorization cannot overstate effective access.
 
-Both current Harnex and RedactGuard candidates have been published successfully to Google Play Internal Testing. Actual Play App Signing identity confirmation and the focused install-order/authorization/connectivity retest remain REAL_ENVIRONMENT evidence and are not inferred from emulator CI or successful upload alone.
+Both current Harnex and RedactGuard candidates were published to Google Play Internal Testing and were physically exercised on 2026-09-07 with RedactGuard installed first, Harnex installed later without reinstalling RedactGuard, `PENDING` observation, explicit Harnex authorization, Connect / Disconnect / Reconnect and real consumer inference. Google Play Console reported the same Play App Signing SHA-256 digest for both current applications: `D6:2D:3C:C8:51:D5:72:05:C3:42:C1:7F:86:26:40:58:E3:FE:29:6A:AE:1B:0E:43:FD:AC:58:82:24:44:1A:BD`. This closes the focused physical install-order/authorization/connectivity check for the current Play topology; distinct-signer behavior remains proved by deterministic release-identity E2E rather than by these same-signer Play builds.
 
 ### Consumer API, OMBRA, evaluation and audit
 
@@ -54,13 +56,13 @@ Local inference Activity/audit is integrated under ADR 0017: accepted inference 
 
 ## Open blockers
 
-### 1. Physical Play signer and install-order confirmation
+### 1. Exact release-candidate identity and remaining SR-6 physical gates
 
-Automated independent-signer and Two-APK evidence is complete. Stable release promotion still requires the focused physical Play Internal retest with the actual Harnex and RedactGuard Play App Signing identities: install RedactGuard first, install Harnex later without reinstalling RedactGuard, confirm `PENDING`, authorize the observed identity in Harnex, then verify Connect / Disconnect / Reconnect and fail-closed signer identity behavior where practical.
+The focused Play Internal install-order/authorization/connectivity retest is complete for the actual current Play App Signing topology. Stable promotion still requires the applicable Harness 0.5 release record to bind the final candidate source/build identity to the installed release artifact and to close any remaining SR-6 physical gates required by [`releases/harness-0.5.md`](releases/harness-0.5.md). The current same-signer Play topology must not be relabeled as physical distinct-signer evidence; that security boundary remains covered by deterministic release-identity integration evidence.
 
-### 2. Representative Android runtime evidence
+### 2. Remaining representative Android runtime evidence
 
-LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence.
+The Samsung `SM-A566B` Qwen3.5 2B `Q4_K_M` physical acceptance closes exact-artifact generation, cancellation, repeated load/generate/unload bounded-memory sanity and thermal capture for that run. Remaining release/runtime evidence includes the applicable exact-release-source binding, LOW_MEMORY and cross-model/lifecycle gates, sustained cold/warm performance/resource measurements where claimed, and any other release-checklist physical observations not covered by this single-model run. The 4B 4-bit candidate tier remains explicitly uncertified until exact-artifact representative-device runtime, memory, thermal and output-quality evidence is recorded.
 
 ### 3. OMBRA and follow-on work
 
@@ -68,15 +70,17 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 
 ## Immediate next block
 
-1. run the focused physical Play Internal independent-signer/install-order authorization retest against the published Harnex and RedactGuard candidates;
-2. once that release evidence is recorded, run RELEASE/FULL promotion validation and promote reconciled `dev` to stable `main`;
-3. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator evidence as physical proof.
+1. integrate the reconciled Play and Qwen3.5 2B physical evidence into the current `dev` baseline;
+2. run a fresh release-gap review plus RELEASE/FULL validation against that exact `dev`, then execute only the remaining blocking real-environment gates required by the Harness 0.5 checklist;
+3. promote reconciled `dev` to stable `main` only after those exact-candidate release gates pass; sustained public benchmarking and 4B candidate qualification continue as separate evidence work rather than being inferred from the 2B lifecycle run.
 
 ## Source links
 
 - Consumer SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Independent consumer authorization: [`adr/0018-independently-signed-consumer-authorization.md`](adr/0018-independently-signed-consumer-authorization.md)
+- Play physical evidence: [`evidence/play-internal-2026-09-07.md`](evidence/play-internal-2026-09-07.md)
+- Qwen3.5 2B physical evidence: [`qwen35/evidence/2026-09-07-sm-a566b-qwen35-2b-q4-k-m-physical-acceptance.md`](qwen35/evidence/2026-09-07-sm-a566b-qwen35-2b-q4-k-m-physical-acceptance.md)
 - Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
 - Local inference audit: [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md), [`adr/0017-durable-local-inference-audit.md`](adr/0017-durable-local-inference-audit.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)

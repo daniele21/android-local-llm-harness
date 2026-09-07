@@ -5,7 +5,7 @@ Document type: roadmap
 Owner: repository
 Canonical scope: roadmap.repository
 Read when: selecting a capability milestone or understanding deferred product direction
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-07
 
 This file tracks capability-level milestones and remaining outcomes. Active branch/PR state and the next implementation task belong in [`current-state.md`](current-state.md).
 
@@ -30,11 +30,11 @@ Broad device/runtime production claims still require representative physical-dev
 | Native Android SDK integration | Planned | Stable consumer adapter over embedded contracts |
 | Capacitor plugin | Planned | Thin bridge after native adapter stabilization |
 | Cross-application diagnostics bridge | Planned | Signature-protected read/control surface |
-| Shared Binder/AIDL runtime | Implemented / physical evidence pending | Formal ARM64/signer/resource evidence; automated lifecycle/fault matrix complete |
+| Shared Binder/AIDL runtime | Implemented / physical evidence pending | Formal ARM64/model/resource evidence; automated lifecycle/fault matrix and current Play install-order smoke complete |
 
 ## Priority order across active plans
 
-- **P0 — evidence/certification lane:** complete the remaining representative physical gates: focused Play signer/install-order confirmation, LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 release evidence. The current Harnex/RedactGuard alpha.11 candidates are integrated on `dev` and published to Play Internal; stable promotion waits on the applicable release evidence. A new llama.cpp pin may preempt only for correctness/security.
+- **P0 — evidence/certification lane:** the focused current-topology Play signer/install-order smoke is recorded; complete the remaining representative physical gates for LAS-07, OMB-6B/OMB-8, Q35-6/Q35-7, MEM-7/MEM-8, SR-6 and Harness 0.5 exact-release evidence. The current Harnex/RedactGuard alpha.11 candidates are integrated on `dev` and published to Play Internal; stable promotion waits only on the applicable release evidence rather than repeating the completed Play smoke. A new llama.cpp pin may preempt only for correctness/security.
 - **P1 — safe parallel hardening:** upstream qualification, backend capability/effective-plan telemetry, prompt-token reuse and bounded CPU measurements may proceed with disjoint ownership. RA-4/5/7/9/10 and model evaluation remain separate owners.
 - **P2 — post-CPU-evidence execution expansion:** Adreno OpenCL, kernel caching, K/V cache experiments, evaluation-only multi-sequence execution and deterministic device-plan evolution start after the CPU baseline is evidence-stable or on an explicit experimental lane.
 - **P3 — research:** Hexagon/HTP and broader heterogeneous execution remain deferred until CPU/OpenCL ownership, packaging and evidence are understood.
@@ -82,7 +82,7 @@ Remaining:
 
 - complete Q35-6/7/8 tuning, validation and certification while preserving model-family-neutral lifecycle contracts;
 - product-facing RAM load/unload controls;
-- representative device cancellation, memory, latency, throughput and thermal evidence;
+- complete remaining representative-device cancellation, memory, latency, throughput and thermal evidence beyond the recorded 2B Q4_K_M lifecycle sanity run;
 - promote measured memory/runtime profiles only from compatible exact evidence;
 - select performance policy from device evidence rather than desktop assumptions;
 - execute bounded llama.cpp efficiency/hardware work without reopening validated Qwen3.5 behavior from generic API availability.
@@ -169,11 +169,12 @@ Implemented:
 - typed Settings, request-timeline, Activity list/detail and model-detail routes;
 - privacy-safe model inventory, diagnostics and validation reports;
 - Google Play Internal Testing publication for the current integrated candidate;
-- independently signed Consumer authorization and install-order-safe Host binding.
+- independently signed Consumer authorization and install-order-safe Host binding;
+- physical Play Internal Consumer-first/install-order/authorization/connectivity smoke for the current Play App Signing topology.
 
 Remaining:
 
-- focused physical Play signer/install-order confirmation for the current release candidate;
+- bind any final stable-release claim to the exact release candidate/source and installed Play artifact rather than inferring it from the earlier physical smoke;
 - migrate remaining Overview, Diagnostics and Settings state/effects from `MainActivity` where still owned there;
 - complete process recreation, state restoration and Back-stack evidence;
 - complete Compose state, screenshot, accessibility, large-font, landscape and expanded-layout matrices;
@@ -198,12 +199,12 @@ These integrations must not duplicate runtime policy or create a second model st
 
 Integrated capabilities include Binder/AIDL shared runtime, version/feature negotiation, signer-aware access control, reconnect/client-death handling, durable logical jobs, packaged Consumer API boundaries, Harnex-owned inference Activity/audit and the OMBRA reference flow.
 
-Automated lifecycle convergence is complete for the current topology: Consumer SDK `0.1.0-alpha.11` is publicly published, RedactGuard consumes it, Harnex and RedactGuard are independently signed in E2E, Consumer-first installation is covered, `PENDING`/explicit authorization is fail-closed, Connect / Disconnect / Reconnect is exercised, signer replacement is denied, and the complete API 35 Two-APK lifecycle/fault matrix is green. Both current candidates are published to Google Play Internal Testing.
+Automated lifecycle convergence is complete for the current topology: Consumer SDK `0.1.0-alpha.11` is publicly published, RedactGuard consumes it, Harnex and RedactGuard are independently signed in E2E, Consumer-first installation is covered, `PENDING`/explicit authorization is fail-closed, Connect / Disconnect / Reconnect is exercised, signer replacement is denied, and the complete API 35 Two-APK lifecycle/fault matrix is green. Both current candidates are published to Google Play Internal Testing. The current Play-delivered topology also passed the focused physical Consumer-first/install-order/authorization/connectivity smoke; both current Play applications report the same Play App Signing identity, so distinct-signer Play behavior is not inferred from that run.
 
 Remaining:
 
-- focused physical Play App Signing identity plus Consumer-first/install-order/authorization confirmation for the current candidate;
-- SR-6/LAS-07 formal physical ARM64/model/resource evidence where required;
+- SR-6/LAS-07 formal exact-candidate physical ARM64/model/resource evidence where required;
+- preserve deterministic release-identity E2E as the distinct-signer proof until a genuinely distinct-signer Play topology is physically exercised;
 - OMB-6B identity/launcher closure;
 - OMB-8 exact-model quality and representative physical document-workflow evidence;
 - signature-protected cross-application diagnostics only if separately justified;
@@ -243,4 +244,4 @@ Deferred until the CPU embedded path and release evidence are stable:
 
 ## Release boundary
 
-The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The current Harnex/RedactGuard alpha.11 integration baseline is validated on `dev` and published to Play Internal; RELEASE/FULL promotion to stable `main` remains gated by the applicable focused physical Play signer/install-order evidence plus any broader representative physical claims explicitly required by the release checklist.
+The active Harness 0.5.0 checklist is [`releases/harness-0.5.md`](releases/harness-0.5.md). The current Harnex/RedactGuard alpha.11 integration baseline is validated on `dev`, published to Play Internal and has focused current-topology physical install-order/authorization/connectivity evidence. RELEASE/FULL promotion to stable `main` remains gated by exact-release-candidate identity and the remaining applicable representative physical claims explicitly required by the release checklist.
