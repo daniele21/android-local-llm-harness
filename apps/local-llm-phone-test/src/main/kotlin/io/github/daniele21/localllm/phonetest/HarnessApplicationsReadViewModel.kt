@@ -31,6 +31,11 @@ internal sealed interface HarnessApplicationsMutationState {
     data class Failed(val message: String) : HarnessApplicationsMutationState
 }
 
+internal enum class HarnessApplicationsRefreshMode {
+    EXPLICIT,
+    OBSERVED_IDENTITY,
+}
+
 internal class HarnessApplicationsReadViewModel : ViewModel() {
     private val mutableState = MutableStateFlow<HarnessApplicationsReadState>(HarnessApplicationsReadState.Loading)
     private val mutableMutationState = MutableStateFlow<HarnessApplicationsMutationState>(HarnessApplicationsMutationState.Idle)
@@ -53,15 +58,21 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
         mutableMutationState.value = HarnessApplicationsMutationState.Idle
     }
 
-    fun refresh() {
+    fun refresh(mode: HarnessApplicationsRefreshMode = HarnessApplicationsRefreshMode.EXPLICIT) {
+        val observedIdentityRefresh = mode == HarnessApplicationsRefreshMode.OBSERVED_IDENTITY
+        if (observedIdentityRefresh && mutableState.value !is HarnessApplicationsReadState.Loaded) return
+        if (observedIdentityRefresh && mutableMutationState.value == HarnessApplicationsMutationState.Saving) return
+
         val attached = gateway
         if (attached == null) {
             mutableState.value = HarnessApplicationsReadState.Failed("Applications source is unavailable")
             return
         }
         val token = generation.incrementAndGet()
-        mutableMutationState.value = HarnessApplicationsMutationState.Idle
-        mutableState.value = HarnessApplicationsReadState.Loading
+        if (!observedIdentityRefresh) {
+            mutableMutationState.value = HarnessApplicationsMutationState.Idle
+            mutableState.value = HarnessApplicationsReadState.Loading
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching(attached::snapshot)
             if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch

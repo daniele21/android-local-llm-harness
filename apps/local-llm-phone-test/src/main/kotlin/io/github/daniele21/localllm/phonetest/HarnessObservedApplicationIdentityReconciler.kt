@@ -9,8 +9,8 @@ import io.github.daniele21.localllm.models.HostControlPlaneStore
  * Refreshes source-backed package/signing identity before Binder authorization.
  *
  * PackageManager observation is never authority by itself: a new independent consumer remains PENDING and an
- * observed signer replacement becomes SIGNATURE_CHANGED. The transaction runs only when the pure reconciliation
- * detects an actual state change, keeping the normal per-call authorization path read-only.
+ * observed signer replacement becomes SIGNATURE_CHANGED. Read-only surfaces may preview that same canonical
+ * reconciliation without persisting it; explicit authorization and Binder authorization persist it first.
  */
 internal class HarnessObservedApplicationIdentityReconciler(
     private val store: HostControlPlaneStore,
@@ -27,31 +27,36 @@ internal class HarnessObservedApplicationIdentityReconciler(
         epochClock = epochClock,
     )
 
+    /** Returns the source-observed identity projection without mutating the persisted Control Plane. */
+    fun previewCurrentState(): HostControlPlaneState = reconcile(store.snapshot(), epochClock()).state
+
     fun reconcileIfNeeded(): HostControlPlaneState {
         val observedAtEpochMs = epochClock()
-        val reconciler =
-            HarnessControlPlaneReconciler(
-                HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(observedPolicies()),
-            )
-        val current = store.snapshot()
-        return when (val preview = reconciler.reconcile(current, observedAtEpochMs)) {
-            is HarnessControlPlaneReconciliationResult.Conflict ->
-                throw HarnessControlPlaneStartupConflictException(preview.code, preview.identity)
-
-            is HarnessControlPlaneReconciliationResult.Success -> {
-                if (!preview.changed) {
-                    preview.state
-                } else {
-                    store.transact { latest ->
-                        when (val result = reconciler.reconcile(latest, observedAtEpochMs)) {
-                            is HarnessControlPlaneReconciliationResult.Success -> result.state
-
-                            is HarnessControlPlaneReconciliationResult.Conflict ->
-                                throw HarnessControlPlaneStartupConflictException(result.code, result.identity)
-                        }
-                    }
-                }
-            }
+        val reconciler = reconciler()
+        val preview = reconcile(reconciler, store.snapshot(), observedAtEpochMs)
+        return if (!preview.changed) {
+            preview.state
+        } else {
+            store.transact { latest -> reconcile(reconciler, latest, observedAtEpochMs).state }
         }
     }
+
+    private fun reconcile(current: HostControlPlaneState, observedAtEpochMs: Long): HarnessControlPlaneReconciliationResult.Success =
+        reconcile(reconciler(), current, observedAtEpochMs)
+
+    private fun reconcile(
+        reconciler: HarnessControlPlaneReconciler,
+        current: HostControlPlaneState,
+        observedAtEpochMs: Long,
+    ): HarnessControlPlaneReconciliationResult.Success = when (val result = reconciler.reconcile(current, observedAtEpochMs)) {
+        is HarnessControlPlaneReconciliationResult.Success -> result
+        is HarnessControlPlaneReconciliationResult.Conflict -> throw conflict(result)
+    }
+
+    private fun reconciler(): HarnessControlPlaneReconciler = HarnessControlPlaneReconciler(
+        HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(observedPolicies()),
+    )
+
+    private fun conflict(result: HarnessControlPlaneReconciliationResult.Conflict) =
+        HarnessControlPlaneStartupConflictException(result.code, result.identity)
 }

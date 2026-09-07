@@ -25,11 +25,6 @@ class HarnessSharedRuntimeService : Service() {
         runtimeGraph = HarnessRuntimeGraph.from(this)
         val resolvedWarmRetention = HarnessResolvedWarmRetentionCoordinator.from(runtimeGraph)
         val policies = runtimeGraph.authorizedClientPolicies
-        val observedIdentityReconciler =
-            HarnessObservedApplicationIdentityReconciler(
-                context = this,
-                store = runtimeGraph.controlPlaneStore,
-            )
         val controlPlaneHost =
             HarnessWarmRetentionAwareControlPlaneHost(
                 delegate =
@@ -53,7 +48,7 @@ class HarnessSharedRuntimeService : Service() {
                 permissionName = null,
                 policies = policies,
                 policySource = {
-                    observedIdentityReconciler.reconcileIfNeeded()
+                    runtimeGraph.controlPlaneStore.reconcileObservedIdentityIfNeeded()
                     runtimeGraph.liveAuthorizedClientPolicies()
                 },
                 hostBuildId = "phone-test-${BuildConfig.VERSION_NAME}",

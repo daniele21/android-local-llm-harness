@@ -19,6 +19,15 @@ val phoneTestUploadSigningPartiallyConfigured =
     phoneTestUploadSigningEnvironment.values.any { !it.isNullOrBlank() } && !phoneTestUploadSigningConfigured
 val allowUnsignedRelease =
     System.getenv("LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE").equals("true", ignoreCase = true)
+val releaseIdentityE2e =
+    providers
+        .gradleProperty("releaseIdentityE2e")
+        .orNull
+        ?.trim()
+        ?.let { raw ->
+            raw.toBooleanStrictOrNull()
+                ?: throw GradleException("releaseIdentityE2e must be true or false")
+        } ?: false
 
 gradle.taskGraph.whenReady {
     val packagesPhoneTestRelease =
@@ -115,8 +124,10 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            if (!releaseIdentityE2e) {
+                applicationIdSuffix = ".debug"
+            }
+            versionNameSuffix = if (releaseIdentityE2e) "-release-identity-e2e" else "-debug"
             ndk {
                 abiFilters += "arm64-v8a"
             }

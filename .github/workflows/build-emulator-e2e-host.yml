@@ -7,12 +7,22 @@ on:
         description: Exact Harness commit to package
         required: true
         type: string
+      release_identity_topology:
+        description: Build testable emulator artifacts with the production Harnex application ID
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       harness_ref:
         description: Exact Harness commit to package
         required: true
         type: string
+      release_identity_topology:
+        description: Build testable emulator artifacts with the production Harnex application ID
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -27,7 +37,7 @@ jobs:
       - name: Checkout exact Harness source
         uses: actions/checkout@v7
         with:
-          repository: daniele21/android-local-llm-harness
+          repository: daniele21/harnex
           ref: ${{ inputs.harness_ref }}
           fetch-depth: 1
           submodules: recursive
@@ -70,10 +80,17 @@ jobs:
 
       - name: Build emulator host and Host-owned authorization instrumentation
         shell: bash
+        env:
+          RELEASE_IDENTITY_TOPOLOGY: ${{ inputs.release_identity_topology }}
         run: |
           set -euo pipefail
           chmod +x gradlew
+          topology_args=()
+          if [[ "$RELEASE_IDENTITY_TOPOLOGY" == "true" ]]; then
+            topology_args+=("-PreleaseIdentityE2e=true")
+          fi
           ./gradlew --no-configuration-cache \
+            "${topology_args[@]}" \
             :apps:local-llm-phone-test:assembleEmulatorE2e \
             :apps:local-llm-phone-test:assembleDebugAndroidTest
 
@@ -89,6 +106,8 @@ jobs:
 
       - name: Stage bounded emulator candidate artifact
         shell: bash
+        env:
+          RELEASE_IDENTITY_TOPOLOGY: ${{ inputs.release_identity_topology }}
         run: |
           set -euo pipefail
           host_apk="$(find apps/local-llm-phone-test/build/outputs/apk -type f -name '*.apk' -path '*emulatorE2e*' | head -n 1)"
@@ -100,6 +119,23 @@ jobs:
           test -s build/consumer-sdk-repository/SHA256SUMS
           cmp -s "$RUNNER_TEMP/harness-source-revision.txt" "$RUNNER_TEMP/consumer-sdk-source-revision.txt"
 
+          if [[ "$RELEASE_IDENTITY_TOPOLOGY" == "true" ]]; then
+            expected_host_package="io.github.daniele21.localllm.phonetest"
+          else
+            expected_host_package="io.github.daniele21.localllm.phonetest.debug"
+          fi
+          expected_test_package="${expected_host_package}.test"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          package_name() {
+            "$aapt" dump badging "$1" \
+              | sed -n "s/^package: name='\([^']*\)'.*/\1/p" \
+              | head -n 1
+          }
+          actual_host_package="$(package_name "$host_apk")"
+          actual_test_package="$(package_name "$host_test_apk")"
+          test "$actual_host_package" = "$expected_host_package"
+          test "$actual_test_package" = "$expected_test_package"
+
           mkdir -p "$RUNNER_TEMP/harness-emulator-host"
           cp "$host_apk" "$RUNNER_TEMP/harness-emulator-host/harness-emulator-e2e.apk"
           cp "$host_test_apk" "$RUNNER_TEMP/harness-emulator-host/harness-debug-androidTest.apk"
@@ -107,6 +143,8 @@ jobs:
           cp "$RUNNER_TEMP/consumer-sdk-version.txt" "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-version.txt"
           cp "$RUNNER_TEMP/consumer-sdk-source-revision.txt" \
             "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-source-revision.txt"
+          printf '%s\n' "$actual_host_package" > "$RUNNER_TEMP/harness-emulator-host/host-package.txt"
+          printf '%s\n' "$actual_test_package" > "$RUNNER_TEMP/harness-emulator-host/host-test-package.txt"
           cp -R build/consumer-sdk-repository \
             "$RUNNER_TEMP/harness-emulator-host/consumer-sdk-repository"
           sha256sum \

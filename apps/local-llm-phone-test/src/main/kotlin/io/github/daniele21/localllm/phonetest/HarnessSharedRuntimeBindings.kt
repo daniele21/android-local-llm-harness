@@ -24,6 +24,8 @@ internal object HarnessSharedRuntimeBindings {
     val ombraDefaultPreset =
         InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
 
+    const val HOST_RELEASE_PACKAGE = "io.github.daniele21.localllm.phonetest"
+    const val HOST_DEBUG_PACKAGE = "io.github.daniele21.localllm.phonetest.debug"
     const val CONSOLE_RELEASE_PACKAGE = "io.github.daniele21.localllm.console"
     const val CONSOLE_DEBUG_PACKAGE = "io.github.daniele21.localllm.console.debug"
     const val CONSOLE_INTERNAL_PACKAGE = "io.github.daniele21.localllm.console.internal"
@@ -34,6 +36,18 @@ internal object HarnessSharedRuntimeBindings {
     val consoleUseCases: Set<UseCaseId> = setOf(consoleUseCaseId, ombraUseCaseId)
     val redactGuardUseCases: Set<UseCaseId> = setOf(ombraUseCaseId)
     val piiConsumerApplicationIds: Set<ApplicationId> = setOf(consoleApplicationId, redactGuardApplicationId)
+
+    /**
+     * Selects peer package identities from the exact installed Host package, not from debuggability.
+     *
+     * The release-identity emulator topology is intentionally debuggable while using the production Host package.
+     * Treating BuildConfig.DEBUG as package identity would make that topology observe the wrong consumer package.
+     */
+    fun usesDebugClientPackageTopology(hostPackageName: String): Boolean = when (hostPackageName) {
+        HOST_DEBUG_PACKAGE -> true
+        HOST_RELEASE_PACKAGE -> false
+        else -> error("Unsupported Harnex host package identity: $hostPackageName")
+    }
 
     fun consolePackages(debugHost: Boolean): Set<String> = if (debugHost) {
         setOf(CONSOLE_DEBUG_PACKAGE, CONSOLE_INTERNAL_PACKAGE)
