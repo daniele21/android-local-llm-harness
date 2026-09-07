@@ -13,6 +13,7 @@ This is the documentation entry point for users, integrators and contributors. S
 
 | I want to… | Start here | Then |
 | --- | --- | --- |
+| Understand durable product mission, users, outcomes and decision boundaries | [`product.md`](product.md) | [`.engineering/product.json`](../.engineering/product.json) and `skills/shape-product-change/SKILL.md` for change routing |
 | Run Harnex on Android | [`android-build-and-run.md`](android-build-and-run.md) | [`device-e2e-testing.md`](device-e2e-testing.md) for physical-device validation |
 | Integrate Harnex into another Android app | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) | [`shared-runtime/README.md`](shared-runtime/README.md) for the Host/Consumer model |
 | Understand the architecture | [`architecture.md`](architecture.md) | [`adr/README.md`](adr/README.md) for durable decisions |
@@ -25,8 +26,9 @@ This is the documentation entry point for users, integrators and contributors. S
 
 ## Core documentation
 
-### Architecture and public boundaries
+### Product, architecture and public boundaries
 
+- [`product.md`](product.md) — durable product mission, primary consumers, owned problems, differentiation, non-goals, product principles, quality promises and success signals.
 - [`architecture.md`](architecture.md) — system ownership, runtime/control-plane/backend boundaries.
 - [`adr/README.md`](adr/README.md) — accepted architecture decisions.
 - [`shared-runtime/README.md`](shared-runtime/README.md) — shared Host/Consumer runtime model.
@@ -90,6 +92,7 @@ A normal operational change may therefore report `README_IDENTITY: N/A` and `REA
 
 | Question | Canonical source |
 | --- | --- |
+| What product is Harnex trying to be, for whom and with which durable boundaries? | [`product.md`](product.md) |
 | What is Harnex and why should I care? | root README identity sections |
 | How do I run/use/integrate Harnex? | root README usage + focused runbooks/API docs |
 | Integrated state and blockers | [`current-state.md`](current-state.md) |
