@@ -18,7 +18,7 @@ internal fun NavGraphBuilder.installApplicationsListRoute(
 ) {
     composable(HarnessDestination.APPS.route) {
         val applicationsViewModel = activityApplicationsViewModel()
-        HarnessObservedIdentityRefreshEffect(applicationsViewModel)
+        harnessObservedIdentityRefreshEffect(applicationsViewModel)
         HarnessApplicationsScreen(
             state = state,
             onRefresh = callbacks.onRefresh,
@@ -47,7 +47,7 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
         ),
     ) { entry ->
         val applicationsViewModel = activityApplicationsViewModel()
-        HarnessObservedIdentityRefreshEffect(applicationsViewModel)
+        harnessObservedIdentityRefreshEffect(applicationsViewModel)
         val applicationId = HarnessApplicationRoutes.decodeApplicationId(
             entry.arguments?.getString(HarnessApplicationRoutes.APPLICATION_ID_ARGUMENT),
         )
@@ -139,7 +139,7 @@ internal fun NavGraphBuilder.installAssignmentRoute(
 }
 
 @Composable
-private fun HarnessObservedIdentityRefreshEffect(viewModel: HarnessApplicationsReadViewModel) {
+private fun harnessObservedIdentityRefreshEffect(viewModel: HarnessApplicationsReadViewModel) {
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
