@@ -44,7 +44,9 @@ Exact automated evidence is green for both cross-app paths:
 
 The tested Harnex source candidate is tree-equivalent to the integrated Harnex `dev` merge commit. RedactGuard's normal FULL validation also resolves the public alpha.11 artifact rather than relying on a source-candidate override.
 
-Both current Harnex and RedactGuard candidates have been published successfully to Google Play Internal Testing. A focused physical Play Internal retest on representative Android hardware has now confirmed the Consumer-first install order with the Play-delivered builds: RedactGuard was installed first, Harnex was installed later without reinstalling RedactGuard, the consumer appeared `PENDING`, explicit Harnex authorization succeeded, Connect / Disconnect / Reconnect succeeded, and real consumer inference completed successfully. This closes the focused Play install-order/authorization/connectivity blocker. It does not replace the broader SR-6, JNI/GGUF, memory, thermal or representative-device release evidence still listed below.
+Both current Harnex and RedactGuard candidates have been published successfully to Google Play Internal Testing. A focused physical Play Internal retest on representative Android hardware confirmed the Consumer-first install order with the Play-delivered builds: RedactGuard was installed first, Harnex was installed later without reinstalling RedactGuard, the consumer appeared `PENDING`, explicit Harnex authorization succeeded, Connect / Disconnect / Reconnect succeeded, and real consumer inference completed successfully.
+
+The actual Play App Signing SHA-256 digest reported for both installed applications is the same identity: `D6:2D:3C:C8:51:D5:72:05:C3:42:C1:7F:86:26:40:58:E3:FE:29:6A:AE:1B:0E:43:FD:AC:58:82:24:44:1A:BD`. This means the physical Play run closes install-order, pending/authorization, connectivity and real-inference behavior for the current Play deployment, but it does **not** constitute physical evidence of distinct Play signing identities. Independent-signer semantics remain proven by deterministic cross-app automation; a physical Play claim for independently signed Host and consumer remains pending until a Play-delivered consumer with a distinct App Signing digest is exercised.
 
 ### Consumer API, OMBRA, evaluation and audit
 
@@ -58,11 +60,15 @@ Local inference Activity/audit is integrated under ADR 0017: accepted inference 
 
 LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence.
 
-### 2. Harness 0.5 physical release evidence
+### 2. Physical Play independent-signer evidence
 
-The focused Play install-order/authorization/connectivity retest is complete, but Harness 0.5 still requires the applicable physical lifecycle and SR-6 evidence from [`releases/harness-0.5.md`](releases/harness-0.5.md): exact release identity, real JNI/GGUF execution, cancellation, repeated lifecycle/memory behavior, cold/warm performance, thermal/resource snapshots and the remaining shared-runtime physical evidence. These gates must be recorded rather than inferred from the successful product smoke test.
+The current Harnex and RedactGuard Internal Testing builds report the same Play App Signing SHA-256 identity, so the physical run cannot close ADR 0018's distinct-Play-signer distribution proof. The current Play deployment has passed Consumer-first installation, `PENDING` discovery, explicit authorization, Connect / Disconnect / Reconnect and real inference. A future Play-delivered consumer signed with a different App Signing identity is required only for a physical claim that Harnex has been demonstrated with independently signed Play applications.
 
-### 3. OMBRA and follow-on work
+### 3. Harness 0.5 physical release evidence
+
+The focused Play install-order/authorization/connectivity retest is complete for the actual current Play signing topology, but Harness 0.5 still requires the applicable physical lifecycle and SR-6 evidence from [`releases/harness-0.5.md`](releases/harness-0.5.md): exact release identity, real JNI/GGUF execution, cancellation, repeated lifecycle/memory behavior, cold/warm performance, thermal/resource snapshots and the remaining shared-runtime physical evidence. These gates must be recorded rather than inferred from the successful product smoke test.
+
+### 4. OMBRA and follow-on work
 
 OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration identities against policy v1. Model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP continue independently where ownership does not conflict.
 
@@ -70,8 +76,9 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 
 1. capture representative physical ARM64/GGUF/runtime/resource evidence for the exact current candidate, starting with the release/Q35/SR-6 measurements that can share one controlled device run;
 2. record exact model/runtime/device identities plus cold/warm TTFT, throughput, memory, thermal and lifecycle/cancellation evidence without promoting broader claims beyond the captured proof;
-3. once the applicable Harness 0.5 release gates are complete, run RELEASE/FULL promotion validation and promote the reconciled `dev` candidate to stable `main`;
-4. continue OMBRA/model-evaluation work independently where ownership does not conflict.
+3. decide separately whether Harness 0.5 requires a physical distinct-Play-signer proof or whether that remains an explicit later compatibility gate beyond the current same-signer Play deployment;
+4. once the applicable Harness 0.5 release gates are complete, run RELEASE/FULL promotion validation and promote the reconciled `dev` candidate to stable `main`;
+5. continue OMBRA/model-evaluation work independently where ownership does not conflict.
 
 ## Source links
 
