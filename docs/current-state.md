@@ -44,7 +44,9 @@ Exact automated evidence is green for both cross-app paths:
 
 The tested Harnex source candidate is tree-equivalent to the integrated Harnex `dev` merge commit. RedactGuard's normal FULL validation also resolves the public alpha.11 artifact rather than relying on a source-candidate override.
 
-Both current Harnex and RedactGuard candidates have been published successfully to Google Play Internal Testing. Actual Play App Signing identity confirmation and the focused install-order/authorization/connectivity retest remain REAL_ENVIRONMENT evidence and are not inferred from emulator CI or successful upload alone.
+Both Harnex and RedactGuard candidates were published successfully to Google Play Internal Testing. The focused physical Play Internal release retest has now been operator-confirmed on the current Play-distributed pair: RedactGuard-first / Harnex-later without reinstall, source-observed `PENDING`, exact Harnex authorization, Connect / Disconnect / Reconnect and representative production Binder/runtime use all behaved as intended. The operator also confirmed the current Play-installed applications use independent signing identities. Exact certificate digest values remain release-evidence metadata and are not duplicated in this operational ledger.
+
+The commits added after the published/runtime-qualified Harnex candidate up to the current release line are limited to documentation, repository governance, verification scripts and workflow-policy surfaces; no Harnex app/runtime source or Android build configuration changed. The focused physical result therefore remains applicable to the current runtime/product tree while deterministic release validation is rerun on the new exact repository HEAD.
 
 ### Consumer API, OMBRA, evaluation and audit
 
@@ -52,25 +54,23 @@ CA-0..4 are integrated; RedactGuard remains a pure Consumer SDK client and concr
 
 Local inference Activity/audit is integrated under ADR 0017: accepted inference history uses bounded encrypted app-private storage, verified Binder caller attribution and truthful restart reconciliation; normal telemetry/diagnostics stay content-free.
 
-## Open blockers
+## Remaining evidence and work gaps
 
-### 1. Physical Play signer and install-order confirmation
-
-Automated independent-signer and Two-APK evidence is complete. Stable release promotion still requires the focused physical Play Internal retest with the actual Harnex and RedactGuard Play App Signing identities: install RedactGuard first, install Harnex later without reinstalling RedactGuard, confirm `PENDING`, authorize the observed identity in Harnex, then verify Connect / Disconnect / Reconnect and fail-closed signer identity behavior where practical.
-
-### 2. Representative Android runtime evidence
+### 1. Representative Android runtime evidence
 
 LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence.
 
-### 3. OMBRA and follow-on work
+### 2. OMBRA and follow-on work
 
 OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration identities against policy v1. Model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP continue independently where ownership does not conflict.
 
+These broader evidence streams constrain the claims they own but are separate from the focused Play signer/install-order release gate that is now confirmed for the current stable-promotion scope.
+
 ## Immediate next block
 
-1. run the focused physical Play Internal independent-signer/install-order authorization retest against the published Harnex and RedactGuard candidates;
-2. once that release evidence is recorded, run RELEASE/FULL promotion validation and promote reconciled `dev` to stable `main`;
-3. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator evidence as physical proof.
+1. rerun RELEASE/FULL promotion validation on the new exact `dev` HEAD against live `main` after this evidence-ledger update;
+2. promote the reconciled green `dev` candidate to stable `main` if exact-head/base validation remains green;
+3. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator or focused signer evidence as broader physical proof.
 
 ## Source links
 
