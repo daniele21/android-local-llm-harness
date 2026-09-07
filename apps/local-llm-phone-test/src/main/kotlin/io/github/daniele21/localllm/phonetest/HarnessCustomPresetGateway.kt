@@ -42,10 +42,15 @@ internal interface HarnessCustomPresetGateway : HarnessApplicationsGateway {
 internal class StoreHarnessCustomPresetGateway(
     private val store: HostControlPlaneStore,
     runtimeSource: HarnessApplicationsRuntimeSource = NoHarnessApplicationsRuntimeSource,
+    private val beforeApplicationAuthorization: () -> Unit = {},
 ) : HarnessCustomPresetGateway {
     constructor(access: HarnessPhoneControlPlaneAccess) : this(
         store = access,
         runtimeSource = access.applicationsRuntimeSource,
+        beforeApplicationAuthorization = {
+            access.reconcileObservedIdentityIfNeeded()
+            Unit
+        },
     )
 
     private val delegate = StoreHarnessApplicationsGateway(store, runtimeSource)
@@ -57,7 +62,12 @@ internal class StoreHarnessCustomPresetGateway(
 
     override fun setApplicationConnectionEnabled(
         command: HarnessSetApplicationConnectionEnabledCommand,
-    ): HarnessControlPlaneMutationResult = delegate.setApplicationConnectionEnabled(command)
+    ): HarnessControlPlaneMutationResult {
+        if (command.enabled) {
+            beforeApplicationAuthorization()
+        }
+        return delegate.setApplicationConnectionEnabled(command)
+    }
 
     override fun createApplicationConnection(command: HarnessCreateApplicationConnectionCommand): HarnessControlPlaneMutationResult =
         delegate.createApplicationConnection(command)
