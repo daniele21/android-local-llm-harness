@@ -182,6 +182,7 @@ jobs:
           evidence="$RUNNER_TEMP/phone-models-ui"
           media="$evidence/ui-media/phone-models"
           video_dir="$media/video"
+          instrumentation_log="$evidence/instrumentation-models.log"
           remote_video="/sdcard/phone-models-ui.mp4"
           mkdir -p "$video_dir"
           adb shell pm clear "$HOST_PACKAGE" >/dev/null
@@ -197,16 +198,30 @@ jobs:
           adb shell am instrument -w -r \
             -e class 'io.github.daniele21.localllm.phonetest.MainActivityUiTest#modelsTierProgressivelyDisclosesQuantizationVariants' \
             "$TEST_PACKAGE/androidx.test.runner.AndroidJUnitRunner" \
-            | tee "$evidence/instrumentation-models.log"
-          test_status=${PIPESTATUS[0]}
+            | tee "$instrumentation_log"
+          adb_status=${PIPESTATUS[0]}
           set -e
+
+          journey_status=0
+          if [[ "$adb_status" -ne 0 ]]; then
+            echo "adb instrumentation command failed with status $adb_status." >&2
+            journey_status=1
+          fi
+          if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2' "$instrumentation_log"; then
+            echo "AndroidJUnitRunner reported a test failure." >&2
+            journey_status=1
+          fi
+          if ! grep -Eq '^OK \([0-9]+ tests?\)$' "$instrumentation_log"; then
+            echo "AndroidJUnitRunner did not report a successful JUnit completion." >&2
+            journey_status=1
+          fi
 
           record_pid="$(adb shell pidof screenrecord 2>/dev/null | tr -d '\r')"
           if [[ -n "$record_pid" ]]; then adb shell kill -2 "$record_pid" || true; fi
           sleep 2
           adb pull "$remote_video" "$video_dir/journey.mp4" >/dev/null
           adb shell rm -f "$remote_video"
-          [[ "$test_status" -eq 0 ]] || exit "$test_status"
+          [[ "$journey_status" -eq 0 ]] || exit "$journey_status"
 
       - name: Collect and verify FULL_MEDIA evidence
         if: always()
