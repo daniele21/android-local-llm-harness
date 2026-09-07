@@ -89,6 +89,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val activationResidency = ActivationResidencyCoordinator(activationLeases)
     val modelStore: ModelStore = HarnessRuntimePlatform.modelStore(appContext)
     val controlPlaneStore = HarnessPhoneControlPlaneAccess(
+        context = appContext,
         store = controlPlaneStoreOwner.store,
         applicationsRuntimeSource = RuntimeGraphHarnessApplicationsRuntimeSource(
             activeResolved = registry::activeResolved,
