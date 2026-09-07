@@ -44,6 +44,15 @@ private constructor(
         connection.connect()
     }
 
+    /**
+     * Explicitly releases the current Host registration while keeping this client reusable.
+     * A later [connect] performs a fresh bind, protocol negotiation and caller authorization.
+     */
+    fun disconnect() {
+        checkOpen()
+        connection.disconnect()
+    }
+
     override fun capabilities(useCaseId: UseCaseId): ConsumerCapabilityResult {
         checkOpen()
         return lifecycle.capabilities(useCaseId)

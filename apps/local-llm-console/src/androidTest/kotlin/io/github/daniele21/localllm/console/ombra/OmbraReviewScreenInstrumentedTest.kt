@@ -1,5 +1,8 @@
 package io.github.daniele21.localllm.console.ombra
 
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertCountEquals
@@ -7,12 +10,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import io.github.daniele21.localllm.console.document.DocumentSegment
 import io.github.daniele21.localllm.console.document.SegmentId
 import io.github.daniele21.localllm.console.document.SourceOccurrence
@@ -30,6 +34,7 @@ import io.github.daniele21.localllm.console.redaction.ReviewOccurrence
 import io.github.daniele21.localllm.ui.designsystem.OmbraStatusTone
 import io.github.daniele21.localllm.ui.designsystem.OmbraTheme
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,7 +42,28 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class OmbraReviewScreenInstrumentedTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun configureRequestedOrientation() {
+        val requestedOrientation =
+            when (val orientation = InstrumentationRegistry.getArguments().getString(ORIENTATION_ARGUMENT, ORIENTATION_PORTRAIT)) {
+                ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                else -> error("Unsupported OMBRA test orientation: $orientation")
+            }
+        val expectedOrientation =
+            when (requestedOrientation) {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> Configuration.ORIENTATION_PORTRAIT
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> Configuration.ORIENTATION_LANDSCAPE
+                else -> error("Unsupported requested orientation: $requestedOrientation")
+            }
+
+        composeRule.activity.requestedOrientation = requestedOrientation
+        composeRule.waitUntil(timeoutMillis = ORIENTATION_TIMEOUT_MILLIS) {
+            composeRule.activity.resources.configuration.orientation == expectedOrientation
+        }
+    }
 
     @Test
     fun hiddenReviewDoesNotExposeSensitiveSurfaceToSemantics() {
@@ -252,6 +278,11 @@ class OmbraReviewScreenInstrumentedTest {
     private data class ReviewFixture(val session: OmbraReviewProjectionSession, val occurrences: List<ReviewOccurrence>)
 
     private companion object {
+        const val ORIENTATION_ARGUMENT = "orientation"
+        const val ORIENTATION_PORTRAIT = "portrait"
+        const val ORIENTATION_LANDSCAPE = "landscape"
+        const val ORIENTATION_TIMEOUT_MILLIS = 10_000L
+
         val ReadyHarness = OmbraHarnessUiStatus(
             label = "Harness connesso",
             tone = OmbraStatusTone.LOCAL_READY,

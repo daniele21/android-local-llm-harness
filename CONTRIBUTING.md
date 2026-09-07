@@ -1,81 +1,179 @@
-# Contributing
+# Contributing to Harnex
 
-## Development prerequisites
+Thanks for helping improve Harnex. Contributions are welcome across Android integration, runtime correctness, model support, observability/evidence, developer experience, documentation and tests.
 
-- JDK 17
-- Android SDK API 36
-- Android Build Tools 36.0.0
-- Android NDK 28.2.13676358
+If you are not sure where a change belongs, open a [GitHub Discussion](https://github.com/daniele21/harnex/discussions) before investing in a large implementation.
 
-Use the committed Gradle wrapper for every local and CI build.
+## Good ways to contribute
 
-## Local validation
+- fix a reproducible bug or lifecycle edge case;
+- improve Android/Consumer SDK developer experience;
+- strengthen tests around public contracts, Binder, runtime or model lifecycle;
+- add evidence or diagnostics without weakening privacy boundaries;
+- improve documentation, examples or troubleshooting;
+- improve performance only with comparable evidence;
+- help make physical-device support more reproducible and reviewable.
+
+For substantial new capabilities, prefer an issue/discussion first so ownership and evidence requirements are clear.
+
+## Product-impact routing
+
+Product depth is independent from delivery stage and validation depth. Classify the change by product impact, not file count or coding effort:
+
+- `PRODUCT_NONE` — implementation-only work such as a bug fix, refactor or internal engineering change with no material supported-product change;
+- `PRODUCT_LOCAL` — settled small behavior/copy/interaction change; state affected user/consumer, expected outcome and observable acceptance;
+- `PRODUCT_FEATURE` — new capability or meaningful supported workflow/behavior change;
+- `PRODUCT_STRATEGIC` — material change to target user, product boundary, value proposition, trust model, platform or another broad hard-to-reverse product decision.
+
+For `PRODUCT_FEATURE` or `PRODUCT_STRATEGIC`, read [`.engineering/product.json`](.engineering/product.json), [`docs/product.md`](docs/product.md) and [`skills/shape-product-change/SKILL.md`](skills/shape-product-change/SKILL.md) before substantial implementation. Establish user/problem/outcome, material value/usability/feasibility/viability risks and assumptions, non-goals, quality constraints and success evidence. Discovery may validly narrow the scope, choose an alternative or conclude `DO_NOT_BUILD`.
+
+Keep this reasoning compact in the existing issue/workstream/PR; do not create parallel PRD/progress documents solely for process compliance. Shipping proves delivery, not confirmed product impact.
+
+## Development setup
+
+Prerequisites:
+
+- JDK 17;
+- Android SDK API 36;
+- Android Build Tools 36.0.0;
+- Android NDK 28.2.13676358;
+- Python 3;
+- Git with submodule support.
+
+Clone and bootstrap:
 
 ```bash
-./gradlew qualityCheck check lintDebug assembleDebug
+git clone --recurse-submodules https://github.com/daniele21/harnex.git
+cd harnex
+bash bootstrap-wrapper.sh
 ```
 
-## Formatting and static analysis
+Use the committed Gradle wrapper for local and CI builds.
+
+Optional environment sanity check:
 
 ```bash
+java -version
+python3 --version
+cmake --version
+./gradlew --version
+```
+
+## Branch model
+
+- `dev` — integration branch;
+- `main` — stable/release line;
+- contributor branches — use a focused name such as `feature/<scope>`, `fix/<scope>` or `docs/<scope>`.
+
+Keep commits scoped and imperative when practical. Avoid mixing unrelated cleanup into a behavioral change.
+
+## Start with the owning boundary
+
+Harnex intentionally keeps one canonical owner for model/runtime/Binder state. Extend that owner instead of creating parallel policy or state.
+
+Key invariants:
+
+- product/model selection is explicit; no silent model substitution;
+- native pointers and `llama.cpp` implementation types stay inside `backends/llama-cpp`;
+- runtime core depends on backend-neutral contracts rather than concrete backend policy;
+- Binder/public Consumer changes must preserve direct-consumer compatibility;
+- prompts and generated output do not enter normal telemetry/logging;
+- resources, jobs, sessions and native state must be bounded, cancellable and cleaned on every terminal path;
+- emulator evidence never implies physical ARM64/JNI/GGUF, memory, thermal or OEM behavior.
+
+Architecture overview: [`docs/architecture.md`](docs/architecture.md). Repository engineering invariants: [`AGENTS.md`](AGENTS.md).
+
+## Validation
+
+Use the narrowest validation that covers the affected boundary, then let repository CI select stronger gates when risk requires it.
+
+Useful local commands:
+
+```bash
+# Formatting
 ./gradlew spotlessApply
-./gradlew detekt
+
+# Repository/static checks
+python3 scripts/verify-agent-navigation.py
+python3 scripts/verify_architecture.py
+./gradlew --no-configuration-cache spotlessCheck detekt verifyNoModelArtifacts
+
+# Full Gradle test surface when appropriate
+./gradlew --no-configuration-cache check
+
+# Debug build
+./gradlew assembleDebug
 ```
 
-Detekt is intentionally executed through its CLI from the root build. The stable Detekt Gradle plugin is not coupled to Android Gradle Plugin 9.
+The repository's canonical command contract is [`.engineering/commands.json`](.engineering/commands.json).
 
-## Dependency locking
+### Validation depth
 
-Dependency locking is enabled for all configurations. Whenever a dependency is added or intentionally updated, regenerate and review lock state with:
+Repository automation classifies changes by risk rather than using one heavyweight suite for every PR:
+
+- **LEAN** — docs/governance/metadata and cheap repository guards;
+- **SCOPED** — contained module change plus direct consumers/tests/lint;
+- **STRONG** — public/shared contracts, Binder/control-plane, persistence, native/JNI, packaging or other release-sensitive work;
+- **FULL** — promotion/release, global build/CI/toolchain changes or unknown executable scope.
+
+Do not weaken or suppress a legitimate failing gate to obtain a green result.
+
+## Physical-device evidence
+
+Many Harnex claims can be tested automatically; some cannot.
+
+A physical device is required only when the claim depends on real ARM64/JNI/GGUF execution, Android/OEM lifecycle behavior, memory pressure, thermal behavior, Play-delivered identity or other hardware/environment fidelity.
+
+Use:
+
+- [`docs/device-e2e-testing.md`](docs/device-e2e-testing.md) for execution;
+- [`docs/device-e2e-evidence.md`](docs/device-e2e-evidence.md) for the privacy-safe evidence contract;
+- [`.engineering/e2e.json`](.engineering/e2e.json) for the automated-vs-real-environment boundary.
+
+Never present emulator results as physical-device proof.
+
+## Dependencies
+
+Dependency locking is enabled. When intentionally adding or updating a dependency:
 
 ```bash
 ./gradlew dependencies --write-locks
 ```
 
-Do not introduce dynamic versions such as `latest.release`, `+` or unbounded ranges.
+Review the resulting lock changes. Do not introduce dynamic versions such as `latest.release`, `+` or unbounded ranges.
 
-## Branches and commits
+A `llama.cpp` pin change is release-sensitive: review the upstream diff and run the applicable native, Android, model and benchmark evidence before promotion.
 
-- Branches: `feature/<scope>`, `fix/<scope>`, `chore/<scope>`
-- Commits: imperative and scoped when useful
-- Do not commit GGUF, GGML or diagnostic export files
+## Documentation
 
-## Architectural rules
+Durable behavior and its documentation ship together. Start from [`docs/README.md`](docs/README.md) to find the canonical owner before creating a new document.
 
-- Keep product model selection explicit in `AppModelBinding`.
-- Do not expose native pointers or `llama.cpp` types outside `backends/llama-cpp`.
-- Do not persist prompts or outputs in telemetry by default.
-- Add a cache only with a documented key, invalidation policy, size budget and metrics.
-- Any native runtime upgrade requires benchmark and sanity-suite comparison.
-- Add an ADR for choices that materially constrain public contracts, native source ownership, storage or process boundaries.
+For docs-only changes, prefer improving an existing owner over adding another file. Keep the root README adoption-focused; detailed implementation contracts belong in focused docs.
 
-## Material ambiguity and failure diagnosis
+## Pull requests
 
-Resolve requirements from canonical code/contracts/docs/ADRs/consumers/tests before implementation. If two reasonable interpretations still materially change behavior, public contracts, persistence, privacy/security, resource/lifecycle semantics, compatibility, acceptance criteria or meaningful UX, ask the user/owner instead of silently choosing.
+A good PR should make the outcome easy to review:
 
-When validation fails, classify it as current-change regression, baseline failure, environment/toolchain issue, flaky behavior, stale-base effect or incorrect assumption/contract before editing production code. Fix the owning invariant; do not weaken legitimate gates or repeat symptom patches without a new falsifiable hypothesis.
+1. explain the observable change and why it matters;
+2. keep the diff focused on the owning boundary;
+3. identify compatibility, privacy/security, lifecycle or resource risks when applicable;
+4. include the tests/evidence that prove the change;
+5. update affected durable documentation;
+6. leave physical/release-only evidence explicitly pending rather than overstating completion.
 
-## Validation depth and execution
+Before integration, repository preflight records exact source/base identity and runs the required automated gates. Promotion to `main` requires the release contract, not merely a green unit-test suite.
 
-Use `scripts/detect_ci_scope.py` through the repository workflow with `auto` as the normal selector:
+## Security and sensitive data
 
-- `LEAN` — docs/governance/metadata and cheap repository guards;
-- `SCOPED` — contained module implementation plus direct consumers/compile/unit/lint;
-- `STRONG` — public/shared contracts, Binder/control-plane, persistence, native/JNI, manifest, dependency, R8/ProGuard, packaging/variant or other release-sensitive changes;
-- `FULL` — promotion/release, selector/CI/global Gradle/module inventory/toolchain changes, unknown executable paths or explicit full request.
+Do not commit:
 
-`FULL` is exceptional for ordinary feature PRs. Stronger explicit validation is allowed; silent downgrade below `auto` is forbidden.
+- GGUF/GGML model binaries;
+- signing keys, passwords or credentials;
+- prompts, generated output or private user documents as test/evidence artifacts;
+- private Android paths or sensitive diagnostic exports.
 
-Execution capability is separate from depth. Required gates are `AGENT_LOCAL`, `REMOTE_AUTOMATED` or `REAL_ENVIRONMENT`. An automatable deterministic gate must not be delegated to the user solely because the coding agent lacks Android tooling.
+For security reporting, see [`SECURITY.md`](SECURITY.md).
 
-## Pre-publication readiness
+## License
 
-Use `skills/preflight-change/SKILL.md` before publishing. Refresh the intended `dev` revision, review the complete diff, record exact head/base identity, select the validation profile and classify execution capability.
-
-If selected deterministic gates cannot run agent-local, use `skills/remote-preflight/SKILL.md` and `/preflight` rather than asking the user to run Gradle/R8/Lint/build commands.
-
-Readiness is one of `READY_FOR_CI`, `READY_FOR_REMOTE_PREFLIGHT`, `AUTOMATED_PREFLIGHT_CONFIRMED` or `NOT_READY_FOR_AUTOMATED_PREFLIGHT`. Physical-device/hardware evidence remains separate and may be `PENDING` when the claim requires it.
-
-## Pull-request checks
-
-PRs record exact head/base, selected profile/reason/affected modules, agent-local evidence, remote automated evidence and pending real-environment evidence using `PASS`, `FAIL`, `PENDING` and `N/A`. Promotion to `main` requires `FULL` validation on the exact candidate.
+By contributing, you agree that your contributions will be licensed under the repository's MIT license.

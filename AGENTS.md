@@ -1,118 +1,58 @@
 # Harnex — Coding Agent Guide
 
-Harnex is an Android local-AI harness. This guide owns routing and durable repository invariants; architecture/current work belong to their canonical docs.
-
-## Read only what the task requires
-
-Always read this file, then only the closest scoped `AGENTS.md`, owning code/contracts/tests and relevant canonical docs. Read:
-
-- `.engineering/commands.json` for delivery stage, validation/execution/build routing;
-- `.engineering/e2e.json` for complete-workflow/environment claims;
-- `skills/validate-change/SKILL.md` during implementation;
-- `skills/preflight-change/SKILL.md` when a coherent outcome becomes integration/release-ready;
-- `skills/remote-preflight/SKILL.md` only for required deterministic gates unavailable locally;
-- `design/*` + `design-product-experience` for meaningful product UI work.
-
-Do not ingest every workstream or run release-grade validation for every edit.
+Harnex is the Android local-AI harness/control plane. Consumer apps own product workflows; Harnex owns governed model/runtime policy, Binder sharing and inference lifecycle. Keep inference local: no silent cloud fallback or content logging.
 
 ## Durable invariants
 
-- Local-first/privacy-first behavior: do not add silent cloud inference or content logging.
-- Model/runtime/Binder state has one canonical owner; do not duplicate lifecycle/policy in UI or adapters.
-- JNI/native handles, model resources, jobs, processes and temporary evidence are bounded, owned, cancellable and cleaned on every applicable exit path.
-- Public Binder/Consumer contracts require direct-consumer compatibility evidence.
-- Emulator evidence never becomes ARM64/native/GGUF/memory/thermal/OEM evidence by implication.
-- Build/package identity and immutable successful artifact semantics remain truthful.
-- UI follows user task, hierarchy, progressive disclosure, accessibility/adaptive behavior and canonical design tokens/components.
+- Durable product mission/users/outcomes/principles live in `docs/product.md`; architecture/features implement them without duplicating product truth.
+- Model/runtime/Binder state has one canonical owner; UI/adapters translate rather than duplicate policy.
+- Android caller identity + Harnex authorization is the shared-runtime authority; caller-declared identity is not.
+- JNI handles, jobs, models, processes and evidence are bounded, cancellable and cleaned on every exit path.
+- Public Binder/Consumer changes require direct-consumer compatibility evidence.
+- Emulator proof never implies ARM64 JNI/llama.cpp, real GGUF, physical memory/thermal or OEM behavior.
+- Build/package identity and immutable successful-artifact semantics remain truthful.
 
-## Ownership routing
+## Ownership
 
-Start from the owning module before editing consumers. Important cross-boundary areas include:
+| Change | Owner / proof |
+| --- | --- |
+| Product mission/users/outcomes/principles | `docs/product.md`, `.engineering/product.json` |
+| Public/runtime contracts | `core/contracts`, `core/backend-spi`, `core/runtime-core`; adapters/fakes/tests |
+| Model/lifecycle truth | `models/model-store`, control-plane stores; runtime/control-plane tests |
+| Binder/client/Host | `transports/android-binder-*`, `integrations/android-service-host`, `apps/shared-runtime-client-consumer-fixture`; consumer/two-APK evidence |
+| Native execution | `backends/llama-cpp`, `third_party/llama.cpp`; JNI/native/package gates |
+| Product experience | phone/console surfaces + `design/*`; design-system/journey evidence |
 
-- `core/contracts`, `core/backend-spi`, `core/runtime-core` — public/runtime contracts;
-- `models/model-store` and control-plane stores — model/lifecycle truth;
-- `transports/android-binder-*` — Binder protocol/client contract;
-- `integrations/android-service-host` — Host/process boundary;
-- `apps/shared-runtime-client-consumer-fixture` — real Consumer compatibility fixture;
-- `backends/llama-cpp` + `third_party/llama.cpp` — native backend/JNI;
-- `apps/local-llm-console` and phone surfaces — product UI/diagnostics.
+Follow applicable scoped `AGENTS.md`; extend the canonical owner before adding parallel state.
 
-Inspect direct consumers/fakes/tests before changing a shared boundary.
+## Read by task
 
-## Delivery model
+| Task | Read now |
+| --- | --- |
+| Docs/copy | affected owner; `docs/README.md` if routing is unclear |
+| Product capability/behavior/strategy shaping | `.engineering/product.json`, `docs/product.md`, `skills/shape-product-change/SKILL.md` |
+| Behavior/bug/contract | `.engineering/commands.json`, `skills/structured-change/SKILL.md`, `skills/validate-change/SKILL.md` |
+| Material UI | above + `skills/design-product-experience/SKILL.md`, relevant `design/*` |
+| Integration/release | `skills/preflight-change/SKILL.md`, `.engineering/commands.json`, `.engineering/e2e.json` |
+| Missing deterministic remote gate | `skills/remote-preflight/SKILL.md` |
+| Persistent work | `skills/plan-workstream/SKILL.md` + active plan; repository state in `docs/current-state.md`; finalize via `skills/finalize-workstream/SKILL.md` |
 
-Delivery stage and validation depth are separate.
+## Delivery boundaries
 
-### ITERATION — default
+Product depth, delivery stage and validation depth are independent.
 
-Use while implementation is changing, including draft collaboration PRs.
+- `PRODUCT_NONE/LOCAL`: no broad product ceremony; preserve settled intent and prove the local outcome.
+- `PRODUCT_FEATURE/STRATEGIC`: establish user/problem/outcome, material value/usability/feasibility/viability risks, assumptions, non-goals and success before substantial implementation. Discovery may narrow, change or reject the requested solution.
+- `ITERATION`: owner-local falsification; no publication ceremony after each edit.
+- `INTEGRATION`: coherent outcome ready for `dev`; current docs, exact candidate/base, required automated gates and affected E2E. Material UI/UX journeys use `FULL_MEDIA`; residual physical proof is `DEFERRED_TO_RELEASE`.
+- `RELEASE`: `FULL` release evidence plus applicable blocking real-environment confirmation.
 
-Goal: fast falsification. Prefer formatter/static checks, affected compile, focused unit/component tests and only directly implicated contract tests. Exact-head publication evidence, full-diff review, durable-doc freshness, remote preflight, packaging/R8/emulator/physical E2E are not default iteration requirements.
+`SHIPPED` proves delivery, not product impact. Resolve risk dimensions into required gates; stacked publication is exception-only. Define post-release learning only when real use must answer something material; telemetry is not mandatory.
 
-### INTEGRATION
+## Context, diagnosis and completion
 
-Use when a coherent **observable user/system outcome** is ready to converge into `dev` or a PR is ready for merge/review.
+`.engineering/documentation-policy.json` owns bounded context routes; use `--route product` for material shaping and `--route bug` for implementation. Routes never authorize omitting relevant owners/source.
 
-Now refresh live `dev` base/head, review the complete diff, make affected durable docs current, select risks -> required gates, run/route deterministic evidence and add only affected critical E2E.
+Missing local tooling is `REMOTE_AUTOMATED`, not user-run work. Reuse only provably equivalent trusted evidence. On failure classify before patching; after two failed repairs with the same signature, change diagnostic strategy and gather discriminating evidence.
 
-### RELEASE
-
-`dev -> main` / release-candidate work is RELEASE. Use FULL plus release-critical artifact/E2E and residual physical evidence required by the claim.
-
-## Validation model
-
-The selector reports:
-
-`outcome -> risk dimensions -> required gates -> LEAN|SCOPED|STRONG|FULL -> executor`.
-
-Profiles are shorthand, not fixed giant suites. FULL is exceptional for ordinary feature work and expected for release, selector/global-build/toolchain/unknown-scope changes.
-
-Draft PRs may run ITERATION. A ready PR to `dev` runs INTEGRATION. `main` promotion runs RELEASE.
-
-When deterministic work cannot run locally, use repository-owned remote automation; never make the user the fallback Gradle runner.
-
-## Evidence reuse
-
-Before dispatching remote preflight, reuse successful evidence when it still matches exact source HEAD, live target base, sufficient profile/required gates and material E2E identity.
-
-PR recreation, draft/ready state or comments alone do not invalidate source evidence. Source edits, material base/dependency changes, changed required gates or stronger E2E requirements do.
-
-Do not run automatic PR `Validate` and then repeat the same expensive validation merely because `/preflight` was requested.
-
-## E2E / fidelity
-
-Use the cheapest declared automated environment sufficient for the claim.
-
-UI evidence modes:
-
-- `ASSERTIONS` — UI is incidental to deterministic system behavior;
-- `SCREENSHOTS` — stable layout/hierarchy/copy/state/recovery/adaptive outcome matters;
-- `FULL_MEDIA` — motion, timing/progression, navigation/transition sequence, lifecycle visibility or release acceptance is part of the claim.
-
-UI presence alone does not force video.
-
-Harnex examples:
-
-- Binder serialization/two-APK emulator journeys prove simulated Android/Binder behavior, not production ARM64 native inference.
-- `phone-cold-start` normally requires screenshots, not continuous video.
-- production llama.cpp/GGUF/memory/thermal/OEM claims retain explicit physical-device evidence.
-
-## Parallel development
-
-Plan work as vertical observable outcomes. Technical layers are subtasks unless independently valuable/mergeable/reviewable.
-
-Agents may work on temporary parallel branches with non-conflicting ownership, but converge early onto a coherent feature/integration branch. Parallel work does not imply a stacked publication chain. Use stacked PRs only when each level genuinely needs independent review/publication; pure stack-sync PRs are a smell.
-
-## Documentation
-
-`docs/current-state.md` describes integrated/blocked/next repository truth, not branch-by-branch activity. Active plans are bounded and disposable.
-
-During ITERATION durable docs may remain pending while behavior changes. At INTEGRATION every affected canonical owner must describe the exact candidate behavior. Delete completed workstreams after durable knowledge transfer by default.
-
-## Failure discipline
-
-Classify failures before editing: change regression, baseline, environment, flaky, base drift or assumption. Fix the owning invariant. Do not suppress/weaken legitimate tests or broaden keep rules blindly to gain speed. A repeated failure after a repair requires a new hypothesis.
-
-## Stop conditions
-
-Surface rather than bypass: material ambiguity, privacy/security/trust conflicts, duplicate ownership, unbounded resources, stale affected docs at integration/release, required deterministic gates with no automation route, stronger environment claims than evidence supports, or a request to weaken a legitimate gate merely for velocity.
+Before integration update affected canonical docs. Transfer durable truth and deferred release obligations before deleting completed plans. Never suppress legitimate tests, hide failed/pending gates, leak sensitive content or downgrade evidence merely to obtain PASS.

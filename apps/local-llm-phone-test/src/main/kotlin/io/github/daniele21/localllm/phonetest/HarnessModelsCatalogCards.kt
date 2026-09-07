@@ -6,8 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,40 +17,50 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.daniele21.localllm.ui.designsystem.HarnessCard
-import io.github.daniele21.localllm.ui.designsystem.HarnessPrimaryButton
-import io.github.daniele21.localllm.ui.designsystem.HarnessSecondaryButton
-import io.github.daniele21.localllm.ui.designsystem.HarnessStatusBadge
-import io.github.daniele21.localllm.ui.designsystem.HarnessStatusTone
+import io.github.daniele21.localllm.ui.designsystem.HarnessInlinePrimaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessInlineSecondaryButton
+import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 
 @Composable
-internal fun UnifiedModelCard(
-    state: HarnessUiState,
+internal fun UnifiedModelVariantRow(
+    environment: ModelsCatalogGroupEnvironment,
     item: HarnessModelInventoryItem,
     model: PhoneCatalogModelUi,
-    actions: UnifiedModelsActions,
-    onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
     loading: Boolean = false,
+    suggested: Boolean = false,
+    showCompatibilityDetail: Boolean = true,
 ) {
-    HarnessCard {
-        ModelCardHeader(item, model, loading) { onOpenModelDetails(item) }
-        ModelStateLine(item, loading)
-        model.detail
-            ?.takeIf { model.status == PhoneCatalogModelStatus.FAILED || model.status == PhoneCatalogModelStatus.INCOMPATIBLE }
-            ?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        ModelLifecycleActions(
-            state = state,
-            item = item,
-            model = model,
-            actions = actions,
-            loading = loading,
-            onOpenModelDetails = { onOpenModelDetails(item) },
-        )
+    val state = environment.state
+    val actions = environment.actions
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ModelVariantIdentity(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = HarnessMinimumTouchTarget)
+                    .clickable(onClickLabel = "Open model details") { environment.onOpenModelDetails(item) },
+                item = item,
+                model = model,
+                loading = loading,
+                suggested = suggested,
+            )
+            ModelVariantAction(
+                state = state,
+                item = item,
+                model = model,
+                actions = actions,
+                loading = loading,
+            )
+            ModelOverflowMenu(state, item, model, actions)
+        }
+        if (model.status == PhoneCatalogModelStatus.DOWNLOADING) {
+            DownloadingVariantContent(model)
+        }
+        ModelVariantDetail(model, showCompatibilityDetail)
         ModelRemovalConfirmation(state, item, model, actions)
     }
 }
@@ -61,22 +71,26 @@ internal fun ActiveModelCard(
     item: HarnessModelInventoryItem,
     model: PhoneCatalogModelUi,
     actions: UnifiedModelsActions,
+    onOpenModelDetails: () -> Unit,
 ) {
     HarnessCard(emphasized = true) {
+        Text(
+            text = "Active model",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = HarnessMinimumTouchTarget)
+                    .clickable(onClickLabel = "Open active model details", onClick = onOpenModelDetails),
+                verticalArrangement = Arrangement.Center,
             ) {
-                Text(
-                    text = "ACTIVE MODEL",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
                 Text(item.displayName, style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = "${item.quantization ?: model.quantization} · ${formatModelBytes(model.sizeBytes)}",
@@ -84,211 +98,183 @@ internal fun ActiveModelCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            HarnessStatusBadge("LOADED", HarnessStatusTone.SUCCESS)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Loaded in memory · ready for Playground",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(
+            HarnessInlineSecondaryButton(
+                text = "Unload",
                 enabled = !state.busy,
                 onClick = actions.unloadLoaded,
-            ) {
-                Text("Unload")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelCardHeader(item: HarnessModelInventoryItem, model: PhoneCatalogModelUi, loading: Boolean, onOpenDetails: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDetails),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(item.displayName, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "${item.quantization ?: model.quantization} · ${formatModelBytes(model.sizeBytes)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        HarnessStatusBadge(
-            label = modelCardStatusLabel(item, loading),
-            tone = if (loading) HarnessStatusTone.INFO else item.lifecycle.statusTone(),
+        Text(
+            text = if (item.lifecycle == HarnessModelLifecycle.DEGRADED) {
+                item.detail ?: "Runtime ownership needs attention before the next inference."
+            } else {
+                "In memory · ready for Playground"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (item.lifecycle == HarnessModelLifecycle.DEGRADED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
         )
     }
 }
 
 @Composable
-private fun ModelStateLine(item: HarnessModelInventoryItem, loading: Boolean) {
-    val detail = when {
-        loading -> "Preparing model in local memory"
-        item.loaded -> "Loaded in memory · ready for Playground"
-        item.selected -> "Selected for Playground · not loaded"
-        item.installed -> "Installed on device · not loaded"
-        else -> null
-    } ?: return
-    Text(
-        text = detail,
-        style = MaterialTheme.typography.bodySmall,
-        color = if (item.loaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun ModelVariantIdentity(
+    modifier: Modifier,
+    item: HarnessModelInventoryItem,
+    model: PhoneCatalogModelUi,
+    loading: Boolean,
+    suggested: Boolean,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = item.quantization ?: model.quantization,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        if (suggested) {
+            Text(
+                text = "Recommended",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = "${formatModelBytes(model.sizeBytes)} · ${modelVariantStatusLabel(item, loading)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = when (item.lifecycle) {
+                HarnessModelLifecycle.FAILED -> MaterialTheme.colorScheme.error
+                HarnessModelLifecycle.LOADED -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
 }
 
 @Composable
-private fun ModelLifecycleActions(
+private fun ModelVariantAction(
     state: HarnessUiState,
     item: HarnessModelInventoryItem,
     model: PhoneCatalogModelUi,
     actions: UnifiedModelsActions,
     loading: Boolean,
-    onOpenModelDetails: () -> Unit,
 ) {
     when (model.status) {
-        PhoneCatalogModelStatus.DOWNLOADING -> DownloadingActions(model, actions, onOpenModelDetails)
-
-        PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL -> ActionRow(
-            menu = { ModelOverflowMenu(state, item, model, actions, onOpenModelDetails) },
+        PhoneCatalogModelStatus.DOWNLOADING -> TextButton(
+            onClick = { actions.catalog.cancelDownload(model.stableId) },
+            modifier = Modifier.heightIn(min = HarnessMinimumTouchTarget),
         ) {
-            HarnessPrimaryButton(
-                text = "Install model",
-                modifier = Modifier.weight(1f),
-            ) {
-                actions.catalog.install(model.stableId)
-            }
+            Text("Cancel")
         }
 
-        PhoneCatalogModelStatus.INSTALLING -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text(
-                text = "Installing in private app storage…",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        PhoneCatalogModelStatus.VERIFIED_READY_TO_INSTALL -> HarnessInlinePrimaryButton(
+            text = "Install",
+            enabled = !state.busy,
+        ) {
+            actions.catalog.install(model.stableId)
         }
 
-        PhoneCatalogModelStatus.INSTALLED -> InstalledLifecycleActions(
-            state = state,
-            item = item,
-            model = model,
-            actions = actions,
-            loading = loading,
-            onOpenModelDetails = onOpenModelDetails,
+        PhoneCatalogModelStatus.INSTALLING -> Text(
+            text = "Installing…",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        PhoneCatalogModelStatus.INSTALLED -> InstalledVariantAction(state, item, model, actions, loading)
 
         PhoneCatalogModelStatus.READY_TO_DOWNLOAD,
         PhoneCatalogModelStatus.CANCELLED,
         PhoneCatalogModelStatus.FAILED,
-        -> ActionRow(
-            menu = { ModelOverflowMenu(state, item, model, actions, onOpenModelDetails) },
+        -> HarnessInlinePrimaryButton(
+            text = if (model.status == PhoneCatalogModelStatus.READY_TO_DOWNLOAD) "Download" else "Retry",
+            enabled = model.compatible && !state.modelDistribution.operationActive,
         ) {
-            HarnessPrimaryButton(
-                text = if (model.status == PhoneCatalogModelStatus.READY_TO_DOWNLOAD) "Download" else "Retry download",
-                enabled = model.compatible && !state.modelDistribution.operationActive,
-                modifier = Modifier.weight(1f),
-            ) {
-                actions.catalog.download(model.stableId)
-            }
+            actions.catalog.download(model.stableId)
         }
 
-        PhoneCatalogModelStatus.INCOMPATIBLE -> ActionRow(
-            menu = { ModelOverflowMenu(state, item, model, actions, onOpenModelDetails) },
-        ) {
-            Text(
-                text = "Not compatible with this device",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        PhoneCatalogModelStatus.INCOMPATIBLE -> Text(
+            text = "›",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
-private fun DownloadingActions(model: PhoneCatalogModelUi, actions: UnifiedModelsActions, onOpenModelDetails: () -> Unit) {
+private fun DownloadingVariantContent(model: PhoneCatalogModelUi) {
     val expected = model.expectedBytes.coerceAtLeast(1L)
     val progress = (model.bytesDownloaded.toDouble() / expected.toDouble()).coerceIn(0.0, 1.0)
     LinearProgressIndicator(progress = { progress.toFloat() }, modifier = Modifier.fillMaxWidth())
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "${formatModelBytes(model.bytesDownloaded)} / ${formatModelBytes(model.expectedBytes)}",
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ModelOverflowButton(
-            onOpenDetails = onOpenModelDetails,
-            onCancelDownload = { actions.catalog.cancelDownload(model.stableId) },
-        )
-    }
+    Text(
+        text = "${formatModelBytes(model.bytesDownloaded)} / ${formatModelBytes(model.expectedBytes)}",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
-private fun InstalledLifecycleActions(
+private fun InstalledVariantAction(
     state: HarnessUiState,
     item: HarnessModelInventoryItem,
     model: PhoneCatalogModelUi,
     actions: UnifiedModelsActions,
     loading: Boolean,
-    onOpenModelDetails: () -> Unit,
 ) {
     val installed = model.installedModel ?: return
-    ActionRow(
-        menu = { ModelOverflowMenu(state, item, model, actions, onOpenModelDetails) },
-    ) {
-        when {
-            loading -> HarnessPrimaryButton(
-                text = "Loading…",
-                enabled = false,
-                modifier = Modifier.weight(1f),
-                onClick = {},
-            )
+    when {
+        loading -> HarnessInlinePrimaryButton(text = "Loading…", enabled = false, onClick = {})
 
-            item.loaded -> HarnessSecondaryButton(
-                text = "Unload model",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-                onClick = actions.unloadLoaded,
-            )
+        item.loaded -> HarnessInlineSecondaryButton(
+            text = "Unload",
+            enabled = !state.busy,
+            onClick = actions.unloadLoaded,
+        )
 
-            else -> HarnessPrimaryButton(
-                text = "Load model",
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f),
-            ) {
-                actions.catalog.selectInstalled(installed)
-            }
+        else -> HarnessInlinePrimaryButton(
+            text = "Load",
+            enabled = !state.busy,
+        ) {
+            actions.catalog.selectInstalled(installed)
         }
     }
 }
 
 @Composable
-private fun ActionRow(menu: @Composable () -> Unit, primary: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        primary()
-        menu()
+private fun ModelVariantDetail(model: PhoneCatalogModelUi, showCompatibilityDetail: Boolean) {
+    val shouldShow = model.status == PhoneCatalogModelStatus.FAILED ||
+        (showCompatibilityDetail && model.status == PhoneCatalogModelStatus.INCOMPATIBLE)
+    if (!shouldShow) return
+    model.detail?.let { detail ->
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (model.status == PhoneCatalogModelStatus.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 
-internal fun modelCardStatusLabel(item: HarnessModelInventoryItem, loading: Boolean): String =
-    if (loading) "LOADING" else item.lifecycle.name.replace('_', ' ')
+internal fun modelVariantStatusLabel(item: HarnessModelInventoryItem, loading: Boolean): String = if (loading) {
+    "Loading"
+} else {
+    when (item.lifecycle) {
+        HarnessModelLifecycle.INCOMPATIBLE -> "Unavailable"
+        HarnessModelLifecycle.READY_TO_DOWNLOAD -> "Available"
+        HarnessModelLifecycle.DOWNLOADING -> "Downloading"
+        HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL -> "Ready to install"
+        HarnessModelLifecycle.INSTALLING -> "Installing"
+        HarnessModelLifecycle.INSTALLED -> "Installed"
+        HarnessModelLifecycle.SELECTED -> "Selected"
+        HarnessModelLifecycle.LOADED -> "In memory"
+        HarnessModelLifecycle.CANCELLED -> "Download stopped"
+        HarnessModelLifecycle.FAILED -> "Needs attention"
+        HarnessModelLifecycle.DEGRADED -> "Needs recovery"
+    }
+}

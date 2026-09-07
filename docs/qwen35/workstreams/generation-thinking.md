@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: qwen35
 Canonical scope: qwen35.generation
 Read when: implementing Qwen3.5 thinking mode, chat-template arguments, sampling defaults, generation overrides or anomalous-generation guards
-Last reviewed: 2026-08-09
+Last reviewed: 2026-09-06
 
 ## Goal
 
@@ -46,7 +46,23 @@ The implemented path carries `temperature`, `topP`, `topK`, `minP`, `presencePen
 - `QWEN35_PRECISE`;
 - `QWEN35_JSON`.
 
-Qwen upstream baselines remain evidence inputs rather than immutable constants. The product resolves separate 0.8B/2B tiers without branching consumer code.
+The product resolves separate 0.8B, 2B and 4B tiers without branching consumer code. Existing 0.8B/2B profiles remain unchanged. The 4B tier is versioned with explicit Unsloth-derived sampling values under ADR 0019.
+
+### Qwen3.5 4B mapping
+
+Unsloth documents distinct Qwen3.5 sampler baselines for non-thinking general use, non-thinking reasoning, thinking/general use and lower-temperature precise/coding use. Harnex maps those semantics to its existing preset vocabulary:
+
+| Harnex profile | Unsloth intent | Thinking | temperature | top_p | top_k | min_p | presence_penalty | repeat_penalty |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `QWEN35_TEXT_FAST` | non-thinking general | disabled | 0.7 | 0.8 | 20 | 0 | 1.5 | 1.0 |
+| `QWEN35_TEXT_QUALITY` | non-thinking reasoning | disabled | 1.0 | 0.95 | 20 | 0 | 1.5 | 1.0 |
+| `QWEN35_THINKING` | thinking general | enabled | 1.0 | 0.95 | 20 | 0 | 1.5 | 1.0 |
+| `QWEN35_PRECISE` | thinking precise/coding | enabled | 0.6 | 0.95 | 20 | 0 | 0 | 1.0 |
+| `QWEN35_JSON` | non-thinking general | disabled | 0.7 | 0.8 | 20 | 0 | 1.5 | 1.0 |
+
+Unsloth does not define a separate JSON sampler. `QWEN35_JSON` therefore uses its non-thinking general baseline while Harnex's output-mode/schema layer continues to own JSON validity and structure.
+
+The 4B model itself has thinking disabled by default upstream. Harnex does not rely on that implicit default: every built-in profile resolves an explicit `ThinkingMode`, which is translated to `enable_thinking` in the chat template.
 
 ## Task ledger
 
@@ -62,23 +78,27 @@ Qwen upstream baselines remain evidence inputs rather than immutable constants. 
 | Q35-GEN-08 | DONE | Bounded anomalous-generation guard execution is implemented in `core/runtime-core`. |
 | Q35-GEN-09 | DONE | Typed guard stop reasons and lifecycle mapping distinguish guard termination from cancellation/backend failure. |
 | Q35-GEN-10 | DONE | Template/sampler and guard-specific deterministic coverage pass. |
+| Q35-GEN-11 | IN PROGRESS | Add the distinct 4B tier with exact Unsloth sampler mapping while preserving established 0.8B/2B behavior. |
 
-## Q35-3 acceptance
+## Acceptance
 
-Q35-3 is complete because:
+Established Q35-3/Q35-4 behavior remains valid because:
 
 - thinking enabled/disabled resolves deterministically through typed template kwargs;
 - no `/think` or `/nothink` injection is required;
 - `minP` and `presencePenalty` reach the backend and safe effective configuration;
 - request/preset/default precedence is deterministic;
-- 0.8B and 2B use typed tier-aware profiles;
+- 0.8B, 2B and 4B use typed tier-aware profiles;
+- selecting another model tier reapplies the active built-in preset so stale lower-tier values do not silently override the selected tier;
+- manual overrides remain explicit custom configuration and are not overwritten by model selection;
 - Playground exposes thinking and the sampler controls;
-- native sampler, resolver, telemetry/Room, phone unit and instrumentation compilation tests pass;
-- repository Validate and Android Package gates are green.
+- the generation guard remains bounded and independent of the 4B sampling-policy extension.
+
+The 4B addition is not considered production-certified until repository deterministic gates pass on the exact change HEAD and representative physical-device evidence exists for the exact 4B artifact being certified.
 
 ## Q35-4 generation guard
 
-Q35-4 is complete. The guard now owns bounded generation protection without changing Q35-3 template/sampler semantics:
+The guard owns bounded generation protection without changing template/sampler semantics:
 
 - a versioned policy defines repetition/runaway thresholds and the optional thinking budget;
 - detection is bounded and independent of streamed chunk boundaries;
@@ -87,9 +107,11 @@ Q35-4 is complete. The guard now owns bounded generation protection without chan
 - guard stop telemetry remains privacy-safe;
 - deterministic runtime tests cover thinking-budget and repetition termination plus normal generation behavior.
 
-The guard does not duplicate JSON/schema validation owned by the output layer.
+The initial B4 guard budget remains conservative and equal to the current B2 bound until physical-device evidence justifies a wider budget. The guard does not duplicate JSON/schema validation owned by the output layer.
 
 ## Upstream references
 
+- https://unsloth.ai/docs/models/qwen3.5
+- https://huggingface.co/unsloth/Qwen3.5-4B-GGUF
 - https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/README.md
 - https://huggingface.co/Qwen/Qwen3.5-2B/blob/main/README.md

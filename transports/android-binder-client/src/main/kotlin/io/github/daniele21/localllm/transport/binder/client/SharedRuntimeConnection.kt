@@ -67,7 +67,12 @@ internal class SharedRuntimeConnection(
             if (current.state in ACTIVE_STATES || current.state == SharedRuntimeConnectionState.CLOSED) return
         }
         if (!binding.hostExists(hostConfig)) {
-            transition(SharedRuntimeConnectionState.HOST_NOT_INSTALLED, detail = "Configured host service is not installed")
+            val epoch = synchronized(lock) { connectionEpoch }
+            transitionForEpoch(
+                epoch,
+                SharedRuntimeConnectionState.HOST_NOT_INSTALLED,
+                detail = "Configured host service is not installed",
+            )
             return
         }
         val epoch = synchronized(lock) {
@@ -99,22 +104,49 @@ internal class SharedRuntimeConnection(
         }
     }
 
+    /**
+     * Releases the current Binder registration without closing this connection owner. A later [connect]
+     * starts a fresh connection epoch and re-authenticates the caller against the Host policy.
+     */
+    fun disconnect() {
+        releaseConnection(
+            targetState = SharedRuntimeConnectionState.DISCONNECTED,
+            invalidationReason = "Shared-runtime client disconnected",
+        )
+    }
+
     override fun close() {
-        val registered = synchronized(lock) {
+        releaseConnection(
+            targetState = SharedRuntimeConnectionState.CLOSED,
+            invalidationReason = "Shared-runtime client connection closed",
+        )
+    }
+
+    private fun releaseConnection(targetState: SharedRuntimeConnectionState, invalidationReason: String) {
+        val release = synchronized(lock) {
             if (current.state == SharedRuntimeConnectionState.CLOSED) return
+            if (targetState == SharedRuntimeConnectionState.DISCONNECTED && current.state == SharedRuntimeConnectionState.DISCONNECTED) {
+                return
+            }
             connectionEpoch += 1
-            registeredEndpoint.also { registeredEndpoint = null }
+            ConnectionRelease(
+                epoch = connectionEpoch,
+                endpoint = registeredEndpoint.also { registeredEndpoint = null },
+            )
         }
-        registered?.let { endpoint ->
+        release.endpoint?.let { endpoint ->
             runCatching { endpoint.service.unregisterClient(endpoint.clientToken) }
-            invalidations.notify(endpoint.connectionEpoch, "Shared-runtime client connection closed")
+            invalidations.notify(endpoint.connectionEpoch, invalidationReason)
         }
         binding.unbind()
-        transition(SharedRuntimeConnectionState.CLOSED)
+        transitionForEpoch(release.epoch, targetState)
     }
 
     private fun negotiate(service: SharedRuntimeRemoteService, epoch: Long) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         transitionForEpoch(epoch, SharedRuntimeConnectionState.NEGOTIATING)
         val negotiated = try {
             negotiateProtocol(service.protocolInfo(), clientHello)
@@ -132,7 +164,10 @@ internal class SharedRuntimeConnection(
     }
 
     private fun register(service: SharedRuntimeRemoteService, negotiated: NegotiatedProtocol, epoch: Long) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         try {
             service.registerClient(
                 hello = clientHello,
@@ -185,7 +220,10 @@ internal class SharedRuntimeConnection(
     }
 
     private fun failConnection(epoch: Long, state: SharedRuntimeConnectionState, detail: String?) {
-        if (!isCurrentEpoch(epoch)) return
+        val currentEpoch = synchronized(lock) {
+            epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
+        }
+        if (!currentEpoch) return
         binding.unbind()
         transitionForEpoch(epoch, state, detail = detail)
     }
@@ -213,10 +251,6 @@ internal class SharedRuntimeConnection(
         runCatching { observer.onStateChanged(lost.snapshot) }
     }
 
-    private fun isCurrentEpoch(epoch: Long): Boolean = synchronized(lock) {
-        epoch == connectionEpoch && current.state != SharedRuntimeConnectionState.CLOSED
-    }
-
     private fun transitionForEpoch(
         epoch: Long,
         state: SharedRuntimeConnectionState,
@@ -231,20 +265,8 @@ internal class SharedRuntimeConnection(
         runCatching { observer.onStateChanged(snapshot) }
     }
 
-    private fun transition(
-        state: SharedRuntimeConnectionState,
-        negotiatedMinor: Int? = null,
-        enabledFeatures: Set<String> = emptySet(),
-        detail: String? = null,
-    ) {
-        val snapshot = synchronized(lock) {
-            if (current.state == SharedRuntimeConnectionState.CLOSED && state != SharedRuntimeConnectionState.CLOSED) return
-            SharedRuntimeConnectionSnapshot(state, negotiatedMinor, enabledFeatures, detail).also { current = it }
-        }
-        runCatching { observer.onStateChanged(snapshot) }
-    }
-
     private data class ConnectionLoss(val endpoint: RegisteredSharedRuntimeEndpoint?, val snapshot: SharedRuntimeConnectionSnapshot)
+    private data class ConnectionRelease(val epoch: Long, val endpoint: RegisteredSharedRuntimeEndpoint?)
 
     companion object {
         fun create(

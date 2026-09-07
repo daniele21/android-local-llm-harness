@@ -8,30 +8,76 @@ import org.junit.Test
 
 class HarnessModelsCatalogUiTest {
     @Test
-    fun catalogExposesOnlyTheTwoSupportedQwen35SizeGroups() {
+    fun catalogExposesTheThreeSupportedQwen35SizeGroups() {
         assertEquals(
-            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B"),
+            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B", "Qwen3.5 · 4B"),
             ModelsSizeFilter.entries.mapNotNull(ModelsSizeFilter::groupLabel),
         )
+        assertEquals("All", ModelsSizeFilter.ALL.label)
+        assertEquals("4-bit variants only", ModelsSizeFilter.B4.groupSupportingText)
+    }
+
+    @Test
+    fun curatedStartingPointsAreExplicitPerSizeTier() {
+        assertEquals("qwen35-08b-q4-k-m", ModelsSizeFilter.B08.suggestedModelId)
+        assertEquals("qwen35-2b-q4-k-m", ModelsSizeFilter.B2.suggestedModelId)
+        assertEquals("qwen35-4b-ud-q4-k-xl", ModelsSizeFilter.B4.suggestedModelId)
+        assertEquals(null, ModelsSizeFilter.ALL.suggestedModelId)
+    }
+
+    @Test
+    fun suggestedModelIsPresentedBeforeQuantizationAlternativesAcrossVersionedReleaseIds() {
+        val alternatives = listOf(
+            item("qwen35-4b-q4-k-m@1.0.0"),
+            item("qwen35-4b-ud-q4-k-xl@1.0.0"),
+            item("qwen35-4b-iq4-xs@1.0.0"),
+        )
+
+        val ordered = orderGroupItems(ModelsSizeFilter.B4, alternatives)
+
+        assertEquals("qwen35-4b-ud-q4-k-xl@1.0.0", ordered.first().stableId)
+        assertTrue(ordered.first().matchesSuggestedModel(ModelsSizeFilter.B4))
+        assertEquals(alternatives.map { it.stableId }.toSet(), ordered.map { it.stableId }.toSet())
+    }
+
+    @Test
+    fun runtimeOwnedIdentityCannotBePromotedAsCuratedStartingPoint() {
+        val runtimeItem = HarnessModelInventoryItem(
+            stableId = "qwen35-4b-ud-q4-k-xl@1.0.0",
+            displayName = "Runtime model",
+            origin = HarnessModelOrigin.RUNTIME,
+            lifecycle = HarnessModelLifecycle.LOADED,
+            loaded = true,
+        )
+
+        assertFalse(runtimeItem.matchesSuggestedModel(ModelsSizeFilter.B4))
+        assertFalse(ModelsSizeFilter.B4.matches(runtimeItem))
     }
 
     @Test
     fun sizeFiltersMatchOnlyTheirQwen35ParameterGroup() {
-        val compact = item("qwen35-08b-q4-k-m")
-        val capable = item("qwen35-2b-q4-k-m")
+        val compact = item("qwen35-08b-q4-k-m@1.0.0")
+        val capable = item("qwen35-2b-q4-k-m@1.0.0")
+        val fourB = item("qwen35-4b-ud-q4-k-xl@1.0.0")
 
         assertTrue(ModelsSizeFilter.B08.matches(compact))
         assertFalse(ModelsSizeFilter.B08.matches(capable))
+        assertFalse(ModelsSizeFilter.B08.matches(fourB))
         assertTrue(ModelsSizeFilter.B2.matches(capable))
         assertFalse(ModelsSizeFilter.B2.matches(compact))
+        assertFalse(ModelsSizeFilter.B2.matches(fourB))
+        assertTrue(ModelsSizeFilter.B4.matches(fourB))
+        assertFalse(ModelsSizeFilter.B4.matches(compact))
+        assertFalse(ModelsSizeFilter.B4.matches(capable))
         assertTrue(ModelsSizeFilter.ALL.matches(compact))
         assertTrue(ModelsSizeFilter.ALL.matches(capable))
+        assertTrue(ModelsSizeFilter.ALL.matches(fourB))
     }
 
     @Test
-    fun availabilityFiltersSeparateInstalledAndAvailableModels() {
-        val installed = item("qwen35-08b-q4-k-m", installed = true)
-        val available = item("qwen35-2b-q4-k-m", installed = false)
+    fun availabilityFiltersSeparateInstalledAndNotInstalledModels() {
+        val installed = item("qwen35-08b-q4-k-m@1.0.0", installed = true)
+        val available = item("qwen35-2b-q4-k-m@1.0.0", installed = false)
 
         assertTrue(ModelsAvailabilityFilter.INSTALLED.matches(installed))
         assertFalse(ModelsAvailabilityFilter.INSTALLED.matches(available))
@@ -42,17 +88,53 @@ class HarnessModelsCatalogUiTest {
     }
 
     @Test
+    fun variantStatusLabelsUseCompactSentenceCaseLifecycleLanguage() {
+        val expected = mapOf(
+            HarnessModelLifecycle.READY_TO_DOWNLOAD to "Available",
+            HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL to "Ready to install",
+            HarnessModelLifecycle.INSTALLED to "Installed",
+            HarnessModelLifecycle.SELECTED to "Selected",
+            HarnessModelLifecycle.LOADED to "In memory",
+            HarnessModelLifecycle.CANCELLED to "Download stopped",
+            HarnessModelLifecycle.FAILED to "Needs attention",
+            HarnessModelLifecycle.DEGRADED to "Needs recovery",
+            HarnessModelLifecycle.INCOMPATIBLE to "Unavailable",
+        )
+
+        expected.forEach { (lifecycle, label) ->
+            assertEquals(label, modelVariantStatusLabel(item("model@1.0.0", lifecycle = lifecycle), loading = false))
+        }
+        assertEquals("Loading", modelVariantStatusLabel(item("model@1.0.0"), loading = true))
+    }
+
+    @Test
+    fun emptyStateExplainsTheActiveFilterWithoutLosingLoadedModelContext() {
+        assertEquals(
+            "No 4B installed models match this filter.",
+            modelsEmptyStateDetail(ModelsAvailabilityFilter.INSTALLED, ModelsSizeFilter.B4, activeModelPresent = false),
+        )
+        assertEquals(
+            "No other 2B models match this filter.",
+            modelsEmptyStateDetail(ModelsAvailabilityFilter.ALL, ModelsSizeFilter.B2, activeModelPresent = true),
+        )
+    }
+
+    @Test
     fun modelFailuresKeepErrorSeverity() {
         assertEquals(HarnessStatusTone.ERROR, HarnessModelLifecycle.FAILED.statusTone())
         assertEquals(HarnessStatusTone.WARNING, HarnessModelLifecycle.DEGRADED.statusTone())
         assertEquals(HarnessStatusTone.WARNING, HarnessModelLifecycle.INCOMPATIBLE.statusTone())
     }
 
-    private fun item(stableId: String, installed: Boolean = false): HarnessModelInventoryItem = HarnessModelInventoryItem(
+    private fun item(
+        stableId: String,
+        installed: Boolean = false,
+        lifecycle: HarnessModelLifecycle = if (installed) HarnessModelLifecycle.INSTALLED else HarnessModelLifecycle.READY_TO_DOWNLOAD,
+    ): HarnessModelInventoryItem = HarnessModelInventoryItem(
         stableId = stableId,
         displayName = stableId,
         origin = HarnessModelOrigin.CATALOG,
-        lifecycle = if (installed) HarnessModelLifecycle.INSTALLED else HarnessModelLifecycle.READY_TO_DOWNLOAD,
+        lifecycle = lifecycle,
         installed = installed,
     )
 }

@@ -2,118 +2,73 @@
 
 ## Scope
 
-This guide applies to `apps/local-llm-phone-test/**` and supplements the repository-wide [`AGENTS.md`](../../AGENTS.md). It covers the connected Compose app, process-scoped runtime composition, local model distribution/management, Performance and Diagnostics presentation, the shared-runtime proof host and the Play-installed physical-device validation surface.
-
-The app orchestrates existing domain contracts. It must not become an alternate owner of runtime, model-installation, telemetry, evaluation, Binder protocol or benchmark policy.
+Applies to `apps/local-llm-phone-test/**` and supplements root [`AGENTS.md`](../../AGENTS.md). This app owns connected Compose composition, process-scoped runtime wiring, shared-runtime proof-host composition and the Play/device validation surface; domain policy remains in its owning runtime/model/evaluation/observability/Binder/audit modules.
 
 ## Navigation
 
-Read the active product state before UI or orchestration work:
+Read only the owners needed for the change:
 
-- [`current-state.md`](../../docs/current-state.md) and the active [`dev-integration-and-harness-0.5-plan.md`](../../docs/dev-integration-and-harness-0.5-plan.md);
-- [`shared-runtime/roadmap.md`](../../docs/shared-runtime/roadmap.md), [`shared-runtime/workstreams/host-service.md`](../../docs/shared-runtime/workstreams/host-service.md) and ADR 0012 for proof-host service work;
-- [`harness-ux-ui-implementation-plan.md`](../../docs/harness-ux-ui-implementation-plan.md) and [`harness-ux-ui-implementation-progress.md`](../../docs/harness-ux-ui-implementation-progress.md) for Compose structure and remaining evidence;
-- [`model-evaluation/README.md`](../../docs/model-evaluation/README.md) for Performance evaluation contracts and sequencing;
-- [`design-system.md`](../../docs/design-system.md) and the shared `ui/design-system` sources for reusable UI;
+- [`current-state.md`](../../docs/current-state.md) and active integration plan for current product state;
+- [`shared-runtime/roadmap.md`](../../docs/shared-runtime/roadmap.md), [`shared-runtime/workstreams/host-service.md`](../../docs/shared-runtime/workstreams/host-service.md), ADR 0012 and ADR 0018 for shared-runtime work;
+- the Harness UX/UI plan/progress and [`design-system.md`](../../docs/design-system.md) for Compose/product work;
+- [`model-evaluation/README.md`](../../docs/model-evaluation/README.md) for Performance;
+- [`features/local-inference-activity-audit.md`](../../docs/features/local-inference-activity-audit.md) and ADR 0017 for inference audit;
 - [`model-management-phone.md`](../../docs/model-management-phone.md) and [`phone-model-distribution.md`](../../docs/phone-model-distribution.md) for model flows;
-- [`play-internal-phone-test.md`](../../docs/play-internal-phone-test.md) for release installation and manual validation.
+- [`play-internal-phone-test.md`](../../docs/play-internal-phone-test.md) for release/device evidence.
 
 Route by responsibility:
 
-| Concern | Start here | Owning dependency to inspect |
+| Concern | Start here | Owning dependency |
 | --- | --- | --- |
-| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control-plane store, transport, observability and design-system contracts |
-| Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, manifest/build variants | `integrations/android-service-host`, Binder contract and ADR 0012 |
-| Destinations and responsive shell | `HarnessDestination.kt`, Compose entry points | Shared navigation/components under `ui/design-system` |
-| Playground state and inference | `HarnessViewModel.kt`, `PhonePlaygroundController.kt` and related UI | `LocalLlmClient`, runtime lifecycle and generation contracts |
-| Performance evaluation UI | `PerformanceViewModel.kt`, `PerformanceScreen.kt`, presentation helpers | `evaluation/*` contracts, persistence/comparison and telemetry evidence |
-| Catalog/download/install UI | `PhoneModelDistributionController.kt`, actions and UI | The [`models` guide](../../models/AGENTS.md) and each stage's contracts |
-| Installed selection, verification and removal | `PhoneModelManagementControl.kt`, metadata store | ModelStore ownership and runtime loaded-model identity |
-| Health, logs, resources and benchmarks | `HarnessViewModel.kt`, `Harness*Source.kt`, Diagnostics UI | The [`observability` guide](../../observability/AGENTS.md) |
-| Physical validation and report | `PhoneTestController.kt`, models and UI | Device/evidence docs and production runtime/backend |
-| Version, manifest, signing and packaging | `version.properties`, `build.gradle.kts`, manifest/resources | Release script and Play runbook |
-
-Use focused searches before editing the large app surface:
-
-```bash
-rg '<state-or-action>' apps/local-llm-phone-test/src/main apps/local-llm-phone-test/src/test
-rg 'RuntimeOrchestrator|ModelStore|TelemetryRepository|Executor' apps/local-llm-phone-test/src/main
-rg --files apps/local-llm-phone-test/src/main/kotlin apps/local-llm-phone-test/src/test apps/local-llm-phone-test/src/androidTest
-```
+| App/process composition | `HarnessRuntimeGraph.kt`, `MainActivity.kt` | Runtime, control plane, transport, observability, audit |
+| Shared-runtime proof host | `HarnessSharedRuntimeService.kt`, `HarnessSharedRuntimePolicy.kt`, variants | `integrations/android-service-host`, Binder, ADR 0012/0018 |
+| Navigation/UI | `HarnessDestination.kt`, Compose entry points | `ui/design-system` |
+| Playground/inference | `HarnessViewModel.kt`, `PhonePlaygroundController.kt` | `LocalLlmClient`, runtime/generation contracts |
+| Performance | `PerformanceViewModel.kt`, `PerformanceScreen.kt` | `evaluation/*`, telemetry |
+| Model distribution/management | distribution controller, management control | `models/*`, ModelStore |
+| Inference Activity | Activity source/ViewModel/presentation | `InferenceAuditRepository` |
+| Diagnostics | `HarnessViewModel.kt`, `Harness*Source.kt` | `observability/*` |
+| Physical validation | `PhoneTestController.kt` | device/evidence docs, production backend |
+| Packaging | `version.properties`, build/manifest | release script, Play runbook |
 
 ## Local invariants
 
-- Keep `MainActivity` as a composition/Activity Result/lifecycle effect boundary, not an owner of domain policy or long-lived mutable render state. Do not add to controller/state ownership debt; move state behind the ViewModel in coherent vertical slices.
-- Screens depend on ViewModels/controllers and neutral contracts; they do not call `RuntimeOrchestrator`, `ModelStore`, repositories or executors directly.
-- Diagnostics resource history is renderable `HarnessUiState`; Compose must not call `HarnessResourceSource.history()` during rendering.
-- Health, resource and benchmark asynchronous actions use ViewModel-owned generation tokens. A stale callback must fail closed, and Activity teardown must invalidate outstanding diagnostic generations before executor/controller teardown.
-- Navigation, opening a screen and observational refresh do not implicitly load a model, start inference/evaluation, download, install, run health, capture resources, mutate a baseline or repair a cache.
-- Performance may present only source-backed evaluation state. It must not rank models/configurations while compatible aggregated latency, throughput, memory and quality evidence is unavailable.
-- The shared-runtime proof `Service` reuses `HarnessRuntimeGraph.from(...)`; binding/handshake must not create a second runtime, select a model or load a GGUF.
-- `HarnessRuntimeGraph` owns the single process-scoped control-plane Room store used by both the proof `Service` and Harness UI; neither surface opens or closes a parallel database owner.
-- Shared-runtime release and debug variants use deterministic, distinct signature-permission names. Caller package matching is exact; never strip application ID suffixes to authorize a caller.
-- Download, install, selection, verification, removal, health, benchmark, evaluation and validation are distinct explicit user actions.
-- Prompt and generated output stay bounded in process memory and out of saved state, Room, normal telemetry and shared reports.
-- Document URIs, signed/download URLs and private filesystem paths never appear in persisted metadata, UI diagnostics or shareable reports.
-- Every displayed value is source-backed or explicitly unavailable; illustrative mockup values must never appear as live data.
-- Model removal requires confirmation and must be blocked while the runtime owns the model. Failure must preserve valid store objects and metadata when possible.
-- Storage Access Framework input streams into private staging/content-addressed storage; never treat a document URI as durable model identity.
-- UI state covers loading, empty, populated, unavailable, warning, failure, cancellation and recovery where applicable.
-- Shared design tokens/components and accessibility semantics belong in `ui/design-system`, not duplicated locally.
-- Emulator and host results are preflight only. Only a Play-installed or ADB-captured physical-device run supports device evidence, and only for its exact matrix entry.
+- `MainActivity` is a composition/Activity Result/lifecycle-effect boundary, not a domain-policy or long-lived render-state owner. Screens use ViewModels/controllers and neutral contracts, not orchestrators, stores, repositories or executors directly.
+- Diagnostics history is renderable `HarnessUiState`. Async diagnostics use ViewModel generation tokens; stale callbacks fail closed and teardown invalidates them before owned resources close.
+- Navigation/observation never implicitly loads a model, starts inference/evaluation, downloads/installs, benchmarks, captures resources, mutates baselines or repairs caches.
+- Performance shows only source-backed evaluation state; do not rank without compatible aggregated latency/throughput/memory/quality evidence.
+- The proof `Service` reuses `HarnessRuntimeGraph.from(...)`. Binding/handshake must not create another runtime, select/load a model, or open a parallel control-plane database.
+- Shared-runtime inference has no custom bind permission; explicit reachability is not authority. Authorize Binder UID → exact installed package → current signer → persisted Harnex authorization → enabled use case. Source-observed consumers start pending; signer changes fail closed until explicit reauthorization; package matching stays exact.
+- Test control stays emulator-only and separate: the ordinary fault receiver is signature-protected; cross-signer CI may use only the `emulatorE2e` Host-process allowlisted `DUMP` bridge, absent from production. Never reuse the inference bind surface for test control.
+- Download, install, selection, verification, removal, health, benchmark, evaluation and validation remain distinct explicit user actions.
+- Prompt/output stay out of saved state, normal telemetry/logs/reports. Persistent content exists only in the ADR-0017 Harnex-owned encrypted audit store with bounded retention. Never persist document URIs, signed URLs or private paths.
+- Display only source-backed or explicitly unavailable values. Model removal requires confirmation and is blocked while runtime-owned; preserve valid store state on failure. SAF input is copied into private staging/content-addressed storage, never used as durable identity.
+- UI state covers applicable loading, empty, populated, unavailable, warning, failure, cancellation and recovery states. Reusable design/accessibility semantics belong in `ui/design-system`.
+- Emulator evidence may prove deterministic Binder authorization semantics; Play App Signing identity and representative ARM64/native/model/resource behavior remain REAL_ENVIRONMENT evidence.
 
 ## Change routing
 
-- Move reusable visual tokens/components to `ui/design-system`; keep app-specific composition and data mapping here.
-- Move runtime, model, telemetry, evaluation, health or benchmark policy to the owning module and expose the smallest neutral contract the app needs.
-- Keep shared-runtime Binder/AIDL, caller authorization and caller-owned ledgers in their transport/integration modules; the phone app owns only the concrete proof service and explicit host configuration.
-- Keep UI models immutable and separate observation from mutating capabilities.
-- Preserve a single process-scoped runtime graph, including its control-plane store owner, across destinations and the proof service; do not create a runtime or control-plane database per screen, Activity recreation or Binder connection.
-- For model flows, test progress plus success, cancellation, invalid state, source failure, cleanup and restart reconciliation.
-- For destructive actions, require explicit confirmation, active-resource protection and a privacy-safe terminal result.
-- For asynchronous Diagnostics actions, test success/failure plus stale-generation and lifecycle invalidation behavior.
-- For navigation, test compact/expanded destinations, back behavior and absence of side effects.
+- Reusable UI belongs in `ui/design-system`; runtime/model/telemetry/audit/evaluation/health/benchmark policy belongs in its owning module behind the smallest neutral contract.
+- Binder/AIDL, generic caller authorization and caller-owned ledgers stay in transport/integration modules. This app owns proof-service composition, known-consumer discovery and explicit Harnex Control Plane authorization.
+- Audit encryption/retention/transitions stay behind `InferenceAuditRepository`; UI never receives ciphertext, Room entities, Keystore handles or raw Binder caller objects.
+- Keep immutable UI models and one process-scoped runtime graph across destinations, Activity recreation and Binder connections.
+- Model flows test progress/success/cancellation/invalid state/source failure/cleanup/restart; destructive actions test confirmation/resource protection/privacy-safe terminal results.
+- Async diagnostics test success/failure/stale-generation/lifecycle invalidation. Navigation tests compact/expanded destinations, back behavior and absence of side effects.
 
 ## Validation
 
-Run the connected app unit, UI, lint and packaging checks appropriate to the change:
+Use repository selection first, then the narrowest sufficient app/owner gates. Common focused commands:
 
 ```bash
 ./gradlew spotlessCheck
 ./gradlew --no-configuration-cache detekt verifyNoModelArtifacts
-./gradlew :integrations:android-service-host:testDebugUnitTest \
-  :integrations:android-service-host:lintDebug \
-  :integrations:android-service-host:assembleDebug
-./gradlew :apps:local-llm-phone-test:compileDebugKotlin \
-  :apps:local-llm-phone-test:compileDebugUnitTestKotlin \
-  :apps:local-llm-phone-test:testDebugUnitTest \
-  :apps:local-llm-phone-test:lintDebug \
-  :apps:local-llm-phone-test:assembleDebug
-LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE=true \
-  ./gradlew :apps:local-llm-phone-test:bundleRelease
-./gradlew :backends:llama-cpp:assembleDebug \
-  :apps:device-test-runner:assembleDebug \
-  :apps:device-test-runner:assembleDebugAndroidTest
+./gradlew :integrations:android-service-host:testDebugUnitTest :integrations:android-service-host:lintDebug
+./gradlew :apps:local-llm-phone-test:testDebugUnitTest :apps:local-llm-phone-test:lintDebug :apps:local-llm-phone-test:assembleDebug
 python3 scripts/verify-android-packaging.py
 ```
 
-When an emulator or physical device is available, run the applicable instrumentation/visual check. A signed Play build and representative physical GGUF evidence remain separate release gates; never infer them from successful assembly or emulator tests.
+Run applicable instrumentation/E2E when selected. A signed Play build and representative physical GGUF evidence are separate release gates; never infer Play identity or physical behavior from assembly/emulator success.
 
 ## Maintaining this guide
 
-Update this file in the same change when:
-
-- composition roots, screen state ownership, navigation or destination structure change;
-- model distribution/management, evaluation, observability or validation orchestration moves between classes;
-- a new direct domain dependency or capability is introduced;
-- privacy, persistence, destructive-action or implicit-side-effect rules change;
-- design-system ownership or accessibility expectations change;
-- app unit, instrumentation, lint, bundle, signing or evidence commands change.
-
-Update the root guide only when the app's repository-level responsibility or cross-domain routing changes. Update the focused UX/model/runbook document for behavior details, architecture/ADR docs for durable boundaries, and current state/roadmap for implementation or evidence status. Do not put transient release version, PR or completion status here.
-
-After editing, run from the repository root:
-
-```bash
-python3 scripts/verify-agent-navigation.py
-```
+Update this guide when its ownership/routing or durable local invariants change, including shared-runtime trust/permissions/caller identity. Put detailed behavior in focused feature/UX/runbook docs and architecture boundaries in ADRs; do not record transient PR/version/completion state here. After edits run `python3 scripts/verify-agent-navigation.py`.

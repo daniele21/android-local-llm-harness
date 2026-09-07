@@ -19,6 +19,10 @@ import io.github.daniele21.localllm.transport.binder.contract.negotiateProtocol
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
+fun interface AuthorizedConsumerClientFactory {
+    fun create(caller: AuthorizedCaller): ConsumerLocalLlmClient
+}
+
 private class SharedRuntimeHostInfrastructure(
     val ledger: ClientConnectionLedger,
     val controlExecutor: HostControlExecutor,
@@ -29,7 +33,8 @@ private class SharedRuntimeHostInfrastructure(
 class SharedRuntimeHostDelegate private constructor(
     private val client: LocalLlmClient,
     val protocolInfo: ProtocolInfoParcel,
-    private val consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+    private val runtimeClientFactory: AuthorizedRuntimeClientFactory?,
+    private val consumerClientFactory: AuthorizedConsumerClientFactory?,
     private val consumerControlPlaneHost: ConsumerControlPlaneHost?,
     private val consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
     infrastructure: SharedRuntimeHostInfrastructure,
@@ -49,7 +54,38 @@ class SharedRuntimeHostDelegate private constructor(
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
-        consumerClientFactory = consumerClientFactory,
+        runtimeClientFactory = null,
+        consumerClientFactory = consumerClientFactory?.let { legacyFactory ->
+            AuthorizedConsumerClientFactory { caller -> legacyFactory(caller.applicationId) }
+        },
+        consumerControlPlaneHost = consumerControlPlaneHost,
+        consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
+        infrastructure =
+        SharedRuntimeHostInfrastructure(
+            ledger = ledger,
+            controlExecutor = controlExecutor,
+            readinessExecutor = readinessExecutor,
+            callbackDispatcherFactory = callbackDispatcherFactory,
+        ),
+        logicalJobMetadataStore = NoOpHostLogicalJobMetadataStore,
+    )
+
+    constructor(
+        client: LocalLlmClient,
+        protocolInfo: ProtocolInfoParcel,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory,
+        consumerControlPlaneHost: ConsumerControlPlaneHost? = null,
+        consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost? = null,
+        ledger: ClientConnectionLedger = ClientConnectionLedger(),
+        controlExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        readinessExecutor: HostControlExecutor = BoundedSerialHostControlExecutor(),
+        callbackDispatcherFactory: HostCallbackDispatcherFactory =
+            HostCallbackDispatcherFactory { BoundedSerialHostCallbackDispatcher() },
+    ) : this(
+        client = client,
+        protocolInfo = protocolInfo,
+        runtimeClientFactory = null,
+        consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -65,14 +101,16 @@ class SharedRuntimeHostDelegate private constructor(
     internal constructor(
         client: LocalLlmClient,
         protocolInfo: ProtocolInfoParcel,
-        consumerClientFactory: ((ApplicationId) -> ConsumerLocalLlmClient)?,
+        authorizedRuntimeClientFactory: AuthorizedRuntimeClientFactory?,
+        authorizedConsumerClientFactory: AuthorizedConsumerClientFactory?,
         consumerControlPlaneHost: ConsumerControlPlaneHost?,
         consumerRuntimeReadinessHost: ConsumerRuntimeReadinessHost?,
         logicalJobMetadataStore: HostLogicalJobMetadataStore,
     ) : this(
         client = client,
         protocolInfo = protocolInfo,
-        consumerClientFactory = consumerClientFactory,
+        runtimeClientFactory = authorizedRuntimeClientFactory,
+        consumerClientFactory = authorizedConsumerClientFactory,
         consumerControlPlaneHost = consumerControlPlaneHost,
         consumerRuntimeReadinessHost = consumerRuntimeReadinessHost,
         infrastructure =
@@ -103,7 +141,13 @@ class SharedRuntimeHostDelegate private constructor(
     private val closed = AtomicBoolean(false)
     private val lifecycleLock = Any()
 
-    internal val runtimeOperations = HostRuntimeOperations(client, ledger, resources, controlExecutor)
+    internal val runtimeOperations = HostRuntimeOperations(
+        client = client,
+        ledger = ledger,
+        resources = resources,
+        controlExecutor = controlExecutor,
+        authorizedRuntimeClientFactory = runtimeClientFactory,
+    )
     internal val consumerOperations =
         ConsumerHostOperations(ledger, resources, consumerResources, controlExecutor)
     internal val logicalJobOperations =
@@ -214,10 +258,7 @@ class SharedRuntimeHostDelegate private constructor(
             return
         }
         resources.attachCallbackDispatcher(token, dispatcher)
-        val consumer =
-            consumerClientFactory?.let { factory ->
-                runCatching { factory(caller.applicationId) }.getOrNull()
-            }
+        val consumer = createConsumerClient(caller)
         if (consumerClientFactory != null && consumer == null) {
             cleanupConnection(token, caller)
             callback.onResult(registrationFailure(wireError(WireErrorCodes.TRANSPORT_FAILURE)))
@@ -239,6 +280,10 @@ class SharedRuntimeHostDelegate private constructor(
             resources.attachDeathLink(token, deathLink)
             callback.onResult(registrationSuccess(token, negotiatedMinor, enabledFeatures))
         }
+    }
+
+    private fun createConsumerClient(caller: AuthorizedCaller): ConsumerLocalLlmClient? = consumerClientFactory?.let { factory ->
+        runCatching { factory.create(caller) }.getOrNull()
     }
 
     private fun cleanupConnection(token: HostClientToken, caller: AuthorizedCaller) {

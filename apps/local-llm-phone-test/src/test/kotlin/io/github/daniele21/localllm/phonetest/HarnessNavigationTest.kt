@@ -8,12 +8,13 @@ import org.junit.Test
 
 class HarnessNavigationTest {
     @Test
-    fun `primary destinations expose Apps and keep Diagnostics out of main navigation`() {
+    fun `primary destinations expose Apps and Activity and keep Diagnostics out of main navigation`() {
         assertEquals(
             listOf(
                 HarnessDestination.OVERVIEW,
                 HarnessDestination.PLAYGROUND,
                 HarnessDestination.APPS,
+                HarnessDestination.ACTIVITY,
                 HarnessDestination.PERFORMANCE,
                 HarnessDestination.MODELS,
             ),
@@ -90,6 +91,20 @@ class HarnessNavigationTest {
     }
 
     @Test
+    fun `inference activity detail round trips opaque request ids and stays in Activity shell`() {
+        val requestId = "activity/request with spaces+unicode-è%42"
+        val route = HarnessInferenceActivityRoutes.detail(requestId)
+        val encoded = route.substringAfter("activity/")
+
+        assertFalse(encoded.contains('/'))
+        assertEquals(requestId, HarnessInferenceActivityRoutes.decodeRequestId(encoded))
+        val shell = HarnessRoutes.shellState(route)
+        assertEquals(HarnessDestination.ACTIVITY, shell.destination)
+        assertTrue(shell.isDetail)
+        assertFalse(shell.showBottomNavigation)
+    }
+
+    @Test
     fun `model detail route round trips digest and stable identities`() {
         listOf(
             "digest:${"a".repeat(64)}",
@@ -111,10 +126,13 @@ class HarnessNavigationTest {
     fun `detail routes reject blank identifiers and malformed arguments`() {
         assertTrue(runCatching { HarnessRoutes.requestTimeline("   ") }.isFailure)
         assertTrue(runCatching { HarnessRoutes.modelDetail("   ") }.isFailure)
+        assertTrue(runCatching { HarnessInferenceActivityRoutes.detail("   ") }.isFailure)
         assertNull(HarnessRoutes.decodeRequestId(null))
         assertNull(HarnessRoutes.decodeRequestId("%%%"))
         assertNull(HarnessRoutes.decodeModelIdentity(null))
         assertNull(HarnessRoutes.decodeModelIdentity("%%%"))
+        assertNull(HarnessInferenceActivityRoutes.decodeRequestId(null))
+        assertNull(HarnessInferenceActivityRoutes.decodeRequestId("%%%"))
     }
 
     @Test

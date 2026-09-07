@@ -87,6 +87,29 @@ class ConsumerHostOperationsTest {
     }
 
     @Test
+    fun `authorized consumer factory receives verified caller identity`() {
+        val consumer = FakeConsumerClient(useCaseId)
+        var factoryCaller: AuthorizedCaller? = null
+        val delegate = SharedRuntimeHostDelegate(
+            client = UnusedLocalClient(),
+            protocolInfo = protocolInfo(),
+            authorizedConsumerClientFactory = AuthorizedConsumerClientFactory { authorizedCaller ->
+                factoryCaller = authorizedCaller
+                consumer
+            },
+            controlExecutor = immediateControlExecutor(),
+            callbackDispatcherFactory = immediateDispatcherFactory(),
+        )
+
+        register(delegate)
+
+        assertEquals(caller.uid, factoryCaller?.uid)
+        assertEquals(caller.packageName, factoryCaller?.packageName)
+        assertEquals(caller.applicationId, factoryCaller?.applicationId)
+        assertEquals(caller.allowedUseCases, factoryCaller?.allowedUseCases)
+    }
+
+    @Test
     fun `unauthorized consumer use case is rejected before public client`() {
         val consumer = FakeConsumerClient(useCaseId)
         val delegate =

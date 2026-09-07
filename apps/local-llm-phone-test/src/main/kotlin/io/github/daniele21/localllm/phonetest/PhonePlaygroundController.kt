@@ -9,11 +9,11 @@ import io.github.daniele21.localllm.contracts.GenerationOverrides
 import io.github.daniele21.localllm.contracts.GenerationRequest
 import io.github.daniele21.localllm.contracts.InferencePresetId
 import io.github.daniele21.localllm.contracts.InferencePresetRef
+import io.github.daniele21.localllm.contracts.LocalLlmClient
 import io.github.daniele21.localllm.contracts.LocalLlmError
 import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionOptions
-import io.github.daniele21.localllm.runtime.RuntimeOrchestrator
 import java.util.UUID
 import java.util.concurrent.Executors
 
@@ -102,7 +102,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
     override fun releaseRuntime(onComplete: () -> Unit): Boolean {
         val resources = synchronized(lock) {
             if (state.active || activeSession != null) return false
-            val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
+            val result = RuntimeResources(harness?.client, activeSession, activeHandle)
             harness = null
             activeSession = null
             activeRequestId = null
@@ -129,7 +129,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
 
     override fun close() {
         val resources = synchronized(lock) {
-            val result = RuntimeResources(harness?.runtime, activeSession, activeHandle)
+            val result = RuntimeResources(harness?.client, activeSession, activeHandle)
             harness = null
             activeSession = null
             activeRequestId = null
@@ -147,12 +147,12 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
             check(verification.valid) { "Model integrity verification failed: ${verification.detail}" }
             val currentHarness = runtimeGraph.harnessFor(model, HarnessRuntimePurpose.PLAYGROUND)
             synchronized(lock) { harness = currentHarness }
-            val prepared = currentHarness.runtime.prepare(
+            val prepared = currentHarness.client.prepare(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
             )
             check(prepared.ready) { "Model preparation failed: ${prepared.detail}" }
-            val session = currentHarness.runtime.createSession(
+            val session = currentHarness.client.createSession(
                 currentHarness.applicationId,
                 currentHarness.useCaseId,
                 SessionOptions(
@@ -168,7 +168,7 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
                 input = prompt,
                 overrides = options.toGenerationOverrides(),
             )
-            val handle = currentHarness.runtime.generate(
+            val handle = currentHarness.client.generate(
                 generationRequest,
                 GenerationListener(::onGenerationEvent),
             )
@@ -303,8 +303,8 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
 
     private fun cleanupAfterTerminal() {
         val session = synchronized(lock) { activeSession }
-        val runtime = synchronized(lock) { harness?.runtime }
-        val cleanupFailed = session != null && runCatching { runtime?.closeSession(session) }.isFailure
+        val client = synchronized(lock) { harness?.client }
+        val cleanupFailed = session != null && runCatching { client?.closeSession(session) }.isFailure
         val current = synchronized(lock) {
             if (cleanupFailed) {
                 state = state.copy(
@@ -327,8 +327,8 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
             if (activeRequestId != requestId) return
             activeSession
         }
-        val runtime = synchronized(lock) { harness?.runtime }
-        val cleanupFailed = session != null && runCatching { runtime?.closeSession(session) }.isFailure
+        val client = synchronized(lock) { harness?.client }
+        val cleanupFailed = session != null && runCatching { client?.closeSession(session) }.isFailure
         val failureDetail = sanitizeFailure(error.message ?: error.javaClass.simpleName)
         val current = synchronized(lock) {
             if (activeRequestId != requestId) return
@@ -357,14 +357,14 @@ internal class PhonePlaygroundController(private val runtimeGraph: HarnessRuntim
 
     private fun closeSessionResources(resources: RuntimeResources) {
         runCatching { resources.handle?.cancel() }
-        runCatching { resources.session?.let { resources.runtime?.closeSession(it) } }
+        runCatching { resources.session?.let { resources.client?.closeSession(it) } }
     }
 
     private fun publish(current: PlaygroundState) {
         listener(current)
     }
 
-    private data class RuntimeResources(val runtime: RuntimeOrchestrator?, val session: SessionId?, val handle: GenerationHandle?)
+    private data class RuntimeResources(val client: LocalLlmClient?, val session: SessionId?, val handle: GenerationHandle?)
 
     private companion object {
         const val MAX_PROMPT_CHARACTERS = 32_768

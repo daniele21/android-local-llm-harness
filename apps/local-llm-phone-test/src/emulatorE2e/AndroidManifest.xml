@@ -1,16 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission
+        android:name="io.github.daniele21.localllm.debug.permission.CONTROL_LOCAL_LLM_E2E"
+        android:protectionLevel="signature" />
+
     <application>
         <receiver
             android:name=".EmulatorE2eFaultReceiver"
             android:exported="true"
-            android:permission="${sharedRuntimePermission}">
+            android:permission="io.github.daniele21.localllm.debug.permission.CONTROL_LOCAL_LLM_E2E">
             <intent-filter>
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.PAUSE_GENERATION" />
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION" />
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.RESET" />
                 <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY" />
+                <action android:name="io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY" />
             </intent-filter>
         </receiver>
+
+        <!--
+          Cross-signer emulator E2E reaches this Host-process bridge as adb shell. DUMP keeps the
+          bridge shell-only while the production-shaped Consumer remains unable to access either
+          test-control surface. The bridge shares the canonical emulator fault command handler and
+          never relays through a nested broadcast.
+        -->
+        <receiver
+            android:name=".HarnessEmulatorE2eShellBridgeReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
     </application>
 </manifest>

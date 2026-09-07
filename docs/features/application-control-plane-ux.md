@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: apps/local-llm-phone-test
 Canonical scope: feature.application-control-plane-ux
 Read when: implementing or changing the Harness UI for consumer applications, assigned use cases or inference presets
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-07
 
 ## Purpose
 
@@ -36,7 +36,10 @@ Invariants:
 
 - Harness remains the canonical owner of application authorization, assignments and presets;
 - package and signer identity are exact source-backed security inputs, not descriptive metadata;
-- navigation and inspection are side-effect free: no model load, download or inference;
+- application reads project the currently observed Android package/signer through the same canonical reconciliation rules used before Binder authorization, without granting or persisting authority;
+- a newly observed identity remains Pending and a signer replacement is shown as Identity changed until the user explicitly authorizes that exact identity;
+- Apps and Application detail re-project observed identity when their lifecycle resumes, while preserving an already rendered snapshot to avoid refresh flicker;
+- navigation and identity refresh are side-effect free with respect to inference: no model load, download, preparation or inference-resource acquisition;
 - connection creation, enable/disable and preset changes are explicit mutations followed by canonical re-read;
 - suggested presets are never edited in place;
 - stale revisions never silently overwrite newer state;
@@ -128,6 +131,8 @@ unavailable/incompatible/stale state
 
 Examples include `Reload changes`, `Retry`, `View compatible models` and identity review when the domain supports them. No hidden retry may turn a stale write into a newer write.
 
+When an installed app identity changes while Harness is backgrounded, returning to Apps or Application detail performs a read-only observed-identity refresh. If the signer no longer matches the authorized identity, the UI must converge to `Identity changed`; re-authorization remains an explicit user mutation.
+
 ## View contracts
 
 ### V1 — App connections
@@ -147,6 +152,8 @@ Each row shows, when source-backed:
 - navigation affordance.
 
 Application ID, signer hash and revisions stay out of the list. Empty state explains that a connection authorizes an exact app identity and use case.
+
+The semantic status is based on the currently observed Android identity projection, not only on the last persisted authorization row. Foreground resume refreshes this projection without replacing a loaded list with a full-screen loading state.
 
 ### V2 — New app connection
 
@@ -171,12 +178,16 @@ Goal: answer **can this app connect, and what does it use Harness for?**
 
 Show app name, package, semantic status, source-backed activity context and assigned use cases.
 
-`Allow app connection` is available only for reversible Authorized/Disabled states:
+`Allow app connection` reflects the effective observed identity state at the most recent projection:
 
-- Enabled: the app may authenticate to the shared runtime for its assignments;
-- Disabled: Binder access is blocked while configuration remains intact.
+- Enabled: the persisted authorization matches the currently observed exact package/signer identity and the app may authenticate to the shared runtime for its assignments;
+- Disabled: Binder access is blocked while configuration remains intact;
+- Pending: an observed identity is known but has not been explicitly authorized;
+- Identity changed: the observed signer no longer matches the previously authorized identity and access must be re-authorized explicitly.
 
-The switch is unavailable while saving or when identity state requires recovery. Every mutation persists before the UI reports success.
+The switch is unavailable while saving or when identity state requires recovery, except for the explicit authorization/re-authorization path supported by the domain. Every mutation persists before the UI reports success.
+
+When the detail lifecycle resumes, Harnex re-reads the source-observed identity through the read-only reconciliation projection. This refresh does not load or prepare a model, acquire inference resources or silently authorize an identity.
 
 Technical details may include application ID, signer fingerprint and first/last seen timestamps.
 
@@ -302,7 +313,7 @@ App-specific composition stays in `apps/local-llm-phone-test`; reusable primitiv
 
 ## Privacy, navigation and ownership
 
-Opening Apps/app/use-case/preset is observational only. Explicit create/enable/disable/save actions are visibly distinguished from navigation.
+Opening Apps/app/use-case/preset and foreground identity refresh are observational only. The observed Android identity may be projected into read state, but it does not become new persisted authority until an explicit authorization mutation succeeds. Explicit create/enable/disable/save actions are visibly distinguished from navigation.
 
 Route concepts:
 
@@ -316,7 +327,7 @@ Route concepts:
 
 Route arguments use bounded opaque IDs, not package/signer/domain serialization. Process recreation re-reads canonical state.
 
-Compose renders immutable ViewModel state. Screens never access Room/control-plane repositories directly. Mutations run through the Activity-scoped Applications ViewModel and neutral gateways.
+Compose renders immutable ViewModel state. Screens never access Room/control-plane repositories directly. Mutations run through the Activity-scoped Applications ViewModel and neutral gateways. Source-observed identity is projected by the phone control-plane access boundary so the Applications UI and Binder authorization share the same reconciliation semantics.
 
 ## Acceptance
 
@@ -325,6 +336,9 @@ The feature is complete only when all applicable evidence agrees:
 - Apps is discoverable from compact and expanded navigation;
 - `New app connection` persists an exact authorization relationship;
 - application detail can enable/disable Binder access while retaining configuration;
+- Apps/Application detail refresh observed identity on foreground resume without flicker or inference activation;
+- a new observed signer projects as Pending and a signer replacement projects as Identity changed without mutating persisted authorization;
+- explicit authorization/re-authorization commits the exact observed identity before reporting Enabled;
 - app -> use case -> preset drill-down works without exposing raw bindings as the primary model;
 - custom generation overrides are editable, persisted and applied during activation;
 - every user-editable numeric value uses `HarnessNumberField` with domain validation;
@@ -332,6 +346,6 @@ The feature is complete only when all applicable evidence agrees:
 - stale revisions fail closed;
 - gateway/domain, Binder-policy, persistence and runtime-activation tests cover the new invariants;
 - adaptive/accessibility semantics remain intact;
-- the repository-selected STRONG automated preflight passes on the exact branch HEAD.
+- the repository selector chooses the validation profile from the final diff and all required deterministic automated gates pass on the exact branch HEAD.
 
 Representative two-APK device evidence remains a separate `REAL_ENVIRONMENT` requirement only when a release/effective-runtime claim needs physical-device proof. A screenshot alone is not completion evidence.

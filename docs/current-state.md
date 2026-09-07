@@ -5,88 +5,89 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-07
 
-This is the operational ledger for integrated state, blockers and immediate work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail stays in its focused workstream/specification.
+This is the operational ledger for integrated state, blockers and immediate work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail stays in focused workstreams.
 
 ## Integration lines
 
 - `dev` is the canonical base/target for ordinary work and Internal Testing candidates.
 - `main` is the stable/release line.
 - New work starts from the latest green `dev` unless explicitly hotfixed.
-- The 2026-09-04 Harnex release promotion is complete and the resulting `main` merge commit has been synchronized back into `dev` per ADR 0008.
+- Stable promotions preserve `main` ancestry in `dev` before the next `dev -> main` release cycle, per ADR 0008.
+- Repository governance is aligned to `repo-template-sw` `0.11.0` with proportional product-development routing plus the local Android/local-AI/product-UI customizations recorded in `.engineering/baseline.json`.
 
 ## Integrated baseline
 
-### Runtime and models
+### Runtime, product and control plane
 
-The repository has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, GGUF inspection/verified installation, explicit model lifecycle, generation/streaming/cancellation, single-decode scheduling, memory-pressure handling, model-aware context planning, output constraints and versioned presets. Product support remains curated Qwen3.5 dense 0.8B/2B; exact artifact/runtime choice is Harnex-owned. Q35-1..5 are complete; Q35-6 still needs representative-device tuning evidence. See [`qwen35/README.md`](qwen35/README.md).
+Harnex has pinned `llama.cpp`, reproducible Android `arm64-v8a` packaging, verified GGUF installation, model/generation lifecycle, cancellation, scheduling, memory-pressure handling, model-aware planning, output constraints and presets. Product support is curated Qwen3.5 dense 0.8B/2B plus the reviewed 4B **4-bit-only** candidate tier; the 4B artifacts remain `CANDIDATE` pending exact-artifact representative-device runtime, memory, thermal and output-quality evidence. Q35-6 still needs representative-device tuning evidence.
 
-### Android product and control plane
-
-`apps/local-llm-phone-test` exposes Overview, Playground, Applications, Performance, Models, Diagnostics and Settings over real repository sources. Public identity is **Harnex** — **“Your local AI harness for Android.”** Historical `Harness*`, package/Binder IDs and compatibility filenames remain technical identifiers.
-
-Applications control-plane work is complete through ACUX-80 and CPREC-10..70. Startup reconciles mandatory built-ins before UI/Binder readers, preserves valid custom/default/disabled state and stays off the main thread. CPREC-80/90 and broader phone UX/runtime claims still require representative-device evidence. See [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md).
+`apps/local-llm-phone-test` exposes Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings. Applications control-plane work is complete through ACUX-80 and CPREC-10..70; broader representative-device UX/runtime evidence remains.
 
 ### Shared runtime and Consumer boundary
 
-SR-0..5 and repository-side SR-6 release-evidence tooling are integrated; representative physical SR-6 evidence remains. The Consumer boundary uses signature-protected Binder access, versioned Maven artifacts and durable logical jobs with explicit cancellation and exact prepared execution identity.
+SR-0..5 and repository-side SR-6 tooling are integrated. The public Consumer SDK is now `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.11`; publication from the integrated Harnex candidate completed successfully, including unauthenticated downstream consumption from the public Maven repository.
 
-Background/process lifecycle hardening is integrated through durable logical jobs, detached execution ownership, explicit cancellation, exact prepared execution identity and started/foreground Host demand. HBG-42 reconciles stale persisted non-terminal jobs to `INTERRUPTED` across Host restart without claiming native work survives process death.
+ADR 0018 is the active trust boundary for consumer applications regardless of whether a particular first-party pair currently shares a signing lineage. The public Harnex service is explicitly bindable with no custom bind permission so Consumer-before-Host installation cannot permanently block reachability. Reachability is not authorization: authority remains fail-closed Binder UID -> exact installed package -> current signer -> Harnex Control Plane authorization -> enabled use case. Known external consumers are source-observed as `PENDING`; signer replacement becomes `SIGNATURE_CHANGED`; both require explicit user authorization.
 
-The final LAS runtime/Binder fixes are integrated from source identity `6b34fe9fcba70f6b8abd107fd58b61c418ac737d`. They preserve accepted cancellation when a concurrent backend error arrives, close Binder connection-loss ordering races, prevent stale endpoint failures from tearing down replacement registrations and make the reusable Two-APK candidate build Host + Consumer SDK from one exact Harnex revision.
-
-The public Consumer SDK `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.10` is published successfully from that integrated source. The corresponding Harnex phone-test is also published to Google Play Internal Testing.
+Consumer SDK `disconnect()` is part of alpha.11 and supports reversible Settings-owned disconnect/reconnect without weakening Harnex authority. Emulator-only fault/control authority remains separate from production inference authority: the ordinary fault receiver is signature protected and the bounded shell bridge exists only in the Harnex `emulatorE2e` Host process.
 
 ### Cross-repository RedactGuard evidence
 
-RedactGuard consumes alpha.10 and the validated product baseline from source identity `0e329c49e8ce5985b3677e9ca5566bc3cb6f3b96` is now on its stable `main` line.
+RedactGuard now consumes immutable Consumer SDK `0.1.0-alpha.11` and exposes explicit Connect / Disconnect / Retry behavior in Settings while leaving authorization Harnex-owned.
 
-The final RedactGuard PR candidate passed FULL integration validation and the complete API 35 Two-APK lifecycle/fault/serialization matrix against Harnex `6b34fe9f...`. Exact integrated RedactGuard source also passed `Validate` push run #949 and Play Internal publication run #4; the subsequent direct `dev -> main` promotion passed RELEASE/FULL Validate #953 before merge.
+Exact automated evidence is green for both cross-app paths:
 
-That automated evidence covers Host absence, cross-process product flow, ViewModel/Home continuity, Binder loss/reconnect without implicit cancellation, explicit cancellation, Host process loss/restart, critical-pressure interruption, RedactGuard process-loss privacy behavior and independent-consumer deterministic serialization.
+- distinct-signer Consumer-first install -> Host absent -> later Harnex install without RedactGuard reinstall -> `PENDING` -> exact Harnex authorization -> Connect / Disconnect / Reconnect -> replacement signer denied as `SIGNATURE_CHANGED`;
+- the complete Two-APK product/lifecycle/fault matrix, including ViewModel/Home continuity and Binder cancellation/process-loss/critical-pressure handling.
 
-A representative manual product run has additionally confirmed the real Android application works end to end. This is product acceptance evidence, not a replacement for the formal ARM64/JNI/GGUF/resource identity bundle where those stronger claims are required.
+The focused physical Play Internal run confirms the real current pre-release distribution journey: RedactGuard-first, Harnex-later without reinstall, source-observed `PENDING`, exact authorization, Connect / Disconnect / Reconnect and representative production Consumer SDK/Binder/local-inference execution all work on device.
 
-### Stable release promotion
+The Play signing metadata collected for that physical run reports the **same current Play App Signing SHA-256 digest for Harnex and RedactGuard**. Under ADR 0018 this is acceptable for the current pre-release first-party stable repository promotion because the topology is recorded truthfully and distinct-signer authorization remains covered by deterministic release-identity evidence. This physical run must not be described as distinct-signer Play qualification.
 
-The validated Harnex baseline was promoted to `main` through PR #530 after RELEASE/FULL Validate #3834, Package Android Artifacts #507, Consumer SDK validation #360, model-distribution #539, evaluation-dataset #147, evaluation-persistence #151, repository-health #899, documentation #1459 and native-host validation were green on the exact promotion head.
+The commits added after the published/runtime-qualified candidates are limited to documentation, repository governance, verification scripts and workflow-policy surfaces; no Harnex app/runtime source or Android build configuration changed. The physical journey therefore remains applicable to the current runtime/product tree.
 
-The resulting `main` merge commit was synchronized back into `dev` through PR #531, restoring explicit shared ancestry for the next development cycle. The corresponding RedactGuard release was promoted through PR #195 and synchronized back to its `dev` through PR #196.
+### Consumer API, OMBRA, evaluation and audit
 
-### Consumer API, OMBRA and evaluation
+CA-0..4 are integrated; RedactGuard remains a pure Consumer SDK client and concrete model/runtime/residency authority stays in Harnex. OMB-6B identity approval, OMB-8 measured quality execution and physical evidence remain open. Model-evaluation work is integrated through EVAL-D-09 with later Android runner/persistence/comparison work continuing.
 
-CA-0..4 are integrated; RedactGuard remains a pure Consumer SDK client and concrete model/runtime/residency authority stays in Harnex. OMBRA repository work includes document ingestion, deterministic analysis planning/validation, host-owned PII use-case policy, redaction/export, product UI, synthetic corpus v2 and pre-registered quality policy v1. OMB-6B identity approval, OMB-8 measured quality execution and physical two-APK evidence remain open. Canonical state: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md) and [`shared-runtime/consumer-api/pii-redactor/roadmap.md`](shared-runtime/consumer-api/pii-redactor/roadmap.md).
+Local inference Activity/audit is integrated under ADR 0017: accepted inference history uses bounded encrypted app-private storage, verified Binder caller attribution and truthful restart reconciliation; normal telemetry/diagnostics stay content-free.
 
-Model-evaluation contracts/evaluators and core dataset pipeline are integrated through EVAL-D-09; Android import D-10 and runner/persistence/comparison/Performance work continue. See [`model-evaluation/README.md`](model-evaluation/README.md).
+## Release evidence state
 
-## Open blockers
+### Pre-release stable promotion
 
-### 1. Representative Android evidence
+The focused Play install-order/authorization/runtime evidence is complete for the current pre-release topology. The same-signer first-party Play pair is explicitly recorded and is not used as the Binder authorization mechanism. Distinct-signer support remains proven deterministically. Therefore signer topology is **not a blocker for this pre-release `dev -> main` promotion** once the resulting exact HEAD/base passes required RELEASE/FULL automated validation.
 
-LAS-07 and the remaining CRV/SR/Q35/phone resource claims require representative physical Android evidence. LAS-07 specifically requires a physical `arm64-v8a` device, the production JNI/llama.cpp path, a real compatible GGUF and exact Harnex/RedactGuard candidate identities. Physical memory/thermal/OEM observations remain distinct from emulator evidence.
+### Deferred public-release signer obligation
 
-A successful ordinary manual app run is useful product acceptance evidence, but does not automatically satisfy every LAS-07 identity/scenario requirement. Play Internal builds are useful for on-device testing, while the canonical same-signer two-APK Binder claim still depends on verified signer identity.
+Before the first public release that depends on independently signed application distribution, or before claiming physical distinct-signer Play qualification, rerun the focused physical journey with distinct observed Play signing identities. This obligation is deferred to that public-release milestone; it must not be silently dropped or misrepresented as already proven.
 
-### 2. OMBRA and follow-on work
+### Representative Android runtime evidence
 
-OMB-6B remains review-gated; OMB-8 must execute reviewed Qwen3.5 artifact/configuration identities against policy v1 without lowering thresholds to fit results. Remaining parallel work includes representative RAM/thermal/device restoration evidence, model evaluation and the [LLUP residency-qualification workstream](workstreams/llama-cpp-v0-3-residency-qualification.md) where ownership does not conflict.
+LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence. These claim-specific gaps do not become proven merely because the stable repository line advances.
+
+### OMBRA and follow-on work
+
+OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration identities against policy v1. Model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP continue independently where ownership does not conflict.
 
 ## Immediate next block
 
-1. execute LAS-07 only for the representative physical claims it genuinely owns, retaining exact source/APK/model/device identity;
-2. continue OMB-6B and OMB-8 from the now-stable cross-repository baseline;
-3. continue model evaluation, Q35 device tuning, RAM/thermal evidence and LLUP independently where ownership does not conflict;
-4. keep future release tags/artifacts tied to exact validated `main` commits and preserve the ADR 0008 `main -> dev` synchronization after promotions.
+1. run RELEASE/FULL on the exact current `dev` HEAD against live `main` after the evidence-contract amendment;
+2. promote reconciled `dev` to stable `main` when those required automated gates are green;
+3. retain the distinct-signer physical Play confirmation as a blocking obligation for the first applicable public release / physical distinct-signer readiness claim;
+4. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator or focused Play evidence as broader physical proof.
 
 ## Source links
 
+- Product strategy / decision boundaries: [`product.md`](product.md)
 - Consumer SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
-- Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
-- Control-plane reconciliation: [`workstreams/control-plane-state-reconciliation.md`](workstreams/control-plane-state-reconciliation.md)
+- Independent consumer authorization: [`adr/0018-independently-signed-consumer-authorization.md`](adr/0018-independently-signed-consumer-authorization.md)
+- Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
+- Local inference audit: [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md), [`adr/0017-durable-local-inference-audit.md`](adr/0017-durable-local-inference-audit.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
 - Model evaluation: [`model-evaluation/README.md`](model-evaluation/README.md)
 - Qwen3.5: [`qwen35/README.md`](qwen35/README.md)
-- LLUP / llama.cpp residency qualification: [`workstreams/llama-cpp-v0-3-residency-qualification.md`](workstreams/llama-cpp-v0-3-residency-qualification.md)
-- Harnex 0.5: [`releases/harness-0.5.md`](releases/harness-0.5.md)
+- LLUP: [`workstreams/llama-cpp-v0-3-residency-qualification.md`](workstreams/llama-cpp-v0-3-residency-qualification.md)

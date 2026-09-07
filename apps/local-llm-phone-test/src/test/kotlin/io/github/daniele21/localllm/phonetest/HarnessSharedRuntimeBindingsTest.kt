@@ -11,11 +11,34 @@ import org.junit.Test
 
 class HarnessSharedRuntimeBindingsTest {
     @Test
-    fun `release host authorizes only exact release console package`() {
+    fun `release host package selects release client topology`() {
+        assertFalse(
+            HarnessSharedRuntimeBindings.usesDebugClientPackageTopology(
+                HarnessSharedRuntimeBindings.HOST_RELEASE_PACKAGE,
+            ),
+        )
         assertEquals(
             setOf(HarnessSharedRuntimeBindings.CONSOLE_RELEASE_PACKAGE),
             HarnessSharedRuntimeBindings.consolePackages(debugHost = false),
         )
+    }
+
+    @Test
+    fun `debug host package selects debug client topology`() {
+        assertTrue(
+            HarnessSharedRuntimeBindings.usesDebugClientPackageTopology(
+                HarnessSharedRuntimeBindings.HOST_DEBUG_PACKAGE,
+            ),
+        )
+    }
+
+    @Test
+    fun `unknown host package cannot select a peer topology`() {
+        assertThrows(IllegalStateException::class.java) {
+            HarnessSharedRuntimeBindings.usesDebugClientPackageTopology(
+                "io.github.daniele21.localllm.phonetest.unreviewed",
+            )
+        }
     }
 
     @Test

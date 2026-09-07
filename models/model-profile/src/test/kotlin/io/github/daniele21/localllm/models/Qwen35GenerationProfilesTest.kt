@@ -7,8 +7,8 @@ import org.junit.Test
 
 class Qwen35GenerationProfilesTest {
     @Test
-    fun profilesResolveOfficialSamplerBaselinesDeterministically() {
-        Qwen35ModelTier.entries.forEach { tier ->
+    fun existingTiersKeepTheirValidatedSamplerBaselines() {
+        listOf(Qwen35ModelTier.B0_8, Qwen35ModelTier.B2).forEach { tier ->
             val profiles = Qwen35GenerationProfiles.forTier(tier)
             assertEquals(Qwen35GenerationProfileId.entries.toSet(), profiles.map { it.id }.toSet())
             val text = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY }.defaults
@@ -20,17 +20,54 @@ class Qwen35GenerationProfilesTest {
             assertEquals(2f, text.presencePenalty)
             assertEquals(1f, text.repeatPenalty)
             assertEquals(ReasoningStreamProtocol.QWEN35_THINK_TAGS, text.reasoningStreamProtocol)
-            val thinking = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_THINKING }.defaults
-            assertEquals(ThinkingMode.ENABLED, thinking.thinkingMode)
-            assertEquals(1f, thinking.temperature)
-            assertEquals(0.95f, thinking.topP)
-            assertEquals(1.5f, thinking.presencePenalty)
-            assertEquals(ReasoningStreamProtocol.QWEN35_THINK_TAGS, thinking.reasoningStreamProtocol)
-            val precise = profiles.single { it.id == Qwen35GenerationProfileId.QWEN35_PRECISE }.defaults
-            assertEquals(ThinkingMode.ENABLED, precise.thinkingMode)
-            assertEquals(0.6f, precise.temperature)
-            assertEquals(0f, precise.presencePenalty)
         }
+    }
+
+    @Test
+    fun fourBitFourBProfilesMatchUnslothGuidance() {
+        val profiles = Qwen35GenerationProfiles.forTier(Qwen35ModelTier.B4)
+        assertEquals(Qwen35GenerationProfileId.entries.toSet(), profiles.map { it.id }.toSet())
+
+        assertSampler(
+            profiles,
+            Qwen35GenerationProfileId.QWEN35_TEXT_FAST,
+            ThinkingMode.DISABLED,
+            temperature = 0.7f,
+            topP = 0.8f,
+            presencePenalty = 1.5f,
+        )
+        assertSampler(
+            profiles,
+            Qwen35GenerationProfileId.QWEN35_TEXT_QUALITY,
+            ThinkingMode.DISABLED,
+            temperature = 1f,
+            topP = 0.95f,
+            presencePenalty = 1.5f,
+        )
+        assertSampler(
+            profiles,
+            Qwen35GenerationProfileId.QWEN35_THINKING,
+            ThinkingMode.ENABLED,
+            temperature = 1f,
+            topP = 0.95f,
+            presencePenalty = 1.5f,
+        )
+        assertSampler(
+            profiles,
+            Qwen35GenerationProfileId.QWEN35_PRECISE,
+            ThinkingMode.ENABLED,
+            temperature = 0.6f,
+            topP = 0.95f,
+            presencePenalty = 0f,
+        )
+        assertSampler(
+            profiles,
+            Qwen35GenerationProfileId.QWEN35_JSON,
+            ThinkingMode.DISABLED,
+            temperature = 0.7f,
+            topP = 0.8f,
+            presencePenalty = 1.5f,
+        )
     }
 
     @Test
@@ -38,6 +75,7 @@ class Qwen35GenerationProfilesTest {
         val expected = mapOf(
             Qwen35ModelTier.B0_8 to (192 to 256),
             Qwen35ModelTier.B2 to (384 to 512),
+            Qwen35ModelTier.B4 to (384 to 512),
         )
 
         expected.forEach { (tier, budgets) ->
@@ -61,5 +99,24 @@ class Qwen35GenerationProfilesTest {
 
         assertEquals("</think>", protocol.closeMarker)
         assertEquals("</think>\n\n", protocol.forcedCloseText)
+    }
+
+    private fun assertSampler(
+        profiles: List<Qwen35GenerationProfile>,
+        id: Qwen35GenerationProfileId,
+        thinkingMode: ThinkingMode,
+        temperature: Float,
+        topP: Float,
+        presencePenalty: Float,
+    ) {
+        val defaults = profiles.single { it.id == id }.defaults
+        assertEquals(thinkingMode, defaults.thinkingMode)
+        assertEquals(temperature, defaults.temperature)
+        assertEquals(topP, defaults.topP)
+        assertEquals(20, defaults.topK)
+        assertEquals(0f, defaults.minP)
+        assertEquals(presencePenalty, defaults.presencePenalty)
+        assertEquals(1f, defaults.repeatPenalty)
+        assertEquals(ReasoningStreamProtocol.QWEN35_THINK_TAGS, defaults.reasoningStreamProtocol)
     }
 }
