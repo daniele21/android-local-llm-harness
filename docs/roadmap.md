@@ -52,7 +52,7 @@ Implemented:
 - scoped PR validation, cumulative `dev` validation and complete promotion validation;
 - protected promotion, hotfix and forward-port rules in ADR 0008;
 - reproducible Android packaging and launcher assets;
-- `repo-template-sw` `0.10.0` governance baseline with preserved Harnex-specific customizations;
+- `repo-template-sw` `0.11.0` product-engineering governance baseline with preserved Harnex-specific customizations;
 - prior stable Harnex/RedactGuard release promotion history with explicit `main -> dev` ancestry synchronization.
 
 Remaining:
