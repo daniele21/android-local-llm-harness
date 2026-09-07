@@ -58,7 +58,7 @@ Curated starting points are source-backed product policy, not runtime ranking:
 
 - Qwen3.5 0.8B `Q4_K_M` is the lightweight default already described by the curated release;
 - Qwen3.5 2B `Q4_K_M` is the quality default already described by the curated release;
-- Qwen3.5 4B `UD-Q4_K_XL` is the Unsloth-guided 4-bit default selected by ADR 0019.
+- Qwen3.5 4B `UD-Q4_K_XL` is the Unsloth-guided reviewed starting variant and preferred Harnex validation candidate defined by ADR 0019.
 
 A **Recommended** label means "start with this reviewed artifact for this size tier". It does not claim measured superiority, certification or device performance. Compatibility, certification and measured performance remain separate source-backed evidence.
 
