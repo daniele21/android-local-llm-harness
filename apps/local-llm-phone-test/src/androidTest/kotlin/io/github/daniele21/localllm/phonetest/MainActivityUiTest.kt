@@ -1,6 +1,7 @@
 package io.github.daniele21.localllm.phonetest
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -87,16 +88,19 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Recommended").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("6 other variants").performScrollTo().assertIsDisplayed()
         assertTextAbsent("Q4_K_M")
+        holdForMediaEvidence()
         captureModelsEvidence("collapsed")
 
         composeRule.onNodeWithText("6 other variants").performClick()
         composeRule.onNodeWithText("Q4_K_M").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Show fewer").performScrollTo().assertIsDisplayed()
+        holdForMediaEvidence()
         captureModelsEvidence("expanded")
 
         composeRule.onNodeWithText("Show fewer").performClick()
         awaitText("6 other variants")
         assertTextAbsent("Q4_K_M")
+        holdForMediaEvidence()
     }
 
     @Test
@@ -153,6 +157,11 @@ class MainActivityUiTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private fun holdForMediaEvidence() {
+        composeRule.waitForIdle()
+        SystemClock.sleep(1_000)
     }
 
     private fun captureModelsEvidence(name: String) {
