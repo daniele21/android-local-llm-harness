@@ -43,12 +43,11 @@ internal object HarnessSharedRuntimeBindings {
      * The release-identity emulator topology is intentionally debuggable while using the production Host package.
      * Treating BuildConfig.DEBUG as package identity would make that topology observe the wrong consumer package.
      */
-    fun usesDebugClientPackageTopology(hostPackageName: String): Boolean =
-        when (hostPackageName) {
-            HOST_DEBUG_PACKAGE -> true
-            HOST_RELEASE_PACKAGE -> false
-            else -> error("Unsupported Harnex host package identity: $hostPackageName")
-        }
+    fun usesDebugClientPackageTopology(hostPackageName: String): Boolean = when (hostPackageName) {
+        HOST_DEBUG_PACKAGE -> true
+        HOST_RELEASE_PACKAGE -> false
+        else -> error("Unsupported Harnex host package identity: $hostPackageName")
+    }
 
     fun consolePackages(debugHost: Boolean): Set<String> = if (debugHost) {
         setOf(CONSOLE_DEBUG_PACKAGE, CONSOLE_INTERNAL_PACKAGE)
