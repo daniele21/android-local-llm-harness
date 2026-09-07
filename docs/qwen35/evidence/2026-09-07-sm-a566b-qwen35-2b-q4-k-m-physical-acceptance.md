@@ -1,12 +1,12 @@
 # Qwen3.5 2B Q4_K_M physical acceptance — Samsung SM-A566B
 
-Status: **PASS**  
-Captured: `2026-09-07T12:08:25Z`  
-Device: Samsung `SM-A566B`  
-Android: `16` / API `36` / `arm64-v8a`  
-Reported RAM: `7,777,300,480` bytes  
-Model: Qwen3.5 2B `Q4_K_M`  
-Model SHA-256: `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`  
+Status: **PASS**
+Captured: `2026-09-07T12:08:25Z`
+Device: Samsung `SM-A566B`
+Android: `16` / API `36` / `arm64-v8a`
+Reported RAM: `7,777,300,480` bytes
+Model: Qwen3.5 2B `Q4_K_M`
+Model SHA-256: `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223`
 Manifest SHA-256: `2e5e87749ea38a2bb9d309da43f9c112ee0bc93742c92b55e19b5de293095535`
 
 ## What this proves
