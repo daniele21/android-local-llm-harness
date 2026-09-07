@@ -39,6 +39,8 @@ Without a shared layer, each app has to deal with models, GGUF files, JNI, runti
 
 Harnex moves those concerns behind one Android-owned boundary. Consumer apps keep their product workflow; Harnex owns model resolution, runtime policy, model residency, execution lifecycle and runtime evidence.
 
+Durable product decision boundaries, quality promises and success signals live in [`docs/product.md`](docs/product.md).
+
 ## Why this is more than a llama.cpp wrapper
 
 Harnex is an Android **local-AI control plane and shared runtime**. `llama.cpp` is the current execution backend, not the architecture.
@@ -196,7 +198,7 @@ Today:
 - Consumer Android SDK `0.1.0-alpha.11` is published from the current validated Harnex baseline and includes reversible `disconnect()`;
 - the corresponding Harnex phone-test candidate is published to Google Play Internal Testing;
 - RedactGuard consumes alpha.11, is published to Play Internal Testing, and its Consumer-first/PENDING/authorize/Connect/Disconnect/Reconnect/signer-replacement evidence is green with a distinct signer;
-- repository governance is aligned to `repo-template-sw` `0.10.0` while preserving Harnex-specific Android/local-AI/product-UI customizations;
+- repository governance is aligned to `repo-template-sw` `0.11.0` with explicit product-development routing while preserving Harnex-specific Android/local-AI/product-UI customizations;
 - product support is currently curated around Qwen3.5 dense 0.8B and 2B;
 - actual Play App Signing identity confirmation plus representative physical ARM64/JNI/GGUF, memory, thermal, OEM and selected release evidence remain separate real-environment gates.
 
@@ -206,6 +208,7 @@ The exact integrated state and blockers live in [`docs/current-state.md`](docs/c
 
 | Need | Start here |
 | --- | --- |
+| Product strategy / decision boundaries | [`docs/product.md`](docs/product.md) |
 | Current state | [`docs/current-state.md`](docs/current-state.md) |
 | Architecture | [`docs/architecture.md`](docs/architecture.md) |
 | Local inference Activity/audit | [`docs/features/local-inference-activity-audit.md`](docs/features/local-inference-activity-audit.md) |
@@ -217,7 +220,7 @@ The exact integrated state and blockers live in [`docs/current-state.md`](docs/c
 
 ## Develop and validate
 
-Contributors work from `dev` and follow [`AGENTS.md`](AGENTS.md).
+Contributors work from `dev` and follow [`AGENTS.md`](AGENTS.md). Canonical product-development routing lives in [`.engineering/product.json`](.engineering/product.json).
 
 For documentation-only changes, use the repository documentation guards. For implementation changes, run the narrowest checks that cover the affected boundary before expanding validation.
 
