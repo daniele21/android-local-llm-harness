@@ -37,7 +37,7 @@ jobs:
       - name: Checkout exact Harness source
         uses: actions/checkout@v7
         with:
-          repository: daniele21/android-local-llm-harness
+          repository: daniele21/harnex
           ref: ${{ inputs.harness_ref }}
           fetch-depth: 1
           submodules: recursive
