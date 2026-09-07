@@ -1,21 +1,40 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable released changes to Harnex are documented here.
 
-The format is based on Keep a Changelog, and the project follows Semantic Versioning for published SDK artifacts.
+Published SDK artifacts follow [Semantic Versioning](https://semver.org/). Host application, Consumer SDK, Binder protocol and model/runtime identities are versioned independently; see [`docs/versioning.md`](docs/versioning.md).
 
 ## [Unreleased]
 
+Harnex `0.5.0` is the current pre-release integration target. It is not production-ready until the applicable release and physical-device evidence gates are complete.
+
 ### Added
 
-- Initial Android multi-module harness scaffold.
-- Explicit application/use-case-to-GGUF model binding contracts.
-- `llama.cpp` JNI boundary stub.
-- Local LLM Console shell and observability contracts.
-- Reproducible build-tool version catalog.
-- Formatting, static-analysis, lint and CI foundations.
-- Detailed architecture and implementation plan.
+- Android local-AI control plane and shared runtime architecture.
+- Curated local GGUF model installation, integrity verification, selection and runtime residency lifecycle.
+- Pinned `llama.cpp` Android backend behind a backend-neutral runtime SPI.
+- Streaming local generation, cooperative cancellation, explicit sessions and recoverable runtime lifecycle.
+- Versioned Android Consumer SDK and Binder transport for external applications.
+- Android-identity-based Consumer authorization using Binder UID, installed package, signing identity, Harnex authorization and enabled use case.
+- Reversible Consumer `connect()` / `disconnect()` plus terminal `close()` lifecycle.
+- Durable logical inference jobs that can be queried after transient Binder reconnects without duplicate submission.
+- Connected Harnex Android product surfaces: Overview, Playground, Activity, Applications, Performance, Models, Diagnostics and Settings.
+- Privacy-safe runtime telemetry, health, benchmark, memory and thermal evidence.
+- Bounded encrypted local inference Activity/audit separated from normal telemetry and logs.
+- Automated repository architecture, Consumer SDK, Binder, lifecycle, UI and evidence validation.
+- Explicit physical-device evidence contracts for claims that cannot be established by emulator/host CI.
 
-## [0.1.0] - TBD
+### Changed
 
-First development release. It will not imply a production-ready inference backend until the Phase 1 acceptance criteria are met.
+- Project identity is now **Harnex — Your local AI harness for Android**.
+- Product/runtime model support is curated around reviewed Qwen3.5 GGUF artifacts rather than arbitrary model-family claims.
+- Runtime policy, model lifecycle and observability are host-owned rather than duplicated in Consumer applications.
+- Repository governance follows the `repo-template-sw` engineering model while preserving Harnex-specific Android/local-AI constraints.
+
+### Current public development artifact
+
+- Consumer Android SDK: `io.github.daniele21.localllm:consumer-android:0.1.0-alpha.11`.
+
+## Release history
+
+The first tagged Harnex release will establish the normal dated release sections below this line. Until then, pre-release implementation history remains available through Git history and the active [`docs/releases/harness-0.5.md`](docs/releases/harness-0.5.md) release checklist.
