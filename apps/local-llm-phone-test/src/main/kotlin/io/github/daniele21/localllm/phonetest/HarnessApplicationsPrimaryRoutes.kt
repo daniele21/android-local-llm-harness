@@ -1,5 +1,10 @@
 package io.github.daniele21.localllm.phonetest
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -12,6 +17,8 @@ internal fun NavGraphBuilder.installApplicationsListRoute(
     callbacks: HarnessApplicationsGraphCallbacks,
 ) {
     composable(HarnessDestination.APPS.route) {
+        val applicationsViewModel = activityApplicationsViewModel()
+        HarnessObservedIdentityRefreshEffect(applicationsViewModel)
         HarnessApplicationsScreen(
             state = state,
             onRefresh = callbacks.onRefresh,
@@ -40,6 +47,7 @@ internal fun NavGraphBuilder.installApplicationDetailRoute(
         ),
     ) { entry ->
         val applicationsViewModel = activityApplicationsViewModel()
+        HarnessObservedIdentityRefreshEffect(applicationsViewModel)
         val applicationId = HarnessApplicationRoutes.decodeApplicationId(
             entry.arguments?.getString(HarnessApplicationRoutes.APPLICATION_ID_ARGUMENT),
         )
@@ -127,6 +135,20 @@ internal fun NavGraphBuilder.installAssignmentRoute(
                 ),
             )
         }
+    }
+}
+
+@Composable
+private fun HarnessObservedIdentityRefreshEffect(viewModel: HarnessApplicationsReadViewModel) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshObservedIdentity()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 
