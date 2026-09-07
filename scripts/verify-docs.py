@@ -102,93 +102,41 @@ def _schema2_main() -> int:
         "active_workstream",
         "architecture",
         "feature_doc",
+        "product_source",
     }
     missing = required_budgets - set(budgets)
     if missing:
         errors.append(f"documentation policy missing budgets: {sorted(missing)}")
     else:
-        _check_budget(
-            root / "AGENTS.md",
-            root,
-            "root AGENTS",
-            budgets["root_agents"],
-            exceptions,
-            chars_per_token,
-            errors,
-        )
-        _check_budget(
-            root / "docs/current-state.md",
-            root,
-            "current state",
-            budgets["current_state"],
-            exceptions,
-            chars_per_token,
-            errors,
-        )
-        _check_budget(
-            root / "docs/architecture.md",
-            root,
-            "architecture",
-            budgets["architecture"],
-            exceptions,
-            chars_per_token,
-            errors,
-        )
+        _check_budget(root / "AGENTS.md", root, "root AGENTS", budgets["root_agents"], exceptions, chars_per_token, errors)
+        _check_budget(root / "docs/product.md", root, "product source", budgets["product_source"], exceptions, chars_per_token, errors)
+        _check_budget(root / "docs/current-state.md", root, "current state", budgets["current_state"], exceptions, chars_per_token, errors)
+        _check_budget(root / "docs/architecture.md", root, "architecture", budgets["architecture"], exceptions, chars_per_token, errors)
 
         excluded = set(policy.get("context_exclude_directories", []))
         for guide in root.rglob("AGENTS.md"):
-            if guide == root / "AGENTS.md" or any(
-                part in excluded for part in guide.relative_to(root).parts
-            ):
+            if guide == root / "AGENTS.md" or any(part in excluded for part in guide.relative_to(root).parts):
                 continue
-            _check_budget(
-                guide,
-                root,
-                "scoped AGENTS",
-                budgets["scoped_agents"],
-                exceptions,
-                chars_per_token,
-                errors,
-            )
+            _check_budget(guide, root, "scoped AGENTS", budgets["scoped_agents"], exceptions, chars_per_token, errors)
 
         feature_root = root / "docs/features"
         if feature_root.is_dir():
             for path in feature_root.glob("*.md"):
                 if path.name != "README.md":
-                    _check_budget(
-                        path,
-                        root,
-                        "feature doc",
-                        budgets["feature_doc"],
-                        exceptions,
-                        chars_per_token,
-                        errors,
-                    )
+                    _check_budget(path, root, "feature doc", budgets["feature_doc"], exceptions, chars_per_token, errors)
 
         workstream_root = root / "docs/workstreams"
-        completed_markers = tuple(
-            marker.lower() for marker in policy.get("completed_workstream_markers", [])
-        )
+        completed_markers = tuple(marker.lower() for marker in policy.get("completed_workstream_markers", []))
         active_count = 0
         if workstream_root.is_dir():
             for path in workstream_root.glob("*.md"):
                 if path.name == "README.md" or path.name.startswith("_"):
                     continue
                 active_count += 1
-                _check_budget(
-                    path,
-                    root,
-                    "active workstream",
-                    budgets["active_workstream"],
-                    exceptions,
-                    chars_per_token,
-                    errors,
-                )
+                _check_budget(path, root, "active workstream", budgets["active_workstream"], exceptions, chars_per_token, errors)
                 text = path.read_text(encoding="utf-8").lower()
                 if any(marker in text for marker in completed_markers):
-                    errors.append(
-                        f"completed workstream kept active: {path.relative_to(root)}; finalize/delete by default"
-                    )
+                    errors.append(f"completed workstream kept active: {path.relative_to(root)}; finalize/delete by default")
         else:
             active_count = 0
 
