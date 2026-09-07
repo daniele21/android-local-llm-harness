@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-client
 Canonical scope: shared-runtime.consumer-android-sdk
 Read when: publishing, versioning, validating or consuming the external Android Consumer SDK artifact
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-07
 
 ## Public dependency
 
@@ -18,6 +18,12 @@ implementation("io.github.daniele21.localllm:consumer-android:<version>")
 The publication carries `core-contracts` and the Binder contract transitively. Consumers must not use `project(...)`, composite builds, git submodules or a Harnex source checkout.
 
 Current candidate: `0.1.0-alpha.11`.
+
+### Runnable onboarding sample
+
+[`../../samples/hello-harnex`](../../samples/hello-harnex/README.md) is the canonical runnable external-app example. It is a standalone Android application that resolves the public Consumer SDK, configures an exact Harnex package/service, exposes its current signing-certificate SHA-256 for Harnex authorization and executes one real assigned local-inference use case.
+
+Use it to understand the smallest production-shaped lifecycle without reading repository internals. The separate `samples/external-consumer-android` project remains the Maven/API-ABI compatibility fixture.
 
 ## Published artifacts
 
@@ -70,7 +76,12 @@ Run:
 bash scripts/verify-consumer-sdk-publication.sh
 ```
 
-The verification publishes release variants to a run-owned local Maven repository under `build/consumer-sdk-repository`, then builds the separate `samples/external-consumer-android` project using Maven coordinates only. A successful run also writes source-aware manifest/checksum evidence.
+The verification publishes release variants to a run-owned local Maven repository under `build/consumer-sdk-repository`, then builds both external consumers from those Maven coordinates only:
+
+- `samples/external-consumer-android` for API/ABI and dependency-surface compatibility;
+- `samples/hello-harnex` for the runnable onboarding integration.
+
+The gate also rejects source/composite/project coupling and writes source-aware manifest/checksum evidence for the published artifacts.
 
 Public API/ABI compatibility is deterministic and already gated. The canonical baseline is:
 
