@@ -34,17 +34,11 @@ internal class HarnessObservedApplicationIdentityReconciler(
     fun reconcileIfNeeded(): HostControlPlaneState {
         val observedAtEpochMs = epochClock()
         val reconciler = reconciler()
-        val current = store.snapshot()
-        return when (val preview = reconcile(reconciler, current, observedAtEpochMs)) {
-            is HarnessControlPlaneReconciliationResult.Success -> {
-                if (!preview.changed) {
-                    preview.state
-                } else {
-                    store.transact { latest -> reconcile(reconciler, latest, observedAtEpochMs).state }
-                }
-            }
-
-            is HarnessControlPlaneReconciliationResult.Conflict -> throw conflict(preview)
+        val preview = reconcile(reconciler, store.snapshot(), observedAtEpochMs)
+        return if (!preview.changed) {
+            preview.state
+        } else {
+            store.transact { latest -> reconcile(reconciler, latest, observedAtEpochMs).state }
         }
     }
 
