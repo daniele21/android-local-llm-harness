@@ -1,56 +1,58 @@
 # Harnex — Coding Agent Guide
 
-Harnex is the Android local-AI harness: it owns runtime lifecycle, policy, Binder sharing and inference orchestration. Keep inference local; never add silent cloud fallback or content logging.
+Harnex is the Android local-AI harness/control plane. Consumer apps own product workflows; Harnex owns governed model/runtime policy, Binder sharing and inference lifecycle. Keep inference local: no silent cloud fallback or content logging.
 
 ## Durable invariants
 
-- Model/runtime/Binder state has one canonical owner; UI and adapters translate, they do not duplicate policy.
-- JNI handles, jobs, models, processes and temporary evidence are bounded, cancellable and cleaned on every exit path.
+- Durable product mission/users/outcomes/principles live in `docs/product.md`; architecture/features implement them without duplicating product truth.
+- Model/runtime/Binder state has one canonical owner; UI/adapters translate rather than duplicate policy.
+- Android caller identity + Harnex authorization is the shared-runtime authority; caller-declared identity is not.
+- JNI handles, jobs, models, processes and evidence are bounded, cancellable and cleaned on every exit path.
 - Public Binder/Consumer changes require direct-consumer compatibility evidence.
 - Emulator proof never implies ARM64 JNI/llama.cpp, real GGUF, physical memory/thermal or OEM behavior.
-- Build/package identity and immutable successful artifact semantics remain truthful.
-- Product UI follows the user task, hierarchy, progressive disclosure, accessibility/adaptive behavior and canonical design tokens/components.
+- Build/package identity and immutable successful-artifact semantics remain truthful.
 
 ## Ownership
 
-| Change | Owner | Direct consumers / proof |
-| --- | --- | --- |
-| Public/runtime contracts | `core/contracts`, `core/backend-spi`, `core/runtime-core` | adapters, fakes, owner tests |
-| Model/lifecycle truth | `models/model-store`, control-plane stores | runtime/control-plane tests |
-| Binder protocol/client | `transports/android-binder-*` | `apps/shared-runtime-client-consumer-fixture`, service host, consumer tests |
-| Host/process boundary | `integrations/android-service-host` | two-APK journeys |
-| Native execution | `backends/llama-cpp`, `third_party/llama.cpp` | JNI/native/package gates |
-| Product UI | `apps/local-llm-console`, phone surfaces, `design/ux-contract.json` | design-system tests + journeys |
+| Change | Owner / proof |
+| --- | --- |
+| Product mission/users/outcomes/principles | `docs/product.md`, `.engineering/product.json` |
+| Public/runtime contracts | `core/contracts`, `core/backend-spi`, `core/runtime-core`; adapters/fakes/tests |
+| Model/lifecycle truth | `models/model-store`, control-plane stores; runtime/control-plane tests |
+| Binder/client/Host | `transports/android-binder-*`, `integrations/android-service-host`; consumer/two-APK evidence |
+| Native execution | `backends/llama-cpp`, `third_party/llama.cpp`; JNI/native/package gates |
+| Product experience | phone/console surfaces + `design/*`; design-system/journey evidence |
 
-Follow applicable scoped `AGENTS.md`. Extend the owner before adding parallel state; inspect material consumers when a shared boundary changes.
+Follow applicable scoped `AGENTS.md`; extend the canonical owner before adding parallel state.
 
 ## Read by task
 
 | Task | Read now |
 | --- | --- |
-| Pure docs/copy | affected source/links; `docs/README.md` only if ownership is unclear |
-| Behavior/bug/contract | `skills/structured-change/SKILL.md`, `skills/validate-change/SKILL.md`, relevant `.engineering/commands.json` |
-| Material product UI | above + `skills/design-product-experience/SKILL.md` and relevant `design/*` |
-| Integration/release | `skills/preflight-change/SKILL.md`, commands and affected `.engineering/e2e.json` |
+| Docs/copy | affected owner; `docs/README.md` if routing is unclear |
+| Product capability/behavior/strategy shaping | `.engineering/product.json`, `docs/product.md`, `skills/shape-product-change/SKILL.md` |
+| Behavior/bug/contract | `skills/structured-change/SKILL.md`, `skills/validate-change/SKILL.md`, relevant commands |
+| Material UI | above + `skills/design-product-experience/SKILL.md`, relevant `design/*` |
+| Integration/release | `skills/preflight-change/SKILL.md`, commands, `.engineering/e2e.json` |
 | Missing deterministic remote gate | `skills/remote-preflight/SKILL.md` |
-| Persistent multi-session work | `skills/plan-workstream/SKILL.md` + active plan; `docs/current-state.md` carries repository-level integrated/blocker/next truth; finalize with `skills/finalize-workstream/SKILL.md` |
+| Persistent work | `skills/plan-workstream/SKILL.md` + active plan; finalize via `skills/finalize-workstream/SKILL.md` |
 
-Read architecture/features/ADRs only for concrete questions. Upstream adoption/update guidance applies only to explicit standard migrations.
+## Product and delivery boundaries
 
-## Delivery boundaries
+Product depth, delivery stage and validation depth are independent.
 
-- **ITERATION**: owner-local falsification; no exact-head/full-diff/docs/publication ceremony after each edit.
-- **INTEGRATION**: coherent outcome ready for `dev`; affected docs, exact candidate/base, required automated gates and affected critical E2E. Material UI/UX integration journeys require `FULL_MEDIA`. Residual physical confirmation is `DEFERRED_TO_RELEASE`.
-- **RELEASE**: `FULL` release evidence plus every applicable blocking real-environment confirmation.
+- `PRODUCT_NONE/LOCAL`: no broad product ceremony; preserve settled intent and prove the local outcome.
+- `PRODUCT_FEATURE/STRATEGIC`: establish user/problem/outcome, material value/usability/feasibility/viability risks, assumptions, non-goals and success before substantial implementation. Discovery may narrow, change or reject the requested solution.
+- `ITERATION`: owner-local falsification; no publication ceremony after each edit.
+- `INTEGRATION`: coherent outcome ready for `dev`; current docs, exact candidate/base, required automated gates and affected E2E. Material UI/UX journeys use `FULL_MEDIA`; residual physical proof is `DEFERRED_TO_RELEASE`.
+- `RELEASE`: `FULL` release evidence plus applicable blocking real-environment confirmation.
 
-Stage and validation depth are independent. Resolve risk dimensions into required gates; unknown executable scope fails safe stronger. Missing local tooling does not make the user the Gradle/native runner. Reuse only provably equivalent trusted evidence. Prefer early convergence; stacked publication is exception-only.
+`SHIPPED` proves delivery, not product impact. Define post-release learning only when real use must answer something material; telemetry is not mandatory.
 
 ## Context, diagnosis and completion
 
-Use bounded search/output and reuse unchanged reads. `.engineering/documentation-policy.json` owns representative context routes; `python3 scripts/verify_agent_context.py --route bug --format json` reports character-based estimates. Add `--path <affected-path>` or `--workstream <plan>` when useful; routes never authorize omitting relevant source or instructions.
+`.engineering/documentation-policy.json` owns bounded context routes; use `--route product` for material shaping and `--route bug` for implementation. Routes never authorize omitting relevant owners/source.
 
-For meaningful work state the observable outcome, owner, preserved invariants and proof in the task/PR. On failure classify before patching. Each failed repair needs a falsifiable hypothesis; after two failed repairs with the same signature, change diagnostic strategy and gather discriminating evidence before a third.
+Resolve risks into gates; missing local tooling is `REMOTE_AUTOMATED`, not user-run work. Reuse only provably equivalent trusted evidence. On failure classify before patching; after two failed repairs with the same signature, change diagnostic strategy and gather discriminating evidence.
 
-On resume refresh source/base identity and use checkpoint evidence as pointers, not current-source proof. Before integration update affected canonical docs. Transfer durable truth and deferred release obligations before deleting completed plans.
-
-Surface unresolved material ambiguity, privacy/security conflicts, duplicate ownership, unbounded resources, stale integration docs, unavailable required automation or evidence/claim mismatch. Never suppress legitimate tests, hide failed/pending gates or downgrade evidence merely to obtain PASS.
+Before integration update affected canonical docs. Transfer durable truth and deferred release obligations before deleting completed plans. Never suppress legitimate tests, hide failed/pending gates, leak sensitive content or downgrade evidence merely to obtain PASS.
