@@ -3,7 +3,7 @@ package io.github.daniele21.localllm.catalog
 /** Administrator-curated Qwen3.5 releases available to the product. */
 object CuratedModelCatalog {
     val catalogId = CatalogId("android-local-llm-curated")
-    const val REVISION: Long = 5
+    const val REVISION: Long = 6
 
     val releases: List<CatalogModelRelease> =
         Qwen35CuratedModelReleases.releases + Qwen35FourBitModelReleases.releases
