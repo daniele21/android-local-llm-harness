@@ -12,7 +12,7 @@ internal object PhoneCatalogCompatibilityPresentation {
         result: CatalogCompatibilityResult,
         device: CatalogDeviceProfile,
     ): String? = result.reasons
-        .takeIf(List<CatalogCompatibilityReason>::isNotEmpty)
+        .takeIf { it.isNotEmpty() }
         ?.joinToString(separator = "\n") { reason -> reason.message(release, result, device) }
 
     private fun CatalogCompatibilityReason.message(
