@@ -84,11 +84,9 @@ private fun ModelsGroupSection(
             shownItems.forEachIndexed { index, item ->
                 val model = environment.distributionByStableId[item.stableId] ?: return@forEachIndexed
                 UnifiedModelVariantRow(
-                    state = environment.state,
+                    environment = environment,
                     item = item,
                     model = model,
-                    actions = environment.actions,
-                    onOpenModelDetails = environment.onOpenModelDetails,
                     loading = environment.loadingStableId == item.stableId,
                     suggested = item.stableId == group.suggestedModelId,
                     showCompatibilityDetail = commonCompatibilityDetail == null,
