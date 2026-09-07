@@ -4,6 +4,18 @@ Samples demonstrate public consumption boundaries without making repository-inte
 
 ## Available
 
+### `hello-harnex`
+
+The **runnable onboarding sample** for external Android developers. It is a standalone app that consumes the published Consumer SDK, shows its exact package/signer identity, guides the user through Harnex authorization and runs one real local inference through Binder.
+
+Start here if you want to answer: **“How does another Android app actually use Harnex?”**
+
+```bash
+./gradlew -p samples/hello-harnex :app:installDebug
+```
+
+See [`hello-harnex/README.md`](hello-harnex/README.md) for the five-minute flow.
+
 ### `external-consumer-android`
 
 A standalone Gradle project used to prove that the published Consumer Android SDK can be consumed through normal Maven coordinates without a Harnex source checkout, composite build or project dependency.
@@ -29,4 +41,4 @@ A Harnex sample should:
 - fail closed when authorization or negotiated capability is unavailable;
 - remain small enough that the Harnex integration boundary is obvious.
 
-A future end-user `hello-harnex` sample should be a runnable Android application rather than extending the publication fixture until it becomes a second hidden test harness.
+`hello-harnex` owns developer onboarding; `external-consumer-android` owns Maven/API compatibility proof. Do not merge those responsibilities into one hidden test harness.
