@@ -65,15 +65,17 @@ class MainActivity : Activity() {
         root.addView(keyValue("Signer SHA-256", signer, selectable = true))
         root.addView(keyValue("Use case", "Document PII detection"))
         root.addView(keyValue("Initial preset", "Balanced"))
-        root.addView(Button(this).apply {
-            text = "Copy signer SHA-256"
-            isAllCaps = false
-            setOnClickListener {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Hello Harnex signer SHA-256", signer))
-                statusValue.text = "Signer copied. Paste it into the Harnex app connection."
-            }
-        })
+        root.addView(
+            Button(this).apply {
+                text = "Copy signer SHA-256"
+                isAllCaps = false
+                setOnClickListener {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Hello Harnex signer SHA-256", signer))
+                    statusValue.text = "Signer copied. Paste it into the Harnex app connection."
+                }
+            },
+        )
 
         root.addView(space(24))
         root.addView(section("2 · Connect"))
@@ -224,21 +226,19 @@ class MainActivity : Activity() {
         setPadding(0, 0, 0, dp(10))
     }
 
-    private fun keyValue(key: String, value: String, selectable: Boolean = false): LinearLayout =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(4), 0, dp(8))
-            addView(label(key, 12f, Typeface.BOLD))
-            addView(label(value, 14f).apply { setTextIsSelectable(selectable) })
-        }
+    private fun keyValue(key: String, value: String, selectable: Boolean = false): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(0, dp(4), 0, dp(8))
+        addView(label(key, 12f, Typeface.BOLD))
+        addView(label(value, 14f).apply { setTextIsSelectable(selectable) })
+    }
 
-    private fun label(text: String, sizeSp: Float, style: Int = Typeface.NORMAL): TextView =
-        TextView(this).apply {
-            this.text = text
-            textSize = sizeSp
-            setTypeface(typeface, style)
-            setLineSpacing(0f, 1.12f)
-        }
+    private fun label(text: String, sizeSp: Float, style: Int = Typeface.NORMAL): TextView = TextView(this).apply {
+        this.text = text
+        textSize = sizeSp
+        setTypeface(typeface, style)
+        setLineSpacing(0f, 1.12f)
+    }
 
     private fun space(heightDp: Int): View = View(this).apply {
         layoutParams = LinearLayout.LayoutParams(1, dp(heightDp))
