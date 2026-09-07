@@ -15,6 +15,7 @@ Harnex `0.5.0` is the current pre-release integration target. It is not producti
 - Pinned `llama.cpp` Android backend behind a backend-neutral runtime SPI.
 - Streaming local generation, cooperative cancellation, explicit sessions and recoverable runtime lifecycle.
 - Versioned Android Consumer SDK and Binder transport for external applications.
+- Runnable standalone `samples/hello-harnex` onboarding app, compiled against the published Consumer SDK rather than repository-internal modules.
 - Android-identity-based Consumer authorization using Binder UID, installed package, signing identity, Harnex authorization and enabled use case.
 - Reversible Consumer `connect()` / `disconnect()` plus terminal `close()` lifecycle.
 - Durable logical inference jobs that can be queried after transient Binder reconnects without duplicate submission.
