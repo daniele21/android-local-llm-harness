@@ -228,25 +228,6 @@ class MainActivity : Activity() {
         statusValue.text = "Failed: ${error.message ?: error::class.java.simpleName}"
     }
 
-    @Suppress("DEPRECATION")
-    private fun currentSignerSha256(): String {
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        val packageInfo = packageManager.getPackageInfo(packageName, flags)
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            requireNotNull(packageInfo.signingInfo).apkContentsSigners.orEmpty().toList()
-        } else {
-            packageInfo.signatures.orEmpty().toList()
-        }
-        val signature = signatures.firstOrNull() ?: error("App signing certificate is unavailable")
-        return MessageDigest.getInstance("SHA-256")
-            .digest(signature.toByteArray())
-            .joinToString(":") { byte -> "%02X".format(byte.toInt() and 0xff) }
-    }
-
     private companion object {
         val ACTIVE_CONNECTION_STATES = setOf(
             SharedRuntimeConnectionState.BINDING,
@@ -254,6 +235,25 @@ class MainActivity : Activity() {
             SharedRuntimeConnectionState.CONNECTED,
         )
     }
+}
+
+@Suppress("DEPRECATION")
+private fun Context.currentSignerSha256(): String {
+    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        PackageManager.GET_SIGNING_CERTIFICATES
+    } else {
+        PackageManager.GET_SIGNATURES
+    }
+    val packageInfo = packageManager.getPackageInfo(packageName, flags)
+    val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        requireNotNull(packageInfo.signingInfo).apkContentsSigners.orEmpty().toList()
+    } else {
+        packageInfo.signatures.orEmpty().toList()
+    }
+    val signature = signatures.firstOrNull() ?: error("App signing certificate is unavailable")
+    return MessageDigest.getInstance("SHA-256")
+        .digest(signature.toByteArray())
+        .joinToString(":") { byte -> "%02X".format(byte.toInt() and 0xff) }
 }
 
 private fun Context.section(text: String): TextView = label(text, 20f, Typeface.BOLD).apply {
