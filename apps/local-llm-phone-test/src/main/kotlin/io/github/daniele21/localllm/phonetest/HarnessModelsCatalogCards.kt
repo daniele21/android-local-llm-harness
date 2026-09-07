@@ -132,21 +132,16 @@ private fun ModelVariantIdentity(
         modifier = modifier,
         verticalArrangement = Arrangement.Center,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Text(
+            text = item.quantization ?: model.quantization,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        if (suggested) {
             Text(
-                text = item.quantization ?: model.quantization,
-                style = MaterialTheme.typography.titleMedium,
+                text = "Recommended",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
             )
-            if (suggested) {
-                Text(
-                    text = "Recommended",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
         }
         Text(
             text = "${formatModelBytes(model.sizeBytes)} · ${modelVariantStatusLabel(item, loading)}",
