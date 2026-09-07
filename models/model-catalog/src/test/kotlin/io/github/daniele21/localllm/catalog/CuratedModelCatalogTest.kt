@@ -15,7 +15,7 @@ class CuratedModelCatalogTest {
 
         val validation = CatalogValidator().validate(document, GENERATED_AT + 1)
         assertTrue(validation.violations.toString(), validation.valid)
-        assertEquals(5L, document.revision)
+        assertEquals(6L, document.revision)
 
         val codec = CatalogJsonCodec()
         val encoded = codec.encode(document) as CatalogEncodeResult.Success
@@ -53,9 +53,40 @@ class CuratedModelCatalogTest {
             setOf("IQ4_XS", "IQ4_NL", "Q4_0", "Q4_1", "Q4_K_S", "Q4_K_M", "UD-Q4_K_XL"),
             releases.mapTo(linkedSetOf()) { it.artifact.quantization },
         )
-        assertTrue(releases.all { it.compatibility.minRamBytes == 8_000_000_000 })
+        assertTrue(releases.all { it.compatibility.minRamBytes == 7_000_000_000 })
         assertTrue(releases.all { it.compatibility.recommendedRamBytes == 12_000_000_000 })
         assertTrue(releases.all { it.artifact.downloadUri.toString().contains("e87f176479d0855a907a41277aca2f8ee7a09523") })
+    }
+
+    @Test
+    fun fourBAdmissionUsesAndroidReportedRamFloorWithoutTreatingEightGbAsExactBytes() {
+        val release = CuratedModelCatalog.releases.first { it.id.modelId.value == "qwen35-4b-q4-k-m" }
+        val target =
+            CatalogTarget(
+                applicationId = ApplicationId("play-internal-phone-test"),
+                useCaseId = UseCaseId("manual-inference-playground"),
+            )
+        val evaluator =
+            CatalogCompatibilityEvaluator(
+                versionMatcher = AcceptingVersionMatcher,
+                profileResolver = AcceptingProfileResolver,
+            )
+
+        val compatible = evaluator.evaluate(
+            release = release,
+            target = target,
+            device = fourBDevice(totalMemoryBytes = 7_500_000_000),
+        )
+        val incompatible = evaluator.evaluate(
+            release = release,
+            target = target,
+            device = fourBDevice(totalMemoryBytes = 6_900_000_000),
+        )
+
+        assertTrue(compatible.reasons.toString(), compatible.compatible)
+        assertTrue(compatible.warnings.contains(CatalogCompatibilityWarning.RAM_BELOW_RECOMMENDED))
+        assertFalse(incompatible.compatible)
+        assertTrue(incompatible.reasons.contains(CatalogCompatibilityReason.INSUFFICIENT_RAM))
     }
 
     @Test
@@ -90,6 +121,15 @@ class CuratedModelCatalogTest {
         assertEquals(listOf(CatalogCompatibilityWarning.RELEASE_CANDIDATE), result.warnings)
         assertFalse(result.reasons.contains(CatalogCompatibilityReason.RELEASE_UNAVAILABLE))
     }
+
+    private fun fourBDevice(totalMemoryBytes: Long): CatalogDeviceProfile = CatalogDeviceProfile(
+        sdkInt = 36,
+        supportedAbis = setOf("arm64-v8a"),
+        totalMemoryBytes = totalMemoryBytes,
+        availableStorageBytes = 10_000_000_000,
+        harnessVersion = "0.3.0",
+        backendId = "llama.cpp",
+    )
 
     private object AcceptingVersionMatcher : CatalogVersionMatcher {
         override fun isInRange(currentVersion: String, minimumInclusive: String?, maximumExclusive: String?): Boolean = true

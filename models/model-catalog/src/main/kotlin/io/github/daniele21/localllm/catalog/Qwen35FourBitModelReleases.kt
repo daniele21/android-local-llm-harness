@@ -4,6 +4,8 @@ package io.github.daniele21.localllm.catalog
 internal object Qwen35FourBitModelReleases {
     private const val SOURCE_REVISION = "e87f176479d0855a907a41277aca2f8ee7a09523"
     private const val SOURCE_URL = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF"
+    private const val MIN_REPORTED_RAM_BYTES = 7_000_000_000L
+    private const val RECOMMENDED_RAM_BYTES = 12_000_000_000L
 
     val releases: List<CatalogModelRelease> =
         listOf(
@@ -76,8 +78,8 @@ internal object Qwen35FourBitModelReleases {
             fileName = fileName,
             architecture = "qwen35",
             quantization = quantization,
-            minRamBytes = 8_000_000_000,
-            recommendedRamBytes = 12_000_000_000,
+            minRamBytes = MIN_REPORTED_RAM_BYTES,
+            recommendedRamBytes = RECOMMENDED_RAM_BYTES,
             profileKey = "qwen35-4b-$idSuffix-ctx4096",
             licenseId = "Apache-2.0",
             sourceUrl = SOURCE_URL,

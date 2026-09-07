@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: apps/local-llm-phone-test
 Canonical scope: phone.models.distribution
 Read when: changing connected-app catalog, download, installation or recovery orchestration
-Last reviewed: 2026-08-06
+Last reviewed: 2026-09-07
 
 `apps/local-llm-phone-test` connects the administrator-curated bootstrap catalog to the existing secure download and explicit installation boundaries.
 
@@ -46,12 +46,12 @@ The device profile includes:
 
 - Android API level;
 - supported ABIs;
-- total RAM;
+- total RAM reported by Android through `ActivityManager.MemoryInfo.totalMem`;
 - available app-private storage;
 - Harness application version;
 - backend ID `llama.cpp`.
 
-The Models screen displays compatible and incompatible releases. Incompatible releases include typed compatibility reasons and cannot be downloaded.
+The Models screen displays compatible and incompatible releases. Incompatible releases cannot be downloaded. The controller preserves the typed compatibility reasons and also derives a user-readable explanation with the relevant measured device value and required threshold where available. That explanation is surfaced on the catalog card and carried into model Details rather than collapsing every failure to a generic “not compatible” state.
 
 Remote catalog synchronization remains a separate follow-up. The current bootstrap catalog is already administrator controlled, but changing it still requires an application update.
 
