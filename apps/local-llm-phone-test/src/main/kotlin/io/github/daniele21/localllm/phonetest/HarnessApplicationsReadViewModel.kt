@@ -54,22 +54,14 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
     }
 
     fun refresh() {
-        val attached = gateway
-        if (attached == null) {
-            mutableState.value = HarnessApplicationsReadState.Failed("Applications source is unavailable")
-            return
-        }
-        val token = generation.incrementAndGet()
-        mutableMutationState.value = HarnessApplicationsMutationState.Idle
-        mutableState.value = HarnessApplicationsReadState.Loading
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = runCatching(attached::snapshot)
-            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
-            mutableState.value = result.fold(
-                onSuccess = HarnessApplicationsReadState::Loaded,
-                onFailure = { HarnessApplicationsReadState.Failed("Applications could not be loaded") },
-            )
-        }
+        refreshSnapshot(showLoading = true, resetMutationState = true)
+    }
+
+    /** Re-reads source-observed application identity without replacing an already-rendered snapshot with a loader. */
+    fun refreshObservedIdentity() {
+        if (mutableState.value !is HarnessApplicationsReadState.Loaded) return
+        if (mutableMutationState.value == HarnessApplicationsMutationState.Saving) return
+        refreshSnapshot(showLoading = false, resetMutationState = false)
     }
 
     fun setApplicationConnectionEnabled(applicationId: String, enabled: Boolean) {
@@ -173,6 +165,25 @@ internal class HarnessApplicationsReadViewModel : ViewModel() {
     fun clearMutationFeedback() {
         if (mutableMutationState.value != HarnessApplicationsMutationState.Saving) {
             mutableMutationState.value = HarnessApplicationsMutationState.Idle
+        }
+    }
+
+    private fun refreshSnapshot(showLoading: Boolean, resetMutationState: Boolean) {
+        val attached = gateway
+        if (attached == null) {
+            mutableState.value = HarnessApplicationsReadState.Failed("Applications source is unavailable")
+            return
+        }
+        val token = generation.incrementAndGet()
+        if (resetMutationState) mutableMutationState.value = HarnessApplicationsMutationState.Idle
+        if (showLoading) mutableState.value = HarnessApplicationsReadState.Loading
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching(attached::snapshot)
+            if (!isCurrentGeneration(generation, token, gateway, attached)) return@launch
+            mutableState.value = result.fold(
+                onSuccess = HarnessApplicationsReadState::Loaded,
+                onFailure = { HarnessApplicationsReadState.Failed("Applications could not be loaded") },
+            )
         }
     }
 
