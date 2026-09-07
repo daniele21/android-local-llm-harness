@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-validation
 Canonical scope: shared-runtime.validation-rollout
 Read when: adding shared-runtime tests, two-APK device execution, evidence, compatibility matrices or release gates
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-07
 
 ## Goal
 
@@ -60,13 +60,17 @@ Independent-consumer path:
 - host: `apps/local-llm-phone-test`;
 - consumer: a separately developed application such as RedactGuard using the packaged/source-built exact Consumer SDK candidate;
 - Host and consumer/test APKs use distinct signing identities;
+- cross-repository emulator evidence uses debug-testable build machinery configured to the production application IDs `io.github.daniele21.localllm.phonetest` and `io.github.daniele21.redactguard`, so package routing matches the release topology while signing remains ephemeral CI identity;
 - the Consumer is installed before the Host in the install-order proof and must reach the explicit exported service afterward without Consumer reinstall;
 - the public inference service has no custom bind permission;
 - Harnex observes the exact installed consumer package/current signer as `PENDING`;
 - consumer is denied by Binder/Control Plane policy before explicit Harnex authorization;
 - Host-owned authorization promotes only that exact observed identity;
+- disabling the authorized identity fails closed on a fresh Consumer connection and explicit reauthorization restores it;
 - authorized connect -> disconnect -> reconnect is exercised without sharing signing credentials;
 - a replacement signer cannot inherit prior authorization.
+
+The release-identity emulator topology proves deterministic package/Binder/Control Plane behavior only. It is not evidence for release minification, production signing, Play App Signing identity, ARM64 JNI/GGUF execution or representative hardware behavior.
 
 Packaged SR-6 fixture path remains useful for same-publisher packaged-AAR and invalid-signer denial evidence. It is not, by itself, evidence that an independently distributed consumer works.
 
@@ -88,7 +92,7 @@ SR-6 packaged release-like evidence capture:
 scripts/capture-shared-runtime-release-evidence.sh
 ```
 
-Cross-repository independent-signer CI owns the production-topology Binder authorization proof for external consumers. Its evidence must record exact Harnex/consumer source revisions, distinct APK signer digests, Consumer-before-Host reachability and the deny -> explicit authorize -> connect/disconnect/reconnect -> replacement signer denied sequence.
+Cross-repository independent-signer CI owns the production-package-topology Binder authorization proof for external consumers. Its evidence must record exact Harnex/consumer source revisions, exact Host/consumer application IDs, distinct APK signer digests, Consumer-before-Host reachability and the deny -> explicit authorize -> connect/disconnect/reconnect -> Host disable/deny -> reauthorize/reconnect -> replacement signer denied sequence.
 
 The SR-6 physical runner remains appropriate for runtime/device evidence and same-publisher packaged fixture scenarios. For an independently distributed Play consumer, Play Internal installation and physical confirmation record the actual Host/consumer Play App Signing identities rather than pretending local external signing keys are equivalent to Play.
 
@@ -101,6 +105,7 @@ The SR-6 physical runner remains appropriate for runtime/device evidence and sam
 | Host present, model absent | Bind/auth can succeed; prepare fails explicitly without download. | SR-4/SR-6 |
 | Known independent consumer first observed | Persisted pending; Binder runtime access denied. | Host tests + independent-signer E2E |
 | Explicitly authorized independent consumer | Exact package/current signer can register only for enabled use cases. | independent-signer E2E |
+| Authorized independent consumer disabled | Fresh Consumer connection is denied until explicit Harnex reauthorization. | independent-signer E2E |
 | Consumer signer replaced | Fail closed as signature-changed until explicit reauthorization. | Host tests + replacement evidence where required |
 | Unknown/mismatched signer | Authorization denied before runtime information. | deterministic/E2E negative |
 | Valid same-publisher client | Register, prepare, stream, complete and close when intentionally configured. | SR-4 + packaged fixture |
@@ -215,7 +220,7 @@ It excludes GGUF bytes, prompt/output/schema text, app-private paths, Binder tok
 | SR-VAL-08 | IN PROGRESS | Physical release-like functional/lifecycle runner is implemented; representative device evidence remains claim-dependent. |
 | SR-VAL-09 | PLANNED | Compare Binder overhead against matching in-process evidence on the same device/model/profile identity. |
 | SR-VAL-10 | IN PROGRESS | Packaged release AAR consumer is executable; final security/public-API/versioning/release review remains pending. |
-| SR-VAL-11 | IN PROGRESS | Distinct-signer external consumer Consumer-before-Host -> deny -> authorize -> disconnect/reconnect -> replacement-denied E2E is integrated and awaits exact-head confirmation. |
+| SR-VAL-11 | IN PROGRESS | Distinct-signer external consumer release-package topology covers Consumer-before-Host -> deny -> authorize -> reconnect -> Host disable/deny -> reauthorize/reconnect -> replacement-denied and awaits exact-head confirmation. |
 
 ## Merge gate
 
