@@ -15,13 +15,15 @@ import java.security.MessageDigest
 internal object HarnessSharedRuntimePolicy {
     fun authorizedClients(context: Context): List<AuthorizedClientPolicy> {
         val hostSigningCertificates = currentPackageSigningCertificates(context, context.packageName, includeHistory = true)
+        val debugClientPackageTopology =
+            HarnessSharedRuntimeBindings.usesDebugClientPackageTopology(context.packageName)
         val internal = AuthorizedClientPolicy(
             packageName = context.packageName,
             applicationId = HarnessRuntimeGraph.APPLICATION_ID,
             allowedUseCases = HarnessRuntimePurpose.entries.map(HarnessRuntimePurpose::useCaseId).toSet(),
             acceptedSigningCertificates = hostSigningCertificates,
         )
-        val consoleClients = HarnessSharedRuntimeBindings.consolePackages(BuildConfig.DEBUG).map { packageName ->
+        val consoleClients = HarnessSharedRuntimeBindings.consolePackages(debugClientPackageTopology).map { packageName ->
             AuthorizedClientPolicy(
                 packageName = packageName,
                 applicationId = HarnessSharedRuntimeBindings.consoleApplicationId,
@@ -29,17 +31,18 @@ internal object HarnessSharedRuntimePolicy {
                 acceptedSigningCertificates = hostSigningCertificates,
             )
         }
-        val redactGuardClients = HarnessSharedRuntimeBindings.redactGuardPackages(BuildConfig.DEBUG).mapNotNull { packageName ->
-            installedCurrentSigningCertificates(context, packageName)?.let { signingCertificates ->
-                AuthorizedClientPolicy(
-                    packageName = packageName,
-                    applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-                    allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
-                    acceptedSigningCertificates = signingCertificates,
-                )
+        val redactGuardClients =
+            HarnessSharedRuntimeBindings.redactGuardPackages(debugClientPackageTopology).mapNotNull { packageName ->
+                installedCurrentSigningCertificates(context, packageName)?.let { signingCertificates ->
+                    AuthorizedClientPolicy(
+                        packageName = packageName,
+                        applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+                        allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
+                        acceptedSigningCertificates = signingCertificates,
+                    )
+                }
             }
-        }
-        val releaseEvidenceClient = if (BuildConfig.DEBUG) {
+        val releaseEvidenceClient = if (debugClientPackageTopology) {
             emptyList()
         } else {
             listOf(
