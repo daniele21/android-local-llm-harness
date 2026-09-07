@@ -48,33 +48,35 @@ internal object PhoneCatalogCompatibilityPresentation {
         CatalogCompatibilityReason.UNSUPPORTED_PROFILE ->
             "The required Harnex model profile is unavailable for this app and use case."
 
-        CatalogCompatibilityReason.INSUFFICIENT_RAM -> {
-            val minimum = release.compatibility.minRamBytes
-            val reported = device.totalMemoryBytes
-            when {
-                minimum != null && reported != null ->
-                    "Needs at least ${formatDecimalGigabytes(minimum)} GB RAM; Android reports " +
-                        "${formatDecimalGigabytes(reported)} GB."
-
-                minimum != null ->
-                    "Needs at least ${formatDecimalGigabytes(minimum)} GB RAM."
-
-                else -> "Not enough device RAM."
-            }
-        }
-
-        CatalogCompatibilityReason.INSUFFICIENT_STORAGE -> {
-            val required = result.requiredStorageBytes
-            if (required != null) {
-                "Needs at least ${formatGibibytes(required)} GiB free storage; " +
-                    "${formatGibibytes(device.availableStorageBytes)} GiB is available."
-            } else {
-                "Not enough free storage for verified download and installation."
-            }
-        }
-
+        CatalogCompatibilityReason.INSUFFICIENT_RAM -> insufficientRamMessage(release, device)
+        CatalogCompatibilityReason.INSUFFICIENT_STORAGE -> insufficientStorageMessage(result, device)
         CatalogCompatibilityReason.STORAGE_REQUIREMENT_OVERFLOW ->
             "The required free-storage amount could not be evaluated safely."
+    }
+
+    private fun insufficientRamMessage(release: CatalogModelRelease, device: CatalogDeviceProfile): String {
+        val minimum = release.compatibility.minRamBytes
+        val reported = device.totalMemoryBytes
+        return when {
+            minimum != null && reported != null ->
+                "Needs at least ${formatDecimalGigabytes(minimum)} GB RAM; Android reports " +
+                    "${formatDecimalGigabytes(reported)} GB."
+
+            minimum != null ->
+                "Needs at least ${formatDecimalGigabytes(minimum)} GB RAM."
+
+            else -> "Not enough device RAM."
+        }
+    }
+
+    private fun insufficientStorageMessage(result: CatalogCompatibilityResult, device: CatalogDeviceProfile): String {
+        val required = result.requiredStorageBytes
+        return if (required != null) {
+            "Needs at least ${formatGibibytes(required)} GiB free storage; " +
+                "${formatGibibytes(device.availableStorageBytes)} GiB is available."
+        } else {
+            "Not enough free storage for verified download and installation."
+        }
     }
 
     private fun formatDecimalGigabytes(bytes: Long): String = String.format(Locale.US, "%.1f", bytes / BYTES_PER_DECIMAL_GB)
