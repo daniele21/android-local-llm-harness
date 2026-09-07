@@ -18,15 +18,21 @@ internal fun ModelsAvailabilityFilter.matches(item: HarnessModelInventoryItem): 
 
 internal fun ModelsSizeFilter.matches(item: HarnessModelInventoryItem): Boolean = when (this) {
     ModelsSizeFilter.ALL -> true
-    ModelsSizeFilter.B08 -> item.stableId.startsWith("qwen35-08b-")
-    ModelsSizeFilter.B2 -> item.stableId.startsWith("qwen35-2b-")
-    ModelsSizeFilter.B4 -> item.stableId.startsWith("qwen35-4b-")
+    ModelsSizeFilter.B08 -> item.catalogModelId()?.startsWith("qwen35-08b-") == true
+    ModelsSizeFilter.B2 -> item.catalogModelId()?.startsWith("qwen35-2b-") == true
+    ModelsSizeFilter.B4 -> item.catalogModelId()?.startsWith("qwen35-4b-") == true
 }
+
+internal fun HarnessModelInventoryItem.matchesSuggestedModel(group: ModelsSizeFilter): Boolean =
+    group.suggestedModelId?.let { suggestedModelId -> catalogModelId() == suggestedModelId } == true
 
 internal fun orderGroupItems(group: ModelsSizeFilter, items: List<HarnessModelInventoryItem>): List<HarnessModelInventoryItem> =
     items.sortedBy { item ->
-        if (item.stableId == group.suggestedModelId) 0 else 1
+        if (item.matchesSuggestedModel(group)) 0 else 1
     }
+
+private fun HarnessModelInventoryItem.catalogModelId(): String? =
+    stableId.substringBefore('@').takeIf { origin == HarnessModelOrigin.CATALOG }
 
 internal fun modelsEmptyStateDetail(
     availabilityFilter: ModelsAvailabilityFilter,
