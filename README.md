@@ -118,9 +118,11 @@ consumer app
    └─ close()        terminal client shutdown
 ```
 
+**Try the complete external-app flow:** [`samples/hello-harnex`](samples/hello-harnex/README.md) is a runnable standalone Android app that shows its signer identity, walks through Harnex authorization and runs one real local inference using only the published Consumer SDK.
+
 For the full public contract, durable logical jobs and publication guarantees, start with [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md).
 
-> The current `samples/external-consumer-android` project is an external Maven-consumption/ABI fixture, not yet a polished end-user demo application.
+`samples/external-consumer-android` remains the separate Maven-consumption/API-ABI compatibility fixture; it is not used as the end-user demo.
 
 ## Architecture
 
@@ -183,7 +185,7 @@ Harnex treats architecture claims as things that should be testable, not just de
 | Boundary | Evidence strategy |
 | --- | --- |
 | Repository architecture | executable layering and repository guards |
-| Consumer SDK | external Maven-consumption and API/ABI compatibility validation |
+| Consumer SDK | external Maven-consumption and API/ABI compatibility validation, including the runnable sample build |
 | Binder contracts | Android parceling plus cross-application lifecycle tests |
 | Authorization | OS-derived caller identity, signer-aware fail-closed policy and signer-replacement coverage |
 | Runtime lifecycle | deterministic load/session/generation/cancellation/recovery tests |
@@ -218,6 +220,7 @@ Current integration truth, active blockers and exact release state live in [`doc
 | I want to… | Start here |
 | --- | --- |
 | Run Harnex locally | [`docs/android-build-and-run.md`](docs/android-build-and-run.md) |
+| Try Harnex from another Android app | [`samples/hello-harnex`](samples/hello-harnex/README.md) |
 | Integrate an Android consumer app | [`docs/shared-runtime/consumer-android-sdk.md`](docs/shared-runtime/consumer-android-sdk.md) |
 | Understand the system architecture | [`docs/architecture.md`](docs/architecture.md) |
 | Understand trust/security decisions | [`docs/adr/README.md`](docs/adr/README.md), [`SECURITY.md`](SECURITY.md) |
@@ -238,6 +241,7 @@ Current integration truth, active blockers and exact release state live in [`doc
 | Embedded transport | `transports/in-process` |
 | Observability | `observability/in-memory-store`, `observability/room-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
 | Product surfaces | `apps/local-llm-phone-test`, `apps/local-llm-console`, `ui/design-system` |
+| Runnable external-app sample | `samples/hello-harnex` |
 | External consumption fixture | `samples/external-consumer-android` |
 
 `settings.gradle.kts` remains the authoritative Gradle module list.

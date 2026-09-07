@@ -15,6 +15,7 @@ This is the documentation entry point for users, integrators and contributors. S
 | --- | --- | --- |
 | Understand durable product mission, users, outcomes and decision boundaries | [`product.md`](product.md) | [`.engineering/product.json`](../.engineering/product.json) and `skills/shape-product-change/SKILL.md` for change routing |
 | Run Harnex on Android | [`android-build-and-run.md`](android-build-and-run.md) | [`device-e2e-testing.md`](device-e2e-testing.md) for physical-device validation |
+| Try Harnex from another Android app | [`../samples/hello-harnex`](../samples/hello-harnex/README.md) | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) for the complete public contract |
 | Integrate Harnex into another Android app | [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md) | [`shared-runtime/README.md`](shared-runtime/README.md) for the Host/Consumer model |
 | Understand the architecture | [`architecture.md`](architecture.md) | [`adr/README.md`](adr/README.md) for durable decisions |
 | Understand model support | [`qwen35/README.md`](qwen35/README.md) | [`curated-model-catalog.md`](curated-model-catalog.md) and model lifecycle docs |
