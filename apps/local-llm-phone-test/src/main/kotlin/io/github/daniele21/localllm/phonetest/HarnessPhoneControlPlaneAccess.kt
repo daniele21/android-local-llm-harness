@@ -26,9 +26,7 @@ internal class HarnessPhoneControlPlaneAccess(
         observedIdentityReconciler = HarnessObservedApplicationIdentityReconciler(context, store),
     )
 
-    override fun snapshot(): HostControlPlaneState =
-        observedIdentityReconciler?.previewCurrentState() ?: store.snapshot()
+    override fun snapshot(): HostControlPlaneState = observedIdentityReconciler?.previewCurrentState() ?: store.snapshot()
 
-    fun reconcileObservedIdentityIfNeeded(): HostControlPlaneState =
-        observedIdentityReconciler?.reconcileIfNeeded() ?: store.snapshot()
+    fun reconcileObservedIdentityIfNeeded(): HostControlPlaneState = observedIdentityReconciler?.reconcileIfNeeded() ?: store.snapshot()
 }
