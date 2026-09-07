@@ -3,7 +3,7 @@ plugins {
 }
 
 val consumerSdkVersion = providers.gradleProperty("consumerSdkVersion").orElse("0.1.0-alpha.11")
-val harnexHostPackage = providers.gradleProperty("harnexHostPackage").orElse("io.github.daniele21.localllm.phonetest")
+val harnexHostPackage = providers.gradleProperty("harnexHostPackage").orElse("io.github.daniele21.localllm.phonetest.debug")
 
 android {
     namespace = "io.github.daniele21.harnex.hello"
