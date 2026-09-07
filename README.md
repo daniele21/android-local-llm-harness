@@ -235,7 +235,8 @@ Current integration truth, active blockers and exact release state live in [`doc
 | Model lifecycle | `models/model-store`, `models/model-profile`, `models/model-catalog`, `models/model-download`, `models/model-install` |
 | Native execution | `backends/llama-cpp`, `third_party/llama.cpp` |
 | Android transport | `transports/android-binder-*`, `integrations/android-service-host` |
-| Observability | `observability/*` |
+| Embedded transport | `transports/in-process` |
+| Observability | `observability/in-memory-store`, `observability/room-store`, `observability/health-engine`, `observability/android-resource-probe`, `observability/benchmark-engine` |
 | Product surfaces | `apps/local-llm-phone-test`, `apps/local-llm-console`, `ui/design-system` |
 | External consumption fixture | `samples/external-consumer-android` |
 
