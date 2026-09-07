@@ -10,9 +10,11 @@ class HarnessModelsCatalogUiTest {
     @Test
     fun catalogExposesTheThreeSupportedQwen35SizeGroups() {
         assertEquals(
-            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B", "Qwen3.5 · 4B · 4-bit only"),
+            listOf("Qwen3.5 · 0.8B", "Qwen3.5 · 2B", "Qwen3.5 · 4B"),
             ModelsSizeFilter.entries.mapNotNull(ModelsSizeFilter::groupLabel),
         )
+        assertEquals("All", ModelsSizeFilter.ALL.label)
+        assertEquals("4-bit variants only", ModelsSizeFilter.B4.groupSupportingText)
     }
 
     @Test
@@ -71,23 +73,23 @@ class HarnessModelsCatalogUiTest {
     }
 
     @Test
-    fun modelStatusLabelsDescribeUserFacingLifecycleState() {
+    fun variantStatusLabelsUseCompactSentenceCaseLifecycleLanguage() {
         val expected = mapOf(
-            HarnessModelLifecycle.READY_TO_DOWNLOAD to "AVAILABLE",
-            HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL to "READY TO INSTALL",
-            HarnessModelLifecycle.INSTALLED to "INSTALLED",
-            HarnessModelLifecycle.SELECTED to "SELECTED",
-            HarnessModelLifecycle.LOADED to "IN MEMORY",
-            HarnessModelLifecycle.CANCELLED to "DOWNLOAD STOPPED",
-            HarnessModelLifecycle.FAILED to "NEEDS ATTENTION",
-            HarnessModelLifecycle.DEGRADED to "NEEDS RECOVERY",
-            HarnessModelLifecycle.INCOMPATIBLE to "NOT COMPATIBLE",
+            HarnessModelLifecycle.READY_TO_DOWNLOAD to "Available",
+            HarnessModelLifecycle.VERIFIED_READY_TO_INSTALL to "Ready to install",
+            HarnessModelLifecycle.INSTALLED to "Installed",
+            HarnessModelLifecycle.SELECTED to "Selected",
+            HarnessModelLifecycle.LOADED to "In memory",
+            HarnessModelLifecycle.CANCELLED to "Download stopped",
+            HarnessModelLifecycle.FAILED to "Needs attention",
+            HarnessModelLifecycle.DEGRADED to "Needs recovery",
+            HarnessModelLifecycle.INCOMPATIBLE to "Unavailable",
         )
 
         expected.forEach { (lifecycle, label) ->
-            assertEquals(label, modelCardStatusLabel(item("model", lifecycle = lifecycle), loading = false))
+            assertEquals(label, modelVariantStatusLabel(item("model", lifecycle = lifecycle), loading = false))
         }
-        assertEquals("LOADING", modelCardStatusLabel(item("model"), loading = true))
+        assertEquals("Loading", modelVariantStatusLabel(item("model"), loading = true))
     }
 
     @Test
