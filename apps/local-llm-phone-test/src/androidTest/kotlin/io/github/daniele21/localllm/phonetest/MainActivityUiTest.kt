@@ -1,16 +1,22 @@
 package io.github.daniele21.localllm.phonetest
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -81,10 +87,12 @@ class MainActivityUiTest {
         composeRule.onNodeWithText("Recommended").assertIsDisplayed()
         composeRule.onNodeWithText("6 other variants").performScrollTo().assertIsDisplayed()
         assertTextAbsent("Q4_K_M")
+        captureModelsEvidence("collapsed")
 
         composeRule.onNodeWithText("6 other variants").performClick()
         composeRule.onNodeWithText("Q4_K_M").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Show fewer").performScrollTo().assertIsDisplayed()
+        captureModelsEvidence("expanded")
 
         composeRule.onNodeWithText("Show fewer").performClick()
         awaitText("6 other variants")
@@ -144,6 +152,20 @@ class MainActivityUiTest {
     private fun awaitText(text: String) {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun captureModelsEvidence(name: String) {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val evidenceDir = File(requireNotNull(targetContext.getExternalFilesDir(null)), "ui-evidence/models")
+        if (!evidenceDir.exists()) {
+            check(evidenceDir.mkdirs()) { "Unable to create Models UI evidence directory" }
+        }
+        val output = File(evidenceDir, "$name.png")
+        output.outputStream().use { stream ->
+            check(composeRule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                "Unable to write Models UI evidence $name"
+            }
         }
     }
 
