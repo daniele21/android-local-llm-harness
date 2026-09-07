@@ -14,25 +14,29 @@ import org.junit.runner.RunWith
 class HarnessIndependentConsumerAuthorizationInstrumentationTest {
     @Test
     fun authorizeExactObservedConsumerIdentity() {
-        val (context, identity) = observedIdentityArguments()
-        val gateway = gateway(context)
-        val observed = gateway.snapshot().applications.single { it.packageName == identity.packageName }
+        setObservedIdentityEnabled(
+            expectedBefore = HarnessApplicationStatus.PENDING,
+            enabled = true,
+            expectedAfter = HarnessApplicationStatus.AUTHORIZED,
+        )
+    }
 
-        assertEquals(identity.signerSha256, observed.signerSha256)
-        assertEquals(HarnessApplicationStatus.PENDING, observed.status)
+    @Test
+    fun disableAuthorizedObservedConsumerIdentity() {
+        setObservedIdentityEnabled(
+            expectedBefore = HarnessApplicationStatus.AUTHORIZED,
+            enabled = false,
+            expectedAfter = HarnessApplicationStatus.DISABLED,
+        )
+    }
 
-        val result =
-            gateway.setApplicationConnectionEnabled(
-                HarnessSetApplicationConnectionEnabledCommand(
-                    applicationId = observed.applicationId,
-                    enabled = true,
-                ),
-            )
-        assertTrue(result is HarnessControlPlaneMutationResult.Success)
-
-        val authorized = gateway.snapshot().applications.single { it.applicationId == observed.applicationId }
-        assertEquals(identity.signerSha256, authorized.signerSha256)
-        assertEquals(HarnessApplicationStatus.AUTHORIZED, authorized.status)
+    @Test
+    fun reauthorizeDisabledObservedConsumerIdentity() {
+        setObservedIdentityEnabled(
+            expectedBefore = HarnessApplicationStatus.DISABLED,
+            enabled = true,
+            expectedAfter = HarnessApplicationStatus.AUTHORIZED,
+        )
     }
 
     @Test
@@ -42,6 +46,32 @@ class HarnessIndependentConsumerAuthorizationInstrumentationTest {
 
         assertEquals(identity.signerSha256, observed.signerSha256)
         assertEquals(HarnessApplicationStatus.IDENTITY_CHANGED, observed.status)
+    }
+
+    private fun setObservedIdentityEnabled(
+        expectedBefore: HarnessApplicationStatus,
+        enabled: Boolean,
+        expectedAfter: HarnessApplicationStatus,
+    ) {
+        val (context, identity) = observedIdentityArguments()
+        val gateway = gateway(context)
+        val observed = gateway.snapshot().applications.single { it.packageName == identity.packageName }
+
+        assertEquals(identity.signerSha256, observed.signerSha256)
+        assertEquals(expectedBefore, observed.status)
+
+        val result =
+            gateway.setApplicationConnectionEnabled(
+                HarnessSetApplicationConnectionEnabledCommand(
+                    applicationId = observed.applicationId,
+                    enabled = enabled,
+                ),
+            )
+        assertTrue(result is HarnessControlPlaneMutationResult.Success)
+
+        val updated = gateway.snapshot().applications.single { it.applicationId == observed.applicationId }
+        assertEquals(identity.signerSha256, updated.signerSha256)
+        assertEquals(expectedAfter, updated.status)
     }
 
     private fun observedIdentityArguments(): Pair<Context, ObservedIdentity> {
