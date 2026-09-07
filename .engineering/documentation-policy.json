@@ -7,7 +7,8 @@
     "current_state": {"max_lines": 200, "max_estimated_tokens": 3000},
     "active_workstream": {"max_lines": 220, "max_estimated_tokens": 3000},
     "architecture": {"max_lines": 400, "max_estimated_tokens": 5500},
-    "feature_doc": {"max_lines": 450, "max_estimated_tokens": 6500}
+    "feature_doc": {"max_lines": 450, "max_estimated_tokens": 6500},
+    "product_source": {"max_lines": 220, "max_estimated_tokens": 3000}
   },
   "budget_exceptions": {
     "observability/AGENTS.md": {"max_lines": 150, "max_estimated_tokens": 2127, "mode": "no-growth"},
@@ -23,6 +24,7 @@
   "context_routes": {
     "docs": {"read_when": "Pure documentation/copy without executable or policy changes; readiness is separate.", "files": ["AGENTS.md", "docs/README.md"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 5000},
     "bug": {"read_when": "Meaningful owner-local bug during iteration.", "files": ["AGENTS.md", ".engineering/commands.json", "skills/structured-change/SKILL.md", "skills/validate-change/SKILL.md"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 7000},
+    "product": {"read_when": "Material Harnex product capability, boundary, behavior or strategy shaping before substantial implementation.", "files": ["AGENTS.md", ".engineering/product.json", "docs/product.md", "skills/shape-product-change/SKILL.md"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 8000},
     "contract": {"read_when": "Shared Binder/runtime/public-boundary implementation; add actual owner/consumer source reads.", "files": ["AGENTS.md", ".engineering/commands.json", "skills/structured-change/SKILL.md", "skills/validate-change/SKILL.md", "docs/architecture.md"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 10500},
     "ui": {"read_when": "Material Harnex product-UI iteration.", "files": ["AGENTS.md", ".engineering/commands.json", "skills/structured-change/SKILL.md", "skills/validate-change/SKILL.md", "skills/design-product-experience/SKILL.md", "design/ux-contract.json", "design/brand-kit.json", ".engineering/e2e.json"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 13000, "requires_profile": "product-ui"},
     "integration": {"read_when": "Candidate readiness, including remote handoff when required.", "files": ["AGENTS.md", ".engineering/commands.json", "skills/preflight-change/SKILL.md", ".engineering/e2e.json", "skills/remote-preflight/SKILL.md", "docs/README.md"], "include_scoped_guides": true, "include_workstream": false, "max_estimated_tokens": 10500},
