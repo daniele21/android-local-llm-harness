@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
+import io.github.daniele21.localllm.ui.designsystem.HarnessCard
 
 @Composable
 internal fun ModelsCatalogGroups(environment: ModelsCatalogGroupEnvironment, visibleItems: List<HarnessModelInventoryItem>) {
@@ -61,40 +61,54 @@ private fun ModelsGroupSection(
     expanded: Boolean,
     onExpandedChanged: (Boolean) -> Unit,
 ) {
-    val collapseAlternatives = environment.progressivelyDisclose && items.size > 1
-    val shownItems = if (collapseAlternatives && !expanded) items.take(1) else items
+    val shownItems = if (expanded) items else items.take(1)
     val hiddenCount = items.size - shownItems.size
+    val commonCompatibilityDetail = commonCompatibilityDetail(items, environment.distributionByStableId)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModelsGroupHeader(group, items.size)
-        shownItems.forEach { item ->
-            val model = environment.distributionByStableId[item.stableId] ?: return@forEach
-            UnifiedModelCard(
-                state = environment.state,
-                item = item,
-                model = model,
-                actions = environment.actions,
-                onOpenModelDetails = environment.onOpenModelDetails,
-                loading = environment.loadingStableId == item.stableId,
-                suggested = item.stableId == group.suggestedModelId,
-            )
-        }
-        if (collapseAlternatives) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(
-                    onClick = { onExpandedChanged(!expanded) },
-                    modifier = Modifier.heightIn(min = HarnessMinimumTouchTarget),
+        HarnessCard {
+            if (commonCompatibilityDetail != null) {
+                Text(
+                    text = "Unavailable on this device",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = commonCompatibilityDetail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider()
+            }
+            shownItems.forEachIndexed { index, item ->
+                val model = environment.distributionByStableId[item.stableId] ?: return@forEachIndexed
+                UnifiedModelVariantRow(
+                    environment = environment,
+                    item = item,
+                    model = model,
+                    loading = environment.loadingStableId == item.stableId,
+                    suggested = item.matchesSuggestedModel(group),
+                    showCompatibilityDetail = commonCompatibilityDetail == null,
+                )
+                if (index < shownItems.lastIndex) {
+                    HorizontalDivider()
+                }
+            }
+            if (items.size > 1) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    Text(
-                        if (expanded) {
-                            "Show fewer"
-                        } else {
-                            "Show $hiddenCount alternative${if (hiddenCount == 1) "" else "s"}"
-                        },
-                    )
+                    TextButton(onClick = { onExpandedChanged(!expanded) }) {
+                        Text(
+                            if (expanded) {
+                                "Show fewer"
+                            } else {
+                                "$hiddenCount other variant${if (hiddenCount == 1) "" else "s"}"
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -103,16 +117,36 @@ private fun ModelsGroupSection(
 
 @Composable
 private fun ModelsGroupHeader(group: ModelsSizeFilter, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(requireNotNull(group.groupLabel), style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = "$count option${if (count == 1) "" else "s"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(requireNotNull(group.groupLabel), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "$count variant${if (count == 1) "" else "s"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        group.groupSupportingText?.let { supportingText ->
+            Text(
+                text = supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
+}
+
+private fun commonCompatibilityDetail(
+    items: List<HarnessModelInventoryItem>,
+    distributionByStableId: Map<String, PhoneCatalogModelUi>,
+): String? {
+    val models = items.mapNotNull { distributionByStableId[it.stableId] }
+    if (models.size != items.size || models.isEmpty() || models.any { it.status != PhoneCatalogModelStatus.INCOMPATIBLE }) {
+        return null
+    }
+    return models.mapNotNull { it.detail?.trim()?.takeIf(String::isNotEmpty) }.distinct().singleOrNull()
 }

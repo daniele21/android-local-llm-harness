@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: ui/design-system
 Canonical scope: ui.design-system
 Read when: changing shared Compose tokens, components, theme behavior or accessibility contracts
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-07
 
 The shared Compose design system lives in `ui/design-system` and is the only place where application-wide visual tokens and reusable primitives are defined.
 
@@ -17,7 +17,7 @@ The shared Compose design system lives in `ui/design-system` and is the only pla
 - `HarnessSpacing.kt`: spacing and minimum touch target;
 - `HarnessTheme.kt`: dark, light and system-theme selection;
 - `HarnessSurfaces.kt`: cards, metrics and status badges;
-- `HarnessActions.kt`: primary/secondary actions and confirmation dialogs;
+- `HarnessActions.kt`: full-width primary/secondary CTA actions, compact inline primary/secondary contextual actions and confirmation dialogs;
 - `HarnessFeedback.kt`: app bar and loading, empty and error states;
 - `HarnessNavigation.kt`: shared navigation container and item;
 - `HarnessInputs.kt`: semantic form primitives, including integer and decimal numeric input;
@@ -25,6 +25,12 @@ The shared Compose design system lives in `ui/design-system` and is the only pla
 - `HarnessPreviews.kt`: dark and light component previews.
 
 Screens should consume these components and `MaterialTheme` semantic values rather than introducing local palette constants, duplicated spacing, one-off shapes or local numeric-field implementations.
+
+## Action hierarchy
+
+`HarnessPrimaryButton` and `HarnessSecondaryButton` are full-width actions for surfaces where a CTA owns the available action area, such as a form or focused recovery step. They must not be used merely because an action is important when the action is contextual to a list row or compact management item.
+
+`HarnessInlinePrimaryButton` and `HarnessInlineSecondaryButton` preserve the same semantic primary/secondary styling and the 48 dp minimum touch target without forcing full width. Use them for trailing or local actions such as Download, Install, Load or Unload inside a management row. A screen should not stretch a contextual action to the full window width as a substitute for information hierarchy.
 
 ## Numeric input contract
 

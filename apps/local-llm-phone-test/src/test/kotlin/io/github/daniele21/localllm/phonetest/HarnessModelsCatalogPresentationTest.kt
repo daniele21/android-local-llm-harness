@@ -37,15 +37,15 @@ class HarnessModelsCatalogPresentationTest {
     }
 
     @Test
-    fun `card distinguishes installed selected loaded and transient loading`() {
+    fun `variant lifecycle labels distinguish installed selected loaded and transient loading`() {
         val installed = inventoryItem(HarnessModelLifecycle.INSTALLED)
         val selected = inventoryItem(HarnessModelLifecycle.SELECTED)
         val loaded = inventoryItem(HarnessModelLifecycle.LOADED)
 
-        assertEquals("INSTALLED", modelCardStatusLabel(installed, loading = false))
-        assertEquals("SELECTED", modelCardStatusLabel(selected, loading = false))
-        assertEquals("IN MEMORY", modelCardStatusLabel(loaded, loading = false))
-        assertEquals("LOADING", modelCardStatusLabel(installed, loading = true))
+        assertEquals("Installed", modelVariantStatusLabel(installed, loading = false))
+        assertEquals("Selected", modelVariantStatusLabel(selected, loading = false))
+        assertEquals("In memory", modelVariantStatusLabel(loaded, loading = false))
+        assertEquals("Loading", modelVariantStatusLabel(installed, loading = true))
     }
 
     private fun catalogModel(stableId: String, fileName: String) = PhoneCatalogModelUi(
