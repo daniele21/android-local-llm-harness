@@ -175,7 +175,7 @@ internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedR
                         terminal = terminal,
                         onStatus = onStatus,
                         onAnswerDelta = onAnswerDelta,
-                        onTerminal = { result -> finishAsync(result, onResult) },
+                        onTerminal = { result -> executor.execute { finishOnExecutor(result, onResult) } },
                     )
                 },
             )
@@ -190,10 +190,6 @@ internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedR
                 )
             }
         }
-    }
-
-    private fun finishAsync(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
-        executor.execute { finishOnExecutor(result, onResult) }
     }
 
     private fun finishOnExecutor(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
