@@ -74,10 +74,7 @@ class HarnessObservedIdentityApplicationsGatewayTest {
         assertEquals(ApplicationRegistrationState.AUTHORIZED, reauthorized.state)
     }
 
-    private fun gateway(
-        store: InMemoryHostControlPlaneStore,
-        signer: () -> String,
-    ): StoreHarnessCustomPresetGateway {
+    private fun gateway(store: InMemoryHostControlPlaneStore, signer: () -> String): StoreHarnessCustomPresetGateway {
         val reconciler = HarnessObservedApplicationIdentityReconciler(
             store = store,
             observedPolicies = { listOf(redactGuardPolicy(signer())) },
