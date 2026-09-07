@@ -30,10 +30,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Minimal production-shaped Consumer SDK integration used by the runnable onboarding sample. */
-internal class HelloHarnexClient(
-    context: Context,
-    onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit,
-) : AutoCloseable {
+internal class HelloHarnexClient(context: Context, onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit) : AutoCloseable {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val running = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
@@ -41,10 +38,10 @@ internal class HelloHarnexClient(
         BinderConsumerLocalLlmClient.create(
             context = context.applicationContext,
             hostConfig =
-                SharedRuntimeHostConfig.create(
-                    BuildConfig.HARNEX_HOST_PACKAGE,
-                    HARNEX_HOST_SERVICE,
-                ),
+            SharedRuntimeHostConfig.create(
+                BuildConfig.HARNEX_HOST_PACKAGE,
+                HARNEX_HOST_SERVICE,
+            ),
             clientBuildId = "hello-harnex-${BuildConfig.VERSION_NAME}",
             observer = SharedRuntimeConnectionObserver { snapshot -> onConnectionChanged(snapshot) },
         )
@@ -69,12 +66,7 @@ internal class HelloHarnexClient(
         client.disconnect()
     }
 
-    fun run(
-        text: String,
-        onStatus: (String) -> Unit,
-        onAnswerDelta: (String) -> Unit,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    fun run(text: String, onStatus: (String) -> Unit, onAnswerDelta: (String) -> Unit, onResult: (Result<HelloInferenceResult>) -> Unit) {
         require(text.isNotBlank()) { "Input must not be blank" }
         if (!running.compareAndSet(false, true)) {
             onResult(Result.failure(IllegalStateException("An inference request is already running")))
@@ -87,11 +79,13 @@ internal class HelloHarnexClient(
                     is ConsumerAssignedUseCasesResult.Available ->
                         result.assignments.singleOrNull { it.useCaseId == USE_CASE_ID }
                             ?: error("The Document PII detection use case is not assigned to this app")
+
                     is ConsumerAssignedUseCasesResult.Rejected ->
                         error("${result.failure.code}: ${result.failure.message}")
                 }
                 val published = when (val result = client.publishedPresets(USE_CASE_ID)) {
                     is ConsumerPublishedPresetsResult.Available -> result
+
                     is ConsumerPublishedPresetsResult.Rejected ->
                         error("${result.failure.code}: ${result.failure.message}")
                 }
@@ -110,6 +104,7 @@ internal class HelloHarnexClient(
                     )
                 ) {
                     is ConsumerActivationResult.Activated -> result.activation
+
                     is ConsumerActivationResult.Rejected ->
                         error("${result.failure.code}: ${result.failure.message}")
                 }
@@ -142,11 +137,15 @@ internal class HelloHarnexClient(
                             if (event.requestId != requestId || terminal.get()) return@ConsumerGenerationListener
                             when (event) {
                                 is ConsumerGenerationEvent.Queued -> onStatus("Queued in the shared runtime…")
+
                                 is ConsumerGenerationEvent.Prepared -> onStatus("Exact execution prepared…")
+
                                 is ConsumerGenerationEvent.Started -> onStatus("Generating locally on device…")
+
                                 is ConsumerGenerationEvent.ContentDelta -> {
                                     if (event.contentType == ConsumerContentType.ANSWER) onAnswerDelta(event.text)
                                 }
+
                                 is ConsumerGenerationEvent.Completed -> {
                                     if (terminal.compareAndSet(false, true)) {
                                         finishAsync(
@@ -160,6 +159,7 @@ internal class HelloHarnexClient(
                                         )
                                     }
                                 }
+
                                 is ConsumerGenerationEvent.Failed -> {
                                     if (terminal.compareAndSet(false, true)) {
                                         finishAsync(
@@ -175,6 +175,7 @@ internal class HelloHarnexClient(
                     )
                 when (start) {
                     is ConsumerGenerationStartResult.Accepted -> activeHandle = start.handle
+
                     is ConsumerGenerationStartResult.Rejected -> {
                         terminal.set(true)
                         finishOnExecutor(
@@ -201,17 +202,11 @@ internal class HelloHarnexClient(
         executor.shutdown()
     }
 
-    private fun finishAsync(
-        result: Result<HelloInferenceResult>,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    private fun finishAsync(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
         executor.execute { finishOnExecutor(result, onResult) }
     }
 
-    private fun finishOnExecutor(
-        result: Result<HelloInferenceResult>,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    private fun finishOnExecutor(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
         cleanupOnExecutor()
         running.set(false)
         onResult(result)
@@ -243,29 +238,35 @@ private val OUTPUT_SCHEMA =
     {"${'$'}schema":"http://json-schema.org/draft-07/schema#","type":"object","additionalProperties":false,"required":["schemaVersion","findings"],"properties":{"schemaVersion":{"const":1},"findings":{"type":"array","maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["typeId","surface","segmentId"],"properties":{"typeId":{"const":"email"},"surface":{"type":"string","minLength":1,"maxLength":512},"segmentId":{"const":"p0001-b0001"}}}}}}
     """.trimIndent()
 
-private fun piiPrompt(text: String): String =
-    buildString {
-        append(INSTRUCTION)
-        append("\n\nDATA:\n")
-        append("{\"definitionSetVersion\":1,\"definitions\":[{")
-        append("\"typeId\":\"email\",\"label\":\"Email address\",")
-        append("\"definition\":\"An Internet email address\",\"example\":\"alice@example.com\"}],")
-        append("\"segments\":[{\"segmentId\":\"p0001-b0001\",\"text\":")
-        appendJsonString(text)
-        append("}]}")
-    }
+private fun piiPrompt(text: String): String = buildString {
+    append(INSTRUCTION)
+    append("\n\nDATA:\n")
+    append("{\"definitionSetVersion\":1,\"definitions\":[{")
+    append("\"typeId\":\"email\",\"label\":\"Email address\",")
+    append("\"definition\":\"An Internet email address\",\"example\":\"alice@example.com\"}],")
+    append("\"segments\":[{\"segmentId\":\"p0001-b0001\",\"text\":")
+    appendJsonString(text)
+    append("}]}")
+}
 
 private fun StringBuilder.appendJsonString(value: String) {
     append('"')
     value.forEach { character ->
         when (character) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             '\b' -> append("\\b")
+
             '\u000C' -> append("\\f")
+
             '\n' -> append("\\n")
+
             '\r' -> append("\\r")
+
             '\t' -> append("\\t")
+
             else -> if (character.code < 0x20) {
                 append("\\u")
                 append(character.code.toString(16).padStart(4, '0'))
