@@ -23,15 +23,15 @@ import io.github.daniele21.localllm.ui.designsystem.HarnessMinimumTouchTarget
 
 @Composable
 internal fun UnifiedModelVariantRow(
-    state: HarnessUiState,
+    environment: ModelsCatalogGroupEnvironment,
     item: HarnessModelInventoryItem,
     model: PhoneCatalogModelUi,
-    actions: UnifiedModelsActions,
-    onOpenModelDetails: (HarnessModelInventoryItem) -> Unit,
     loading: Boolean = false,
     suggested: Boolean = false,
     showCompatibilityDetail: Boolean = true,
 ) {
+    val state = environment.state
+    val actions = environment.actions
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -42,7 +42,7 @@ internal fun UnifiedModelVariantRow(
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = HarnessMinimumTouchTarget)
-                    .clickable(onClickLabel = "Open model details") { onOpenModelDetails(item) },
+                    .clickable(onClickLabel = "Open model details") { environment.onOpenModelDetails(item) },
                 item = item,
                 model = model,
                 loading = loading,
