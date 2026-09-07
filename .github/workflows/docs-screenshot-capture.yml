@@ -1,0 +1,304 @@
+name: Documentation screenshot capture
+
+on:
+  push:
+    branches:
+      - agent/docs-screenshots-20260907
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-screenshot-capture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture Harnex documentation screens
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harnex-doc-screenshots"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/harnex-doc-screenshots/source-revision.txt"
+          git rev-parse HEAD^ | tee "$RUNNER_TEMP/harnex-doc-screenshots/product-revision.txt"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Configure Android AVD home
+        shell: bash
+        run: |
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/android-avd" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=$RUNNER_TEMP/android-user" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-avd" "$RUNNER_TEMP/android-user"
+
+      - name: Install Android build and emulator components
+        shell: bash
+        run: |
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Build production-shaped debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-configuration-cache --stacktrace :apps:local-llm-phone-test:assembleDebug
+
+      - name: Prepare no-native emulator canary
+        id: canary
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/harnex-doc-screenshots"
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
+          mapfile -t candidates < <(find apps/local-llm-phone-test/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' | sort)
+          [[ "${#candidates[@]}" -eq 1 ]] || { echo "Expected exactly one phone debug APK" >&2; exit 1; }
+
+          original_apk="${candidates[0]}"
+          canary_unaligned="$RUNNER_TEMP/harnex-docs-no-native-unaligned.apk"
+          canary_apk="$RUNNER_TEMP/harnex-docs-no-native.apk"
+          canary_keystore="$RUNNER_TEMP/harnex-docs-canary.p12"
+          cp "$original_apk" "$canary_unaligned"
+
+          mapfile -t native_entries < <(zipinfo -1 "$canary_unaligned" | grep '^lib/' || true)
+          [[ "${#native_entries[@]}" -gt 0 ]] || { echo "Expected native entries before stripping" >&2; exit 1; }
+          printf '%s\n' "${native_entries[@]}" > "$evidence/original-native-entries.txt"
+          zip -dq "$canary_unaligned" "${native_entries[@]}"
+
+          rm -f "$canary_keystore"
+          keytool -genkeypair \
+            -keystore "$canary_keystore" \
+            -storetype PKCS12 \
+            -storepass android \
+            -keypass android \
+            -alias docs \
+            -dname "CN=Harnex Docs CI, OU=CI, O=Harnex, C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -noprompt
+
+          "$build_tools/zipalign" -f -p 4 "$canary_unaligned" "$canary_apk"
+          "$build_tools/apksigner" sign \
+            --ks "$canary_keystore" \
+            --ks-key-alias docs \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            "$canary_apk"
+          "$build_tools/apksigner" verify --verbose "$canary_apk" > "$evidence/apksigner-verify.txt"
+
+          package_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/package: name='\([^']*\)'.*/\1/p" | head -n 1)
+          activity_name=$("$build_tools/aapt" dump badging "$canary_apk" | sed -n "s/launchable-activity: name='\([^']*\)'.*/\1/p" | head -n 1)
+          [[ -n "$package_name" && -n "$activity_name" ]] || { echo "Unable to resolve package/activity" >&2; exit 1; }
+          printf 'package=%s\n' "$package_name" >> "$GITHUB_OUTPUT"
+          printf 'activity=%s\n' "$activity_name" >> "$GITHUB_OUTPUT"
+          printf 'apk=%s\n' "$canary_apk" >> "$GITHUB_OUTPUT"
+
+      - name: Enable KVM access
+        shell: bash
+        run: |
+          if [[ -e /dev/kvm ]]; then sudo chmod 666 /dev/kvm; fi
+
+      - name: Create and start emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/harnex-doc-screenshots"
+          echo "no" | avdmanager create avd \
+            --force \
+            --name harnex-docs-api35 \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6"
+
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd harnex-docs-api35 \
+            -port 5554 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            > "$evidence/emulator.log" 2>&1 &
+
+          timeout 180 adb -s emulator-5554 wait-for-device
+          for attempt in $(seq 1 90); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              adb -s emulator-5554 shell settings put global window_animation_scale 0
+              adb -s emulator-5554 shell settings put global transition_animation_scale 0
+              adb -s emulator-5554 shell settings put global animator_duration_scale 0
+              adb -s emulator-5554 shell settings put system font_scale 1.0
+              adb -s emulator-5554 shell cmd uimode night no || true
+              adb -s emulator-5554 shell wm dismiss-keyguard || true
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$evidence/emulator.log" >&2 || true
+          exit 1
+
+      - name: Install app and capture all documentation screens
+        env:
+          ANDROID_SERIAL: emulator-5554
+          CANARY_APK: ${{ steps.canary.outputs.apk }}
+          PACKAGE_NAME: ${{ steps.canary.outputs.package }}
+          ACTIVITY_NAME: ${{ steps.canary.outputs.activity }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/harnex-doc-screenshots"
+          screenshots="$evidence/screenshots"
+          mkdir -p "$screenshots"
+          component="$PACKAGE_NAME/$ACTIVITY_NAME"
+
+          dump_ui() {
+            adb shell uiautomator dump /sdcard/harnex-docs-window.xml >/dev/null
+            adb pull /sdcard/harnex-docs-window.xml "$evidence/window.xml" >/dev/null
+          }
+
+          find_center() {
+            local attr="$1"
+            local value="$2"
+            python3 - "$evidence/window.xml" "$attr" "$value" <<'PY'
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+          path, attr, value = sys.argv[1:]
+          root = ET.parse(path).getroot()
+          for node in root.iter('node'):
+              if node.attrib.get(attr, '') == value:
+                  bounds = node.attrib.get('bounds', '')
+                  nums = [int(x) for x in re.findall(r'\d+', bounds)]
+                  if len(nums) == 4:
+                      x1, y1, x2, y2 = nums
+                      print(f"{(x1+x2)//2} {(y1+y2)//2}")
+                      raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+          }
+
+          tap_exact() {
+            local attr="$1"
+            local value="$2"
+            local allow_scroll="${3:-0}"
+            for attempt in $(seq 1 4); do
+              dump_ui
+              if coords="$(find_center "$attr" "$value")"; then
+                read -r x y <<< "$coords"
+                adb shell input tap "$x" "$y"
+                sleep 1
+                return 0
+              fi
+              if [[ "$allow_scroll" == "1" ]]; then
+                adb shell input swipe 540 1650 540 850 300
+                sleep 0.5
+              fi
+            done
+            echo "Could not find UI node $attr=$value" >&2
+            cat "$evidence/window.xml" >&2 || true
+            return 1
+          }
+
+          capture() {
+            local name="$1"
+            sleep 1
+            adb exec-out screencap -p > "$screenshots/$name.png"
+            [[ -s "$screenshots/$name.png" ]] || { echo "Empty screenshot: $name" >&2; exit 1; }
+          }
+
+          adb install --no-streaming -r -t "$CANARY_APK"
+          adb shell pm clear "$PACKAGE_NAME"
+          adb shell am force-stop "$PACKAGE_NAME"
+          adb shell am start -W -n "$component" > "$evidence/am-start.txt"
+          sleep 3
+
+          dump_ui
+          grep -F 'text="Harnex"' "$evidence/window.xml" >/dev/null
+          grep -F 'text="Local AI Console"' "$evidence/window.xml" >/dev/null
+
+          capture "01-overview"
+
+          tap_exact content-desc "Playground"
+          capture "02-playground"
+
+          tap_exact content-desc "Apps"
+          capture "03-apps"
+
+          tap_exact content-desc "Activity"
+          capture "04-activity"
+
+          tap_exact content-desc "Performance"
+          capture "05-performance"
+
+          tap_exact content-desc "Models"
+          capture "06-models"
+
+          tap_exact content-desc "Overview"
+          tap_exact text "Runtime health" 1
+          capture "07-diagnostics"
+
+          tap_exact content-desc "Open settings"
+          capture "08-settings"
+
+          cat > "$evidence/manifest.txt" <<EOF
+          product=Harnex
+          product_revision=$(cat "$evidence/product-revision.txt")
+          capture_revision=$(cat "$evidence/source-revision.txt")
+          execution_environment=Android API 35 Google APIs x86_64 emulator (Pixel 6 profile)
+          fidelity_class=simulated_or_emulated
+          theme=light
+          font_scale=1.0
+          native_backend=not_executed; ARM64 native libraries stripped only to enable x86_64 UI capture
+          screens=Overview,Playground,Apps,Activity,Performance,Models,Diagnostics,Settings
+          EOF
+
+          (cd "$screenshots" && sha256sum *.png) > "$evidence/screenshots.sha256"
+          ls -lh "$screenshots"
+
+      - name: Clean emulator resources
+        if: always()
+        shell: bash
+        run: |
+          adb -s emulator-5554 uninstall io.github.daniele21.localllm.phonetest.debug || true
+          adb -s emulator-5554 emu kill || true
+          rm -f "$RUNNER_TEMP/harnex-docs-canary.p12" "$RUNNER_TEMP/harnex-docs-no-native-unaligned.apk"
+
+      - name: Upload documentation screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: harnex-documentation-screenshots
+          path: ${{ runner.temp }}/harnex-doc-screenshots/**
+          if-no-files-found: error
+          retention-days: 14
