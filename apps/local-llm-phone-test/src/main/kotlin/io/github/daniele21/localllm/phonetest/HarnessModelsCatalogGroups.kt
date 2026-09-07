@@ -88,7 +88,7 @@ private fun ModelsGroupSection(
                     item = item,
                     model = model,
                     loading = environment.loadingStableId == item.stableId,
-                    suggested = item.stableId == group.suggestedModelId,
+                    suggested = item.matchesSuggestedModel(group),
                     showCompatibilityDetail = commonCompatibilityDetail == null,
                 )
                 if (index < shownItems.lastIndex) {
