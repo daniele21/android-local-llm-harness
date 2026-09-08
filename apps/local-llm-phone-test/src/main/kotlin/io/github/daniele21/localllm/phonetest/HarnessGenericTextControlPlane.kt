@@ -22,46 +22,46 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.genericText(
 ): HarnessBuiltInControlPlaneSpec = HarnessBuiltInControlPlaneSpec(
     applications = applications.sortedBy { it.applicationId.value },
     useCase =
-    UseCaseDefinition(
-        useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
-        displayName = "Generic text generation",
-        description = "Run bounded stateless local text generation for Consumer SDK integrations and app-owned workflows",
-        requirements =
-        UseCaseRequirements(
-            outputMode = OutputMode.TEXT,
-            sessionKind = SessionKind.STATELESS,
-            reasoningSupported = false,
-            minimumContextTokens = GENERIC_TEXT_MINIMUM_CONTEXT_TOKENS,
-            maxInputCharacters = GENERIC_TEXT_MAX_INPUT_CHARACTERS,
+        UseCaseDefinition(
+            useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
+            displayName = "Generic text generation",
+            description = "Run bounded stateless local text generation for Consumer SDK integrations and app-owned workflows",
+            requirements =
+                UseCaseRequirements(
+                    outputMode = OutputMode.TEXT,
+                    sessionKind = SessionKind.STATELESS,
+                    reasoningSupported = false,
+                    minimumContextTokens = GENERIC_TEXT_MINIMUM_CONTEXT_TOKENS,
+                    maxInputCharacters = GENERIC_TEXT_MAX_INPUT_CHARACTERS,
+                ),
+            state = UseCaseDefinitionState.ACTIVE,
+            revision = 1,
         ),
-        state = UseCaseDefinitionState.ACTIVE,
-        revision = 1,
-    ),
     preset =
-    UseCasePresetDefinition(
-        useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
-        metadata =
-        PresetConsumerMetadata(
-            presetId = HarnessSharedRuntimeBindings.genericTextDefaultPreset.id.value,
-            revision = HarnessSharedRuntimeBindings.genericTextDefaultPreset.version,
-            displayName = "Quality",
-            description = "General-purpose non-thinking local text generation",
+        UseCasePresetDefinition(
+            useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
+            metadata =
+                PresetConsumerMetadata(
+                    presetId = HarnessSharedRuntimeBindings.genericTextDefaultPreset.id.value,
+                    revision = HarnessSharedRuntimeBindings.genericTextDefaultPreset.version,
+                    displayName = "Quality",
+                    description = "General-purpose non-thinking local text generation",
+                ),
+            creationSource = PresetCreationSource.SUGGESTED,
+            state = PresetLifecycleState.PUBLISHED,
+            execution =
+                PresetExecutionPolicy(
+                    modelProfileId = null,
+                    inferencePreset = HarnessSharedRuntimeBindings.genericTextDefaultPreset,
+                    contextTokens = GENERIC_TEXT_MINIMUM_CONTEXT_TOKENS,
+                    cachePolicy =
+                        UseCaseCachePolicy(
+                            retainModelWarmMs = GENERIC_TEXT_WARM_RETENTION_MS,
+                            reuseStatelessContext = false,
+                            enablePrefixSnapshot = false,
+                            enableDeterministicResultCache = false,
+                        ),
+                ),
         ),
-        creationSource = PresetCreationSource.SUGGESTED,
-        state = PresetLifecycleState.PUBLISHED,
-        execution =
-        PresetExecutionPolicy(
-            modelProfileId = null,
-            inferencePreset = HarnessSharedRuntimeBindings.genericTextDefaultPreset,
-            contextTokens = GENERIC_TEXT_MINIMUM_CONTEXT_TOKENS,
-            cachePolicy =
-            UseCaseCachePolicy(
-                retainModelWarmMs = GENERIC_TEXT_WARM_RETENTION_MS,
-                reuseStatelessContext = false,
-                enablePrefixSnapshot = false,
-                enableDeterministicResultCache = false,
-            ),
-        ),
-    ),
     isDefaultBinding = false,
 )
