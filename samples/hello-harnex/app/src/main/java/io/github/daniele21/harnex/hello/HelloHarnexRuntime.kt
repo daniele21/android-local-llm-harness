@@ -48,9 +48,7 @@ internal interface HelloHarnexRuntime : AutoCloseable {
     fun closeSession(sessionId: SessionId)
 }
 
-internal class BinderHelloHarnexRuntime private constructor(
-    private val client: BinderConsumerLocalLlmClient,
-) : HelloHarnexRuntime {
+internal class BinderHelloHarnexRuntime private constructor(private val client: BinderConsumerLocalLlmClient) : HelloHarnexRuntime {
     override fun connect() = client.connect()
 
     override fun disconnect() = client.disconnect()
@@ -67,28 +65,23 @@ internal class BinderHelloHarnexRuntime private constructor(
 
     override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult = client.createSession(preparedId)
 
-    override fun generate(
-        request: ConsumerGenerationRequest,
-        listener: ConsumerGenerationListener,
-    ): ConsumerGenerationStartResult = client.generate(request, listener)
+    override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult =
+        client.generate(request, listener)
 
     override fun closeSession(sessionId: SessionId) = client.closeSession(sessionId)
 
     override fun close() = client.close()
 
     companion object {
-        fun create(
-            context: Context,
-            onConnectionChanged: SharedRuntimeConnectionObserver,
-        ): BinderHelloHarnexRuntime =
+        fun create(context: Context, onConnectionChanged: SharedRuntimeConnectionObserver): BinderHelloHarnexRuntime =
             BinderHelloHarnexRuntime(
                 BinderConsumerLocalLlmClient.create(
                     context = context.applicationContext,
                     hostConfig =
-                        SharedRuntimeHostConfig.create(
-                            BuildConfig.HARNEX_HOST_PACKAGE,
-                            HARNEX_HOST_SERVICE,
-                        ),
+                    SharedRuntimeHostConfig.create(
+                        BuildConfig.HARNEX_HOST_PACKAGE,
+                        HARNEX_HOST_SERVICE,
+                    ),
                     clientBuildId = "hello-harnex-${BuildConfig.VERSION_NAME}",
                     observer = onConnectionChanged,
                 ),
