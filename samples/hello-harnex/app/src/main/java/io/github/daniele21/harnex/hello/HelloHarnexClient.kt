@@ -302,11 +302,8 @@ internal enum class HelloHarnexFailureKind {
     RUNTIME,
 }
 
-internal class HelloHarnexException(
-    val kind: HelloHarnexFailureKind,
-    val stage: String,
-    val detail: String,
-) : IllegalStateException("$stage: $detail") {
+internal class HelloHarnexException(val kind: HelloHarnexFailureKind, val stage: String, val detail: String) :
+    IllegalStateException("$stage: $detail") {
     val userMessage: String
         get() = when (kind) {
             HelloHarnexFailureKind.AUTHORIZATION_REQUIRED ->
