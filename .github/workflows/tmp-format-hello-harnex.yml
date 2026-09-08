@@ -1,0 +1,48 @@
+name: Temporary Hello Harnex formatting
+
+on:
+  push:
+    branches:
+      - feat/hello-harnex-golden-consumer
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Apply canonical Spotless formatting
+        run: ./gradlew spotlessApply
+
+      - name: Collect formatted Hello Harnex sources
+        run: |
+          mkdir -p build/formatted-hello-harnex
+          cp --parents \
+            samples/hello-harnex/app/src/main/java/io/github/daniele21/harnex/hello/HelloHarnexClient.kt \
+            samples/hello-harnex/app/src/main/java/io/github/daniele21/harnex/hello/HelloHarnexRuntime.kt \
+            samples/hello-harnex/app/src/main/java/io/github/daniele21/harnex/hello/HelloHarnexViewModel.kt \
+            samples/hello-harnex/app/src/main/java/io/github/daniele21/harnex/hello/MainActivity.kt \
+            samples/hello-harnex/app/src/test/java/io/github/daniele21/harnex/hello/HelloHarnexClientTest.kt \
+            build/formatted-hello-harnex/
+
+      - name: Upload formatted sources
+        uses: actions/upload-artifact@v5
+        with:
+          name: formatted-hello-harnex
+          path: build/formatted-hello-harnex
+          if-no-files-found: error
