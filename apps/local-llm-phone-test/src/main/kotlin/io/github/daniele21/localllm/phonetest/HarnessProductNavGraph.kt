@@ -2,7 +2,6 @@ package io.github.daniele21.localllm.phonetest
 
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import io.github.daniele21.localllm.models.PresetGenerationOverrides
 
 /**
  * App-level product graph composition used by the phone Harness shell.
@@ -14,33 +13,13 @@ internal fun NavGraphBuilder.installHarnessApplicationsGraph(
     navController: NavHostController,
     state: HarnessApplicationsReadState,
     mutationState: HarnessApplicationsMutationState,
-    onRefresh: () -> Unit,
-    onRefreshObservedIdentity: () -> Unit,
-    onSetDefaultPreset: (String, HarnessAssignmentSummary, HarnessPresetSummary) -> Unit,
-    onSetApplicationConnectionEnabled: (String, Boolean) -> Unit,
-    onCreateApplicationConnection: (String, String, String, String, String, String, Int) -> Unit,
-    onCreateCustomPreset: (
-        String,
-        HarnessAssignmentSummary,
-        HarnessPresetSummary,
-        String,
-        String?,
-        Int?,
-        PresetGenerationOverrides?,
-    ) -> Unit,
-    onClearMutationFeedback: () -> Unit,
+    callbacks: HarnessApplicationsGraphCallbacks,
 ) {
     installHarnessApplicationsFeatureGraph(
         navController = navController,
         state = state,
         mutationState = mutationState,
-        onRefresh = onRefresh,
-        onRefreshObservedIdentity = onRefreshObservedIdentity,
-        onSetDefaultPreset = onSetDefaultPreset,
-        onSetApplicationConnectionEnabled = onSetApplicationConnectionEnabled,
-        onCreateApplicationConnection = onCreateApplicationConnection,
-        onCreateCustomPreset = onCreateCustomPreset,
-        onClearMutationFeedback = onClearMutationFeedback,
+        callbacks = callbacks,
     )
     installHarnessInferenceActivityGraph(navController)
 }

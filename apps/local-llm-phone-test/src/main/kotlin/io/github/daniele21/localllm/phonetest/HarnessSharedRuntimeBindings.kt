@@ -132,6 +132,8 @@ internal object HarnessSharedRuntimeBindings {
             useCaseId = ombraUseCaseId,
             defaultPreset = ombraDefaultPreset,
             profileSuffix = OMBRA_PROFILE_SUFFIX,
+            maxOutputTokens = STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS,
+            contextSize = STRUCTURED_CONTEXT_SIZE,
         )
 
     /** Bounded TEXT runtime shared by user-created Consumer applications after explicit authorization. */
@@ -175,44 +177,13 @@ internal object HarnessSharedRuntimeBindings {
                     useCaseId = useCaseId,
                     defaultPreset = auraDefaultPreset,
                     profileSuffix = profileSuffix,
+                    maxOutputTokens = STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS,
+                    contextSize = STRUCTURED_CONTEXT_SIZE,
                 )
             }
 
             else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
         }
-
-    private fun resolveJsonSchemaUseCase(
-        model: ImportedPhoneModel,
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-        defaultPreset: InferencePresetRef,
-        profileSuffix: String,
-    ): ResolvedUseCase {
-        val resolved =
-            resolvedPhoneUseCase(
-                model = model,
-                maxOutputTokens = STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS,
-                useCaseValue = useCaseId.value,
-                profileSuffix = profileSuffix,
-                contextSize = STRUCTURED_CONTEXT_SIZE,
-            )
-        val useCase =
-            resolved.useCase.copy(
-                outputMode = OutputMode.JSON_SCHEMA,
-                defaultPreset = defaultPreset,
-            )
-        check(useCase.presets.any { it.ref == defaultPreset && OutputMode.JSON_SCHEMA in it.allowedOutputModes }) {
-            "Structured Consumer default preset must support JSON_SCHEMA"
-        }
-        return resolved.copy(
-            binding = AppModelBinding(
-                applicationId = applicationId,
-                useCaseId = useCaseId,
-                useCaseProfileId = useCase.id,
-            ),
-            useCase = useCase,
-        )
-    }
 
     private const val CONSOLE_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val CONSOLE_CONTEXT_SIZE = 4_096
@@ -225,4 +196,39 @@ internal object HarnessSharedRuntimeBindings {
     private const val GENERIC_TEXT_PROFILE_SUFFIX = "generic-text"
     private const val AURA_SCHEMA_PROFILE_SUFFIX = "aura-import-schema"
     private const val AURA_CATEGORY_PROFILE_SUFFIX = "aura-import-category"
+}
+
+private fun resolveJsonSchemaUseCase(
+    model: ImportedPhoneModel,
+    applicationId: ApplicationId,
+    useCaseId: UseCaseId,
+    defaultPreset: InferencePresetRef,
+    profileSuffix: String,
+    maxOutputTokens: Int,
+    contextSize: Int,
+): ResolvedUseCase {
+    val resolved =
+        resolvedPhoneUseCase(
+            model = model,
+            maxOutputTokens = maxOutputTokens,
+            useCaseValue = useCaseId.value,
+            profileSuffix = profileSuffix,
+            contextSize = contextSize,
+        )
+    val useCase =
+        resolved.useCase.copy(
+            outputMode = OutputMode.JSON_SCHEMA,
+            defaultPreset = defaultPreset,
+        )
+    check(useCase.presets.any { it.ref == defaultPreset && OutputMode.JSON_SCHEMA in it.allowedOutputModes }) {
+        "Structured Consumer default preset must support JSON_SCHEMA"
+    }
+    return resolved.copy(
+        binding = AppModelBinding(
+            applicationId = applicationId,
+            useCaseId = useCaseId,
+            useCaseProfileId = useCase.id,
+        ),
+        useCase = useCase,
+    )
 }
