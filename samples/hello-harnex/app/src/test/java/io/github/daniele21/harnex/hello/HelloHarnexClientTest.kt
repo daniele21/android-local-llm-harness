@@ -265,10 +265,7 @@ class HelloHarnexClientTest {
         override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult =
             ConsumerSessionResult.Created(SessionId("session-1"))
 
-        override fun generate(
-            request: ConsumerGenerationRequest,
-            listener: ConsumerGenerationListener,
-        ): ConsumerGenerationStartResult {
+        override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
             lastGenerationRequest = request
             generationRequestId = request.requestId
             generationListener = listener
