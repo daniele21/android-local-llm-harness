@@ -297,27 +297,22 @@ private fun controlPlaneFailure(
         kind =
             when (code) {
                 ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
-                ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
-                -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
+                ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
                 ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
                 ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
                 ConsumerControlPlaneErrorCode.STALE_REVISION,
-                ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
-                -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+                ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
                 ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
-                -> HelloHarnexFailureKind.MODEL_NOT_READY
+                ConsumerControlPlaneErrorCode.MODEL_CONFLICT -> HelloHarnexFailureKind.MODEL_NOT_READY
 
                 ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
-                -> HelloHarnexFailureKind.CONNECTION
+                ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE -> HelloHarnexFailureKind.CONNECTION
 
                 ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
                 ConsumerControlPlaneErrorCode.INVALID_REQUEST,
-                ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
-                -> HelloHarnexFailureKind.RUNTIME
+                ConsumerControlPlaneErrorCode.RUNTIME_FAILURE -> HelloHarnexFailureKind.RUNTIME
             },
         stage = stage,
         detail = "$code: $message",
@@ -342,14 +337,12 @@ private fun consumerFailure(
                 ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
                 ConsumerErrorCode.STALE_CAPABILITY,
                 ConsumerErrorCode.PREPARED_SELECTION_STALE,
-                ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
-                -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+                ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
                 ConsumerErrorCode.INVALID_INPUT,
                 ConsumerErrorCode.PREPARE_FAILED,
                 ConsumerErrorCode.SESSION_NOT_FOUND,
-                ConsumerErrorCode.RUNTIME_FAILURE,
-                -> HelloHarnexFailureKind.RUNTIME
+                ConsumerErrorCode.RUNTIME_FAILURE -> HelloHarnexFailureKind.RUNTIME
             },
         stage = stage,
         detail = "$code: $message",
