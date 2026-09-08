@@ -43,7 +43,42 @@ internal data class EmulatorE2eFaultCommandResult(val code: Int, val data: Strin
 
 /** Canonical emulator-only command owner shared by the protected receiver and shell bridge. */
 internal object EmulatorE2eFaultCommandHandler {
-    fun handle(context: Context, intent: Intent): EmulatorE2eFaultCommandResult = when (intent.action) {
+    fun handle(context: Context, intent: Intent): EmulatorE2eFaultCommandResult =
+        handleAuraAction(context, intent.action) ?: handleGeneralAction(context, intent)
+
+    private fun handleAuraAction(context: Context, action: String?): EmulatorE2eFaultCommandResult? = when (action) {
+        EmulatorE2eFaultActions.AUTHORIZE_AURA ->
+            auraControlResult(EmulatorE2eAuraImportControl.authorize(context))
+
+        EmulatorE2eFaultActions.ENABLE_AURA_SCHEMA ->
+            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = true))
+
+        EmulatorE2eFaultActions.DISABLE_AURA_SCHEMA ->
+            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = false))
+
+        EmulatorE2eFaultActions.ENABLE_AURA_CATEGORY ->
+            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = true))
+
+        EmulatorE2eFaultActions.DISABLE_AURA_CATEGORY ->
+            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = false))
+
+        EmulatorE2eFaultActions.MODEL_UNAVAILABLE -> {
+            EmulatorE2eModelAvailabilityGate.setUnavailable(true)
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+        }
+
+        EmulatorE2eFaultActions.MODEL_AVAILABLE -> {
+            EmulatorE2eModelAvailabilityGate.setUnavailable(false)
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+        }
+
+        EmulatorE2eFaultActions.QUERY_AURA ->
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+
+        else -> null
+    }
+
+    private fun handleGeneralAction(context: Context, intent: Intent): EmulatorE2eFaultCommandResult = when (intent.action) {
         EmulatorE2eFaultActions.QUERY_ACTIVITY -> {
             val verifiedPackageName = intent.getStringExtra(EmulatorE2eFaultActions.EXTRA_VERIFIED_PACKAGE)
             if (verifiedPackageName.isNullOrBlank()) {
@@ -76,34 +111,6 @@ internal object EmulatorE2eFaultCommandHandler {
             EmulatorE2eBackendFailureGate.arm()
             gateStatusResult()
         }
-
-        EmulatorE2eFaultActions.AUTHORIZE_AURA ->
-            auraControlResult(EmulatorE2eAuraImportControl.authorize(context))
-
-        EmulatorE2eFaultActions.ENABLE_AURA_SCHEMA ->
-            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = true))
-
-        EmulatorE2eFaultActions.DISABLE_AURA_SCHEMA ->
-            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = false))
-
-        EmulatorE2eFaultActions.ENABLE_AURA_CATEGORY ->
-            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = true))
-
-        EmulatorE2eFaultActions.DISABLE_AURA_CATEGORY ->
-            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = false))
-
-        EmulatorE2eFaultActions.MODEL_UNAVAILABLE -> {
-            EmulatorE2eModelAvailabilityGate.setUnavailable(true)
-            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
-        }
-
-        EmulatorE2eFaultActions.MODEL_AVAILABLE -> {
-            EmulatorE2eModelAvailabilityGate.setUnavailable(false)
-            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
-        }
-
-        EmulatorE2eFaultActions.QUERY_AURA ->
-            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
 
         EmulatorE2eFaultActions.RESET -> {
             EmulatorE2eGenerationGate.reset()
