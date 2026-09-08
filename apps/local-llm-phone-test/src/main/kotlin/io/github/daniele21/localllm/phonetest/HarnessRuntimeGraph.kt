@@ -77,7 +77,6 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val auditStartupState = inferenceActivitySource.reconcileInterrupted(System.currentTimeMillis())
 
     init {
-        val genericTextSpec = HarnessSharedRuntimePolicy.builtInGenericTextControlPlaneSpec(authorizedClientPolicies)
         val auraSpecs = HarnessSharedRuntimePolicy.builtInAuraControlPlaneSpecs(authorizedClientPolicies)
         HarnessControlPlaneStartup(
             store = controlPlaneStoreOwner.store,
@@ -85,8 +84,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
             HarnessControlPlaneReconciler(
                 HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(authorizedClientPolicies),
             ),
-            additionalReconcilers =
-            listOf(HarnessControlPlaneReconciler(genericTextSpec)) + auraSpecs.map(::HarnessControlPlaneReconciler),
+            additionalReconcilers = auraSpecs.map(::HarnessControlPlaneReconciler),
         ).reconcile()
     }
 
@@ -161,11 +159,7 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                                 maxJsonSchemaCharacters = 32_768,
                             ),
                         )
-                    listOf(
-                        legacyConsolePolicy,
-                        HarnessOmbraConsumerPolicy.create(applicationId),
-                        HarnessGenericTextConsumerPolicy.create(applicationId),
-                    )
+                    listOf(legacyConsolePolicy, HarnessOmbraConsumerPolicy.create(applicationId))
                 }
 
                 HarnessSharedRuntimeBindings.redactGuardApplicationId ->
@@ -183,18 +177,10 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
                 else -> {
                     val state = controlPlaneStore.snapshot()
-                    val configuredPolicies = buildList {
-                        if (state.isAuthorizedOmbraConsumer(applicationId)) {
-                            add(HarnessOmbraConsumerPolicy.create(applicationId))
-                        }
-                        if (state.isAuthorizedGenericTextConsumer(applicationId)) {
-                            add(HarnessGenericTextConsumerPolicy.create(applicationId))
-                        }
-                    }
-                    require(configuredPolicies.isNotEmpty()) {
+                    require(state.isAuthorizedOmbraConsumer(applicationId)) {
                         "Consumer API is not configured for applicationId ${applicationId.value}"
                     }
-                    configuredPolicies
+                    listOf(HarnessOmbraConsumerPolicy.create(applicationId))
                 }
             }
         val fallbackPolicyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies)

@@ -25,9 +25,6 @@ internal object HarnessSharedRuntimeBindings {
     /** Host-owned PII-analysis use case. Consumers never provide model identity. */
     val ombraUseCaseId = UseCaseId("document-pii-detection")
 
-    /** Host-owned bounded text-generation use case for general Consumer SDK workflows. */
-    val genericTextUseCaseId = UseCaseId("generic-text-generation")
-
     /** Host-owned Aura spreadsheet schema-selection use case. */
     val auraSchemaInferenceUseCaseId = UseCaseId("aura-transaction-schema-inference")
 
@@ -36,8 +33,6 @@ internal object HarnessSharedRuntimeBindings {
 
     val ombraDefaultPreset =
         InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
-    val genericTextDefaultPreset =
-        InferencePresetRef(InferencePresetId("qwen35-text-quality"), PHONE_INFERENCE_PRESET_VERSION)
     val auraDefaultPreset =
         InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
 
@@ -52,7 +47,7 @@ internal object HarnessSharedRuntimeBindings {
     const val AURA_DEBUG_PACKAGE = "com.staituned.aura.debug"
     const val SR6_RELEASE_CONSUMER_PACKAGE = "io.github.daniele21.localllm.consumerfixture"
 
-    val consoleUseCases: Set<UseCaseId> = setOf(consoleUseCaseId, ombraUseCaseId, genericTextUseCaseId)
+    val consoleUseCases: Set<UseCaseId> = setOf(consoleUseCaseId, ombraUseCaseId)
     val redactGuardUseCases: Set<UseCaseId> = setOf(ombraUseCaseId)
     val auraUseCases: Set<UseCaseId> = setOf(auraSchemaInferenceUseCaseId, auraCategoryClassificationUseCaseId)
     val piiConsumerApplicationIds: Set<ApplicationId> = setOf(consoleApplicationId, redactGuardApplicationId)
@@ -92,7 +87,6 @@ internal object HarnessSharedRuntimeBindings {
         val suffix = when (useCaseId) {
             consoleUseCaseId.value -> CONSOLE_PROFILE_SUFFIX
             ombraUseCaseId.value -> OMBRA_PROFILE_SUFFIX
-            genericTextUseCaseId.value -> GENERIC_TEXT_PROFILE_SUFFIX
             auraSchemaInferenceUseCaseId.value -> AURA_SCHEMA_PROFILE_SUFFIX
             auraCategoryClassificationUseCaseId.value -> AURA_CATEGORY_PROFILE_SUFFIX
             else -> return null
@@ -134,31 +128,10 @@ internal object HarnessSharedRuntimeBindings {
             profileSuffix = OMBRA_PROFILE_SUFFIX,
         )
 
-    /** Bounded TEXT runtime shared by user-created Consumer applications after explicit authorization. */
-    fun resolveGenericText(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
-        val resolved =
-            resolvedPhoneUseCase(
-                model = model,
-                maxOutputTokens = GENERIC_TEXT_DEFAULT_MAX_OUTPUT_TOKENS,
-                useCaseValue = genericTextUseCaseId.value,
-                profileSuffix = GENERIC_TEXT_PROFILE_SUFFIX,
-                contextSize = GENERIC_TEXT_CONTEXT_SIZE,
-            )
-        return resolved.copy(
-            binding = AppModelBinding(
-                applicationId = applicationId,
-                useCaseId = genericTextUseCaseId,
-                useCaseProfileId = resolved.useCase.id,
-            ),
-        )
-    }
-
     /** Runtime resolver used by the Consumer control plane after assignment/authorization has already succeeded. */
     fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         when (useCaseId) {
             ombraUseCaseId -> resolveOmbra(model, applicationId)
-
-            genericTextUseCaseId -> resolveGenericText(model, applicationId)
 
             auraSchemaInferenceUseCaseId,
             auraCategoryClassificationUseCaseId,
@@ -216,13 +189,10 @@ internal object HarnessSharedRuntimeBindings {
 
     private const val CONSOLE_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val CONSOLE_CONTEXT_SIZE = 4_096
-    private const val GENERIC_TEXT_DEFAULT_MAX_OUTPUT_TOKENS = 512
-    private const val GENERIC_TEXT_CONTEXT_SIZE = 4_096
     private const val STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val STRUCTURED_CONTEXT_SIZE = 4_096
     private const val CONSOLE_PROFILE_SUFFIX = "shared-console"
     private const val OMBRA_PROFILE_SUFFIX = "ombra-pii"
-    private const val GENERIC_TEXT_PROFILE_SUFFIX = "generic-text"
     private const val AURA_SCHEMA_PROFILE_SUFFIX = "aura-import-schema"
     private const val AURA_CATEGORY_PROFILE_SUFFIX = "aura-import-category"
 }

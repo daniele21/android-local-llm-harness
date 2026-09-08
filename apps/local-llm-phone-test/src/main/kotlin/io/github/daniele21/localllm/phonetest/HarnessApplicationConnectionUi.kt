@@ -2,6 +2,8 @@
 
 package io.github.daniele21.localllm.phonetest
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
@@ -37,18 +40,26 @@ internal fun NavGraphBuilder.installNewApplicationConnectionRoute(
     callbacks: HarnessApplicationsGraphCallbacks,
 ) {
     composable(HarnessApplicationRoutes.NEW_APPLICATION_ROUTE) {
+        val applicationsViewModel = activityApplicationsViewModel()
         LaunchedEffect(Unit) { callbacks.onClearMutationFeedback() }
         HarnessApplicationsRouteContent(state = state, onRefresh = callbacks.onRefresh) { snapshot ->
             HarnessCreateApplicationConnectionScreen(
                 options = snapshot.connectionOptions,
                 mutationState = mutationState,
-                onCreate = callbacks.onCreateApplicationConnection,
+                onCreate = applicationsViewModel::createApplicationConnection,
                 onReload = callbacks.onRefresh,
                 onClearFeedback = callbacks.onClearMutationFeedback,
                 onDone = { navController.popBackStack() },
             )
         }
     }
+}
+
+@Composable
+internal fun activityApplicationsViewModel(): HarnessApplicationsReadViewModel {
+    val owner = LocalActivity.current as? ComponentActivity
+        ?: error("Application control-plane routes require a ComponentActivity owner")
+    return viewModel(viewModelStoreOwner = owner)
 }
 
 @Composable
@@ -138,6 +149,7 @@ internal fun HarnessCreateApplicationConnectionScreen(
             )
         }
         item { ConnectionReviewCard(displayName, packageName, selectedUseCase, selectedPreset) }
+        item { ConnectionMutationFeedback(mutationState, onReload, onClearFeedback, onDone) }
         if (!saved) {
             item {
                 ConnectionCreateAction(
@@ -156,7 +168,6 @@ internal fun HarnessCreateApplicationConnectionScreen(
                 )
             }
         }
-        item { ConnectionMutationFeedback(mutationState, onReload, onClearFeedback, onDone) }
     }
 }
 
