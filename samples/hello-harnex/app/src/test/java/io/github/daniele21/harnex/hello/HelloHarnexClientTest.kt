@@ -161,16 +161,14 @@ class HelloHarnexClientTest {
 
     @Test
     fun `authorization rejection is surfaced as actionable failure`() {
-        val runtime =
-            FakeHelloHarnexRuntime(
-                assignments =
-                    ConsumerAssignedUseCasesResult.Rejected(
-                        ConsumerControlPlaneFailure(
-                            ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
-                            "authorization required",
-                        ),
-                    ),
-            )
+        val runtime = FakeHelloHarnexRuntime(
+            assignments = ConsumerAssignedUseCasesResult.Rejected(
+                ConsumerControlPlaneFailure(
+                    ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
+                    "authorization required",
+                ),
+            ),
+        )
         val client = HelloHarnexClient(runtime)
         try {
             val resultReady = CountDownLatch(1)
@@ -224,49 +222,45 @@ class HelloHarnexClientTest {
             return assignments
         }
 
-        override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
-            ConsumerPublishedPresetsResult.Available(
-                useCaseId = useCaseId,
-                bindingRevision = 1,
-                presets =
-                    listOf(
-                        ConsumerPublishedPreset(
-                            preset = PRESET,
-                            displayName = "Quality",
-                            description = "General-purpose text preset",
-                            isDefault = true,
-                        ),
-                    ),
-            )
-
-        override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult =
-            ConsumerActivationResult.Activated(
-                ConsumerActivation(
-                    activationId = ConsumerActivationId("activation-1"),
-                    useCaseId = request.useCaseId,
-                    useCaseRevision = request.useCaseRevision,
-                    bindingRevision = request.bindingRevision,
-                    preset = request.preset,
+        override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult = ConsumerPublishedPresetsResult.Available(
+            useCaseId = useCaseId,
+            bindingRevision = 1,
+            presets = listOf(
+                ConsumerPublishedPreset(
+                    preset = PRESET,
+                    displayName = "Quality",
+                    description = "General-purpose text preset",
+                    isDefault = true,
                 ),
-            )
+            ),
+        )
+
+        override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult = ConsumerActivationResult.Activated(
+            ConsumerActivation(
+                activationId = ConsumerActivationId("activation-1"),
+                useCaseId = request.useCaseId,
+                useCaseRevision = request.useCaseRevision,
+                bindingRevision = request.bindingRevision,
+                preset = request.preset,
+            ),
+        )
 
         override fun deactivate(activationId: ConsumerActivationId): ConsumerDeactivationResult {
             deactivations.incrementAndGet()
             return ConsumerDeactivationResult.Released
         }
 
-        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult =
-            ConsumerPrepareResult.Prepared(
-                ConsumerPreparedSelection(
-                    preparedId = ConsumerPreparedId("prepared-1"),
-                    useCaseId = request.useCaseId,
-                    capabilityRevision = "capability-1",
-                    preset = PRESET,
-                    reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-                    outputConstraint = ConsumerOutputConstraintKind.TEXT,
-                    sessionKind = SessionKind.STATELESS,
-                ),
-            )
+        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult = ConsumerPrepareResult.Prepared(
+            ConsumerPreparedSelection(
+                preparedId = ConsumerPreparedId("prepared-1"),
+                useCaseId = request.useCaseId,
+                capabilityRevision = "capability-1",
+                preset = PRESET,
+                reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+                outputConstraint = ConsumerOutputConstraintKind.TEXT,
+                sessionKind = SessionKind.STATELESS,
+            ),
+        )
 
         override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult =
             ConsumerSessionResult.Created(SessionId("session-1"))
@@ -324,18 +318,17 @@ class HelloHarnexClientTest {
         val USE_CASE = UseCaseId("generic-text-generation")
         val PRESET = InferencePresetRef(InferencePresetId("qwen35-text-quality"), 1)
 
-        fun validAssignments(): ConsumerAssignedUseCasesResult =
-            ConsumerAssignedUseCasesResult.Available(
-                listOf(
-                    ConsumerAssignedUseCase(
-                        useCaseId = USE_CASE,
-                        useCaseRevision = 1,
-                        bindingRevision = 1,
-                        displayName = "Generic text generation",
-                        description = "Run bounded local text generation",
-                        isDefault = true,
-                    ),
+        fun validAssignments(): ConsumerAssignedUseCasesResult = ConsumerAssignedUseCasesResult.Available(
+            listOf(
+                ConsumerAssignedUseCase(
+                    useCaseId = USE_CASE,
+                    useCaseRevision = 1,
+                    bindingRevision = 1,
+                    displayName = "Generic text generation",
+                    description = "Run bounded local text generation",
+                    isDefault = true,
                 ),
-            )
+            ),
+        )
     }
 }
