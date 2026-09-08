@@ -48,11 +48,18 @@ internal interface HelloHarnexRuntime : AutoCloseable {
     fun closeSession(sessionId: SessionId)
 }
 
-internal class BinderHelloHarnexRuntime private constructor(private val client: BinderConsumerLocalLlmClient) : HelloHarnexRuntime {
+private abstract class BinderConnectionHelloHarnexRuntime(
+    protected val client: BinderConsumerLocalLlmClient,
+) : HelloHarnexRuntime {
     override fun connect() = client.connect()
 
     override fun disconnect() = client.disconnect()
 
+    override fun close() = client.close()
+}
+
+internal class BinderHelloHarnexRuntime private constructor(client: BinderConsumerLocalLlmClient) :
+    BinderConnectionHelloHarnexRuntime(client) {
     override fun assignedUseCases(): ConsumerAssignedUseCasesResult = client.assignedUseCases()
 
     override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult = client.publishedPresets(useCaseId)
@@ -69,8 +76,6 @@ internal class BinderHelloHarnexRuntime private constructor(private val client: 
         client.generate(request, listener)
 
     override fun closeSession(sessionId: SessionId) = client.closeSession(sessionId)
-
-    override fun close() = client.close()
 
     companion object {
         fun create(context: Context, onConnectionChanged: SharedRuntimeConnectionObserver): BinderHelloHarnexRuntime =
