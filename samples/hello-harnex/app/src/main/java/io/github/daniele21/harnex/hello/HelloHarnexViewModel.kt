@@ -13,9 +13,7 @@ import io.github.daniele21.localllm.transport.binder.client.SharedRuntimeConnect
  *
  * Product UI renders this state and sends user intents; Binder/runtime lifecycle stays outside the Activity.
  */
-internal class HelloHarnexViewModel(
-    context: Context,
-) : ViewModel() {
+internal class HelloHarnexViewModel(context: Context) : ViewModel() {
     private val stateLock = Any()
     private var currentState = HelloHarnexUiState()
     private val mutableState = MutableLiveData(currentState)
@@ -118,9 +116,7 @@ internal class HelloHarnexViewModel(
         mutableState.postValue(next)
     }
 
-    class Factory(
-        private val context: Context,
-    ) : ViewModelProvider.Factory {
+    class Factory(private val context: Context) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(HelloHarnexViewModel::class.java)) {
                 "Unsupported ViewModel ${modelClass.name}"
