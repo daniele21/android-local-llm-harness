@@ -108,6 +108,7 @@ class HarnessGenericTextUseCaseTest {
                 lastSeenAtEpochMs = 1L,
             ),
         ),
+        useCases = listOf(HarnessBuiltInControlPlaneSpec.genericText(emptyList()).useCase),
         bindings = listOf(
             ApplicationUseCaseBinding(
                 bindingId = "connection:${applicationId.value}:generic-text-generation",
