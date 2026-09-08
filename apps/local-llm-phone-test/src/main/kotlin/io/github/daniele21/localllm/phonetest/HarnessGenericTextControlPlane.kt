@@ -21,13 +21,11 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.genericText(
     applications: List<HarnessBuiltInApplicationRequirement>,
 ): HarnessBuiltInControlPlaneSpec = HarnessBuiltInControlPlaneSpec(
     applications = applications.sortedBy { it.applicationId.value },
-    useCase =
-    UseCaseDefinition(
+    useCase = UseCaseDefinition(
         useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
         displayName = "Generic text generation",
         description = "Run bounded stateless local text generation for Consumer SDK integrations and app-owned workflows",
-        requirements =
-        UseCaseRequirements(
+        requirements = UseCaseRequirements(
             outputMode = OutputMode.TEXT,
             sessionKind = SessionKind.STATELESS,
             reasoningSupported = false,
@@ -37,11 +35,9 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.genericText(
         state = UseCaseDefinitionState.ACTIVE,
         revision = 1,
     ),
-    preset =
-    UseCasePresetDefinition(
+    preset = UseCasePresetDefinition(
         useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
-        metadata =
-        PresetConsumerMetadata(
+        metadata = PresetConsumerMetadata(
             presetId = HarnessSharedRuntimeBindings.genericTextDefaultPreset.id.value,
             revision = HarnessSharedRuntimeBindings.genericTextDefaultPreset.version,
             displayName = "Quality",
@@ -49,13 +45,11 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.genericText(
         ),
         creationSource = PresetCreationSource.SUGGESTED,
         state = PresetLifecycleState.PUBLISHED,
-        execution =
-        PresetExecutionPolicy(
+        execution = PresetExecutionPolicy(
             modelProfileId = null,
             inferencePreset = HarnessSharedRuntimeBindings.genericTextDefaultPreset,
             contextTokens = GENERIC_TEXT_MINIMUM_CONTEXT_TOKENS,
-            cachePolicy =
-            UseCaseCachePolicy(
+            cachePolicy = UseCaseCachePolicy(
                 retainModelWarmMs = GENERIC_TEXT_WARM_RETENTION_MS,
                 reuseStatelessContext = false,
                 enablePrefixSnapshot = false,
