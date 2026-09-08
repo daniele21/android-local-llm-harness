@@ -54,14 +54,14 @@ internal class HelloHarnexClient internal constructor(
 
     fun connect() {
         synchronized(lifecycleLock) {
-            checkOpen()
+            HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex client is closed")
             runtime.connect()
         }
     }
 
     fun disconnect() {
         synchronized(lifecycleLock) {
-            checkOpen()
+            HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex client is closed")
             check(!running.get()) { "Cancel or finish the active inference before disconnecting" }
             runtime.disconnect()
         }
@@ -73,7 +73,10 @@ internal class HelloHarnexClient internal constructor(
             onResult(Result.failure(IllegalStateException("An inference request is already running")))
             return
         }
-        if (!submitIfOpen { executeRun(text, onStatus, onAnswerDelta, onResult) }) {
+        if (!HelloHarnexClientSupport.submitIfOpen(lifecycleLock, closed, executor) {
+                executeRun(text, onStatus, onAnswerDelta, onResult)
+            }
+        ) {
             running.set(false)
             onResult(Result.failure(IllegalStateException("Hello Harnex client is closed")))
         }
@@ -111,71 +114,35 @@ internal class HelloHarnexClient internal constructor(
         }
         runCatching {
             val sessionId = prepareSession(onStatus)
-            checkExecutionOpen()
+            HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex execution was closed")
             startGeneration(sessionId, text, onStatus, onAnswerDelta, onResult)
         }.onFailure { failure -> finishOnExecutor(Result.failure(failure), onResult) }
     }
 
     private fun prepareSession(onStatus: (String) -> Unit): SessionId {
         onStatus("Discovering the Harnex assignment…")
-        val assignment = when (val result = runtime.assignedUseCases()) {
-            is ConsumerAssignedUseCasesResult.Available ->
-                result.assignments.singleOrNull { it.useCaseId == USE_CASE_ID }
-                    ?: throw HelloHarnexException(
-                        kind = HelloHarnexFailureKind.CONFIGURATION_REQUIRED,
-                        stage = "assignment",
-                        detail = "The Document PII detection use case is not assigned to this app",
-                    )
-
-            is ConsumerAssignedUseCasesResult.Rejected ->
-                throw controlPlaneFailure("assignment", result.failure.code, result.failure.message)
-        }
-        val published = when (val result = runtime.publishedPresets(USE_CASE_ID)) {
-            is ConsumerPublishedPresetsResult.Available -> result
-
-            is ConsumerPublishedPresetsResult.Rejected ->
-                throw controlPlaneFailure("preset discovery", result.failure.code, result.failure.message)
-        }
-        val preset = published.presets.singleOrNull { it.isDefault }
-            ?: throw HelloHarnexException(
-                kind = HelloHarnexFailureKind.CONFIGURATION_REQUIRED,
-                stage = "preset discovery",
-                detail = "The assigned use case has no default published preset",
-            )
+        val assignment = HelloHarnexClientSupport.assignment(runtime.assignedUseCases(), USE_CASE_ID)
+        val preset = HelloHarnexClientSupport.defaultPreset(runtime.publishedPresets(USE_CASE_ID))
 
         onStatus("Activating the host-owned local execution…")
-        val activation = when (
-            val result = runtime.activate(
-                ConsumerActivationRequest(
-                    useCaseId = USE_CASE_ID,
-                    useCaseRevision = assignment.useCaseRevision,
-                    bindingRevision = assignment.bindingRevision,
-                    preset = preset.preset,
+        val activation =
+            HelloHarnexClientSupport.activation(
+                runtime.activate(
+                    ConsumerActivationRequest(
+                        useCaseId = USE_CASE_ID,
+                        useCaseRevision = assignment.useCaseRevision,
+                        bindingRevision = assignment.bindingRevision,
+                        preset = preset.preset,
+                    ),
                 ),
             )
-        ) {
-            is ConsumerActivationResult.Activated -> result.activation
-
-            is ConsumerActivationResult.Rejected ->
-                throw controlPlaneFailure("activation", result.failure.code, result.failure.message)
-        }
         activeActivation = activation.activationId
-        checkExecutionOpen()
+        HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex execution was closed")
 
         onStatus("Preparing the exact execution capability…")
-        val prepared = when (val result = runtime.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
-            is ConsumerPrepareResult.Prepared -> result.selection
-
-            is ConsumerPrepareResult.Rejected ->
-                throw consumerFailure("prepare", result.failure.code, result.failure.message)
-        }
-        checkExecutionOpen()
-        return when (val result = runtime.createSession(prepared.preparedId)) {
-            is ConsumerSessionResult.Created -> result.sessionId.also { activeSession = it }
-
-            is ConsumerSessionResult.Rejected ->
-                throw consumerFailure("session creation", result.failure.code, result.failure.message)
-        }
+        val prepared = HelloHarnexClientSupport.prepared(runtime.prepare(ConsumerPrepareRequest(USE_CASE_ID)))
+        HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex execution was closed")
+        return HelloHarnexClientSupport.session(runtime.createSession(prepared.preparedId)).also { activeSession = it }
     }
 
     private fun startGeneration(
@@ -204,7 +171,11 @@ internal class HelloHarnexClient internal constructor(
                         terminal = terminal,
                         onStatus = onStatus,
                         onAnswerDelta = onAnswerDelta,
-                        onTerminal = { result -> submitIfOpen { finishOnExecutor(result, onResult) } },
+                        onTerminal = { result ->
+                            HelloHarnexClientSupport.submitIfOpen(lifecycleLock, closed, executor) {
+                                finishOnExecutor(result, onResult)
+                            }
+                        },
                     )
                 },
             )
@@ -242,23 +213,6 @@ internal class HelloHarnexClient internal constructor(
         activeActivation = null
     }
 
-    private fun submitIfOpen(block: () -> Unit): Boolean = synchronized(lifecycleLock) {
-        if (closed.get()) {
-            false
-        } else {
-            executor.execute(block)
-            true
-        }
-    }
-
-    private fun checkOpen() {
-        check(!closed.get()) { "Hello Harnex client is closed" }
-    }
-
-    private fun checkExecutionOpen() {
-        check(!closed.get()) { "Hello Harnex execution was closed" }
-    }
-
     companion object {
         fun create(context: Context, onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit): HelloHarnexClient = HelloHarnexClient(
             runtime =
@@ -267,6 +221,68 @@ internal class HelloHarnexClient internal constructor(
                 onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
             ),
         )
+    }
+}
+
+private object HelloHarnexClientSupport {
+    fun ensureOpen(closed: AtomicBoolean, message: String) {
+        check(!closed.get()) { message }
+    }
+
+    fun submitIfOpen(lock: Any, closed: AtomicBoolean, executor: ExecutorService, block: () -> Unit): Boolean = synchronized(lock) {
+        if (closed.get()) {
+            false
+        } else {
+            executor.execute(block)
+            true
+        }
+    }
+
+    fun assignment(result: ConsumerAssignedUseCasesResult, useCaseId: UseCaseId) = when (result) {
+        is ConsumerAssignedUseCasesResult.Available ->
+            result.assignments.singleOrNull { it.useCaseId == useCaseId }
+                ?: throw HelloHarnexException(
+                    kind = HelloHarnexFailureKind.CONFIGURATION_REQUIRED,
+                    stage = "assignment",
+                    detail = "The Document PII detection use case is not assigned to this app",
+                )
+
+        is ConsumerAssignedUseCasesResult.Rejected ->
+            throw controlPlaneFailure("assignment", result.failure.code, result.failure.message)
+    }
+
+    fun defaultPreset(result: ConsumerPublishedPresetsResult) = when (result) {
+        is ConsumerPublishedPresetsResult.Available ->
+            result.presets.singleOrNull { it.isDefault }
+                ?: throw HelloHarnexException(
+                    kind = HelloHarnexFailureKind.CONFIGURATION_REQUIRED,
+                    stage = "preset discovery",
+                    detail = "The assigned use case has no default published preset",
+                )
+
+        is ConsumerPublishedPresetsResult.Rejected ->
+            throw controlPlaneFailure("preset discovery", result.failure.code, result.failure.message)
+    }
+
+    fun activation(result: ConsumerActivationResult) = when (result) {
+        is ConsumerActivationResult.Activated -> result.activation
+
+        is ConsumerActivationResult.Rejected ->
+            throw controlPlaneFailure("activation", result.failure.code, result.failure.message)
+    }
+
+    fun prepared(result: ConsumerPrepareResult) = when (result) {
+        is ConsumerPrepareResult.Prepared -> result.selection
+
+        is ConsumerPrepareResult.Rejected ->
+            throw consumerFailure("prepare", result.failure.code, result.failure.message)
+    }
+
+    fun session(result: ConsumerSessionResult) = when (result) {
+        is ConsumerSessionResult.Created -> result.sessionId
+
+        is ConsumerSessionResult.Rejected ->
+            throw consumerFailure("session creation", result.failure.code, result.failure.message)
     }
 }
 
