@@ -31,12 +31,12 @@ import io.github.daniele21.localllm.contracts.RequestId
 import io.github.daniele21.localllm.contracts.SessionId
 import io.github.daniele21.localllm.contracts.SessionKind
 import io.github.daniele21.localllm.contracts.UseCaseId
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class HelloHarnexClientTest {
     @Test
@@ -139,9 +139,8 @@ class HelloHarnexClientTest {
         }
     }
 
-    private class FakeHelloHarnexRuntime(
-        private val assignments: ConsumerAssignedUseCasesResult = validAssignments(),
-    ) : HelloHarnexRuntime {
+    private class FakeHelloHarnexRuntime(private val assignments: ConsumerAssignedUseCasesResult = validAssignments()) :
+        HelloHarnexRuntime {
         val generationStarted = CountDownLatch(1)
         val closed = CountDownLatch(1)
         val cancelCount = AtomicInteger(0)
@@ -158,57 +157,51 @@ class HelloHarnexClientTest {
 
         override fun assignedUseCases(): ConsumerAssignedUseCasesResult = assignments
 
-        override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult =
-            ConsumerPublishedPresetsResult.Available(
-                useCaseId = useCaseId,
-                bindingRevision = 1,
-                presets =
-                    listOf(
-                        ConsumerPublishedPreset(
-                            preset = PRESET,
-                            displayName = "Balanced",
-                            description = "Balanced test preset",
-                            isDefault = true,
-                        ),
+        override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult = ConsumerPublishedPresetsResult.Available(
+            useCaseId = useCaseId,
+            bindingRevision = 1,
+            presets =
+                listOf(
+                    ConsumerPublishedPreset(
+                        preset = PRESET,
+                        displayName = "Balanced",
+                        description = "Balanced test preset",
+                        isDefault = true,
                     ),
-            )
-
-        override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult =
-            ConsumerActivationResult.Activated(
-                ConsumerActivation(
-                    activationId = ConsumerActivationId("activation-1"),
-                    useCaseId = request.useCaseId,
-                    useCaseRevision = request.useCaseRevision,
-                    bindingRevision = request.bindingRevision,
-                    preset = request.preset,
                 ),
-            )
+        )
+
+        override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult = ConsumerActivationResult.Activated(
+            ConsumerActivation(
+                activationId = ConsumerActivationId("activation-1"),
+                useCaseId = request.useCaseId,
+                useCaseRevision = request.useCaseRevision,
+                bindingRevision = request.bindingRevision,
+                preset = request.preset,
+            ),
+        )
 
         override fun deactivate(activationId: ConsumerActivationId): ConsumerDeactivationResult {
             deactivations.incrementAndGet()
             return ConsumerDeactivationResult.Released
         }
 
-        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult =
-            ConsumerPrepareResult.Prepared(
-                ConsumerPreparedSelection(
-                    preparedId = ConsumerPreparedId("prepared-1"),
-                    useCaseId = request.useCaseId,
-                    capabilityRevision = "capability-1",
-                    preset = PRESET,
-                    reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
-                    outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
-                    sessionKind = SessionKind.STATELESS,
-                ),
-            )
+        override fun prepare(request: ConsumerPrepareRequest): ConsumerPrepareResult = ConsumerPrepareResult.Prepared(
+            ConsumerPreparedSelection(
+                preparedId = ConsumerPreparedId("prepared-1"),
+                useCaseId = request.useCaseId,
+                capabilityRevision = "capability-1",
+                preset = PRESET,
+                reasoningMode = EffectiveConsumerReasoningMode.DISABLED,
+                outputConstraint = ConsumerOutputConstraintKind.JSON_SCHEMA,
+                sessionKind = SessionKind.STATELESS,
+            ),
+        )
 
         override fun createSession(preparedId: ConsumerPreparedId): ConsumerSessionResult =
             ConsumerSessionResult.Created(SessionId("session-1"))
 
-        override fun generate(
-            request: ConsumerGenerationRequest,
-            listener: ConsumerGenerationListener,
-        ): ConsumerGenerationStartResult {
+        override fun generate(request: ConsumerGenerationRequest, listener: ConsumerGenerationListener): ConsumerGenerationStartResult {
             generationRequestId = request.requestId
             generationListener = listener
             generationStarted.countDown()
@@ -248,18 +241,17 @@ class HelloHarnexClientTest {
         val USE_CASE = UseCaseId("document-pii-detection")
         val PRESET = InferencePresetRef(InferencePresetId("balanced"), 1)
 
-        fun validAssignments(): ConsumerAssignedUseCasesResult =
-            ConsumerAssignedUseCasesResult.Available(
-                listOf(
-                    ConsumerAssignedUseCase(
-                        useCaseId = USE_CASE,
-                        useCaseRevision = 1,
-                        bindingRevision = 1,
-                        displayName = "Document PII detection",
-                        description = "Detect personal information",
-                        isDefault = true,
-                    ),
+        fun validAssignments(): ConsumerAssignedUseCasesResult = ConsumerAssignedUseCasesResult.Available(
+            listOf(
+                ConsumerAssignedUseCase(
+                    useCaseId = USE_CASE,
+                    useCaseRevision = 1,
+                    bindingRevision = 1,
+                    displayName = "Document PII detection",
+                    description = "Detect personal information",
+                    isDefault = true,
                 ),
-            )
+            ),
+        )
     }
 }
