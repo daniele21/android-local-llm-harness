@@ -135,10 +135,7 @@ internal object HarnessSharedRuntimeBindings {
         )
 
     /** Bounded TEXT runtime shared by user-created Consumer applications after explicit authorization. */
-    fun resolveGenericText(
-        model: ImportedPhoneModel,
-        applicationId: ApplicationId = consoleApplicationId,
-    ): ResolvedUseCase {
+    fun resolveGenericText(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
@@ -160,6 +157,7 @@ internal object HarnessSharedRuntimeBindings {
     fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         when (useCaseId) {
             ombraUseCaseId -> resolveOmbra(model, applicationId)
+
             genericTextUseCaseId -> resolveGenericText(model, applicationId)
 
             auraSchemaInferenceUseCaseId,
