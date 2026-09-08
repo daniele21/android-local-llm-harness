@@ -35,6 +35,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -90,14 +91,16 @@ class HelloHarnexClientTest {
     }
 
     @Test
-    fun `close during active generation cancels and cleans up exactly once`() {
-        val runtime = FakeHelloHarnexRuntime()
+    fun `close racing generation acceptance cancels and cleans up exactly once`() {
+        val runtime = FakeHelloHarnexRuntime(blockGenerationReturn = true)
         val client = HelloHarnexClient(runtime)
 
         client.run("test", {}, {}, {})
         assertTrue(runtime.generationStarted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
 
         client.close()
+        runtime.allowGenerationToReturn()
+
         assertTrue(runtime.closed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
         assertEquals(1, runtime.cancelCount.get())
         assertEquals(1, runtime.closedSessions.get())
@@ -106,6 +109,32 @@ class HelloHarnexClientTest {
         runtime.failGeneration(ConsumerErrorCode.CANCELLED, "late terminal callback")
         client.close()
         assertEquals(1, runtime.closeCount.get())
+    }
+
+    @Test
+    fun `close before queued inference starts performs no host work`() {
+        val runtime = FakeHelloHarnexRuntime()
+        val executor = Executors.newSingleThreadExecutor()
+        val blockerStarted = CountDownLatch(1)
+        val releaseBlocker = CountDownLatch(1)
+        executor.execute {
+            blockerStarted.countDown()
+            releaseBlocker.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
+        val client = HelloHarnexClient(runtime, executor)
+        try {
+            assertTrue(blockerStarted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            client.run("test", {}, {}, {})
+            client.close()
+            releaseBlocker.countDown()
+
+            assertTrue(runtime.closed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            assertEquals(0, runtime.assignmentCalls.get())
+            assertEquals(0, runtime.cancelCount.get())
+        } finally {
+            releaseBlocker.countDown()
+            client.close()
+        }
     }
 
     @Test
@@ -139,15 +168,19 @@ class HelloHarnexClientTest {
         }
     }
 
-    private class FakeHelloHarnexRuntime(private val assignments: ConsumerAssignedUseCasesResult = validAssignments()) :
-        HelloHarnexRuntime {
+    private class FakeHelloHarnexRuntime(
+        private val assignments: ConsumerAssignedUseCasesResult = validAssignments(),
+        private val blockGenerationReturn: Boolean = false,
+    ) : HelloHarnexRuntime {
         val generationStarted = CountDownLatch(1)
         val closed = CountDownLatch(1)
         val cancelCount = AtomicInteger(0)
         val closedSessions = AtomicInteger(0)
         val deactivations = AtomicInteger(0)
         val closeCount = AtomicInteger(0)
+        val assignmentCalls = AtomicInteger(0)
 
+        private val generationReturnAllowed = CountDownLatch(if (blockGenerationReturn) 1 else 0)
         private var generationRequestId: RequestId? = null
         private var generationListener: ConsumerGenerationListener? = null
 
@@ -155,7 +188,10 @@ class HelloHarnexClientTest {
 
         override fun disconnect() = Unit
 
-        override fun assignedUseCases(): ConsumerAssignedUseCasesResult = assignments
+        override fun assignedUseCases(): ConsumerAssignedUseCasesResult {
+            assignmentCalls.incrementAndGet()
+            return assignments
+        }
 
         override fun publishedPresets(useCaseId: UseCaseId): ConsumerPublishedPresetsResult = ConsumerPublishedPresetsResult.Available(
             useCaseId = useCaseId,
@@ -205,6 +241,11 @@ class HelloHarnexClientTest {
             generationRequestId = request.requestId
             generationListener = listener
             generationStarted.countDown()
+            if (blockGenerationReturn) {
+                check(generationReturnAllowed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    "Timed out waiting to release fake generation"
+                }
+            }
             return ConsumerGenerationStartResult.Accepted(
                 object : ConsumerGenerationHandle {
                     override val requestId: RequestId = request.requestId
@@ -223,6 +264,10 @@ class HelloHarnexClientTest {
         override fun close() {
             closeCount.incrementAndGet()
             closed.countDown()
+        }
+
+        fun allowGenerationToReturn() {
+            generationReturnAllowed.countDown()
         }
 
         fun failGeneration(code: ConsumerErrorCode, message: String) {
