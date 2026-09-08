@@ -56,7 +56,9 @@ internal class HarnessConsumerSetupResolver(private val modelStore: ModelStore) 
         execution: ResolvedHostExecution,
         model: ImportedPhoneModel,
     ): ConsumerSetupResolutionResult {
-        val runtimeResolved = runCatching { HarnessSharedRuntimeBindings.resolveOmbra(model, applicationId) }.getOrNull()
+        val runtimeResolved = runCatching {
+            HarnessSharedRuntimeBindings.resolveConsumerUseCase(model, applicationId, execution.useCaseId)
+        }.getOrNull()
         return when {
             runtimeResolved == null -> rejected(
                 ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,

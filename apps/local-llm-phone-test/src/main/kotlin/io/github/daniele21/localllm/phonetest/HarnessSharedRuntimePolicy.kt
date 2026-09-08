@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
 import io.github.daniele21.localllm.contracts.ApplicationId
+import io.github.daniele21.localllm.contracts.UseCaseId
 import io.github.daniele21.localllm.integration.servicehost.AuthorizedClientPolicy
 import io.github.daniele21.localllm.integration.servicehost.SigningCertificateSha256
 import io.github.daniele21.localllm.models.ApplicationRegistrationState
@@ -31,17 +32,18 @@ internal object HarnessSharedRuntimePolicy {
                 acceptedSigningCertificates = hostSigningCertificates,
             )
         }
-        val redactGuardClients =
-            HarnessSharedRuntimeBindings.redactGuardPackages(debugClientPackageTopology).mapNotNull { packageName ->
-                installedCurrentSigningCertificates(context, packageName)?.let { signingCertificates ->
-                    AuthorizedClientPolicy(
-                        packageName = packageName,
-                        applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
-                        allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
-                        acceptedSigningCertificates = signingCertificates,
-                    )
-                }
-            }
+        val redactGuardClients = independentlySignedClients(
+            context = context,
+            packageNames = HarnessSharedRuntimeBindings.redactGuardPackages(debugClientPackageTopology),
+            applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            allowedUseCases = HarnessSharedRuntimeBindings.redactGuardUseCases,
+        )
+        val auraClients = independentlySignedClients(
+            context = context,
+            packageNames = HarnessSharedRuntimeBindings.auraPackages(debugClientPackageTopology),
+            applicationId = HarnessSharedRuntimeBindings.auraApplicationId,
+            allowedUseCases = HarnessSharedRuntimeBindings.auraUseCases,
+        )
         val releaseEvidenceClient = if (debugClientPackageTopology) {
             emptyList()
         } else {
@@ -54,23 +56,26 @@ internal object HarnessSharedRuntimePolicy {
                 ),
             )
         }
-        // RedactGuard appears in this bootstrap list only so startup reconciliation can observe its source-backed
-        // package/signer identity. It is deliberately excluded from static live trust below until the user has
-        // explicitly authorized the persisted Control Plane registration.
-        return listOf(internal) + consoleClients + redactGuardClients + releaseEvidenceClient
+        // Independently signed products appear in this bootstrap list only so startup reconciliation can observe
+        // their source-backed package/signer identity. They are deliberately excluded from static live trust until
+        // the user explicitly authorizes the persisted Control Plane registration.
+        return listOf(internal) + consoleClients + redactGuardClients + auraClients + releaseEvidenceClient
     }
 
     /**
      * Projects the current persisted app-connection state into the Binder security boundary.
-     * Same-publisher built-ins keep their reviewed signing policy. Independently signed consumers such as
-     * RedactGuard use the exact package/signing identity persisted after explicit user authorization.
+     * Same-publisher built-ins keep their reviewed signing policy. Independently signed consumers use the exact
+     * package/signing identity persisted after explicit user authorization.
      */
     fun liveAuthorizedClients(
         basePolicies: Collection<AuthorizedClientPolicy>,
         state: HostControlPlaneState,
     ): List<AuthorizedClientPolicy> {
         val internal = basePolicies.filter { it.applicationId == HarnessRuntimeGraph.APPLICATION_ID }
-        val controlPlaneSignerApplicationIds = setOf(HarnessSharedRuntimeBindings.redactGuardApplicationId)
+        val controlPlaneSignerApplicationIds = setOf(
+            HarnessSharedRuntimeBindings.redactGuardApplicationId,
+            HarnessSharedRuntimeBindings.auraApplicationId,
+        )
         val builtInApplicationIds = basePolicies
             .asSequence()
             .map(AuthorizedClientPolicy::applicationId)
@@ -112,34 +117,82 @@ internal object HarnessSharedRuntimePolicy {
     }
 
     fun builtInOmbraControlPlaneSpec(policies: Collection<AuthorizedClientPolicy>): HarnessBuiltInControlPlaneSpec {
-        val applications = policies
-            .filter { HarnessSharedRuntimeBindings.ombraUseCaseId in it.allowedUseCases }
-            .groupBy(AuthorizedClientPolicy::applicationId)
-            .map { (applicationId, applicationPolicies) ->
-                val independentlySigned = applicationId == HarnessSharedRuntimeBindings.redactGuardApplicationId
-                val signersByPackage = applicationPolicies
-                    .groupBy(AuthorizedClientPolicy::packageName)
-                    .mapValues { (_, packagePolicies) ->
-                        packagePolicies
-                            .flatMap(AuthorizedClientPolicy::acceptedSigningCertificates)
-                            .map(SigningCertificateSha256::hex)
-                            .toSet()
-                    }
-                HarnessBuiltInApplicationRequirement(
-                    applicationId = applicationId,
-                    acceptedPackageNames = signersByPackage.keys,
-                    acceptedSignerSha256 = signersByPackage.values.flatten().toSet(),
-                    displayName = displayName(applicationId),
-                    initialState = if (independentlySigned) {
-                        ApplicationRegistrationState.PENDING
-                    } else {
-                        ApplicationRegistrationState.AUTHORIZED
-                    },
-                    allowObservedSignerChange = independentlySigned,
-                    acceptedSignerSha256ByPackage = signersByPackage,
-                )
-            }
+        val applications = requirementsForUseCases(
+            policies = policies,
+            useCaseIds = setOf(HarnessSharedRuntimeBindings.ombraUseCaseId),
+            independentlySignedApplicationIds = setOf(HarnessSharedRuntimeBindings.redactGuardApplicationId),
+        )
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
+    }
+
+    /**
+     * Seeds Aura only when its exact installed package/signing identity was observed. The independently signed Aura
+     * registration starts PENDING and does not enter live Binder trust until explicit control-plane authorization.
+     */
+    fun builtInAuraControlPlaneSpecs(policies: Collection<AuthorizedClientPolicy>): List<HarnessBuiltInControlPlaneSpec> {
+        val auraPolicies = policies.filter { policy ->
+            policy.applicationId == HarnessSharedRuntimeBindings.auraApplicationId &&
+                policy.allowedUseCases.any(HarnessSharedRuntimeBindings.auraUseCases::contains)
+        }
+        if (auraPolicies.isEmpty()) return emptyList()
+
+        val applications = requirementsForUseCases(
+            policies = auraPolicies,
+            useCaseIds = HarnessSharedRuntimeBindings.auraUseCases,
+            independentlySignedApplicationIds = setOf(HarnessSharedRuntimeBindings.auraApplicationId),
+        )
+        return listOf(
+            HarnessBuiltInControlPlaneSpec.auraSchema(applications),
+            HarnessBuiltInControlPlaneSpec.auraCategory(applications),
+        )
+    }
+
+    private fun requirementsForUseCases(
+        policies: Collection<AuthorizedClientPolicy>,
+        useCaseIds: Set<UseCaseId>,
+        independentlySignedApplicationIds: Set<ApplicationId>,
+    ): List<HarnessBuiltInApplicationRequirement> = policies
+        .filter { policy -> policy.allowedUseCases.any(useCaseIds::contains) }
+        .groupBy(AuthorizedClientPolicy::applicationId)
+        .map { (applicationId, applicationPolicies) ->
+            val independentlySigned = applicationId in independentlySignedApplicationIds
+            val signersByPackage = applicationPolicies
+                .groupBy(AuthorizedClientPolicy::packageName)
+                .mapValues { (_, packagePolicies) ->
+                    packagePolicies
+                        .flatMap(AuthorizedClientPolicy::acceptedSigningCertificates)
+                        .map(SigningCertificateSha256::hex)
+                        .toSet()
+                }
+            HarnessBuiltInApplicationRequirement(
+                applicationId = applicationId,
+                acceptedPackageNames = signersByPackage.keys,
+                acceptedSignerSha256 = signersByPackage.values.flatten().toSet(),
+                displayName = displayName(applicationId),
+                initialState = if (independentlySigned) {
+                    ApplicationRegistrationState.PENDING
+                } else {
+                    ApplicationRegistrationState.AUTHORIZED
+                },
+                allowObservedSignerChange = independentlySigned,
+                acceptedSignerSha256ByPackage = signersByPackage,
+            )
+        }
+
+    private fun independentlySignedClients(
+        context: Context,
+        packageNames: Set<String>,
+        applicationId: ApplicationId,
+        allowedUseCases: Set<UseCaseId>,
+    ): List<AuthorizedClientPolicy> = packageNames.mapNotNull { packageName ->
+        installedCurrentSigningCertificates(context, packageName)?.let { signingCertificates ->
+            AuthorizedClientPolicy(
+                packageName = packageName,
+                applicationId = applicationId,
+                allowedUseCases = allowedUseCases,
+                acceptedSigningCertificates = signingCertificates,
+            )
+        }
     }
 
     private fun installedCurrentSigningCertificates(context: Context, packageName: String): Set<SigningCertificateSha256>? = runCatching {
@@ -176,6 +229,7 @@ internal object HarnessSharedRuntimePolicy {
     private fun displayName(applicationId: ApplicationId): String = when (applicationId) {
         HarnessSharedRuntimeBindings.consoleApplicationId -> "Local LLM Console"
         HarnessSharedRuntimeBindings.redactGuardApplicationId -> "RedactGuard"
+        HarnessSharedRuntimeBindings.auraApplicationId -> "Aura Finance"
         else -> applicationId.value
     }
 

@@ -16,12 +16,24 @@ internal object HarnessSharedRuntimeBindings {
     /** Independent product identity used by daniele21/redactguard-android. */
     val redactGuardApplicationId = ApplicationId("redactguard")
 
+    /** Independent product identity used by daniele21/personal-budget (Aura Finance). */
+    val auraApplicationId = ApplicationId("aura-finance")
+
     /** Legacy surface retained only until the in-repo Console/OMBRA consumer is removed. */
     val consoleUseCaseId = UseCaseId("console-inference-playground")
 
     /** Host-owned PII-analysis use case. Consumers never provide model identity. */
     val ombraUseCaseId = UseCaseId("document-pii-detection")
+
+    /** Host-owned Aura spreadsheet schema-selection use case. */
+    val auraSchemaInferenceUseCaseId = UseCaseId("aura-transaction-schema-inference")
+
+    /** Host-owned Aura transaction category-selection use case. */
+    val auraCategoryClassificationUseCaseId = UseCaseId("aura-transaction-category-classification")
+
     val ombraDefaultPreset =
+        InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
+    val auraDefaultPreset =
         InferencePresetRef(InferencePresetId("qwen35-json"), PHONE_INFERENCE_PRESET_VERSION)
 
     const val HOST_RELEASE_PACKAGE = "io.github.daniele21.localllm.phonetest"
@@ -31,10 +43,13 @@ internal object HarnessSharedRuntimeBindings {
     const val CONSOLE_INTERNAL_PACKAGE = "io.github.daniele21.localllm.console.internal"
     const val REDACTGUARD_RELEASE_PACKAGE = "io.github.daniele21.redactguard"
     const val REDACTGUARD_DEBUG_PACKAGE = "io.github.daniele21.redactguard.debug"
+    const val AURA_RELEASE_PACKAGE = "com.staituned.aura"
+    const val AURA_DEBUG_PACKAGE = "com.staituned.aura.debug"
     const val SR6_RELEASE_CONSUMER_PACKAGE = "io.github.daniele21.localllm.consumerfixture"
 
     val consoleUseCases: Set<UseCaseId> = setOf(consoleUseCaseId, ombraUseCaseId)
     val redactGuardUseCases: Set<UseCaseId> = setOf(ombraUseCaseId)
+    val auraUseCases: Set<UseCaseId> = setOf(auraSchemaInferenceUseCaseId, auraCategoryClassificationUseCaseId)
     val piiConsumerApplicationIds: Set<ApplicationId> = setOf(consoleApplicationId, redactGuardApplicationId)
 
     /**
@@ -61,15 +76,19 @@ internal object HarnessSharedRuntimeBindings {
         setOf(REDACTGUARD_RELEASE_PACKAGE)
     }
 
-    fun externalClientPackages(debugHost: Boolean): Set<String> = consolePackages(debugHost) +
-        redactGuardPackages(debugHost) +
-        if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
+    fun auraPackages(debugHost: Boolean): Set<String> = if (debugHost) {
+        setOf(AURA_DEBUG_PACKAGE)
+    } else {
+        setOf(AURA_RELEASE_PACKAGE)
+    }
 
     fun modelProfileId(useCaseId: String, catalogProfileKey: String): String? {
         require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
         val suffix = when (useCaseId) {
             consoleUseCaseId.value -> CONSOLE_PROFILE_SUFFIX
             ombraUseCaseId.value -> OMBRA_PROFILE_SUFFIX
+            auraSchemaInferenceUseCaseId.value -> AURA_SCHEMA_PROFILE_SUFFIX
+            auraCategoryClassificationUseCaseId.value -> AURA_CATEGORY_PROFILE_SUFFIX
             else -> return null
         }
         return "$catalogProfileKey-$suffix"
@@ -100,27 +119,68 @@ internal object HarnessSharedRuntimeBindings {
      * Resolves the document-PII runtime for any application identity already authorized and assigned by the
      * control plane. Built-in and user-created applications share the same host-owned runtime contract.
      */
-    fun resolveOmbra(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
+    fun resolveOmbra(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase =
+        resolveJsonSchemaUseCase(
+            model = model,
+            applicationId = applicationId,
+            useCaseId = ombraUseCaseId,
+            defaultPreset = ombraDefaultPreset,
+            profileSuffix = OMBRA_PROFILE_SUFFIX,
+        )
+
+    /** Runtime resolver used by the Consumer control plane after assignment/authorization has already succeeded. */
+    fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
+        when (useCaseId) {
+            ombraUseCaseId -> resolveOmbra(model, applicationId)
+
+            auraSchemaInferenceUseCaseId,
+            auraCategoryClassificationUseCaseId,
+            -> {
+                require(applicationId == auraApplicationId) { "Aura import runtime requires the Aura application identity" }
+                val profileSuffix = when (useCaseId) {
+                    auraSchemaInferenceUseCaseId -> AURA_SCHEMA_PROFILE_SUFFIX
+                    auraCategoryClassificationUseCaseId -> AURA_CATEGORY_PROFILE_SUFFIX
+                    else -> error("Unsupported Aura import useCaseId ${useCaseId.value}")
+                }
+                resolveJsonSchemaUseCase(
+                    model = model,
+                    applicationId = applicationId,
+                    useCaseId = useCaseId,
+                    defaultPreset = auraDefaultPreset,
+                    profileSuffix = profileSuffix,
+                )
+            }
+
+            else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
+        }
+
+    private fun resolveJsonSchemaUseCase(
+        model: ImportedPhoneModel,
+        applicationId: ApplicationId,
+        useCaseId: UseCaseId,
+        defaultPreset: InferencePresetRef,
+        profileSuffix: String,
+    ): ResolvedUseCase {
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
-                maxOutputTokens = OMBRA_DEFAULT_MAX_OUTPUT_TOKENS,
-                useCaseValue = ombraUseCaseId.value,
-                profileSuffix = OMBRA_PROFILE_SUFFIX,
-                contextSize = OMBRA_CONTEXT_SIZE,
+                maxOutputTokens = STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS,
+                useCaseValue = useCaseId.value,
+                profileSuffix = profileSuffix,
+                contextSize = STRUCTURED_CONTEXT_SIZE,
             )
         val useCase =
             resolved.useCase.copy(
                 outputMode = OutputMode.JSON_SCHEMA,
-                defaultPreset = ombraDefaultPreset,
+                defaultPreset = defaultPreset,
             )
-        check(useCase.presets.any { it.ref == ombraDefaultPreset && OutputMode.JSON_SCHEMA in it.allowedOutputModes }) {
-            "OMBRA default preset must support JSON_SCHEMA"
+        check(useCase.presets.any { it.ref == defaultPreset && OutputMode.JSON_SCHEMA in it.allowedOutputModes }) {
+            "Structured Consumer default preset must support JSON_SCHEMA"
         }
         return resolved.copy(
             binding = AppModelBinding(
                 applicationId = applicationId,
-                useCaseId = ombraUseCaseId,
+                useCaseId = useCaseId,
                 useCaseProfileId = useCase.id,
             ),
             useCase = useCase,
@@ -129,8 +189,10 @@ internal object HarnessSharedRuntimeBindings {
 
     private const val CONSOLE_DEFAULT_MAX_OUTPUT_TOKENS = 512
     private const val CONSOLE_CONTEXT_SIZE = 4_096
-    private const val OMBRA_DEFAULT_MAX_OUTPUT_TOKENS = 512
-    private const val OMBRA_CONTEXT_SIZE = 4_096
+    private const val STRUCTURED_DEFAULT_MAX_OUTPUT_TOKENS = 512
+    private const val STRUCTURED_CONTEXT_SIZE = 4_096
     private const val CONSOLE_PROFILE_SUFFIX = "shared-console"
     private const val OMBRA_PROFILE_SUFFIX = "ombra-pii"
+    private const val AURA_SCHEMA_PROFILE_SUFFIX = "aura-import-schema"
+    private const val AURA_CATEGORY_PROFILE_SUFFIX = "aura-import-category"
 }

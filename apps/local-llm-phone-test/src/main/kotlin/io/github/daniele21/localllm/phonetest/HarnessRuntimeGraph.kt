@@ -77,12 +77,14 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
     val auditStartupState = inferenceActivitySource.reconcileInterrupted(System.currentTimeMillis())
 
     init {
+        val auraSpecs = HarnessSharedRuntimePolicy.builtInAuraControlPlaneSpecs(authorizedClientPolicies)
         HarnessControlPlaneStartup(
             store = controlPlaneStoreOwner.store,
             reconciler =
             HarnessControlPlaneReconciler(
                 HarnessSharedRuntimePolicy.builtInOmbraControlPlaneSpec(authorizedClientPolicies),
             ),
+            additionalReconcilers = auraSpecs.map(::HarnessControlPlaneReconciler),
         ).reconcile()
     }
 
@@ -162,6 +164,16 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
 
                 HarnessSharedRuntimeBindings.redactGuardApplicationId ->
                     listOf(HarnessOmbraConsumerPolicy.create(applicationId))
+
+                HarnessSharedRuntimeBindings.auraApplicationId -> {
+                    val state = controlPlaneStore.snapshot()
+                    require(state.isAuthorizedAuraConsumer(applicationId)) {
+                        "Consumer API is not configured for applicationId ${applicationId.value}"
+                    }
+                    HarnessSharedRuntimeBindings.auraUseCases
+                        .sortedBy(UseCaseId::value)
+                        .map { useCaseId -> HarnessAuraImportConsumerPolicy.create(applicationId, useCaseId) }
+                }
 
                 else -> {
                     val state = controlPlaneStore.snapshot()

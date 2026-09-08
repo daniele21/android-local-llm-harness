@@ -118,7 +118,7 @@ internal class HarnessConsumerControlPlaneHost(
                 presetId = request.preset.id.value,
                 presetRevision = request.preset.version,
             ),
-            executionEnvironment(applicationId),
+            executionEnvironment(applicationId, request.useCaseId),
         )
         return when (resolution) {
             is HostExecutionResolution.Failure -> ConsumerSetupResolutionResult.Rejected(resolution.code.toConsumerFailure())
@@ -134,7 +134,7 @@ internal class HarnessConsumerControlPlaneHost(
                 presetId = request.preset.id.value,
                 presetRevision = request.preset.version,
             ),
-            executionEnvironment(applicationId),
+            executionEnvironment(applicationId, request.useCaseId),
         )
         return when (resolution) {
             is HostExecutionResolution.Failure -> ConsumerActivationResult.Rejected(
@@ -190,7 +190,11 @@ internal class HarnessConsumerControlPlaneHost(
         val execution = resolution.execution
         val installed = modelStore.find(execution.modelDigest)
         val imported = installed?.let { importedPhoneModel(it.digest, it.sizeBytes) }
-        val baseRuntimeResolved = imported?.let { HarnessSharedRuntimeBindings.resolveOmbra(it, applicationId) }
+        val baseRuntimeResolved = imported?.let {
+            runCatching {
+                HarnessSharedRuntimeBindings.resolveConsumerUseCase(it, applicationId, request.useCaseId)
+            }.getOrNull()
+        }
         val preparationFailure = activationPreparationFailure(
             staleRevision = execution.useCaseRevision != request.useCaseRevision || execution.bindingRevision != request.bindingRevision,
             modelInstalled = installed != null,
@@ -267,11 +271,13 @@ internal class HarnessConsumerControlPlaneHost(
         )
     }
 
-    private fun executionEnvironment(applicationId: ApplicationId): HostExecutionEnvironment {
+    private fun executionEnvironment(applicationId: ApplicationId, useCaseId: UseCaseId): HostExecutionEnvironment {
         val installed = modelStore.snapshot().entries
         val profiles = installed.mapNotNull { stored ->
             importedPhoneModel(stored.digest, stored.sizeBytes)?.let { model ->
-                runCatching { HarnessSharedRuntimeBindings.resolveOmbra(model, applicationId).model }.getOrNull()
+                runCatching {
+                    HarnessSharedRuntimeBindings.resolveConsumerUseCase(model, applicationId, useCaseId).model
+                }.getOrNull()
             }
         }
         return HostExecutionEnvironment(

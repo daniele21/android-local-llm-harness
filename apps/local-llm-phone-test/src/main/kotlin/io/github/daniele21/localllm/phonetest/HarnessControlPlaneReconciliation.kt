@@ -107,6 +107,7 @@ internal data class HarnessBuiltInControlPlaneSpec(
     val applications: List<HarnessBuiltInApplicationRequirement>,
     val useCase: UseCaseDefinition,
     val preset: UseCasePresetDefinition,
+    val isDefaultBinding: Boolean = true,
 ) {
     init {
         require(applications.isNotEmpty()) { "At least one built-in consumer application is required" }
@@ -122,7 +123,7 @@ internal data class HarnessBuiltInControlPlaneSpec(
         useCaseId = useCase.useCaseId,
         revision = BUILT_IN_BINDING_REVISION,
         enabled = true,
-        isDefault = true,
+        isDefault = isDefaultBinding,
     )
 
     companion object {
