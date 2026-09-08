@@ -243,10 +243,9 @@ private fun Context.space(heightDp: Int): View = View(this).apply {
     layoutParams = LinearLayout.LayoutParams(1, dp(heightDp))
 }
 
-private fun Context.matchWidth() =
-    LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        LinearLayout.LayoutParams.WRAP_CONTENT,
-    )
+private fun Context.matchWidth() = LinearLayout.LayoutParams(
+    LinearLayout.LayoutParams.MATCH_PARENT,
+    LinearLayout.LayoutParams.WRAP_CONTENT,
+)
 
 private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
