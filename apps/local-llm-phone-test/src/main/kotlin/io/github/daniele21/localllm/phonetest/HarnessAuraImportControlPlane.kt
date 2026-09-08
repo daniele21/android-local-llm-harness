@@ -49,6 +49,7 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.auraCategory(
         displayName = "Aura local category classification",
         description = "Structured local inference for Aura transaction category selection",
     ),
+    isDefaultBinding = false,
 )
 
 private fun auraUseCase(useCaseId: io.github.daniele21.localllm.contracts.UseCaseId, displayName: String, description: String) =

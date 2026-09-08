@@ -115,6 +115,9 @@ class HarnessAuraImportUseCasesTest {
         assertTrue(seeded.useCases.all { it.requirements.outputMode == OutputMode.JSON_SCHEMA })
         assertTrue(seeded.useCases.all { it.requirements.sessionKind == SessionKind.STATELESS })
         assertTrue(seeded.useCases.all { !it.requirements.reasoningSupported })
+        val assignments = seeded.currentBindings(HarnessSharedRuntimeBindings.auraApplicationId).associateBy { it.useCaseId }
+        assertTrue(requireNotNull(assignments[HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId]).isDefault)
+        assertFalse(requireNotNull(assignments[HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId]).isDefault)
 
         val authorized = seeded.copy(
             applications = listOf(pending.copy(state = ApplicationRegistrationState.AUTHORIZED)),
