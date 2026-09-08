@@ -42,7 +42,7 @@ class HarnessAuraImportUseCasesTest {
         val model = curatedModel()
 
         for (useCaseId in HarnessSharedRuntimeBindings.auraUseCases) {
-            val resolved = HarnessSharedRuntimeBindings.resolveAuraImport(
+            val resolved = HarnessSharedRuntimeBindings.resolveConsumerUseCase(
                 model = model,
                 applicationId = HarnessSharedRuntimeBindings.auraApplicationId,
                 useCaseId = useCaseId,
@@ -58,12 +58,12 @@ class HarnessAuraImportUseCasesTest {
             assertEquals(io.github.daniele21.localllm.contracts.ThinkingMode.DISABLED, preset.generation.thinkingMode)
         }
 
-        val schema = HarnessSharedRuntimeBindings.resolveAuraImport(
+        val schema = HarnessSharedRuntimeBindings.resolveConsumerUseCase(
             model,
             HarnessSharedRuntimeBindings.auraApplicationId,
             HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId,
         )
-        val category = HarnessSharedRuntimeBindings.resolveAuraImport(
+        val category = HarnessSharedRuntimeBindings.resolveConsumerUseCase(
             model,
             HarnessSharedRuntimeBindings.auraApplicationId,
             HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId,

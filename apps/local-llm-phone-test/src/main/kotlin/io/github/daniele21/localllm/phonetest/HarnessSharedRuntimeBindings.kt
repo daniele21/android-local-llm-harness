@@ -133,24 +133,6 @@ internal object HarnessSharedRuntimeBindings {
             profileSuffix = OMBRA_PROFILE_SUFFIX,
         )
 
-    /** Resolves one of the two reviewed Aura import use cases. */
-    fun resolveAuraImport(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
-        require(applicationId == auraApplicationId) { "Aura import runtime requires the Aura application identity" }
-        require(useCaseId in auraUseCases) { "Unsupported Aura import useCaseId ${useCaseId.value}" }
-        val profileSuffix = when (useCaseId) {
-            auraSchemaInferenceUseCaseId -> AURA_SCHEMA_PROFILE_SUFFIX
-            auraCategoryClassificationUseCaseId -> AURA_CATEGORY_PROFILE_SUFFIX
-            else -> error("Unsupported Aura import useCaseId ${useCaseId.value}")
-        }
-        return resolveJsonSchemaUseCase(
-            model = model,
-            applicationId = applicationId,
-            useCaseId = useCaseId,
-            defaultPreset = auraDefaultPreset,
-            profileSuffix = profileSuffix,
-        )
-    }
-
     /** Runtime resolver used by the Consumer control plane after assignment/authorization has already succeeded. */
     fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         when (useCaseId) {
@@ -158,7 +140,21 @@ internal object HarnessSharedRuntimeBindings {
 
             auraSchemaInferenceUseCaseId,
             auraCategoryClassificationUseCaseId,
-            -> resolveAuraImport(model, applicationId, useCaseId)
+            -> {
+                require(applicationId == auraApplicationId) { "Aura import runtime requires the Aura application identity" }
+                val profileSuffix = when (useCaseId) {
+                    auraSchemaInferenceUseCaseId -> AURA_SCHEMA_PROFILE_SUFFIX
+                    auraCategoryClassificationUseCaseId -> AURA_CATEGORY_PROFILE_SUFFIX
+                    else -> error("Unsupported Aura import useCaseId ${useCaseId.value}")
+                }
+                resolveJsonSchemaUseCase(
+                    model = model,
+                    applicationId = applicationId,
+                    useCaseId = useCaseId,
+                    defaultPreset = auraDefaultPreset,
+                    profileSuffix = profileSuffix,
+                )
+            }
 
             else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
         }
