@@ -4,10 +4,7 @@ import android.content.Context
 import io.github.daniele21.localllm.contracts.UseCaseId
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal data class EmulatorE2eAuraControlResult(
-    val success: Boolean,
-    val detail: String,
-)
+internal data class EmulatorE2eAuraControlResult(val success: Boolean, val detail: String)
 
 /** Emulator-only Aura control surface layered on the canonical phone Control Plane owners. */
 internal object EmulatorE2eAuraImportControl {
@@ -23,7 +20,9 @@ internal object EmulatorE2eAuraImportControl {
             )
         ) {
             is HarnessControlPlaneMutationResult.Success -> EmulatorE2eAuraControlResult(true, status(context))
+
             is HarnessControlPlaneMutationResult.Rejected -> EmulatorE2eAuraControlResult(false, result.message)
+
             is HarnessControlPlaneMutationResult.StaleRevision -> EmulatorE2eAuraControlResult(
                 false,
                 "stale_revision:${result.expectedRevision}:${result.actualRevision}",
@@ -61,11 +60,7 @@ internal object EmulatorE2eAuraImportControl {
         }
     }
 
-    private fun setAssignmentEnabled(
-        context: Context,
-        useCaseId: UseCaseId,
-        enabled: Boolean,
-    ): EmulatorE2eAuraControlResult {
+    private fun setAssignmentEnabled(context: Context, useCaseId: UseCaseId, enabled: Boolean): EmulatorE2eAuraControlResult {
         val access = HarnessRuntimeGraph.from(context).controlPlaneStore
         return runCatching {
             access.transact { current ->
