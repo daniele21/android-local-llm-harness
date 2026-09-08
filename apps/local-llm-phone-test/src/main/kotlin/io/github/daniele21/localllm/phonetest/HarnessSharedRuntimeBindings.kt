@@ -135,7 +135,10 @@ internal object HarnessSharedRuntimeBindings {
         )
 
     /** Bounded TEXT runtime shared by user-created Consumer applications after explicit authorization. */
-    fun resolveGenericText(model: ImportedPhoneModel, applicationId: ApplicationId = consoleApplicationId): ResolvedUseCase {
+    fun resolveGenericText(
+        model: ImportedPhoneModel,
+        applicationId: ApplicationId = consoleApplicationId,
+    ): ResolvedUseCase {
         val resolved =
             resolvedPhoneUseCase(
                 model = model,
