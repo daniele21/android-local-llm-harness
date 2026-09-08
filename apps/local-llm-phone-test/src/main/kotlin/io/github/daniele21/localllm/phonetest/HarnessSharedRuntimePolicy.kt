@@ -125,6 +125,15 @@ internal object HarnessSharedRuntimePolicy {
         return HarnessBuiltInControlPlaneSpec.ombra(applications)
     }
 
+    fun builtInGenericTextControlPlaneSpec(policies: Collection<AuthorizedClientPolicy>): HarnessBuiltInControlPlaneSpec {
+        val applications = requirementsForUseCases(
+            policies = policies,
+            useCaseIds = setOf(HarnessSharedRuntimeBindings.genericTextUseCaseId),
+            independentlySignedApplicationIds = emptySet(),
+        )
+        return HarnessBuiltInControlPlaneSpec.genericText(applications)
+    }
+
     /**
      * Seeds Aura only when its exact installed package/signing identity was observed. The independently signed Aura
      * registration starts PENDING and does not enter live Binder trust until explicit control-plane authorization.

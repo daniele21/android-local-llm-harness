@@ -488,7 +488,12 @@ class MainActivity :
                         state = applicationsState,
                         mutationState = applicationsMutationState,
                         onRefresh = applicationsViewModel::refresh,
+                        onRefreshObservedIdentity = {
+                            applicationsViewModel.refresh(HarnessApplicationsRefreshMode.OBSERVED_IDENTITY)
+                        },
                         onSetDefaultPreset = applicationsViewModel::setDefaultPreset,
+                        onSetApplicationConnectionEnabled = applicationsViewModel::setApplicationConnectionEnabled,
+                        onCreateApplicationConnection = applicationsViewModel::createApplicationConnection,
                         onCreateCustomPreset = applicationsViewModel::createCustomPreset,
                         onClearMutationFeedback = applicationsViewModel::clearMutationFeedback,
                     )
