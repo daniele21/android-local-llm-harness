@@ -12,6 +12,7 @@ import io.github.daniele21.localllm.runtime.ConsumerUseCasePolicy
 internal object HarnessGenericTextConsumerPolicy {
     const val REVISION = "generic-text-v1"
     const val MAX_INPUT_CHARACTERS = 12_000
+    const val MAX_JSON_SCHEMA_CHARACTERS = 4_096
 
     fun create(
         applicationId: ApplicationId,
@@ -28,10 +29,10 @@ internal object HarnessGenericTextConsumerPolicy {
         sessionKinds = setOf(SessionKind.STATELESS),
         defaultSessionKind = SessionKind.STATELESS,
         limits =
-        ConsumerLimits(
-            maxInputCharacters = MAX_INPUT_CHARACTERS,
-            maxConversationMessages = 1,
-            maxJsonSchemaCharacters = 1,
-        ),
+            ConsumerLimits(
+                maxInputCharacters = MAX_INPUT_CHARACTERS,
+                maxConversationMessages = 1,
+                maxJsonSchemaCharacters = MAX_JSON_SCHEMA_CHARACTERS,
+            ),
     )
 }
