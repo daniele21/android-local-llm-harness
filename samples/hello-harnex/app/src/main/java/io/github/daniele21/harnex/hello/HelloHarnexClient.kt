@@ -131,17 +131,16 @@ internal class HelloHarnexClient internal constructor(
         val preset = HelloHarnexClientSupport.defaultPreset(runtime.publishedPresets(USE_CASE_ID))
 
         onStatus("Activating the host-owned local execution…")
-        val activation =
-            HelloHarnexClientSupport.activation(
-                runtime.activate(
-                    ConsumerActivationRequest(
-                        useCaseId = USE_CASE_ID,
-                        useCaseRevision = assignment.useCaseRevision,
-                        bindingRevision = assignment.bindingRevision,
-                        preset = preset.preset,
-                    ),
+        val activation = HelloHarnexClientSupport.activation(
+            runtime.activate(
+                ConsumerActivationRequest(
+                    useCaseId = USE_CASE_ID,
+                    useCaseRevision = assignment.useCaseRevision,
+                    bindingRevision = assignment.bindingRevision,
+                    preset = preset.preset,
                 ),
-            )
+            ),
+        )
         activeActivation = activation.activationId
         HelloHarnexClientSupport.ensureOpen(closed, "Hello Harnex execution was closed")
 
@@ -162,31 +161,29 @@ internal class HelloHarnexClient internal constructor(
     ) {
         val terminal = AtomicBoolean(false)
         val requestId = RequestId("hello-${UUID.randomUUID()}")
-        val request =
-            ConsumerGenerationRequest(
-                requestId = requestId,
-                sessionId = sessionId,
-                input = ConsumerGenerationInput.Text(text),
-                outputConstraint = ConsumerOutputConstraint.Text,
-            )
-        val start =
-            runtime.generate(
-                request,
-                ConsumerGenerationListener { event ->
-                    handleGenerationEvent(
-                        event = event,
-                        requestId = requestId,
-                        terminal = terminal,
-                        onStatus = onStatus,
-                        onAnswerDelta = onAnswerDelta,
-                        onTerminal = { result ->
-                            HelloHarnexClientSupport.submitIfOpen(lifecycleLock, closed, executor) {
-                                finishOnExecutor(result, onResult)
-                            }
-                        },
-                    )
-                },
-            )
+        val request = ConsumerGenerationRequest(
+            requestId = requestId,
+            sessionId = sessionId,
+            input = ConsumerGenerationInput.Text(text),
+            outputConstraint = ConsumerOutputConstraint.Text,
+        )
+        val start = runtime.generate(
+            request,
+            ConsumerGenerationListener { event ->
+                handleGenerationEvent(
+                    event = event,
+                    requestId = requestId,
+                    terminal = terminal,
+                    onStatus = onStatus,
+                    onAnswerDelta = onAnswerDelta,
+                    onTerminal = { result ->
+                        HelloHarnexClientSupport.submitIfOpen(lifecycleLock, closed, executor) {
+                            finishOnExecutor(result, onResult)
+                        }
+                    },
+                )
+            },
+        )
         when (start) {
             is ConsumerGenerationStartResult.Accepted ->
                 synchronized(lifecycleLock) {
@@ -235,11 +232,10 @@ internal class HelloHarnexClient internal constructor(
             context: Context,
             onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit,
         ): HelloHarnexClient = HelloHarnexClient(
-            runtime =
-                BinderHelloHarnexRuntime.create(
-                    context = context,
-                    onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
-                ),
+            runtime = BinderHelloHarnexRuntime.create(
+                context = context,
+                onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
+            ),
         )
     }
 }
@@ -351,67 +347,64 @@ private fun controlPlaneFailure(
     stage: String,
     code: ConsumerControlPlaneErrorCode,
     message: String,
-): HelloHarnexException =
-    HelloHarnexException(
-        kind =
-            when (code) {
-                ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
-                ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
-                -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
+): HelloHarnexException = HelloHarnexException(
+    kind = when (code) {
+        ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
+        ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
+        -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
-                ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
-                ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
-                ConsumerControlPlaneErrorCode.STALE_REVISION,
-                ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
-                -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+        ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
+        ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
+        ConsumerControlPlaneErrorCode.STALE_REVISION,
+        ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
+        -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
-                ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
-                -> HelloHarnexFailureKind.MODEL_NOT_READY
+        ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+        ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
+        -> HelloHarnexFailureKind.MODEL_NOT_READY
 
-                ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
-                -> HelloHarnexFailureKind.CONNECTION
+        ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
+        ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
+        -> HelloHarnexFailureKind.CONNECTION
 
-                ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
-                ConsumerControlPlaneErrorCode.INVALID_REQUEST,
-                ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
-                -> HelloHarnexFailureKind.RUNTIME
-            },
-        stage = stage,
-        detail = "$code: $message",
-    )
+        ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
+        ConsumerControlPlaneErrorCode.INVALID_REQUEST,
+        ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+        -> HelloHarnexFailureKind.RUNTIME
+    },
+    stage = stage,
+    detail = "$code: $message",
+)
 
 private fun consumerFailure(
     stage: String,
     code: ConsumerErrorCode,
     message: String,
 ): HelloHarnexException = HelloHarnexException(
-    kind =
-        when (code) {
-            ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
+    kind = when (code) {
+        ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
-            ConsumerErrorCode.MODEL_UNAVAILABLE -> HelloHarnexFailureKind.MODEL_NOT_READY
+        ConsumerErrorCode.MODEL_UNAVAILABLE -> HelloHarnexFailureKind.MODEL_NOT_READY
 
-            ConsumerErrorCode.CANCELLED -> HelloHarnexFailureKind.CANCELLED
+        ConsumerErrorCode.CANCELLED -> HelloHarnexFailureKind.CANCELLED
 
-            ConsumerErrorCode.CAPABILITY_INCOMPATIBLE,
-            ConsumerErrorCode.PRESET_NOT_ALLOWED,
-            ConsumerErrorCode.REASONING_NOT_ALLOWED,
-            ConsumerErrorCode.REASONING_REQUIRED,
-            ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
-            ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
-            ConsumerErrorCode.STALE_CAPABILITY,
-            ConsumerErrorCode.PREPARED_SELECTION_STALE,
-            ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
-            -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+        ConsumerErrorCode.CAPABILITY_INCOMPATIBLE,
+        ConsumerErrorCode.PRESET_NOT_ALLOWED,
+        ConsumerErrorCode.REASONING_NOT_ALLOWED,
+        ConsumerErrorCode.REASONING_REQUIRED,
+        ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
+        ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
+        ConsumerErrorCode.STALE_CAPABILITY,
+        ConsumerErrorCode.PREPARED_SELECTION_STALE,
+        ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
+        -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
-            ConsumerErrorCode.INVALID_INPUT,
-            ConsumerErrorCode.PREPARE_FAILED,
-            ConsumerErrorCode.SESSION_NOT_FOUND,
-            ConsumerErrorCode.RUNTIME_FAILURE,
-            -> HelloHarnexFailureKind.RUNTIME
-        },
+        ConsumerErrorCode.INVALID_INPUT,
+        ConsumerErrorCode.PREPARE_FAILED,
+        ConsumerErrorCode.SESSION_NOT_FOUND,
+        ConsumerErrorCode.RUNTIME_FAILURE,
+        -> HelloHarnexFailureKind.RUNTIME
+    },
     stage = stage,
     detail = "$code: $message",
 )
