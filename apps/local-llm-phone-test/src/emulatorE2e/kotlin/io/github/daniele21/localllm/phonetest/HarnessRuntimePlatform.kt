@@ -61,26 +61,40 @@ private class EmulatorE2eModelStore(context: Context) : ModelStore {
         verified = false,
     )
 
-    override fun find(digest: ModelDigest): StoredModel? = stored.takeIf { it.digest == digest }
+    override fun find(digest: ModelDigest): StoredModel? =
+        stored.takeIf { !EmulatorE2eModelAvailabilityGate.isUnavailable() && it.digest == digest }
 
     override fun import(source: File, artifact: GgufArtifact): StoredModel = throw ModelImportException(
         ModelImportErrorCode.INVALID_SOURCE,
         "The emulator E2E model store is pre-provisioned and immutable",
     )
 
-    override fun verify(digest: ModelDigest): VerificationResult = VerificationResult(
-        valid = digest == stored.digest,
-        actualDigest = stored.digest.takeIf { digest == stored.digest },
-        detail = if (digest == stored.digest) "Emulator E2E model identity is provisioned" else "Model is not provisioned",
-    )
+    override fun verify(digest: ModelDigest): VerificationResult {
+        if (EmulatorE2eModelAvailabilityGate.isUnavailable()) {
+            return VerificationResult(
+                valid = false,
+                actualDigest = null,
+                detail = "Emulator E2E model is intentionally unavailable",
+            )
+        }
+        return VerificationResult(
+            valid = digest == stored.digest,
+            actualDigest = stored.digest.takeIf { digest == stored.digest },
+            detail = if (digest == stored.digest) "Emulator E2E model identity is provisioned" else "Model is not provisioned",
+        )
+    }
 
     override fun remove(digest: ModelDigest): Boolean = false
 
-    override fun snapshot(): ModelStoreSnapshot = ModelStoreSnapshot(
-        modelCount = 1,
-        totalBytes = stored.sizeBytes,
-        entries = listOf(stored),
-    )
+    override fun snapshot(): ModelStoreSnapshot = if (EmulatorE2eModelAvailabilityGate.isUnavailable()) {
+        ModelStoreSnapshot(modelCount = 0, totalBytes = 0L, entries = emptyList())
+    } else {
+        ModelStoreSnapshot(
+            modelCount = 1,
+            totalBytes = stored.sizeBytes,
+            entries = listOf(stored),
+        )
+    }
 }
 
 private data class EmulatorE2eModelHandle(
@@ -158,7 +172,8 @@ private class DeterministicEmulatorInferenceBackend : InferenceBackend {
             "Injected emulator E2E backend failure"
         }
 
-        val output = EmulatorE2eAnalysisResponder.output(request.prompt)
+        val output = EmulatorE2eAuraImportResponder.outputOrNull(request.prompt)
+            ?: EmulatorE2eAnalysisResponder.output(request.prompt)
         val midpoint = (output.length / 2).coerceAtLeast(1)
         val chunks = listOf(output.substring(0, midpoint), output.substring(midpoint)).filter(String::isNotEmpty)
         var emitted = 0
