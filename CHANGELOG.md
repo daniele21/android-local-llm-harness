@@ -28,6 +28,7 @@ Harnex `0.5.0` is the current pre-release integration target. It is not producti
 ### Changed
 
 - Project identity is now **Harnex — Your local AI harness for Android**.
+- `samples/hello-harnex` now serves as the golden Consumer-app ownership reference: transient UI is separated from lifecycle-owned state, the public SDK sits behind a small app-owned boundary, terminal cleanup is race-hardened and focused lifecycle/failure tests run against publication artifacts.
 - Product/runtime model support is curated around reviewed Qwen3.5 GGUF artifacts rather than arbitrary model-family claims.
 - Runtime policy, model lifecycle and observability are host-owned rather than duplicated in Consumer applications.
 - Repository governance follows the `repo-template-sw` engineering model while preserving Harnex-specific Android/local-AI constraints.
