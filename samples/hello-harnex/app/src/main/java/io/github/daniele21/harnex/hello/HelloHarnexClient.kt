@@ -67,12 +67,7 @@ internal class HelloHarnexClient internal constructor(
         }
     }
 
-    fun run(
-        text: String,
-        onStatus: (String) -> Unit,
-        onAnswerDelta: (String) -> Unit,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    fun run(text: String, onStatus: (String) -> Unit, onAnswerDelta: (String) -> Unit, onResult: (Result<HelloInferenceResult>) -> Unit) {
         require(text.isNotBlank()) { "Input must not be blank" }
         if (!running.compareAndSet(false, true)) {
             onResult(Result.failure(IllegalStateException("An inference request is already running")))
@@ -129,6 +124,7 @@ internal class HelloHarnexClient internal constructor(
         }
         val published = when (val result = runtime.publishedPresets(USE_CASE_ID)) {
             is ConsumerPublishedPresetsResult.Available -> result
+
             is ConsumerPublishedPresetsResult.Rejected ->
                 throw controlPlaneFailure("preset discovery", result.failure.code, result.failure.message)
         }
@@ -151,6 +147,7 @@ internal class HelloHarnexClient internal constructor(
             )
         ) {
             is ConsumerActivationResult.Activated -> result.activation
+
             is ConsumerActivationResult.Rejected ->
                 throw controlPlaneFailure("activation", result.failure.code, result.failure.message)
         }
@@ -159,11 +156,13 @@ internal class HelloHarnexClient internal constructor(
         onStatus("Preparing the exact execution capability…")
         val prepared = when (val result = runtime.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
             is ConsumerPrepareResult.Prepared -> result.selection
+
             is ConsumerPrepareResult.Rejected ->
                 throw consumerFailure("prepare", result.failure.code, result.failure.message)
         }
         return when (val result = runtime.createSession(prepared.preparedId)) {
             is ConsumerSessionResult.Created -> result.sessionId.also { activeSession = it }
+
             is ConsumerSessionResult.Rejected ->
                 throw consumerFailure("session creation", result.failure.code, result.failure.message)
         }
@@ -201,6 +200,7 @@ internal class HelloHarnexClient internal constructor(
             )
         when (start) {
             is ConsumerGenerationStartResult.Accepted -> activeHandle = start.handle
+
             is ConsumerGenerationStartResult.Rejected -> {
                 terminal.set(true)
                 finishOnExecutor(
@@ -211,10 +211,7 @@ internal class HelloHarnexClient internal constructor(
         }
     }
 
-    private fun finishOnExecutor(
-        result: Result<HelloInferenceResult>,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    private fun finishOnExecutor(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
         cleanupOnExecutor()
         running.set(false)
         onResult(result)
@@ -228,32 +225,27 @@ internal class HelloHarnexClient internal constructor(
         activeActivation = null
     }
 
-    private fun submitIfOpen(block: () -> Unit): Boolean =
-        synchronized(lifecycleLock) {
-            if (closed.get()) {
-                false
-            } else {
-                executor.execute(block)
-                true
-            }
+    private fun submitIfOpen(block: () -> Unit): Boolean = synchronized(lifecycleLock) {
+        if (closed.get()) {
+            false
+        } else {
+            executor.execute(block)
+            true
         }
+    }
 
     private fun checkOpen() {
         check(!closed.get()) { "Hello Harnex client is closed" }
     }
 
     companion object {
-        fun create(
-            context: Context,
-            onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit,
-        ): HelloHarnexClient =
-            HelloHarnexClient(
-                runtime =
-                    BinderHelloHarnexRuntime.create(
-                        context = context,
-                        onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
-                    ),
-            )
+        fun create(context: Context, onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit): HelloHarnexClient = HelloHarnexClient(
+            runtime =
+            BinderHelloHarnexRuntime.create(
+                context = context,
+                onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
+            ),
+        )
     }
 }
 
@@ -268,85 +260,88 @@ internal enum class HelloHarnexFailureKind {
     RUNTIME,
 }
 
-internal class HelloHarnexException(
-    val kind: HelloHarnexFailureKind,
-    val stage: String,
-    val detail: String,
-) : IllegalStateException("$stage: $detail") {
+internal class HelloHarnexException(val kind: HelloHarnexFailureKind, val stage: String, val detail: String) :
+    IllegalStateException("$stage: $detail") {
     val userMessage: String
         get() = when (kind) {
             HelloHarnexFailureKind.AUTHORIZATION_REQUIRED ->
                 "Authorization required. Open Harnex and authorize this app."
+
             HelloHarnexFailureKind.CONFIGURATION_REQUIRED ->
                 "Harnex is reachable, but this app's use case is not fully configured."
+
             HelloHarnexFailureKind.MODEL_NOT_READY ->
                 "The assigned local model is not ready in Harnex."
+
             HelloHarnexFailureKind.CONNECTION ->
                 "The Harnex connection is unavailable."
+
             HelloHarnexFailureKind.CANCELLED -> "Inference cancelled."
+
             HelloHarnexFailureKind.RUNTIME -> detail
         }
 }
 
-private fun controlPlaneFailure(
-    stage: String,
-    code: ConsumerControlPlaneErrorCode,
-    message: String,
-): HelloHarnexException =
+private fun controlPlaneFailure(stage: String, code: ConsumerControlPlaneErrorCode, message: String): HelloHarnexException =
     HelloHarnexException(
         kind =
-            when (code) {
-                ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
-                ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
+        when (code) {
+            ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
+            ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
+            -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
-                ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
-                ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
-                ConsumerControlPlaneErrorCode.STALE_REVISION,
-                ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+            ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
+            ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
+            ConsumerControlPlaneErrorCode.STALE_REVISION,
+            ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
+            -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
-                ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.MODEL_CONFLICT -> HelloHarnexFailureKind.MODEL_NOT_READY
+            ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+            ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
+            -> HelloHarnexFailureKind.MODEL_NOT_READY
 
-                ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
-                ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE -> HelloHarnexFailureKind.CONNECTION
+            ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
+            ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
+            -> HelloHarnexFailureKind.CONNECTION
 
-                ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
-                ConsumerControlPlaneErrorCode.INVALID_REQUEST,
-                ConsumerControlPlaneErrorCode.RUNTIME_FAILURE -> HelloHarnexFailureKind.RUNTIME
-            },
+            ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
+            ConsumerControlPlaneErrorCode.INVALID_REQUEST,
+            ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+            -> HelloHarnexFailureKind.RUNTIME
+        },
         stage = stage,
         detail = "$code: $message",
     )
 
-private fun consumerFailure(
-    stage: String,
-    code: ConsumerErrorCode,
-    message: String,
-): HelloHarnexException =
-    HelloHarnexException(
-        kind =
-            when (code) {
-                ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
-                ConsumerErrorCode.MODEL_UNAVAILABLE -> HelloHarnexFailureKind.MODEL_NOT_READY
-                ConsumerErrorCode.CANCELLED -> HelloHarnexFailureKind.CANCELLED
-                ConsumerErrorCode.CAPABILITY_INCOMPATIBLE,
-                ConsumerErrorCode.PRESET_NOT_ALLOWED,
-                ConsumerErrorCode.REASONING_NOT_ALLOWED,
-                ConsumerErrorCode.REASONING_REQUIRED,
-                ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
-                ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
-                ConsumerErrorCode.STALE_CAPABILITY,
-                ConsumerErrorCode.PREPARED_SELECTION_STALE,
-                ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+private fun consumerFailure(stage: String, code: ConsumerErrorCode, message: String): HelloHarnexException = HelloHarnexException(
+    kind =
+    when (code) {
+        ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
-                ConsumerErrorCode.INVALID_INPUT,
-                ConsumerErrorCode.PREPARE_FAILED,
-                ConsumerErrorCode.SESSION_NOT_FOUND,
-                ConsumerErrorCode.RUNTIME_FAILURE -> HelloHarnexFailureKind.RUNTIME
-            },
-        stage = stage,
-        detail = "$code: $message",
-    )
+        ConsumerErrorCode.MODEL_UNAVAILABLE -> HelloHarnexFailureKind.MODEL_NOT_READY
+
+        ConsumerErrorCode.CANCELLED -> HelloHarnexFailureKind.CANCELLED
+
+        ConsumerErrorCode.CAPABILITY_INCOMPATIBLE,
+        ConsumerErrorCode.PRESET_NOT_ALLOWED,
+        ConsumerErrorCode.REASONING_NOT_ALLOWED,
+        ConsumerErrorCode.REASONING_REQUIRED,
+        ConsumerErrorCode.OUTPUT_NOT_ALLOWED,
+        ConsumerErrorCode.SESSION_KIND_NOT_ALLOWED,
+        ConsumerErrorCode.STALE_CAPABILITY,
+        ConsumerErrorCode.PREPARED_SELECTION_STALE,
+        ConsumerErrorCode.PREPARED_SELECTION_NOT_FOUND,
+        -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+
+        ConsumerErrorCode.INVALID_INPUT,
+        ConsumerErrorCode.PREPARE_FAILED,
+        ConsumerErrorCode.SESSION_NOT_FOUND,
+        ConsumerErrorCode.RUNTIME_FAILURE,
+        -> HelloHarnexFailureKind.RUNTIME
+    },
+    stage = stage,
+    detail = "$code: $message",
+)
 
 private fun handleGenerationEvent(
     event: ConsumerGenerationEvent,
@@ -359,11 +354,15 @@ private fun handleGenerationEvent(
     if (event.requestId != requestId || terminal.get()) return
     when (event) {
         is ConsumerGenerationEvent.Queued -> onStatus("Queued in the shared runtime…")
+
         is ConsumerGenerationEvent.Prepared -> onStatus("Exact execution prepared…")
+
         is ConsumerGenerationEvent.Started -> onStatus("Generating locally on device…")
+
         is ConsumerGenerationEvent.ContentDelta -> {
             if (event.contentType == ConsumerContentType.ANSWER) onAnswerDelta(event.text)
         }
+
         is ConsumerGenerationEvent.Completed -> {
             if (terminal.compareAndSet(false, true)) {
                 onTerminal(
@@ -376,6 +375,7 @@ private fun handleGenerationEvent(
                 )
             }
         }
+
         is ConsumerGenerationEvent.Failed -> {
             if (terminal.compareAndSet(false, true)) {
                 onTerminal(
@@ -418,12 +418,19 @@ private fun StringBuilder.appendJsonString(value: String) {
     value.forEach { character ->
         when (character) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             '\b' -> append("\\b")
+
             '\u000C' -> append("\\f")
+
             '\n' -> append("\\n")
+
             '\r' -> append("\\r")
+
             '\t' -> append("\\t")
+
             else -> if (character.code < 0x20) {
                 append("\\u")
                 append(character.code.toString(16).padStart(4, '0'))
