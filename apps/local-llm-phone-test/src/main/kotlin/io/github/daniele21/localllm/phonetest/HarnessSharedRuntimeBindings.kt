@@ -82,11 +82,10 @@ internal object HarnessSharedRuntimeBindings {
         setOf(AURA_RELEASE_PACKAGE)
     }
 
-    fun externalClientPackages(debugHost: Boolean): Set<String> =
-        consolePackages(debugHost) +
-            redactGuardPackages(debugHost) +
-            auraPackages(debugHost) +
-            if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
+    fun externalClientPackages(debugHost: Boolean): Set<String> = consolePackages(debugHost) +
+        redactGuardPackages(debugHost) +
+        auraPackages(debugHost) +
+        if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
     fun modelProfileId(useCaseId: String, catalogProfileKey: String): String? {
         require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
@@ -101,8 +100,7 @@ internal object HarnessSharedRuntimeBindings {
     }
 
     /** Exact model-profile identity exposed by the current document-PII runtime environment. */
-    fun ombraModelProfileId(catalogProfileKey: String): String =
-        requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
+    fun ombraModelProfileId(catalogProfileKey: String): String = requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
@@ -157,9 +155,11 @@ internal object HarnessSharedRuntimeBindings {
     fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
         when (useCaseId) {
             ombraUseCaseId -> resolveOmbra(model, applicationId)
+
             auraSchemaInferenceUseCaseId,
             auraCategoryClassificationUseCaseId,
             -> resolveAuraImport(model, applicationId, useCaseId)
+
             else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
         }
 
