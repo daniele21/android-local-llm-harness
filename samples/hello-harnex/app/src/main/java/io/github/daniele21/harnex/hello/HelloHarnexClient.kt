@@ -67,12 +67,7 @@ internal class HelloHarnexClient internal constructor(
         }
     }
 
-    fun run(
-        text: String,
-        onStatus: (String) -> Unit,
-        onAnswerDelta: (String) -> Unit,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    fun run(text: String, onStatus: (String) -> Unit, onAnswerDelta: (String) -> Unit, onResult: (Result<HelloInferenceResult>) -> Unit) {
         require(text.isNotBlank()) { "Input must not be blank" }
         if (!running.compareAndSet(false, true)) {
             onResult(Result.failure(IllegalStateException("An inference request is already running")))
@@ -210,10 +205,7 @@ internal class HelloHarnexClient internal constructor(
         }
     }
 
-    private fun finishOnExecutor(
-        result: Result<HelloInferenceResult>,
-        onResult: (Result<HelloInferenceResult>) -> Unit,
-    ) {
+    private fun finishOnExecutor(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
         cleanupOnExecutor()
         running.set(false)
         if (!closed.get()) onResult(result)
@@ -228,10 +220,7 @@ internal class HelloHarnexClient internal constructor(
     }
 
     companion object {
-        fun create(
-            context: Context,
-            onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit,
-        ): HelloHarnexClient = HelloHarnexClient(
+        fun create(context: Context, onConnectionChanged: (SharedRuntimeConnectionSnapshot) -> Unit): HelloHarnexClient = HelloHarnexClient(
             runtime = BinderHelloHarnexRuntime.create(
                 context = context,
                 onConnectionChanged = SharedRuntimeConnectionObserver(onConnectionChanged),
@@ -245,12 +234,7 @@ private object HelloHarnexClientSupport {
         check(!closed.get()) { message }
     }
 
-    fun submitIfOpen(
-        lock: Any,
-        closed: AtomicBoolean,
-        executor: ExecutorService,
-        block: () -> Unit,
-    ): Boolean = synchronized(lock) {
+    fun submitIfOpen(lock: Any, closed: AtomicBoolean, executor: ExecutorService, block: () -> Unit): Boolean = synchronized(lock) {
         if (closed.get()) {
             false
         } else {
@@ -343,44 +327,37 @@ internal class HelloHarnexException(
         }
 }
 
-private fun controlPlaneFailure(
-    stage: String,
-    code: ConsumerControlPlaneErrorCode,
-    message: String,
-): HelloHarnexException = HelloHarnexException(
-    kind = when (code) {
-        ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
-        ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
-        -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
+private fun controlPlaneFailure(stage: String, code: ConsumerControlPlaneErrorCode, message: String): HelloHarnexException =
+    HelloHarnexException(
+        kind = when (code) {
+            ConsumerControlPlaneErrorCode.UNKNOWN_APPLICATION,
+            ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
+            -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
-        ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
-        ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
-        ConsumerControlPlaneErrorCode.STALE_REVISION,
-        ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
-        -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
+            ConsumerControlPlaneErrorCode.USE_CASE_NOT_ASSIGNED,
+            ConsumerControlPlaneErrorCode.PRESET_NOT_EXPOSED,
+            ConsumerControlPlaneErrorCode.STALE_REVISION,
+            ConsumerControlPlaneErrorCode.CONFIGURATION_REQUIRED,
+            -> HelloHarnexFailureKind.CONFIGURATION_REQUIRED
 
-        ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
-        ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
-        -> HelloHarnexFailureKind.MODEL_NOT_READY
+            ConsumerControlPlaneErrorCode.MODEL_UNAVAILABLE,
+            ConsumerControlPlaneErrorCode.MODEL_CONFLICT,
+            -> HelloHarnexFailureKind.MODEL_NOT_READY
 
-        ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
-        ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
-        -> HelloHarnexFailureKind.CONNECTION
+            ConsumerControlPlaneErrorCode.FEATURE_UNAVAILABLE,
+            ConsumerControlPlaneErrorCode.TRANSPORT_FAILURE,
+            -> HelloHarnexFailureKind.CONNECTION
 
-        ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
-        ConsumerControlPlaneErrorCode.INVALID_REQUEST,
-        ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
-        -> HelloHarnexFailureKind.RUNTIME
-    },
-    stage = stage,
-    detail = "$code: $message",
-)
+            ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE,
+            ConsumerControlPlaneErrorCode.INVALID_REQUEST,
+            ConsumerControlPlaneErrorCode.RUNTIME_FAILURE,
+            -> HelloHarnexFailureKind.RUNTIME
+        },
+        stage = stage,
+        detail = "$code: $message",
+    )
 
-private fun consumerFailure(
-    stage: String,
-    code: ConsumerErrorCode,
-    message: String,
-): HelloHarnexException = HelloHarnexException(
+private fun consumerFailure(stage: String, code: ConsumerErrorCode, message: String): HelloHarnexException = HelloHarnexException(
     kind = when (code) {
         ConsumerErrorCode.USE_CASE_NOT_ALLOWED -> HelloHarnexFailureKind.AUTHORIZATION_REQUIRED
 
