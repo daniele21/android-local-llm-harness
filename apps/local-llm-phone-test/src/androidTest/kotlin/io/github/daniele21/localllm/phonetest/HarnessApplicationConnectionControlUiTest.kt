@@ -1,5 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -74,7 +75,8 @@ class HarnessApplicationConnectionControlUiTest {
         composeRule.onNodeWithTag("connection-create").assertIsEnabled().performClick()
 
         composeRule.runOnIdle {
-            val submitted = assertNotNull(submission).let { requireNotNull(submission) }
+            assertNotNull(submission)
+            val submitted = requireNotNull(submission)
             assertEquals("hello-harnex", submitted.applicationId)
             assertEquals("Hello Harnex", submitted.displayName)
             assertEquals("io.github.daniele21.harnex.hello", submitted.packageName)
@@ -87,12 +89,11 @@ class HarnessApplicationConnectionControlUiTest {
 
     @Test
     fun createConnectionAlwaysShowsMutationOutcomeNearAction() {
-        var mutationState: HarnessApplicationsMutationState = HarnessApplicationsMutationState.Saving
         composeRule.setContent {
             HarnessTheme(darkTheme = false) {
                 HarnessCreateApplicationConnectionScreen(
                     options = listOf(genericTextOption()),
-                    mutationState = mutationState,
+                    mutationState = HarnessApplicationsMutationState.Saving,
                     onCreate = { _, _, _, _, _, _, _ -> },
                     onReload = {},
                     onClearFeedback = {},
@@ -104,12 +105,13 @@ class HarnessApplicationConnectionControlUiTest {
         composeRule.onNodeWithTag("connection-create").assertTextEquals("Creating connection…")
         composeRule.onNodeWithText("Saving").assertExists()
 
-        mutationState = HarnessApplicationsMutationState.Saved("Application connection created and enabled.")
         composeRule.setContent {
             HarnessTheme(darkTheme = false) {
                 HarnessCreateApplicationConnectionScreen(
                     options = listOf(genericTextOption()),
-                    mutationState = mutationState,
+                    mutationState = HarnessApplicationsMutationState.Saved(
+                        "Application connection created and enabled.",
+                    ),
                     onCreate = { _, _, _, _, _, _, _ -> },
                     onReload = {},
                     onClearFeedback = {},
@@ -120,12 +122,13 @@ class HarnessApplicationConnectionControlUiTest {
         composeRule.onNodeWithText("Connection ready").assertExists()
         composeRule.onNodeWithText("Application connection created and enabled.").assertExists()
 
-        mutationState = HarnessApplicationsMutationState.Failed("Package name is already connected")
         composeRule.setContent {
             HarnessTheme(darkTheme = false) {
                 HarnessCreateApplicationConnectionScreen(
                     options = listOf(genericTextOption()),
-                    mutationState = mutationState,
+                    mutationState = HarnessApplicationsMutationState.Failed(
+                        "Package name is already connected",
+                    ),
                     onCreate = { _, _, _, _, _, _, _ -> },
                     onReload = {},
                     onClearFeedback = {},
