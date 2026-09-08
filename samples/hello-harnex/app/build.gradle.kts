@@ -32,4 +32,10 @@ android {
 
 dependencies {
     implementation("io.github.daniele21.localllm:consumer-android:${consumerSdkVersion.get()}")
+
+    implementation("androidx.activity:activity:1.12.1")
+    implementation("androidx.lifecycle:lifecycle-livedata-core:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.9.4")
+
+    testImplementation("junit:junit:4.13.2")
 }
