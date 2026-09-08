@@ -86,7 +86,10 @@ internal class HelloHarnexClient internal constructor(
     override fun close() {
         synchronized(lifecycleLock) {
             if (!closed.compareAndSet(false, true)) return
-            activeHandle?.cancel()
+            activeHandle?.let { handle ->
+                activeHandle = null
+                handle.cancel()
+            }
             executor.execute {
                 cleanupOnExecutor()
                 running.set(false)
@@ -102,8 +105,13 @@ internal class HelloHarnexClient internal constructor(
         onAnswerDelta: (String) -> Unit,
         onResult: (Result<HelloInferenceResult>) -> Unit,
     ) {
+        if (closed.get()) {
+            running.set(false)
+            return
+        }
         runCatching {
             val sessionId = prepareSession(onStatus)
+            checkExecutionOpen()
             startGeneration(sessionId, text, onStatus, onAnswerDelta, onResult)
         }.onFailure { failure -> finishOnExecutor(Result.failure(failure), onResult) }
     }
@@ -152,6 +160,7 @@ internal class HelloHarnexClient internal constructor(
                 throw controlPlaneFailure("activation", result.failure.code, result.failure.message)
         }
         activeActivation = activation.activationId
+        checkExecutionOpen()
 
         onStatus("Preparing the exact execution capability…")
         val prepared = when (val result = runtime.prepare(ConsumerPrepareRequest(USE_CASE_ID))) {
@@ -160,6 +169,7 @@ internal class HelloHarnexClient internal constructor(
             is ConsumerPrepareResult.Rejected ->
                 throw consumerFailure("prepare", result.failure.code, result.failure.message)
         }
+        checkExecutionOpen()
         return when (val result = runtime.createSession(prepared.preparedId)) {
             is ConsumerSessionResult.Created -> result.sessionId.also { activeSession = it }
 
@@ -199,7 +209,14 @@ internal class HelloHarnexClient internal constructor(
                 },
             )
         when (start) {
-            is ConsumerGenerationStartResult.Accepted -> activeHandle = start.handle
+            is ConsumerGenerationStartResult.Accepted ->
+                synchronized(lifecycleLock) {
+                    if (closed.get()) {
+                        start.handle.cancel()
+                    } else {
+                        activeHandle = start.handle
+                    }
+                }
 
             is ConsumerGenerationStartResult.Rejected -> {
                 terminal.set(true)
@@ -214,7 +231,7 @@ internal class HelloHarnexClient internal constructor(
     private fun finishOnExecutor(result: Result<HelloInferenceResult>, onResult: (Result<HelloInferenceResult>) -> Unit) {
         cleanupOnExecutor()
         running.set(false)
-        onResult(result)
+        if (!closed.get()) onResult(result)
     }
 
     private fun cleanupOnExecutor() {
@@ -236,6 +253,10 @@ internal class HelloHarnexClient internal constructor(
 
     private fun checkOpen() {
         check(!closed.get()) { "Hello Harnex client is closed" }
+    }
+
+    private fun checkExecutionOpen() {
+        check(!closed.get()) { "Hello Harnex execution was closed" }
     }
 
     companion object {
