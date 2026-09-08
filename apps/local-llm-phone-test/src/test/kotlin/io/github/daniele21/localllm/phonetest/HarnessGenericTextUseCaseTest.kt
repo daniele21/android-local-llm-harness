@@ -71,11 +71,21 @@ class HarnessGenericTextUseCaseTest {
     @Test
     fun `generic text requires authorized application and enabled binding`() {
         val applicationId = ApplicationId("hello-harnex")
-        val authorized = genericConsumerState(applicationId, ApplicationRegistrationState.AUTHORIZED, bindingEnabled = true)
-        val disabledApplication =
-            genericConsumerState(applicationId, ApplicationRegistrationState.DISABLED, bindingEnabled = true)
-        val disabledBinding =
-            genericConsumerState(applicationId, ApplicationRegistrationState.AUTHORIZED, bindingEnabled = false)
+        val authorized = genericConsumerState(
+            applicationId = applicationId,
+            registrationState = ApplicationRegistrationState.AUTHORIZED,
+            bindingEnabled = true,
+        )
+        val disabledApplication = genericConsumerState(
+            applicationId = applicationId,
+            registrationState = ApplicationRegistrationState.DISABLED,
+            bindingEnabled = true,
+        )
+        val disabledBinding = genericConsumerState(
+            applicationId = applicationId,
+            registrationState = ApplicationRegistrationState.AUTHORIZED,
+            bindingEnabled = false,
+        )
 
         assertTrue(authorized.isAuthorizedGenericTextConsumer(applicationId))
         assertFalse(disabledApplication.isAuthorizedGenericTextConsumer(applicationId))
@@ -87,29 +97,27 @@ class HarnessGenericTextUseCaseTest {
         registrationState: ApplicationRegistrationState,
         bindingEnabled: Boolean,
     ) = HostControlPlaneState(
-        applications =
-            listOf(
-                RegisteredApplication(
-                    applicationId = applicationId,
-                    packageName = "io.github.daniele21.harnex.hello",
-                    signerSha256 = "a".repeat(64),
-                    displayName = "Hello Harnex",
-                    state = registrationState,
-                    firstSeenAtEpochMs = 1L,
-                    lastSeenAtEpochMs = 1L,
-                ),
+        applications = listOf(
+            RegisteredApplication(
+                applicationId = applicationId,
+                packageName = "io.github.daniele21.harnex.hello",
+                signerSha256 = "a".repeat(64),
+                displayName = "Hello Harnex",
+                state = registrationState,
+                firstSeenAtEpochMs = 1L,
+                lastSeenAtEpochMs = 1L,
             ),
-        bindings =
-            listOf(
-                ApplicationUseCaseBinding(
-                    bindingId = "connection:${applicationId.value}:generic-text-generation",
-                    applicationId = applicationId,
-                    useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
-                    revision = 1,
-                    enabled = bindingEnabled,
-                    isDefault = true,
-                ),
+        ),
+        bindings = listOf(
+            ApplicationUseCaseBinding(
+                bindingId = "connection:${applicationId.value}:generic-text-generation",
+                applicationId = applicationId,
+                useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
+                revision = 1,
+                enabled = bindingEnabled,
+                isDefault = true,
             ),
+        ),
     )
 
     private fun requirement() = HarnessBuiltInApplicationRequirement(
