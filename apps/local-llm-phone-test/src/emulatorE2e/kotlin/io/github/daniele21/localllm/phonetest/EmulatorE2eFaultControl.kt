@@ -77,9 +77,38 @@ internal object EmulatorE2eFaultCommandHandler {
             gateStatusResult()
         }
 
+        EmulatorE2eFaultActions.AUTHORIZE_AURA ->
+            auraControlResult(EmulatorE2eAuraImportControl.authorize(context))
+
+        EmulatorE2eFaultActions.ENABLE_AURA_SCHEMA ->
+            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = true))
+
+        EmulatorE2eFaultActions.DISABLE_AURA_SCHEMA ->
+            auraControlResult(EmulatorE2eAuraImportControl.setSchemaEnabled(context, enabled = false))
+
+        EmulatorE2eFaultActions.ENABLE_AURA_CATEGORY ->
+            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = true))
+
+        EmulatorE2eFaultActions.DISABLE_AURA_CATEGORY ->
+            auraControlResult(EmulatorE2eAuraImportControl.setCategoryEnabled(context, enabled = false))
+
+        EmulatorE2eFaultActions.MODEL_UNAVAILABLE -> {
+            EmulatorE2eModelAvailabilityGate.setUnavailable(true)
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+        }
+
+        EmulatorE2eFaultActions.MODEL_AVAILABLE -> {
+            EmulatorE2eModelAvailabilityGate.setUnavailable(false)
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+        }
+
+        EmulatorE2eFaultActions.QUERY_AURA ->
+            EmulatorE2eFaultCommandResult(Activity.RESULT_OK, EmulatorE2eAuraImportControl.status(context))
+
         EmulatorE2eFaultActions.RESET -> {
             EmulatorE2eGenerationGate.reset()
             EmulatorE2eBackendFailureGate.reset()
+            EmulatorE2eModelAvailabilityGate.reset()
             gateStatusResult()
         }
 
@@ -87,6 +116,12 @@ internal object EmulatorE2eFaultCommandHandler {
 
         else -> EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
     }
+
+    private fun auraControlResult(result: EmulatorE2eAuraControlResult): EmulatorE2eFaultCommandResult =
+        EmulatorE2eFaultCommandResult(
+            if (result.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+            result.detail,
+        )
 
     private fun gateStatusResult() = EmulatorE2eFaultCommandResult(
         Activity.RESULT_OK,
@@ -99,6 +134,14 @@ internal object EmulatorE2eFaultActions {
     const val RELEASE_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.RELEASE_GENERATION"
     const val FAIL_NEXT_GENERATION = "io.github.daniele21.localllm.phonetest.emulatorE2e.FAIL_NEXT_GENERATION"
     const val RUN_INTERNAL_ACTIVITY_PROBE = "io.github.daniele21.localllm.phonetest.emulatorE2e.RUN_INTERNAL_ACTIVITY_PROBE"
+    const val AUTHORIZE_AURA = "io.github.daniele21.localllm.phonetest.emulatorE2e.AUTHORIZE_AURA"
+    const val ENABLE_AURA_SCHEMA = "io.github.daniele21.localllm.phonetest.emulatorE2e.ENABLE_AURA_SCHEMA"
+    const val DISABLE_AURA_SCHEMA = "io.github.daniele21.localllm.phonetest.emulatorE2e.DISABLE_AURA_SCHEMA"
+    const val ENABLE_AURA_CATEGORY = "io.github.daniele21.localllm.phonetest.emulatorE2e.ENABLE_AURA_CATEGORY"
+    const val DISABLE_AURA_CATEGORY = "io.github.daniele21.localllm.phonetest.emulatorE2e.DISABLE_AURA_CATEGORY"
+    const val MODEL_UNAVAILABLE = "io.github.daniele21.localllm.phonetest.emulatorE2e.MODEL_UNAVAILABLE"
+    const val MODEL_AVAILABLE = "io.github.daniele21.localllm.phonetest.emulatorE2e.MODEL_AVAILABLE"
+    const val QUERY_AURA = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_AURA"
     const val RESET = "io.github.daniele21.localllm.phonetest.emulatorE2e.RESET"
     const val QUERY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY"
     const val QUERY_ACTIVITY = "io.github.daniele21.localllm.phonetest.emulatorE2e.QUERY_ACTIVITY"
@@ -110,6 +153,14 @@ internal object EmulatorE2eFaultActions {
             RELEASE_GENERATION,
             FAIL_NEXT_GENERATION,
             RUN_INTERNAL_ACTIVITY_PROBE,
+            AUTHORIZE_AURA,
+            ENABLE_AURA_SCHEMA,
+            DISABLE_AURA_SCHEMA,
+            ENABLE_AURA_CATEGORY,
+            DISABLE_AURA_CATEGORY,
+            MODEL_UNAVAILABLE,
+            MODEL_AVAILABLE,
+            QUERY_AURA,
             RESET,
             QUERY,
             QUERY_ACTIVITY,
