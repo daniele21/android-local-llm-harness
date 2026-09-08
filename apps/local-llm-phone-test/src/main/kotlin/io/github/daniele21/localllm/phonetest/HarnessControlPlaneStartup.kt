@@ -13,6 +13,7 @@ internal class HarnessControlPlaneStartupConflictException(val code: HarnessCont
 internal class HarnessControlPlaneStartup(
     private val store: HostControlPlaneStore,
     private val reconciler: HarnessControlPlaneReconciler,
+    private val additionalReconcilers: List<HarnessControlPlaneReconciler> = emptyList(),
     private val epochClock: () -> Long = System::currentTimeMillis,
     private val executorFactory: () -> ExecutorService = ::newControlPlaneStartupExecutor,
 ) {
@@ -26,11 +27,14 @@ internal class HarnessControlPlaneStartup(
     ).run()
 
     private fun reconcileTransaction(): HostControlPlaneState = store.transact { current ->
-        when (val result = reconciler.reconcile(current, epochClock())) {
-            is HarnessControlPlaneReconciliationResult.Success -> result.state
+        val observedAtEpochMs = epochClock()
+        (listOf(reconciler) + additionalReconcilers).fold(current) { state, nextReconciler ->
+            when (val result = nextReconciler.reconcile(state, observedAtEpochMs)) {
+                is HarnessControlPlaneReconciliationResult.Success -> result.state
 
-            is HarnessControlPlaneReconciliationResult.Conflict ->
-                throw HarnessControlPlaneStartupConflictException(result.code, result.identity)
+                is HarnessControlPlaneReconciliationResult.Conflict ->
+                    throw HarnessControlPlaneStartupConflictException(result.code, result.identity)
+            }
         }
     }
 }
