@@ -109,6 +109,14 @@ internal object EmulatorE2eModelAvailabilityGate {
 
 /** Deterministic JSON responder for Aura's constrained schema/category use cases. */
 internal object EmulatorE2eAuraImportResponder {
+    private data class SchemaSelection(
+        val sheet: String,
+        val header: String,
+        val date: String,
+        val amount: String,
+        val description: String,
+    )
+
     private val sheetId = Regex("\\\"sheets\\\"\\s*:\\s*\\[\\s*\\{\\s*\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
     private val headerId = Regex("\\\"headerCandidates\\\"\\s*:\\s*\\[\\s*\\{\\s*\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
     private val dateCandidateId = Regex("\\\"dateCandidates\\\"\\s*:\\s*\\[\\s*\\{\\s*\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
@@ -124,27 +132,39 @@ internal object EmulatorE2eAuraImportResponder {
     }
 
     private fun schemaOutput(prompt: String): String {
-        val sheet = sheetId.find(prompt)?.groupValues?.get(1)
-        val header = headerId.find(prompt)?.groupValues?.get(1)
-        val date = dateCandidateId.find(prompt)?.groupValues?.get(1)
-        val amount = amountCandidateId.find(prompt)?.groupValues?.get(1)
-        val description = descriptionColumnId.find(prompt)?.groupValues?.get(1)
-        if (sheet == null || header == null || date == null || amount == null || description == null) {
-            return "{\"status\":\"ambiguous\",\"ambiguities\":[\"header\"]}"
-        }
+        val selection = schemaSelection(prompt)
+            ?: return "{\"status\":\"ambiguous\",\"ambiguities\":[\"header\"]}"
         return buildString {
             append("{\"status\":\"resolved\",\"sheetId\":\"")
-            append(jsonEscape(sheet))
+            append(jsonEscape(selection.sheet))
             append("\",\"headerCandidateId\":\"")
-            append(jsonEscape(header))
+            append(jsonEscape(selection.header))
             append("\",\"dateCandidateId\":\"")
-            append(jsonEscape(date))
+            append(jsonEscape(selection.date))
             append("\",\"descriptionColumnIds\":[\"")
-            append(jsonEscape(description))
+            append(jsonEscape(selection.description))
             append("\"],\"amountCandidateId\":\"")
-            append(jsonEscape(amount))
+            append(jsonEscape(selection.amount))
             append("\"}")
         }
+    }
+
+    private fun schemaSelection(prompt: String): SchemaSelection? {
+        val values = listOf(
+            sheetId.find(prompt)?.groupValues?.get(1),
+            headerId.find(prompt)?.groupValues?.get(1),
+            dateCandidateId.find(prompt)?.groupValues?.get(1),
+            amountCandidateId.find(prompt)?.groupValues?.get(1),
+            descriptionColumnId.find(prompt)?.groupValues?.get(1),
+        )
+        if (values.any { it == null }) return null
+        return SchemaSelection(
+            sheet = requireNotNull(values[0]),
+            header = requireNotNull(values[1]),
+            date = requireNotNull(values[2]),
+            amount = requireNotNull(values[3]),
+            description = requireNotNull(values[4]),
+        )
     }
 
     private fun categoryOutput(prompt: String): String {
