@@ -1,7 +1,6 @@
 package io.github.daniele21.localllm.phonetest
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -141,13 +140,13 @@ class HarnessApplicationConnectionControlUiTest {
         displayName = "Generic text generation",
         description = "Run bounded stateless local text generation",
         presets =
-            listOf(
-                HarnessConnectionPresetOption(
-                    presetId = "qwen35-text-quality",
-                    revision = 1,
-                    displayName = "Quality",
-                    description = "General-purpose non-thinking local text generation",
-                ),
+        listOf(
+            HarnessConnectionPresetOption(
+                presetId = "qwen35-text-quality",
+                revision = 1,
+                displayName = "Quality",
+                description = "General-purpose non-thinking local text generation",
             ),
+        ),
     )
 }
