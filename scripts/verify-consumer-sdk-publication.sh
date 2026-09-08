@@ -21,6 +21,7 @@ rm -rf "$REPO_DIR"
 ./gradlew -p samples/hello-harnex \
   -PconsumerSdkVersion="$SDK_VERSION" \
   -PconsumerSdkRepositoryUrl="$REPO_DIR" \
+  :app:testDebugUnitTest \
   :app:assembleDebug
 
 if grep -R --line-number -E 'project\(|includeBuild\(|android-local-llm-harness' \
