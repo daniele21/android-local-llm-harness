@@ -29,10 +29,10 @@ internal object HarnessGenericTextConsumerPolicy {
         sessionKinds = setOf(SessionKind.STATELESS),
         defaultSessionKind = SessionKind.STATELESS,
         limits =
-            ConsumerLimits(
-                maxInputCharacters = MAX_INPUT_CHARACTERS,
-                maxConversationMessages = 1,
-                maxJsonSchemaCharacters = MAX_JSON_SCHEMA_CHARACTERS,
-            ),
+        ConsumerLimits(
+            maxInputCharacters = MAX_INPUT_CHARACTERS,
+            maxConversationMessages = 1,
+            maxJsonSchemaCharacters = MAX_JSON_SCHEMA_CHARACTERS,
+        ),
     )
 }
