@@ -113,12 +113,12 @@ class HelloHarnexClientTest {
         val runtime =
             FakeHelloHarnexRuntime(
                 assignments =
-                    ConsumerAssignedUseCasesResult.Rejected(
-                        ConsumerControlPlaneFailure(
-                            ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
-                            "authorization required",
-                        ),
+                ConsumerAssignedUseCasesResult.Rejected(
+                    ConsumerControlPlaneFailure(
+                        ConsumerControlPlaneErrorCode.APPLICATION_NOT_AUTHORIZED,
+                        "authorization required",
                     ),
+                ),
             )
         val client = HelloHarnexClient(runtime)
         try {
@@ -161,14 +161,14 @@ class HelloHarnexClientTest {
             useCaseId = useCaseId,
             bindingRevision = 1,
             presets =
-                listOf(
-                    ConsumerPublishedPreset(
-                        preset = PRESET,
-                        displayName = "Balanced",
-                        description = "Balanced test preset",
-                        isDefault = true,
-                    ),
+            listOf(
+                ConsumerPublishedPreset(
+                    preset = PRESET,
+                    displayName = "Balanced",
+                    description = "Balanced test preset",
+                    isDefault = true,
                 ),
+            ),
         )
 
         override fun activate(request: ConsumerActivationRequest): ConsumerActivationResult = ConsumerActivationResult.Activated(
