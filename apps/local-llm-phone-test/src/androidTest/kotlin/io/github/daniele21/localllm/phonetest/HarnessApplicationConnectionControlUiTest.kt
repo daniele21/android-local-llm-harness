@@ -139,8 +139,7 @@ class HarnessApplicationConnectionControlUiTest {
         useCaseRevision = 1,
         displayName = "Generic text generation",
         description = "Run bounded stateless local text generation",
-        presets =
-        listOf(
+        presets = listOf(
             HarnessConnectionPresetOption(
                 presetId = "qwen35-text-quality",
                 revision = 1,
