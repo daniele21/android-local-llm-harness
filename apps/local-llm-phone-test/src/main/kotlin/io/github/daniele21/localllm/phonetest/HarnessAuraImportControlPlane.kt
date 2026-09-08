@@ -51,49 +51,43 @@ internal fun HarnessBuiltInControlPlaneSpec.Companion.auraCategory(
     ),
 )
 
-private fun auraUseCase(
-    useCaseId: io.github.daniele21.localllm.contracts.UseCaseId,
-    displayName: String,
-    description: String,
-) = UseCaseDefinition(
-    useCaseId = useCaseId,
-    displayName = displayName,
-    description = description,
-    requirements = UseCaseRequirements(
-        outputMode = OutputMode.JSON_SCHEMA,
-        sessionKind = SessionKind.STATELESS,
-        reasoningSupported = false,
-        minimumContextTokens = AURA_MINIMUM_CONTEXT_TOKENS,
-        maxInputCharacters = AURA_MAX_INPUT_CHARACTERS,
-        maxJsonSchemaCharacters = AURA_MAX_SCHEMA_CHARACTERS,
-    ),
-    state = UseCaseDefinitionState.ACTIVE,
-    revision = 1,
-)
-
-private fun auraPreset(
-    useCaseId: io.github.daniele21.localllm.contracts.UseCaseId,
-    displayName: String,
-    description: String,
-) = UseCasePresetDefinition(
-    useCaseId = useCaseId,
-    metadata = PresetConsumerMetadata(
-        presetId = HarnessSharedRuntimeBindings.auraDefaultPreset.id.value,
-        revision = HarnessSharedRuntimeBindings.auraDefaultPreset.version,
+private fun auraUseCase(useCaseId: io.github.daniele21.localllm.contracts.UseCaseId, displayName: String, description: String) =
+    UseCaseDefinition(
+        useCaseId = useCaseId,
         displayName = displayName,
         description = description,
-    ),
-    creationSource = PresetCreationSource.SUGGESTED,
-    state = PresetLifecycleState.PUBLISHED,
-    execution = PresetExecutionPolicy(
-        modelProfileId = null,
-        inferencePreset = HarnessSharedRuntimeBindings.auraDefaultPreset,
-        contextTokens = AURA_MINIMUM_CONTEXT_TOKENS,
-        cachePolicy = UseCaseCachePolicy(
-            retainModelWarmMs = AURA_WARM_RETENTION_MS,
-            reuseStatelessContext = false,
-            enablePrefixSnapshot = false,
-            enableDeterministicResultCache = false,
+        requirements = UseCaseRequirements(
+            outputMode = OutputMode.JSON_SCHEMA,
+            sessionKind = SessionKind.STATELESS,
+            reasoningSupported = false,
+            minimumContextTokens = AURA_MINIMUM_CONTEXT_TOKENS,
+            maxInputCharacters = AURA_MAX_INPUT_CHARACTERS,
+            maxJsonSchemaCharacters = AURA_MAX_SCHEMA_CHARACTERS,
         ),
-    ),
-)
+        state = UseCaseDefinitionState.ACTIVE,
+        revision = 1,
+    )
+
+private fun auraPreset(useCaseId: io.github.daniele21.localllm.contracts.UseCaseId, displayName: String, description: String) =
+    UseCasePresetDefinition(
+        useCaseId = useCaseId,
+        metadata = PresetConsumerMetadata(
+            presetId = HarnessSharedRuntimeBindings.auraDefaultPreset.id.value,
+            revision = HarnessSharedRuntimeBindings.auraDefaultPreset.version,
+            displayName = displayName,
+            description = description,
+        ),
+        creationSource = PresetCreationSource.SUGGESTED,
+        state = PresetLifecycleState.PUBLISHED,
+        execution = PresetExecutionPolicy(
+            modelProfileId = null,
+            inferencePreset = HarnessSharedRuntimeBindings.auraDefaultPreset,
+            contextTokens = AURA_MINIMUM_CONTEXT_TOKENS,
+            cachePolicy = UseCaseCachePolicy(
+                retainModelWarmMs = AURA_WARM_RETENTION_MS,
+                reuseStatelessContext = false,
+                enablePrefixSnapshot = false,
+                enableDeterministicResultCache = false,
+            ),
+        ),
+    )

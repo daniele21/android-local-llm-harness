@@ -10,10 +10,7 @@ import io.github.daniele21.localllm.models.HostControlPlaneState
  * Binder package/signature authorization is necessary but not sufficient: the application must also remain
  * authorized in the canonical control plane and hold at least one current enabled reviewed assignment.
  */
-internal fun HostControlPlaneState.isAuthorizedConsumerForAnyUseCase(
-    applicationId: ApplicationId,
-    useCaseIds: Set<UseCaseId>,
-): Boolean {
+internal fun HostControlPlaneState.isAuthorizedConsumerForAnyUseCase(applicationId: ApplicationId, useCaseIds: Set<UseCaseId>): Boolean {
     val application = applications.singleOrNull { it.applicationId == applicationId } ?: return false
     if (application.state != ApplicationRegistrationState.AUTHORIZED) return false
     return useCaseIds.any { useCaseId -> latestBinding(applicationId, useCaseId)?.enabled == true }

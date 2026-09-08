@@ -82,10 +82,11 @@ internal object HarnessSharedRuntimeBindings {
         setOf(AURA_RELEASE_PACKAGE)
     }
 
-    fun externalClientPackages(debugHost: Boolean): Set<String> = consolePackages(debugHost) +
-        redactGuardPackages(debugHost) +
-        auraPackages(debugHost) +
-        if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
+    fun externalClientPackages(debugHost: Boolean): Set<String> =
+        consolePackages(debugHost) +
+            redactGuardPackages(debugHost) +
+            auraPackages(debugHost) +
+            if (debugHost) emptySet() else setOf(SR6_RELEASE_CONSUMER_PACKAGE)
 
     fun modelProfileId(useCaseId: String, catalogProfileKey: String): String? {
         require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
@@ -100,7 +101,8 @@ internal object HarnessSharedRuntimeBindings {
     }
 
     /** Exact model-profile identity exposed by the current document-PII runtime environment. */
-    fun ombraModelProfileId(catalogProfileKey: String): String = requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
+    fun ombraModelProfileId(catalogProfileKey: String): String =
+        requireNotNull(modelProfileId(ombraUseCaseId.value, catalogProfileKey))
 
     fun resolveConsole(model: ImportedPhoneModel): ResolvedUseCase {
         val resolved =
@@ -134,11 +136,7 @@ internal object HarnessSharedRuntimeBindings {
         )
 
     /** Resolves one of the two reviewed Aura import use cases. */
-    fun resolveAuraImport(
-        model: ImportedPhoneModel,
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-    ): ResolvedUseCase {
+    fun resolveAuraImport(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
         require(applicationId == auraApplicationId) { "Aura import runtime requires the Aura application identity" }
         require(useCaseId in auraUseCases) { "Unsupported Aura import useCaseId ${useCaseId.value}" }
         val profileSuffix = when (useCaseId) {
@@ -156,17 +154,14 @@ internal object HarnessSharedRuntimeBindings {
     }
 
     /** Runtime resolver used by the Consumer control plane after assignment/authorization has already succeeded. */
-    fun resolveConsumerUseCase(
-        model: ImportedPhoneModel,
-        applicationId: ApplicationId,
-        useCaseId: UseCaseId,
-    ): ResolvedUseCase = when (useCaseId) {
-        ombraUseCaseId -> resolveOmbra(model, applicationId)
-        auraSchemaInferenceUseCaseId,
-        auraCategoryClassificationUseCaseId,
-        -> resolveAuraImport(model, applicationId, useCaseId)
-        else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
-    }
+    fun resolveConsumerUseCase(model: ImportedPhoneModel, applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase =
+        when (useCaseId) {
+            ombraUseCaseId -> resolveOmbra(model, applicationId)
+            auraSchemaInferenceUseCaseId,
+            auraCategoryClassificationUseCaseId,
+            -> resolveAuraImport(model, applicationId, useCaseId)
+            else -> error("Unsupported Consumer useCaseId ${useCaseId.value}")
+        }
 
     private fun resolveJsonSchemaUseCase(
         model: ImportedPhoneModel,
