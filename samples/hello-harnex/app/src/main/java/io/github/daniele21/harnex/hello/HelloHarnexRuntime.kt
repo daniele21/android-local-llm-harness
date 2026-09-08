@@ -48,9 +48,7 @@ internal interface HelloHarnexRuntime : AutoCloseable {
     fun closeSession(sessionId: SessionId)
 }
 
-private abstract class BinderConnectionHelloHarnexRuntime(
-    protected val client: BinderConsumerLocalLlmClient,
-) : HelloHarnexRuntime {
+private abstract class BinderConnectionHelloHarnexRuntime(protected val client: BinderConsumerLocalLlmClient) : HelloHarnexRuntime {
     override fun connect() = client.connect()
 
     override fun disconnect() = client.disconnect()
