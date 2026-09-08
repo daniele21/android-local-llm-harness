@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-client
 Canonical scope: shared-runtime.consumer-android-sdk
 Read when: publishing, versioning, validating or consuming the external Android Consumer SDK artifact
-Last reviewed: 2026-09-07
+Last reviewed: 2026-09-08
 
 ## Public dependency
 
@@ -21,9 +21,45 @@ Current candidate: `0.1.0-alpha.11`.
 
 ### Runnable onboarding sample
 
-[`../../samples/hello-harnex`](../../samples/hello-harnex/README.md) is the canonical runnable external-app example. It is a standalone Android application that resolves the public Consumer SDK, configures an exact Harnex package/service, exposes its current signing-certificate SHA-256 for Harnex authorization and executes one real assigned local-inference use case.
+[`../../samples/hello-harnex`](../../samples/hello-harnex/README.md) is the canonical runnable external-app example and the baseline ownership reference for a new Consumer application. It is a standalone Android application that resolves the public Consumer SDK, configures an exact Harnex package/service, exposes its current signing-certificate SHA-256 for Harnex authorization and executes one real assigned local-inference use case.
 
 Use it to understand the smallest production-shaped lifecycle without reading repository internals. The separate `samples/external-consumer-android` project remains the Maven/API-ABI compatibility fixture.
+
+### Recommended Consumer-app ownership
+
+A Consumer app should keep the Harnex boundary narrow and owned by the application:
+
+```text
+product UI
+   |
+   v
+lifecycle/state owner (for example ViewModel)
+   |
+   v
+app-owned Harnex client/gateway
+   |
+   v
+consumer-android public SDK
+   |
+   v
+Binder -> Harnex
+```
+
+The names are not contractual; the ownership is. Product UI must not become the owner of Binder sessions, model identity or runtime policy. A small app-owned seam is recommended so application behavior can be tested without a live Binder Host and so SDK details do not spread through product code.
+
+For ordinary connection-scoped inference:
+
+- keep the Consumer client outside a transient Activity/Fragment lifetime;
+- treat `connect()` / `disconnect()` as reversible transport lifecycle and `close()` as terminal;
+- discover only Harnex-assigned use cases/presets rather than hardcoding model/runtime authority into the app;
+- release session and activation ownership on success, failure, cancellation and terminal close;
+- keep a single canonical owner for active generation handles and reject or deliberately sequence overlapping work;
+- preserve typed Consumer/control-plane failures internally and map them to actionable product states such as authorization required, configuration required, model unavailable, transport unavailable or cancelled;
+- never persist prompt/output content merely for SDK diagnostics or evidence.
+
+For work that is intended to survive transient UI/connection observation, use `ConsumerLogicalJobClient` and its stable job identity/recovery contract. Do not extend Activity lifetime or create an application-specific pseudo-resume layer around ordinary callback generation.
+
+The golden sample's architecture is intentionally small: `MainActivity -> HelloHarnexViewModel -> HelloHarnexClient -> HelloHarnexRuntime -> consumer-android`. New apps may use Compose, repositories or dependency injection where their product warrants it, but they should preserve the same Harnex ownership boundary rather than copying sample structure mechanically.
 
 ## Published artifacts
 
@@ -79,7 +115,7 @@ bash scripts/verify-consumer-sdk-publication.sh
 The verification publishes release variants to a run-owned local Maven repository under `build/consumer-sdk-repository`, then builds both external consumers from those Maven coordinates only:
 
 - `samples/external-consumer-android` for API/ABI and dependency-surface compatibility;
-- `samples/hello-harnex` for the runnable onboarding integration.
+- `samples/hello-harnex` for runnable onboarding, Consumer lifecycle unit tests and application-boundary integration.
 
 The gate also rejects source/composite/project coupling and writes source-aware manifest/checksum evidence for the published artifacts.
 

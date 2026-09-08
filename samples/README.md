@@ -6,15 +6,15 @@ Samples demonstrate public consumption boundaries without making repository-inte
 
 ### `hello-harnex`
 
-The **runnable onboarding sample** for external Android developers. It is a standalone app that consumes the published Consumer SDK, shows its exact package/signer identity, guides the user through Harnex authorization and runs one real local inference through Binder.
+The **runnable onboarding sample and golden Consumer-app reference** for external Android developers. It is a standalone app that consumes the published Consumer SDK, shows its exact package/signer identity, guides the user through Harnex authorization and runs one real local inference through Binder.
 
-Start here if you want to answer: **“How does another Android app actually use Harnex?”**
+Start here if you want to answer: **“How should another Android app actually integrate Harnex?”**
 
 ```bash
 ./gradlew -p samples/hello-harnex :app:installDebug
 ```
 
-See [`hello-harnex/README.md`](hello-harnex/README.md) for the five-minute flow.
+See [`hello-harnex/README.md`](hello-harnex/README.md) for the runnable flow and reference ownership pattern.
 
 ### `external-consumer-android`
 
@@ -32,13 +32,20 @@ For the complete Consumer contract, lifecycle and authorization model, see [`../
 
 ## Sample design rules
 
-A Harnex sample should:
+A Harnex Consumer sample should:
 
 - depend only on supported public artifacts/contracts;
 - keep Harnex runtime/model policy out of consumer product code;
+- keep Binder/SDK details behind one small app-owned boundary rather than spreading them through UI/product code;
+- keep ordinary Consumer client ownership outside a transient Activity/Fragment lifetime;
 - demonstrate explicit connect/disconnect/close lifecycle where applicable;
+- release sessions, activations, handles and other app-owned resources on every terminal/close path;
+- translate typed SDK failures into product-actionable states without hiding diagnostic codes;
 - avoid persisting prompts or outputs as diagnostics/evidence;
 - fail closed when authorization or negotiated capability is unavailable;
+- include focused tests for lifecycle/failure behavior, not only a successful compile;
 - remain small enough that the Harnex integration boundary is obvious.
 
-`hello-harnex` owns developer onboarding; `external-consumer-android` owns Maven/API compatibility proof. Do not merge those responsibilities into one hidden test harness.
+For work designed to outlive transient UI/transport observation, use the public durable logical-job API rather than extending Activity lifetime or inventing app-local recovery semantics.
+
+`hello-harnex` owns developer onboarding and the recommended Consumer ownership pattern; `external-consumer-android` owns Maven/API compatibility proof. Do not merge those responsibilities into one hidden test harness.
