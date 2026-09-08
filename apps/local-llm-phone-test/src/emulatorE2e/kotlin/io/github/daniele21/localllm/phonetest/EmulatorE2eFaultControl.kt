@@ -117,11 +117,10 @@ internal object EmulatorE2eFaultCommandHandler {
         else -> EmulatorE2eFaultCommandResult(Activity.RESULT_CANCELED, "unsupported")
     }
 
-    private fun auraControlResult(result: EmulatorE2eAuraControlResult): EmulatorE2eFaultCommandResult =
-        EmulatorE2eFaultCommandResult(
-            if (result.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
-            result.detail,
-        )
+    private fun auraControlResult(result: EmulatorE2eAuraControlResult): EmulatorE2eFaultCommandResult = EmulatorE2eFaultCommandResult(
+        if (result.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+        result.detail,
+    )
 
     private fun gateStatusResult() = EmulatorE2eFaultCommandResult(
         Activity.RESULT_OK,
