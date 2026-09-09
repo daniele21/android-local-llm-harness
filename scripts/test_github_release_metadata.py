@@ -33,7 +33,15 @@ class GithubReleaseMetadataTest(unittest.TestCase):
         write(
             root,
             "CHANGELOG.md",
-            "# Changelog\n\n## [Unreleased]\n\n## [0.5.0-rc.1]\n\n### Added\n\n- First release.\n",
+            (
+                "# Changelog\n\n"
+                "## [Unreleased]\n\n"
+                "## [0.5.0-rc.1]\n\n"
+                "### Added\n\n"
+                "- First release.\n\n"
+                "## Release history\n\n"
+                "This must not leak into release notes.\n"
+            ),
         )
         write(
             root,
@@ -93,7 +101,10 @@ class GithubReleaseMetadataTest(unittest.TestCase):
             self.assertEqual(data["backend"]["revision"], "b" * 40)
             self.assertEqual(data["artifacts"][0]["sha256"], module.sha256_file(apk))
             self.assertIn(apk.name, checksums.read_text(encoding="utf-8"))
-            self.assertIn("## [0.5.0-rc.1]", notes.read_text(encoding="utf-8"))
+            notes_text = notes.read_text(encoding="utf-8")
+            self.assertIn("## [0.5.0-rc.1]", notes_text)
+            self.assertNotIn("## Release history", notes_text)
+            self.assertNotIn("must not leak", notes_text)
 
     def test_verify_rejects_changed_candidate_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
