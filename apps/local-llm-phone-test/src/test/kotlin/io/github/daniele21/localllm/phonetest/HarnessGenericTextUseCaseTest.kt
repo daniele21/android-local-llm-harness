@@ -116,7 +116,7 @@ class HarnessGenericTextUseCaseTest {
                 useCaseId = HarnessSharedRuntimeBindings.genericTextUseCaseId,
                 revision = 1,
                 enabled = bindingEnabled,
-                isDefault = true,
+                isDefault = bindingEnabled,
             ),
         ),
     )
