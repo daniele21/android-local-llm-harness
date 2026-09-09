@@ -5,7 +5,7 @@ Document type: current-state
 Owner: repository
 Canonical scope: state.repository
 Read when: determining the integrated baseline, open blockers or next repository work block
-Last reviewed: 2026-09-07
+Last reviewed: 2026-09-09
 
 This is the operational ledger for integrated state, blockers and immediate work. Capability history belongs in [`roadmap.md`](roadmap.md); milestone detail stays in focused workstreams.
 
@@ -56,17 +56,33 @@ Local inference Activity/audit is integrated under ADR 0017: accepted inference 
 
 ## Release evidence state
 
+### GitHub release productization
+
+The active [`github-release-productization.md`](workstreams/github-release-productization.md) workstream targets `v0.5.0-rc.1` as the first public GitHub prerelease. ADR 0020 defines GitHub Releases as the primary direct-download Host channel and Google Play as an optional independent channel. Both use the same Host package/service contract, but the GitHub APK uses a dedicated signing lineage rather than the Play upload/App-Signing identity.
+
+The release design is fail-closed and exact-artifact-based: prepare signs and freezes one candidate APK with manifest/checksums/provenance; applicable REAL_ENVIRONMENT evidence must exercise that exact APK; publish downloads and verifies the same bytes rather than rebuilding them.
+
+`v0.5.0-rc.1` is **not published**. GitHub Releases remain empty until setup, signing, exact-source promotion and applicable release evidence close.
+
+### Repository protection gap
+
+The documented branch contract requires protected `dev`/`main`, but the live GitHub repository currently reports both the `dev` branch as unprotected and no repository rulesets. This is a repository-admin configuration gap and must be closed or the durable branching contract deliberately revised before first public release. Release automation must not be used as a substitute for branch protection.
+
 ### Pre-release stable promotion
 
-The focused Play install-order/authorization/runtime evidence is complete for the current pre-release topology. The same-signer first-party Play pair is explicitly recorded and is not used as the Binder authorization mechanism. Distinct-signer support remains proven deterministically. Therefore signer topology is **not a blocker for this pre-release `dev -> main` promotion** once the resulting exact HEAD/base passes required RELEASE/FULL automated validation.
+The focused Play install-order/authorization/runtime evidence is complete for the current pre-release topology. The same-signer first-party Play pair is explicitly recorded and is not used as the Binder authorization mechanism. Distinct-signer support remains proven deterministically. Therefore signer topology is **not a blocker for an ordinary pre-release `dev -> main` repository promotion** once the resulting exact HEAD/base passes required RELEASE/FULL automated validation.
 
-### Deferred public-release signer obligation
+### Public-release signer obligation
 
-Before the first public release that depends on independently signed application distribution, or before claiming physical distinct-signer Play qualification, rerun the focused physical journey with distinct observed Play signing identities. This obligation is deferred to that public-release milestone; it must not be silently dropped or misrepresented as already proven.
+The first public GitHub Host release introduces a dedicated Host signing identity and makes independently signed external Consumer behavior part of the intended public distribution surface. The exact GitHub-signed Host candidate therefore needs claim-matched physical evidence with a genuinely distinct external Consumer identity before the public cross-app distribution claim can be made. The earlier same-signer Play physical run cannot satisfy or be relabelled as that proof.
+
+A later claim specifically about distinct-signer Play distribution still requires actual Play-delivered applications with distinct observed Play App Signing identities.
 
 ### Representative Android runtime evidence
 
-LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The new 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence. These claim-specific gaps do not become proven merely because the stable repository line advances.
+LAS-07 and remaining CRV/SR/Q35/resource claims require representative physical Android evidence with exact candidate, production JNI/llama.cpp path and compatible GGUF where applicable. The 4B 4-bit candidate tier is explicitly part of this evidence gap; catalog admission does not certify runtime suitability. Memory, thermal and OEM observations remain distinct from deterministic emulator evidence. These claim-specific gaps do not become proven merely because the stable repository line advances.
+
+For the first GitHub APK, representative evidence must be bound to the exact prepared GitHub-signed APK rather than a locally rebuilt or differently signed release-like binary.
 
 ### OMBRA and follow-on work
 
@@ -74,17 +90,23 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 
 ## Immediate next block
 
-1. run RELEASE/FULL on the exact current `dev` HEAD against live `main` after the evidence-contract amendment;
-2. promote reconciled `dev` to stable `main` when those required automated gates are green;
-3. retain the distinct-signer physical Play confirmation as a blocking obligation for the first applicable public release / physical distinct-signer readiness claim;
-4. continue the independent ARM64/GGUF/runtime/resource/evaluation evidence workstreams without relabeling emulator or focused Play evidence as broader physical proof.
+1. integrate the release-productization setup into the latest `dev` with FULL automated validation and no accidental overlap with concurrent product work;
+2. close the live branch/ruleset protection gap and configure the dedicated protected GitHub Release signing environment/key custody;
+3. reconcile the intended `0.5.0-rc.1` scope on current `dev`, run RELEASE/FULL against live `main`, and promote the exact candidate;
+4. prepare the immutable GitHub-signed APK from exact `main` and run claim-matched physical ARM64/JNI/GGUF and distinct-Consumer signer evidence against those exact bytes;
+5. publish the same candidate as GitHub prerelease only when the blocking release evidence closes; keep Play optional unless a Play-specific claim is being made;
+6. continue independent model/runtime/resource/evaluation workstreams without relabelling emulator or focused Play evidence as broader physical proof.
 
 ## Source links
 
 - Product strategy / decision boundaries: [`product.md`](product.md)
+- Release productization: [`workstreams/github-release-productization.md`](workstreams/github-release-productization.md)
+- GitHub release runbook: [`github-releases.md`](github-releases.md)
+- Versioning/distribution policy: [`versioning.md`](versioning.md)
 - Consumer SDK: [`shared-runtime/consumer-android-sdk.md`](shared-runtime/consumer-android-sdk.md)
 - Shared runtime: [`shared-runtime/roadmap.md`](shared-runtime/roadmap.md)
 - Independent consumer authorization: [`adr/0018-independently-signed-consumer-authorization.md`](adr/0018-independently-signed-consumer-authorization.md)
+- GitHub/Play distribution decision: [`adr/0020-official-github-and-play-distribution.md`](adr/0020-official-github-and-play-distribution.md)
 - Background lifecycle: [`workstreams/background-process-lifecycle-hardening.md`](workstreams/background-process-lifecycle-hardening.md), [`adr/0016-detached-shared-runtime-jobs.md`](adr/0016-detached-shared-runtime-jobs.md)
 - Local inference audit: [`features/local-inference-activity-audit.md`](features/local-inference-activity-audit.md), [`adr/0017-durable-local-inference-audit.md`](adr/0017-durable-local-inference-audit.md)
 - Consumer API / OMBRA: [`shared-runtime/consumer-api/roadmap.md`](shared-runtime/consumer-api/roadmap.md)
