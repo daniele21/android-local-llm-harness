@@ -65,6 +65,9 @@ Restrict deployment to trusted release maintainers and stable release refs accor
 | Secret | `HARNEX_GITHUB_RELEASE_STORE_PASSWORD` | PKCS12 password |
 | Secret | `HARNEX_GITHUB_RELEASE_KEY_PASSWORD` | Key password; may equal store password but is stored independently |
 | Variable | `HARNEX_GITHUB_RELEASE_KEY_ALIAS` | Normally `harnex-github-release` |
+| Variable | `HARNEX_GITHUB_RELEASE_SIGNER_SHA256` | Pinned expected public certificate SHA-256 digest, normalized as 64 lowercase hex characters |
+
+Prepare and publish both fail closed if the actual APK signer differs from `HARNEX_GITHUB_RELEASE_SIGNER_SHA256`. Updating that variable is therefore a signing-lineage change, not routine release metadata.
 
 To create the base64 value locally without changing the keystore:
 
@@ -73,6 +76,14 @@ base64 < ~/.keystore/harnex-github-release.p12 | tr -d '\n'
 ```
 
 Never paste the resulting value into issues, PRs, logs, release notes or repository files.
+
+## Native GitHub release immutability
+
+Before the first public Harnex release, enable repository release immutability in GitHub repository settings. This is an administrative repository setting and is not replaced by the workflow's exact-byte checks.
+
+With release immutability enabled, a published release's tag and assets cannot be modified or deleted. Draft releases remain editable until publication. The GitHub CLI release-create flow stages asset uploads before publication, so the canonical workflow can attach the complete release surface and only then cross the immutable publication boundary.
+
+Build-provenance attestation for the prepared APK remains separate and complementary: provenance binds how the candidate was produced, while GitHub release immutability protects the published tag/assets after publication.
 
 ## Release flow
 
@@ -99,9 +110,9 @@ Prepare fails closed unless:
 - `VERSION` matches the requested version;
 - the release tag/release does not already exist;
 - exact-main `Validate` and `Package Android Artifacts` push workflows are green;
-- the dedicated signing material is available through the protected environment.
+- the dedicated signing material and pinned signer digest are available through the protected environment.
 
-The job builds an unsigned release APK, signs it once with the GitHub Release key, verifies the signature, generates release metadata and creates build provenance.
+The job builds an unsigned release APK, signs it once with the GitHub Release key, verifies the signature against the pinned certificate digest, generates release metadata and creates build provenance.
 
 The bounded candidate artifact contains only the public release surface:
 
@@ -157,10 +168,10 @@ Publish downloads the exact prepared candidate. It does not rebuild the APK. It 
 - candidate version;
 - exact source revision and current `main`;
 - APK filename, size and SHA-256;
-- APK signer digest;
+- APK signer digest against the pinned expected certificate;
 - required evidence identity.
 
-It then finalizes `release-record.json`, creates the immutable `v<version>` tag and publishes the GitHub Release with:
+It then finalizes `release-record.json`, creates the `v<version>` tag and publishes the GitHub Release with:
 
 ```text
 harnex-v<version>-android-arm64.apk
@@ -169,7 +180,7 @@ release-record.json
 SHA256SUMS
 ```
 
-A prerelease version such as `0.5.0-rc.1` is published with GitHub's prerelease flag.
+When native GitHub release immutability is enabled, the publication boundary makes the release tag/assets immutable. A prerelease version such as `0.5.0-rc.1` is published with GitHub's prerelease flag.
 
 ## Release notes
 
