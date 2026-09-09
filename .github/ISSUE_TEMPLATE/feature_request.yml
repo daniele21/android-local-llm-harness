@@ -1,0 +1,52 @@
+name: Feature request
+description: Propose a Harnex capability by problem, outcome and product boundary rather than implementation mechanism alone.
+title: "feat: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the developer/user problem first. Harnex keeps Consumer product workflow in the app and owns governed local-AI runtime/control-plane capabilities; proposed mechanisms may be narrowed or changed to preserve that boundary.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / job to be done
+      description: Who has the problem and what are they unable to do reliably today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What observable result would make the capability useful?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current workaround / alternative
+      description: How is this handled today, if at all?
+  - type: textarea
+    id: scope
+    attributes:
+      label: Suggested scope and non-goals
+      description: Include important compatibility, privacy, lifecycle or UX constraints. Implementation suggestions are welcome but are not the problem definition.
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: Most relevant Harnex surface
+      options:
+        - Consumer SDK / Binder contract
+        - Runtime / lifecycle
+        - Models / model policy
+        - Evaluation / observability
+        - Android Host UI / control plane
+        - Packaging / distribution
+        - Documentation / onboarding
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / examples
+      description: Links, reproducible use cases or non-sensitive examples that show why this matters.
