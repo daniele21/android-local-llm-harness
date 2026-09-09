@@ -1,0 +1,43 @@
+name: Documentation issue
+description: Report missing, stale, contradictory or hard-to-follow Harnex documentation.
+title: "docs: "
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page / file
+      placeholder: docs/github-releases.md or a GitHub URL
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: Problem type
+      options:
+        - Incorrect / stale
+        - Missing information
+        - Contradictory sources
+        - Hard to follow
+        - Broken link / example
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should the reader be able to do or understand?
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: Any attached example is free of prompts, generated output, credentials, signing material, private paths and other sensitive content.
+          required: true
