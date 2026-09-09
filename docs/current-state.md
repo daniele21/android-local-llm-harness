@@ -64,9 +64,11 @@ The release design is fail-closed and exact-artifact-based: prepare signs and fr
 
 `v0.5.0-rc.1` is **not published**. GitHub Releases remain empty until setup, signing, exact-source promotion and applicable release evidence close.
 
-### Repository protection gap
+### Repository protection state
 
-The documented branch contract requires protected `dev`/`main`, but the live GitHub repository currently reports both the `dev` branch as unprotected and no repository rulesets. This is a repository-admin configuration gap and must be closed or the durable branching contract deliberately revised before first public release. Release automation must not be used as a substitute for branch protection.
+A live repository ruleset named `Harnex protected branches` is active for both `dev` and `main`. It currently blocks deletion and non-fast-forward updates, requires pull requests, requires the `Repository validation` status check and requires branches to be current with their targets.
+
+Two settings still differ from the durable contract in [`../BRANCHING.md`](../BRANCHING.md): resolved review conversations are not currently required, and `main` does not currently require the documented additional approval. This is now a **partial configuration mismatch**, not an absence of branch protection. It must be reconciled deliberately before treating the first public release path as fully aligned with repository governance; release automation must not be used to bypass the discrepancy.
 
 ### Pre-release stable promotion
 
@@ -91,7 +93,7 @@ OMB-6B remains review-gated; OMB-8 must execute reviewed artifact/configuration 
 ## Immediate next block
 
 1. integrate the release-productization setup into the latest `dev` with FULL automated validation and no accidental overlap with concurrent product work;
-2. close the live branch/ruleset protection gap and configure the dedicated protected GitHub Release signing environment/key custody;
+2. reconcile the remaining live ruleset mismatch and complete the dedicated protected GitHub Release signing environment/key custody plus native GitHub release immutability;
 3. reconcile the intended `0.5.0-rc.1` scope on current `dev`, run RELEASE/FULL against live `main`, and promote the exact candidate;
 4. prepare the immutable GitHub-signed APK from exact `main` and run claim-matched physical ARM64/JNI/GGUF and distinct-Consumer signer evidence against those exact bytes;
 5. publish the same candidate as GitHub prerelease only when the blocking release evidence closes; keep Play optional unless a Play-specific claim is being made;
