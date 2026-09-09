@@ -63,7 +63,7 @@ def changelog_section(root: Path, version: str) -> str:
     start = text.find(marker)
     if start < 0:
         raise SystemExit(f"CHANGELOG.md has no {marker} section")
-    next_heading = text.find("\n## [", start + len(marker))
+    next_heading = text.find("\n## ", start + len(marker))
     section = text[start : next_heading if next_heading >= 0 else len(text)].strip()
     if len(section.splitlines()) < 2:
         raise SystemExit(f"CHANGELOG section for {version} is empty")
