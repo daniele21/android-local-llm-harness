@@ -1,0 +1,346 @@
+name: GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Prepare an immutable candidate or publish a previously prepared candidate
+        required: true
+        type: choice
+        options:
+          - prepare
+          - publish
+        default: prepare
+      version:
+        description: Exact Harnex version from VERSION (for example 0.5.0-rc.1)
+        required: true
+        type: string
+        default: 0.5.0-rc.1
+      candidate_run_id:
+        description: Prepare workflow run ID to publish; required only for publish
+        required: false
+        type: string
+      physical_evidence_ref:
+        description: Reviewable REAL_ENVIRONMENT evidence reference; required only for publish
+        required: false
+        type: string
+      physical_evidence_sha256:
+        description: SHA-256 of the reviewed physical evidence bundle; required only for publish
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  attestations: write
+  contents: write
+  id-token: write
+
+concurrency:
+  group: github-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_ENVIRONMENT: github-release
+
+jobs:
+  prepare:
+    name: Prepare immutable GitHub APK candidate
+    if: inputs.mode == 'prepare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: github-release
+    steps:
+      - name: Checkout current stable main
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          ref: main
+
+      - name: Verify release intent and exact stable source
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_revision="$(git rev-parse HEAD)"
+          test "$source_revision" = "$(git rev-parse origin/main)"
+          source_version="$(tr -d '[:space:]' < VERSION)"
+          test "$source_version" = "$REQUESTED_VERSION"
+          tag="v$REQUESTED_VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; release identities are immutable." >&2
+            exit 1
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "GitHub Release $tag already exists; refusing to replace it." >&2
+            exit 1
+          fi
+
+      - name: Require successful exact-main release automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_revision="$(git rev-parse HEAD)"
+          require_success() {
+            local workflow="$1"
+            local response
+            response="$(gh api -X GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs" \
+              -f head_sha="$source_revision" \
+              -f event=push \
+              -f per_page=20)"
+            RESPONSE="$response" python3 - "$workflow" <<'PY'
+          import json
+          import os
+          import sys
+          workflow = sys.argv[1]
+          runs = json.loads(os.environ["RESPONSE"]).get("workflow_runs", [])
+          successful = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") == "success"]
+          if not successful:
+              raise SystemExit(f"No successful push run of {workflow} exists for the exact main commit")
+          print(f"{workflow}: PASS via run {successful[0]['id']}")
+          PY
+          }
+          require_success validate.yml
+          require_success package.yml
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Validate release metadata tooling
+        run: |
+          python3 scripts/test_github_release_metadata.py
+          python3 -m py_compile scripts/github_release_metadata.py
+
+      - name: Build unsigned exact release APK
+        env:
+          LOCAL_LLM_PHONE_TEST_ALLOW_UNSIGNED_RELEASE: "true"
+        run: ./gradlew --no-configuration-cache :apps:local-llm-phone-test:assembleRelease
+
+      - name: Restore dedicated GitHub Release signing key
+        env:
+          HARNEX_GITHUB_RELEASE_KEYSTORE_B64: ${{ secrets.HARNEX_GITHUB_RELEASE_KEYSTORE_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$HARNEX_GITHUB_RELEASE_KEYSTORE_B64"
+          printf '%s' "$HARNEX_GITHUB_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/harnex-github-release.p12"
+          chmod 600 "$RUNNER_TEMP/harnex-github-release.p12"
+
+      - name: Sign and verify GitHub APK
+        id: sign
+        env:
+          HARNEX_GITHUB_RELEASE_STORE_PASSWORD: ${{ secrets.HARNEX_GITHUB_RELEASE_STORE_PASSWORD }}
+          HARNEX_GITHUB_RELEASE_KEY_PASSWORD: ${{ secrets.HARNEX_GITHUB_RELEASE_KEY_PASSWORD }}
+          HARNEX_GITHUB_RELEASE_KEY_ALIAS: ${{ vars.HARNEX_GITHUB_RELEASE_KEY_ALIAS || 'harnex-github-release' }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$HARNEX_GITHUB_RELEASE_STORE_PASSWORD"
+          effective_key_password="${HARNEX_GITHUB_RELEASE_KEY_PASSWORD:-$HARNEX_GITHUB_RELEASE_STORE_PASSWORD}"
+          export HARNEX_GITHUB_RELEASE_EFFECTIVE_KEY_PASSWORD="$effective_key_password"
+          unsigned="apps/local-llm-phone-test/build/outputs/apk/release/local-llm-phone-test-release-unsigned.apk"
+          if [[ ! -f "$unsigned" ]]; then
+            unsigned="apps/local-llm-phone-test/build/outputs/apk/release/local-llm-phone-test-release.apk"
+          fi
+          test -f "$unsigned"
+          mkdir -p dist
+          signed="dist/harnex-v${REQUESTED_VERSION}-android-arm64.apk"
+          apksigner sign \
+            --ks "$RUNNER_TEMP/harnex-github-release.p12" \
+            --ks-key-alias "$HARNEX_GITHUB_RELEASE_KEY_ALIAS" \
+            --ks-pass env:HARNEX_GITHUB_RELEASE_STORE_PASSWORD \
+            --key-pass env:HARNEX_GITHUB_RELEASE_EFFECTIVE_KEY_PASSWORD \
+            --out "$signed" \
+            "$unsigned"
+          apksigner verify --verbose --print-certs "$signed" | tee dist/apksigner.txt
+          signer="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' dist/apksigner.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          [[ "$signer" =~ ^[0-9a-f]{64}$ ]]
+          echo "signer_sha256=$signer" >> "$GITHUB_OUTPUT"
+          rm -f dist/apksigner.txt
+
+      - name: Generate release manifest, checksums and notes
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          SIGNER_SHA256: ${{ steps.sign.outputs.signer_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_revision="$(git rev-parse HEAD)"
+          python3 scripts/github_release_metadata.py prepare \
+            --version "$REQUESTED_VERSION" \
+            --source-revision "$source_revision" \
+            --apk "dist/harnex-v${REQUESTED_VERSION}-android-arm64.apk" \
+            --signer-sha256 "$SIGNER_SHA256" \
+            --manifest-output dist/release-manifest.json \
+            --checksums-output dist/SHA256SUMS \
+            --notes-output dist/release-notes.md
+
+      - name: Attest exact GitHub APK candidate
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/harnex-v${{ inputs.version }}-android-arm64.apk
+
+      - name: Upload immutable release candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: harnex-github-release-candidate-${{ inputs.version }}
+          path: |
+            dist/harnex-v${{ inputs.version }}-android-arm64.apk
+            dist/release-manifest.json
+            dist/SHA256SUMS
+            dist/release-notes.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Candidate summary
+        shell: bash
+        run: |
+          echo "### Harnex GitHub release candidate prepared" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: \`${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Source: \`$(git rev-parse HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Candidate run: \`${GITHUB_RUN_ID}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: awaiting applicable REAL_ENVIRONMENT evidence before publication" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish prepared GitHub Release
+    if: inputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: github-release
+    steps:
+      - name: Checkout current stable main
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Validate publication inputs
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          EVIDENCE_REF: ${{ inputs.physical_evidence_ref }}
+          EVIDENCE_SHA256: ${{ inputs.physical_evidence_sha256 }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_RUN_ID" =~ ^[0-9]+$ ]]
+          test -n "$EVIDENCE_REF"
+          [[ "${EVIDENCE_SHA256,,}" =~ ^[0-9a-f]{64}$ ]]
+          test "$(tr -d '[:space:]' < VERSION)" = "$REQUESTED_VERSION"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager "build-tools;36.0.0"
+
+      - name: Download exact prepared candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download "$CANDIDATE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "harnex-github-release-candidate-${REQUESTED_VERSION}" \
+            --dir dist
+
+      - name: Verify exact candidate and stable source
+        id: candidate
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_revision="$(python3 -c 'import json; print(json.load(open("dist/release-manifest.json"))["release"]["sourceRevision"])')"
+          test "$source_revision" = "$(git rev-parse HEAD)"
+          test "$source_revision" = "$(git rev-parse origin/main)"
+          apk="dist/harnex-v${REQUESTED_VERSION}-android-arm64.apk"
+          python3 scripts/github_release_metadata.py verify \
+            --version "$REQUESTED_VERSION" \
+            --source-revision "$source_revision" \
+            --apk "$apk" \
+            --manifest dist/release-manifest.json
+          expected_signer="$(python3 -c 'import json; print(json.load(open("dist/release-manifest.json"))["host"]["signerCertificateSha256"])')"
+          actual_signer="$(apksigner verify --print-certs "$apk" 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          test "$expected_signer" = "$actual_signer"
+          echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize reviewed release record
+        env:
+          EVIDENCE_REF: ${{ inputs.physical_evidence_ref }}
+          EVIDENCE_SHA256: ${{ inputs.physical_evidence_sha256 }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          python3 scripts/github_release_metadata.py finalize \
+            --manifest dist/release-manifest.json \
+            --evidence-ref "$EVIDENCE_REF" \
+            --evidence-sha256 "$EVIDENCE_SHA256" \
+            --candidate-run-id "$CANDIDATE_RUN_ID" \
+            --output dist/release-record.json
+
+      - name: Create immutable tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          SOURCE_REVISION: ${{ steps.candidate.outputs.source_revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${REQUESTED_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "GitHub Release $tag already exists; release assets are immutable." >&2
+            exit 1
+          fi
+
+          remote_tag="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+          if [[ -n "$remote_tag" ]]; then
+            resolved="$(git rev-list -n 1 "$tag" 2>/dev/null || true)"
+            if [[ -z "$resolved" ]]; then
+              git fetch --tags origin "$tag"
+              resolved="$(git rev-list -n 1 "$tag")"
+            fi
+            test "$resolved" = "$SOURCE_REVISION"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$tag" "$SOURCE_REVISION" -m "Harnex ${REQUESTED_VERSION}"
+            git push origin "$tag"
+          fi
+
+          prerelease_args=()
+          if [[ "$REQUESTED_VERSION" == *-* ]]; then
+            prerelease_args=(--prerelease)
+          fi
+          gh release create "$tag" \
+            "dist/harnex-v${REQUESTED_VERSION}-android-arm64.apk" \
+            dist/release-manifest.json \
+            dist/release-record.json \
+            dist/SHA256SUMS \
+            --title "Harnex ${REQUESTED_VERSION}" \
+            --notes-file dist/release-notes.md \
+            "${prerelease_args[@]}"
