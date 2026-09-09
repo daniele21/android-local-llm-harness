@@ -30,7 +30,7 @@ Read when: implementing or resuming the first Harnex GitHub Release and dual-cha
 
 ### GR-1 — Canonical release/distribution contract — ACTIVE
 
-Owns/writes: `VERSION`, ADR 0019, `docs/versioning.md`, release runbook, release checklist, changelog/README release surface.
+Owns/writes: `VERSION`, ADR 0020, `docs/versioning.md`, release runbook, release checklist, changelog/README release surface.
 
 Acceptance: GitHub primary direct APK + optional Play are documented without signer/update ambiguity; `v0.5.0-rc.1` is the first target.
 
@@ -74,7 +74,7 @@ Acceptance: public GitHub prerelease `v0.5.0-rc.1` exists with the exact prepare
 - `docs/current-state.md`
 - `README.md`
 - `CHANGELOG.md`
-- `docs/adr/0019-official-github-and-play-distribution.md`
+- `docs/adr/0020-official-github-and-play-distribution.md`
 
 ## Resume checkpoint
 
