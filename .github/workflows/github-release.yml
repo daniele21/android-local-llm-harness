@@ -30,17 +30,11 @@ on:
         type: string
 
 permissions:
-  actions: read
-  attestations: write
-  contents: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: github-release-${{ inputs.version }}
   cancel-in-progress: false
-
-env:
-  RELEASE_ENVIRONMENT: github-release
 
 jobs:
   prepare:
@@ -49,6 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: github-release
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
     steps:
       - name: Checkout current stable main
         uses: actions/checkout@v7
@@ -97,11 +96,18 @@ jobs:
           import json
           import os
           import sys
+
           workflow = sys.argv[1]
           runs = json.loads(os.environ["RESPONSE"]).get("workflow_runs", [])
-          successful = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") == "success"]
+          successful = [
+              run
+              for run in runs
+              if run.get("status") == "completed" and run.get("conclusion") == "success"
+          ]
           if not successful:
-              raise SystemExit(f"No successful push run of {workflow} exists for the exact main commit")
+              raise SystemExit(
+                  f"No successful push run of {workflow} exists for the exact main commit"
+              )
           print(f"{workflow}: PASS via run {successful[0]['id']}")
           PY
           }
@@ -152,11 +158,14 @@ jobs:
           HARNEX_GITHUB_RELEASE_STORE_PASSWORD: ${{ secrets.HARNEX_GITHUB_RELEASE_STORE_PASSWORD }}
           HARNEX_GITHUB_RELEASE_KEY_PASSWORD: ${{ secrets.HARNEX_GITHUB_RELEASE_KEY_PASSWORD }}
           HARNEX_GITHUB_RELEASE_KEY_ALIAS: ${{ vars.HARNEX_GITHUB_RELEASE_KEY_ALIAS || 'harnex-github-release' }}
+          EXPECTED_SIGNER_SHA256: ${{ vars.HARNEX_GITHUB_RELEASE_SIGNER_SHA256 }}
           REQUESTED_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "$HARNEX_GITHUB_RELEASE_STORE_PASSWORD"
+          expected_signer="${EXPECTED_SIGNER_SHA256,,}"
+          [[ "$expected_signer" =~ ^[0-9a-f]{64}$ ]]
           effective_key_password="${HARNEX_GITHUB_RELEASE_KEY_PASSWORD:-$HARNEX_GITHUB_RELEASE_STORE_PASSWORD}"
           export HARNEX_GITHUB_RELEASE_EFFECTIVE_KEY_PASSWORD="$effective_key_password"
           unsigned="apps/local-llm-phone-test/build/outputs/apk/release/local-llm-phone-test-release-unsigned.apk"
@@ -176,6 +185,7 @@ jobs:
           apksigner verify --verbose --print-certs "$signed" | tee dist/apksigner.txt
           signer="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' dist/apksigner.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
           [[ "$signer" =~ ^[0-9a-f]{64}$ ]]
+          test "$signer" = "$expected_signer"
           echo "signer_sha256=$signer" >> "$GITHUB_OUTPUT"
           rm -f dist/apksigner.txt
 
@@ -229,6 +239,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: github-release
+    permissions:
+      actions: read
+      contents: write
     steps:
       - name: Checkout current stable main
         uses: actions/checkout@v7
@@ -249,6 +262,35 @@ jobs:
           test -n "$EVIDENCE_REF"
           [[ "${EVIDENCE_SHA256,,}" =~ ^[0-9a-f]{64}$ ]]
           test "$(tr -d '[:space:]' < VERSION)" = "$REQUESTED_VERSION"
+
+      - name: Verify candidate workflow provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}")"
+          workflow_id="$(RUN_JSON="$run_json" python3 - <<'PY'
+          import json
+          import os
+
+          run = json.loads(os.environ["RUN_JSON"])
+          repository = (run.get("repository") or {}).get("full_name")
+          if repository != os.environ["GITHUB_REPOSITORY"]:
+              raise SystemExit("candidate run belongs to a different repository")
+          if run.get("event") != "workflow_dispatch":
+              raise SystemExit("candidate run was not a manual release workflow dispatch")
+          if run.get("status") != "completed" or run.get("conclusion") != "success":
+              raise SystemExit("candidate workflow run is not successfully completed")
+          workflow_id = run.get("workflow_id")
+          if not workflow_id:
+              raise SystemExit("candidate run has no workflow identity")
+          print(workflow_id)
+          PY
+          )"
+          workflow_path="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}" --jq '.path')"
+          test "$workflow_path" = ".github/workflows/github-release.yml"
 
       - uses: android-actions/setup-android@v3
 
@@ -272,10 +314,13 @@ jobs:
       - name: Verify exact candidate and stable source
         id: candidate
         env:
+          EXPECTED_SIGNER_SHA256: ${{ vars.HARNEX_GITHUB_RELEASE_SIGNER_SHA256 }}
           REQUESTED_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
+          expected_signer="${EXPECTED_SIGNER_SHA256,,}"
+          [[ "$expected_signer" =~ ^[0-9a-f]{64}$ ]]
           source_revision="$(python3 -c 'import json; print(json.load(open("dist/release-manifest.json"))["release"]["sourceRevision"])')"
           test "$source_revision" = "$(git rev-parse HEAD)"
           test "$source_revision" = "$(git rev-parse origin/main)"
@@ -285,9 +330,10 @@ jobs:
             --source-revision "$source_revision" \
             --apk "$apk" \
             --manifest dist/release-manifest.json
-          expected_signer="$(python3 -c 'import json; print(json.load(open("dist/release-manifest.json"))["host"]["signerCertificateSha256"])')"
+          manifest_signer="$(python3 -c 'import json; print(json.load(open("dist/release-manifest.json"))["host"]["signerCertificateSha256"])')"
           actual_signer="$(apksigner verify --print-certs "$apk" 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
-          test "$expected_signer" = "$actual_signer"
+          test "$manifest_signer" = "$expected_signer"
+          test "$actual_signer" = "$expected_signer"
           echo "source_revision=$source_revision" >> "$GITHUB_OUTPUT"
 
       - name: Finalize reviewed release record
