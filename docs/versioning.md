@@ -68,7 +68,7 @@ Signing certificate digests are evidence/security identities, not product versio
 
 ## Official Android distribution channels
 
-Harnex has two official Host distribution channels, as defined by ADR 0019.
+Harnex has two official Host distribution channels, as defined by ADR 0020.
 
 ### GitHub Releases
 
