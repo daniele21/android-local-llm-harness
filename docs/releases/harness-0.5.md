@@ -34,19 +34,23 @@ The GitHub and Play Host APKs may have different signing lineages while sharing 
 - [x] Add the protected `GitHub Release` prepare/publish workflow.
 - [x] Add build-provenance attestation for the public GitHub APK candidate.
 - [ ] Merge the release-productization setup into the current `dev` line with required FULL automated validation.
-- [ ] Confirm live repository rulesets protect `dev` and `main` as documented: PR-only changes, current branch requirement, required repository validation, no force push/deletion; `main` additionally requires approval.
+- [x] Create an active repository ruleset covering both `dev` and `main` with PR-only changes, current-branch status checks, `Repository validation`, deletion protection and non-fast-forward protection.
+- [ ] Reconcile the live ruleset with the remaining durable branching requirements: resolved review conversations and the documented additional `main` approval.
+- [ ] Enable native GitHub release immutability before first public publication.
 - [ ] Enable automatic deletion of merged short-lived branches or otherwise reconcile the live repository setting with `BRANCHING.md`.
 
 ## Dedicated GitHub signing identity
 
-- [ ] Create the dedicated PKCS12 GitHub Release signing key outside the repository.
+- [x] Create the dedicated PKCS12 GitHub Release signing key outside the repository.
 - [ ] Store an encrypted offline backup and recovery information before first publication.
-- [ ] Record the public signing-certificate SHA-256 fingerprint in the private release record.
+- [x] Record the public signing-certificate SHA-256 fingerprint for the first GitHub signing lineage:
+  `a1aaa6bee8aae73ef7e3ba406ae482aac35c1bddfce96f9073f1503988cf25b2`.
 - [ ] Configure the protected `github-release` GitHub Actions environment.
-- [ ] Configure `HARNEX_GITHUB_RELEASE_KEYSTORE_B64`, store/key-password secrets and the release-key alias variable.
+- [ ] Configure `HARNEX_GITHUB_RELEASE_KEYSTORE_B64`, store/key-password secrets and `HARNEX_GITHUB_RELEASE_KEY_ALIAS`.
+- [ ] Configure `HARNEX_GITHUB_RELEASE_SIGNER_SHA256` to the exact pinned public fingerprint above.
 - [ ] Confirm no Play upload/app-signing private material is reused for the GitHub signing lineage.
 
-The first GitHub APK must not be prepared or published using a transient/debug signing identity.
+The first GitHub APK must not be prepared or published using a transient/debug signing identity. Prepare and publish must fail closed if the actual signer differs from the pinned fingerprint.
 
 ## Release source and promotion
 
@@ -65,6 +69,7 @@ Run `.github/workflows/github-release.yml` with `mode=prepare` only after the so
 
 - [ ] Prepare succeeds from the exact current `main` commit.
 - [ ] Candidate APK is signed by the dedicated GitHub Release certificate.
+- [ ] Candidate signer matches `a1aaa6bee8aae73ef7e3ba406ae482aac35c1bddfce96f9073f1503988cf25b2`.
 - [ ] `release-manifest.json` records source revision, Host version/build, channel, signer digest, Consumer SDK, Binder protocol, `llama.cpp`, APK size and SHA-256.
 - [ ] `SHA256SUMS` matches the exact prepared APK.
 - [ ] GitHub build-provenance attestation exists for the exact APK.
@@ -135,6 +140,7 @@ Only after every blocking gate applicable to the public GitHub release claim is 
 - [ ] Confirm the final `release-record.json` binds the exact candidate and evidence identity.
 - [ ] Create tag `v0.5.0-rc.1` only on the validated `main` commit.
 - [ ] Publish GitHub prerelease `v0.5.0-rc.1` with the exact APK, manifest, release record and checksums.
+- [ ] Confirm the published release reports GitHub-native immutability.
 - [ ] Download the public APK after publication and independently verify SHA-256 and signing-certificate digest.
 - [ ] Confirm the GitHub Release is marked prerelease and release notes do not exceed the evidence.
 - [ ] Update `docs/current-state.md` only after the release actually exists.
