@@ -44,6 +44,7 @@ internal class HarnessConfiguredConsumerProfileResolver(
         )
         val execution = when (resolution) {
             is HostExecutionResolution.Success -> resolution.execution
+
             is HostExecutionResolution.Failure -> error(
                 "Configured Consumer execution is unavailable: ${resolution.code}",
             )
