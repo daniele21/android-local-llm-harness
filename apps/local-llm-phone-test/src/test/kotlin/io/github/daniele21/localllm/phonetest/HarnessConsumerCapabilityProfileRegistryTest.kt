@@ -126,12 +126,9 @@ private object CapabilityEmptyModelStore : ModelStore {
         entries = emptyList(),
     )
 
-    override fun import(source: File, artifact: GgufArtifact): StoredModel =
-        error("Capability discovery must not import model bytes")
+    override fun import(source: File, artifact: GgufArtifact): StoredModel = error("Capability discovery must not import model bytes")
 
-    override fun verify(digest: ModelDigest): VerificationResult =
-        error("Capability discovery must not verify absent model bytes")
+    override fun verify(digest: ModelDigest): VerificationResult = error("Capability discovery must not verify absent model bytes")
 
-    override fun remove(digest: ModelDigest): Boolean =
-        error("Capability discovery must not remove model bytes")
+    override fun remove(digest: ModelDigest): Boolean = error("Capability discovery must not remove model bytes")
 }
