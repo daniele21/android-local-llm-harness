@@ -31,10 +31,7 @@ internal class HarnessConsumerCapabilityProfileRegistry(
 }
 
 /** Side-effect-free adapter from persisted Host Control Plane state to a Consumer-safe runtime profile view. */
-internal class HarnessConfiguredConsumerProfileResolver(
-    private val store: HostControlPlaneStore,
-    private val modelStore: ModelStore,
-) {
+internal class HarnessConfiguredConsumerProfileResolver(private val store: HostControlPlaneStore, private val modelStore: ModelStore) {
     private val resolver = HostExecutionResolver(store)
 
     fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase {
