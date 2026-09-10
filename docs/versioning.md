@@ -5,7 +5,15 @@ Document type: release-policy
 Owner: repository
 Canonical scope: release.versioning
 Read when: changing versions, compatibility promises, promotion or release artifacts
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-09
+
+## Harnex repository versions
+
+The repository-level Harnex version is stored in the root [`VERSION`](../VERSION) file and follows Semantic Versioning.
+
+Before `1.0.0`, public Harnex milestones use prerelease identifiers when the supported envelope is still intentionally pre-stable, for example `0.5.0-rc.1`. The Git tag is the version prefixed with `v`.
+
+A GitHub prerelease is a real immutable release record, not a development snapshot. It may communicate a bounded pre-stable support envelope, but it does not relax RELEASE/FULL validation or permit claims that exceed the attached evidence.
 
 ## SDK versions
 
@@ -24,6 +32,7 @@ The following identities are versioned or recorded separately from the SDK relea
 - shared-runtime Android client SDK version;
 - shared-runtime Binder protocol major/minor and negotiated feature set;
 - Host and consumer package/signing-certificate identities;
+- Host distribution channel and release signer identity;
 - GGUF artifact digest;
 - model load profile schema;
 - use-case profile schema;
@@ -40,8 +49,8 @@ Changing an SDK version must never implicitly change an application's configured
 A shared-runtime release or physical evidence record must identify at least:
 
 ```text
-harnex git commit
-host package + version/build
+harnex version + git commit
+host package + version/build + distribution channel
 consumer package + version/build when a concrete app is under test
 client SDK version
 Binder protocol major/minor
@@ -57,6 +66,34 @@ The Binder protocol remains independently versioned from host/client packaging. 
 
 Signing certificate digests are evidence/security identities, not product versions. Independently distributed Host and consumer applications are not required to share a signing identity; authorization follows ADR 0018. Full certificates, private keys and passwords are never release metadata.
 
+## Official Android distribution channels
+
+Harnex has two official Host distribution channels, as defined by ADR 0020.
+
+### GitHub Releases
+
+GitHub Releases are the primary direct-download channel. The public APK:
+
+- uses package `io.github.daniele21.localllm.phonetest`;
+- is signed with a dedicated Harnex GitHub Release key;
+- records the signing-certificate SHA-256 digest in release metadata;
+- is prepared once, validated/evidenced as that exact byte sequence and then promoted without rebuilding;
+- is published with `release-manifest.json`, `release-record.json`, `SHA256SUMS` and GitHub build-provenance attestation.
+
+The GitHub Release signing key is not the Google Play upload key and is not committed or emitted as an artifact.
+
+### Google Play
+
+Google Play is an optional managed distribution channel. The existing developer upload key signs the AAB submitted to Play; Google Play App Signing owns the signing identity of the APK actually delivered by Play.
+
+Play availability never gates the existence of a GitHub Release unless a specific release claim explicitly depends on Play evidence.
+
+### Switching channels
+
+GitHub and Play may use different signing lineages while sharing the same package name. Android therefore may reject an in-place update from one channel to the other.
+
+Harnex does not hide this invariant. Switching channel may require uninstall/reinstall and can remove app-private model/configuration state. No release note may imply seamless cross-channel update unless a future explicit signing-lineage migration has been implemented and qualified.
+
 ## Integration and release lines
 
 - `dev` carries snapshot development and is the only normal base and target for feature work.
@@ -64,6 +101,40 @@ Signing certificate digests are evidence/security identities, not product versio
 - Feature pull requests normally squash into `dev`; promotions use a merge commit to preserve the exact validated candidate.
 - Tags, changelog release entries and distributed Android artifacts are created only from validated `main` commits.
 - Emergency hotfixes are applied to `main` and then forward-ported to `dev`.
+
+## GitHub Release candidate lifecycle
+
+A GitHub Release uses two explicit phases.
+
+### Prepare
+
+The prepare phase:
+
+1. checks out the exact current `main` commit;
+2. requires the requested version to match `VERSION` and the versioned `CHANGELOG.md` section;
+3. requires successful exact-main `Validate` and package automation;
+4. builds the release APK from clean source without a development signing identity;
+5. signs it with the protected GitHub Release key;
+6. verifies the APK signature and records its signer digest;
+7. generates release manifest, checksums and human release notes;
+8. creates build-provenance attestation;
+9. stores the immutable candidate as a bounded GitHub Actions artifact for release evidence.
+
+No public tag or GitHub Release is created by prepare.
+
+### Publish
+
+The publish phase:
+
+1. requires the exact prepare-run ID and reviewable REAL_ENVIRONMENT evidence identity;
+2. downloads the prepared candidate rather than rebuilding it;
+3. verifies version, source commit, APK SHA-256, APK size and signer digest against the manifest;
+4. requires that source commit to remain the exact current `main` release source;
+5. finalizes a release record containing the reviewed evidence reference;
+6. creates the immutable `v<version>` tag and GitHub Release;
+7. attaches the exact prepared APK and release metadata.
+
+Existing releases are never overwritten. A retry may reuse an existing tag only when that tag resolves to the same exact source commit and no GitHub Release has yet been published.
 
 ## Play Internal phone-test identity
 
@@ -84,13 +155,14 @@ A release requires:
 - an exact `dev` candidate promoted to `main` through a protected pull request;
 - complete non-scoped Android, native and packaging validation on the candidate;
 - passing CI from a clean checkout;
-- changelog entry;
+- a versioned changelog entry matching `VERSION`;
 - public API review;
 - updated sample applications when relevant;
 - model and device compatibility notes;
 - benchmark comparison for runtime-critical changes;
 - explicit cache/snapshot compatibility decision;
-- checksums for distributed artifacts.
+- checksums for distributed artifacts;
+- release artifacts prepared and promoted immutably rather than rebuilt after evidence.
 
 For a shared-runtime client/host distribution, the release gate additionally requires:
 
@@ -100,13 +172,13 @@ For a shared-runtime client/host distribution, the release gate additionally req
 - packaged release client-AAR consumer execution;
 - cancellation, host-death/reconnect, memory and thermal evidence where material to the release claim;
 - protocol compatibility fixtures and applicable package replacement/upgrade evidence;
-- release notes binding host version, client SDK version, protocol identity, runtime/backend identity, Host/consumer signing identities and selected model evidence;
+- release notes binding Harnex version, host version, distribution channel, client SDK version, protocol identity, runtime/backend identity, Host/consumer signing identities and selected model evidence;
 - a security review of the exported explicit-component Binder service, exact Binder caller identity policy, Harnex Control Plane authorization, bounded pre-authorization behavior and privacy boundary.
 
-Same-key or Host-first-only emulator evidence does not satisfy an independently signed distribution claim. Physical Play Internal confirmation remains required before stable promotion when Play App Signing identity is material.
+Same-key or Host-first-only emulator evidence does not satisfy an independently signed distribution claim. Physical distribution confirmation remains required when signing identity, real Android ARM64/JNI/GGUF behavior, memory, thermal or OEM behavior is material to the published claim.
 
 ## Development versions
 
-Development builds on `dev` use snapshot semantics and are not releases. Harnex `0.5.0` is the current internal-integration target; it may be promoted to `main` and distributed through Google Play Internal Testing only after its promotion gates pass. The shared-runtime client currently carries snapshot identity until its physical/release gates close.
+Development builds on `dev` use snapshot semantics and are not releases. Harnex `0.5.0-rc.1` is the current first GitHub prerelease target; it may be published only after its exact `main` candidate, signing identity and release evidence gates close. The shared-runtime client keeps its own independently published version identity.
 
-Harnex 0.5.0 and the shared runtime must not be described as production-ready until representative physical-device Qwen3.5 lifecycle, cancellation, memory, JNI-loading, thermal and cross-process release evidence is complete.
+Neither Harnex `0.5.0-rc.1` nor the shared runtime may be described as universally production-ready until representative physical-device Qwen3.5 lifecycle, cancellation, memory, JNI-loading, thermal and applicable cross-process release evidence is complete.

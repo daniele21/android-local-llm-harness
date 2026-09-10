@@ -1,0 +1,82 @@
+name: Bug report
+description: Report a reproducible Harnex runtime, Host, Consumer SDK or UI defect.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Harnex. Keep reports privacy-safe: do not include prompts, generated output, signing secrets, Binder tokens, private file paths, signed URLs, GGUF bytes or full certificates.
+  - type: input
+    id: version
+    attributes:
+      label: Harnex version / commit
+      description: Use the GitHub Release version when installed from a release, otherwise the exact commit SHA when known.
+      placeholder: 0.5.0-rc.1 or 40-character commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Installation channel
+      options:
+        - GitHub Release APK
+        - Google Play
+        - Source / development build
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 8, Android 16, arm64-v8a
+    validations:
+      required: true
+  - type: input
+    id: consumer
+    attributes:
+      label: Consumer app / SDK version
+      description: Fill this when the issue crosses the Binder/Consumer boundary.
+      placeholder: RedactGuard 1.x / consumer-android 0.1.0-alpha.11
+  - type: input
+    id: model
+    attributes:
+      label: Model identity
+      description: If relevant, provide the Harnex catalog model ID, quantization and public SHA-256 digest. Do not attach GGUF bytes or private paths.
+      placeholder: Qwen3.5 2B / Q4_K_M / sha256...
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest sequence that reproduces the behavior without sensitive inference content.
+      placeholder: |
+        1. Install...
+        2. Open...
+        3. Trigger...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Redact sensitive inference content from screenshots/logs before attaching them.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Privacy-safe diagnostics
+      description: Add bounded logs, screenshots or evidence references only when they contain no prompt/output, tokens, secrets or private paths.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I verified that this report and its attachments do not contain prompts, generated output, credentials, signing material, Binder tokens, GGUF bytes or private paths.
+          required: true

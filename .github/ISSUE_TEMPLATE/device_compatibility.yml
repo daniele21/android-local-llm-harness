@@ -1,0 +1,77 @@
+name: Device compatibility report
+description: Report representative Android device behavior, packaging, JNI, memory or thermal compatibility.
+title: "device: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Device reports help define Harnex's evidence-backed support envelope. Do not include adb serial numbers, prompts, generated output, signing secrets, private paths or GGUF bytes.
+  - type: input
+    id: version
+    attributes:
+      label: Harnex version / commit
+      placeholder: 0.5.0-rc.1 or exact commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Installation channel
+      options:
+        - GitHub Release APK
+        - Google Play
+        - Source / development build
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: Manufacturer + model
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version / API level
+      placeholder: Android 16 / API 36
+    validations:
+      required: true
+  - type: input
+    id: abi
+    attributes:
+      label: ABI
+      placeholder: arm64-v8a
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Curated model / quantization
+      placeholder: Qwen3.5 2B Q4_K_M
+  - type: input
+    id: digest
+    attributes:
+      label: Model SHA-256 digest
+      description: Public artifact digest only; do not provide private model paths or model bytes.
+  - type: textarea
+    id: observation
+    attributes:
+      label: Observed behavior
+      description: Describe install/startup/JNI/generation/cancellation/memory/thermal behavior without prompt or output content.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Privacy-safe evidence
+      description: Optional bounded metrics/logs/screenshots with serial numbers and sensitive inference content removed.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Evidence scope
+      options:
+        - label: I understand that one device report is evidence for this configuration, not universal Android/OEM compatibility.
+          required: true
+        - label: I verified that no adb serial, prompt/output, credential, signing secret, private path or GGUF byte is included.
+          required: true

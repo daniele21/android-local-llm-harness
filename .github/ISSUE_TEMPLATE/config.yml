@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/daniele21/harnex/security/policy
+    about: Report security-sensitive issues through the private security process, not a public issue.
+  - name: Questions and integration help
+    url: https://github.com/daniele21/harnex/discussions
+    about: Use Discussions for usage questions, design discussion and integration help.

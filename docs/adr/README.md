@@ -5,7 +5,7 @@ Document type: adr-index
 Owner: repository
 Canonical scope: architecture.decisions
 Read when: a change may alter a durable architectural constraint or supersede an accepted decision
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-09
 
 Architecture Decision Records capture decisions that materially constrain the runtime, public contracts, native integration, storage, security or deployment model.
 
@@ -30,6 +30,7 @@ Architecture Decision Records capture decisions that materially constrain the ru
 - [`0017-durable-local-inference-audit.md`](0017-durable-local-inference-audit.md) — strict Harnex-owned local inference audit, sensitive-content separation from telemetry, verified caller attribution and encrypted bounded persistence
 - [`0018-independently-signed-consumer-authorization.md`](0018-independently-signed-consumer-authorization.md) — independently signed consumer binding capability, Binder-derived package/signer trust, explicit Harnex authorization and signer-change reauthorization
 - [`0019-qwen35-4b-four-bit-product-support.md`](0019-qwen35-4b-four-bit-product-support.md) — extend the closed Qwen3.5 envelope with the reviewed Unsloth 4B 4-bit tier and tier-aware generation/resource policy
+- [`0020-official-github-and-play-distribution.md`](0020-official-github-and-play-distribution.md) — dual official Host distribution through GitHub Releases and optional Google Play with separate signing lineages and immutable candidate promotion
 
 ## Status values
 
