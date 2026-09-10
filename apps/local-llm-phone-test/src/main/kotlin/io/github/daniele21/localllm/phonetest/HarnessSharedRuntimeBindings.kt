@@ -87,8 +87,9 @@ internal object HarnessSharedRuntimeBindings {
         val suffix = when (useCaseId) {
             consoleUseCaseId.value -> CONSOLE_PROFILE_SUFFIX
             ombraUseCaseId.value -> OMBRA_PROFILE_SUFFIX
-            auraSchemaInferenceUseCaseId.value -> AURA_SCHEMA_PROFILE_SUFFIX
-            auraCategoryClassificationUseCaseId.value -> AURA_CATEGORY_PROFILE_SUFFIX
+            auraSchemaInferenceUseCaseId.value,
+            auraCategoryClassificationUseCaseId.value,
+            -> AURA_IMPORT_MODEL_PROFILE_SUFFIX
             else -> return null
         }
         return "$catalogProfileKey-$suffix"
@@ -169,8 +170,11 @@ internal object HarnessSharedRuntimeBindings {
                 profileSuffix = profileSuffix,
                 contextSize = STRUCTURED_CONTEXT_SIZE,
             )
+        val catalogProfileKey = Qwen35PhoneModelPolicy.requireCurated(model).profileKey.value
+        val canonicalModelProfileId = requireNotNull(modelProfileId(useCaseId.value, catalogProfileKey))
         val useCase =
             resolved.useCase.copy(
+                modelProfileId = canonicalModelProfileId,
                 outputMode = OutputMode.JSON_SCHEMA,
                 defaultPreset = defaultPreset,
             )
@@ -184,6 +188,7 @@ internal object HarnessSharedRuntimeBindings {
                 useCaseProfileId = useCase.id,
             ),
             useCase = useCase,
+            model = resolved.model.copy(id = canonicalModelProfileId),
         )
     }
 
@@ -193,6 +198,7 @@ internal object HarnessSharedRuntimeBindings {
     private const val STRUCTURED_CONTEXT_SIZE = 4_096
     private const val CONSOLE_PROFILE_SUFFIX = "shared-console"
     private const val OMBRA_PROFILE_SUFFIX = "ombra-pii"
+    private const val AURA_IMPORT_MODEL_PROFILE_SUFFIX = "aura-import"
     private const val AURA_SCHEMA_PROFILE_SUFFIX = "aura-import-schema"
     private const val AURA_CATEGORY_PROFILE_SUFFIX = "aura-import-category"
 }
