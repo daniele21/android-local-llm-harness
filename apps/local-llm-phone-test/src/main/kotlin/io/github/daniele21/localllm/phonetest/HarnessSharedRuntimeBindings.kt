@@ -86,10 +86,13 @@ internal object HarnessSharedRuntimeBindings {
         require(catalogProfileKey.isNotBlank()) { "Catalog profile key must not be blank" }
         val suffix = when (useCaseId) {
             consoleUseCaseId.value -> CONSOLE_PROFILE_SUFFIX
+
             ombraUseCaseId.value -> OMBRA_PROFILE_SUFFIX
+
             auraSchemaInferenceUseCaseId.value,
             auraCategoryClassificationUseCaseId.value,
             -> AURA_IMPORT_MODEL_PROFILE_SUFFIX
+
             else -> return null
         }
         return "$catalogProfileKey-$suffix"
