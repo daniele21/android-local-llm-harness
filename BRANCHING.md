@@ -88,7 +88,7 @@ Repository settings for both `main` and `dev` must require:
 - force pushes and branch deletion to be disabled;
 - repository administrators to follow the same protection rules, except for documented emergency recovery.
 
-`main` additionally requires at least one approval and normally accepts only `dev` promotions. `dev` remains the daily integration target and is frozen when its required post-merge validation is red.
+`main` normally accepts only `dev` promotions. Repositories with an eligible independent maintainer require at least one approval on `main`; a solo-maintainer repository must not configure an impossible self-approval gate and instead relies on the protected PR path, current-target requirement, stable `Repository validation`, release `FULL` validation and applicable release/REAL_ENVIRONMENT evidence. `dev` remains the daily integration target and is frozen when its required post-merge validation is red.
 
 Physical-device evidence is not required for every repository pull request. It is required before a production-ready release, before distributing the runtime to application consumers and before making device compatibility or performance claims. A pull request that itself introduces such a claim must include or reference the relevant evidence.
 
