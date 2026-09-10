@@ -92,6 +92,40 @@ class HarnessSharedRuntimeBindingsTest {
     }
 
     @Test
+    fun `aura use cases share one physical model profile while keeping distinct use case profiles`() {
+        val model = curatedModel()
+        val schema = HarnessSharedRuntimeBindings.resolveConsumerUseCase(
+            model,
+            HarnessSharedRuntimeBindings.auraApplicationId,
+            HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId,
+        )
+        val category = HarnessSharedRuntimeBindings.resolveConsumerUseCase(
+            model,
+            HarnessSharedRuntimeBindings.auraApplicationId,
+            HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId,
+        )
+        val catalogProfileKey = CuratedModelCatalog.releases.first().profileKey.value
+
+        assertEquals(schema.model.id, category.model.id)
+        assertEquals(schema.model.id, schema.useCase.modelProfileId)
+        assertEquals(category.model.id, category.useCase.modelProfileId)
+        assertEquals(
+            HarnessSharedRuntimeBindings.modelProfileId(
+                HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId.value,
+                catalogProfileKey,
+            ),
+            HarnessSharedRuntimeBindings.modelProfileId(
+                HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId.value,
+                catalogProfileKey,
+            ),
+        )
+        assertFalse(schema.useCase.id == category.useCase.id)
+        assertFalse(schema.useCase.systemPromptVersion == category.useCase.systemPromptVersion)
+        assertEquals(HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId, schema.binding.useCaseId)
+        assertEquals(HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId, category.binding.useCaseId)
+    }
+
+    @Test
     fun `external binding requires explicit control-plane activation even with selected model`() {
         val registry = HarnessPhoneBindingRegistry()
         registry.selectedModel = curatedModel()
