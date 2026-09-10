@@ -77,8 +77,10 @@ internal object EmulatorE2eAuraImportControl {
                     binding.useCaseId != useCaseId && binding.isDefault
                 }
                 val nextIsDefault = enabled &&
-                    (latest.isDefault ||
-                        (useCaseId == HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId && !anotherCurrentDefaultExists))
+                    (
+                        latest.isDefault ||
+                            (useCaseId == HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId && !anotherCurrentDefaultExists)
+                    )
                 val next = latest.copy(
                     revision = latest.revision + 1,
                     enabled = enabled,
