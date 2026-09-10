@@ -48,6 +48,44 @@ class HarnessSharedRuntimePolicyTest {
     }
 
     @Test
+    fun auraSpecsSeedObservedPackageAliasesAsPendingForBothUseCases() {
+        val applicationId = HarnessSharedRuntimeBindings.auraApplicationId
+        val policies = listOf(
+            policy(
+                HarnessSharedRuntimeBindings.AURA_RELEASE_PACKAGE,
+                applicationId,
+                SIGNER_A,
+                HarnessSharedRuntimeBindings.auraUseCases,
+            ),
+            policy(
+                HarnessSharedRuntimeBindings.AURA_DEBUG_PACKAGE,
+                applicationId,
+                SIGNER_B,
+                HarnessSharedRuntimeBindings.auraUseCases,
+            ),
+        )
+
+        val specs = HarnessSharedRuntimePolicy.builtInAuraControlPlaneSpecs(policies)
+
+        assertEquals(2, specs.size)
+        assertEquals(HarnessSharedRuntimeBindings.auraUseCases, specs.map { it.useCase.useCaseId }.toSet())
+        specs.forEach { spec ->
+            val requirement = spec.applications.single()
+            assertEquals(applicationId, requirement.applicationId)
+            assertEquals(
+                setOf(
+                    HarnessSharedRuntimeBindings.AURA_RELEASE_PACKAGE,
+                    HarnessSharedRuntimeBindings.AURA_DEBUG_PACKAGE,
+                ),
+                requirement.acceptedPackageNames,
+            )
+            assertEquals(setOf(SIGNER_A, SIGNER_B), requirement.acceptedSignerSha256)
+            assertEquals(ApplicationRegistrationState.PENDING, requirement.initialState)
+            assertTrue(requirement.allowObservedSignerChange)
+        }
+    }
+
+    @Test
     fun ombraSpecRejectsSignerFromDifferentPackageAlias() {
         val applicationId = HarnessSharedRuntimeBindings.redactGuardApplicationId
         val requirement = HarnessSharedRuntimePolicy
@@ -156,10 +194,15 @@ class HarnessSharedRuntimePolicyTest {
         revision = 1,
     )
 
-    private fun policy(packageName: String, applicationId: ApplicationId, signer: String) = AuthorizedClientPolicy(
+    private fun policy(
+        packageName: String,
+        applicationId: ApplicationId,
+        signer: String,
+        allowedUseCases: Set<UseCaseId> = setOf(HarnessSharedRuntimeBindings.ombraUseCaseId),
+    ) = AuthorizedClientPolicy(
         packageName = packageName,
         applicationId = applicationId,
-        allowedUseCases = setOf(HarnessSharedRuntimeBindings.ombraUseCaseId),
+        allowedUseCases = allowedUseCases,
         acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(signer)),
     )
 
