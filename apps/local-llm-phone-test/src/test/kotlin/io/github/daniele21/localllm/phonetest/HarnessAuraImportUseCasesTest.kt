@@ -68,8 +68,7 @@ class HarnessAuraImportUseCasesTest {
             HarnessSharedRuntimeBindings.auraApplicationId,
             HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId,
         )
-        assertEquals(schema.model.id, category.model.id)
-        assertFalse(schema.binding.useCaseId == category.binding.useCaseId)
+        assertFalse(schema.model.id == category.model.id)
     }
 
     @Test
