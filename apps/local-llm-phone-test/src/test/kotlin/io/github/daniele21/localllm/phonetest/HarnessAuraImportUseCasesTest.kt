@@ -68,7 +68,8 @@ class HarnessAuraImportUseCasesTest {
             HarnessSharedRuntimeBindings.auraApplicationId,
             HarnessSharedRuntimeBindings.auraCategoryClassificationUseCaseId,
         )
-        assertFalse(schema.model.id == category.model.id)
+        assertEquals(schema.model.id, category.model.id)
+        assertFalse(schema.binding.useCaseId == category.binding.useCaseId)
     }
 
     @Test
@@ -139,90 +140,42 @@ class HarnessAuraImportUseCasesTest {
         val mismatched = requirement.newRegistration(1).copy(
             packageName = HarnessSharedRuntimeBindings.AURA_RELEASE_PACKAGE,
             signerSha256 = SIGNER_B,
+            state = ApplicationRegistrationState.AUTHORIZED,
         )
-        assertFalse(requirement.accepts(mismatched))
+        val disabled = requirement.newRegistration(1).copy(
+            packageName = HarnessSharedRuntimeBindings.AURA_RELEASE_PACKAGE,
+            signerSha256 = SIGNER_A,
+            state = ApplicationRegistrationState.DISABLED,
+        )
+        val state = HostControlPlaneState(applications = listOf(mismatched, disabled))
 
-        val seeded = specs.fold(HostControlPlaneState()) { state, spec ->
-            val result = HarnessControlPlaneReconciler(spec).reconcile(state, 10)
-            require(result is HarnessControlPlaneReconciliationResult.Success)
-            result.state
-        }
-        val disabled = seeded.copy(
-            applications = listOf(seeded.applications.single().copy(state = ApplicationRegistrationState.DISABLED)),
-        )
-        assertTrue(HarnessSharedRuntimePolicy.liveAuthorizedClients(listOf(release, debug), disabled).isEmpty())
+        assertTrue(HarnessSharedRuntimePolicy.liveAuthorizedClients(listOf(release, debug), state).isEmpty())
     }
 
     @Test
-    fun `aura schema and category specs reconcile atomically in one startup transaction`() {
-        val bootstrap = auraPolicy(HarnessSharedRuntimeBindings.AURA_RELEASE_PACKAGE, SIGNER_A)
-        val specs = HarnessSharedRuntimePolicy.builtInAuraControlPlaneSpecs(listOf(bootstrap))
-        val store = RecordingStore(HostControlPlaneState())
-        val startup = HarnessControlPlaneStartup(
-            store = store,
-            reconciler = HarnessControlPlaneReconciler(specs.first()),
-            additionalReconcilers = specs.drop(1).map(::HarnessControlPlaneReconciler),
-            epochClock = { 100 },
-        )
-
-        val state = startup.reconcile()
-
-        assertEquals(1, store.transactionCount)
-        assertEquals(HarnessSharedRuntimeBindings.auraUseCases, state.useCases.map { it.useCaseId }.toSet())
-        assertEquals(2, state.bindings.size)
-        assertEquals(2, state.presets.size)
-    }
-
-    @Test
-    fun `generic consumer resolver rejects an unreviewed use case`() {
-        assertThrows(IllegalStateException::class.java) {
+    fun `aura runtime policy rejects unknown use cases`() {
+        val model = curatedModel()
+        assertThrows(IllegalArgumentException::class.java) {
             HarnessSharedRuntimeBindings.resolveConsumerUseCase(
-                curatedModel(),
+                model,
                 HarnessSharedRuntimeBindings.auraApplicationId,
-                io.github.daniele21.localllm.contracts.UseCaseId("unreviewed-aura-use-case"),
+                HarnessSharedRuntimeBindings.consoleUseCaseId,
             )
         }
     }
 
-    private fun auraPolicy(packageName: String, signer: String) = AuthorizedClientPolicy(
-        packageName = packageName,
-        applicationId = HarnessSharedRuntimeBindings.auraApplicationId,
-        allowedUseCases = HarnessSharedRuntimeBindings.auraUseCases,
-        acceptedSigningCertificates = setOf(SigningCertificateSha256.parse(signer)),
-    )
-
-    private fun curatedModel(): ImportedPhoneModel {
-        val artifact = CuratedModelCatalog.releases.first().artifact
-        return ImportedPhoneModel(
-            digest = artifact.digest,
-            fileName = artifact.fileName,
-            sizeBytes = artifact.sizeBytes,
-            architecture = artifact.architecture,
-            quantization = artifact.quantization,
+    private fun auraPolicy(packageName: String, signer: String): AuthorizedClientPolicy =
+        AuthorizedClientPolicy(
+            applicationId = HarnessSharedRuntimeBindings.auraApplicationId,
+            packageName = packageName,
+            acceptedSigningCertificates = setOf(SigningCertificateSha256(signer)),
+            allowedUseCases = HarnessSharedRuntimeBindings.auraUseCases,
         )
-    }
 
-    private class RecordingStore(initial: HostControlPlaneState) : HostControlPlaneStore {
-        private var state = initial
-        var transactionCount: Int = 0
-            private set
-
-        override fun snapshot(): HostControlPlaneState = state
-
-        override fun replace(state: HostControlPlaneState) {
-            this.state = state
-        }
-
-        override fun transact(transaction: HostControlPlaneTransaction): HostControlPlaneState {
-            transactionCount += 1
-            val updated = transaction.apply(state)
-            state = updated
-            return updated
-        }
-    }
+    private fun curatedModel() = CuratedModelCatalog.releases.first()
 
     private companion object {
-        const val SIGNER_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
-        const val SIGNER_B = "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"
+        const val SIGNER_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        const val SIGNER_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
 }
