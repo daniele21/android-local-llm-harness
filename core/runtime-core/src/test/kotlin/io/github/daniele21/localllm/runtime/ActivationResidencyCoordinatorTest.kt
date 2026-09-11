@@ -16,7 +16,7 @@ class ActivationResidencyCoordinatorTest {
     private val secondDigest = ModelDigest("b".repeat(64))
 
     @Test
-    fun `compatible activations share one protected model`() {
+    fun `compatible activations share one protected model profile`() {
         val coordinator = coordinator()
 
         val first = coordinator.acquire(request("owner-a", firstDigest), retainModelWarmMs = 30_000)
@@ -25,6 +25,7 @@ class ActivationResidencyCoordinatorTest {
         assertTrue(first is ActivationResidencyResult.Success)
         assertTrue(second is ActivationResidencyResult.Success)
         assertTrue(coordinator.protects(firstDigest))
+        assertTrue(coordinator.protectsModelProfile(firstDigest, PROFILE_A))
         assertEquals(2, coordinator.activeLeaseCount(firstDigest))
     }
 
@@ -53,9 +54,27 @@ class ActivationResidencyCoordinatorTest {
         result as ActivationResidencyResult.Failure
         assertEquals(ActivationResidencyFailure.MODEL_CONFLICT, result.reason)
         assertEquals(firstDigest, result.conflict?.protectedModelDigest)
+        assertEquals(PROFILE_A, result.conflict?.protectedModelProfileId)
         assertEquals(secondDigest, result.conflict?.requestedModelDigest)
+        assertEquals(PROFILE_A, result.conflict?.requestedModelProfileId)
         assertEquals(1, result.conflict?.activeLeaseCount)
-        assertFalse(coordinator.canActivate(secondDigest))
+        assertFalse(coordinator.canActivate(secondDigest, PROFILE_A))
+    }
+
+    @Test
+    fun `same digest different model profile conflicts while first profile is active`() {
+        val coordinator = coordinator()
+        coordinator.acquire(request("owner-a", firstDigest, PROFILE_A), retainModelWarmMs = 30_000)
+
+        val result = coordinator.acquire(request("owner-b", firstDigest, PROFILE_B), retainModelWarmMs = 30_000)
+
+        result as ActivationResidencyResult.Failure
+        assertEquals(ActivationResidencyFailure.MODEL_CONFLICT, result.reason)
+        assertEquals(firstDigest, result.conflict?.protectedModelDigest)
+        assertEquals(PROFILE_A, result.conflict?.protectedModelProfileId)
+        assertEquals(firstDigest, result.conflict?.requestedModelDigest)
+        assertEquals(PROFILE_B, result.conflict?.requestedModelProfileId)
+        assertFalse(coordinator.canActivate(firstDigest, PROFILE_B))
     }
 
     @Test
@@ -69,6 +88,7 @@ class ActivationResidencyCoordinatorTest {
             coordinator.release(first.value.activationId, first.value.ownerId) as ActivationResidencyResult.Success
 
         assertTrue(coordinator.protects(firstDigest))
+        assertTrue(coordinator.protectsModelProfile(firstDigest, PROFILE_A))
         assertEquals(1, result.value.remainingLeaseCount)
         assertTrue(result.value.warmRetentionByModelMs.isEmpty())
     }
@@ -83,6 +103,7 @@ class ActivationResidencyCoordinatorTest {
             coordinator.release(acquired.value.activationId, acquired.value.ownerId) as ActivationResidencyResult.Success
 
         assertFalse(coordinator.protects(firstDigest))
+        assertFalse(coordinator.protectsModelProfile(firstDigest, PROFILE_A))
         assertEquals(0, result.value.remainingLeaseCount)
         assertEquals(45_000L, result.value.warmRetentionByModelMs[firstDigest])
     }
@@ -112,14 +133,24 @@ class ActivationResidencyCoordinatorTest {
         )
     }
 
-    private fun request(ownerId: String, digest: ModelDigest): UseCaseActivationRequest = UseCaseActivationRequest(
+    private fun request(
+        ownerId: String,
+        digest: ModelDigest,
+        modelProfileId: String = PROFILE_A,
+    ): UseCaseActivationRequest = UseCaseActivationRequest(
         ownerId = ActivationOwnerId(ownerId),
         applicationId = ApplicationId("application-$ownerId"),
         useCaseId = UseCaseId("document-analysis"),
         preset = InferencePresetRef(InferencePresetId("balanced"), 3),
         modelDigest = digest,
+        modelProfileId = modelProfileId,
         acquiredAtEpochMs = 1_000,
         useCaseRevision = 2,
         bindingRevision = 7,
     )
+
+    private companion object {
+        const val PROFILE_A = "profile-a"
+        const val PROFILE_B = "profile-b"
+    }
 }

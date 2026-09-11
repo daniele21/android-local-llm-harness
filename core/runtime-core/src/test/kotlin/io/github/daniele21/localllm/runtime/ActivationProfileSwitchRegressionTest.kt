@@ -19,7 +19,6 @@ import io.github.daniele21.localllm.store.ModelStore
 import io.github.daniele21.localllm.store.ModelStoreSnapshot
 import io.github.daniele21.localllm.store.StoredModel
 import io.github.daniele21.localllm.store.VerificationResult
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -31,13 +30,13 @@ class ActivationProfileSwitchRegressionTest {
     private val digest = ModelDigest("a".repeat(64))
 
     @Test
-    fun `active same-digest second profile currently blocks resident profile switch`() {
+    fun `released schema activation allows same-digest category profile switch`() {
         val modelFile = File.createTempFile("activation-profile-switch", ".gguf").apply {
             writeText("model")
             deleteOnExit()
         }
-        val schema = resolved(schemaUseCaseId, "qwen35-aura-import-schema", modelFile)
-        val category = resolved(categoryUseCaseId, "qwen35-aura-import-category", modelFile)
+        val schema = resolved(schemaUseCaseId, SCHEMA_PROFILE, modelFile)
+        val category = resolved(categoryUseCaseId, CATEGORY_PROFILE, modelFile)
         val registry = object : ModelProfileRegistry {
             override fun resolve(applicationId: ApplicationId, useCaseId: UseCaseId): ResolvedUseCase = when (useCaseId) {
                 schemaUseCaseId -> schema
@@ -56,34 +55,38 @@ class ActivationProfileSwitchRegressionTest {
         )
 
         val schemaActivation = activationResidency.acquire(
-            activationRequest("schema-owner", schemaUseCaseId),
+            activationRequest("schema-owner", schemaUseCaseId, SCHEMA_PROFILE),
             retainModelWarmMs = 30_000,
         ) as ActivationResidencyResult.Success
         assertTrue(runtime.prepare(applicationId, schemaUseCaseId).ready)
         activationResidency.release(schemaActivation.value.activationId, schemaActivation.value.ownerId)
 
         val categoryActivation = activationResidency.acquire(
-            activationRequest("category-owner", categoryUseCaseId),
+            activationRequest("category-owner", categoryUseCaseId, CATEGORY_PROFILE),
             retainModelWarmMs = 30_000,
         ) as ActivationResidencyResult.Success
         val categoryPrepare = runtime.prepare(applicationId, categoryUseCaseId)
 
-        assertFalse(categoryPrepare.ready)
-        assertTrue(categoryPrepare.detail.contains("protected by an active use-case activation"))
-        assertTrue(delegate.loadedProfiles == listOf("qwen35-aura-import-schema"))
-        assertFalse(delegate.unloaded)
+        assertTrue(categoryPrepare.ready)
+        assertTrue(delegate.loadedProfiles == listOf(SCHEMA_PROFILE, CATEGORY_PROFILE))
+        assertTrue(delegate.unloaded)
 
         activationResidency.release(categoryActivation.value.activationId, categoryActivation.value.ownerId)
         runtime.close()
         modelFile.delete()
     }
 
-    private fun activationRequest(owner: String, useCaseId: UseCaseId) = UseCaseActivationRequest(
+    private fun activationRequest(
+        owner: String,
+        useCaseId: UseCaseId,
+        modelProfileId: String,
+    ) = UseCaseActivationRequest(
         ownerId = ActivationOwnerId(owner),
         applicationId = applicationId,
         useCaseId = useCaseId,
         preset = InferencePresetRef(InferencePresetId("qwen35-json"), 1),
         modelDigest = digest,
+        modelProfileId = modelProfileId,
         acquiredAtEpochMs = 1_000,
         useCaseRevision = 1,
         bindingRevision = 1,
@@ -129,6 +132,11 @@ class ActivationProfileSwitchRegressionTest {
             useCase = useCase,
             model = model,
         )
+    }
+
+    private companion object {
+        const val SCHEMA_PROFILE = "qwen35-aura-import-schema"
+        const val CATEGORY_PROFILE = "qwen35-aura-import-category"
     }
 }
 

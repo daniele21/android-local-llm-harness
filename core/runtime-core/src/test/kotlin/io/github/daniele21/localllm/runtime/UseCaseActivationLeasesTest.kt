@@ -22,6 +22,7 @@ class UseCaseActivationLeasesTest {
         assertEquals(4, lease.useCaseRevision)
         assertEquals(7, lease.bindingRevision)
         assertEquals(MODEL, lease.modelDigest)
+        assertEquals(MODEL_PROFILE, lease.modelProfileId)
     }
 
     @Test
@@ -50,13 +51,14 @@ class UseCaseActivationLeasesTest {
     }
 
     @Test
-    fun `multiple owners may hold leases for the same resolved model`() {
+    fun `multiple owners may hold leases for the same resolved model profile`() {
         val ids = ArrayDeque(listOf("activation-a", "activation-b"))
         val registry = UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId(ids.removeFirst()) })
         registry.acquire(request(ownerId = OWNER_A))
         registry.acquire(request(ownerId = OWNER_B))
 
         assertEquals(2, registry.activeForModel(MODEL).size)
+        assertEquals(2, registry.activeForModelProfile(MODEL, MODEL_PROFILE).size)
     }
 
     @Test
@@ -94,6 +96,7 @@ class UseCaseActivationLeasesTest {
         useCaseId = UseCaseId("document-pii-detection"),
         preset = PRESET,
         modelDigest = MODEL,
+        modelProfileId = MODEL_PROFILE,
         acquiredAtEpochMs = 100,
         useCaseRevision = 4,
         bindingRevision = 7,
@@ -104,5 +107,6 @@ class UseCaseActivationLeasesTest {
         val OWNER_B = ActivationOwnerId("owner-b")
         val PRESET = InferencePresetRef(InferencePresetId("quality"), 3)
         val MODEL = ModelDigest("a".repeat(64))
+        const val MODEL_PROFILE = "profile-a"
     }
 }

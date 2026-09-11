@@ -10,7 +10,9 @@ enum class ActivationResidencyFailure {
 
 data class ActivationResidencyConflict(
     val requestedModelDigest: ModelDigest,
+    val requestedModelProfileId: String,
     val protectedModelDigest: ModelDigest,
+    val protectedModelProfileId: String,
     val activeLeaseCount: Int,
 )
 
@@ -34,9 +36,10 @@ sealed interface ActivationResidencyResult<out T> {
  * Connects product-level activation ownership to the one-resident-model runtime policy.
  *
  * The lease registry remains authoritative for owner/application identity. This coordinator adds
- * residency semantics: compatible activations may share one model, a different-model activation is
- * rejected while another digest is protected, normal unload can query protection explicitly, and
- * the final release returns the resolved warm-retention duration that must start after demand ends.
+ * residency semantics: compatible activations may share one exact model profile, a different-profile
+ * activation is rejected while another profile is protected, normal unload can query protection
+ * explicitly, and the final release returns the resolved warm-retention duration that must start
+ * after demand ends.
  */
 class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseRegistry) {
     private val warmRetentionByActivation = LinkedHashMap<UseCaseActivationId, Long>()
@@ -48,7 +51,7 @@ class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseR
     /**
      * Consumer API v1.2 does not carry an activation identity into open-session calls. Keep routing
      * deterministic by allowing at most one activation for the same owner/application/use-case.
-     * Other owners may still share the same resolved model concurrently.
+     * Other owners may still share the same resolved model profile concurrently.
      */
     @Synchronized
     fun acquireExclusiveUseCase(
@@ -117,7 +120,11 @@ class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseR
 
     fun protects(modelDigest: ModelDigest): Boolean = leases.activeForModel(modelDigest).isNotEmpty()
 
-    fun canActivate(modelDigest: ModelDigest): Boolean = leases.activeLeases().all { it.modelDigest == modelDigest }
+    fun protectsModelProfile(modelDigest: ModelDigest, modelProfileId: String): Boolean =
+        leases.activeForModelProfile(modelDigest, modelProfileId).isNotEmpty()
+
+    fun canActivate(modelDigest: ModelDigest, modelProfileId: String): Boolean =
+        leases.activeLeases().all { it.modelDigest == modelDigest && it.modelProfileId == modelProfileId }
 
     fun activeLeaseCount(modelDigest: ModelDigest): Int = leases.activeForModel(modelDigest).size
 
@@ -127,13 +134,18 @@ class ActivationResidencyCoordinator(private val leases: UseCaseActivationLeaseR
     ): ActivationResidencyResult<UseCaseActivationLease> {
         require(retainModelWarmMs >= 0) { "Model warm-retention duration must not be negative" }
         val active = leases.activeLeases()
-        val protectedDigest = active.firstOrNull()?.modelDigest
-        if (protectedDigest != null && protectedDigest != request.modelDigest) {
+        val protected = active.firstOrNull()
+        if (
+            protected != null &&
+            (protected.modelDigest != request.modelDigest || protected.modelProfileId != request.modelProfileId)
+        ) {
             return ActivationResidencyResult.Failure(
                 reason = ActivationResidencyFailure.MODEL_CONFLICT,
                 conflict = ActivationResidencyConflict(
                     requestedModelDigest = request.modelDigest,
-                    protectedModelDigest = protectedDigest,
+                    requestedModelProfileId = request.modelProfileId,
+                    protectedModelDigest = protected.modelDigest,
+                    protectedModelProfileId = protected.modelProfileId,
                     activeLeaseCount = active.size,
                 ),
             )

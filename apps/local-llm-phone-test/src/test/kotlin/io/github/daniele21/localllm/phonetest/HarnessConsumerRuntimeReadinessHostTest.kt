@@ -46,6 +46,7 @@ class HarnessConsumerRuntimeReadinessHostTest {
                 useCaseId = useCaseId,
                 preset = InferencePresetRef(InferencePresetId("preset"), 1),
                 modelDigest = modelDigest,
+                modelProfileId = "profile-a",
                 acquiredAtEpochMs = 1L,
                 useCaseRevision = 1,
                 bindingRevision = 1,

@@ -26,12 +26,14 @@ data class UseCaseActivationLease(
     val useCaseId: UseCaseId,
     val preset: InferencePresetRef,
     val modelDigest: ModelDigest,
+    val modelProfileId: String,
     val acquiredAtEpochMs: Long,
     val useCaseRevision: Int,
     val presetRevision: Int,
     val bindingRevision: Int,
 ) {
     init {
+        require(modelProfileId.isNotBlank()) { "Activation model profile ID must not be blank" }
         require(acquiredAtEpochMs >= 0) { "Activation acquisition timestamp must not be negative" }
         require(useCaseRevision > 0) { "Use-case revision must be positive" }
         require(presetRevision > 0) { "Preset revision must be positive" }
@@ -48,10 +50,15 @@ data class UseCaseActivationRequest(
     val useCaseId: UseCaseId,
     val preset: InferencePresetRef,
     val modelDigest: ModelDigest,
+    val modelProfileId: String,
     val acquiredAtEpochMs: Long,
     val useCaseRevision: Int,
     val bindingRevision: Int,
-)
+) {
+    init {
+        require(modelProfileId.isNotBlank()) { "Activation model profile ID must not be blank" }
+    }
+}
 
 enum class ActivationLeaseFailure {
     CAPACITY_REACHED,
@@ -99,6 +106,7 @@ class UseCaseActivationLeaseRegistry(
             useCaseId = request.useCaseId,
             preset = request.preset,
             modelDigest = request.modelDigest,
+            modelProfileId = request.modelProfileId,
             acquiredAtEpochMs = request.acquiredAtEpochMs,
             useCaseRevision = request.useCaseRevision,
             presetRevision = request.preset.version,
@@ -141,6 +149,10 @@ class UseCaseActivationLeaseRegistry(
 
     @Synchronized
     fun activeForModel(modelDigest: ModelDigest): List<UseCaseActivationLease> = leases.values.filter { it.modelDigest == modelDigest }
+
+    @Synchronized
+    fun activeForModelProfile(modelDigest: ModelDigest, modelProfileId: String): List<UseCaseActivationLease> =
+        leases.values.filter { it.modelDigest == modelDigest && it.modelProfileId == modelProfileId }
 
     companion object {
         const val DEFAULT_MAX_ACTIVE_LEASES = 32
