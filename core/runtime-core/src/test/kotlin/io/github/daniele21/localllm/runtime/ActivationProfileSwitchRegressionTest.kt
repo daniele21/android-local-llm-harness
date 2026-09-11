@@ -76,11 +76,7 @@ class ActivationProfileSwitchRegressionTest {
         modelFile.delete()
     }
 
-    private fun activationRequest(
-        owner: String,
-        useCaseId: UseCaseId,
-        modelProfileId: String,
-    ) = UseCaseActivationRequest(
+    private fun activationRequest(owner: String, useCaseId: UseCaseId, modelProfileId: String) = UseCaseActivationRequest(
         ownerId = ActivationOwnerId(owner),
         applicationId = applicationId,
         useCaseId = useCaseId,
