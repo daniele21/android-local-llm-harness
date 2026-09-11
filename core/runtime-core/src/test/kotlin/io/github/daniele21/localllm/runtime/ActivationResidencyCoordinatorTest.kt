@@ -133,21 +133,18 @@ class ActivationResidencyCoordinatorTest {
         )
     }
 
-    private fun request(
-        ownerId: String,
-        digest: ModelDigest,
-        modelProfileId: String = PROFILE_A,
-    ): UseCaseActivationRequest = UseCaseActivationRequest(
-        ownerId = ActivationOwnerId(ownerId),
-        applicationId = ApplicationId("application-$ownerId"),
-        useCaseId = UseCaseId("document-analysis"),
-        preset = InferencePresetRef(InferencePresetId("balanced"), 3),
-        modelDigest = digest,
-        modelProfileId = modelProfileId,
-        acquiredAtEpochMs = 1_000,
-        useCaseRevision = 2,
-        bindingRevision = 7,
-    )
+    private fun request(ownerId: String, digest: ModelDigest, modelProfileId: String = PROFILE_A): UseCaseActivationRequest =
+        UseCaseActivationRequest(
+            ownerId = ActivationOwnerId(ownerId),
+            applicationId = ApplicationId("application-$ownerId"),
+            useCaseId = UseCaseId("document-analysis"),
+            preset = InferencePresetRef(InferencePresetId("balanced"), 3),
+            modelDigest = digest,
+            modelProfileId = modelProfileId,
+            acquiredAtEpochMs = 1_000,
+            useCaseRevision = 2,
+            bindingRevision = 7,
+        )
 
     private companion object {
         const val PROFILE_A = "profile-a"
