@@ -1426,11 +1426,9 @@ private class RequestLifecycle(val requestId: RequestId, private val listener: G
         if (!generationLifecycle.tryFinish()) {
             return
         }
-        try {
-            runCatching { listener.onEvent(event) }
-        } finally {
-            onTerminal()
-        }
+        val release = runCatching { onTerminal() }
+        runCatching { listener.onEvent(event) }
+        release.getOrThrow()
     }
 }
 
