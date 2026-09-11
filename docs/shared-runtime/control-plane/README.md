@@ -5,7 +5,7 @@ Document type: feature-index
 Owner: shared-runtime-control-plane
 Canonical scope: shared-runtime.control-plane.routing
 Read when: designing or implementing dynamic application/use-case bindings, presets, residency ownership, Harness decisions/notifications, or unified cross-app inference observability
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-11
 
 Harness is the owner of local-AI execution policy for both its own UI and authorized consumer applications. Consumers declare intent through host-advertised use cases and presets; they never own exact GGUF/artifact selection, residency, backend tuning or host diagnostics.
 
@@ -30,7 +30,7 @@ Harness control plane
   -> allow user-created presets and per-application exposure
   -> resolve preset revision to exact model + execution profile
   -> project consumer-safe effective setup without acquiring residency
-  -> acquire/release model residency leases only at explicit activation
+  -> acquire/release model-profile residency leases only at explicit activation
   -> surface decisions through an in-app decision center and Android notifications
 
 Harness runtime + observability
@@ -47,7 +47,7 @@ Harness runtime + observability
 - Setup resolution is observational. Opening or refreshing a consumer setup surface must not activate, prepare, verify/hash or load a model, open a session, start inference or acquire a residency lease.
 - Setup resolution revalidates the exact use-case, binding and preset revisions supplied by the consumer and fails closed when the observed configuration became stale.
 - A published configuration change creates a new revision. Existing activations/sessions retain the revision they started with.
-- Model residency is protected by explicit activation leases. Normal warm-idle unload cannot evict a model with an active lease.
+- Exact model-profile residency is protected by explicit activation leases. Normal warm-idle unload cannot evict the `(modelDigest, modelProfileId)` resident targeted by an active lease; a lease for another profile on the same artifact does not protect that stale profile.
 - Every inference executed by the Harness runtime is observable through the same host-owned telemetry path, regardless of whether it originated in Harness, device validation or an external Binder consumer.
 - Production Harness telemetry is persistent and bounded; prompt text, generated output, document content and private paths stay out of normal telemetry.
 - Actionable operational states are represented once as structured decision events. The in-app decision center is the source of truth; Android notifications are a delivery surface for selected actionable events, not a parallel state store.
