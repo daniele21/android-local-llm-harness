@@ -5,7 +5,7 @@ Document type: target-specification
 Owner: runtime-memory
 Canonical scope: memory-management.bounded-multi-model-residency
 Read when: changing resident-model capacity, cross-model activation, model eviction, aggregate model admission or multi-resident lifecycle semantics
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-11
 
 ## Goal
 
@@ -19,8 +19,8 @@ The current runtime already has the required ownership boundaries:
 
 - `ModelResidencyLifecycle` owns in-memory model-handle identity and load/unload transitions, today for one model;
 - `RuntimeOrchestrator` serializes resource mutation, creates sessions, performs model switching and owns terminal cleanup;
-- `ActivationResidencyCoordinator` connects activation leases to residency protection, today by rejecting a different digest while another digest is protected;
-- `UseCaseActivationLeaseRegistry` owns activation/application/use-case identity and can query leases by model digest;
+- `ActivationResidencyCoordinator` connects activation leases to residency protection, today by comparing exact model-profile identity `(modelDigest, modelProfileId)` and rejecting an incompatible profile while another exact profile is protected;
+- `UseCaseActivationLeaseRegistry` owns activation/application/use-case identity and can query leases by exact model-profile identity as well as by artifact digest where aggregate artifact-level accounting is needed;
 - `MemoryAdmissionController` owns headroom and projected-allocation admission;
 - `SingleDecodeScheduler` globally serializes production decode and remains the decode-concurrency owner;
 - `WarmIdleResidencyController` and memory-pressure handling decide when idle resources should be released without taking ownership of native handles;
@@ -86,16 +86,16 @@ Increasing capacity is not an instruction to fill every slot eagerly. Models rem
 
 ## Pinning and eviction eligibility
 
-A resident model is not evictable while any owner still requires its physical handle. At minimum this includes:
+A resident model profile is not evictable while any owner still requires its physical handle. At minimum this includes:
 
-- a live session bound to the model;
-- a materialized context or request that still references the model;
-- an activation lease whose `modelDigest` matches the resident model;
+- a live session bound to the model profile;
+- a materialized context or request that still references the model profile;
+- an activation lease whose `(modelDigest, modelProfileId)` matches the resident `ModelResidencyKey`;
 - a lifecycle transition already in progress.
 
-Activation leases remain digest-based and may protect different model digests simultaneously once multi-residency is enabled. Lease identity, ownership and release rules stay in `UseCaseActivationLeaseRegistry`.
+Activation leases are exact-profile keyed for residency protection. Artifact-digest queries may still exist for aggregate accounting or warm-retention bookkeeping, but an activation for profile B must not protect a stale resident profile A merely because both profiles reference the same GGUF digest. Lease identity, ownership and release rules stay in `UseCaseActivationLeaseRegistry`.
 
-`ActivationResidencyCoordinator` must therefore stop treating “another protected digest exists” as an unconditional global conflict. A different-model activation may proceed only when the residency/admission policy can satisfy it without evicting protected state. Capacity `1` preserves the current conflict outcome.
+`ActivationResidencyCoordinator` must therefore stop treating “another protected exact profile exists” as an unconditional global conflict once multi-residency can admit another slot. A different-profile activation may proceed only when the residency/admission policy can satisfy it without evicting protected state. Capacity `1` preserves the current conflict outcome while an incompatible exact profile remains actively leased. If the prior profile's final lease has released, a later activation for another profile on the same digest may replace that idle resident normally.
 
 ## Deterministic victim selection
 
@@ -144,7 +144,7 @@ A prepared/resident model does not imply a context remains allocated. Context li
 
 Warm-idle policy becomes per resident key while timer infrastructure stays process-bounded.
 
-- releasing the final demand/lease for a model may make that model warm-idle;
+- releasing the final demand/lease for a model profile may make that exact resident key warm-idle;
 - reconnect/re-demand for the same key cancels or supersedes its pending expiry;
 - expiry makes only that eligible key a release candidate;
 - critical memory pressure may release multiple eligible residents immediately;
@@ -183,7 +183,7 @@ Expected internal changes include:
 - singular lifecycle queries become keyed/set queries while capacity-1 convenience behavior may remain where it is unambiguous;
 - residency snapshots expose bounded multi-entry state instead of one `residentModel`;
 - `RuntimeOrchestrator.ensureModelLoaded` resolves exact-key reuse, free-slot admission or deterministic eviction;
-- activation residency asks the lifecycle/admission owner whether a different digest can coexist instead of enforcing a global digest conflict itself;
+- activation residency asks the lifecycle/admission owner whether a different exact model-profile key can coexist instead of enforcing a global exact-profile conflict itself;
 - memory snapshots replace the single `modelLoaded` assumption with model-count/aggregate state needed by admission;
 - telemetry reports counts/decisions/identities already allowed by privacy policy, never prompt content.
 
@@ -206,7 +206,8 @@ Expected validation depth is **STRONG** because shared lifecycle, resource admis
 Required deterministic cases include:
 
 - capacity `1` current load/reuse/switch behavior;
-- capacity `1` protected model blocks different-model replacement;
+- capacity `1` protected exact model profile blocks incompatible replacement;
+- capacity `1` same-digest/different-profile switch succeeds after the prior profile's final activation releases;
 - explicit test capacity `2` keeps A+B resident;
 - same exact key reuses one handle rather than consuming another slot;
 - live A lease/session prevents A eviction while B is admitted elsewhere;
